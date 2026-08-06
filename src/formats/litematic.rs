@@ -433,8 +433,7 @@ fn parse_metadata(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Res
     // anyway: the descriptor is JSON and the runner reports what it cannot
     // parse, which beats a file that silently claims to have no test.
     if let Ok(test) = root.get::<_, &NbtCompound>("NucleationTest") {
-        schematic.metadata.embedded_test =
-            test.get::<_, &str>("Spec").ok().map(String::from);
+        schematic.metadata.embedded_test = test.get::<_, &str>("Spec").ok().map(String::from);
     }
 
     let metadata = root.get::<_, &NbtCompound>("Metadata")?;
@@ -647,7 +646,8 @@ mod tests {
     /// `crates/mc-tick/docs/history/entity-abuse-in-record-doors.md`.
     #[test]
     fn litematic_round_trips_nan_velocities_and_passengers() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/samples/55_3x3.zip");
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/samples/55_3x3.zip");
         let bytes = std::fs::read(&path).expect("the record-door sample must be present");
         let source = crate::formats::world::from_world_zip(&bytes).expect("the sample loads");
 
@@ -679,8 +679,14 @@ mod tests {
         let entities_before = source.get_entities_as_list().len();
         let nan_before = count_nan(&source);
         let riders_before = count_riders(&source);
-        assert!(nan_before > 0, "the sample must contain nan carts to be worth testing");
-        assert!(riders_before > 0, "the sample must contain passengers to be worth testing");
+        assert!(
+            nan_before > 0,
+            "the sample must contain nan carts to be worth testing"
+        );
+        assert!(
+            riders_before > 0,
+            "the sample must contain passengers to be worth testing"
+        );
 
         let lit = to_litematic(&source).expect("the door writes as a litematic");
         let back = from_litematic(&lit).expect("and reads back");
@@ -742,7 +748,10 @@ mod tests {
         let test = root
             .get::<_, &NbtCompound>("NucleationTest")
             .expect("NucleationTest sits at the root, beside Metadata");
-        assert_eq!(test.get::<_, i32>("Format").unwrap(), NUCLEATION_TEST_FORMAT);
+        assert_eq!(
+            test.get::<_, i32>("Format").unwrap(),
+            NUCLEATION_TEST_FORMAT
+        );
         assert!(
             root.get::<_, &NbtCompound>("Metadata")
                 .unwrap()
@@ -754,7 +763,9 @@ mod tests {
         // A build with no test writes no tag at all, rather than an empty one.
         let plain = to_litematic(&UniversalSchematic::new("plain".into())).expect("writes");
         assert!(
-            read_root(&plain).get::<_, &NbtCompound>("NucleationTest").is_err(),
+            read_root(&plain)
+                .get::<_, &NbtCompound>("NucleationTest")
+                .is_err(),
             "a build with no test must not grow an empty NucleationTest"
         );
     }
@@ -769,7 +780,8 @@ mod tests {
     /// error anywhere.
     #[test]
     fn litematic_round_trips_the_record_doors_data_version() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/samples/55_3x3.zip");
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/samples/55_3x3.zip");
         let bytes = std::fs::read(&path).expect("the record-door sample must be present");
         let source = crate::formats::world::from_world_zip(&bytes).expect("the sample loads");
         assert_eq!(
@@ -780,7 +792,9 @@ mod tests {
 
         let lit = to_litematic(&source).expect("writes");
         assert_eq!(
-            read_root(&lit).get::<_, i32>("MinecraftDataVersion").unwrap(),
+            read_root(&lit)
+                .get::<_, i32>("MinecraftDataVersion")
+                .unwrap(),
             4082,
             "the file must state the version it was captured at"
         );

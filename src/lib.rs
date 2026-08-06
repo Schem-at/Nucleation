@@ -86,9 +86,9 @@ getrandom::register_custom_getrandom!(wasm_entropy::getrandom_fallback);
 pub use block_state::BlockState;
 pub use bounding_box::BoundingBox;
 pub use entity::{ArmorStandEquipment, Entity, NbtValue};
-pub use formats::{litematic, schematic, world_stream};
 #[cfg(not(target_arch = "wasm32"))]
 pub use formats::world_pack;
+pub use formats::{litematic, schematic, world_stream};
 pub use print_utils::{format_json_schematic, format_schematic};
 pub use region::Region;
 pub use schematic_builder::{

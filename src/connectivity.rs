@@ -28,10 +28,10 @@
 //! This module is generic geometry over "non-air blocks" and carries no
 //! knowledge of any particular extraction or tagging scheme.
 
+use crate::block_position::BlockPosition;
 use crate::selection::{
     connected_components_collect, flood, iter_bounds, Component, Connectivity, Limits, NotAirMask,
 };
-use crate::block_position::BlockPosition;
 use crate::universal_schematic::UniversalSchematic;
 
 impl UniversalSchematic {
@@ -232,10 +232,8 @@ impl UniversalSchematic {
         let core_centroids: Vec<(f64, f64, f64)> =
             core_idx.iter().map(|&i| centroid(&comps[i])).collect();
 
-        let mut buckets: Vec<Vec<BlockPosition>> = core_idx
-            .iter()
-            .map(|&i| comps[i].blocks.clone())
-            .collect();
+        let mut buckets: Vec<Vec<BlockPosition>> =
+            core_idx.iter().map(|&i| comps[i].blocks.clone()).collect();
 
         for &fi in &frag_idx {
             let fc = centroid(&comps[fi]);
@@ -355,7 +353,9 @@ mod tests {
         assert_eq!(comp.blocks.len(), 2);
         // Air seed -> empty component.
         assert_eq!(
-            s.select_connected((0, 3, 0), Connectivity::Corner).blocks.len(),
+            s.select_connected((0, 3, 0), Connectivity::Corner)
+                .blocks
+                .len(),
             0
         );
     }
@@ -386,7 +386,8 @@ mod tests {
         // Blob B: a chest (with NBT) plus a neighbouring stone block.
         let mut nbt = HashMap::new();
         nbt.insert("CustomName".to_string(), "\"Loot\"".to_string());
-        s.set_block_with_nbt(50, 0, 0, "minecraft:chest", nbt).unwrap();
+        s.set_block_with_nbt(50, 0, 0, "minecraft:chest", nbt)
+            .unwrap();
         place(&mut s, 51, 0, 0);
 
         let pieces = s.split_connected(Connectivity::Face);
@@ -487,7 +488,10 @@ mod tests {
         }
         recombined.sort();
 
-        assert_eq!(original, recombined, "no block lost, duplicated, or mutated");
+        assert_eq!(
+            original, recombined,
+            "no block lost, duplicated, or mutated"
+        );
     }
 
     #[test]

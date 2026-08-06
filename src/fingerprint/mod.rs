@@ -942,7 +942,10 @@ mod exact_memory_goldens {
     fn fixtures() -> Vec<(&'static str, UniversalSchematic)> {
         let mut v: Vec<(&'static str, UniversalSchematic)> = Vec::new();
 
-        v.push(("small_stone", filled_box((0, 0, 0), (2, 2, 2), "minecraft:stone")));
+        v.push((
+            "small_stone",
+            filled_box((0, 0, 0), (2, 2, 2), "minecraft:stone"),
+        ));
 
         {
             let mut s = UniversalSchematic::new("g".into());
@@ -999,10 +1002,8 @@ mod exact_memory_goldens {
             for x in 0..=4 {
                 s.set_block_entity(
                     BlockPosition { x, y: 0, z: 0 },
-                    BlockEntity::new("minecraft:chest".to_string(), (x, 0, 0)).with_nbt_data(
-                        "Lock".to_string(),
-                        NbtValue::String(format!("key{x}")),
-                    ),
+                    BlockEntity::new("minecraft:chest".to_string(), (x, 0, 0))
+                        .with_nbt_data("Lock".to_string(), NbtValue::String(format!("key{x}"))),
                 );
             }
             v.push(("multi_be", s));
@@ -1064,7 +1065,10 @@ mod exact_memory_goldens {
                 }
             }
         }
-        assert!(!missing, "fill in PLACEHOLDER goldens from the printed lines");
+        assert!(
+            !missing,
+            "fill in PLACEHOLDER goldens from the printed lines"
+        );
     }
 
     /// The refactor must not disturb translation invariance of the exact preset.

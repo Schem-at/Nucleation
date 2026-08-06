@@ -146,9 +146,7 @@ where
     order.sort_by(|&a, &b| {
         let pa = &placements[a];
         let pb = &placements[b];
-        pa.key
-            .cmp(&pb.key)
-            .then_with(|| pa.offset.cmp(&pb.offset))
+        pa.key.cmp(&pb.key).then_with(|| pa.offset.cmp(&pb.offset))
     });
 
     // Plan: for each chunk column, the *last* processing position that touches
@@ -324,12 +322,12 @@ mod tests {
 
     #[test]
     fn packs_blocks_at_placement_plus_local() {
-        let a = schem("a", &[(0, 0, 0, "minecraft:stone"), (1, 0, 0, "minecraft:dirt")]);
+        let a = schem(
+            "a",
+            &[(0, 0, 0, "minecraft:stone"), (1, 0, 0, "minecraft:dirt")],
+        );
         let b = schem("b", &[(0, 0, 0, "minecraft:gold_block")]);
-        let placements = vec![
-            place("a", (0, 70, 0), &a),
-            place("b", (40, 70, 40), &b),
-        ];
+        let placements = vec![place("a", (0, 70, 0), &a), place("b", (40, 70, 40), &b)];
 
         let dir = tempdir();
         let mut sink = WorldSink::create(&dir, None).unwrap();
@@ -347,16 +345,28 @@ mod tests {
 
         assert_eq!(stats.blocks_written, 3);
         let world = read_world(&dir);
-        assert_eq!(world.get(&(0, 70, 0)).map(String::as_str), Some("minecraft:stone"));
-        assert_eq!(world.get(&(1, 70, 0)).map(String::as_str), Some("minecraft:dirt"));
-        assert_eq!(world.get(&(40, 70, 40)).map(String::as_str), Some("minecraft:gold_block"));
+        assert_eq!(
+            world.get(&(0, 70, 0)).map(String::as_str),
+            Some("minecraft:stone")
+        );
+        assert_eq!(
+            world.get(&(1, 70, 0)).map(String::as_str),
+            Some("minecraft:dirt")
+        );
+        assert_eq!(
+            world.get(&(40, 70, 40)).map(String::as_str),
+            Some("minecraft:gold_block")
+        );
         cleanup(&dir);
     }
 
     #[test]
     fn air_cells_are_not_written() {
         // A schematic where set_block leaves gaps (unset = air) and an explicit air block.
-        let mut a = schem("a", &[(0, 0, 0, "minecraft:stone"), (2, 0, 0, "minecraft:stone")]);
+        let mut a = schem(
+            "a",
+            &[(0, 0, 0, "minecraft:stone"), (2, 0, 0, "minecraft:stone")],
+        );
         a.set_block_str(1, 0, 0, "minecraft:air");
         let placements = vec![place("a", (0, 64, 0), &a)];
 
@@ -366,8 +376,14 @@ mod tests {
         sink.finish().unwrap();
 
         let world = read_world(&dir);
-        assert_eq!(world.get(&(0, 64, 0)).map(String::as_str), Some("minecraft:stone"));
-        assert_eq!(world.get(&(2, 64, 0)).map(String::as_str), Some("minecraft:stone"));
+        assert_eq!(
+            world.get(&(0, 64, 0)).map(String::as_str),
+            Some("minecraft:stone")
+        );
+        assert_eq!(
+            world.get(&(2, 64, 0)).map(String::as_str),
+            Some("minecraft:stone")
+        );
         assert!(world.get(&(1, 64, 0)).is_none(), "air must not be written");
         cleanup(&dir);
     }
@@ -448,7 +464,12 @@ mod tests {
         let placements = grid_layout(&items, 1, 64);
         let dir = tempdir();
         let mut sink = WorldSink::create(&dir, None).unwrap();
-        let stats = pack(&placements, |p| Ok(map.get(&p.key).unwrap().clone()), &mut sink).unwrap();
+        let stats = pack(
+            &placements,
+            |p| Ok(map.get(&p.key).unwrap().clone()),
+            &mut sink,
+        )
+        .unwrap();
         sink.finish().unwrap();
 
         assert_eq!(stats.schematics, 9);

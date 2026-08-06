@@ -2113,14 +2113,8 @@ impl UniversalSchematic {
         if let Some(descriptor) = Self::strip_simulate_tag(block_string)? {
             #[cfg(all(feature = "bridge", feature = "mc-tick"))]
             {
-                return crate::bridge::mc_tick::simulate_placement_into(
-                    self,
-                    x,
-                    y,
-                    z,
-                    &descriptor,
-                )
-                .map(|written| written > 0);
+                return crate::bridge::mc_tick::simulate_placement_into(self, x, y, z, &descriptor)
+                    .map(|written| written > 0);
             }
             #[cfg(not(all(feature = "bridge", feature = "mc-tick")))]
             {

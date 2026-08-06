@@ -923,9 +923,8 @@ mod tests {
             );
 
             // A build with no test writes no tag at all, rather than an empty one.
-            let plain =
-                to_schematic_version(&UniversalSchematic::new("plain".into()), version)
-                    .expect("writes");
+            let plain = to_schematic_version(&UniversalSchematic::new("plain".into()), version)
+                .expect("writes");
             let back = from_schematic(&plain).expect("reads");
             assert_eq!(back.metadata.embedded_test, None, "{version:?}");
         }

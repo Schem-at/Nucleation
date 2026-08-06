@@ -133,6 +133,61 @@ fn value_snbt(value: &crate::nbt::NbtValue) -> String {
     }
 }
 
+/// Entity NBT has a legacy public value type distinct from block-entity NBT.
+/// Keep one faithful SNBT writer for fields that must cross into mc-tick.
+fn entity_value_snbt(value: &crate::entity::NbtValue) -> String {
+    use crate::entity::NbtValue as V;
+    use std::fmt::Write as _;
+    match value {
+        V::Byte(v) => format!("{v}b"),
+        V::Short(v) => format!("{v}s"),
+        V::Int(v) => v.to_string(),
+        V::Long(v) => format!("{v}L"),
+        V::Float(v) => format!("{v}f"),
+        V::Double(v) => snbt_double(*v),
+        V::String(v) => quoted_snbt(v),
+        V::Boolean(v) => format!("{}b", if *v { 1 } else { 0 }),
+        V::ByteArray(values) => {
+            let body: Vec<String> = values.iter().map(|v| format!("{v}b")).collect();
+            format!("[B; {}]", body.join(", "))
+        }
+        V::IntArray(values) => {
+            let body: Vec<String> = values.iter().map(i32::to_string).collect();
+            format!("[I; {}]", body.join(", "))
+        }
+        V::LongArray(values) => {
+            let body: Vec<String> = values.iter().map(|v| format!("{v}L")).collect();
+            format!("[L; {}]", body.join(", "))
+        }
+        V::List(values) => {
+            let body: Vec<String> = values.iter().map(entity_value_snbt).collect();
+            format!("[{}]", body.join(", "))
+        }
+        V::Compound(map) => {
+            let mut entries: Vec<_> = map.iter().collect();
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            let mut out = String::from("{");
+            for (index, (key, value)) in entries.into_iter().enumerate() {
+                if index > 0 {
+                    out.push_str(", ");
+                }
+                let bare = !key.is_empty()
+                    && key
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || "_-.+".contains(c));
+                if bare {
+                    out.push_str(key);
+                } else {
+                    let _ = write!(out, "{}", quoted_snbt(key));
+                }
+                let _ = write!(out, ": {}", entity_value_snbt(value));
+            }
+            out.push('}');
+            out
+        }
+    }
+}
+
 /// Always-quoted SNBT string: double quotes unless the content prefers single.
 fn quoted_snbt(text: &str) -> String {
     if text.contains('"') && !text.contains('\'') {
@@ -279,6 +334,24 @@ fn entities_snbt(schematic: &crate::UniversalSchematic, min: (i32, i32, i32)) ->
                 let _ = write!(out, ", Rotation: [{text}f, 0.0f]");
             }
         }
+        // A leash is mechanism for the one nonzero-motion body pose the tick
+        // engine can currently identify: `boat_fence.litematic`'s oak boat at
+        // tether rest. Dropping the tag here made that boat indistinguishable
+        // from a free-moving one, so the engine correctly refused it even
+        // though the litematic importer had preserved the attachment.
+        //
+        // Keep both spellings. 26.2 writes lowercase `leash`; older saves use
+        // the `Leash` compound. The tick reader only needs presence today, but
+        // carrying the payload keeps this a real structure file and leaves the
+        // anchor available when full tether physics lands.
+        if let Some(value) = entity.nbt.get("UUID") {
+            let _ = write!(out, ", UUID: {}", entity_value_snbt(value));
+        }
+        for key in ["leash", "Leash"] {
+            if let Some(value) = entity.nbt.get(key) {
+                let _ = write!(out, ", {key}: {}", entity_value_snbt(value));
+            }
+        }
         // A furnace cart's self-drive. Every one in that door reads zero, but
         // the engine *refuses* a fuelled cart rather than running it as an
         // unfuelled one, and a writer that never emits `Fuel` makes that
@@ -364,6 +437,9 @@ fn entities_snbt(schematic: &crate::UniversalSchematic, min: (i32, i32, i32)) ->
                         snbt_double(seat[1] - f64::from(my)),
                         snbt_double(seat[2] - f64::from(mz)),
                     );
+                }
+                if let Some(value) = fields.get("UUID") {
+                    let _ = write!(riders, ", UUID: {}", entity_value_snbt(value));
                 }
                 let _ = write!(
                     riders,
@@ -487,4 +563,108 @@ fn render(schematic: &crate::UniversalSchematic, data_version: i32) -> String {
         blocks,
         entities_snbt(schematic, (mx, my, mz))
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gametest_snbt_preserves_the_boat_fence_leash() {
+        let mut schematic = crate::UniversalSchematic::new("boat fence".to_string());
+        schematic.set_block(
+            1,
+            6,
+            3,
+            &crate::BlockState::new("minecraft:oak_fence".to_string()),
+        );
+        let mut boat = crate::Entity::new(
+            "minecraft:oak_boat".to_string(),
+            (1.488_202_109_234_411, 0.045_043_285_781_332_54, 2.812_601_257_115_602_5),
+        );
+        boat.nbt.insert(
+            "Motion".to_string(),
+            crate::NbtValue::List(vec![
+                crate::NbtValue::Double(-4.323_888_315_084_626_6e-16),
+                crate::NbtValue::Double(0.011_681_267_954_871_115),
+                crate::NbtValue::Double(-3.611_030_807_389_778_4e-85),
+            ]),
+        );
+        boat.nbt.insert(
+            "leash".to_string(),
+            crate::NbtValue::IntArray(vec![-23, -52, -46]),
+        );
+        schematic.add_entity(boat);
+
+        let snbt = to_gametest_snbt(&schematic);
+        assert!(snbt.contains("leash: [I; -23, -52, -46]"), "{snbt}");
+    }
+
+    #[test]
+    fn gametest_snbt_preserves_elevator_vehicle_and_rider_identity() {
+        use std::collections::HashMap;
+
+        let mut schematic = crate::UniversalSchematic::new("elevator boat".to_string());
+        schematic.set_block(
+            0,
+            0,
+            0,
+            &crate::BlockState::new("minecraft:stone".to_string()),
+        );
+        let mut boat =
+            crate::Entity::new("minecraft:pale_oak_boat".to_string(), (0.5, 1.0, 0.5));
+        boat.nbt.insert(
+            "Motion".to_string(),
+            crate::NbtValue::List(vec![
+                crate::NbtValue::Double(0.0),
+                crate::NbtValue::Double(0.0),
+                crate::NbtValue::Double(-5.0e-6),
+            ]),
+        );
+        boat.nbt.insert(
+            "UUID".to_string(),
+            crate::NbtValue::IntArray(vec![1, 2, 3, 4]),
+        );
+        let mut leash = HashMap::new();
+        leash.insert(
+            "UUID".to_string(),
+            crate::NbtValue::IntArray(vec![5, 6, 7, 8]),
+        );
+        boat.nbt
+            .insert("leash".to_string(), crate::NbtValue::Compound(leash));
+        let mut rider = HashMap::new();
+        rider.insert(
+            "id".to_string(),
+            crate::NbtValue::String("minecraft:silverfish".to_string()),
+        );
+        rider.insert(
+            "UUID".to_string(),
+            crate::NbtValue::IntArray(vec![9, 10, 11, 12]),
+        );
+        rider.insert(
+            "Pos".to_string(),
+            crate::NbtValue::List(vec![
+                crate::NbtValue::Double(0.5),
+                crate::NbtValue::Double(1.1875),
+                crate::NbtValue::Double(0.5),
+            ]),
+        );
+        boat.nbt.insert(
+            "Passengers".to_string(),
+            crate::NbtValue::List(vec![crate::NbtValue::Compound(rider)]),
+        );
+        schematic.add_entity(boat);
+
+        let snbt = to_gametest_snbt(&schematic);
+        assert!(snbt.contains("UUID: [I; 1, 2, 3, 4]"), "{snbt}");
+        assert!(snbt.contains("leash: {UUID: [I; 5, 6, 7, 8]}"), "{snbt}");
+        assert!(snbt.contains("UUID: [I; 9, 10, 11, 12]"), "{snbt}");
+        let structure = mc_tick::Structure::parse(&snbt).expect("rendered structure parses");
+        let mc_tick::structure::SpawnedEntity::Body(boat) = &structure.entities[0] else {
+            panic!("expected pale-oak boat body");
+        };
+        assert!(boat.leashed);
+        assert_eq!(boat.passengers.len(), 1);
+        assert_eq!(boat.passengers[0].kind(), "minecraft:silverfish");
+    }
 }
