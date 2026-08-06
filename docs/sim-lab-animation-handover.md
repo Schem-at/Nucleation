@@ -1,7 +1,8 @@
 # Sim Lab — animation correctness and renderer performance
 
-Handover for a fresh context. Everything described here is committed and green;
-the animation work in §3 is diagnosed but **not started**.
+Handover for a fresh context. §3 (animation correctness) is **done** — see the
+"What was done" subsection there for what landed and what deliberately did not.
+§4's remaining work (a pack-wide atlas) is still open.
 
 ---
 
@@ -116,6 +117,7 @@ Run them from that directory — `node` resolves playwright out of its
 | `verify-entities.mjs <build>` | are entities drawn, sized right, in the right place |
 | `verify-tps.mjs <build> [--break x,y,z]` | target vs achieved tps across the slider; where it throttles |
 | `profile-remesh.mjs <build>` | ms/tick split across step / applyChanges / flush |
+| `verify-handover.mjs <build>` | **is every cell drawn by something** — flight→chunk hand-off, and flights with no mesh |
 | `atlascheck.mjs <build>` | **are chunk atlases identical** — the guard on §4's cache |
 | `chunkcmp.mjs <build>` | meshing cost at 16³ / 32³ / whole-build |
 | `strokedump.mjs <build>` | per-tick changes vs flights created — the §3 evidence |
@@ -126,9 +128,11 @@ so the last row would measure a world the earlier rows built.
 
 ---
 
-## 3. THE TASK — animation correctness
+## 3. Animation correctness — DONE
 
-Three reported symptoms, one root cause plus one contributing bug.
+Three reported symptoms, one root cause plus one contributing bug. The
+diagnosis below is kept because it is the evidence; what was actually built is
+at the end of the section.
 
 ### Symptoms
 
@@ -209,39 +213,175 @@ sees N independent block changes where the engine dispatched one stroke. The
 teleport at speed exists because a batch of changes carries no stroke structure
 at all.
 
-### Fix plan
+### What was done
 
-**Library first:**
+The plan said "expose the timeline's `PistonEvent`s". What landed instead is
+**`Simulation::moving_blocks()`** — the engine's list of blocks it currently
+has in flight. It is the same principle applied one step closer to the
+question: a stroke still leaves the consumer to work out *which cells* it
+carries, and `PendingMove` — the engine's own in-flight record — already knows
+each cell, the state that will land there, its sweep direction and the tick it
+resolves on. Nothing is re-derived, and there is no stroke-reassembly step in
+between.
 
-1. **Expose the timeline's piston events through `src/bridge/mc_tick.rs`** —
-   per stroke: dispatch tick, landing tick, direction, and the cells moved.
-   With a Rust test that fails without it. This is the fix; the rest is
-   rendering.
-2. **Regenerate bindings** so Python and the CLI get it too — an animated GLB
-   exported from the CLI has exactly the same need, and `to_animated_glb`
-   already consumes a piston-event timeline. Today the CLI and the browser
-   derive strokes by different routes, which is precisely how they drift.
+**A retracting piston does not move** — its arm comes home and its body stays
+put. This was got wrong first, so the sources are recorded here.
 
-**Then the app, which becomes small:**
+- The **server** jar (`deof-mc`, `PistonMovingBlockEntity`) only has the offset
+  math: `getExtendedProgress = extending ? f - 1 : 1 - f`, applied along the
+  BE's `direction`, which `PistonBaseBlock.triggerEvent` sets to the piston's
+  **facing** for both extension and retraction. Read alone, that says the
+  `movedState` — the retracted base — slides from the head slot into the base
+  cell. It is not enough to answer the question.
+- The **client** jar (26.2, `net.minecraft.client.renderer.blockentity`
+  `.PistonHeadRenderer`) settles it. `extractRenderState` has a branch for
+  `isSourcePiston() && !isExtending()`: it puts a **`piston_head`** (TYPE from
+  the base, FACING from the base, SHORT from `progress >= 0.5`) in the moving
+  slot, and the base with **`EXTENDED=true`** in a separate `base` slot. Then
+  `submit` does `pushPose → translate(offset) → submit(block) → popPose` and
+  submits `base` **outside** that translate. Only the arm is interpolated.
+- G4mespeed's `GSPistonHeadRendererMixin` corroborates the shape of that method
+  (it `@ModifyConstant`s the `4.0f` short-arm cutoff to `0.5f`); its real
+  contribution is elsewhere — sub-tick interpolation and
+  `cPistonRenderDistance` for block entities beyond normal BE render range,
+  which is a problem the lab does not have.
 
-3. Consume strokes instead of reconstructing them. Delete the `moving_piston`
-   regex, the `FACING` table and the schematic-mirror source lookup from
-   `world.ts` — all of it is engine knowledge the app should not hold.
-4. Interpolate on **tick progress between dispatch and landing**, not
-   milliseconds, so frame jitter and throttling cannot desync it, and a stroke
-   animates correctly whether one tick or fifty are stepped in a frame.
-5. Retire a flight on its landing tick; keep the destination cell empty until
-   then.
+So the engine has to report what *travels* separately from what *lands*, or
+every consumer slides the whole piston body a block backwards.
 
-If (1) proves too large to land first, (5) alone removes the double-draw and
-the gap and is a legitimate stopgap — but write it as a stopgap, not a design,
-and leave the pointer to (1).
+**Library** (`crates/mc-tick/`):
 
-Verify with `strokedump.mjs`: flights must retire on the same tick their
-landing change arrives, and concurrent flights of one stroke must report
-`distinct starts=1`. Then `verify-anim.mjs` for the slide itself. The Rust test
-from (1) is the one that actually guards it — the probes need a browser and a
-human to run.
+- `PendingMove` gained `started_on`, so a move carries its whole window and not
+  just its end. Nothing in the engine reads it; a consumer interpolating one
+  cannot do without it.
+- `Simulation::moving_blocks() -> Vec<MovingBlock>`: `to`, `from`, `state`,
+  `carried`, `remains`, `travel`, `extending`, `started_on`, `lands_on`,
+  `source_piston`. Deferred writes with no `Sweep` are excluded — those are
+  delayed writes, not motion.
+- `carried` is what to **draw travelling** and `remains` what to **park at
+  `to`** for the whole move. They equal `state` / `None` for everything except
+  a retracting source piston, where they are the `piston_head` and the
+  `EXTENDED=true` body — vanilla's two render slots. `PendingMove` carries
+  them from `defer_source_retracting`, so the piston states the answer rather
+  than a consumer reassembling a head state out of a base's.
+- `carried_short` is the arm with `short=true`. The game draws a moving head
+  **shortened while it is within half a block of its body** and full length
+  beyond that; without it the shaft is visibly drawn through the back of the
+  piston as the arm comes home. `PistonHeadRenderer` writes that as two
+  *opposite* comparisons — `SHORT` at `progress <= 0.5` on the extension branch
+  (`fcmpg; ifgt`) and at `progress >= 0.5` on the retraction branch
+  (`fcmpl; iflt`) — which is one rule read from each end, since an extension
+  travels away from the base and a retraction back to it. Choosing between the
+  two forms is the mover's job (it holds the sub-tick progress); naming the
+  states is the engine's. `piston_head[…,short=true,…]` is interned as a
+  companion purely so it can be handed over — the simulation never places it.
+- `Dir::name()`, because the CLI already had a private copy of it.
+- `crates/mc-tick/tests/moving_blocks.rs` — 5 tests, including
+  `a_retracting_piston_walks_its_head_home_and_leaves_its_body_where_it_is`.
+  The one that matters most is
+  `a_flight_lives_until_its_block_lands_and_not_past_it`: it walks the whole
+  window asserting the destination is unwritten for exactly as long as the
+  flight is listed. That is the double-draw and the gap, pinned from both
+  sides.
+- **Tick frame of reference**, which bit twice while writing those tests:
+  `tick_count()` counts *completed* ticks, while `started_on`/`lands_on` name
+  the tick that was executing. A flight dispatched during the step that takes
+  `tick_count` 0 → 1 has `started_on == 0`. It is listed while
+  `tick_count() <= lands_on` and gone after — so its last listed tick is the
+  one where it is visually home but the world still holds the placeholder,
+  which is vanilla's `progressO` reaching 1.0 on the landing tick.
+
+**Bridge**: `TickSimulation::moving_blocks_json()`, bindings regenerated — all
+five. Binding-level tests added to `tests/node_mc_tick_sim_test.mjs` (19/19)
+and `tests/python_mc_tick_sim_test.py`, including the invariant that
+`remains != null` exactly when a flight is a retracting source piston.
+
+**App**: `world.ts` lost the `moving_piston` regex, the `FACING` table and the
+schematic-mirror source lookup. `flights` is now a `Map` keyed by destination,
+reconciled against `movingBlocksJson()` in `syncFlights()`; a flight draws
+`carried` on the interpolated path and `remains` parked at `to`, mirroring
+vanilla's two slots. `animate()` takes a **fractional tick**
+(`tickCount + carry`) instead of `performance.now()`.
+`applyChanges` lost its `moveSeconds` parameter and `App.tsx` lost the
+`steps === 1` guard — a stroke is now drawn correctly whether one tick or fifty
+were stepped, so there is nothing left to guard.
+
+**A cell is not a flight's identity.** The first version of `syncFlights` keyed
+the flight map on the destination cell and skipped any cell it already held —
+`if (this.flights.has(k)) continue`. Consecutive strokes reuse a destination: a
+sticky piston extends its head into a slot and, two ticks later, retracts and
+pulls a block back into that same slot. The reconciler kept the head flight, so
+the pulled block was **never drawn while in flight** and the head stayed on
+screen **past its landing**, beside the real one. That is precisely the
+"blocks disappear on retractions / piston heads get duplicated" report, and on
+BB it happens dozens of times in 60 ticks. Reconciliation now compares
+`started` + `from` + `carried` and replaces the flight when any of them change.
+
+**A cell must be drawn by something at every painted frame.** Two separate
+ways it was not, both reported as "the meshes blink a bit":
+
+- **The hand-off.** A flight retires on the tick its block lands — exact, and
+  the simulation's decision. The chunk that must then draw that block is
+  re-meshed *asynchronously*, one `MeshResult` at a time. Disposing the flight
+  at retirement left the cell drawn by nothing in between: **1446 of 4965
+  retirements on BB, up to 8 painted frames each.** `World.retire` now parks
+  the meshes at the destination instead, and `flush` releases them in the same
+  turn as the chunk swap — so no frame shows both and none shows neither. A
+  flight whose cell is genuinely empty (a stroke cancelled mid-flight;
+  `finalTick` lands air for a source piston) is still dropped at once.
+- **A flight with no mesh yet.** A one-block mesh is a GLB parse, and until it
+  finished the flight was not drawn *at all* — the cell blank for the whole
+  stroke, since the source has already been cleared. **601 of 5484 flights.**
+  `warmBlockMeshes` pre-parses every state in the world snapshot at load.
+  Note it is **not** `paletteJson()`, which was tried first and is wrong: that
+  returns bare block *names* with no properties, so all 155 of its entries were
+  cache keys no flight could ever match — 155 parses for zero hits. Flights key
+  on the full state string. `warmState`, called on every change, then catches
+  what the simulation invents later (`piston_head`, `observer[powered=true]` —
+  in no initial state anywhere). Residual: **26 of 5346 (0.5%)**, the first
+  flight of each such derived state, bounded by state count not by runtime.
+
+`strokedump.mjs` guards the reconciler: for every flight the engine reports,
+the app must be drawing *that* flight in that cell. `verify-handover.mjs`
+guards both of the above. It also counts overlaps from each cell's
+**last** write in a batch rather than every write — `applyChanges` replays a
+batch in order and re-meshes once, so an intermediate state (a head landing in
+a slot the same tick's retraction turns straight back into a placeholder) is
+never on screen and must not be counted as a double-draw.
+
+Measured on BB (`strokedump.mjs`), against the "8 in air; distinct starts=6
+DESYNCED" in the evidence above:
+
+```
+0 overlaps, 0 ticks with desynced flights, 0 stale/missing flights
+>> 38 launched together; distinct starts=1
+```
+
+(also clean over a 250-tick sweep, which is where the stale-flight bug showed
+up — 14 ticks was too short to catch it.)
+
+`verify-anim.mjs`: `piston_head[facing=west] [33,6,13] -> [32,6,13] ticks 1..3`,
+sliding, and the arm sampled at 0/¼/½/¾/1 of its stroke reads `SSSll`
+extending and `llSSS` retracting — vanilla's flip, from both ends. Note the app
+no longer special-cases the head slot; the engine names `piston_head` itself.
+
+### What was deliberately not done
+
+The CLI's animated-GLB path still projects `PistonEvent`s into
+`schematic_mesher::Timeline`, and the mesher works out the carried cells at its
+end. So the browser and the CLI *still* reach strokes by two routes — the
+handover called that out and it remains true. Closing it means changing the
+Timeline format in `../Schematic-Mesher` to carry cells rather than infer them,
+which is a push to another repo (see §4's note) and a bigger change than the
+symptoms justified. `moving_blocks` is the right source for it when someone
+does.
+
+### Verifying it again
+
+`strokedump.mjs <build>` — must print `0 overlaps, 0 ticks with desynced
+flights`; both probes were rewritten for the new flight shape. Then
+`verify-anim.mjs <build>` for the slide. The Rust and binding tests are what
+actually guard it; the probes need a browser and a human.
 
 ---
 
