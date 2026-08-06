@@ -16,7 +16,7 @@ fn is_comparator(descriptor: &str) -> bool {
     descriptor.starts_with("minecraft:comparator")
 }
 
-use crate::pos::{Bounds, Pos};
+use crate::pos::{Bounds, Dir, Pos};
 use crate::schedule::{BlockEvent, EventQueue, TickPriority, TickQueue};
 use crate::state::{StateId, StateRegistry};
 use crate::world::World;
@@ -116,6 +116,64 @@ pub enum StopReason {
     /// Surfaced rather than swallowed: it means either a pathological build or a
     /// defect in our event handling, and both need to be seen.
     EventChainLimit,
+}
+
+/// One block a piston is currently carrying between two cells.
+///
+/// The presentable view of a [`PendingMove`] that has a
+/// [`Sweep`](crate::piston::Sweep): where it came from, what it looks like, and
+/// the tick window it occupies. See [`Simulation::moving_blocks`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MovingBlock {
+    /// The cell the block is travelling toward, and where it will be written.
+    pub to: Pos,
+    /// The cell it left, one step back along [`travel`](Self::travel).
+    ///
+    /// Given rather than left to the caller: a piston move is exactly one
+    /// block, but "exactly one block, backwards along the sweep" is the sort of
+    /// rule five bindings would each restate and one of them would get wrong.
+    pub from: Pos,
+    /// The state that lands at [`to`](Self::to) — the block being carried, not
+    /// the `moving_piston` placeholder standing in for it.
+    pub state: StateId,
+    /// The state to *draw* travelling, which is [`state`](Self::state) for
+    /// everything except a retracting piston's own square: there the body
+    /// stays where it is and a `piston_head` comes home, so what lands and
+    /// what moves are different blocks. See
+    /// [`PendingMove::carried`](crate::behaviour::PendingMove::carried).
+    ///
+    pub carried: StateId,
+    /// [`carried`](Self::carried) with a piston arm's `short=true`, or `None`
+    /// if it is not an arm.
+    ///
+    /// The game draws a moving head **shortened while it is within half a
+    /// block of its body** and full length beyond that — otherwise the shaft
+    /// visibly passes through the back of the piston as it comes home.
+    /// `PistonHeadRenderer` writes that as `SHORT = progress <= 0.5` when
+    /// extending and `SHORT = progress >= 0.5` when retracting: one rule read
+    /// from each end, since an extension travels away from the base and a
+    /// retraction back to it. Which form to use is the mover's call — it holds
+    /// the sub-tick progress — but the state is the engine's to name.
+    pub carried_short: Option<StateId>,
+    /// A state occupying [`to`](Self::to) for the duration of the move — the
+    /// retracting piston's body, and `None` for every other move, whose
+    /// destination is genuinely empty until it arrives.
+    pub remains: Option<StateId>,
+    /// The direction of travel.
+    pub travel: Dir,
+    /// Whether the piston is pushing (`true`) or pulling back (`false`).
+    pub extending: bool,
+    /// The tick the stroke was dispatched on.
+    pub started_on: u64,
+    /// The tick the block is written at [`to`](Self::to).
+    ///
+    /// A consumer animating the move should retire it here and not on a
+    /// wall-clock timer: the landing is the simulation's decision, and any
+    /// other clock will eventually disagree with it.
+    pub lands_on: u64,
+    /// Whether this is the piston's own square — the head sliding out of a base
+    /// that stays put, rather than a block being carried.
+    pub source_piston: bool,
 }
 
 /// A saved simulation state.
@@ -2317,6 +2375,42 @@ impl Simulation {
 
     pub fn tick_count(&self) -> u64 {
         self.tick
+    }
+
+    /// Every block a piston currently has in flight.
+    ///
+    /// The engine's own answer to the question a renderer otherwise guesses at.
+    /// A block change says only that a cell became a `moving_piston`
+    /// placeholder; it does not say which block set off, which cell it left,
+    /// or which tick it arrives — so a consumer that reconstructs strokes from
+    /// the change stream is reimplementing [`crate::piston`] downstream of it,
+    /// and its animation lands on a different clock from the simulation's.
+    /// Every artefact that follows (a block drawn twice, a gap where one
+    /// should be, a piston head shearing off the block it pushes) is that
+    /// disagreement made visible.
+    ///
+    /// Deferred writes with no [`Sweep`](crate::piston::Sweep) are not here:
+    /// those are delayed *writes*, not blocks in motion, and nothing travels.
+    pub fn moving_blocks(&self) -> Vec<MovingBlock> {
+        self.moves
+            .iter()
+            .filter_map(|m| {
+                let sweep = m.sweep?;
+                Some(MovingBlock {
+                    to: m.pos,
+                    from: m.pos.offset(sweep.travel.opposite()),
+                    state: m.state,
+                    carried: m.carried,
+                    carried_short: m.carried_short,
+                    remains: m.remains,
+                    travel: sweep.travel,
+                    extending: sweep.extending,
+                    started_on: m.started_on,
+                    lands_on: m.resolve_on,
+                    source_piston: m.source_piston,
+                })
+            })
+            .collect()
     }
 
     /// The block storage.

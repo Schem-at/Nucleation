@@ -127,6 +127,7 @@ fn build(repeater_delay: u8) -> Circuit {
                     on: piston_out,
                 },
                 head,
+                head_short: head,
                 moving,
                 moving_block: moving,
                 power: model.clone(),

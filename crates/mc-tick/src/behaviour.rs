@@ -210,6 +210,39 @@ pub struct PendingMove {
     pub pos: Pos,
     /// What it becomes.
     pub state: StateId,
+    /// The state that is visibly *travelling*, which is not always the state
+    /// that lands.
+    ///
+    /// Equal to [`state`](Self::state) for everything a piston carries. It
+    /// differs for the one case vanilla's client singles out: a **retracting
+    /// source piston**, where `PistonHeadRenderer.extractRenderState` puts a
+    /// `piston_head` in the moving slot and draws the base separately. The
+    /// piston body does not move when it retracts — its arm comes home — and a
+    /// consumer given only the landing state slides the whole body a block.
+    pub carried: StateId,
+    /// [`carried`](Self::carried) with a piston arm's `short=true`, if it is
+    /// one.
+    ///
+    /// The game draws a moving head shortened while it is within half a block
+    /// of its body and full length beyond that, so a mover has to be able to
+    /// pick. `None` for anything that is not a piston head.
+    pub carried_short: Option<StateId>,
+    /// A state that occupies `pos` for the whole move, if any.
+    ///
+    /// Vanilla's `base` slot: the retracting piston's own body, drawn
+    /// `EXTENDED=true` and *outside* the interpolated translate that
+    /// [`carried`](Self::carried) rides. `None` whenever the cell is simply
+    /// empty until the move lands, which is every other move.
+    pub remains: Option<StateId>,
+    /// The tick that scheduled the write.
+    ///
+    /// Not used by the engine — [`resolve_on`](Self::resolve_on) is what it
+    /// acts on. It is here because a *consumer* animating a move needs the
+    /// window, not just its end: how far along a stroke is at tick `t` is
+    /// `(t - started_on) / (resolve_on - started_on)`, and the alternative is
+    /// every consumer assuming [`crate::piston::PISTON_MOVE_TICKS`] applies to
+    /// a delay this struct deliberately leaves free.
+    pub started_on: u64,
     /// The tick whose block-entities phase applies it.
     pub resolve_on: u64,
     /// `isSourcePiston`: the placeholder a piston writes over its *own* square —
@@ -1013,7 +1046,7 @@ impl<'a> TickCtx<'a> {
         delay: u64,
         sweep: Option<crate::piston::Sweep>,
     ) {
-        self.push_move(pos, state, delay, false, sweep);
+        self.push_move(pos, state, state, None, None, delay, false, sweep);
     }
 
     /// `defer`, for the placeholder a piston writes over its own square.
@@ -1024,13 +1057,42 @@ impl<'a> TickCtx<'a> {
         delay: u64,
         sweep: Option<crate::piston::Sweep>,
     ) {
-        self.push_move(pos, state, delay, true, sweep);
+        self.push_move(pos, state, state, None, None, delay, true, sweep);
     }
 
+    /// [`defer_source`](Self::defer_source) for a move whose travelling block
+    /// is a piston **arm**.
+    ///
+    /// `head`/`head_short` are the two forms the game draws it in, and `body`
+    /// is the piston left standing in place while the arm moves — which a
+    /// retraction has and an extension does not, because an extending piston's
+    /// body is already written into the world.
+    ///
+    /// Nothing in the simulation reads any of them. They exist so a consumer
+    /// does not have to know that a retracting piston's body stays put, or
+    /// assemble `piston_head` states out of a base's.
+    #[allow(clippy::too_many_arguments)]
+    pub fn defer_source_arm(
+        &mut self,
+        pos: Pos,
+        state: StateId,
+        head: StateId,
+        head_short: StateId,
+        body: Option<StateId>,
+        delay: u64,
+        sweep: Option<crate::piston::Sweep>,
+    ) {
+        self.push_move(pos, state, head, Some(head_short), body, delay, true, sweep);
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn push_move(
         &mut self,
         pos: Pos,
         state: StateId,
+        carried: StateId,
+        carried_short: Option<StateId>,
+        remains: Option<StateId>,
         delay: u64,
         source_piston: bool,
         sweep: Option<crate::piston::Sweep>,
@@ -1038,6 +1100,10 @@ impl<'a> TickCtx<'a> {
         self.moves.push(PendingMove {
             pos,
             state,
+            carried,
+            carried_short,
+            remains,
+            started_on: self.tick,
             resolve_on: self.tick + delay,
             source_piston,
             sweep,

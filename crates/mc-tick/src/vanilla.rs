@@ -2338,17 +2338,25 @@ pub fn register_all_at(
                 let Some(states) = extended_pair(registry, descriptor) else {
                     continue;
                 };
+                let kind = if name == "minecraft:sticky_piston" {
+                    "sticky"
+                } else {
+                    "normal"
+                };
                 let head = registry
                     .get(&format!(
-                        "minecraft:piston_head[facing={},short=false,type={}]",
+                        "minecraft:piston_head[facing={},short=false,type={kind}]",
                         face_name(facing),
-                        if name == "minecraft:sticky_piston" {
-                            "sticky"
-                        } else {
-                            "normal"
-                        }
                     ))
                     .unwrap_or(StateId::AIR);
+                // Drawn, never placed: the arm the game shortens while the head
+                // is beside its body.
+                let head_short = registry
+                    .get(&format!(
+                        "minecraft:piston_head[facing={},short=true,type={kind}]",
+                        face_name(facing),
+                    ))
+                    .unwrap_or(head);
                 let moving = registry
                     .get(&format!(
                         "minecraft:moving_piston[facing={},type={}]",
@@ -2376,6 +2384,7 @@ pub fn register_all_at(
                         sticky: name == "minecraft:sticky_piston",
                         states,
                         head,
+                        head_short,
                         moving,
                         moving_block,
                         power: rules.clone(),
@@ -3754,6 +3763,15 @@ pub fn intern_companions(registry: &mut StateRegistry) {
                     descriptor.with("extended", "true"),
                     format!(
                         "minecraft:piston_head[facing={},short=false,type={kind}]",
+                        face_name(facing)
+                    ),
+                    // Never placed by the simulation — the game only ever
+                    // *draws* it, while a moving head is within half a block of
+                    // its body. Interned so that a renderer can be handed the
+                    // state instead of assembling one; see
+                    // `MovingBlock::carried_short`.
+                    format!(
+                        "minecraft:piston_head[facing={},short=true,type={kind}]",
                         face_name(facing)
                     ),
                     format!(

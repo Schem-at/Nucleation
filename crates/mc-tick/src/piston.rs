@@ -580,6 +580,15 @@ pub struct Piston<P: PowerSource, M: Movability> {
     pub states: StatePair,
     /// The block placed as the piston head when extended.
     pub head: StateId,
+    /// The head with `short=true`, which the game **draws** — never places —
+    /// while a moving head is within half a block of its body.
+    ///
+    /// `PistonHeadRenderer.extractRenderState` swaps to it at
+    /// `progress <= 0.5` on an extension and `progress >= 0.5` on a
+    /// retraction: the same rule read from each end, since one travels away
+    /// from the base and the other back to it. Carried so a renderer is handed
+    /// the state rather than assembling one out of the long form.
+    pub head_short: StateId,
     /// The `moving_piston` placeholder for the head slot.
     ///
     /// Carries the piston's own type: `triggerEvent` builds it with
@@ -942,9 +951,14 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // The head slot is itself in motion until the move completes.
                 ctx.set_shape_only(head_slot, self.moving);
                 ctx.drain();
-                ctx.defer_source(
+                ctx.defer_source_arm(
                     head_slot,
                     self.head,
+                    self.head,
+                    self.head_short,
+                    // The base is already written as an extended piston, so
+                    // the world draws it; only the arm is in motion.
+                    None,
                     PISTON_MOVE_TICKS,
                     Some(Sweep {
                         travel: self.facing,
@@ -1147,9 +1161,19 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     ctx.drain();
                 }
                 ctx.set(pos, self.moving);
-                ctx.defer_source(
+                // The base is what *lands*; the head is what *travels*. Vanilla's
+                // `PistonHeadRenderer.extractRenderState` singles this case out —
+                // `isSourcePiston() && !isExtending()` puts a `piston_head` in the
+                // moving slot and the base, `EXTENDED=true`, in a separate `base`
+                // slot that `submit` draws outside the interpolated translate. A
+                // renderer told only the landing state slides the whole piston
+                // body a block backwards out of the head slot.
+                ctx.defer_source_arm(
                     pos,
                     self.states.get(false),
+                    self.head,
+                    self.head_short,
+                    Some(self.states.get(true)),
                     PISTON_MOVE_TICKS,
                     Some(Sweep {
                         travel: self.facing.opposite(),
@@ -1420,6 +1444,9 @@ mod tests {
                 on: EXTENDED,
             },
             head: HEAD,
+            // These models have one head state; the short form is a render
+            // detail no unit test here exercises.
+            head_short: HEAD,
             moving: MOVING,
             moving_block: MOVING,
             power: model.clone(),

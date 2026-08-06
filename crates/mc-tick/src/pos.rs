@@ -147,6 +147,23 @@ impl Dir {
             Dir::East => Dir::West,
         }
     }
+
+    /// The name the game gives this direction, as it appears in a `facing`
+    /// block-state property.
+    ///
+    /// Here rather than in each consumer: it is the spelling every serialised
+    /// form has to agree on, and a binding that spells one of the six
+    /// differently produces block states nothing else can read.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Dir::Down => "down",
+            Dir::Up => "up",
+            Dir::North => "north",
+            Dir::South => "south",
+            Dir::West => "west",
+            Dir::East => "east",
+        }
+    }
 }
 
 /// An inclusive axis-aligned region.

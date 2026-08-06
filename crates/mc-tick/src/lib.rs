@@ -66,13 +66,13 @@ pub use motion::MotionSemantics;
 pub use observer::{Observer, OBSERVER_PULSE_TICKS};
 pub use phase::{Phase, PHASE_ORDER};
 pub use piston::{
-    resolve_push, Movability, Piston, PushPlan, MAX_PUSH_DEPTH, TRIGGER_CONTRACT, TRIGGER_DROP,
-    TRIGGER_EXTEND,
+    resolve_push, Movability, Piston, PushPlan, Sweep, MAX_PUSH_DEPTH, PISTON_MOVE_TICKS,
+    TRIGGER_CONTRACT, TRIGGER_DROP, TRIGGER_EXTEND,
 };
 pub use pos::{Bounds, Dir, Pos, ALL_DIRS};
 pub use redstone::{RedstoneNetwork, MAX_POWER};
 pub use schedule::{BlockEvent, EventQueue, ScheduledTick, TickPriority, TickQueue};
-pub use sim::{Checkpoint, Simulation, StopReason};
+pub use sim::{Checkpoint, MovingBlock, Simulation, StopReason};
 pub use state::{StateError, StateId, StateRegistry};
 pub use structure::{Structure, StructureError};
 pub use timeline::{

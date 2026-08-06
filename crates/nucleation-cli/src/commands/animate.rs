@@ -525,14 +525,7 @@ fn format_cycle(cycle: Option<Cycle>) -> String {
 }
 
 fn dir_name(dir: Dir) -> &'static str {
-    match dir {
-        Dir::Down => "down",
-        Dir::Up => "up",
-        Dir::North => "north",
-        Dir::South => "south",
-        Dir::West => "west",
-        Dir::East => "east",
-    }
+    dir.name()
 }
 
 fn parse_settle(value: &str) -> SettleMode {
