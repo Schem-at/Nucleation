@@ -78,3 +78,6 @@ button:disabled { opacity: 0.4; cursor: default; }
   border: 1px solid var(--line); border-radius: 5px;
   padding: 4px 6px; font: inherit;
 }
+
+/* The achieved-rate readout, amber when the engine could not keep up. */
+.tick.throttled { color: #ffd166; }

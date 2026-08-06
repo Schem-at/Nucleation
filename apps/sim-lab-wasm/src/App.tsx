@@ -17,6 +17,50 @@ type Status = { kind: "idle" | "loading" | "ready" | "error"; message?: string }
 
 const INTERACTIVE = /lever|button|note_block|trapdoor|_door|_gate|repeater|comparator|daylight/;
 
+/** How much of a frame the simulation may have.
+ *
+ * The rest belongs to meshing and drawing. Ten milliseconds of a 16 ms frame
+ * leaves enough to stay interactive while the tab is saturated — the tab going
+ * unresponsive is the one failure mode that makes a throttle indicator useless,
+ * because you cannot read it.
+ */
+const TICK_BUDGET_MS = 10;
+
+const SLIDER_MAX = 1000;
+/** Where the fine regime ends, in slider travel and in tps. */
+const FINE_END = 600;
+const FINE_TPS = 20;
+/** Top of the coarse regime. Past this the slider asks for everything. */
+const COARSE_TPS = 20_000;
+/** Slider pinned to the top: run as many ticks as the frame budget allows and
+ * report what that turned out to be. */
+const UNCAPPED = Infinity;
+
+/** Slider position to ticks per second.
+ *
+ * Two regimes, because the useful range is not uniform. Below ~20 tps you are
+ * watching a machine work and want to land on exactly 3, or 7, or 0.5 — so the
+ * bottom 60% of the travel is linear there, about 0.03 tps per step. Above it
+ * you are finding out where it breaks and only order of magnitude matters, so
+ * the top 40% is exponential. The last notch is uncapped.
+ */
+function sliderToTps(p: number): number {
+  if (p >= SLIDER_MAX) return UNCAPPED;
+  if (p <= FINE_END) return Math.max(0.1, Math.round((p / FINE_END) * FINE_TPS * 100) / 100);
+  const t = (p - FINE_END) / (SLIDER_MAX - FINE_END);
+  return Math.round(FINE_TPS * Math.pow(COARSE_TPS / FINE_TPS, t));
+}
+
+/** Ticks per second, written the way a reader wants it at that magnitude. */
+function fmtTps(tps: number): string {
+  if (tps === UNCAPPED) return "max";
+  if (tps >= 10_000) return `${(tps / 1000).toFixed(0)}k`;
+  if (tps >= 1000) return `${(tps / 1000).toFixed(1)}k`;
+  if (tps >= 100) return tps.toFixed(0);
+  if (tps >= 10) return tps.toFixed(1);
+  return tps.toFixed(2);
+}
+
 export default function App(): JSX.Element {
   const mount = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -31,7 +75,15 @@ export default function App(): JSX.Element {
 
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [running, setRunning] = useState(false);
-  const [rate, setRate] = useState(10);
+  /** Slider travel, not tps — the mapping between them is not linear. */
+  const [slider, setSlider] = useState(300);
+  const rate = sliderToTps(slider);
+  /** Ticks per second actually achieved, and whether that fell short of what
+   * was asked. Measured rather than assumed: the whole point of pushing the
+   * rate up is to find where the engine stops keeping up, and a readout that
+   * echoed the target back would hide exactly that. */
+  const [actualTps, setActualTps] = useState(0);
+  const [throttled, setThrottled] = useState(false);
   const [stepN, setStepN] = useState(20);
   const [settle, setSettle] = useState<SettleName>("in-world");
   const [tick, setTick] = useState(0);
@@ -100,6 +152,10 @@ export default function App(): JSX.Element {
     let last = performance.now();
     let carry = 0;
     let flushing = false;
+    // Rolling measurement of what the rate actually came out to.
+    let ran = 0;
+    let shortfall = false;
+    let measuredAt = performance.now();
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const dt = Math.min((now - last) / 1000, 0.1);
@@ -110,11 +166,67 @@ export default function App(): JSX.Element {
       const world = worldRef.current;
       if (world?.sim) {
         if (runningRef.current) {
-          carry += dt * rateRef.current;
-          let steps = Math.floor(carry);
-          carry -= steps;
-          steps = Math.min(steps, 200); // never freeze the tab on a big rate
-          for (let i = 0; i < steps; i++) world.sim.step();
+          // What was asked for this frame. Uncapped asks for as much as the
+          // budget will take, which is the only honest way to answer "how
+          // fast can this go" — any fixed number is a guess about a machine.
+          let want: number;
+          if (rateRef.current === UNCAPPED) {
+            want = Infinity;
+            carry = 0;
+          } else {
+            carry += dt * rateRef.current;
+            want = Math.floor(carry);
+            carry -= want;
+          }
+
+          // Spend ticks until the budget runs out rather than stopping at a
+          // fixed count. The old cap of 200 a frame was a ceiling of about
+          // 12k tps on any build, however small — it throttled the engine
+          // and called it the engine's limit.
+          const spendStart = performance.now();
+          let steps = 0;
+          let outOfBudget = false;
+          while (steps < want) {
+            world.sim.step();
+            steps++;
+            // Checking the clock every tick would cost more than a tick on a
+            // small build, so amortise it.
+            if ((steps & 63) === 0 && performance.now() - spendStart >= TICK_BUDGET_MS) {
+              outOfBudget = true;
+              break;
+            }
+          }
+          // Uncapped is budget-limited by definition, so say so rather than
+          // reporting a clean run: at the top of the slider the number on
+          // screen *is* the ceiling, and it should be labelled as one.
+          const missed = want === Infinity ? outOfBudget : steps < want;
+          // Asked for more than the budget bought: drop the debt instead of
+          // letting `carry` grow without bound, which would make the machine
+          // sprint to catch up the moment the rate came back down.
+          if (missed) carry = 0;
+
+          // Against the wall clock, not against time spent inside `step()`.
+          // Ticks per second means ticks per second of the user's time —
+          // dividing by stepping time alone would report the engine's
+          // throughput and quietly hide every frame it did not get to run.
+          ran += steps;
+          shortfall = shortfall || missed;
+          const window = now - measuredAt;
+          // Wait for enough ticks to divide by, not just enough time. A fixed
+          // 250 ms window sees one tick or none at 2 tps, so the readout
+          // quantises to multiples of four and a correctly-paced 2 tps reads
+          // as 4 — the measurement lying about the thing it exists to check.
+          // Ten ticks is enough to be accurate; the 2 s ceiling keeps a very
+          // slow rate updating at all.
+          if (window >= 250 && (ran >= 10 || window >= 2000)) {
+            // Kept fractional: rounding to an integer here would report a
+            // deliberate 0.5 tps as either 0 or 1.
+            setActualTps(ran / (window / 1000));
+            setThrottled(shortfall);
+            ran = 0;
+            shortfall = false;
+            measuredAt = now;
+          }
           // One drain for the whole batch: the log is cumulative, so
           // reading it per step is quadratic.
           //
@@ -355,15 +467,21 @@ export default function App(): JSX.Element {
           </select>
         </label>
         <label className="rate">
-          {rate} tps
+          {fmtTps(rate)} tps
           <input
             type="range"
-            min={1}
-            max={60}
-            value={rate}
-            onChange={(e) => setRate(Number(e.target.value))}
+            min={0}
+            max={SLIDER_MAX}
+            value={slider}
+            onChange={(e) => setSlider(Number(e.target.value))}
           />
         </label>
+        {/* Target and achieved are separate readouts on purpose: when they
+            diverge, that gap is the answer to how fast this build can go. */}
+        <span className={`tick rate-actual${throttled ? " throttled" : ""}`}>
+          {fmtTps(actualTps)} actual
+          {throttled ? " · throttled" : ""}
+        </span>
         <span className="tick">tick {tick}</span>
         {entities > 0 && <span className="tick">{entities} entities</span>}
         <span className={`status ${status.kind}`}>{status.message ?? "drop a schematic"}</span>

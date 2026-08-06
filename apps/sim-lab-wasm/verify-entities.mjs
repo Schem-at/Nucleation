@@ -13,7 +13,7 @@ const p = await b.newPage();
 const errs = [];
 p.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
 p.on("console", (m) => { if (m.type() === "error") errs.push(m.text().slice(0, 200)); });
-await p.goto("http://127.0.0.1:8455/", { waitUntil: "networkidle" });
+await p.goto("http://localhost:8455/", { waitUntil: "networkidle" });
 await p.setInputFiles("input[type=file]", process.argv[2]);
 await p.waitForSelector(".status.ready, .status.error", { timeout: 300000 });
 
