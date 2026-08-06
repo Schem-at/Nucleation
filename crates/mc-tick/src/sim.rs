@@ -550,7 +550,7 @@ impl Simulation {
     pub fn recorded_timeline(&self) -> Option<crate::timeline::RunTimeline> {
         self.timeline
             .as_ref()
-            .map(|timeline| timeline.finish(self.log.as_deref().unwrap_or(&[])))
+            .map(|timeline| timeline.finish(self.log.as_deref().unwrap_or(&[]), self.tick))
     }
 
     /// The entity events recorded since [`Simulation::record`].

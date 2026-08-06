@@ -297,6 +297,11 @@ pub enum TimelineError {
 pub struct RunTimeline {
     /// Tick at which recording began.
     pub start_tick: u64,
+    /// Tick at which recording stopped — the last completed tick.
+    ///
+    /// Held because replay needs to know where to stop, and the per-tick frame
+    /// vector that used to answer that is what replay exists to remove.
+    pub end_tick: u64,
     /// Ordered block deltas, shared with [`crate::Simulation::recorded`].
     pub changes: Vec<BlockChange>,
     /// Ordered external inputs.
@@ -447,9 +452,10 @@ impl TimelineRecorder {
         }
     }
 
-    pub(crate) fn finish(&self, changes: &[BlockChange]) -> RunTimeline {
+    pub(crate) fn finish(&self, changes: &[BlockChange], end_tick: u64) -> RunTimeline {
         RunTimeline {
             start_tick: self.start_tick,
+            end_tick,
             changes: changes.to_vec(),
             inputs: self.inputs.clone(),
             pistons: self.pistons.clone(),
@@ -521,6 +527,7 @@ mod tests {
         let still = frame(2, &[(Pos::new(1, 0, 0), stone)], &registry);
         let timeline = RunTimeline {
             start_tick: 0,
+            end_tick: 2,
             changes: vec![BlockChange {
                 tick: 0,
                 pos: Pos::new(0, 0, 0),
@@ -567,5 +574,18 @@ mod tests {
         assert_eq!(timeline.inputs.len(), 1);
         assert_eq!(timeline.changes.len(), 1);
         assert_eq!(timeline.frames.len(), 2);
+    }
+
+    #[test]
+    fn a_timeline_knows_the_tick_its_run_ended_on() {
+        let mut sim = Simulation::new(Bounds::new(Pos::new(-2, -2, -2), Pos::new(2, 2, 2)));
+        let stone = sim.registry_mut().intern("minecraft:stone").unwrap();
+        sim.record_timeline();
+        sim.place_block(Pos::new(0, 0, 0), stone);
+        sim.step();
+        sim.step();
+        let timeline = sim.recorded_timeline().expect("timeline");
+        assert_eq!(timeline.start_tick, 0);
+        assert_eq!(timeline.end_tick, 2, "two completed ticks");
     }
 }
