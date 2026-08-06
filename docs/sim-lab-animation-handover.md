@@ -5,6 +5,48 @@ the animation work in §3 is diagnosed but **not started**.
 
 ---
 
+## 0. Nucleation, and what the lab is for
+
+**Nucleation is the product. The lab is a wrapper around it.**
+
+Nucleation is a Rust library for Minecraft builds — read and write every
+schematic format, mesh them, diff and fingerprint them, segment them out of
+worlds, and (via `crates/mc-tick`) simulate them tick-for-tick against vanilla.
+It ships to Python, JS/wasm, JVM, PHP and C through generated bindings
+(`src/bridge/` → `bindings/`), and vanilla parity is the thing it sells.
+
+`apps/sim-lab-wasm/` is a **demo and a test harness**: the most convincing
+proof that the library works, and the fastest way to see a machine misbehave.
+It is not where behaviour should live.
+
+### The rule this implies
+
+**Any capability worth having belongs in the library, not the app.** If the lab
+needs something, the question is not "how do I do this in TypeScript" but
+"what is missing from Nucleation, and why has no other consumer needed it yet".
+
+Concretely, a change lands in the library when:
+
+- it is knowledge about *what the simulation did* (the app must not re-derive
+  it — see §3, where exactly this went wrong),
+- another binding would plausibly want it (Python, JVM, CLI),
+- or it is logic that could silently drift from the engine's truth.
+
+A change may stay in the app only when it is genuinely presentation: camera,
+input, colours, DOM.
+
+Library work carries library obligations, in this order:
+
+1. a Rust test that fails without it,
+2. exposure through `src/bridge/` so *every* binding gets it, not just JS,
+3. regenerated bindings,
+4. the app rewritten to consume it rather than keeping its own copy.
+
+The app-side workaround in §4 (`atlasCache`) is deliberately *not* an exception
+to this — see the note there. It is a stopgap with a known proper home.
+
+---
+
 ## 1. What the sim lab is
 
 `apps/sim-lab-wasm/` — a browser app: drop a schematic, fly through it, click
@@ -136,26 +178,70 @@ Whenever more than one tick is stepped in a frame, `App.tsx` passes `move = 0`
 and strokes teleport outright. This is why it looks worse the faster you run.
 See the `steps === 1` condition in the frame loop.
 
+### The deeper problem — and why the fix is library work
+
+Read §0 first. The lab is **re-deriving the simulation's behaviour from its
+output**: `applyChanges` regex-matches `moving_piston[facing=…]` out of the
+block-change stream, guesses the source cell as `pos - facing`, and reads what
+was there out of a schematic mirror that lags a batch behind. That is a
+reimplementation of piston mechanics in TypeScript, sitting downstream of an
+engine that models them exactly.
+
+And the engine already knows. `crates/mc-tick/src/timeline.rs`:
+
+```rust
+/// One successfully dispatched piston stroke.
+pub struct PistonEvent {
+    pub tick: u64,
+    ...
+}
+pub enum PistonAction { /* extend, retract (pulling when sticky) */ }
+```
+
+Authoritative, from the simulator itself, with the tick it was dispatched on —
+so it knows when a stroke starts *and* when it lands. **It is not exposed
+through the bridge**: `grep -n 'Timeline' src/bridge/mc_tick.rs` returns
+nothing. The lab guesses because nobody gave it the answer.
+
+Every symptom in this section follows from that. Wall-clock durations exist
+because the app has no tick to land on. Six start stamps exist because the app
+sees N independent block changes where the engine dispatched one stroke. The
+teleport at speed exists because a batch of changes carries no stroke structure
+at all.
+
 ### Fix plan
 
-1. **Retire a flight when its landing change arrives**, not when a timer
-   expires. Single highest-value change: it makes a flight's lifetime exactly
-   the interval the simulation says it is, killing both the double-draw and the
-   gap.
-2. **Launch a stroke as one group** — one start stamp and one duration shared
-   by every block in it, so a rigid body stays rigid.
-3. **Drive progress from tick count, not milliseconds**, so frame jitter and
-   throttling cannot desync the picture from the simulation. This is the
-   structural one and what makes it correct at any rate.
-4. **Keep the destination cell empty until its flight retires**, rather than
-   meshing the landed block the moment the change arrives.
+**Library first:**
 
-(1) and (2) are contained in `launch` / `animate` / `applyChanges` in
-`world.ts`. (3) touches the frame loop in `App.tsx` too.
+1. **Expose the timeline's piston events through `src/bridge/mc_tick.rs`** —
+   per stroke: dispatch tick, landing tick, direction, and the cells moved.
+   With a Rust test that fails without it. This is the fix; the rest is
+   rendering.
+2. **Regenerate bindings** so Python and the CLI get it too — an animated GLB
+   exported from the CLI has exactly the same need, and `to_animated_glb`
+   already consumes a piston-event timeline. Today the CLI and the browser
+   derive strokes by different routes, which is precisely how they drift.
+
+**Then the app, which becomes small:**
+
+3. Consume strokes instead of reconstructing them. Delete the `moving_piston`
+   regex, the `FACING` table and the schematic-mirror source lookup from
+   `world.ts` — all of it is engine knowledge the app should not hold.
+4. Interpolate on **tick progress between dispatch and landing**, not
+   milliseconds, so frame jitter and throttling cannot desync it, and a stroke
+   animates correctly whether one tick or fifty are stepped in a frame.
+5. Retire a flight on its landing tick; keep the destination cell empty until
+   then.
+
+If (1) proves too large to land first, (5) alone removes the double-draw and
+the gap and is a legitimate stopgap — but write it as a stopgap, not a design,
+and leave the pointer to (1).
 
 Verify with `strokedump.mjs`: flights must retire on the same tick their
 landing change arrives, and concurrent flights of one stroke must report
-`distinct starts=1`. Then `verify-anim.mjs` for the slide itself.
+`distinct starts=1`. Then `verify-anim.mjs` for the slide itself. The Rust test
+from (1) is the one that actually guards it — the probes need a browser and a
+human to run.
 
 ---
 
@@ -183,6 +269,14 @@ out of the GLB container and re-attaching the cached materials.
 > **wrong**. The atlas is built per chunk from the block types that chunk
 > contains, so six chunks of one flying machine embed six different atlases.
 > `atlascheck.mjs` is that guard; run it if you touch this.
+
+**This is a stopgap living in the wrong place, by §0's rule.** `atlasCache` and
+`stripEmbeddedImages` in `world.ts` are the app compensating for the mesher
+emitting a redundant atlas per chunk — every consumer that meshes incrementally
+would need the same trick, and only this one has it. It earns its place for now
+because it is a 7× win available today against a change in another repo, but it
+should be deleted, not maintained: a pack-wide atlas removes the reason it
+exists. Do not build on it.
 
 Chunk size is now a setting (16³ / 32³ / 64³ / whole build), because it trades
 geometry re-meshed against number of distinct atlases and the balance depends
