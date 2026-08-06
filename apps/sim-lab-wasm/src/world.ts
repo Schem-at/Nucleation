@@ -27,6 +27,16 @@ function b64ToBytes(b64: string): Uint8Array {
 
 const key = (x: number, y: number, z: number) => `${x},${y},${z}`;
 
+/** Unit step per `facing` value, for reading a `moving_piston`'s travel. */
+const FACING: Record<string, [number, number, number]> = {
+  east: [1, 0, 0],
+  west: [-1, 0, 0],
+  up: [0, 1, 0],
+  down: [0, -1, 0],
+  south: [0, 0, 1],
+  north: [0, 0, -1],
+};
+
 export type Change = { pos: [number, number, number]; to: string };
 
 /** How a build is settled before tick 0.
@@ -86,6 +96,8 @@ export class World {
    * carries the blocks an interaction may introduce — a redstone block for
    * manual poking is the one the engine always allows. */
   startSim(): string | null {
+    // Whatever was mid-flight belongs to the run being replaced.
+    this.clearFlights();
     try {
       this.sim = this.eng.TickSimulation.fromSchematic(
         this.schem,
@@ -210,16 +222,168 @@ export class World {
     await this.installChunk(cx, cy, cz, mesh);
   }
 
-  /** Apply what the last tick changed: patch the schematic, mark chunks. */
-  applyChanges(changes: Change[]): void {
+  /** A block mid-flight between two cells, drawn by [`World.animate`]. */
+  private flights: {
+    state: string;
+    /** Null until the block's mesh finishes parsing; see [`World.animate`]. */
+    object: THREE.Object3D | null;
+    from: [number, number, number];
+    to: [number, number, number];
+    start: number;
+    dur: number;
+  }[] = [];
+  /** One parsed mesh per block state, so a hundred sliding slime blocks cost
+   * one mesh and a hundred cheap clones. */
+  private blockMeshes = new Map<string, THREE.Object3D | null>();
+  private pendingMeshes = new Set<string>();
+
+  /** A 1x1x1 mesh of `state`, built once and cloned thereafter.
+   *
+   * Returns null until the parse finishes; a flight with no mesh yet simply
+   * is not drawn for a frame or two, which is invisible at these speeds.
+   */
+  private blockMesh(state: string): THREE.Object3D | null {
+    const have = this.blockMeshes.get(state);
+    if (have !== undefined) return have;
+    if (this.pendingMeshes.has(state)) return null;
+    this.pendingMeshes.add(state);
+    void (async () => {
+      let object: THREE.Object3D | null = null;
+      try {
+        const scratch = this.eng.Schematic.create("one");
+        scratch.setBlockFromString(0, 0, 0, state);
+        const mesh = this.eng.MeshResult.create(scratch, this.pack, this.cfg);
+        const glb = mesh?.glbDataB64?.() ?? "";
+        if (glb) {
+          const bytes = b64ToBytes(glb);
+          const gltf = await loader.parseAsync(
+            bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+            "",
+          );
+          let drawable = false;
+          gltf.scene.traverse((o: Any) => {
+            if (o.isMesh) drawable = true;
+          });
+          object = drawable ? gltf.scene : null;
+        }
+      } catch {
+        object = null;
+      }
+      this.blockMeshes.set(state, object);
+      this.pendingMeshes.delete(state);
+    })();
+    return null;
+  }
+
+  /** Start drawing `state` sliding from `from` to `to` over `dur` seconds.
+   *
+   * The flight is recorded even though its mesh is still parsing — the first
+   * sighting of any block state is always a cache miss, and dropping those
+   * meant the first stroke of every kind never animated at all.
+   */
+  private launch(state: string, from: [number, number, number], to: [number, number, number], dur: number) {
+    this.blockMesh(state); // kick off the parse; picked up in `animate`
+    // Milliseconds, to match `performance.now()`. Holding the caller's
+    // seconds here made every flight expire on its first frame.
+    this.flights.push({ state, object: null, from, to, start: performance.now(), dur: dur * 1000 });
+  }
+
+  /** Advance every in-flight block; drop the ones that have arrived.
+   *
+   * Called once a frame. A move takes two game ticks, so at the rates worth
+   * watching it spans many frames — which is the whole point: without this a
+   * piston stroke is two instantaneous jumps.
+   */
+  animate(now: number): void {
+    if (this.flights.length === 0) return;
+    this.flights = this.flights.filter((f) => {
+      const t = f.dur > 0 ? (now - f.start) / f.dur : 1;
+      if (t >= 1) {
+        if (f.object) {
+          this.group.remove(f.object);
+          f.object.traverse((o: Any) => o.geometry?.dispose?.());
+        }
+        return false;
+      }
+      // Late arrival: the mesh finished parsing after the flight began.
+      if (!f.object) {
+        const proto = this.blockMesh(f.state);
+        if (!proto) return true; // still parsing; try again next frame
+        f.object = proto.clone(true);
+        this.group.add(f.object);
+      }
+      // Linear, like the game's own `getExtendedProgress` — a piston does not
+      // ease in or out, and faking it reads as lag.
+      f.object.position.set(
+        f.from[0] + (f.to[0] - f.from[0]) * t,
+        f.from[1] + (f.to[1] - f.from[1]) * t,
+        f.from[2] + (f.to[2] - f.from[2]) * t,
+      );
+      return true;
+    });
+  }
+
+  /** Drop every in-flight block — on reload, reset, or a jump in time. */
+  clearFlights(): void {
+    for (const f of this.flights) {
+      if (!f.object) continue;
+      this.group.remove(f.object);
+      f.object.traverse((o: Any) => o.geometry?.dispose?.());
+    }
+    this.flights = [];
+  }
+
+  /** Apply what the last tick changed: patch the schematic, mark chunks.
+   *
+   * `moveSeconds` is how long a piston stroke should take on screen — two
+   * game ticks at the current rate. Zero disables the animation, which is
+   * what a fast-forward wants: interpolating a stroke that is already over
+   * by the next frame just smears it.
+   */
+  applyChanges(changes: Change[], moveSeconds = 0): void {
+    // Before anything is written: a cell turning into `moving_piston` is a
+    // block arriving from the far side, and the only place its identity still
+    // exists is the schematic we are about to overwrite. Read the sources
+    // first, animate second, write third.
+    if (moveSeconds > 0) {
+      for (const c of changes) {
+        const dir = /moving_piston\[facing=(\w+)/.exec(c.to);
+        if (!dir) continue;
+        const [dx, dy, dz] = FACING[dir[1]] ?? [0, 0, 0];
+        const [x, y, z] = c.pos;
+        const src: [number, number, number] = [x - dx, y - dy, z - dz];
+        // The *schematic*, not `blockAt` — the simulation has already stepped
+        // and cleared the source, so it is the mirror lagging one batch behind
+        // that still knows what set off.
+        let carried = "";
+        try {
+          carried = this.schem.getBlockString(src[0], src[1], src[2]) ?? "";
+        } catch {
+          carried = "";
+        }
+        if (!carried || carried === "minecraft:air") continue;
+        if (carried.startsWith("minecraft:moving_piston")) continue; // already in flight
+        // A piston's own head slot: the base stays put and the head slides
+        // out of it, so draw the head rather than a second copy of the base.
+        const head = new RegExp(`^minecraft:(sticky_)?piston\\[.*facing=${dir[1]}`).exec(carried);
+        const state = head
+          ? `minecraft:piston_head[facing=${dir[1]},short=false,type=${head[1] ? "sticky" : "normal"}]`
+          : carried;
+        this.launch(state, src, [x, y, z], moveSeconds);
+      }
+    }
     for (const c of changes) {
       const [x, y, z] = c.pos;
+      // A placeholder is not a block anyone should see. The chunk shows a
+      // hole for the two ticks the stroke lasts and the sliding mesh fills
+      // it — meshing `moving_piston` instead drew a stand-in that popped.
+      const solidified = c.to.startsWith("minecraft:moving_piston") ? "minecraft:air" : c.to;
       try {
-        this.schem.setBlockFromString(x, y, z, c.to);
+        this.schem.setBlockFromString(x, y, z, solidified);
       } catch {
         /* a state the schematic cannot express is still simulated */
       }
-      if (c.to === "minecraft:air") this.solid.delete(key(x, y, z));
+      if (solidified === "minecraft:air") this.solid.delete(key(x, y, z));
       else this.solid.add(key(x, y, z));
       // The block's own chunk, plus any neighbour whose face meshing it
       // changes — a block on a seam alters the chunk next door.

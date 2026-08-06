@@ -33,6 +33,19 @@ npm run build && npx vite preview --port 8455
   gametest framework's knownShape placement).
 - **Run / step / rate.** Free-run at 1–60 tps, or single-step and watch one
   tick at a time.
+- **Pistons slide.** A stroke takes two game ticks, and the blocks it carries
+  are drawn moving across them instead of jumping twice. The engine only
+  says *a block is in flight here* — a `moving_piston` placeholder — so the
+  carried block's identity comes from the mirror schematic, which is still a
+  batch behind and therefore still remembers. Each distinct block state is
+  meshed once on its own and cloned per moving copy, so a hundred sliding
+  slime blocks cost one mesh. A piston's own head is drawn as a head rather
+  than a second copy of its base.
+
+  Only while a stroke outlasts a frame: past ~30 tps it is over before it
+  could be drawn, and interpolating then smears the machine rather than
+  clarifying it. Single-stepping uses a fixed quarter-second beat, because
+  that is the case where you most want to see the stroke.
 
 ## Rebuilding the engine
 

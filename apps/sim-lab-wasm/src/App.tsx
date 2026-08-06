@@ -113,9 +113,18 @@ export default function App(): JSX.Element {
           for (let i = 0; i < steps; i++) world.sim.step();
           // One drain for the whole batch: the log is cumulative, so
           // reading it per step is quadratic.
-          if (steps) world.applyChanges(world.drainChanges());
+          //
+          // A piston stroke is two game ticks, so that is how long it should
+          // take on screen. Only worth animating while a stroke outlasts a
+          // frame — past ~30 tps it is over before it could be drawn, and
+          // interpolating then smears the machine instead of clarifying it.
+          if (steps) {
+            const move = rateRef.current <= 30 && steps === 1 ? 2 / rateRef.current : 0;
+            world.applyChanges(world.drainChanges(), move);
+          }
           if (steps) setTick(Number(world.sim.tickCount?.() ?? 0));
         }
+        world.animate(now);
         if (!flushing) {
           flushing = true;
           void world.flush().finally(() => {
@@ -259,7 +268,10 @@ export default function App(): JSX.Element {
     const t0 = performance.now();
     for (let i = 0; i < n; i++) world.sim.step();
     const changes = world.drainChanges();
-    world.applyChanges(changes);
+    // Stepping one tick by hand is the case where you most want to *see* the
+    // stroke, so give it a fixed beat rather than the run rate. Jumping many
+    // ticks lands them all at once, which is what "jump" means.
+    world.applyChanges(changes, n === 1 ? 0.25 : 0);
     const ms = performance.now() - t0;
     setTick(Number(world.sim.tickCount?.() ?? 0));
     setInfo(
