@@ -15,7 +15,19 @@ import { loadMeshEnv } from "./mesher";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;
 
+/** Default mesh-chunk edge, in blocks.
+ *
+ * Not a fixed property of the format — it is a tuning knob, and the right
+ * value depends on the build. Small chunks re-mesh less geometry when one
+ * block changes but split the build across many texture atlases; one chunk
+ * spanning the whole build means every re-mesh redoes all its geometry, but
+ * there is then exactly one atlas and it is always a cache hit. A flying
+ * machine is small enough that the second wins outright; a cathedral is not.
+ */
 export const CHUNK = 16;
+/** `chunkSize` values the UI offers. `0` means "one chunk for the whole
+ * build", resolved against its dimensions at load. */
+export const CHUNK_CHOICES = [16, 32, 64, 0] as const;
 export const loader = new GLTFLoader();
 
 function b64ToBytes(b64: string): Uint8Array {
@@ -232,6 +244,9 @@ export class World {
   private entityGroup = new THREE.Group();
   /** How the build is settled before tick 0; see [`SettleName`]. */
   settle: SettleName = "in-world";
+  /** Mesh-chunk edge for this build; see [`CHUNK`]. Never zero here — a
+   * requested 0 is resolved to something that spans the build at load. */
+  chunkSize: number = CHUNK;
 
   private constructor(eng: Any, pack: Any, cfg: Any) {
     this.eng = eng;
@@ -240,13 +255,20 @@ export class World {
     this.group.add(this.entityGroup);
   }
 
-  static async load(bytes: Uint8Array, settle: SettleName = "in-world"): Promise<World> {
+  static async load(
+    bytes: Uint8Array,
+    settle: SettleName = "in-world",
+    chunkSize: number = CHUNK,
+  ): Promise<World> {
     const { eng, pack, cfg } = await loadMeshEnv();
     const w = new World(eng, pack, cfg);
     w.settle = settle;
     w.schem = eng.Schematic.fromData(bytes);
     const d = w.schem.tightDimensions();
     w.dims = [Number(d.x), Number(d.y), Number(d.z)];
+    // 0 means "one chunk for the whole build": round the longest edge up so a
+    // single box covers it, and the build then has exactly one atlas.
+    w.chunkSize = chunkSize > 0 ? chunkSize : Math.max(16, ...w.dims) + 1;
     w.startSim();
     await w.meshAll();
     return w;
@@ -285,7 +307,7 @@ export class World {
       this.schem,
       this.pack,
       this.cfg,
-      CHUNK,
+      this.chunkSize,
     );
     const count = result.chunkCount();
     const jobs: Promise<void>[] = [];
@@ -389,17 +411,17 @@ export class World {
       const scratch = this.eng.Schematic.create("chunk");
       scratch.copyRegion(
         this.schem,
-        cx * CHUNK,
-        cy * CHUNK,
-        cz * CHUNK,
-        cx * CHUNK + CHUNK - 1,
-        cy * CHUNK + CHUNK - 1,
-        cz * CHUNK + CHUNK - 1,
+        cx * this.chunkSize,
+        cy * this.chunkSize,
+        cz * this.chunkSize,
+        cx * this.chunkSize + this.chunkSize - 1,
+        cy * this.chunkSize + this.chunkSize - 1,
+        cz * this.chunkSize + this.chunkSize - 1,
         // Copy the box to where it actually lives, so the re-meshed chunk
         // comes back in the same world space as the initial pass.
-        cx * CHUNK,
-        cy * CHUNK,
-        cz * CHUNK,
+        cx * this.chunkSize,
+        cy * this.chunkSize,
+        cz * this.chunkSize,
         "[]",
       );
       // An empty box has nothing to mesh and the mesher says so by
@@ -669,9 +691,9 @@ export class World {
           for (let dz = -1; dz <= 1; dz++) {
             this.dirty.add(
               key(
-                Math.floor((x + dx) / CHUNK),
-                Math.floor((y + dy) / CHUNK),
-                Math.floor((z + dz) / CHUNK),
+                Math.floor((x + dx) / this.chunkSize),
+                Math.floor((y + dy) / this.chunkSize),
+                Math.floor((z + dz) / this.chunkSize),
               ),
             );
           }

@@ -9,7 +9,7 @@
 
 import * as THREE from "three";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { World, loader, type SettleName } from "./world";
+import { World, loader, CHUNK, type SettleName } from "./world";
 import { Player } from "./player";
 import { addDefaultLights } from "./mesher";
 
@@ -86,6 +86,9 @@ export default function App(): JSX.Element {
   const [throttled, setThrottled] = useState(false);
   const [stepN, setStepN] = useState(20);
   const [settle, setSettle] = useState<SettleName>("in-world");
+  /** Mesh-chunk edge. Changing it reloads the build, because chunking is
+   * decided when the scene is built. `0` is one chunk for the whole thing. */
+  const [chunkSize, setChunkSize] = useState<number>(CHUNK);
   const [tick, setTick] = useState(0);
   /** Entities on screen. Worth its own readout: a build can be all boats and
    * carts, and until they were drawn at all an empty-looking room that ticked
@@ -335,12 +338,12 @@ export default function App(): JSX.Element {
     };
   }, []);
 
-  const open = useCallback(async (file: File, mode: SettleName = settle) => {
+  const open = useCallback(async (file: File, mode: SettleName = settle, chunk: number = chunkSize) => {
     setStatus({ kind: "loading", message: `meshing ${file.name}…` });
     setRunning(false);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const world = await World.load(bytes, mode);
+      const world = await World.load(bytes, mode, chunk);
       lastFile.current = file;
       // Swap the scene contents: the old build leaves, the new one arrives.
       const previous = worldRef.current;
@@ -370,7 +373,7 @@ export default function App(): JSX.Element {
     } catch (e) {
       setStatus({ kind: "error", message: String(e) });
     }
-  }, [settle]);
+  }, [settle, chunkSize]);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -465,6 +468,25 @@ export default function App(): JSX.Element {
             <option value="in-world">as it stood (at rest)</option>
             <option value="placement">as if pasted (observers pulse)</option>
             <option value="quiet">quiet (onPlace only)</option>
+          </select>
+        </label>
+        <label
+          className="settle"
+          title="mesh chunk size — smaller re-meshes less geometry per change; one chunk gives the build a single texture atlas, which never has to be decoded twice"
+        >
+          <select
+            value={chunkSize}
+            onChange={(e) => {
+              const size = Number(e.target.value);
+              setChunkSize(size);
+              setRunning(false);
+              if (lastFile.current) void open(lastFile.current, settle, size);
+            }}
+          >
+            <option value={16}>chunks 16³</option>
+            <option value={32}>chunks 32³</option>
+            <option value={64}>chunks 64³</option>
+            <option value={0}>one chunk (whole build)</option>
           </select>
         </label>
         <label className="rate">
