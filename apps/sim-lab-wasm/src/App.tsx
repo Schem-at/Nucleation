@@ -168,6 +168,12 @@ export default function App(): JSX.Element {
 
       const world = worldRef.current;
       if (world?.sim) {
+        // How far the pacing has carried toward the next tick. Zero while
+        // paused: nothing is advancing, so a stroke caught mid-flight should
+        // hold its position rather than drift on a clock the simulation is
+        // not running on. Stepping by hand then walks it forward a tick at a
+        // time, which is the point of stepping by hand.
+        let subTick = 0;
         if (runningRef.current) {
           // What was asked for this frame. Uncapped asks for as much as the
           // budget will take, which is the only honest way to answer "how
@@ -232,21 +238,20 @@ export default function App(): JSX.Element {
           }
           // One drain for the whole batch: the log is cumulative, so
           // reading it per step is quadratic.
-          //
-          // A piston stroke is two game ticks, so that is how long it should
-          // take on screen. Only worth animating while a stroke outlasts a
-          // frame — past ~30 tps it is over before it could be drawn, and
-          // interpolating then smears the machine instead of clarifying it.
           if (steps) {
-            const move = rateRef.current <= 30 && steps === 1 ? 2 / rateRef.current : 0;
-            world.applyChanges(world.drainChanges(), move);
-          }
-          if (steps) {
+            world.applyChanges(world.drainChanges());
             setTick(Number(world.sim.tickCount?.() ?? 0));
             setEntities(world.entityCount());
           }
+          subTick = Math.min(carry, 1);
         }
-        world.animate(now);
+        // A fractional tick, not a wall-clock stamp: whole ticks completed plus
+        // however far the pacing has carried toward the next. Strokes are
+        // interpolated against the same clock the simulation advances on, so
+        // one stepped tick and fifty are both drawn correctly and neither can
+        // desync — which is what the old `steps === 1` guard was papering over
+        // by teleporting everything above it.
+        world.animate(Number(world.sim.tickCount?.() ?? 0) + subTick);
         if (!flushing) {
           flushing = true;
           void world.flush().finally(() => {
@@ -392,10 +397,7 @@ export default function App(): JSX.Element {
     const t0 = performance.now();
     for (let i = 0; i < n; i++) world.sim.step();
     const changes = world.drainChanges();
-    // Stepping one tick by hand is the case where you most want to *see* the
-    // stroke, so give it a fixed beat rather than the run rate. Jumping many
-    // ticks lands them all at once, which is what "jump" means.
-    world.applyChanges(changes, n === 1 ? 0.25 : 0);
+    world.applyChanges(changes);
     const ms = performance.now() - t0;
     setTick(Number(world.sim.tickCount?.() ?? 0));
     setEntities(world.entityCount());

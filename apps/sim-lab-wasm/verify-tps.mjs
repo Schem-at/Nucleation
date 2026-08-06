@@ -36,7 +36,7 @@ if (brk || use) {
     const w = window.simlab.world;
     if (brk) w.sim.placeBlock(brk[0], brk[1], brk[2], "minecraft:air");
     if (use) w.sim.useBlock(use[0], use[1], use[2]);
-    w.applyChanges(w.drainChanges(), 0);
+    w.applyChanges(w.drainChanges());
   }, { brk, use });
 }
 
@@ -48,7 +48,7 @@ const loadAndKick = async () => {
       const w = window.simlab.world;
       if (brk) w.sim.placeBlock(brk[0], brk[1], brk[2], "minecraft:air");
       if (use) w.sim.useBlock(use[0], use[1], use[2]);
-      w.applyChanges(w.drainChanges(), 0);
+      w.applyChanges(w.drainChanges());
     }, { brk, use });
   }
 };

@@ -39,17 +39,39 @@ function b64ToBytes(b64: string): Uint8Array {
 
 const key = (x: number, y: number, z: number) => `${x},${y},${z}`;
 
-/** Unit step per `facing` value, for reading a `moving_piston`'s travel. */
-const FACING: Record<string, [number, number, number]> = {
-  east: [1, 0, 0],
-  west: [-1, 0, 0],
-  up: [0, 1, 0],
-  down: [0, -1, 0],
-  south: [0, 0, 1],
-  north: [0, 0, -1],
-};
-
 export type Change = { pos: [number, number, number]; to: string };
+
+/** One block the engine currently has in flight — `movingBlocksJson`.
+ *
+ * Read, not derived. The app used to reconstruct this from the block-change
+ * stream: regex `moving_piston[facing=…]` out of it, guess the source as
+ * `pos - facing`, and look the carried block up in a schematic mirror that
+ * lagged a batch behind. That is piston mechanics reimplemented in TypeScript
+ * downstream of an engine that models them exactly, and it animated on a
+ * wall-clock timer the simulation did not share — which is what drew a block
+ * twice, left a gap where one should be, and sheared a piston head off its
+ * load. See `Simulation::moving_blocks` in `crates/mc-tick/src/sim.rs`.
+ */
+type MovingBlock = {
+  to: [number, number, number];
+  from: [number, number, number];
+  /** What lands at `to`. Not always what is drawn — see `carried`. */
+  state: string;
+  /** What to draw travelling. Differs from `state` for a retracting piston:
+   * its body stays put and a `piston_head` comes home. */
+  carried: string;
+  /** `carried` with a piston arm's `short=true`, or null if it is not an arm.
+   * Drawn while the head is within half a block of its body. */
+  carried_short: string | null;
+  /** What to draw parked at `to` for the whole move — the retracting piston's
+   * body — or null when the cell is genuinely empty until the block lands. */
+  remains: string | null;
+  dir: string;
+  extending: boolean;
+  started: number;
+  lands: number;
+  source_piston: boolean;
+};
 
 /** How a build is settled before tick 0.
  *
@@ -327,7 +349,66 @@ export class World {
     }
     await Promise.all(jobs);
     this.rebuildSolidSet();
+    void this.warmBlockMeshes();
   }
+
+  /** Parse a one-block mesh for every state in the build, in the background.
+   *
+   * A flight whose mesh has not parsed yet is not drawn *at all* — its cell is
+   * blank for the whole stroke, and the chunk cannot cover for it because the
+   * source cell has already been cleared. Measured on BB: 601 of 5484 flights
+   * over 120 ticks, arriving in bursts, one per block type the first time that
+   * type set off. The old comment here called that "a frame or two, which is
+   * invisible at these speeds"; it is a GLB parse, and it is not.
+   *
+   * Not `paletteJson()`, which was the first thing tried here and is wrong: it
+   * returns bare block *names* with no properties, so every one of its 155
+   * entries on BB was a cache key no flight could ever match — 155 parses paid
+   * for and zero hits. Flights are keyed on the full state string. The world
+   * snapshot is the same set with the properties still attached.
+   *
+   * Even that is a starting point, not the whole set. Some of what flies is
+   * produced by the simulation and is in no initial state at all: a
+   * `piston_head` only exists once a piston extends, an
+   * `observer[powered=true]` only once one fires. Those are caught by
+   * [`World.warmState`] off the change stream — one flight late the first time
+   * each appears, which is the residual, and it is bounded by the number of
+   * distinct states rather than by how long the machine runs.
+   *
+   * A few at a time and off the critical path: the user is looking at the
+   * build while this runs, and firing two hundred parses at once would stall
+   * the view to fix a flicker.
+   */
+  private async warmBlockMeshes(): Promise<void> {
+    const token = ++this.warmToken;
+    let states: string[] = [];
+    try {
+      const snapshot: { state: string }[] = JSON.parse(this.sim.worldSnapshotJson());
+      states = [...new Set(snapshot.map((b) => b.state))];
+    } catch {
+      return;
+    }
+    for (const state of states) {
+      if (token !== this.warmToken) return; // a new build was loaded
+      this.warmState(state);
+      // Let a handful run together — serialising one per frame took fifteen
+      // seconds on a 161-state build, by which time the flicker it exists to
+      // prevent has already happened.
+      while (this.pendingMeshes.size >= 6 && token === this.warmToken) {
+        await new Promise((r) => requestAnimationFrame(r));
+      }
+    }
+  }
+
+  /** Parse this state's one-block mesh now, if it is not known already. */
+  private warmState(state: string): void {
+    if (!state || state === "minecraft:air") return;
+    if (state.startsWith("minecraft:moving_piston")) return; // never drawn
+    if (this.blockMeshes.has(state) || this.pendingMeshes.has(state)) return;
+    this.blockMesh(state);
+  }
+
+  private warmToken = 0;
 
   private async installChunk(cx: number, cy: number, cz: number, mesh: Any): Promise<void> {
     const k = key(cx, cy, cz);
@@ -437,16 +518,63 @@ export class World {
     await this.installChunk(cx, cy, cz, mesh);
   }
 
-  /** A block mid-flight between two cells, drawn by [`World.animate`]. */
-  private flights: {
-    state: string;
-    /** Null until the block's mesh finishes parsing; see [`World.animate`]. */
+  /** A block mid-flight between two cells, drawn by [`World.animate`].
+   *
+   * One per entry of the engine's own in-flight list, keyed by destination —
+   * created and retired by [`World.syncFlights`], never by a timer here.
+   */
+  private flights = new Map<
+    string,
+    {
+      state: string;
+      /** The shortened piston arm, drawn while the head is beside its body;
+       * null for anything that is not an arm. */
+      shortState: string | null;
+      /** Which of `state`/`shortState` `object` was cloned from. */
+      drawnState: string;
+      /** True while the arm travels away from its body, false while it
+       * returns — which end of the move the body sits at. */
+      extending: boolean;
+      /** Null until the block's mesh finishes parsing; see [`World.animate`]. */
+      object: THREE.Object3D | null;
+      /** A block parked at `to` for the whole move, drawn but never moved — a
+       * retracting piston's body. The chunk cannot draw it: the cell holds a
+       * `moving_piston` placeholder, which meshes as a hole. */
+      still: string | null;
+      stillObject: THREE.Object3D | null;
+      from: [number, number, number];
+      to: [number, number, number];
+      /** Engine tick the stroke was dispatched on. */
+      started: number;
+      /** Engine tick the block is written at `to`. */
+      lands: number;
+    }
+  >();
+  /** How many times each chunk has been marked dirty, and the stand-ins
+   * waiting on it.
+   *
+   * A flight retires on the tick its block lands, which is correct and exact.
+   * The chunk that must then draw that block is re-meshed **asynchronously** —
+   * one `MeshResult` per chunk, tens of milliseconds each. Disposing the
+   * flight at retirement left the cell drawn by nothing in between: measured
+   * on BB at 1446 of 4965 retirements, up to 8 painted frames each. That is
+   * the blink.
+   *
+   * So a flight whose cell now holds a real block is not disposed; it is
+   * parked at its destination and released by [`World.releaseHandovers`] in
+   * the same turn as the chunk swap that takes over from it.
+   */
+  private chunkRevision = new Map<string, number>();
+  private handover: {
+    /** The destination cell, for probes and debugging. */
+    cell: string;
+    chunk: string;
+    /** The chunk revision that will draw this block for real. */
+    revision: number;
     object: THREE.Object3D | null;
-    from: [number, number, number];
-    to: [number, number, number];
-    start: number;
-    dur: number;
+    stillObject: THREE.Object3D | null;
   }[] = [];
+
   /** One parsed mesh per block state, so a hundred sliding slime blocks cost
    * one mesh and a hundred cheap clones. */
   private blockMeshes = new Map<string, THREE.Object3D | null>();
@@ -490,42 +618,154 @@ export class World {
     return null;
   }
 
-  /** Start drawing `state` sliding from `from` to `to` over `dur` seconds.
+  /** Match the drawn flights to the ones the engine currently has in the air.
    *
-   * The flight is recorded even though its mesh is still parsing — the first
-   * sighting of any block state is always a cache miss, and dropping those
-   * meant the first stroke of every kind never animated at all.
+   * Called after every batch of steps. The engine's list *is* the truth: an
+   * entry appears on the tick the stroke was dispatched and is gone on the
+   * tick the real block is written, so a flight created and retired from it
+   * can never be drawn alongside the block it is carrying, nor vanish before
+   * it arrives. Both artefacts were the old wall-clock lifetimes racing the
+   * simulation for the same cell.
    */
-  private launch(state: string, from: [number, number, number], to: [number, number, number], dur: number) {
-    this.blockMesh(state); // kick off the parse; picked up in `animate`
-    // Milliseconds, to match `performance.now()`. Holding the caller's
-    // seconds here made every flight expire on its first frame.
-    this.flights.push({ state, object: null, from, to, start: performance.now(), dur: dur * 1000 });
+  syncFlights(): void {
+    let live: MovingBlock[];
+    try {
+      live = JSON.parse(this.sim.movingBlocksJson?.() ?? "[]") as MovingBlock[];
+    } catch {
+      live = [];
+    }
+    if (live.length === 0 && this.flights.size === 0) return;
+
+    const seen = new Set<string>();
+    for (const m of live) {
+      const k = key(m.to[0], m.to[1], m.to[2]);
+      seen.add(k);
+      // A cell is not an identity. Consecutive strokes reuse a destination —
+      // a sticky piston extends its head into a slot and two ticks later
+      // retracts and pulls a block back into the same one — so "do I already
+      // have a flight here" is the wrong question. Asking it kept the head
+      // flight: the pulled block was never drawn at all, and the head stayed
+      // on screen past its landing beside the real one. Compare what is
+      // flying, from where, since when.
+      const have = this.flights.get(k);
+      if (have && have.started === m.started && have.state === m.carried &&
+          have.from[0] === m.from[0] && have.from[1] === m.from[1] && have.from[2] === m.from[2]) {
+        continue;
+      }
+      if (have) this.retire(k, have);
+      // `carried`, not `state`: a retracting piston lands its base but what
+      // travels is its head. Recorded even though the mesh may still be
+      // parsing — the first sighting of any block state is always a cache
+      // miss, and dropping those meant the first stroke of every kind never
+      // animated at all.
+      this.blockMesh(m.carried);
+      if (m.carried_short) this.blockMesh(m.carried_short);
+      if (m.remains) this.blockMesh(m.remains);
+      this.flights.set(k, {
+        state: m.carried,
+        shortState: m.carried_short,
+        drawnState: m.carried,
+        extending: m.extending,
+        object: null,
+        still: m.remains,
+        stillObject: null,
+        from: m.from,
+        to: m.to,
+        started: m.started,
+        lands: m.lands,
+      });
+    }
+    for (const [k, f] of this.flights) {
+      if (seen.has(k)) continue;
+      this.retire(k, f);
+      this.flights.delete(k);
+    }
   }
 
-  /** Advance every in-flight block; drop the ones that have arrived.
+  /** Take a flight off the live list without leaving its cell blank.
    *
-   * Called once a frame. A move takes two game ticks, so at the rates worth
-   * watching it spans many frames — which is the whole point: without this a
-   * piston stroke is two instantaneous jumps.
+   * If the cell now holds a real block, the chunk will draw it — but not until
+   * it has been re-meshed, which is asynchronous. Park the flight's meshes at
+   * the destination until that happens. If the cell is empty (a stroke
+   * cancelled mid-flight: vanilla's `finalTick` lands air for a source piston)
+   * nothing should be drawn there and they go immediately.
    */
-  animate(now: number): void {
-    if (this.flights.length === 0) return;
-    this.flights = this.flights.filter((f) => {
-      const t = f.dur > 0 ? (now - f.start) / f.dur : 1;
-      if (t >= 1) {
-        if (f.object) {
-          this.group.remove(f.object);
-          f.object.traverse((o: Any) => o.geometry?.dispose?.());
+  private retire(k: string, f: { object: THREE.Object3D | null; stillObject: THREE.Object3D | null }): void {
+    if (!this.solid.has(k) || (!f.object && !f.stillObject)) {
+      this.dispose(f.object);
+      this.dispose(f.stillObject);
+      return;
+    }
+    const [x, y, z] = k.split(",").map(Number);
+    // Snapped, not left wherever the last frame put it: a flight retired in
+    // the same frame its mesh finished parsing has never been positioned, and
+    // `animate` will not touch it again.
+    f.object?.position.set(x, y, z);
+    const chunk = key(
+      Math.floor(x / this.chunkSize),
+      Math.floor(y / this.chunkSize),
+      Math.floor(z / this.chunkSize),
+    );
+    this.handover.push({
+      cell: k,
+      chunk,
+      revision: this.chunkRevision.get(chunk) ?? 0,
+      object: f.object,
+      stillObject: f.stillObject,
+    });
+  }
+
+  /** Draw every in-flight block at its position as of `tickNow`.
+   *
+   * `tickNow` is a *fractional tick*: completed ticks plus how far the pacing
+   * has carried toward the next one. Interpolating against it rather than
+   * against `performance.now()` is what keeps a stroke in step with the
+   * simulation — frame jitter, a throttled frame, or fifty ticks stepped at
+   * once all move this clock and the stroke with it, instead of leaving an
+   * animation running against a world that has moved on.
+   */
+  animate(tickNow: number): void {
+    if (this.flights.size === 0) return;
+    for (const f of this.flights.values()) {
+      // A block that holds its cell for the whole move — the retracting
+      // piston's body. Placed once and never touched again; only `object`
+      // below is interpolated, exactly as vanilla submits its `base` slot
+      // outside the translate that carries the moving one.
+      if (f.still && !f.stillObject) {
+        const proto = this.blockMesh(f.still);
+        if (proto) {
+          f.stillObject = proto.clone(true);
+          f.stillObject.position.set(f.to[0], f.to[1], f.to[2]);
+          this.group.add(f.stillObject);
         }
-        return false;
       }
-      // Late arrival: the mesh finished parsing after the flight began.
-      if (!f.object) {
-        const proto = this.blockMesh(f.state);
-        if (!proto) return true; // still parsing; try again next frame
-        f.object = proto.clone(true);
-        this.group.add(f.object);
+      const span = f.lands - f.started;
+      // Clamped, and deliberately reaching 1 before the flight retires: a
+      // piston's blocks are visually home a tick before the world is written,
+      // which is vanilla's own `progressO` having reached 1.0 on the landing
+      // tick. Holding them at the destination for that tick is correct.
+      const t = span > 0 ? Math.min(1, Math.max(0, (tickNow - f.started) / span)) : 1;
+      // A piston arm is drawn shortened while it is within half a block of its
+      // body and full length beyond that, or its shaft passes visibly through
+      // the back of the piston as it comes home. The body sits at `from` on an
+      // extension and at `to` on a retraction, so "near the body" flips with
+      // the direction of travel — which is exactly the pair of opposite
+      // comparisons vanilla's `PistonHeadRenderer` spells out (`SHORT` at
+      // `progress <= 0.5` extending, `progress >= 0.5` retracting).
+      const want =
+        f.shortState && (f.extending ? t <= 0.5 : t >= 0.5) ? f.shortState : f.state;
+      // Late arrival: the mesh finished parsing after the flight began. Also
+      // the swap between the two arm lengths — a clone, not a re-parse.
+      if (!f.object || f.drawnState !== want) {
+        const proto = this.blockMesh(want);
+        if (!proto) {
+          if (!f.object) continue; // still parsing; try again next frame
+        } else {
+          this.dispose(f.object);
+          f.object = proto.clone(true);
+          f.drawnState = want;
+          this.group.add(f.object);
+        }
       }
       // Linear, like the game's own `getExtendedProgress` — a piston does not
       // ease in or out, and faking it reads as lag.
@@ -534,8 +774,13 @@ export class World {
         f.from[1] + (f.to[1] - f.from[1]) * t,
         f.from[2] + (f.to[2] - f.from[2]) * t,
       );
-      return true;
-    });
+    }
+  }
+
+  private dispose(object: THREE.Object3D | null): void {
+    if (!object) return;
+    this.group.remove(object);
+    object.traverse((o: Any) => o.geometry?.dispose?.());
   }
 
   /** Redraw every live entity from the engine's own view.
@@ -611,62 +856,43 @@ export class World {
 
   /** Drop every in-flight block — on reload, reset, or a jump in time. */
   clearFlights(): void {
-    for (const f of this.flights) {
-      if (!f.object) continue;
-      this.group.remove(f.object);
-      f.object.traverse((o: Any) => o.geometry?.dispose?.());
+    for (const f of this.flights.values()) {
+      this.dispose(f.object);
+      this.dispose(f.stillObject);
     }
-    this.flights = [];
+    this.flights.clear();
+    for (const h of this.handover) {
+      this.dispose(h.object);
+      this.dispose(h.stillObject);
+    }
+    this.handover = [];
+    this.chunkRevision.clear();
   }
 
   /** Apply what the last tick changed: patch the schematic, mark chunks.
    *
-   * `moveSeconds` is how long a piston stroke should take on screen — two
-   * game ticks at the current rate. Zero disables the animation, which is
-   * what a fast-forward wants: interpolating a stroke that is already over
-   * by the next frame just smears it.
+   * Animation is not decided here. Strokes come from
+   * [`World.syncFlights`] — the engine's own in-flight list — because the
+   * only thing this stream says about a stroke is that some cell became a
+   * placeholder, and everything else the app used to infer from that (which
+   * block set off, from where, for how long) was a guess racing the
+   * simulation.
    */
-  applyChanges(changes: Change[], moveSeconds = 0): void {
+  applyChanges(changes: Change[]): void {
     // Entities first, and unconditionally: an entity can move on a tick that
     // changes no block at all, so gating this on `changes.length` would freeze
     // a boat drifting through still air.
     this.syncEntities();
-    // Before anything is written: a cell turning into `moving_piston` is a
-    // block arriving from the far side, and the only place its identity still
-    // exists is the schematic we are about to overwrite. Read the sources
-    // first, animate second, write third.
-    if (moveSeconds > 0) {
-      for (const c of changes) {
-        const dir = /moving_piston\[facing=(\w+)/.exec(c.to);
-        if (!dir) continue;
-        const [dx, dy, dz] = FACING[dir[1]] ?? [0, 0, 0];
-        const [x, y, z] = c.pos;
-        const src: [number, number, number] = [x - dx, y - dy, z - dz];
-        // The *schematic*, not `blockAt` — the simulation has already stepped
-        // and cleared the source, so it is the mirror lagging one batch behind
-        // that still knows what set off.
-        let carried = "";
-        try {
-          carried = this.schem.getBlockString(src[0], src[1], src[2]) ?? "";
-        } catch {
-          carried = "";
-        }
-        if (!carried || carried === "minecraft:air") continue;
-        if (carried.startsWith("minecraft:moving_piston")) continue; // already in flight
-        // A piston's own head slot: the base stays put and the head slides
-        // out of it, so draw the head rather than a second copy of the base.
-        const head = new RegExp(`^minecraft:(sticky_)?piston\\[.*facing=${dir[1]}`).exec(carried);
-        const state = head
-          ? `minecraft:piston_head[facing=${dir[1]},short=false,type=${head[1] ? "sticky" : "normal"}]`
-          : carried;
-        this.launch(state, src, [x, y, z], moveSeconds);
-      }
-    }
     for (const c of changes) {
       const [x, y, z] = c.pos;
       // A placeholder is not a block anyone should see. The chunk shows a
       // hole for the two ticks the stroke lasts and the sliding mesh fills
       // it — meshing `moving_piston` instead drew a stand-in that popped.
+      // Anything the simulation writes is a candidate for flying later — a
+      // `piston_head` that has just landed will fly again the next time that
+      // piston retracts. Warming here is what covers the states the build's
+      // palette never contained.
+      this.warmState(c.to);
       const solidified = c.to.startsWith("minecraft:moving_piston") ? "minecraft:air" : c.to;
       try {
         this.schem.setBlockFromString(x, y, z, solidified);
@@ -689,15 +915,22 @@ export class World {
       for (let dx = -1; dx <= 1; dx++)
         for (let dy = -1; dy <= 1; dy++)
           for (let dz = -1; dz <= 1; dz++) {
-            this.dirty.add(
-              key(
-                Math.floor((x + dx) / this.chunkSize),
-                Math.floor((y + dy) / this.chunkSize),
-                Math.floor((z + dz) / this.chunkSize),
-              ),
+            const k = key(
+              Math.floor((x + dx) / this.chunkSize),
+              Math.floor((y + dy) / this.chunkSize),
+              Math.floor((z + dz) / this.chunkSize),
             );
+            this.dirty.add(k);
+            this.chunkRevision.set(k, (this.chunkRevision.get(k) ?? 0) + 1);
           }
     }
+    // *After* the writes, not before. A retiring flight has to know whether the
+    // cell it is vacating now holds a real block — if it does, the flight hands
+    // over to the chunk instead of disappearing; if the stroke was cancelled
+    // and the cell is air, nothing should be drawn and it goes at once. Both
+    // answers live in `solid` and `chunkRevision`, which the loop above has
+    // just brought up to date.
+    this.syncFlights();
   }
 
   /** Re-mesh everything marked dirty. Called once per animation frame, not
@@ -706,11 +939,32 @@ export class World {
     if (this.dirty.size === 0) return 0;
     const todo = [...this.dirty];
     this.dirty.clear();
+    // The schematic already holds every change these chunks are being re-meshed
+    // for, so this is the revision each one is about to catch up to. Captured
+    // before the first `await`: a change landing mid-flush belongs to the next
+    // pass, and a hand-off must not be released on a mesh that predates it.
+    const caughtUpTo = new Map(todo.map((k) => [k, this.chunkRevision.get(k) ?? 0]));
     for (const k of todo) {
       const [cx, cy, cz] = k.split(",").map(Number);
       await this.remeshChunk(cx, cy, cz);
+      // Same turn as the chunk swap inside `installChunk`: the new geometry is
+      // in the scene, so whatever was standing in for it can go now. A frame
+      // later would show both; the retirement that queued it would have shown
+      // neither.
+      this.releaseHandovers(k, caughtUpTo.get(k) ?? 0);
     }
     return todo.length;
+  }
+
+  /** Drop the stand-ins for `chunk` that `revision` has now drawn for real. */
+  private releaseHandovers(chunk: string, revision: number): void {
+    if (this.handover.length === 0) return;
+    this.handover = this.handover.filter((h) => {
+      if (h.chunk !== chunk || h.revision > revision) return true;
+      this.dispose(h.object);
+      this.dispose(h.stillObject);
+      return false;
+    });
   }
 
   private rebuildSolidSet(): void {

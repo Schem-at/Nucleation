@@ -33,7 +33,7 @@ const out = await p.evaluate(() => {
   // Step a while: entities must survive ticking, and be re-synced each time.
   for (let t = 0; t < 20; t++) {
     w.sim.step();
-    w.applyChanges(w.drainChanges(), 0);
+    w.applyChanges(w.drainChanges());
   }
   return {
     counts,

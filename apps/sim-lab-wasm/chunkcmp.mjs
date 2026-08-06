@@ -13,7 +13,7 @@ for (const size of [16, 32, 0]) {
     w.sim.placeBlock(31,7,13,"minecraft:air");
     let flushMs=0, chunks=0, ticks=0;
     for (let t=0;t<60;t++) {
-      w.sim.step(); w.applyChanges(w.drainChanges(),0);
+      w.sim.step(); w.applyChanges(w.drainChanges());
       const n=w.dirty.size; const m=performance.now(); await w.flush();
       flushMs+=performance.now()-m; chunks+=n; ticks++;
     }
