@@ -2480,7 +2480,7 @@ impl Simulation {
         self.phase = None;
         self.tick += 1;
         if let Some(timeline) = self.timeline.as_mut() {
-            timeline.frames.push(crate::timeline::StateFrame::capture(
+            timeline.frames.push(crate::timeline::StateFrame::of(
                 self.tick,
                 &self.world,
                 &self.registry,

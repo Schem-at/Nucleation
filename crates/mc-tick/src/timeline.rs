@@ -48,8 +48,21 @@ pub struct StateFrame {
 }
 
 impl StateFrame {
-    pub(crate) fn capture(tick: u64, world: &World, registry: &StateRegistry) -> Self {
-        let mut blocks: Vec<(Pos, StateId)> = world.iter_non_air().collect();
+    /// Capture the visible world at `tick`.
+    pub fn of(tick: u64, world: &World, registry: &StateRegistry) -> Self {
+        Self::from_blocks(tick, world.iter_non_air().collect(), registry)
+    }
+
+    /// Build a frame from a block list in any order.
+    ///
+    /// The canonical sort lives here rather than in the caller so that a frame
+    /// rebuilt by replay is byte-identical to one captured from a `World` —
+    /// two orderings would make every cycle comparison wrong.
+    pub fn from_blocks(
+        tick: u64,
+        mut blocks: Vec<(Pos, StateId)>,
+        registry: &StateRegistry,
+    ) -> Self {
         blocks.sort_unstable_by_key(|(pos, _)| *pos);
         let origin = blocks
             .first()
@@ -65,13 +78,7 @@ impl StateFrame {
             .unwrap_or_default();
         let exact = fingerprint(&blocks, Pos::default(), registry);
         let translated = fingerprint(&blocks, origin, registry);
-        Self {
-            tick,
-            exact,
-            translated,
-            origin,
-            blocks,
-        }
+        Self { tick, exact, translated, origin, blocks }
     }
 
     fn same_exact(&self, other: &Self) -> bool {
@@ -436,7 +443,7 @@ impl TimelineRecorder {
             start_tick: tick,
             inputs: Vec::new(),
             pistons: Vec::new(),
-            frames: vec![StateFrame::capture(tick, world, registry)],
+            frames: vec![StateFrame::of(tick, world, registry)],
         }
     }
 
@@ -462,7 +469,28 @@ mod tests {
         for (pos, state) in entries {
             world.set(*pos, *state);
         }
-        StateFrame::capture(tick, &world, registry)
+        StateFrame::of(tick, &world, registry)
+    }
+
+    #[test]
+    fn a_frame_built_from_blocks_matches_one_captured_from_a_world() {
+        let mut registry = StateRegistry::new();
+        let stone = registry.intern("minecraft:stone").unwrap();
+        let bounds = Bounds::new(Pos::new(-8, -2, -8), Pos::new(8, 2, 8));
+        let mut world = World::new(bounds);
+        world.set(Pos::new(1, 0, 0), stone);
+        world.set(Pos::new(-3, 1, 2), stone);
+
+        let captured = StateFrame::of(7, &world, &registry);
+        // Deliberately unsorted and in a different order from storage order: the
+        // constructor is responsible for canonicalising, or a replayed frame can
+        // never equal a recorded one.
+        let built = StateFrame::from_blocks(
+            7,
+            vec![(Pos::new(-3, 1, 2), stone), (Pos::new(1, 0, 0), stone)],
+            &registry,
+        );
+        assert_eq!(captured, built);
     }
 
     #[test]
