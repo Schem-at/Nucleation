@@ -44,7 +44,11 @@ pub struct StitchState {
 
 impl StitchState {
     pub fn empty() -> Self {
-        StitchState { parent: BTreeMap::new(), clusters: BTreeMap::new(), margin: Vec::new() }
+        StitchState {
+            parent: BTreeMap::new(),
+            clusters: BTreeMap::new(),
+            margin: Vec::new(),
+        }
     }
 
     pub fn from(seg: &TileSegments, cell_size: u32, min_y: i32) -> Self {
@@ -60,7 +64,12 @@ impl StitchState {
                 partition: m.partition.clone(),
             });
         }
-        s.margin.sort_by(|a, b| a.cell.cmp(&b.cell).then(a.cluster.cmp(&b.cluster)).then(a.partition.cmp(&b.partition)));
+        s.margin.sort_by(|a, b| {
+            a.cell
+                .cmp(&b.cell)
+                .then(a.cluster.cmp(&b.cluster))
+                .then(a.partition.cmp(&b.partition))
+        });
         s
     }
 
@@ -68,7 +77,9 @@ impl StitchState {
     /// Absent ids are their own root (defensive).
     pub fn find(&self, mut x: ClusterId) -> ClusterId {
         while let Some(&p) = self.parent.get(&x) {
-            if p == x { break; }
+            if p == x {
+                break;
+            }
             x = p;
         }
         x
@@ -82,7 +93,9 @@ impl StitchState {
     /// not depend on argument order.
     fn union(&mut self, a: ClusterId, b: ClusterId) {
         let (ra, rb) = (self.find(a), self.find(b));
-        if ra == rb { return; }
+        if ra == rb {
+            return;
+        }
         let (root, child) = if ra < rb { (ra, rb) } else { (rb, ra) };
         self.parent.insert(child, root);
     }
@@ -117,7 +130,12 @@ impl StitchState {
         // entries were already mutually resolved by earlier merges.
         let incoming = b.margin;
         a.margin.extend(incoming.iter().cloned());
-        a.margin.sort_by(|x, y| x.cell.cmp(&y.cell).then(x.cluster.cmp(&y.cluster)).then(x.partition.cmp(&y.partition)));
+        a.margin.sort_by(|x, y| {
+            x.cell
+                .cmp(&y.cell)
+                .then(x.cluster.cmp(&y.cluster))
+                .then(x.partition.cmp(&y.partition))
+        });
         a.margin.dedup();
         // Incremental adjacency resolution — the fix for the quadratic
         // full-rescan. We probe ONLY the entries contributed by `b` against a
@@ -162,7 +180,10 @@ impl StitchState {
         // Spatial index: global cell -> entries there (over the full margin).
         let mut index: BTreeMap<GlobalCell, Vec<(ClusterId, Option<String>)>> = BTreeMap::new();
         for e in &self.margin {
-            index.entry(e.cell).or_default().push((e.cluster, e.partition.clone()));
+            index
+                .entry(e.cell)
+                .or_default()
+                .push((e.cluster, e.partition.clone()));
         }
         // Collect unions first (do not mutate the forest while iterating).
         let mut to_union: Vec<(ClusterId, ClusterId)> = Vec::new();
@@ -206,13 +227,27 @@ impl StitchState {
             let partition = self.clusters[&ids[0]].partition_id.clone();
             for id in &ids {
                 let c = &self.clusters[id];
-                bbox.0 = (bbox.0.0.min(c.bbox.0.0), bbox.0.1.min(c.bbox.0.1), bbox.0.2.min(c.bbox.0.2));
-                bbox.1 = (bbox.1.0.max(c.bbox.1.0), bbox.1.1.max(c.bbox.1.1), bbox.1.2.max(c.bbox.1.2));
+                bbox.0 = (
+                    bbox.0 .0.min(c.bbox.0 .0),
+                    bbox.0 .1.min(c.bbox.0 .1),
+                    bbox.0 .2.min(c.bbox.0 .2),
+                );
+                bbox.1 = (
+                    bbox.1 .0.max(c.bbox.1 .0),
+                    bbox.1 .1.max(c.bbox.1 .1),
+                    bbox.1 .2.max(c.bbox.1 .2),
+                );
                 blocks += c.block_count;
                 cells += c.cell_count;
             }
-            builds.push(Build { id: root, cluster_ids: ids, bbox, block_count: blocks,
-                                cell_count: cells, partition_id: partition });
+            builds.push(Build {
+                id: root,
+                cluster_ids: ids,
+                bbox,
+                block_count: blocks,
+                cell_count: cells,
+                partition_id: partition,
+            });
         }
         builds.sort_by_key(|b| b.id);
         builds
@@ -235,21 +270,37 @@ mod tests {
     use crate::world_segment::ids::{ClusterId, TileId};
     use crate::world_segment::segment::{Cluster, MarginCell, TileSegments};
 
-    fn cid(tile: TileId, anchor: (i32,i32,i32)) -> ClusterId {
+    fn cid(tile: TileId, anchor: (i32, i32, i32)) -> ClusterId {
         // Use the real constructor so ids are realistic; config/profile/partition
         // folded in by segment_tile don't matter for stitch-key behaviour here.
         ClusterId::new(
             crate::world_segment::ids::ContentId::of(&[b"t"]),
-            tile, None, anchor,
+            tile,
+            None,
+            anchor,
         )
     }
 
-    fn seg_with(tile: TileId, id: ClusterId, cell: (i32,i32,i32), part: Option<&str>) -> TileSegments {
+    fn seg_with(
+        tile: TileId,
+        id: ClusterId,
+        cell: (i32, i32, i32),
+        part: Option<&str>,
+    ) -> TileSegments {
         TileSegments {
             tile_id: tile,
-            clusters: vec![Cluster{ id, bbox:((0,0,0),(1,1,1)), block_count:5, cell_count:1,
-                                    partition_id: part.map(|s| s.to_string()) }],
-            margin: vec![MarginCell{ cell, cluster:id, partition: part.map(|s| s.to_string()) }],
+            clusters: vec![Cluster {
+                id,
+                bbox: ((0, 0, 0), (1, 1, 1)),
+                block_count: 5,
+                cell_count: 1,
+                partition_id: part.map(|s| s.to_string()),
+            }],
+            margin: vec![MarginCell {
+                cell,
+                cluster: id,
+                partition: part.map(|s| s.to_string()),
+            }],
         }
     }
 
@@ -257,21 +308,29 @@ mod tests {
     fn adjacent_clusters_across_a_seam_join() {
         // Tile (0,0) right edge cell and tile (1,0) left edge cell, one global
         // cell apart -> within 2R+1 -> same build.
-        let a = cid(TileId{x:0,z:0}, (127,1,1));
-        let b = cid(TileId{x:1,z:0}, (0,1,1));
+        let a = cid(TileId { x: 0, z: 0 }, (127, 1, 1));
+        let b = cid(TileId { x: 1, z: 0 }, (0, 1, 1));
         // region 0 local x=127 -> global 127; region 1 local x=0 -> global 128. Distance 1.
-        let sa = StitchState::from(&seg_with(TileId{x:0,z:0}, a, (127,1,1), None), 4, -64);
-        let sb = StitchState::from(&seg_with(TileId{x:1,z:0}, b, (0,1,1), None), 4, -64);
+        let sa = StitchState::from(
+            &seg_with(TileId { x: 0, z: 0 }, a, (127, 1, 1), None),
+            4,
+            -64,
+        );
+        let sb = StitchState::from(&seg_with(TileId { x: 1, z: 0 }, b, (0, 1, 1), None), 4, -64);
         let m = StitchState::merge(sa, sb, 2);
         assert_eq!(m.find(a), m.find(b), "one global cell apart must join");
     }
 
     #[test]
     fn distant_clusters_do_not_join() {
-        let a = cid(TileId{x:0,z:0}, (0,1,1));
-        let b = cid(TileId{x:1,z:0}, (100,1,1)); // far inside region 1 -> global 228, distance >> 2R+1
-        let sa = StitchState::from(&seg_with(TileId{x:0,z:0}, a, (0,1,1), None), 4, -64);
-        let sb = StitchState::from(&seg_with(TileId{x:1,z:0}, b, (100,1,1), None), 4, -64);
+        let a = cid(TileId { x: 0, z: 0 }, (0, 1, 1));
+        let b = cid(TileId { x: 1, z: 0 }, (100, 1, 1)); // far inside region 1 -> global 228, distance >> 2R+1
+        let sa = StitchState::from(&seg_with(TileId { x: 0, z: 0 }, a, (0, 1, 1), None), 4, -64);
+        let sb = StitchState::from(
+            &seg_with(TileId { x: 1, z: 0 }, b, (100, 1, 1), None),
+            4,
+            -64,
+        );
         let m = StitchState::merge(sa, sb, 2);
         assert_ne!(m.find(a), m.find(b));
     }
@@ -279,10 +338,18 @@ mod tests {
     #[test]
     fn clusters_in_different_partitions_never_join() {
         // Same geometry as the joining case, but different partitions.
-        let a = cid(TileId{x:0,z:0}, (127,1,1));
-        let b = cid(TileId{x:1,z:0}, (0,1,1));
-        let sa = StitchState::from(&seg_with(TileId{x:0,z:0}, a, (127,1,1), Some("L")), 4, -64);
-        let sb = StitchState::from(&seg_with(TileId{x:1,z:0}, b, (0,1,1), Some("R")), 4, -64);
+        let a = cid(TileId { x: 0, z: 0 }, (127, 1, 1));
+        let b = cid(TileId { x: 1, z: 0 }, (0, 1, 1));
+        let sa = StitchState::from(
+            &seg_with(TileId { x: 0, z: 0 }, a, (127, 1, 1), Some("L")),
+            4,
+            -64,
+        );
+        let sb = StitchState::from(
+            &seg_with(TileId { x: 1, z: 0 }, b, (0, 1, 1), Some("R")),
+            4,
+            -64,
+        );
         let m = StitchState::merge(sa, sb, 2);
         assert_ne!(m.find(a), m.find(b), "different partitions must not union");
     }
@@ -291,27 +358,37 @@ mod tests {
     fn to_global_aligns_tiles_on_one_lattice() {
         // cell_size 4, min_y -64. Region (1,0) origin x=512 -> 128 cells.
         // Local cell (0,_,_) in region 1 == global x 128; local (0) in region 0 == global 0.
-        assert_eq!(to_global((0,0,0), TileId{x:0,z:0}, 4, -64).0, 0);
-        assert_eq!(to_global((0,0,0), TileId{x:1,z:0}, 4, -64).0, 128);
+        assert_eq!(to_global((0, 0, 0), TileId { x: 0, z: 0 }, 4, -64).0, 0);
+        assert_eq!(to_global((0, 0, 0), TileId { x: 1, z: 0 }, 4, -64).0, 128);
         // Y uses div_euclid: min_y -64 / 4 = -16, plus ly.
-        assert_eq!(to_global((0,0,0), TileId{x:0,z:0}, 4, -64).1, -16);
-        assert_eq!(to_global((0,5,0), TileId{x:0,z:0}, 4, -64).1, -11);
+        assert_eq!(to_global((0, 0, 0), TileId { x: 0, z: 0 }, 4, -64).1, -16);
+        assert_eq!(to_global((0, 5, 0), TileId { x: 0, z: 0 }, 4, -64).1, -11);
         // Negative region: region -1 origin x = -512, /4 = -128.
-        assert_eq!(to_global((0,0,0), TileId{x:-1,z:0}, 4, -64).0, -128);
+        assert_eq!(to_global((0, 0, 0), TileId { x: -1, z: 0 }, 4, -64).0, -128);
         // Non-divisor cell_size on a negative region: this is the case that
         // discriminates truncating `/` from `div_euclid`. Region -1 origin
         // x = -512; -512.div_euclid(6) == -86, but -512 / 6 == -85
         // (truncates toward zero). Only div_euclid gives -86.
-        assert_eq!(to_global((0,0,0), TileId{x:-1,z:0}, 6, -64).0, -86);
+        assert_eq!(to_global((0, 0, 0), TileId { x: -1, z: 0 }, 6, -64).0, -86);
     }
 
     #[test]
     fn from_lifts_clusters_and_margin_into_global_coords() {
-        let a = cid(TileId{x:0,z:0}, (1,1,1));
+        let a = cid(TileId { x: 0, z: 0 }, (1, 1, 1));
         let seg = TileSegments {
-            tile_id: TileId{x:0,z:0},
-            clusters: vec![Cluster{ id:a, bbox:((0,0,0),(3,3,3)), block_count:10, cell_count:2, partition_id:None }],
-            margin: vec![MarginCell{ cell:(0,0,0), cluster:a, partition:None }],
+            tile_id: TileId { x: 0, z: 0 },
+            clusters: vec![Cluster {
+                id: a,
+                bbox: ((0, 0, 0), (3, 3, 3)),
+                block_count: 10,
+                cell_count: 2,
+                partition_id: None,
+            }],
+            margin: vec![MarginCell {
+                cell: (0, 0, 0),
+                cluster: a,
+                partition: None,
+            }],
         };
         let s = StitchState::from(&seg, 4, -64);
         // The cluster is its own representative initially.
@@ -322,10 +399,14 @@ mod tests {
 
     #[test]
     fn finish_groups_joined_clusters_into_one_build() {
-        let a = cid(TileId{x:0,z:0}, (127,1,1));
-        let b = cid(TileId{x:1,z:0}, (0,1,1));
-        let sa = StitchState::from(&seg_with(TileId{x:0,z:0}, a, (127,1,1), None), 4, -64);
-        let sb = StitchState::from(&seg_with(TileId{x:1,z:0}, b, (0,1,1), None), 4, -64);
+        let a = cid(TileId { x: 0, z: 0 }, (127, 1, 1));
+        let b = cid(TileId { x: 1, z: 0 }, (0, 1, 1));
+        let sa = StitchState::from(
+            &seg_with(TileId { x: 0, z: 0 }, a, (127, 1, 1), None),
+            4,
+            -64,
+        );
+        let sb = StitchState::from(&seg_with(TileId { x: 1, z: 0 }, b, (0, 1, 1), None), 4, -64);
         let builds = StitchState::merge(sa, sb, 2).finish();
         assert_eq!(builds.len(), 1);
         assert_eq!(builds[0].cluster_ids.len(), 2);

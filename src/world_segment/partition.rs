@@ -134,13 +134,19 @@ impl PartitionIndex {
     }
 
     pub fn partition_at(&self, x: i32, y: i32, z: i32) -> Option<&str> {
-        self.hints.iter().find(|h| h.contains(x, y, z)).map(|h| h.id.as_str())
+        self.hints
+            .iter()
+            .find(|h| h.contains(x, y, z))
+            .map(|h| h.id.as_str())
     }
 
     /// Stable numeric handle for the partition at this point, for cheap
     /// per-cell comparison during dilation.
     pub fn id_index_at(&self, x: i32, y: i32, z: i32) -> Option<u32> {
-        self.hints.iter().position(|h| h.contains(x, y, z)).map(|i| i as u32)
+        self.hints
+            .iter()
+            .position(|h| h.contains(x, y, z))
+            .map(|i| i as u32)
     }
 
     /// Looks up the id for a previously-obtained index.
@@ -166,9 +172,21 @@ mod tests {
 
     fn hints() -> Vec<PartitionHint> {
         vec![
-            PartitionHint { id: "a".into(), bbox_xz: (0, 9, 0, 9), y_range: None },
-            PartitionHint { id: "b".into(), bbox_xz: (11, 20, 0, 9), y_range: None },
-            PartitionHint { id: "c".into(), bbox_xz: (0, 9, 11, 20), y_range: Some((0, 10)) },
+            PartitionHint {
+                id: "a".into(),
+                bbox_xz: (0, 9, 0, 9),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "b".into(),
+                bbox_xz: (11, 20, 0, 9),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "c".into(),
+                bbox_xz: (0, 9, 11, 20),
+                y_range: Some((0, 10)),
+            },
         ]
     }
 
@@ -230,9 +248,21 @@ mod tests {
         // Same ids, different boxes: the case that used to slip through
         // `config_hash` entirely.
         let narrower = vec![
-            PartitionHint { id: "a".into(), bbox_xz: (0, 8, 0, 9), y_range: None },
-            PartitionHint { id: "b".into(), bbox_xz: (11, 20, 0, 9), y_range: None },
-            PartitionHint { id: "c".into(), bbox_xz: (0, 9, 11, 20), y_range: Some((0, 10)) },
+            PartitionHint {
+                id: "a".into(),
+                bbox_xz: (0, 8, 0, 9),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "b".into(),
+                bbox_xz: (11, 20, 0, 9),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "c".into(),
+                bbox_xz: (0, 9, 11, 20),
+                y_range: Some((0, 10)),
+            },
         ];
         assert_ne!(
             PartitionIndex::new(hints()).hints_hash(),
@@ -246,8 +276,11 @@ mod tests {
             bbox_xz: (0, 9, 0, 9),
             y_range: Some((i32::MIN, i32::MAX)),
         }];
-        let unbounded =
-            vec![PartitionHint { id: "a".into(), bbox_xz: (0, 9, 0, 9), y_range: None }];
+        let unbounded = vec![PartitionHint {
+            id: "a".into(),
+            bbox_xz: (0, 9, 0, 9),
+            y_range: None,
+        }];
         assert_ne!(
             PartitionIndex::new(full).hints_hash(),
             PartitionIndex::new(unbounded).hints_hash()
@@ -255,14 +288,33 @@ mod tests {
 
         // Ids must not alias through concatenation.
         let ab_c = vec![
-            PartitionHint { id: "ab".into(), bbox_xz: (0, 0, 0, 0), y_range: None },
-            PartitionHint { id: "c".into(), bbox_xz: (0, 0, 0, 0), y_range: None },
+            PartitionHint {
+                id: "ab".into(),
+                bbox_xz: (0, 0, 0, 0),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "c".into(),
+                bbox_xz: (0, 0, 0, 0),
+                y_range: None,
+            },
         ];
         let a_bc = vec![
-            PartitionHint { id: "a".into(), bbox_xz: (0, 0, 0, 0), y_range: None },
-            PartitionHint { id: "bc".into(), bbox_xz: (0, 0, 0, 0), y_range: None },
+            PartitionHint {
+                id: "a".into(),
+                bbox_xz: (0, 0, 0, 0),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "bc".into(),
+                bbox_xz: (0, 0, 0, 0),
+                y_range: None,
+            },
         ];
-        assert_ne!(PartitionIndex::new(ab_c).hints_hash(), PartitionIndex::new(a_bc).hints_hash());
+        assert_ne!(
+            PartitionIndex::new(ab_c).hints_hash(),
+            PartitionIndex::new(a_bc).hints_hash()
+        );
 
         // A prefix of the hint list must not collide with the whole.
         assert_ne!(
@@ -280,8 +332,16 @@ mod tests {
         // it gets) would depend on input order. Sorting on the full content
         // tuple (id, bbox_xz, y_range) fixes a single order regardless of
         // how the caller supplied them.
-        let dup_first = PartitionHint { id: "dup".into(), bbox_xz: (0, 4, 0, 4), y_range: None };
-        let dup_second = PartitionHint { id: "dup".into(), bbox_xz: (10, 14, 0, 4), y_range: None };
+        let dup_first = PartitionHint {
+            id: "dup".into(),
+            bbox_xz: (0, 4, 0, 4),
+            y_range: None,
+        };
+        let dup_second = PartitionHint {
+            id: "dup".into(),
+            bbox_xz: (10, 14, 0, 4),
+            y_range: None,
+        };
 
         let forward = vec![dup_first.clone(), dup_second.clone()];
         let mut reversed = forward.clone();
@@ -291,12 +351,24 @@ mod tests {
         let idx_reversed = PartitionIndex::new(reversed);
 
         // Point inside the first box.
-        assert_eq!(idx_forward.partition_at(2, 0, 2), idx_reversed.partition_at(2, 0, 2));
-        assert_eq!(idx_forward.id_index_at(2, 0, 2), idx_reversed.id_index_at(2, 0, 2));
+        assert_eq!(
+            idx_forward.partition_at(2, 0, 2),
+            idx_reversed.partition_at(2, 0, 2)
+        );
+        assert_eq!(
+            idx_forward.id_index_at(2, 0, 2),
+            idx_reversed.id_index_at(2, 0, 2)
+        );
 
         // Point inside the second box.
-        assert_eq!(idx_forward.partition_at(12, 0, 2), idx_reversed.partition_at(12, 0, 2));
-        assert_eq!(idx_forward.id_index_at(12, 0, 2), idx_reversed.id_index_at(12, 0, 2));
+        assert_eq!(
+            idx_forward.partition_at(12, 0, 2),
+            idx_reversed.partition_at(12, 0, 2)
+        );
+        assert_eq!(
+            idx_forward.id_index_at(12, 0, 2),
+            idx_reversed.id_index_at(12, 0, 2)
+        );
 
         // Both boxes resolve to the same id string either way.
         assert_eq!(idx_forward.partition_at(2, 0, 2), Some("dup"));

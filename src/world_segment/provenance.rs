@@ -57,7 +57,12 @@ mod tests {
     use crate::world_segment::ids::{ClusterId, ContentId, TileId};
 
     fn cid() -> ClusterId {
-        ClusterId::new(ContentId::of(&[b"c"]), TileId { x: 0, z: 0 }, None, (0,0,0))
+        ClusterId::new(
+            ContentId::of(&[b"c"]),
+            TileId { x: 0, z: 0 },
+            None,
+            (0, 0, 0),
+        )
     }
 
     #[test]
@@ -76,8 +81,8 @@ mod tests {
             snapshot_build_id: cid(),
             source_id: "w".into(),
             snapshot_id: "2026-05-19".into(),
-            world_bbox: ((0,0,0),(9,9,9)),
-            origin_offset: (0,0,0),
+            world_bbox: ((0, 0, 0), (9, 9, 9)),
+            origin_offset: (0, 0, 0),
             block_count: 100,
             cluster_count: 1,
             fingerprint: 42,

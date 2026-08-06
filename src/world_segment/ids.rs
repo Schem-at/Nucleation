@@ -143,8 +143,16 @@ mod tests {
         let cfg = ContentId::of(&[b"config-a"]);
         let base = ClusterId::new(cfg, t, None, (1, 2, 3));
 
-        assert_eq!(base, ClusterId::new(cfg, t, None, (1, 2, 3)), "same inputs, same id");
-        assert_ne!(base, ClusterId::new(cfg, t, None, (1, 2, 4)), "anchor matters");
+        assert_eq!(
+            base,
+            ClusterId::new(cfg, t, None, (1, 2, 3)),
+            "same inputs, same id"
+        );
+        assert_ne!(
+            base,
+            ClusterId::new(cfg, t, None, (1, 2, 4)),
+            "anchor matters"
+        );
         assert_ne!(
             base,
             ClusterId::new(cfg, TileId { x: 4, z: -7 }, None, (1, 2, 3)),
@@ -155,7 +163,11 @@ mod tests {
             ClusterId::new(ContentId::of(&[b"config-b"]), t, None, (1, 2, 3)),
             "config matters"
         );
-        assert_ne!(base, ClusterId::new(cfg, t, Some("left"), (1, 2, 3)), "partition matters");
+        assert_ne!(
+            base,
+            ClusterId::new(cfg, t, Some("left"), (1, 2, 3)),
+            "partition matters"
+        );
         assert_ne!(
             ClusterId::new(cfg, t, Some("left"), (1, 2, 3)),
             ClusterId::new(cfg, t, Some("right"), (1, 2, 3)),
@@ -169,6 +181,9 @@ mod tests {
         // confused with a caller who genuinely named a partition "".
         let t = TileId { x: 0, z: 0 };
         let cfg = ContentId::of(&[b"c"]);
-        assert_ne!(ClusterId::new(cfg, t, None, (0, 0, 0)), ClusterId::new(cfg, t, Some(""), (0, 0, 0)));
+        assert_ne!(
+            ClusterId::new(cfg, t, None, (0, 0, 0)),
+            ClusterId::new(cfg, t, Some(""), (0, 0, 0))
+        );
     }
 }

@@ -18,9 +18,12 @@ pub struct TileBounds {
 
 impl TileBounds {
     pub fn contains(&self, x: i32, y: i32, z: i32) -> bool {
-        x >= self.min.0 && x <= self.max.0
-            && y >= self.min.1 && y <= self.max.1
-            && z >= self.min.2 && z <= self.max.2
+        x >= self.min.0
+            && x <= self.max.0
+            && y >= self.min.1
+            && y <= self.max.1
+            && z >= self.min.2
+            && z <= self.max.2
     }
 }
 
@@ -120,10 +123,17 @@ impl VoxelTile {
             palette.push(seen[*old_idx as usize].clone());
         }
 
-        let cells: Vec<((i32, i32, i32), u32)> =
-            cells.into_iter().map(|(pos, old)| (pos, remap[old as usize])).collect();
+        let cells: Vec<((i32, i32, i32), u32)> = cells
+            .into_iter()
+            .map(|(pos, old)| (pos, remap[old as usize]))
+            .collect();
 
-        VoxelTile { id, bounds, palette, cells }
+        VoxelTile {
+            id,
+            bounds,
+            palette,
+            cells,
+        }
     }
 
     pub fn id(&self) -> TileId {
@@ -148,14 +158,19 @@ impl VoxelTile {
 
     /// Blocks in ascending position order.
     pub fn blocks(&self) -> impl Iterator<Item = ((i32, i32, i32), &BlockState)> + '_ {
-        self.cells.iter().map(move |(pos, idx)| (*pos, &self.palette[*idx as usize]))
+        self.cells
+            .iter()
+            .map(move |(pos, idx)| (*pos, &self.palette[*idx as usize]))
     }
 }
 
 /// Canonical string for palette dedup: name plus sorted properties.
 fn palette_key(state: &BlockState) -> String {
-    let mut props: Vec<String> =
-        state.properties.iter().map(|(k, v)| format!("{k}={v}")).collect();
+    let mut props: Vec<String> = state
+        .properties
+        .iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect();
     props.sort();
     format!("{}[{}]", state.get_name(), props.join(","))
 }
@@ -170,7 +185,10 @@ mod tests {
     }
 
     fn bounds() -> TileBounds {
-        TileBounds { min: (0, 0, 0), max: (15, 15, 15) }
+        TileBounds {
+            min: (0, 0, 0),
+            max: (15, 15, 15),
+        }
     }
 
     #[test]
@@ -195,7 +213,11 @@ mod tests {
             .into_iter(),
         );
         assert_eq!(tile.len(), 3);
-        assert_eq!(tile.palette_len(), 2, "identical states share a palette entry");
+        assert_eq!(
+            tile.palette_len(),
+            2,
+            "identical states share a palette entry"
+        );
         assert_eq!(tile.id(), TileId { x: 0, z: 0 });
     }
 
@@ -204,8 +226,11 @@ mod tests {
         let tile = VoxelTile::from_blocks(
             TileId { x: 0, z: 0 },
             bounds(),
-            vec![((1, 1, 1), bs("minecraft:stone")), ((99, 1, 1), bs("minecraft:stone"))]
-                .into_iter(),
+            vec![
+                ((1, 1, 1), bs("minecraft:stone")),
+                ((99, 1, 1), bs("minecraft:stone")),
+            ]
+            .into_iter(),
         );
         assert_eq!(tile.len(), 1, "out-of-bounds blocks are rejected");
     }
@@ -222,19 +247,28 @@ mod tests {
         let forward = VoxelTile::from_blocks(
             TileId { x: 0, z: 0 },
             bounds(),
-            vec![((1, 1, 1), bs("minecraft:stone")), ((1, 1, 1), bs("minecraft:redstone_wire"))]
-                .into_iter(),
+            vec![
+                ((1, 1, 1), bs("minecraft:stone")),
+                ((1, 1, 1), bs("minecraft:redstone_wire")),
+            ]
+            .into_iter(),
         );
         let reverse = VoxelTile::from_blocks(
             TileId { x: 0, z: 0 },
             bounds(),
-            vec![((1, 1, 1), bs("minecraft:redstone_wire")), ((1, 1, 1), bs("minecraft:stone"))]
-                .into_iter(),
+            vec![
+                ((1, 1, 1), bs("minecraft:redstone_wire")),
+                ((1, 1, 1), bs("minecraft:stone")),
+            ]
+            .into_iter(),
         );
 
         for (label, tile) in [("forward", &forward), ("reverse", &reverse)] {
             assert_eq!(tile.len(), 1, "{label}: one position, one cell");
-            let got: Vec<_> = tile.blocks().map(|(p, b)| (p, b.get_name().to_string())).collect();
+            let got: Vec<_> = tile
+                .blocks()
+                .map(|(p, b)| (p, b.get_name().to_string()))
+                .collect();
             assert_eq!(
                 got,
                 vec![((1, 1, 1), "minecraft:redstone_wire".to_string())],
@@ -251,14 +285,20 @@ mod tests {
         let forward = VoxelTile::from_blocks(
             TileId { x: 0, z: 0 },
             bounds(),
-            vec![((1, 1, 1), bs("minecraft:stone")), ((1, 1, 1), bs("minecraft:redstone_wire"))]
-                .into_iter(),
+            vec![
+                ((1, 1, 1), bs("minecraft:stone")),
+                ((1, 1, 1), bs("minecraft:redstone_wire")),
+            ]
+            .into_iter(),
         );
         let reverse = VoxelTile::from_blocks(
             TileId { x: 0, z: 0 },
             bounds(),
-            vec![((1, 1, 1), bs("minecraft:redstone_wire")), ((1, 1, 1), bs("minecraft:stone"))]
-                .into_iter(),
+            vec![
+                ((1, 1, 1), bs("minecraft:redstone_wire")),
+                ((1, 1, 1), bs("minecraft:stone")),
+            ]
+            .into_iter(),
         );
         assert_eq!(forward.palette_len(), 1, "the losing state is not retained");
         assert_eq!(forward.palette_len(), reverse.palette_len());
@@ -286,8 +326,14 @@ mod tests {
             ]
             .into_iter(),
         );
-        let f: Vec<_> = forward.blocks().map(|(p, b)| (p, b.get_name().to_string())).collect();
-        let r: Vec<_> = reverse.blocks().map(|(p, b)| (p, b.get_name().to_string())).collect();
+        let f: Vec<_> = forward
+            .blocks()
+            .map(|(p, b)| (p, b.get_name().to_string()))
+            .collect();
+        let r: Vec<_> = reverse
+            .blocks()
+            .map(|(p, b)| (p, b.get_name().to_string()))
+            .collect();
         assert_eq!(f, r, "iteration order must not depend on insertion order");
     }
 }

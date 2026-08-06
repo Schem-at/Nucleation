@@ -71,38 +71,58 @@ fn fingerprint_spec() -> crate::fingerprint::FingerprintSpec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
     use crate::world_segment::ids::{ClusterId, ContentId, TileId};
+    use crate::world_segment::provenance::StableBuildId;
     use crate::world_segment::score::Tier;
     use crate::world_segment::stitch::Build;
-    use crate::world_segment::provenance::StableBuildId;
     use crate::BlockState;
+    use std::collections::BTreeMap;
 
     fn build() -> Build {
-        let id = ClusterId::new(ContentId::of(&[b"b"]), TileId{x:0,z:0}, None, (0,0,0));
-        Build { id, cluster_ids: vec![id], bbox: ((10,-60,10),(11,-60,10)),
-                block_count: 2, cell_count: 1, partition_id: None }
+        let id = ClusterId::new(
+            ContentId::of(&[b"b"]),
+            TileId { x: 0, z: 0 },
+            None,
+            (0, 0, 0),
+        );
+        Build {
+            id,
+            cluster_ids: vec![id],
+            bbox: ((10, -60, 10), (11, -60, 10)),
+            block_count: 2,
+            cell_count: 1,
+            partition_id: None,
+        }
     }
 
     fn ctx() -> MaterializeCtx<'static> {
-        MaterializeCtx { source_id: "w", snapshot_id: "s", config_hash: ContentId::of(&[b"c"]),
-                         profile_hash: ContentId::of(&[b"p"]), extracted_at: 100 }
+        MaterializeCtx {
+            source_id: "w",
+            snapshot_id: "s",
+            config_hash: ContentId::of(&[b"c"]),
+            profile_hash: ContentId::of(&[b"p"]),
+            extracted_at: 100,
+        }
     }
 
     #[test]
     fn schematic_is_local_origin_normalized() {
         let mut blocks = BTreeMap::new();
-        blocks.insert((10,-60,10), BlockState::new("minecraft:redstone_wire"));
-        blocks.insert((11,-60,10), BlockState::new("minecraft:repeater"));
+        blocks.insert((10, -60, 10), BlockState::new("minecraft:redstone_wire"));
+        blocks.insert((11, -60, 10), BlockState::new("minecraft:repeater"));
         let sid = StableBuildId::seed("w", build().id);
         let (schem, prov) = materialize(&build(), &blocks, Tier::Confident, sid, &ctx());
         // Block at world (10,-60,10) lands at local (0,0,0).
-        assert_eq!(schem.get_block(0,0,0).map(|b| b.get_name().to_string()),
-                   Some("minecraft:redstone_wire".to_string()));
-        assert_eq!(schem.get_block(1,0,0).map(|b| b.get_name().to_string()),
-                   Some("minecraft:repeater".to_string()));
-        assert_eq!(prov.origin_offset, (10,-60,10));
-        assert_eq!(prov.world_bbox, ((10,-60,10),(11,-60,10)));
+        assert_eq!(
+            schem.get_block(0, 0, 0).map(|b| b.get_name().to_string()),
+            Some("minecraft:redstone_wire".to_string())
+        );
+        assert_eq!(
+            schem.get_block(1, 0, 0).map(|b| b.get_name().to_string()),
+            Some("minecraft:repeater".to_string())
+        );
+        assert_eq!(prov.origin_offset, (10, -60, 10));
+        assert_eq!(prov.world_bbox, ((10, -60, 10), (11, -60, 10)));
         assert_eq!(prov.block_count, 2);
         assert_eq!(prov.tier, Tier::Confident);
     }
@@ -110,12 +130,15 @@ mod tests {
     #[test]
     fn materialize_is_deterministic() {
         let mut blocks = BTreeMap::new();
-        blocks.insert((10,-60,10), BlockState::new("minecraft:redstone_wire"));
-        blocks.insert((11,-60,10), BlockState::new("minecraft:repeater"));
+        blocks.insert((10, -60, 10), BlockState::new("minecraft:redstone_wire"));
+        blocks.insert((11, -60, 10), BlockState::new("minecraft:repeater"));
         let sid = StableBuildId::seed("w", build().id);
         let (_, p1) = materialize(&build(), &blocks, Tier::Confident, sid, &ctx());
         let (_, p2) = materialize(&build(), &blocks, Tier::Confident, sid, &ctx());
-        assert_eq!(p1, p2, "same inputs → identical provenance (incl. fingerprint)");
+        assert_eq!(
+            p1, p2,
+            "same inputs → identical provenance (incl. fingerprint)"
+        );
     }
 
     /// provenance.block_count tracks the materialized `blocks` map, not
@@ -128,8 +151,8 @@ mod tests {
     #[test]
     fn provenance_block_count_tracks_materialized_blocks_not_build() {
         let mut blocks = BTreeMap::new();
-        blocks.insert((10,-60,10), BlockState::new("minecraft:redstone_wire"));
-        blocks.insert((11,-60,10), BlockState::new("minecraft:repeater"));
+        blocks.insert((10, -60, 10), BlockState::new("minecraft:redstone_wire"));
+        blocks.insert((11, -60, 10), BlockState::new("minecraft:repeater"));
         let sid = StableBuildId::seed("w", build().id);
         let (_, prov) = materialize(&build(), &blocks, Tier::Confident, sid, &ctx());
         assert_eq!(prov.block_count, blocks.len() as u64);

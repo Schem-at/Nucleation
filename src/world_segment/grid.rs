@@ -112,7 +112,8 @@ impl OccupancyGrid {
     /// Label 6-connected components with a flood fill seeded in sorted cell
     /// order.
     pub fn label_components(&self) -> ComponentLabels {
-        let mut labels: std::collections::BTreeMap<(i32, i32, i32), u32> = std::collections::BTreeMap::new();
+        let mut labels: std::collections::BTreeMap<(i32, i32, i32), u32> =
+            std::collections::BTreeMap::new();
         let mut anchors: Vec<(i32, i32, i32)> = Vec::new();
 
         // Sorted order: the first cell reached for a component is by
@@ -128,9 +129,12 @@ impl OccupancyGrid {
             labels.insert(seed, label);
             while let Some(cell) = stack.pop() {
                 const NEIGHBOURS: [(i32, i32, i32); 6] = [
-                    (1, 0, 0), (-1, 0, 0),
-                    (0, 1, 0), (0, -1, 0),
-                    (0, 0, 1), (0, 0, -1),
+                    (1, 0, 0),
+                    (-1, 0, 0),
+                    (0, 1, 0),
+                    (0, -1, 0),
+                    (0, 0, 1),
+                    (0, 0, -1),
                 ];
                 for (dx, dy, dz) in NEIGHBOURS {
                     let n = (cell.0 + dx, cell.1 + dy, cell.2 + dz);
@@ -246,9 +250,16 @@ mod tests {
             g.occupied_cells().collect::<Vec<_>>(),
             "radius 0 must reproduce the occupied set exactly, not merely its size"
         );
-        assert_eq!(d.occupied_cells().collect::<Vec<_>>(), vec![(0, 1, 2), (5, 5, 5)]);
+        assert_eq!(
+            d.occupied_cells().collect::<Vec<_>>(),
+            vec![(0, 1, 2), (5, 5, 5)]
+        );
         assert_eq!(d.dims(), g.dims(), "dims must be carried over");
-        assert_eq!(d.cell_size(), g.cell_size(), "cell_size must be carried over");
+        assert_eq!(
+            d.cell_size(),
+            g.cell_size(),
+            "cell_size must be carried over"
+        );
     }
 
     #[test]
@@ -263,8 +274,8 @@ mod tests {
     #[test]
     fn separated_cells_are_separate_components() {
         let mut g = grid();
-        g.mark(0, 0, 0);   // cell (0,0,0)
-        g.mark(40, 0, 0);  // cell (10,0,0)
+        g.mark(0, 0, 0); // cell (0,0,0)
+        g.mark(40, 0, 0); // cell (10,0,0)
         let labels = g.label_components();
         assert_eq!(labels.component_count(), 2);
         assert_ne!(labels.label_of((0, 0, 0)), labels.label_of((10, 0, 0)));

@@ -438,8 +438,11 @@ fn segment_tile_inner(
         }
         // Keyed by index, not by name, so grouping is independent of the order
         // the caller supplied the hints in.
-        let pidx =
-            if use_partitions { partitions.id_index_at(pos.0, pos.1, pos.2) } else { None };
+        let pidx = if use_partitions {
+            partitions.id_index_at(pos.0, pos.1, pos.2)
+        } else {
+            None
+        };
         // Partition-scoped floor subtraction: a block in the substrate band
         // whose name locally dominates its own partition's band layer is that
         // partition's floor, and is dropped exactly like global substrate. This
@@ -462,7 +465,11 @@ fn segment_tile_inner(
     }
     if artificial.is_empty() {
         return (
-            TileSegments { tile_id: tile.id(), clusters: Vec::new(), margin: Vec::new() },
+            TileSegments {
+                tile_id: tile.id(),
+                clusters: Vec::new(),
+                margin: Vec::new(),
+            },
             BTreeMap::new(),
         );
     }
@@ -519,8 +526,12 @@ fn segment_tile_inner(
     let mut pos_to_cluster: BTreeMap<(i32, i32, i32), ClusterId> = BTreeMap::new();
     for (pos, pidx) in artificial {
         let cell_coord = geometry.cell_of(pos.0, pos.1, pos.2);
-        let Some(id) = cluster_of_cell.get(&(pidx, cell_coord)) else { continue };
-        acc.entry(*id).or_insert_with(ClusterAcc::new).push(pos, cell_coord);
+        let Some(id) = cluster_of_cell.get(&(pidx, cell_coord)) else {
+            continue;
+        };
+        acc.entry(*id)
+            .or_insert_with(ClusterAcc::new)
+            .push(pos, cell_coord);
         if want_membership {
             pos_to_cluster.insert(pos, *id);
         }
@@ -586,12 +597,22 @@ fn segment_tile_inner(
     // cluster was dropped by `min_cluster_blocks` is not part of any emitted
     // build, so it must not appear in the membership map either.
     let membership = if want_membership {
-        pos_to_cluster.into_iter().filter(|(_, id)| kept.contains(id)).collect()
+        pos_to_cluster
+            .into_iter()
+            .filter(|(_, id)| kept.contains(id))
+            .collect()
     } else {
         BTreeMap::new()
     };
 
-    (TileSegments { tile_id: tile.id(), clusters, margin }, membership)
+    (
+        TileSegments {
+            tile_id: tile.id(),
+            clusters,
+            margin,
+        },
+        membership,
+    )
 }
 
 struct ClusterAcc {
@@ -612,8 +633,16 @@ impl ClusterAcc {
     }
 
     fn push(&mut self, pos: (i32, i32, i32), cell: (i32, i32, i32)) {
-        self.min = (self.min.0.min(pos.0), self.min.1.min(pos.1), self.min.2.min(pos.2));
-        self.max = (self.max.0.max(pos.0), self.max.1.max(pos.1), self.max.2.max(pos.2));
+        self.min = (
+            self.min.0.min(pos.0),
+            self.min.1.min(pos.1),
+            self.min.2.min(pos.2),
+        );
+        self.max = (
+            self.max.0.max(pos.0),
+            self.max.1.max(pos.1),
+            self.max.2.max(pos.2),
+        );
         self.block_count += 1;
         self.cells.insert(cell);
     }
@@ -647,7 +676,9 @@ fn group_into(
 ) {
     let labels = grid.dilated(radius).label_components();
     for cell in grid.occupied_cells() {
-        let Some(label) = labels.label_of(cell) else { continue };
+        let Some(label) = labels.label_of(cell) else {
+            continue;
+        };
         groups
             .entry((pidx, label))
             // The partition name is cloned once per group, not once per cell.
@@ -698,7 +729,9 @@ fn assign_ids(
     for ((pidx, _label), group) in groups {
         let GroupAcc { cells, partition } = group;
         // `BTreeSet` iterates ascending, so the first cell is the lexmin.
-        let Some(anchor) = cells.iter().next().copied() else { continue };
+        let Some(anchor) = cells.iter().next().copied() else {
+            continue;
+        };
         let id = ClusterId::new(config, tile, partition.as_deref(), anchor);
         debug_assert!(
             !partition_of_cluster.contains_key(&id),
@@ -777,7 +810,9 @@ fn split_disconnected_clusters(
         let comp_blocks: Vec<u64> = comps
             .iter()
             .map(|comp| {
-                comp.iter().map(|c| cell_blocks.get(&(pidx, *c)).copied().unwrap_or(0)).sum()
+                comp.iter()
+                    .map(|c| cell_blocks.get(&(pidx, *c)).copied().unwrap_or(0))
+                    .sum()
             })
             .collect();
         let total: u64 = comp_blocks.iter().sum();
@@ -806,9 +841,14 @@ fn split_disconnected_clusters(
         // Mint one id per seed, anchored on the seed's own lexmin original cell.
         let mut seeds_meta: Vec<(usize, ClusterId, (i32, i32, i32))> = Vec::new();
         for &si in &seeds {
-            let anchor = *comps[si].iter().min().expect("a seed component is non-empty");
+            let anchor = *comps[si]
+                .iter()
+                .min()
+                .expect("a seed component is non-empty");
             let id = ClusterId::new(config, tile, partition.as_deref(), anchor);
-            partition_of_cluster.entry(id).or_insert_with(|| partition.clone());
+            partition_of_cluster
+                .entry(id)
+                .or_insert_with(|| partition.clone());
             for c in &comps[si] {
                 out.insert((pidx, *c), id);
             }
@@ -923,7 +963,10 @@ fn centroid(cells: &[(i32, i32, i32)]) -> (i64, i64, i64) {
 
 /// Chebyshev distance between two points.
 fn cheb(a: (i64, i64, i64), b: (i64, i64, i64)) -> i64 {
-    (a.0 - b.0).abs().max((a.1 - b.1).abs()).max((a.2 - b.2).abs())
+    (a.0 - b.0)
+        .abs()
+        .max((a.1 - b.1).abs())
+        .max((a.2 - b.2).abs())
 }
 
 /// For each partition present in the tile, the set of block names that
@@ -961,7 +1004,9 @@ fn partition_floor_materials(
         if pos.1 < lo || pos.1 > hi {
             continue;
         }
-        let Some(p) = partitions.id_index_at(pos.0, pos.1, pos.2) else { continue };
+        let Some(p) = partitions.id_index_at(pos.0, pos.1, pos.2) else {
+            continue;
+        };
         *counts.entry((p, state.get_name().to_string())).or_insert(0) += 1;
         *totals.entry(p).or_insert(0) += 1;
     }
@@ -1008,17 +1053,28 @@ mod tests {
 
     fn profile() -> WorldProfile {
         WorldProfile::new(
-            ["minecraft:stone", "minecraft:bedrock"].iter().map(|s| s.to_string()).collect(),
+            ["minecraft:stone", "minecraft:bedrock"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             (-64, -50),
         )
     }
 
     fn cfg() -> SegConfig {
-        SegConfig { cell_size: 4, closing_radius: 2, min_cluster_blocks: 1, ..SegConfig::default() }
+        SegConfig {
+            cell_size: 4,
+            closing_radius: 2,
+            min_cluster_blocks: 1,
+            ..SegConfig::default()
+        }
     }
 
     fn bounds() -> TileBounds {
-        TileBounds { min: (0, -64, 0), max: (127, 63, 127) }
+        TileBounds {
+            min: (0, -64, 0),
+            max: (127, 63, 127),
+        }
     }
 
     /// Build a tile from `(pos, block_name)` pairs.
@@ -1041,7 +1097,10 @@ mod tests {
             ((11, -60, 10), "minecraft:stone"),
         ]);
         let segs = segment_tile(&t, &profile(), &cfg(), &no_hints());
-        assert!(segs.clusters.is_empty(), "a tile of pure substrate yields no clusters");
+        assert!(
+            segs.clusters.is_empty(),
+            "a tile of pure substrate yields no clusters"
+        );
     }
 
     #[test]
@@ -1124,7 +1183,10 @@ mod tests {
 
     #[test]
     fn min_cluster_blocks_filters_small_clusters() {
-        let config = SegConfig { min_cluster_blocks: 2, ..cfg() };
+        let config = SegConfig {
+            min_cluster_blocks: 2,
+            ..cfg()
+        };
         let segs = segment_tile(
             &tile(vec![
                 ((10, 10, 10), "minecraft:redstone_wire"),
@@ -1135,7 +1197,11 @@ mod tests {
             &config,
             &no_hints(),
         );
-        assert_eq!(segs.clusters.len(), 1, "the single-block cluster is dropped");
+        assert_eq!(
+            segs.clusters.len(),
+            1,
+            "the single-block cluster is dropped"
+        );
         assert_eq!(segs.clusters[0].block_count, 2);
     }
 
@@ -1144,10 +1210,21 @@ mod tests {
         // Two blocks 8 apart would normally bridge; a boundary between them
         // must stop that.
         let hints = PartitionIndex::new(vec![
-            PartitionHint { id: "left".into(), bbox_xz: (0, 13, 0, 127), y_range: None },
-            PartitionHint { id: "right".into(), bbox_xz: (14, 127, 0, 127), y_range: None },
+            PartitionHint {
+                id: "left".into(),
+                bbox_xz: (0, 13, 0, 127),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "right".into(),
+                bbox_xz: (14, 127, 0, 127),
+                y_range: None,
+            },
         ]);
-        let config = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let config = SegConfig {
+            partition_policy: PartitionPolicy::HardCut,
+            ..cfg()
+        };
         let segs = segment_tile(
             &tile(vec![
                 ((10, 10, 10), "minecraft:redstone_wire"),
@@ -1160,8 +1237,11 @@ mod tests {
         assert_eq!(segs.clusters.len(), 2, "the boundary splits them");
         // Clusters are ordered by ClusterId (a hash), not by position, so
         // compare as a set rather than by index.
-        let mut got: Vec<_> =
-            segs.clusters.iter().map(|c| c.partition_id.clone().unwrap()).collect();
+        let mut got: Vec<_> = segs
+            .clusters
+            .iter()
+            .map(|c| c.partition_id.clone().unwrap())
+            .collect();
         got.sort();
         assert_eq!(got, vec!["left".to_string(), "right".to_string()]);
     }
@@ -1185,10 +1265,21 @@ mod tests {
         // Their cell low corners are world (0,8,0) and (0,8,4), which the
         // hints below place in "near" (z <= 3) and "far" (z >= 4).
         let hints = PartitionIndex::new(vec![
-            PartitionHint { id: "near".into(), bbox_xz: (0, 127, 0, 3), y_range: None },
-            PartitionHint { id: "far".into(), bbox_xz: (0, 127, 4, 127), y_range: None },
+            PartitionHint {
+                id: "near".into(),
+                bbox_xz: (0, 127, 0, 3),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "far".into(),
+                bbox_xz: (0, 127, 4, 127),
+                y_range: None,
+            },
         ]);
-        let config = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let config = SegConfig {
+            partition_policy: PartitionPolicy::HardCut,
+            ..cfg()
+        };
         let segs = segment_tile(
             &tile(vec![
                 ((0, 8, 0), "minecraft:redstone_wire"),
@@ -1204,9 +1295,15 @@ mod tests {
             2,
             "a clipped dilation anchor must not fuse two partitions' clusters"
         );
-        assert_ne!(segs.clusters[0].id, segs.clusters[1].id, "ids must stay distinct");
-        let mut got: Vec<_> =
-            segs.clusters.iter().map(|c| c.partition_id.clone().unwrap()).collect();
+        assert_ne!(
+            segs.clusters[0].id, segs.clusters[1].id,
+            "ids must stay distinct"
+        );
+        let mut got: Vec<_> = segs
+            .clusters
+            .iter()
+            .map(|c| c.partition_id.clone().unwrap())
+            .collect();
         got.sort();
         assert_eq!(got, vec!["far".to_string(), "near".to_string()]);
     }
@@ -1231,10 +1328,21 @@ mod tests {
         // Partitioning per block instead puts the two blocks in separate
         // grids, so the shared cell is occupied in each independently.
         let hints = PartitionIndex::new(vec![
-            PartitionHint { id: "L".into(), bbox_xz: (0, 61, 0, 127), y_range: None },
-            PartitionHint { id: "R".into(), bbox_xz: (62, 127, 0, 127), y_range: None },
+            PartitionHint {
+                id: "L".into(),
+                bbox_xz: (0, 61, 0, 127),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "R".into(),
+                bbox_xz: (62, 127, 0, 127),
+                y_range: None,
+            },
         ]);
-        let config = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let config = SegConfig {
+            partition_policy: PartitionPolicy::HardCut,
+            ..cfg()
+        };
         let segs = segment_tile(
             &tile(vec![
                 ((60, 10, 40), "minecraft:redstone_wire"),
@@ -1253,7 +1361,11 @@ mod tests {
                 c.bbox
             );
         }
-        assert_eq!(segs.clusters.len(), 2, "the boundary splits the straddling cell");
+        assert_eq!(
+            segs.clusters.len(),
+            2,
+            "the boundary splits the straddling cell"
+        );
 
         let mut got: Vec<_> = segs
             .clusters
@@ -1280,10 +1392,21 @@ mod tests {
         //
         // Same straddling cell (15,18,10) as above, reached from both sides.
         let hints = PartitionIndex::new(vec![
-            PartitionHint { id: "L".into(), bbox_xz: (0, 61, 0, 127), y_range: None },
-            PartitionHint { id: "R".into(), bbox_xz: (62, 127, 0, 127), y_range: None },
+            PartitionHint {
+                id: "L".into(),
+                bbox_xz: (0, 61, 0, 127),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "R".into(),
+                bbox_xz: (62, 127, 0, 127),
+                y_range: None,
+            },
         ]);
-        let config = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let config = SegConfig {
+            partition_policy: PartitionPolicy::HardCut,
+            ..cfg()
+        };
         let segs = segment_tile(
             &tile(vec![
                 ((60, 10, 40), "minecraft:redstone_wire"),
@@ -1317,10 +1440,21 @@ mod tests {
         //   (2,10,40) -> cell (2/4, 18,       40/4) = (0,18,10)  -> "R"
         // cell x = 0 < band 5, so both are in the margin band.
         let hints = PartitionIndex::new(vec![
-            PartitionHint { id: "L".into(), bbox_xz: (0, 1, 0, 127), y_range: None },
-            PartitionHint { id: "R".into(), bbox_xz: (2, 127, 0, 127), y_range: None },
+            PartitionHint {
+                id: "L".into(),
+                bbox_xz: (0, 1, 0, 127),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "R".into(),
+                bbox_xz: (2, 127, 0, 127),
+                y_range: None,
+            },
         ]);
-        let config = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let config = SegConfig {
+            partition_policy: PartitionPolicy::HardCut,
+            ..cfg()
+        };
         let segs = segment_tile(
             &tile(vec![
                 ((1, 10, 40), "minecraft:redstone_wire"),
@@ -1331,10 +1465,17 @@ mod tests {
             &hints,
         );
 
-        assert_eq!(segs.clusters.len(), 2, "the boundary splits the straddling cell");
+        assert_eq!(
+            segs.clusters.len(),
+            2,
+            "the boundary splits the straddling cell"
+        );
 
-        let shared: Vec<&MarginCell> =
-            segs.margin.iter().filter(|m| m.cell == (0, 18, 10)).collect();
+        let shared: Vec<&MarginCell> = segs
+            .margin
+            .iter()
+            .filter(|m| m.cell == (0, 18, 10))
+            .collect();
         assert_eq!(
             shared.len(),
             2,
@@ -1361,8 +1502,7 @@ mod tests {
                 .expect("margin entry must reference a surviving cluster");
             assert_eq!(&m.partition, &owner.partition_id);
         }
-        let mut names: Vec<Option<String>> =
-            shared.iter().map(|m| m.partition.clone()).collect();
+        let mut names: Vec<Option<String>> = shared.iter().map(|m| m.partition.clone()).collect();
         names.sort();
         assert_eq!(names, vec![Some("L".to_string()), Some("R".to_string())]);
     }
@@ -1370,10 +1510,21 @@ mod tests {
     #[test]
     fn policy_off_reproduces_the_unpartitioned_result() {
         let hints = PartitionIndex::new(vec![
-            PartitionHint { id: "left".into(), bbox_xz: (0, 13, 0, 127), y_range: None },
-            PartitionHint { id: "right".into(), bbox_xz: (14, 127, 0, 127), y_range: None },
+            PartitionHint {
+                id: "left".into(),
+                bbox_xz: (0, 13, 0, 127),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "right".into(),
+                bbox_xz: (14, 127, 0, 127),
+                y_range: None,
+            },
         ]);
-        let config = SegConfig { partition_policy: PartitionPolicy::Off, ..cfg() };
+        let config = SegConfig {
+            partition_policy: PartitionPolicy::Off,
+            ..cfg()
+        };
         let blocks = vec![
             ((10, 10, 10), "minecraft:redstone_wire"),
             ((18, 10, 10), "minecraft:redstone_wire"),
@@ -1426,16 +1577,30 @@ mod tests {
         // margin covers the same cells. Both facts are asserted below, so this
         // is strictly more specific than the whole-value equality it replaces.
         let hints = PartitionIndex::new(vec![
-            PartitionHint { id: "left".into(), bbox_xz: (0, 13, 0, 127), y_range: None },
-            PartitionHint { id: "right".into(), bbox_xz: (14, 127, 0, 127), y_range: None },
+            PartitionHint {
+                id: "left".into(),
+                bbox_xz: (0, 13, 0, 127),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "right".into(),
+                bbox_xz: (14, 127, 0, 127),
+                y_range: None,
+            },
         ]);
         let blocks = vec![
             ((10, 10, 10), "minecraft:redstone_wire"),
             ((18, 10, 10), "minecraft:redstone_wire"),
         ];
 
-        let prefer = SegConfig { partition_policy: PartitionPolicy::Prefer, ..cfg() };
-        let off = SegConfig { partition_policy: PartitionPolicy::Off, ..cfg() };
+        let prefer = SegConfig {
+            partition_policy: PartitionPolicy::Prefer,
+            ..cfg()
+        };
+        let off = SegConfig {
+            partition_policy: PartitionPolicy::Off,
+            ..cfg()
+        };
         let prefer_segs = segment_tile(&tile(blocks.clone()), &profile(), &prefer, &hints);
         let off_segs = segment_tile(&tile(blocks.clone()), &profile(), &off, &hints);
 
@@ -1449,15 +1614,25 @@ mod tests {
             prefer_segs.clusters[0].id, off_segs.clusters[0].id,
             "different configs must still mint different ids"
         );
-        assert_eq!(prefer_segs.clusters.len(), 1, "the boundary is not enforced under Prefer");
+        assert_eq!(
+            prefer_segs.clusters.len(),
+            1,
+            "the boundary is not enforced under Prefer"
+        );
         assert!(
-            prefer_segs.clusters.iter().all(|c| c.partition_id.is_none()),
+            prefer_segs
+                .clusters
+                .iter()
+                .all(|c| c.partition_id.is_none()),
             "nothing is recorded: every partition_id is None"
         );
 
         // Contrast: the same input under HardCut *is* split, which shows the
         // hints and the boundary are real and Prefer is simply ignoring them.
-        let hard = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let hard = SegConfig {
+            partition_policy: PartitionPolicy::HardCut,
+            ..cfg()
+        };
         let hard_segs = segment_tile(&tile(blocks), &profile(), &hard, &hints);
         assert_eq!(hard_segs.clusters.len(), 2);
     }
@@ -1472,7 +1647,10 @@ mod tests {
         // block, so `min_cluster_blocks = 2` drops it.
         // (64,10,64)/(65,10,64) -> cell (16,18,16): interior (5 <= 16 < 27),
         // survives.
-        let config = SegConfig { min_cluster_blocks: 2, ..cfg() };
+        let config = SegConfig {
+            min_cluster_blocks: 2,
+            ..cfg()
+        };
         let segs = segment_tile(
             &tile(vec![
                 ((2, 10, 2), "minecraft:redstone_wire"),
@@ -1484,7 +1662,11 @@ mod tests {
             &no_hints(),
         );
 
-        assert_eq!(segs.clusters.len(), 1, "the near-face single-block cluster is dropped");
+        assert_eq!(
+            segs.clusters.len(),
+            1,
+            "the near-face single-block cluster is dropped"
+        );
         assert_eq!(segs.clusters[0].block_count, 2);
 
         let kept: std::collections::BTreeSet<ClusterId> =
@@ -1507,7 +1689,11 @@ mod tests {
             &cfg(),
             &no_hints(),
         );
-        assert_eq!(segs.clusters.len(), 1, "one block must give exactly one cluster");
+        assert_eq!(
+            segs.clusters.len(),
+            1,
+            "one block must give exactly one cluster"
+        );
         segs.margin.iter().map(|m| m.cell).collect()
     }
 
@@ -1557,7 +1743,11 @@ mod tests {
             &cfg(),
             &no_hints(),
         );
-        assert_eq!(segs.clusters.len(), 2, "cell distance 2R+2 leaves a one-cell gap");
+        assert_eq!(
+            segs.clusters.len(),
+            2,
+            "cell distance 2R+2 leaves a one-cell gap"
+        );
     }
 
     #[test]
@@ -1608,7 +1798,10 @@ mod tests {
         // (108,10,108) -> (108/4, 18, 108/4) = (27,18,27), first in-band layer.
         assert_eq!(margin_cells((108, 10, 108)), vec![(27, 18, 27)]);
         // (107,10,107) -> (107/4, 18, 107/4) = (26,18,26), last interior layer.
-        assert!(margin_cells((107, 10, 107)).is_empty(), "cell 26 is interior");
+        assert!(
+            margin_cells((107, 10, 107)).is_empty(),
+            "cell 26 is interior"
+        );
     }
 
     /// `margin_cells`, but on a caller-supplied tile so the grid need not be a
@@ -1620,7 +1813,11 @@ mod tests {
             std::iter::once((block, BlockState::new("minecraft:redstone_wire"))),
         );
         let segs = segment_tile(&t, &profile(), &cfg(), &no_hints());
-        assert_eq!(segs.clusters.len(), 1, "one block must give exactly one cluster");
+        assert_eq!(
+            segs.clusters.len(),
+            1,
+            "one block must give exactly one cluster"
+        );
         segs.margin.iter().map(|m| m.cell).collect()
     }
 
@@ -1639,7 +1836,10 @@ mod tests {
         //   band = 2R + 1 = 5
         //   X band: cells 0..=4 and 27..=31   (32 - 5 = 27)
         //   Z band: cells 0..=4 and 59..=63   (64 - 5 = 59)
-        let b = TileBounds { min: (0, -64, 0), max: (127, 63, 255) };
+        let b = TileBounds {
+            min: (0, -64, 0),
+            max: (127, 63, 255),
+        };
 
         // Near X only, interior Z. (13,10,64) -> cell (13/4, (10+64)/4, 64/4)
         // = (3,18,16): depth 3 on X, depth 16 on Z.
@@ -1675,7 +1875,10 @@ mod tests {
 
         // And the last interior layer before the far-Z band, for the edge.
         // (64,10,232) -> (16,18,58).
-        assert!(margin_cells_of(b, (64, 10, 232)).is_empty(), "cell z = 58 is interior");
+        assert!(
+            margin_cells_of(b, (64, 10, 232)).is_empty(),
+            "cell z = 58 is interior"
+        );
     }
 
     #[test]
@@ -1700,8 +1903,15 @@ mod tests {
         let a = segment_tile(&tile(forward), &profile(), &cfg(), &no_hints());
         let b = segment_tile(&tile(reverse), &profile(), &cfg(), &no_hints());
 
-        assert_eq!(a, b, "a duplicated position must not let input order reach the output");
-        assert_eq!(a.clusters.len(), 1, "redstone_wire wins the position, so one cluster");
+        assert_eq!(
+            a, b,
+            "a duplicated position must not let input order reach the output"
+        );
+        assert_eq!(
+            a.clusters.len(),
+            1,
+            "redstone_wire wins the position, so one cluster"
+        );
     }
 
     /// The cluster ids a given input/config/profile combination produces.
@@ -1715,7 +1925,11 @@ mod tests {
             config,
             &no_hints(),
         );
-        assert_eq!(segs.clusters.len(), 1, "the probe input must be a single cluster");
+        assert_eq!(
+            segs.clusters.len(),
+            1,
+            "the probe input must be a single cluster"
+        );
         segs.clusters.iter().map(|c| c.id).collect()
     }
 
@@ -1738,7 +1952,10 @@ mod tests {
         // same ClusterId for output produced by a different algorithm — a
         // cache-poisoning hazard, since a consumer keyed on the id would serve
         // stale results after an algorithm change.
-        let v2 = SegConfig { algorithm_version: 2, ..cfg() };
+        let v2 = SegConfig {
+            algorithm_version: 2,
+            ..cfg()
+        };
         assert_ne!(
             ids(&cfg(), &profile()),
             ids(&v2, &profile()),
@@ -1763,14 +1980,33 @@ mod tests {
         // downstream cache keyed on the id would serve one run's clusters for
         // the other's. The hint geometry must be part of the identity.
         let wide = PartitionIndex::new(vec![
-            PartitionHint { id: "L".into(), bbox_xz: (0, 61, 0, 127), y_range: None },
-            PartitionHint { id: "R".into(), bbox_xz: (62, 127, 0, 127), y_range: None },
+            PartitionHint {
+                id: "L".into(),
+                bbox_xz: (0, 61, 0, 127),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "R".into(),
+                bbox_xz: (62, 127, 0, 127),
+                y_range: None,
+            },
         ]);
         let narrow = PartitionIndex::new(vec![
-            PartitionHint { id: "L".into(), bbox_xz: (0, 40, 0, 127), y_range: None },
-            PartitionHint { id: "R".into(), bbox_xz: (41, 127, 0, 127), y_range: None },
+            PartitionHint {
+                id: "L".into(),
+                bbox_xz: (0, 40, 0, 127),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "R".into(),
+                bbox_xz: (41, 127, 0, 127),
+                y_range: None,
+            },
         ]);
-        let config = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let config = SegConfig {
+            partition_policy: PartitionPolicy::HardCut,
+            ..cfg()
+        };
         let blocks = vec![((10, 10, 40), "minecraft:redstone_wire")];
 
         let a = segment_tile(&tile(blocks.clone()), &profile(), &config, &wide);
@@ -1812,26 +2048,55 @@ mod tests {
             &no_hints(),
         );
         assert_eq!(segs.clusters.len(), 1);
-        assert!(segs.margin.is_empty(), "a centre cluster is nowhere near a face");
+        assert!(
+            segs.margin.is_empty(),
+            "a centre cluster is nowhere near a face"
+        );
     }
 
     #[test]
     fn membership_maps_every_emitted_block_to_its_cluster() {
         // Reuse the substrate-standing test's world: two builds on a slab.
         let profile = WorldProfile::new(
-            ["minecraft:stone"].iter().map(|s| s.to_string()).collect(), (-64,-50));
-        let cfg = SegConfig { cell_size:4, closing_radius:2, min_cluster_blocks:1, ..SegConfig::default() };
+            ["minecraft:stone"].iter().map(|s| s.to_string()).collect(),
+            (-64, -50),
+        );
+        let cfg = SegConfig {
+            cell_size: 4,
+            closing_radius: 2,
+            min_cluster_blocks: 1,
+            ..SegConfig::default()
+        };
         let mut blocks = vec![];
-        for x in 0..40 { for z in 0..40 { blocks.push(((x,-60,z), BlockState::new("minecraft:stone"))); } }
-        blocks.push(((10,-59,10), BlockState::new("minecraft:redstone_wire")));
-        let t = VoxelTile::from_blocks(TileId{x:0,z:0},
-            TileBounds{min:(0,-64,0),max:(127,63,127)}, blocks.into_iter());
-        let (segs, membership) = segment_tile_membership(&t, &profile, &cfg, &PartitionIndex::new(vec![]));
+        for x in 0..40 {
+            for z in 0..40 {
+                blocks.push(((x, -60, z), BlockState::new("minecraft:stone")));
+            }
+        }
+        blocks.push(((10, -59, 10), BlockState::new("minecraft:redstone_wire")));
+        let t = VoxelTile::from_blocks(
+            TileId { x: 0, z: 0 },
+            TileBounds {
+                min: (0, -64, 0),
+                max: (127, 63, 127),
+            },
+            blocks.into_iter(),
+        );
+        let (segs, membership) =
+            segment_tile_membership(&t, &profile, &cfg, &PartitionIndex::new(vec![]));
         // The one build's block is mapped; substrate is not.
         assert_eq!(segs.clusters.len(), 1);
         let cluster = segs.clusters[0].id;
-        assert_eq!(membership.get(&(10,-59,10)), Some(&cluster), "build block maps to its cluster");
-        assert_eq!(membership.get(&(0,-60,0)), None, "substrate is not in the membership map");
+        assert_eq!(
+            membership.get(&(10, -59, 10)),
+            Some(&cluster),
+            "build block maps to its cluster"
+        );
+        assert_eq!(
+            membership.get(&(0, -60, 0)),
+            None,
+            "substrate is not in the membership map"
+        );
         // Every mapped position belongs to an emitted cluster.
         for (_pos, cid) in &membership {
             assert!(segs.clusters.iter().any(|c| c.id == *cid));
@@ -1841,21 +2106,34 @@ mod tests {
     #[test]
     fn segment_tile_and_membership_agree_on_segments() {
         let profile = WorldProfile::new(
-            ["minecraft:stone"].iter().map(|s| s.to_string()).collect(), (-64,-50));
+            ["minecraft:stone"].iter().map(|s| s.to_string()).collect(),
+            (-64, -50),
+        );
         let cfg = SegConfig::default();
-        let t = VoxelTile::from_blocks(TileId{x:0,z:0},
-            TileBounds{min:(0,-64,0),max:(127,63,127)},
-            vec![((10,10,10), BlockState::new("minecraft:redstone_wire"))].into_iter());
+        let t = VoxelTile::from_blocks(
+            TileId { x: 0, z: 0 },
+            TileBounds {
+                min: (0, -64, 0),
+                max: (127, 63, 127),
+            },
+            vec![((10, 10, 10), BlockState::new("minecraft:redstone_wire"))].into_iter(),
+        );
         let a = segment_tile(&t, &profile, &cfg, &PartitionIndex::new(vec![]));
         let (b, _) = segment_tile_membership(&t, &profile, &cfg, &PartitionIndex::new(vec![]));
-        assert_eq!(a, b, "membership variant must return identical TileSegments");
+        assert_eq!(
+            a, b,
+            "membership variant must return identical TileSegments"
+        );
     }
 
     /// Profile whose only *global* substrate is stone; the plot floors below
     /// (wool, concrete) are globally rare, so a global palette cannot catch
     /// them — only the per-partition floor pass can.
     fn floor_profile() -> WorldProfile {
-        WorldProfile::new(["minecraft:stone"].iter().map(|s| s.to_string()).collect(), (-64, -57))
+        WorldProfile::new(
+            ["minecraft:stone"].iter().map(|s| s.to_string()).collect(),
+            (-64, -57),
+        )
     }
 
     /// Two plots side by side, each a solid floor sheet with two redstone
@@ -1880,8 +2158,16 @@ mod tests {
     ///   crossed by any block (L ends at x=35, R starts at x=68).
     fn two_plots() -> (PartitionIndex, Vec<((i32, i32, i32), &'static str)>) {
         let hints = PartitionIndex::new(vec![
-            PartitionHint { id: "L".into(), bbox_xz: (0, 63, 0, 127), y_range: None },
-            PartitionHint { id: "R".into(), bbox_xz: (64, 127, 0, 127), y_range: None },
+            PartitionHint {
+                id: "L".into(),
+                bbox_xz: (0, 63, 0, 127),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "R".into(),
+                bbox_xz: (64, 127, 0, 127),
+                y_range: None,
+            },
         ]);
         let mut blocks: Vec<((i32, i32, i32), &'static str)> = Vec::new();
         for x in 4..=35 {
@@ -1918,7 +2204,10 @@ mod tests {
             segs.clusters.len(),
             4,
             "floor subtracted: two separate builds per plot, four total; got {:?}",
-            segs.clusters.iter().map(|c| (c.bbox, c.block_count)).collect::<Vec<_>>()
+            segs.clusters
+                .iter()
+                .map(|c| (c.bbox, c.block_count))
+                .collect::<Vec<_>>()
         );
         for c in &segs.clusters {
             let x_extent = c.bbox.1 .0 - c.bbox.0 .0;
@@ -1937,7 +2226,10 @@ mod tests {
         // artificial slab and morphological closing fuses both builds and the
         // whole sheet into one mega-cluster per plot — the exact real-data
         // failure. This is the discriminating case: None => merged blobs.
-        let off = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let off = SegConfig {
+            partition_policy: PartitionPolicy::HardCut,
+            ..cfg()
+        };
         assert!(off.partition_floor_share.is_none());
         let merged = segment_tile(&tile(blocks), &floor_profile(), &off, &hints);
         assert_eq!(
@@ -1965,7 +2257,10 @@ mod tests {
         // `partition_floor_share: None` via `..SegConfig::default()`, so an
         // explicit `None` cannot diverge from it — but pin it against a config
         // that never mentions the field, exercised on real inputs.
-        let explicit_none = SegConfig { partition_floor_share: None, ..cfg() };
+        let explicit_none = SegConfig {
+            partition_floor_share: None,
+            ..cfg()
+        };
 
         // (a) plain build.
         let plain = vec![
@@ -1994,11 +2289,25 @@ mod tests {
         // (c) HardCut with hints, floor feature off: partitions still enforced,
         // floor pass inert.
         let hints = PartitionIndex::new(vec![
-            PartitionHint { id: "left".into(), bbox_xz: (0, 13, 0, 127), y_range: None },
-            PartitionHint { id: "right".into(), bbox_xz: (14, 127, 0, 127), y_range: None },
+            PartitionHint {
+                id: "left".into(),
+                bbox_xz: (0, 13, 0, 127),
+                y_range: None,
+            },
+            PartitionHint {
+                id: "right".into(),
+                bbox_xz: (14, 127, 0, 127),
+                y_range: None,
+            },
         ]);
-        let hard = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
-        let hard_none = SegConfig { partition_floor_share: None, ..hard.clone() };
+        let hard = SegConfig {
+            partition_policy: PartitionPolicy::HardCut,
+            ..cfg()
+        };
+        let hard_none = SegConfig {
+            partition_floor_share: None,
+            ..hard.clone()
+        };
         let split = vec![
             ((10, 10, 10), "minecraft:redstone_wire"),
             ((18, 10, 10), "minecraft:redstone_wire"),
@@ -2019,8 +2328,14 @@ mod tests {
             bbox_xz: (0, 63, 0, 127),
             y_range: None,
         }]);
-        let base = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
-        let with_floor = SegConfig { partition_floor_share: Some(0.3), ..base.clone() };
+        let base = SegConfig {
+            partition_policy: PartitionPolicy::HardCut,
+            ..cfg()
+        };
+        let with_floor = SegConfig {
+            partition_floor_share: Some(0.3),
+            ..base.clone()
+        };
         assert_ne!(
             base.config_hash(&floor_profile(), &parts),
             with_floor.config_hash(&floor_profile(), &parts),
@@ -2069,7 +2384,11 @@ mod tests {
 
     /// Small-threshold policy so a tiny test grid can exercise the split.
     fn split_policy() -> DisconnectedSplit {
-        DisconnectedSplit { min_component_blocks: 8, min_component_share: 0.40, min_gap_cells: 2 }
+        DisconnectedSplit {
+            min_component_blocks: 8,
+            min_component_share: 0.40,
+            min_gap_cells: 2,
+        }
     }
 
     /// Two 4x4x4 builds (64 blocks each), 12 blocks / 3 cells apart on z. That
@@ -2092,7 +2411,10 @@ mod tests {
             1,
             "closing fuses two builds within 2R+1 cells into one cluster"
         );
-        assert_eq!(segs.clusters[0].block_count, 128, "both builds land in the one cluster");
+        assert_eq!(
+            segs.clusters[0].block_count, 128,
+            "both builds land in the one cluster"
+        );
     }
 
     #[test]
@@ -2100,12 +2422,22 @@ mod tests {
         // The fix: the same input, with the split enabled, comes back as two
         // clusters — one per build — and no block is lost.
         let t = tile(two_disconnected_builds());
-        let on = SegConfig { split_disconnected: Some(split_policy()), ..cfg() };
+        let on = SegConfig {
+            split_disconnected: Some(split_policy()),
+            ..cfg()
+        };
         let segs = segment_tile(&t, &profile(), &on, &no_hints());
-        assert_eq!(segs.clusters.len(), 2, "two disconnected substantial builds must split");
+        assert_eq!(
+            segs.clusters.len(),
+            2,
+            "two disconnected substantial builds must split"
+        );
         let counts: Vec<u64> = segs.clusters.iter().map(|c| c.block_count).collect();
         assert_eq!(counts, vec![64, 64], "each build keeps its own 64 blocks");
-        assert_ne!(segs.clusters[0].id, segs.clusters[1].id, "distinct clusters get distinct ids");
+        assert_ne!(
+            segs.clusters[0].id, segs.clusters[1].id,
+            "distinct clusters get distinct ids"
+        );
     }
 
     #[test]
@@ -2118,10 +2450,20 @@ mod tests {
         let mut blocks = cuboid(8, 11, 0, 3, 8, 11, "minecraft:oak_planks");
         blocks.extend(cuboid(8, 9, 0, 1, 20, 21, "minecraft:oak_planks"));
         let t = tile(blocks);
-        let on = SegConfig { split_disconnected: Some(split_policy()), ..cfg() };
+        let on = SegConfig {
+            split_disconnected: Some(split_policy()),
+            ..cfg()
+        };
         let segs = segment_tile(&t, &profile(), &on, &no_hints());
-        assert_eq!(segs.clusters.len(), 1, "a minor detached part must not split the build");
-        assert_eq!(segs.clusters[0].block_count, 72, "every block stays in the one cluster");
+        assert_eq!(
+            segs.clusters.len(),
+            1,
+            "a minor detached part must not split the build"
+        );
+        assert_eq!(
+            segs.clusters[0].block_count, 72,
+            "every block stays in the one cluster"
+        );
     }
 
     #[test]
@@ -2132,9 +2474,16 @@ mod tests {
         let mut blocks = cuboid(8, 11, 0, 3, 8, 11, "minecraft:oak_planks");
         blocks.extend(cuboid(12, 15, 0, 3, 12, 15, "minecraft:oak_planks"));
         let t = tile(blocks);
-        let on = SegConfig { split_disconnected: Some(split_policy()), ..cfg() };
+        let on = SegConfig {
+            split_disconnected: Some(split_policy()),
+            ..cfg()
+        };
         let segs = segment_tile(&t, &profile(), &on, &no_hints());
-        assert_eq!(segs.clusters.len(), 1, "seeds closer than min_gap_cells stay merged");
+        assert_eq!(
+            segs.clusters.len(),
+            1,
+            "seeds closer than min_gap_cells stay merged"
+        );
     }
 
     #[test]
@@ -2142,10 +2491,17 @@ mod tests {
         // A backward-compatible extension, exactly like partition_floor_share:
         // `None` digests identically to the pre-feature layout, `Some` differs.
         let base = cfg();
-        let with_split = SegConfig { split_disconnected: Some(split_policy()), ..cfg() };
+        let with_split = SegConfig {
+            split_disconnected: Some(split_policy()),
+            ..cfg()
+        };
         assert_eq!(
             base.config_hash(&profile(), &no_hints()),
-            SegConfig { split_disconnected: None, ..cfg() }.config_hash(&profile(), &no_hints()),
+            SegConfig {
+                split_disconnected: None,
+                ..cfg()
+            }
+            .config_hash(&profile(), &no_hints()),
             "None must be byte-for-byte inert in config_hash"
         );
         assert_ne!(

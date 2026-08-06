@@ -25,7 +25,10 @@ pub struct WorldProfile {
 
 impl WorldProfile {
     pub fn new(substrate_palette: BTreeSet<String>, substrate_y_band: (i32, i32)) -> Self {
-        WorldProfile { substrate_palette, substrate_y_band }
+        WorldProfile {
+            substrate_palette,
+            substrate_y_band,
+        }
     }
 
     /// Stable hash of the pinned profile. Recorded on every build so a run can
@@ -103,11 +106,17 @@ impl WorldProfile {
     pub fn derive(samples: &[VoxelTile], params: &ProfileParams) -> WorldProfile {
         // Sort sample references by (tile id, content key) for order-independence,
         // even when two samples share a tile id but differ in contents.
-        let mut ordered: Vec<_> = samples.iter().map(|t| (t.id(), content_key(t), t)).collect();
+        let mut ordered: Vec<_> = samples
+            .iter()
+            .map(|t| (t.id(), content_key(t), t))
+            .collect();
         ordered.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
         let stride = params.sample_stride.max(1);
-        let chosen: Vec<&VoxelTile> =
-            ordered.into_iter().step_by(stride).map(|(_, _, t)| t).collect();
+        let chosen: Vec<&VoxelTile> = ordered
+            .into_iter()
+            .step_by(stride)
+            .map(|(_, _, t)| t)
+            .collect();
 
         if chosen.is_empty() {
             return WorldProfile::new(BTreeSet::new(), (0, 0));
@@ -186,8 +195,7 @@ impl WorldProfile {
         let palette: BTreeSet<String> = counts
             .into_iter()
             .filter(|(_, count)| {
-                total_band_blocks == 0
-                    || (*count as f64 / total_band_blocks as f64) >= min_share
+                total_band_blocks == 0 || (*count as f64 / total_band_blocks as f64) >= min_share
             })
             .map(|(name, _)| name)
             .collect();
@@ -218,7 +226,10 @@ mod derive_tests {
         blocks.push(((4, 0, 3), BlockState::new("minecraft:repeater")));
         VoxelTile::from_blocks(
             TileId { x: 0, z: 0 },
-            TileBounds { min: (0, -64, 0), max: (15, 63, 15) },
+            TileBounds {
+                min: (0, -64, 0),
+                max: (15, 63, 15),
+            },
             blocks.into_iter(),
         )
     }
@@ -236,7 +247,9 @@ mod derive_tests {
         assert_eq!(profile.substrate_y_band, (-64, -61));
         // Palette is exactly the ground material, not the build blocks.
         assert!(profile.substrate_palette.contains("minecraft:stone"));
-        assert!(!profile.substrate_palette.contains("minecraft:redstone_wire"));
+        assert!(!profile
+            .substrate_palette
+            .contains("minecraft:redstone_wire"));
         assert!(!profile.substrate_palette.contains("minecraft:repeater"));
     }
 
@@ -254,7 +267,10 @@ mod derive_tests {
         }
         VoxelTile::from_blocks(
             id,
-            TileBounds { min: (0, -64, 0), max: (3, 63, 3) },
+            TileBounds {
+                min: (0, -64, 0),
+                max: (3, 63, 3),
+            },
             blocks.into_iter(),
         )
     }
@@ -313,7 +329,10 @@ mod derive_tests {
         }
         let tile = VoxelTile::from_blocks(
             TileId { x: 0, z: 0 },
-            TileBounds { min: (0, -70, 0), max: (9, 63, 0) },
+            TileBounds {
+                min: (0, -70, 0),
+                max: (9, 63, 0),
+            },
             blocks.into_iter(),
         );
 
@@ -354,7 +373,10 @@ mod derive_tests {
             blocks.push(((21, -63, 20), BlockState::new("minecraft:redstone_wire")));
             VoxelTile::from_blocks(
                 TileId { x: 0, z: 0 },
-                TileBounds { min: (0, -64, 0), max: (21, 63, 21) },
+                TileBounds {
+                    min: (0, -64, 0),
+                    max: (21, 63, 21),
+                },
                 blocks.into_iter(),
             )
         }
@@ -371,7 +393,9 @@ mod derive_tests {
         assert_eq!(filtered.substrate_y_band, (-64, -61));
         assert!(filtered.substrate_palette.contains("minecraft:stone"));
         assert!(
-            !filtered.substrate_palette.contains("minecraft:redstone_wire"),
+            !filtered
+                .substrate_palette
+                .contains("minecraft:redstone_wire"),
             "rare name below palette_min_share must be filtered out"
         );
 
@@ -386,6 +410,8 @@ mod derive_tests {
         let unfiltered = WorldProfile::derive(&[build_tile()], &default_params);
         assert_eq!(unfiltered.substrate_y_band, (-64, -61));
         assert!(unfiltered.substrate_palette.contains("minecraft:stone"));
-        assert!(unfiltered.substrate_palette.contains("minecraft:redstone_wire"));
+        assert!(unfiltered
+            .substrate_palette
+            .contains("minecraft:redstone_wire"));
     }
 }

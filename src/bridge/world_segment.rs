@@ -78,7 +78,11 @@ pub mod ffi {
                 cell_size,
                 closing_radius,
                 min_cluster_blocks,
-                partition_policy: if hard_cut { PartitionPolicy::HardCut } else { PartitionPolicy::Off },
+                partition_policy: if hard_cut {
+                    PartitionPolicy::HardCut
+                } else {
+                    PartitionPolicy::Off
+                },
                 algorithm_version: SegConfig::default().algorithm_version,
                 partition_floor_share: SegConfig::default().partition_floor_share,
                 split_disconnected: SegConfig::default().split_disconnected,
@@ -119,7 +123,11 @@ pub mod ffi {
             z1: i32,
         ) -> Result<(), NucleationError> {
             let id = utf8(id)?.to_string();
-            self.0.push(PartitionHint { id, bbox_xz: (x0, x1, z0, z1), y_range: None });
+            self.0.push(PartitionHint {
+                id,
+                bbox_xz: (x0, x1, z0, z1),
+                y_range: None,
+            });
             Ok(())
         }
 
@@ -148,8 +156,7 @@ pub mod ffi {
             coverage: f32,
         ) -> Result<Box<WsProfile>, NucleationError> {
             let dir = utf8(world_dir)?;
-            let source =
-                WorldSource::open_dir(Path::new(dir)).map_err(|_| NucleationError::Io)?;
+            let source = WorldSource::open_dir(Path::new(dir)).map_err(|_| NucleationError::Io)?;
             let tiles = WorldSourceTiles::new(source, min_y, max_y);
 
             let limit = sample.max(1) as usize;
@@ -165,7 +172,10 @@ pub mod ffi {
                 })
                 .map_err(|_| NucleationError::Io)?;
 
-            let params = ProfileParams { min_slab_coverage: coverage, ..ProfileParams::default() };
+            let params = ProfileParams {
+                min_slab_coverage: coverage,
+                ..ProfileParams::default()
+            };
             Ok(Box::new(WsProfile(WorldProfile::derive(&samples, &params))))
         }
 
@@ -218,8 +228,7 @@ pub mod ffi {
             world_dir: &DiplomatStr,
         ) -> Result<Box<WsRunResult>, NucleationError> {
             let dir = utf8(world_dir)?;
-            let source =
-                WorldSource::open_dir(Path::new(dir)).map_err(|_| NucleationError::Io)?;
+            let source = WorldSource::open_dir(Path::new(dir)).map_err(|_| NucleationError::Io)?;
             let tiles = WorldSourceTiles::new(source, job.0.min_y, job.0.max_y);
             let partitions = PartitionIndex::new(hints.0.clone());
 
@@ -282,7 +291,9 @@ pub mod ffi {
         }
 
         fn get(&self, index: u32) -> Result<&MaterializedBuild, NucleationError> {
-            self.builds.get(index as usize).ok_or(NucleationError::NotFound)
+            self.builds
+                .get(index as usize)
+                .ok_or(NucleationError::NotFound)
         }
 
         /// The build's stable id (hex), stable across re-runs against the
@@ -326,13 +337,21 @@ pub mod ffi {
         /// The build's world-space bounding box minimum (inclusive).
         pub fn bbox_min_of(&self, index: u32) -> Result<BlockPos, NucleationError> {
             let (min, _max) = self.get(index)?.provenance.world_bbox;
-            Ok(BlockPos { x: min.0, y: min.1, z: min.2 })
+            Ok(BlockPos {
+                x: min.0,
+                y: min.1,
+                z: min.2,
+            })
         }
 
         /// The build's world-space bounding box maximum (inclusive).
         pub fn bbox_max_of(&self, index: u32) -> Result<BlockPos, NucleationError> {
             let (_min, max) = self.get(index)?.provenance.world_bbox;
-            Ok(BlockPos { x: max.0, y: max.1, z: max.2 })
+            Ok(BlockPos {
+                x: max.0,
+                y: max.1,
+                z: max.2,
+            })
         }
 
         /// Save the build's schematic to a file, picking the format from the
@@ -341,7 +360,11 @@ pub mod ffi {
         /// Not available in JS: the WASM build has no filesystem.
         #[cfg(not(target_arch = "wasm32"))]
         #[diplomat::attr(js, disable)]
-        pub fn write_schem_to(&self, index: u32, path: &DiplomatStr) -> Result<(), NucleationError> {
+        pub fn write_schem_to(
+            &self,
+            index: u32,
+            path: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
             let mb = self.get(index)?;
             let path = utf8(path)?;
             let manager = get_manager();

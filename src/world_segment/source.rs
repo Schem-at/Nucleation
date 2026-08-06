@@ -47,7 +47,10 @@ pub fn region_tile_bounds(
     let x0 = region_x * REGION_BLOCKS;
     let z0 = region_z * REGION_BLOCKS;
     (
-        TileId { x: region_x, z: region_z },
+        TileId {
+            x: region_x,
+            z: region_z,
+        },
         TileBounds {
             min: (x0, min_y, z0),
             max: (x0 + REGION_BLOCKS - 1, max_y, z0 + REGION_BLOCKS - 1),
@@ -143,7 +146,10 @@ mod tests {
         fn tile(&self, id: TileId) -> Result<Option<VoxelTile>, TileError> {
             Ok(Some(VoxelTile::from_blocks(
                 id,
-                TileBounds { min: (0, 0, 0), max: (15, 15, 15) },
+                TileBounds {
+                    min: (0, 0, 0),
+                    max: (15, 15, 15),
+                },
                 std::iter::once((
                     (0, 0, 0),
                     crate::block_state::BlockState::new("minecraft:stone"),
@@ -170,6 +176,9 @@ mod tests {
             result.is_ok(),
             "Stop must not propagate as an error: got {result:?}"
         );
-        assert_eq!(call_count, 1, "iteration must stop right after the Stop-returning call");
+        assert_eq!(
+            call_count, 1,
+            "iteration must stop right after the Stop-returning call"
+        );
     }
 }

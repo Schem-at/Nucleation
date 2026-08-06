@@ -74,7 +74,9 @@ impl WorldSegmenter {
         prior: &[PriorBuild],
     ) -> Vec<MaterializedBuild> {
         let mut out = Vec::new();
-        Self::run_streaming(source, profile, partitions, job, prior, &mut |mb| out.push(mb));
+        Self::run_streaming(source, profile, partitions, job, prior, &mut |mb| {
+            out.push(mb)
+        });
         out
     }
 
@@ -113,7 +115,10 @@ impl WorldSegmenter {
                     tile.blocks().map(|(p, b)| (p, b.clone())).collect();
                 for (pos, cid) in membership {
                     if let Some(block) = tile_blocks.get(&pos) {
-                        blocks_by_cluster.entry(cid).or_default().insert(pos, block.clone());
+                        blocks_by_cluster
+                            .entry(cid)
+                            .or_default()
+                            .insert(pos, block.clone());
                     }
                 }
 
@@ -127,7 +132,10 @@ impl WorldSegmenter {
 
         let matches = match_snapshots(&builds, prior, &job.source_id, job.match_iou);
         let stable_by_build: BTreeMap<ClusterId, crate::world_segment::provenance::StableBuildId> =
-            matches.into_iter().map(|m| (m.build_id, m.stable_id)).collect();
+            matches
+                .into_iter()
+                .map(|m| (m.build_id, m.stable_id))
+                .collect();
 
         let config_hash = job.config.config_hash(profile, partitions);
         let profile_hash = profile.profile_hash();
@@ -165,8 +173,7 @@ impl WorldSegmenter {
                 profile_hash,
                 extracted_at: job.extracted_at,
             };
-            let (schematic, provenance) =
-                materialize(build, &blocks, scored.tier, stable_id, &ctx);
+            let (schematic, provenance) = materialize(build, &blocks, scored.tier, stable_id, &ctx);
 
             stats.builds += 1;
             match scored.tier {
@@ -179,7 +186,10 @@ impl WorldSegmenter {
             }
             stats.largest_block_count = stats.largest_block_count.max(build.block_count);
 
-            emit(MaterializedBuild { schematic, provenance });
+            emit(MaterializedBuild {
+                schematic,
+                provenance,
+            });
         }
 
         stats
@@ -253,7 +263,10 @@ mod tests {
 
         let source = MemSource {
             id: TileId { x: 0, z: 0 },
-            bounds: TileBounds { min: (0, -64, 0), max: (15, 63, 15) },
+            bounds: TileBounds {
+                min: (0, -64, 0),
+                max: (15, 63, 15),
+            },
             blocks,
         };
 
@@ -271,17 +284,16 @@ mod tests {
         };
 
         let mut emitted: Vec<MaterializedBuild> = Vec::new();
-        let stats = WorldSegmenter::run_streaming(
-            &source,
-            &profile,
-            &partitions,
-            &job,
-            &[],
-            &mut |mb| emitted.push(mb),
-        );
+        let stats =
+            WorldSegmenter::run_streaming(&source, &profile, &partitions, &job, &[], &mut |mb| {
+                emitted.push(mb)
+            });
 
         assert_eq!(stats.builds, emitted.len() as u64);
-        assert!(stats.tier_debris >= 1, "the speck should be scored as debris");
+        assert!(
+            stats.tier_debris >= 1,
+            "the speck should be scored as debris"
+        );
 
         let expected = WorldSegmenter::run(&source, &profile, &partitions, &job, &[]);
         let mut expected_provenance: Vec<Provenance> =
@@ -309,7 +321,10 @@ mod tests {
 
         let source = MemSource {
             id: TileId { x: 0, z: 0 },
-            bounds: TileBounds { min: (0, -64, 0), max: (15, 63, 15) },
+            bounds: TileBounds {
+                min: (0, -64, 0),
+                max: (15, 63, 15),
+            },
             blocks,
         };
 
@@ -341,11 +356,15 @@ mod tests {
 
         // The schematic is local-origin normalized: world (5,-59,5) -> (0,0,0).
         assert_eq!(
-            mb.schematic.get_block(0, 0, 0).map(|b| b.get_name().to_string()),
+            mb.schematic
+                .get_block(0, 0, 0)
+                .map(|b| b.get_name().to_string()),
             Some("minecraft:redstone_wire".to_string())
         );
         assert_eq!(
-            mb.schematic.get_block(1, 0, 0).map(|b| b.get_name().to_string()),
+            mb.schematic
+                .get_block(1, 0, 0)
+                .map(|b| b.get_name().to_string()),
             Some("minecraft:repeater".to_string())
         );
     }

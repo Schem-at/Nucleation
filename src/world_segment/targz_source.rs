@@ -63,7 +63,12 @@ impl TarGzSource {
         if !path.exists() {
             return Err(TileError::Io(format!("{} does not exist", path.display())));
         }
-        Ok(TarGzSource { path, min_y, max_y, world_border: None })
+        Ok(TarGzSource {
+            path,
+            min_y,
+            max_y,
+            world_border: None,
+        })
     }
 
     pub fn with_world_border(mut self, border_abs: i32) -> Self {
@@ -109,7 +114,9 @@ impl TileSource for TarGzSource {
         let file = File::open(&self.path).map_err(|e| TileError::Io(e.to_string()))?;
         let gz = GzDecoder::new(BufReader::new(file));
         let mut archive = tar::Archive::new(gz);
-        let entries = archive.entries().map_err(|e| TileError::Io(e.to_string()))?;
+        let entries = archive
+            .entries()
+            .map_err(|e| TileError::Io(e.to_string()))?;
         let mut buf: Vec<u8> = Vec::new();
         for entry in entries {
             let mut entry = entry.map_err(|e| TileError::Io(e.to_string()))?;
@@ -128,7 +135,9 @@ impl TileSource for TarGzSource {
                 }
             };
             buf.clear();
-            entry.read_to_end(&mut buf).map_err(|e| TileError::Io(e.to_string()))?;
+            entry
+                .read_to_end(&mut buf)
+                .map_err(|e| TileError::Io(e.to_string()))?;
             if buf.is_empty() {
                 eprintln!("world_segment: skipping {name}: empty entry");
                 continue;
@@ -142,18 +151,20 @@ impl TileSource for TarGzSource {
             // Per-entry decode failures below are reported and skipped, not
             // propagated: a single malformed region must never abort the rest
             // of the archive (see module docs).
-            let source = match crate::formats::world_stream::WorldSource::from_mca_bytes(buf.clone())
-            {
-                Ok(source) => source,
-                Err(e) => {
-                    eprintln!("world_segment: skipping {name}: malformed region data ({e})");
-                    continue;
-                }
-            };
+            let source =
+                match crate::formats::world_stream::WorldSource::from_mca_bytes(buf.clone()) {
+                    Ok(source) => source,
+                    Err(e) => {
+                        eprintln!("world_segment: skipping {name}: malformed region data ({e})");
+                        continue;
+                    }
+                };
             let positions = match source.region_positions() {
                 Ok(positions) => positions,
                 Err(e) => {
-                    eprintln!("world_segment: skipping {name}: could not read region positions ({e})");
+                    eprintln!(
+                        "world_segment: skipping {name}: could not read region positions ({e})"
+                    );
                     continue;
                 }
             };
@@ -203,14 +214,20 @@ mod tests {
     #[test]
     fn parses_valid_region_names() {
         assert_eq!(parse_region_coords("world/region/r.0.0.mca"), Some((0, 0)));
-        assert_eq!(parse_region_coords("build/region/r.-1.-2.mca"), Some((-1, -2)));
+        assert_eq!(
+            parse_region_coords("build/region/r.-1.-2.mca"),
+            Some((-1, -2))
+        );
         assert_eq!(parse_region_coords("region/r.5.-3.mca"), Some((5, -3)));
     }
 
     #[test]
     fn rejects_non_region_and_backup_entries() {
         assert_eq!(parse_region_coords("world/region/r.0.0.mca.bak"), None);
-        assert_eq!(parse_region_coords("world/region/r.-2.-8.mca.5409229131383617463.backup"), None);
+        assert_eq!(
+            parse_region_coords("world/region/r.-2.-8.mca.5409229131383617463.backup"),
+            None
+        );
         assert_eq!(parse_region_coords("world/level.dat"), None);
         assert_eq!(parse_region_coords("world/entities/r.0.0.mca"), None); // not /region/
         assert_eq!(parse_region_coords("world/region/notaregion.mca"), None);
@@ -230,8 +247,14 @@ mod tests {
         // border 8192: region 17 covers blocks 8704..9215, fully beyond -> excluded.
         // region 16 covers 8192..8703 and block 8192 is ON the border, so it
         // TOUCHES and must be kept. region 0 is well inside.
-        assert!(region_outside_border(17, 0, 8192), "fully beyond the border");
-        assert!(!region_outside_border(16, 0, 8192), "touches the border, keep it");
+        assert!(
+            region_outside_border(17, 0, 8192),
+            "fully beyond the border"
+        );
+        assert!(
+            !region_outside_border(16, 0, 8192),
+            "touches the border, keep it"
+        );
         assert!(!region_outside_border(15, 0, 8192), "inside");
         assert!(!region_outside_border(0, 0, 8192), "inside");
     }
@@ -300,8 +323,8 @@ mod tests {
 
         // Write to a fixed, unique temp path (no tempfile dep: not present in
         // [dev-dependencies], so use std::env::temp_dir() and clean up after).
-        let path = std::env::temp_dir()
-            .join("nucleation_test_targz_source_skips_bad_entries.tar.gz");
+        let path =
+            std::env::temp_dir().join("nucleation_test_targz_source_skips_bad_entries.tar.gz");
         std::fs::write(&path, &gz_bytes).unwrap();
 
         let source = TarGzSource::open(&path, -64, 320).unwrap();
@@ -389,14 +412,18 @@ mod tests {
             header.set_size(tiny_a.len() as u64);
             header.set_mode(0o644);
             header.set_cksum();
-            builder.append_data(&mut header, "world/region/r.0.0.mca", &tiny_a[..]).unwrap();
+            builder
+                .append_data(&mut header, "world/region/r.0.0.mca", &tiny_a[..])
+                .unwrap();
 
             let tiny_b = b"not a real region file, entry b";
             let mut header = tar::Header::new_gnu();
             header.set_size(tiny_b.len() as u64);
             header.set_mode(0o644);
             header.set_cksum();
-            builder.append_data(&mut header, "world/region/r.1.0.mca", &tiny_b[..]).unwrap();
+            builder
+                .append_data(&mut header, "world/region/r.1.0.mca", &tiny_b[..])
+                .unwrap();
 
             // Junk entry, rejected by classify() before any decode is attempted.
             let leveldat = b"junk level.dat contents";
@@ -404,7 +431,9 @@ mod tests {
             header.set_size(leveldat.len() as u64);
             header.set_mode(0o644);
             header.set_cksum();
-            builder.append_data(&mut header, "world/level.dat", &leveldat[..]).unwrap();
+            builder
+                .append_data(&mut header, "world/level.dat", &leveldat[..])
+                .unwrap();
 
             builder.finish().unwrap();
         }
@@ -417,8 +446,8 @@ mod tests {
             encoder.finish().unwrap();
         }
 
-        let path = std::env::temp_dir()
-            .join("nucleation_test_targz_source_reports_ok_on_stop.tar.gz");
+        let path =
+            std::env::temp_dir().join("nucleation_test_targz_source_reports_ok_on_stop.tar.gz");
         std::fs::write(&path, &gz_bytes).unwrap();
 
         let source = TarGzSource::open(&path, -64, 320).unwrap();
@@ -437,6 +466,9 @@ mod tests {
         // See the doc comment above: with this fixture no entry decodes far
         // enough to reach the callback, so call_count stays 0. This is
         // consistent with (not proof of) short-circuiting; see doc comment.
-        assert_eq!(call_count, 0, "no entry in this fixture decodes into a callable tile");
+        assert_eq!(
+            call_count, 0,
+            "no entry in this fixture decodes into a callable tile"
+        );
     }
 }

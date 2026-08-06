@@ -56,7 +56,10 @@ pub struct SnapshotMatch {
 /// intersection volume over the union volume (0.0 if the union is empty,
 /// which cannot actually happen for two well-formed boxes but is guarded
 /// against divide-by-zero regardless).
-pub fn bbox_iou(a: ((i32, i32, i32), (i32, i32, i32)), b: ((i32, i32, i32), (i32, i32, i32))) -> f32 {
+pub fn bbox_iou(
+    a: ((i32, i32, i32), (i32, i32, i32)),
+    b: ((i32, i32, i32), (i32, i32, i32)),
+) -> f32 {
     fn axis_len(min: i32, max: i32) -> i64 {
         (max - min + 1) as i64
     }
@@ -168,8 +171,10 @@ pub fn match_snapshots(
                         .then(prior[a].stable_id.cmp(&prior[b].stable_id))
                 })
                 .unwrap();
-            let mut from: Vec<StableBuildId> =
-                matched_priors.iter().map(|&pi| prior[pi].stable_id).collect();
+            let mut from: Vec<StableBuildId> = matched_priors
+                .iter()
+                .map(|&pi| prior[pi].stable_id)
+                .collect();
             from.sort();
             (prior[inherited_pi].stable_id, Outcome::Merge { from })
         } else {
@@ -182,7 +187,9 @@ pub fn match_snapshots(
                 } else {
                     (
                         StableBuildId::seed(source_id, c.id),
-                        Outcome::Split { inherits: prior[pi].stable_id },
+                        Outcome::Split {
+                            inherits: prior[pi].stable_id,
+                        },
                     )
                 }
             } else {
@@ -190,7 +197,11 @@ pub fn match_snapshots(
             }
         };
 
-        results.push(SnapshotMatch { build_id: c.id, stable_id, outcome });
+        results.push(SnapshotMatch {
+            build_id: c.id,
+            stable_id,
+            outcome,
+        });
     }
 
     results.sort_by_key(|m| m.build_id);
@@ -201,36 +212,54 @@ pub fn match_snapshots(
 mod tests {
     use super::*;
     use crate::world_segment::ids::{ClusterId, ContentId, TileId};
-    use crate::world_segment::stitch::Build;
     use crate::world_segment::provenance::StableBuildId;
+    use crate::world_segment::stitch::Build;
 
-    fn build(tag: &[u8], bbox: ((i32,i32,i32),(i32,i32,i32)), n: u64) -> Build {
-        let id = ClusterId::new(ContentId::of(&[tag]), TileId{x:0,z:0}, None, (0,0,0));
-        Build { id, cluster_ids: vec![id], bbox, block_count: n, cell_count: n, partition_id: None }
+    fn build(tag: &[u8], bbox: ((i32, i32, i32), (i32, i32, i32)), n: u64) -> Build {
+        let id = ClusterId::new(
+            ContentId::of(&[tag]),
+            TileId { x: 0, z: 0 },
+            None,
+            (0, 0, 0),
+        );
+        Build {
+            id,
+            cluster_ids: vec![id],
+            bbox,
+            block_count: n,
+            cell_count: n,
+            partition_id: None,
+        }
     }
 
     #[test]
     fn iou_of_identical_boxes_is_one() {
-        assert!((bbox_iou(((0,0,0),(9,9,9)), ((0,0,0),(9,9,9))) - 1.0).abs() < 1e-6);
+        assert!((bbox_iou(((0, 0, 0), (9, 9, 9)), ((0, 0, 0), (9, 9, 9))) - 1.0).abs() < 1e-6);
     }
 
     #[test]
     fn iou_of_disjoint_boxes_is_zero() {
-        assert_eq!(bbox_iou(((0,0,0),(1,1,1)), ((100,100,100),(101,101,101))), 0.0);
+        assert_eq!(
+            bbox_iou(((0, 0, 0), (1, 1, 1)), ((100, 100, 100), (101, 101, 101))),
+            0.0
+        );
     }
 
     #[test]
     fn unmatched_current_is_new() {
-        let cur = vec![build(b"a", ((0,0,0),(9,9,9)), 100)];
+        let cur = vec![build(b"a", ((0, 0, 0), (9, 9, 9)), 100)];
         let out = match_snapshots(&cur, &[], "w", 0.5);
         assert!(matches!(out[0].outcome, Outcome::New));
     }
 
     #[test]
     fn overlapping_current_inherits_prior_stable_id() {
-        let prior = vec![PriorBuild { stable_id: StableBuildId::seed("w", build(b"old", ((0,0,0),(9,9,9)), 90).id),
-                                       bbox: ((0,0,0),(9,9,9)), block_count: 90 }];
-        let cur = vec![build(b"a", ((0,0,0),(9,9,9)), 100)]; // same box, edited
+        let prior = vec![PriorBuild {
+            stable_id: StableBuildId::seed("w", build(b"old", ((0, 0, 0), (9, 9, 9)), 90).id),
+            bbox: ((0, 0, 0), (9, 9, 9)),
+            block_count: 90,
+        }];
+        let cur = vec![build(b"a", ((0, 0, 0), (9, 9, 9)), 100)]; // same box, edited
         let out = match_snapshots(&cur, &prior, "w", 0.5);
         assert_eq!(out[0].stable_id, prior[0].stable_id);
         assert!(matches!(out[0].outcome, Outcome::Same(_)));
@@ -242,15 +271,19 @@ mod tests {
     /// `Split { inherits }` pointing at the same prior.
     #[test]
     fn split_gives_the_largest_current_the_inherited_id() {
-        let old = build(b"old", ((0,0,0),(9,0,9)), 200);
+        let old = build(b"old", ((0, 0, 0), (9, 0, 9)), 200);
         let prior_id = StableBuildId::seed("w", old.id);
-        let prior = vec![PriorBuild { stable_id: prior_id, bbox: old.bbox, block_count: 200 }];
+        let prior = vec![PriorBuild {
+            stable_id: prior_id,
+            bbox: old.bbox,
+            block_count: 200,
+        }];
 
         // Two current builds each overlapping the old footprint enough to
         // pass threshold (using generous IoU here isn't the point; both
         // must independently clear the threshold against the same prior).
-        let big = build(b"big", ((0,0,0),(9,0,9)), 150);
-        let small = build(b"small", ((0,0,0),(4,0,4)), 50);
+        let big = build(b"big", ((0, 0, 0), (9, 0, 9)), 150);
+        let small = build(b"small", ((0, 0, 0), (4, 0, 4)), 50);
         let cur = vec![big.clone(), small.clone()];
 
         let out = match_snapshots(&cur, &prior, "w", 0.1);
@@ -259,11 +292,19 @@ mod tests {
         let big_match = out.iter().find(|m| m.build_id == big.id).unwrap();
         let small_match = out.iter().find(|m| m.build_id == small.id).unwrap();
 
-        assert_eq!(big_match.stable_id, prior_id, "largest current inherits the prior id");
+        assert_eq!(
+            big_match.stable_id, prior_id,
+            "largest current inherits the prior id"
+        );
         assert!(matches!(big_match.outcome, Outcome::Same(sid) if sid == prior_id));
 
-        assert_ne!(small_match.stable_id, prior_id, "split-off current gets a fresh id");
-        assert!(matches!(&small_match.outcome, Outcome::Split { inherits } if *inherits == prior_id));
+        assert_ne!(
+            small_match.stable_id, prior_id,
+            "split-off current gets a fresh id"
+        );
+        assert!(
+            matches!(&small_match.outcome, Outcome::Split { inherits } if *inherits == prior_id)
+        );
 
         // Output sorted by build_id.
         assert!(out[0].build_id <= out[1].build_id);
@@ -274,16 +315,24 @@ mod tests {
     /// id and records both priors in `from`, sorted.
     #[test]
     fn merge_records_all_priors() {
-        let old_a = build(b"old_a", ((0,0,0),(4,0,9)), 40);
-        let old_b = build(b"old_b", ((5,0,0),(9,0,9)), 90);
+        let old_a = build(b"old_a", ((0, 0, 0), (4, 0, 9)), 40);
+        let old_b = build(b"old_b", ((5, 0, 0), (9, 0, 9)), 90);
         let stable_a = StableBuildId::seed("w", old_a.id);
         let stable_b = StableBuildId::seed("w", old_b.id);
         let prior = vec![
-            PriorBuild { stable_id: stable_a, bbox: old_a.bbox, block_count: 40 },
-            PriorBuild { stable_id: stable_b, bbox: old_b.bbox, block_count: 90 },
+            PriorBuild {
+                stable_id: stable_a,
+                bbox: old_a.bbox,
+                block_count: 40,
+            },
+            PriorBuild {
+                stable_id: stable_b,
+                bbox: old_b.bbox,
+                block_count: 90,
+            },
         ];
 
-        let merged = build(b"merged", ((0,0,0),(9,0,9)), 130);
+        let merged = build(b"merged", ((0, 0, 0), (9, 0, 9)), 130);
         let cur = vec![merged.clone()];
 
         let out = match_snapshots(&cur, &prior, "w", 0.1);

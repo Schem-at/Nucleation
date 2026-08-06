@@ -74,9 +74,18 @@ mod tests {
     #[test]
     fn band_edges_are_inclusive() {
         let p = profile();
-        assert_eq!(classify(&BlockState::new("minecraft:stone"), -64, &p), BlockClass::Substrate);
-        assert_eq!(classify(&BlockState::new("minecraft:stone"), -50, &p), BlockClass::Substrate);
-        assert_eq!(classify(&BlockState::new("minecraft:stone"), -49, &p), BlockClass::Artificial);
+        assert_eq!(
+            classify(&BlockState::new("minecraft:stone"), -64, &p),
+            BlockClass::Substrate
+        );
+        assert_eq!(
+            classify(&BlockState::new("minecraft:stone"), -50, &p),
+            BlockClass::Substrate
+        );
+        assert_eq!(
+            classify(&BlockState::new("minecraft:stone"), -49, &p),
+            BlockClass::Artificial
+        );
     }
 
     #[test]

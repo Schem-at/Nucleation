@@ -20,7 +20,11 @@ pub struct WorldSourceTiles {
 
 impl WorldSourceTiles {
     pub fn new(source: WorldSource, min_y: i32, max_y: i32) -> Self {
-        WorldSourceTiles { source, min_y, max_y }
+        WorldSourceTiles {
+            source,
+            min_y,
+            max_y,
+        }
     }
 
     fn collect_tile(&self, region_x: i32, region_z: i32) -> Result<Option<VoxelTile>, TileError> {
