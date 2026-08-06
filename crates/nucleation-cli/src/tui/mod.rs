@@ -11,5 +11,6 @@ pub(crate) mod inspector;
 #[cfg(test)]
 mod screen_tests;
 pub(crate) mod tests_screen;
+pub(crate) mod voxel;
 
 pub(crate) use app::{run, Screen};

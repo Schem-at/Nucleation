@@ -1,0 +1,265 @@
+.\" nucleation(1) — mdoc, mandoc-native.
+.\" Regenerate nothing: this page is the source of truth, embedded into the
+.\" binary and shown by `nucleation man`.
+.Dd August 4, 2026
+.Dt NUCLEATION 1
+.Os
+.Sh NAME
+.Nm nucleation
+.Nd inspect, test, convert and render Minecraft schematics
+.Sh SYNOPSIS
+.Nm
+.Nm
+.Cm test
+.Op Fl -path Ar path
+.Op Fl -filter Ar substring
+.Op Fl -specs Ar dir
+.Op Fl -json
+.Op Fl -trace-window Ar n
+.Op Ar path | -
+.Nm
+.Cm port
+.Op Fl -path Ar path
+.Op Fl -specs Ar dir
+.Op Fl -max-ticks Ar n
+.Fl -out Ar dir
+.Nm
+.Cm inspect
+.Op Ar file | -
+.Op Fl -json
+.Nm
+.Cm info
+.Op Ar file | -
+.Op Fl -json
+.Nm
+.Cm convert
+.Ar in | -
+.Fl o Ar out | -
+.Op Fl -to Ar format
+.Op Fl -format-version Ar v
+.Nm
+.Cm diff
+.Ar a | -
+.Ar b
+.Op Fl -preset Ar name
+.Op Fl -json
+.Nm
+.Cm render
+.Ar file | -
+.Fl -pack Ar pack
+.Fl o Ar out.png | -
+.Op Fl -width Ar n
+.Op Fl -height Ar n
+.Nm
+.Cm mesh
+.Ar file | -
+.Op Fl o Ar out.glb | -
+.Op Fl -to Ar glb | usdz
+.Op Fl -pack Ar pack
+.Nm
+.Cm man
+.Op Fl -install
+.Sh DESCRIPTION
+.Nm
+is one binary over the Nucleation schematic library: a file browser,
+inspector and test runner as a terminal UI, and pipeline-friendly
+subcommands for scripts.
+Every format the library reads is accepted by content detection, never by
+extension:
+.Pa .litematic , .schem , .schematic , .snbt , .nbt , .mcstructure
+and friends.
+.Pp
+Run bare on a terminal,
+.Nm
+opens the shell: a browser over the current directory, an inspector per
+file, and a live test screen.
+Run with stdout piped, every subcommand is plain text (or raw payload
+bytes), and
+.Ql -
+means stdin or stdout in any position that names a file, in the manner of
+.Xr ffmpeg 1 :
+payload bytes own stdout, status lines go to stderr.
+.Sh SUBCOMMANDS
+.Bl -tag -width Ds
+.It Cm test Op Ar paths...
+Discover and run every test suite under the given paths: schematics
+carrying an embedded
+.Ql NucleationTest
+suite, and
+.Pa .snbt
+structures with a
+.Pa <stem>.test.json
+sidecar or a
+.Fl -specs
+match.
+Structures with no test report as unported rather than vanishing.
+A single
+.Ql -
+reads the path list from stdin, one per line:
+.Ql find . -name '*.litematic' | nucleation test - .
+Exit status 1 when anything fails.
+.It Cm port
+Convert a corpus of
+.Pa .snbt
+gametest structures into self-contained
+.Pa .litematic
+tests under
+.Fl -out ,
+embedding a hand spec when one exists and otherwise synthesizing one from
+the structure's own test blocks.
+.It Cm inspect Ar file
+The inspector: a TUI on a terminal, the text overview otherwise (or with
+.Fl -json ) .
+.Ql -
+inspects a schematic piped to stdin (text mode).
+.It Cm info Ar file
+The same overview, always text:
+format, size, palette, entities, machinery, and the embedded test summary.
+.It Cm convert Ar in Fl o Ar out
+Re-encode between formats.
+The output extension picks the exporter;
+.Fl -to
+names it explicitly
+.Pq required when writing to Ql - .
+.It Cm diff Ar a Ar b
+Structural diff of two builds.
+One side may be
+.Ql - .
+.It Cm render Ar file
+A PNG snapshot through the GPU pipeline
+.Pq compiled with the Ql render feature .
+.Fl o Ar -
+streams the PNG to stdout.
+.It Cm mesh Ar file
+Mesh a schematic into a 3D model through the same pipeline the 3D view and
+.Cm render
+use
+.Pq compiled with the Ql mesh or Ql render feature .
+The container is
+.Fl -to ,
+else the output extension, else
+.Pa .glb :
+.Pa glb
+is binary glTF for engines and viewers,
+.Pa usdz
+is the archive
+.Xr open 1
+hands to Quick Look on macOS, so
+.Ql nucleation mesh build.litematic -o b.usdz && open b.usdz
+is a 3D preview with nothing else installed.
+Without
+.Fl o
+the output lands beside the input as
+.Pa <stem>.glb ,
+or on stdout when the input was the pipe.
+The pack defaults like the GPU view:
+.Ev NUCLEATION_PACK ,
+else the newest installed client jar.
+.It Cm man
+Show this page.
+With
+.Fl -install ,
+copy it into the first writable of
+.Pa /opt/homebrew/share/man/man1 ,
+.Pa /usr/local/share/man/man1 ,
+.Pa ~/.local/share/man/man1
+so plain
+.Ql man nucleation
+works.
+.El
+.Sh THE SHELL
+Tab toggles between two kept sides: the world (browser or inspector) and
+the tests screen; each side parks while the other is up, so nothing
+rescans on a switch.
+From the inspector, Tab runs the file being inspected; from the browser,
+its directory.
+.Ss Keys
+.Bl -tag -width "1/2/3/4" -compact
+.It Ic q
+quit
+.It Ic Tab
+toggle world/tests
+.It Ic Esc
+back (collapse first where a detail is open)
+.It Ic Enter
+open / expand
+.It Ic /
+filter the browser
+.It Ic i
+inspect the selected test row
+.It Ic r
+rerun the tests screen
+.It Ic 1-4
+inspector tabs: overview, entities, test, 3D view
+.It Ic n , p
+next/previous case on the test tab
+.It Ic v
+cycle the image protocol on the view tab
+.It Ic +/-
+zoom the 3D view;
+.Ic 0
+resets orbit, zoom and pan
+.El
+.Ss Mouse
+Left-drag orbits the 3D view (grab-the-model sense), right-drag pans,
+the wheel zooms over the view and scrolls elsewhere; rows, tabs and the
+header chips are clickable.
+Dropping a file onto the terminal opens it.
+Hold Shift for the terminal's native text selection while the TUI runs.
+.Ss The 3D view
+A software voxel raycaster needs nothing; with the
+.Ql render
+feature and a resource pack (or client jar) the view upgrades to the real
+meshing and GPU pipeline.
+Frames travel over the terminal's image protocol
+.Pq Kitty, iTerm2, Sixel
+with Unicode half-blocks as the universal fallback.
+.Sh ENVIRONMENT
+.Bl -tag -width NUCLEATION_TUI_PROTOCOL
+.It Ev NUCLEATION_PACK
+Resource pack zip or Minecraft client jar for the GPU view.
+Unset, the newest installed client jar is auto-discovered (vanilla
+launcher and Prism/MultiMC layouts).
+.It Ev NUCLEATION_TUI_PROTOCOL
+Force the image protocol:
+.Ql halfblocks ,
+.Ql sixel ,
+.Ql kitty
+or
+.Ql iterm2 ,
+for terminals that claim what they do not render.
+.El
+.Sh EXIT STATUS
+0 on success and on a fully passing test run; 1 when any test fails; 2 on
+usage or I/O errors.
+.Sh EXAMPLES
+Convert a litematic to a Sponge schematic, in a pipeline:
+.Bd -literal -offset indent
+curl -s $URL | nucleation convert - --to schematic - > build.schem
+.Ed
+.Pp
+Run every test a find(1) turns up:
+.Bd -literal -offset indent
+find tests/corpus -name '*.litematic' | nucleation test -
+.Ed
+.Pp
+Inspect whatever a pipeline carries, as JSON:
+.Bd -literal -offset indent
+generate-build | nucleation info - --json | jq .palette
+.Ed
+.Pp
+Render straight into an image viewer:
+.Bd -literal -offset indent
+nucleation render build.litematic --pack client.jar -o - | open -f -a Preview
+.Ed
+.Pp
+Pull a build from a URL and Quick Look it in 3D
+.Pq Preview cannot read glTF, so USDZ :
+.Bd -literal -offset indent
+curl -sL $URL | nucleation mesh - -o /tmp/b.usdz && open /tmp/b.usdz
+.Ed
+.Sh SEE ALSO
+.Xr ffmpeg 1 ,
+.Xr mandoc 1
+.Sh AUTHORS
+.An The Nucleation project

@@ -40,11 +40,20 @@ fn coords(var: &str) -> Option<(i32, i32, i32)> {
 /// An adder has seventeen levers; driving it one `MC_USE` at a time is not a
 /// probe, it is a typing exercise.
 fn coord_list(var: &str) -> Vec<(i32, i32, i32)> {
-    let Ok(v) = std::env::var(var) else { return Vec::new() };
+    let Ok(v) = std::env::var(var) else {
+        return Vec::new();
+    };
     v.split(';')
         .filter_map(|part| {
-            let c: Vec<i32> = part.split(',').filter_map(|n| n.trim().parse().ok()).collect();
-            if let [x, y, z] = c[..] { Some((x, y, z)) } else { None }
+            let c: Vec<i32> = part
+                .split(',')
+                .filter_map(|n| n.trim().parse().ok())
+                .collect();
+            if let [x, y, z] = c[..] {
+                Some((x, y, z))
+            } else {
+                None
+            }
         })
         .collect()
 }
@@ -75,8 +84,14 @@ fn run_machine() {
     } else {
         std::env::var("MC_MACHINE").expect("set MC_MACHINE or MC_STRUCTURE")
     };
-    let ticks: u64 = std::env::var("MC_TICKS").ok().and_then(|t| t.parse().ok()).unwrap_or(20);
-    let settle = match std::env::var("MC_SETTLE").unwrap_or_else(|_| "placement".into()).as_str() {
+    let ticks: u64 = std::env::var("MC_TICKS")
+        .ok()
+        .and_then(|t| t.parse().ok())
+        .unwrap_or(20);
+    let settle = match std::env::var("MC_SETTLE")
+        .unwrap_or_else(|_| "placement".into())
+        .as_str()
+    {
         "quiet" => mc_test::SettleMode::Quiet,
         "in-world" => mc_test::SettleMode::InWorld,
         _ => mc_test::SettleMode::Placement,
@@ -110,7 +125,13 @@ fn run_machine() {
         for (pos, entry) in &structure.blocks {
             let state = structure.palette[*entry].as_str();
             if state.contains(&needle) {
-                eprintln!("  [{},{},{}] {}", pos.x, pos.y, pos.z, state.replace("minecraft:", ""));
+                eprintln!(
+                    "  [{},{},{}] {}",
+                    pos.x,
+                    pos.y,
+                    pos.z,
+                    state.replace("minecraft:", "")
+                );
                 hits += 1;
             }
         }
@@ -137,10 +158,20 @@ fn run_machine() {
         }
     }
 
-    let mut sim =
-        mc_test::build_sim(&structure, Pos::new(0, 0, 0), settle, &[], &[], None, "machine");
+    let mut sim = mc_test::build_sim(
+        &structure,
+        Pos::new(0, 0, 0),
+        settle,
+        &[],
+        &[],
+        None,
+        "machine",
+    );
     sim.record();
-    let air = sim.registry_mut().intern("minecraft:air").expect("air interns");
+    let air = sim
+        .registry_mut()
+        .intern("minecraft:air")
+        .expect("air interns");
 
     let use_at = coord_list("MC_USE");
     let use_ticks = ticks_list("MC_USE_TICK", "5");
@@ -169,7 +200,10 @@ fn run_machine() {
                 sim.place_block(Pos::new(x, y, z), air);
                 eprintln!(
                     "  -- broke ({x},{y},{z}) at t{t} (was {})",
-                    sim.registry().descriptor(was).unwrap_or("?").replace("minecraft:", "")
+                    sim.registry()
+                        .descriptor(was)
+                        .unwrap_or("?")
+                        .replace("minecraft:", "")
                 );
             }
         }
@@ -181,13 +215,19 @@ fn run_machine() {
         // `BlockChange`, so a replay leaves blocks standing where the engine
         // has none. Diffs built that way accuse the wrong cells. Dump the
         // world and compare that.
-        if std::env::var("MC_DUMP_AT").ok().and_then(|v| v.parse::<u64>().ok()) == Some(t) {
+        if std::env::var("MC_DUMP_AT")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            == Some(t)
+        {
             let mut cells: Vec<_> = sim.world().iter_non_air().collect();
             cells.sort_by_key(|(p, _)| (p.x, p.y, p.z));
             for (p, id) in cells {
                 println!(
                     "DUMP [{},{},{}] {}",
-                    p.x, p.y, p.z,
+                    p.x,
+                    p.y,
+                    p.z,
                     sim.registry().descriptor(id).unwrap_or("?")
                 );
             }
@@ -202,7 +242,12 @@ fn run_machine() {
                 if let Some((lo, hi)) = footprint(&sim) {
                     let line = format!(
                         "x {}..{}  y {}..{}  z {}..{}  ({} non-air)",
-                        lo.x, hi.x, lo.y, hi.y, lo.z, hi.z,
+                        lo.x,
+                        hi.x,
+                        lo.y,
+                        hi.y,
+                        lo.z,
+                        hi.z,
                         sim.world().non_air_count()
                     );
                     if last_print.as_deref() != Some(line.as_str()) {
@@ -217,9 +262,18 @@ fn run_machine() {
         for c in sim.recorded() {
             eprintln!(
                 "  t{:<3} [{},{},{}] {} -> {}",
-                c.tick, c.pos.x, c.pos.y, c.pos.z,
-                sim.registry().descriptor(c.from).unwrap_or("?").replace("minecraft:", ""),
-                sim.registry().descriptor(c.to).unwrap_or("?").replace("minecraft:", ""),
+                c.tick,
+                c.pos.x,
+                c.pos.y,
+                c.pos.z,
+                sim.registry()
+                    .descriptor(c.from)
+                    .unwrap_or("?")
+                    .replace("minecraft:", ""),
+                sim.registry()
+                    .descriptor(c.to)
+                    .unwrap_or("?")
+                    .replace("minecraft:", ""),
             );
         }
     }
@@ -236,7 +290,9 @@ fn run_machine() {
         .world()
         .iter_non_air()
         .filter(|(_, id)| {
-            sim.registry().descriptor(*id).is_some_and(|d| d.contains("moving_piston"))
+            sim.registry()
+                .descriptor(*id)
+                .is_some_and(|d| d.contains("moving_piston"))
         })
         .map(|(p, _)| p)
         .collect();
@@ -256,6 +312,9 @@ fn run_machine() {
             );
         }
     }
-    eprintln!("=== {} change(s) total over {ticks} ticks", sim.recorded().len());
+    eprintln!(
+        "=== {} change(s) total over {ticks} ticks",
+        sim.recorded().len()
+    );
     panic!("probe output above");
 }

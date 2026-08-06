@@ -36,8 +36,10 @@ fn probe_command_nbt_shape() {
 #[ignore = "diagnostic probe, run by hand with --ignored"]
 fn probe_lithium_structure() {
     let name = std::env::var("MC_PROBE").unwrap_or_else(|_| "hopper_transfer_speed".to_string());
-    let ticks: u64 =
-        std::env::var("MC_PROBE_TICKS").ok().and_then(|t| t.parse().ok()).unwrap_or(200);
+    let ticks: u64 = std::env::var("MC_PROBE_TICKS")
+        .ok()
+        .and_then(|t| t.parse().ok())
+        .unwrap_or(200);
     let schematic = if let Ok(file) = std::env::var("MC_PROBE_FILE") {
         let bytes = std::fs::read(&file).expect("readable");
         let manager = nucleation::formats::manager::get_manager();
@@ -101,14 +103,20 @@ fn probe_lithium_structure() {
         sim.step();
     }
     sim.record();
-    let rb = sim.registry().get("minecraft:redstone_block").expect("interned");
+    let rb = sim
+        .registry()
+        .get("minecraft:redstone_block")
+        .expect("interned");
     // Constant start signal — the wiki-documented test_block behaviour.
     sim.place_block(start, rb);
     for _ in 0..ticks {
         sim.step();
     }
 
-    eprintln!("--- recorded inventory changes ({}):", sim.recorded_inventory().len());
+    eprintln!(
+        "--- recorded inventory changes ({}):",
+        sim.recorded_inventory().len()
+    );
     for change in sim.recorded_inventory().iter().take(80) {
         eprintln!("  {change:?}");
     }
@@ -118,7 +126,10 @@ fn probe_lithium_structure() {
             let coords: Vec<i32> = triple.split(',').filter_map(|c| c.parse().ok()).collect();
             if let [x, y, z] = coords[..] {
                 let pos = Pos::new(x, y, z);
-                let descriptor = sim.registry().descriptor(sim.world().get(pos)).unwrap_or("?");
+                let descriptor = sim
+                    .registry()
+                    .descriptor(sim.world().get(pos))
+                    .unwrap_or("?");
                 eprintln!("  ({x},{y},{z}) {descriptor}");
             }
         }
@@ -140,7 +151,11 @@ fn probe_lithium_structure() {
             .split(';')
             .filter_map(|triple| {
                 let coords: Vec<i32> = triple.split(',').filter_map(|c| c.parse().ok()).collect();
-                if let [x, y, z] = coords[..] { Some(Pos::new(x, y, z)) } else { None }
+                if let [x, y, z] = coords[..] {
+                    Some(Pos::new(x, y, z))
+                } else {
+                    None
+                }
             })
             .collect();
         for change in sim.recorded() {
@@ -168,7 +183,10 @@ fn probe_lithium_structure() {
     eprintln!("--- test blocks at the end:");
     for (pos, entry) in &structure.blocks {
         if structure.palette[*entry].starts_with("minecraft:test_block") {
-            let now = sim.registry().descriptor(sim.world().get(*pos)).unwrap_or("?");
+            let now = sim
+                .registry()
+                .descriptor(sim.world().get(*pos))
+                .unwrap_or("?");
             eprintln!("  {pos:?} was {} now {now}", structure.palette[*entry]);
         }
     }

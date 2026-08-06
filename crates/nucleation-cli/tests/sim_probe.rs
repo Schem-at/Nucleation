@@ -14,20 +14,38 @@ fn what_refuses() {
     let bytes = std::fs::read(&file).expect("readable");
     let manager = nucleation::formats::manager::get_manager();
     let schematic = manager.lock().unwrap().read(&bytes).expect("imports");
-    eprintln!("dims {:?}  blocks {}", schematic.get_dimensions(), schematic.total_blocks());
+    eprintln!(
+        "dims {:?}  blocks {}",
+        schematic.get_dimensions(),
+        schematic.total_blocks()
+    );
     let snbt = to_gametest_snbt(&schematic);
     let structure = Structure::parse(&snbt).expect("engine parses");
-    eprintln!("palette {} states, {} placed", structure.palette.len(), structure.blocks.len());
+    eprintln!(
+        "palette {} states, {} placed",
+        structure.palette.len(),
+        structure.blocks.len()
+    );
     match mc_test::try_build_sim(
-        &structure, Pos::new(0, 0, 0), mc_test::SettleMode::Placement, &[], &[], None, "probe",
+        &structure,
+        Pos::new(0, 0, 0),
+        mc_test::SettleMode::Placement,
+        &[],
+        &[],
+        None,
+        "probe",
     ) {
         Ok(_) => eprintln!("SIM STARTS CLEAN"),
         Err(report) => {
             let list = report.rsplit("simulated as nothing: ").next().unwrap_or("");
-            let names: std::collections::BTreeSet<&str> =
-                list.split(", ").map(|d| d.split('[').next().unwrap_or(d).trim()).collect();
+            let names: std::collections::BTreeSet<&str> = list
+                .split(", ")
+                .map(|d| d.split('[').next().unwrap_or(d).trim())
+                .collect();
             eprintln!("REFUSED — {} distinct block(s):", names.len());
-            for n in &names { eprintln!("  {n}"); }
+            for n in &names {
+                eprintln!("  {n}");
+            }
         }
     }
     panic!("probe output above");

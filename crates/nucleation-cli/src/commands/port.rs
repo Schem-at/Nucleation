@@ -14,14 +14,24 @@ pub(crate) fn port_main(args: impl Iterator<Item = String>) {
     let mut args = args.peekable();
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--path" => paths.push(PathBuf::from(args.next().unwrap_or_else(|| usage_and_exit()))),
+            "--path" => paths.push(PathBuf::from(
+                args.next().unwrap_or_else(|| usage_and_exit()),
+            )),
             "--specs" => {
-                specs = Some(PathBuf::from(args.next().unwrap_or_else(|| usage_and_exit())))
+                specs = Some(PathBuf::from(
+                    args.next().unwrap_or_else(|| usage_and_exit()),
+                ))
             }
-            "--out" => out = Some(PathBuf::from(args.next().unwrap_or_else(|| usage_and_exit()))),
+            "--out" => {
+                out = Some(PathBuf::from(
+                    args.next().unwrap_or_else(|| usage_and_exit()),
+                ))
+            }
             "--max-ticks" => {
-                max_ticks =
-                    args.next().and_then(|n| n.parse().ok()).unwrap_or_else(|| usage_and_exit())
+                max_ticks = args
+                    .next()
+                    .and_then(|n| n.parse().ok())
+                    .unwrap_or_else(|| usage_and_exit())
             }
             other if other.starts_with("--") => usage_and_exit(),
             other => paths.push(PathBuf::from(other)),
@@ -67,7 +77,10 @@ pub(crate) fn port_main(args: impl Iterator<Item = String>) {
             }
         }
     }
-    println!("\n{ported} ported, {skipped} skipped, {failed} failed → {}", out.display());
+    println!(
+        "\n{ported} ported, {skipped} skipped, {failed} failed → {}",
+        out.display()
+    );
     std::process::exit(i32::from(failed > 0));
 }
 
@@ -81,15 +94,19 @@ fn port_one(
     rel: &Path,
     max_ticks: u64,
 ) -> Result<String, String> {
-    let what = file.file_stem().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let what = file
+        .file_stem()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
     let text =
         std::fs::read_to_string(file).map_err(|e| format!("reading {}: {e}", file.display()))?;
 
     // The output carrier needs a UniversalSchematic; only the modern
     // `data:`-flavor imports to one. The old engine flavor pairs with
     // sidecar descriptors already and needs no porting.
-    let mut schematic = nucleation::formats::structure_snbt::from_structure_snbt(text.as_bytes())
-        .map_err(|_| "skipped: engine-flavor snbt, keep its sidecar descriptor".to_string())?;
+    let mut schematic =
+        nucleation::formats::structure_snbt::from_structure_snbt(text.as_bytes())
+            .map_err(|_| "skipped: engine-flavor snbt, keep its sidecar descriptor".to_string())?;
 
     // A hand-written descriptor wins; the synthesizer is the fallback.
     let sidecar = file.with_extension("").with_extension("test.json");
@@ -99,9 +116,15 @@ fn port_one(
             .with_extension("test.json")
     });
     let (spec, source) = if sidecar.is_file() {
-        (std::fs::read_to_string(&sidecar).map_err(|e| e.to_string())?, "hand-written sidecar")
+        (
+            std::fs::read_to_string(&sidecar).map_err(|e| e.to_string())?,
+            "hand-written sidecar",
+        )
     } else if let Some(mirrored) = mirrored.filter(|m| m.is_file()) {
-        (std::fs::read_to_string(&mirrored).map_err(|e| e.to_string())?, "hand-written spec")
+        (
+            std::fs::read_to_string(&mirrored).map_err(|e| e.to_string())?,
+            "hand-written spec",
+        )
     } else {
         let structure = load_structure(file)?;
         // Probe: what does the engine refuse to simulate? Those blocks get
@@ -123,7 +146,9 @@ fn port_one(
                 Ok(_) => break,
                 Err(report) => {
                     // "...simulated as nothing: a, b[c=d], e" — take the names.
-                    let Some(list) = report.rsplit("simulated as nothing: ").next() else { break };
+                    let Some(list) = report.rsplit("simulated as nothing: ").next() else {
+                        break;
+                    };
                     let before = inert.len();
                     for descriptor in list.split(", ") {
                         let name = descriptor.split('[').next().unwrap_or(descriptor).trim();
@@ -146,14 +171,19 @@ fn port_one(
         // one-block shift phase-shifts observer chains.
         let mut min = (i32::MAX, i32::MAX, i32::MAX);
         for (pos, entry) in &structure.blocks {
-            let name = structure.palette[*entry].split('[').next().unwrap_or_default();
+            let name = structure.palette[*entry]
+                .split('[')
+                .next()
+                .unwrap_or_default();
             if name != "minecraft:air" {
                 min = (min.0.min(pos.x), min.1.min(pos.y), min.2.min(pos.z));
             }
         }
         let shift = if min.0 == i32::MAX { (0, 0, 0) } else { min };
         let spec = mc_test::synthesize_block_based(&structure, &what, max_ticks, &inert, shift)
-            .ok_or("skipped: no expressible test-block claim and no hand-written spec".to_string())?;
+            .ok_or(
+                "skipped: no expressible test-block claim and no hand-written spec".to_string(),
+            )?;
         (spec, "synthesized from test blocks")
     };
 

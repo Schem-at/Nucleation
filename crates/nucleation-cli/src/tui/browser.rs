@@ -39,11 +39,20 @@ pub(crate) struct BrowserState {
     loading: Option<(PathBuf, mpsc::Receiver<Result<FileReport, String>>)>,
     /// A finished gather waiting for the app loop to open the inspector.
     ready: Option<FileReport>,
+    /// Last frame's table area and scroll offset, for resolving clicks.
+    pub(crate) hit_rows: Option<(Rect, usize)>,
 }
 
 /// Extensions worth highlighting. Detection at open time is content-based;
 /// this is only the visual cue.
-const SUPPORTED: &[&str] = &["litematic", "schem", "schematic", "snbt", "nbt", "mcstructure"];
+const SUPPORTED: &[&str] = &[
+    "litematic",
+    "schem",
+    "schematic",
+    "snbt",
+    "nbt",
+    "mcstructure",
+];
 
 impl BrowserState {
     pub(crate) fn new(dir: PathBuf) -> Self {
@@ -52,6 +61,7 @@ impl BrowserState {
             entries: Vec::new(),
             cursor: 0,
             filter: String::new(),
+            hit_rows: None,
             filtering: false,
             status: None,
             loading: None,
@@ -75,16 +85,28 @@ impl BrowserState {
             .map(|e| {
                 let path = e.path();
                 let is_dir = path.is_dir();
-                let bytes =
-                    if is_dir { 0 } else { e.metadata().map(|m| m.len()).unwrap_or(0) };
+                let bytes = if is_dir {
+                    0
+                } else {
+                    e.metadata().map(|m| m.len()).unwrap_or(0)
+                };
                 let supported = !is_dir
                     && path
                         .extension()
                         .and_then(|e| e.to_str())
                         .is_some_and(|ext| SUPPORTED.contains(&ext.to_lowercase().as_str()));
-                Entry { path, is_dir, bytes, supported }
+                Entry {
+                    path,
+                    is_dir,
+                    bytes,
+                    supported,
+                }
             })
-            .filter(|e| !e.path.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.')))
+            .filter(|e| {
+                !e.path
+                    .file_name()
+                    .is_some_and(|n| n.to_string_lossy().starts_with('.'))
+            })
             .collect();
         entries.sort_by(|a, b| {
             b.is_dir
@@ -93,6 +115,41 @@ impl BrowserState {
                 .then_with(|| a.path.cmp(&b.path))
         });
         self.entries = entries;
+    }
+
+    /// A left click on the file table: first click selects, a click on the
+    /// already-selected row opens it — the two-step a mouse user expects.
+    pub(crate) fn click(&mut self, x: u16, y: u16) -> super::app::Transition {
+        let Some((area, offset)) = self.hit_rows else {
+            return super::app::Transition::Stay;
+        };
+        // Rows start under the border and the header line.
+        let top = area.y + 2;
+        if x < area.x || x >= area.x + area.width || y < top || y >= area.y + area.height - 1 {
+            return super::app::Transition::Stay;
+        }
+        let row = offset + (y - top) as usize;
+        if row >= self.visible().len() {
+            return super::app::Transition::Stay;
+        }
+        if self.cursor == row {
+            return self.on_key(ratatui::crossterm::event::KeyCode::Enter);
+        }
+        self.cursor = row;
+        super::app::Transition::Stay
+    }
+
+    /// Put the cursor on the entry named `name` in the visible view — how
+    /// the inspector's Esc lands back on the file it was showing instead of
+    /// on row zero.
+    pub(crate) fn select(&mut self, name: &std::ffi::OsStr) {
+        let target = self
+            .visible()
+            .into_iter()
+            .position(|i| self.entries[i].path.file_name() == Some(name));
+        if let Some(row) = target {
+            self.cursor = row;
+        }
     }
 
     /// Indices of entries the filter keeps, in display order.
@@ -176,7 +233,9 @@ impl BrowserState {
                 }
             }
             KeyCode::Enter | KeyCode::Char('l') | KeyCode::Right => {
-                let Some(&index) = visible.get(self.cursor) else { return Transition::Stay };
+                let Some(&index) = visible.get(self.cursor) else {
+                    return Transition::Stay;
+                };
                 let entry = &self.entries[index];
                 if entry.is_dir {
                     self.dir = entry.path.clone();
@@ -205,7 +264,7 @@ impl BrowserState {
     }
 }
 
-pub(crate) fn draw(frame: &mut Frame, area: Rect, state: &BrowserState) {
+pub(crate) fn draw(frame: &mut Frame, area: Rect, state: &mut BrowserState) {
     let visible = state.visible();
     let mut title = format!(" {} ", state.dir.display());
     if state.filtering || !state.filter.is_empty() {
@@ -229,8 +288,12 @@ pub(crate) fn draw(frame: &mut Frame, area: Rect, state: &BrowserState) {
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| entry.path.display().to_string());
             let (name, kind, size, style) = if entry.is_dir {
-                (format!("{name}/"), "dir".to_string(), String::new(),
-                 Style::default().fg(Color::Blue))
+                (
+                    format!("{name}/"),
+                    "dir".to_string(),
+                    String::new(),
+                    Style::default().fg(Color::Blue),
+                )
             } else {
                 let kind = entry
                     .path
@@ -249,15 +312,22 @@ pub(crate) fn draw(frame: &mut Frame, area: Rect, state: &BrowserState) {
         .collect();
     let table = Table::new(
         rows,
-        [Constraint::Min(24), Constraint::Length(10), Constraint::Length(9)],
+        [
+            Constraint::Min(24),
+            Constraint::Length(10),
+            Constraint::Length(9),
+        ],
     )
-    .header(
-        Row::new(vec!["name", "kind", "size"]).style(Style::default().fg(Color::DarkGray)),
-    )
+    .header(Row::new(vec!["name", "kind", "size"]).style(Style::default().fg(Color::DarkGray)))
     .block(Block::default().borders(Borders::ALL).title(title))
     .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
     let mut table_state = TableState::default().with_selected(Some(state.cursor));
     frame.render_stateful_widget(table, area, &mut table_state);
+    // A fresh TableState scrolls just enough to show the selection: the
+    // offset a click must subtract is exactly that formula.
+    let rows_visible = area.height.saturating_sub(3) as usize; // borders + header
+    let offset = (state.cursor + 1).saturating_sub(rows_visible.max(1));
+    state.hit_rows = Some((area, offset));
 
     if visible.is_empty() {
         let message = if state.filter.is_empty() {

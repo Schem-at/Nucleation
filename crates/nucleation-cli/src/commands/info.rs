@@ -72,7 +72,11 @@ pub(crate) fn to_text(report: &FileReport) -> String {
     use std::fmt::Write as _;
     let mut out = String::new();
     let _ = writeln!(out, "{}", report.path.display());
-    let _ = writeln!(out, "  format      {} ({} bytes)", report.format, report.bytes);
+    let _ = writeln!(
+        out,
+        "  format      {} ({} bytes)",
+        report.format, report.bytes
+    );
     if let Some(name) = &report.name {
         let _ = writeln!(out, "  name        {name}");
     }
@@ -95,8 +99,11 @@ pub(crate) fn to_text(report: &FileReport) -> String {
         let _ = writeln!(out, "  regions:");
         for region in &report.regions {
             let (w, h, l) = region.dimensions;
-            let _ =
-                writeln!(out, "    {}  {w}x{h}x{l}  {} blocks", region.name, region.blocks);
+            let _ = writeln!(
+                out,
+                "    {}  {w}x{h}x{l}  {} blocks",
+                region.name, region.blocks
+            );
         }
     }
     match &report.embedded_test {
@@ -108,7 +115,12 @@ pub(crate) fn to_text(report: &FileReport) -> String {
             );
         }
         Some(test) => {
-            let _ = writeln!(out, "  test        {} case(s): {}", test.cases, test.names.join("; "));
+            let _ = writeln!(
+                out,
+                "  test        {} case(s): {}",
+                test.cases,
+                test.names.join("; ")
+            );
         }
         None => {
             let _ = writeln!(out, "  test        none embedded");

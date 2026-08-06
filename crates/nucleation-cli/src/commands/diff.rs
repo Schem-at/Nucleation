@@ -21,7 +21,9 @@ pub(crate) fn diff_main(args: impl Iterator<Item = String>) {
             other => files.push(PathBuf::from(other)),
         }
     }
-    let [a_path, b_path] = files.as_slice() else { usage_and_exit() };
+    let [a_path, b_path] = files.as_slice() else {
+        usage_and_exit()
+    };
 
     let Some(spec) = DiffSpec::resolve(&preset, &SpecOverrides::default()) else {
         eprintln!("unknown preset {preset:?} — try \"exact\"");
@@ -36,8 +38,12 @@ pub(crate) fn diff_main(args: impl Iterator<Item = String>) {
     // CLI never re-derives what different means.
     let doc: serde_json::Value = serde_json::from_str(&summary).unwrap_or_default();
     let count = |key: &str| doc["counts"].get(key).and_then(|v| v.as_u64()).unwrap_or(0);
-    let (added, removed, changed, swapped) =
-        (count("added"), count("removed"), count("changed"), count("swapped"));
+    let (added, removed, changed, swapped) = (
+        count("added"),
+        count("removed"),
+        count("changed"),
+        count("swapped"),
+    );
     let identical = added + removed + changed + swapped == 0;
 
     if json {
@@ -56,10 +62,13 @@ pub(crate) fn diff_main(args: impl Iterator<Item = String>) {
 
 fn load(path: &Path) -> UniversalSchematic {
     let result = (|| -> Result<UniversalSchematic, String> {
-        let bytes = std::fs::read(path).map_err(|e| format!("reading {}: {e}", path.display()))?;
+        // `-` reads one side from stdin; only one side can, naturally.
+        let bytes = super::io::read_input(path)?;
         let manager = nucleation::formats::manager::get_manager();
         let manager = manager.lock().map_err(|e| format!("format manager: {e}"))?;
-        manager.read(&bytes).map_err(|e| format!("{}: unreadable: {e:?}", path.display()))
+        manager
+            .read(&bytes)
+            .map_err(|e| format!("{}: unreadable: {e:?}", super::io::display_name(path)))
     })();
     result.unwrap_or_else(|e| {
         eprintln!("{e}");

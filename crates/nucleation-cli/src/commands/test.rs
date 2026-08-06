@@ -41,12 +41,14 @@ pub(crate) fn test_main(args: impl Iterator<Item = String>) {
     let mut args = args.peekable();
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--path" => options
-                .paths
-                .push(PathBuf::from(args.next().unwrap_or_else(|| usage_and_exit()))),
+            "--path" => options.paths.push(PathBuf::from(
+                args.next().unwrap_or_else(|| usage_and_exit()),
+            )),
             "--filter" => options.filter = args.next().unwrap_or_else(|| usage_and_exit()),
             "--specs" => {
-                options.specs = Some(PathBuf::from(args.next().unwrap_or_else(|| usage_and_exit())))
+                options.specs = Some(PathBuf::from(
+                    args.next().unwrap_or_else(|| usage_and_exit()),
+                ))
             }
             "--json" => options.json = true,
             "--tui" => tui = true,
@@ -58,6 +60,18 @@ pub(crate) fn test_main(args: impl Iterator<Item = String>) {
             }
             other if other.starts_with("--") => usage_and_exit(),
             other => options.paths.push(PathBuf::from(other)),
+        }
+    }
+    // `-` means the path list arrives on stdin, one per line — the
+    // `find … | nucleation test -` shape.
+    if options.paths.iter().any(|p| super::io::is_stdio(p)) {
+        options.paths.retain(|p| !super::io::is_stdio(p));
+        match super::io::paths_from_stdin() {
+            Ok(mut piped) => options.paths.append(&mut piped),
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(2);
+            }
         }
     }
     if options.paths.is_empty() {
@@ -83,22 +97,28 @@ pub(crate) fn test_main(args: impl Iterator<Item = String>) {
     for (root, file) in files {
         rows.push((file.clone(), run_file_caught(&root, &file, &options)));
     }
-    let code = if options.json { print_json(&rows) } else { print_grid(&rows) };
+    let code = if options.json {
+        print_json(&rows)
+    } else {
+        print_grid(&rows)
+    };
     std::process::exit(code);
 }
 
 /// [`run_file`], with the harness's panics (a structure it refuses to
 /// half-simulate) turned into a broken row rather than the end of the run.
 pub(crate) fn run_file_caught(root: &Path, file: &Path, options: &Options) -> FileOutcome {
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_file(root, file, options)))
-        .unwrap_or_else(|panic| {
-            let why = panic
-                .downcast_ref::<String>()
-                .map(String::as_str)
-                .or_else(|| panic.downcast_ref::<&str>().copied())
-                .unwrap_or("the harness panicked");
-            FileOutcome::Broken(why.to_string())
-        })
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        run_file(root, file, options)
+    }))
+    .unwrap_or_else(|panic| {
+        let why = panic
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| panic.downcast_ref::<&str>().copied())
+            .unwrap_or("the harness panicked");
+        FileOutcome::Broken(why.to_string())
+    })
 }
 
 /// Walk each path; a directory yields its files recursively (sorted), a file
@@ -107,7 +127,9 @@ pub(crate) fn run_file_caught(root: &Path, file: &Path, options: &Options) -> Fi
 /// than being rows of their own.
 pub(crate) fn discover(paths: &[PathBuf], filter: &str) -> Vec<(PathBuf, PathBuf)> {
     fn walk(root: &Path, dir: &Path, filter: &str, into: &mut Vec<(PathBuf, PathBuf)>) {
-        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
         let mut children: Vec<PathBuf> = entries.filter_map(|e| e.ok()).map(|e| e.path()).collect();
         children.sort();
         for child in children {
@@ -128,7 +150,10 @@ pub(crate) fn discover(paths: &[PathBuf], filter: &str) -> Vec<(PathBuf, PathBuf
         }
     }
     fn is_candidate(path: &Path) -> bool {
-        let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
         if name.starts_with('.') {
             return false;
         }
@@ -155,11 +180,19 @@ pub(crate) fn discover(paths: &[PathBuf], filter: &str) -> Vec<(PathBuf, PathBuf
 }
 
 pub(crate) fn run_file(root: &Path, path: &Path, options: &Options) -> FileOutcome {
-    let what = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let what = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
     if what.ends_with(".test.json") {
         // A standalone descriptor: its structures are the ones it names
         // (`structure` per case, defaulting to its own `<stem>.snbt`).
-        run_spec(path, &path.with_extension("").with_extension("snbt"), &what, options)
+        run_spec(
+            path,
+            &path.with_extension("").with_extension("snbt"),
+            &what,
+            options,
+        )
     } else if path.extension().is_some_and(|e| e == "snbt") {
         run_snbt(root, path, &what, options)
     } else {
@@ -197,7 +230,9 @@ fn run_schematic(path: &Path, what: &str, options: &Options) -> FileOutcome {
         Ok(structure) => structure,
         Err(e) => return FileOutcome::Broken(format!("the engine refused it: {e:?}")),
     };
-    let run_options = RunOptions { trace_window: options.trace_window };
+    let run_options = RunOptions {
+        trace_window: options.trace_window,
+    };
     let mut results = Vec::new();
     for case in &cases {
         if case.structure.is_some() {
@@ -209,8 +244,12 @@ fn run_schematic(path: &Path, what: &str, options: &Options) -> FileOutcome {
         }
         // The file's stated data version is the authority on `Entity.load`
         // motion semantics — see tests/embedded_cases.rs for why.
-        let result =
-            run_with(&structure, case, schematic.metadata.source_data_version, &run_options);
+        let result = run_with(
+            &structure,
+            case,
+            schematic.metadata.source_data_version,
+            &run_options,
+        );
         results.push((result.name, result.ticks, result.wall, result.outcome));
     }
     FileOutcome::Ran(results)
@@ -225,7 +264,10 @@ fn run_snbt(root: &Path, path: &Path, what: &str, options: &Options) -> FileOutc
     } else {
         options.specs.as_ref().and_then(|specs| {
             let rel = path.strip_prefix(root).unwrap_or(path);
-            let mirrored = specs.join(rel).with_extension("").with_extension("test.json");
+            let mirrored = specs
+                .join(rel)
+                .with_extension("")
+                .with_extension("test.json");
             mirrored.is_file().then_some(mirrored)
         })
     };
@@ -252,7 +294,9 @@ fn run_spec(
         Ok(cases) => cases,
         Err(e) => return FileOutcome::Broken(e),
     };
-    let run_options = RunOptions { trace_window: options.trace_window };
+    let run_options = RunOptions {
+        trace_window: options.trace_window,
+    };
     let mut results = Vec::new();
     for case in &cases {
         let structure_path = match &case.structure {
@@ -277,8 +321,8 @@ fn run_spec(
 /// in the engine flavor — anything that imports to a `UniversalSchematic` is
 /// a carrier.
 pub(crate) fn load_structure(path: &Path) -> Result<Structure, String> {
-    let text = std::fs::read_to_string(path)
-        .map_err(|e| format!("reading {}: {e}", path.display()))?;
+    let text =
+        std::fs::read_to_string(path).map_err(|e| format!("reading {}: {e}", path.display()))?;
     let engine_err = match Structure::parse(&text) {
         Ok(structure) => return Ok(structure),
         Err(e) => e,
@@ -295,7 +339,10 @@ pub(crate) fn load_structure(path: &Path) -> Result<Structure, String> {
 
 pub(crate) fn display_path(path: &Path) -> String {
     let cwd = std::env::current_dir().unwrap_or_default();
-    path.strip_prefix(&cwd).unwrap_or(path).display().to_string()
+    path.strip_prefix(&cwd)
+        .unwrap_or(path)
+        .display()
+        .to_string()
 }
 
 /// The human grid: failures in full first, then one row per file, then the
@@ -325,7 +372,11 @@ fn print_grid(rows: &[(PathBuf, FileOutcome)]) -> i32 {
                 }
                 grid.push((
                     shown,
-                    format!("{glyphs}  {} case(s)  {}ms", results.len(), wall.as_millis()),
+                    format!(
+                        "{glyphs}  {} case(s)  {}ms",
+                        results.len(),
+                        wall.as_millis()
+                    ),
                 ));
             }
             FileOutcome::Unported => {
@@ -343,7 +394,11 @@ fn print_grid(rows: &[(PathBuf, FileOutcome)]) -> i32 {
     for report in &reports {
         println!("{report}\n");
     }
-    let width = grid.iter().map(|(path, _)| path.chars().count()).max().unwrap_or(0);
+    let width = grid
+        .iter()
+        .map(|(path, _)| path.chars().count())
+        .max()
+        .unwrap_or(0);
     for (path, cell) in &grid {
         println!("{path:width$}  {cell}");
     }

@@ -43,17 +43,47 @@ pub(crate) struct TestsState {
     receiver: Option<mpsc::Receiver<UiEvent>>,
     /// What to discover again on `r`.
     paths: Vec<PathBuf>,
+    /// Last frame's list area and scroll offset, for resolving clicks.
+    pub(crate) hit_rows: Option<(Rect, usize)>,
+    /// Where this run points, for the title — a file name, a directory, or
+    /// a root count. The screen must say what it is testing: a scan that
+    /// looks identical whether it covers one file or the whole tree is how
+    /// focus gets lost.
+    pub(crate) scope_label: String,
     specs: Option<PathBuf>,
     trace_window: u64,
 }
 
 impl TestsState {
-    pub(crate) fn discovering_cwd() -> Self {
-        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        Self::new(vec![cwd], None, 2)
+    /// A run scoped to one file or directory — what Tab from the inspector
+    /// or browser builds, instead of a working-directory-wide scan.
+    pub(crate) fn scoped(path: PathBuf) -> Self {
+        Self::new(vec![path], None, 2)
+    }
+
+    /// Whether `path` is inside what this run covers — the test for reusing
+    /// a finished run instead of rescanning when the user tabs back in.
+    pub(crate) fn covers(&self, path: &std::path::Path) -> bool {
+        self.rows.iter().any(|(p, _)| p == path)
+            || self.paths.iter().any(|root| path.starts_with(root))
+    }
+
+    /// Put the cursor on `path`'s row, when it has one.
+    pub(crate) fn focus(&mut self, path: &std::path::Path) {
+        if let Some(index) = self.rows.iter().position(|(p, _)| p == path) {
+            self.cursor = index;
+        }
     }
 
     pub(crate) fn new(paths: Vec<PathBuf>, specs: Option<PathBuf>, trace_window: u64) -> Self {
+        let scope_label = match paths.as_slice() {
+            [one] if one.is_file() => one
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| display_path(one)),
+            [one] => display_path(one),
+            many => format!("{} roots", many.len()),
+        };
         let mut state = Self {
             rows: Vec::new(),
             cursor: 0,
@@ -63,6 +93,8 @@ impl TestsState {
             spinner: 0,
             receiver: None,
             paths,
+            hit_rows: None,
+            scope_label,
             specs,
             trace_window,
         };
@@ -88,7 +120,9 @@ impl TestsState {
         std::thread::spawn(move || {
             let files = discover(&paths, "");
             if sender
-                .send(UiEvent::Discovered(files.iter().map(|(_, f)| f.clone()).collect()))
+                .send(UiEvent::Discovered(
+                    files.iter().map(|(_, f)| f.clone()).collect(),
+                ))
                 .is_err()
             {
                 return;
@@ -107,7 +141,9 @@ impl TestsState {
     /// Pull everything the worker produced since the last frame.
     pub(crate) fn drain_events(&mut self) {
         self.spinner = self.spinner.wrapping_add(1);
-        let Some(receiver) = &self.receiver else { return };
+        let Some(receiver) = &self.receiver else {
+            return;
+        };
         let events: Vec<UiEvent> = receiver.try_iter().collect();
         for event in events {
             match event {
@@ -116,7 +152,15 @@ impl TestsState {
                     self.rows = files.into_iter().map(|f| (f, RowState::Pending)).collect();
                 }
                 UiEvent::Started(path) => self.set_row(&path, RowState::Running),
-                UiEvent::Done(path, outcome) => self.set_row(&path, RowState::Done(outcome)),
+                UiEvent::Done(path, outcome) => {
+                    self.set_row(&path, RowState::Done(outcome));
+                    // A run over exactly one file opens its per-case detail
+                    // by itself — that detail *is* what a scoped run is for.
+                    if self.rows.len() == 1 && self.expanded.is_none() {
+                        self.expanded = Some(0);
+                        self.expanded_scroll = 0;
+                    }
+                }
             }
         }
     }
@@ -139,20 +183,41 @@ impl TestsState {
             spinner: 0,
             receiver: None,
             paths: Vec::new(),
+            hit_rows: None,
+            scope_label: String::new(),
             specs: None,
             trace_window: 2,
         }
     }
 
+    /// A left click on the run list: select, or expand the already-selected
+    /// row's detail (the same thing Enter does).
+    pub(crate) fn click(&mut self, x: u16, y: u16) -> Transition {
+        let Some((area, offset)) = self.hit_rows else {
+            return Transition::Stay;
+        };
+        let top = area.y + 1;
+        if x < area.x || x >= area.x + area.width || y < top || y >= area.y + area.height - 1 {
+            return Transition::Stay;
+        }
+        let row = offset + (y - top) as usize;
+        if row >= self.rows.len() {
+            return Transition::Stay;
+        }
+        if self.cursor == row {
+            return self.on_key(KeyCode::Enter);
+        }
+        self.cursor = row;
+        Transition::Stay
+    }
+
     pub(crate) fn on_key(&mut self, key: KeyCode) -> Transition {
         match key {
             KeyCode::Esc => {
+                // Collapse the detail; leaving the screen entirely is the
+                // app's job — it restores whatever the user tabbed in from.
                 if self.expanded.is_some() {
                     self.expanded = None;
-                } else {
-                    return Transition::To(Screen::Browser(super::browser::BrowserState::new(
-                        std::env::current_dir().unwrap_or_else(|_| ".".into()),
-                    )));
                 }
             }
             KeyCode::Up | KeyCode::Char('k') => {
@@ -257,14 +322,22 @@ impl TestsState {
     }
 }
 
-pub(crate) fn draw(frame: &mut Frame, area: Rect, state: &TestsState) {
+pub(crate) fn draw(frame: &mut Frame, area: Rect, state: &mut TestsState) {
     let (_, _, _, _, pending) = state.counts();
     let running = pending > 0 || state.discovering;
     let gauge_height = u16::from(running);
     let constraints = if state.expanded.is_some() {
-        [Constraint::Length(gauge_height), Constraint::Percentage(45), Constraint::Min(4)]
+        [
+            Constraint::Length(gauge_height),
+            Constraint::Percentage(45),
+            Constraint::Min(4),
+        ]
     } else {
-        [Constraint::Length(gauge_height), Constraint::Min(1), Constraint::Length(0)]
+        [
+            Constraint::Length(gauge_height),
+            Constraint::Min(1),
+            Constraint::Length(0),
+        ]
     };
     let [gauge_area, list_area, detail_area] = Layout::vertical(constraints).areas(area);
 
@@ -308,8 +381,7 @@ pub(crate) fn draw(frame: &mut Frame, area: Rect, state: &TestsState) {
             };
             let cases = match row {
                 RowState::Done(FileOutcome::Ran(results)) => {
-                    let ms: u128 =
-                        results.iter().map(|(_, _, wall, _)| wall.as_millis()).sum();
+                    let ms: u128 = results.iter().map(|(_, _, wall, _)| wall.as_millis()).sum();
                     format!("  {} case(s) · {ms}ms", results.len())
                 }
                 _ => String::new(),
@@ -322,10 +394,17 @@ pub(crate) fn draw(frame: &mut Frame, area: Rect, state: &TestsState) {
         })
         .collect();
     let list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title(format!(" {} ", state.summary())))
+        .block(Block::default().borders(Borders::ALL).title(format!(
+            " tests · {} · {} ",
+            state.scope_label,
+            state.summary()
+        )))
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
     let mut list_state = ListState::default().with_selected(Some(state.cursor));
     frame.render_stateful_widget(list, list_area, &mut list_state);
+    let rows_visible = list_area.height.saturating_sub(2) as usize;
+    let offset = (state.cursor + 1).saturating_sub(rows_visible.max(1));
+    state.hit_rows = Some((list_area, offset));
 
     if let Some(index) = state.expanded {
         let title = state

@@ -41,6 +41,13 @@ pub(crate) fn usage_and_exit() -> ! {
          \x20 convert  re-encode: `convert <in> -o <out> [--to FORMAT] [--format-version V]`\n\
          \x20 diff     compare two builds: `diff <a> <b> [--preset exact] [--json]`\n\
          \x20 render   PNG snapshot: `render <file> --pack <pack.zip> -o out.png [--width N] [--height N]`\n\
+         \x20 mesh     3D model: `mesh <file> [-o out.glb|out.usdz] [--to glb|usdz] [--pack P]`\n\
+         \x20 animate  mc-tick replay: `animate <file.snbt> --ticks N [actions] [-o out.glb]`\n\
+         \x20 man      the manual (mdoc); `man --install` puts it on the man path\n\
+         \n\
+         `-` is stdin/stdout wherever a file is named, ffmpeg-style: payload\n\
+         bytes own stdout, status goes to stderr. `test -` reads a path list\n\
+         from stdin (one per line, as find prints them).\n\
          \n\
          nucleation test [--path P]... [--filter S] [--specs DIR] [--json] [--trace-window N] [paths...]\n\
          \n\
@@ -70,13 +77,19 @@ fn main() {
         Some("test") | Some("run") => commands::test::test_main(args),
         Some("port") => commands::port::port_main(args),
         Some("info") => commands::info::info_main(args),
+        Some("man") => commands::man::man_main(args),
         Some("inspect") => {
             let rest: Vec<String> = args.collect();
-            let wants_tui = std::io::stdout().is_terminal() && !rest.iter().any(|a| a == "--json");
+            // `-` reads the schematic from stdin — which the TUI needs for
+            // keys, so a piped inspect is always the text overview.
+            let wants_tui =
+                std::io::stdout().is_terminal() && !rest.iter().any(|a| a == "--json" || a == "-");
             if !wants_tui {
                 return commands::info::info_main(rest.into_iter());
             }
-            let Some(file) = rest.iter().find(|a| !a.starts_with("--")) else { usage_and_exit() };
+            let Some(file) = rest.iter().find(|a| !a.starts_with("--")) else {
+                usage_and_exit()
+            };
             match model::gather(std::path::Path::new(file)) {
                 Ok(report) => {
                     let screen =
@@ -91,6 +104,26 @@ fn main() {
                     std::process::exit(2);
                 }
             }
+        }
+        #[cfg(any(feature = "mesh", feature = "render"))]
+        Some("mesh") => commands::mesh::mesh_main(args),
+        #[cfg(not(any(feature = "mesh", feature = "render")))]
+        Some("mesh") => {
+            eprintln!(
+                "the mesh subcommand is compiled out — rebuild with:\n\
+                 \x20 cargo install --path crates/nucleation-cli --features mesh   # or render"
+            );
+            std::process::exit(2);
+        }
+        #[cfg(any(feature = "mesh", feature = "render"))]
+        Some("animate") => commands::animate::animate_main(args),
+        #[cfg(not(any(feature = "mesh", feature = "render")))]
+        Some("animate") => {
+            eprintln!(
+                "the animate subcommand is compiled out — rebuild with:\n\
+                 \x20 cargo install --path crates/nucleation-cli --features mesh"
+            );
+            std::process::exit(2);
         }
         Some("convert") => commands::convert::convert_main(args),
         Some("diff") => commands::diff::diff_main(args),
