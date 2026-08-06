@@ -270,6 +270,45 @@ public:
   template<typename W>
   inline void updates_wave_json_write(uint32_t tick, W& writeable_output) const;
 
+  /**
+   * Every block a piston currently has in flight, as JSON:
+   * `[{"to":[x,y,z],"from":[x,y,z],"state":"...","carried":"...",
+   * "carried_short":"..."|null,"remains":"..."|null,"dir":"east",
+   * "extending":bool,"started":T,"lands":T,"source_piston":bool}]`.
+   *
+   * Draw `carried` travelling `from` -> `to`, and `remains` (when it is
+   * not null) parked at `to` for the whole move. They differ from
+   * `state` — what actually lands — only for a retracting piston, whose
+   * body stays put while its head comes home; vanilla's
+   * `PistonHeadRenderer` splits exactly these two slots.
+   *
+   * `carried_short` is the same arm with `short=true`. Draw it while the
+   * head is **within half a block of its body** — `progress <= 0.5`
+   * extending, `progress >= 0.5` retracting — or the shaft passes
+   * visibly through the back of the piston as it comes home. Which form
+   * to use is yours; naming the state is the engine's.
+   *
+   * What a renderer needs to animate a stroke, from the simulator that
+   * dispatched it. The block-change stream cannot answer this: it says a
+   * cell became a `moving_piston` placeholder, not which block set off,
+   * which cell it left, or which tick it arrives — so a host that
+   * reconstructs strokes from changes is reimplementing piston mechanics
+   * downstream of the engine, and animating on a clock the simulation
+   * does not share. That desync is what draws a block twice, leaves a
+   * gap where one should be, and shears a piston head off its load.
+   *
+   * `started` and `lands` are tick numbers in the engine's frame, where
+   * {@link Self::tick_count} counts *completed* ticks: after stepping to
+   * `tick_count == t`, a flight's progress is
+   * `(t - started) / (lands - started)`, clamped to 1. Draw it while it
+   * is listed and drop it when it stops being listed — the same call
+   * that stops reporting it is the tick the real block is written, so
+   * there is no frame with both and none with neither.
+   */
+  inline std::string moving_blocks_json() const;
+  template<typename W>
+  inline void moving_blocks_json_write(W& writeable_output) const;
+
   inline std::string changes_json() const;
   template<typename W>
   inline void changes_json_write(W& writeable_output) const;

@@ -253,6 +253,12 @@ final class TickSimulation {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function movingBlocksJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->TickSimulation_moving_blocks_json($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function changesJson() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         Lib::ffi()->TickSimulation_changes_json($this->ptr, $write);

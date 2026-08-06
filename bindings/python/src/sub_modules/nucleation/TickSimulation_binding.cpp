@@ -33,6 +33,7 @@ void add_TickSimulation_binding(nb::module_ mod) {
         .def("machine_graph_json", &nucleation::TickSimulation::machine_graph_json)
         .def_static("max_volume", &nucleation::TickSimulation::max_volume)
         .def("motion_semantics", &nucleation::TickSimulation::motion_semantics)
+        .def("moving_blocks_json", &nucleation::TickSimulation::moving_blocks_json)
         .def("non_air_center_x", &nucleation::TickSimulation::non_air_center_x)
         .def("non_air_count", &nucleation::TickSimulation::non_air_count)
         .def("non_air_max_x", &nucleation::TickSimulation::non_air_max_x)

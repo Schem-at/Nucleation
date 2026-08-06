@@ -79,6 +79,8 @@ namespace capi {
 
     void TickSimulation_updates_wave_json(const diplomat::capi::TickSimulation* self, uint32_t tick, diplomat::capi::DiplomatWrite* write);
 
+    void TickSimulation_moving_blocks_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
+
     void TickSimulation_changes_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
 
     void TickSimulation_item_entities_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
@@ -388,6 +390,20 @@ inline void TickSimulation::updates_wave_json_write(uint32_t tick, W& writeable)
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     diplomat::capi::TickSimulation_updates_wave_json(this->AsFFI(),
         tick,
+        &write);
+}
+
+inline std::string TickSimulation::moving_blocks_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_moving_blocks_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::moving_blocks_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_moving_blocks_json(this->AsFFI(),
         &write);
 }
 

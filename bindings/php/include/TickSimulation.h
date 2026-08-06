@@ -76,6 +76,8 @@ void TickSimulation_updates_heat_json(const TickSimulation* self, uint32_t from_
 
 void TickSimulation_updates_wave_json(const TickSimulation* self, uint32_t tick, DiplomatWrite* write);
 
+void TickSimulation_moving_blocks_json(const TickSimulation* self, DiplomatWrite* write);
+
 void TickSimulation_changes_json(const TickSimulation* self, DiplomatWrite* write);
 
 void TickSimulation_item_entities_json(const TickSimulation* self, DiplomatWrite* write);

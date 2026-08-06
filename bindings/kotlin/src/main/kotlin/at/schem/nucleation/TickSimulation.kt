@@ -33,6 +33,7 @@ internal interface TickSimulationLib: Library {
     fun TickSimulation_updates_json_between(handle: Pointer, fromTick: FFIUint32, toTick: FFIUint32, write: Pointer): Unit
     fun TickSimulation_updates_heat_json(handle: Pointer, fromTick: FFIUint32, toTick: FFIUint32, write: Pointer): Unit
     fun TickSimulation_updates_wave_json(handle: Pointer, tick: FFIUint32, write: Pointer): Unit
+    fun TickSimulation_moving_blocks_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_changes_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_item_entities_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_motion_semantics(handle: Pointer, write: Pointer): Unit
@@ -497,6 +498,48 @@ class TickSimulation internal constructor (
     fun updatesWaveJson(tick: UInt): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.TickSimulation_updates_wave_json(handle, FFIUint32(tick), write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
+    }
+
+    /** Every block a piston currently has in flight, as JSON:
+    *`[{"to":[x,y,z],"from":[x,y,z],"state":"...","carried":"...",
+    *"carried_short":"..."|null,"remains":"..."|null,"dir":"east",
+    *"extending":bool,"started":T,"lands":T,"source_piston":bool}]`.
+    *
+    *Draw `carried` travelling `from` -> `to`, and `remains` (when it is
+    *not null) parked at `to` for the whole move. They differ from
+    *`state` — what actually lands — only for a retracting piston, whose
+    *body stays put while its head comes home; vanilla's
+    *`PistonHeadRenderer` splits exactly these two slots.
+    *
+    *`carried_short` is the same arm with `short=true`. Draw it while the
+    *head is **within half a block of its body** — `progress <= 0.5`
+    *extending, `progress >= 0.5` retracting — or the shaft passes
+    *visibly through the back of the piston as it comes home. Which form
+    *to use is yours; naming the state is the engine's.
+    *
+    *What a renderer needs to animate a stroke, from the simulator that
+    *dispatched it. The block-change stream cannot answer this: it says a
+    *cell became a `moving_piston` placeholder, not which block set off,
+    *which cell it left, or which tick it arrives — so a host that
+    *reconstructs strokes from changes is reimplementing piston mechanics
+    *downstream of the engine, and animating on a clock the simulation
+    *does not share. That desync is what draws a block twice, leaves a
+    *gap where one should be, and shears a piston head off its load.
+    *
+    *`started` and `lands` are tick numbers in the engine's frame, where
+    *[Self::tick_count] counts *completed* ticks: after stepping to
+    *`tick_count == t`, a flight's progress is
+    *`(t - started) / (lands - started)`, clamped to 1. Draw it while it
+    *is listed and drop it when it stops being listed — the same call
+    *that stops reporting it is the tick the real block is written, so
+    *there is no frame with both and none with neither.
+    */
+    fun movingBlocksJson(): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.TickSimulation_moving_blocks_json(handle, write);
 
         val returnString = DW.writeToString(write)
         return returnString

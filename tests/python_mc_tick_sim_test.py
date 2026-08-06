@@ -105,5 +105,78 @@ expect(
     "the 6x6 door's pistons move after the lever click",
 )
 
+# What the engine currently has in flight — the renderer's answer to "which
+# block is sliding, from where, arriving when". Reconstructing it from
+# `changes_json` is a reimplementation of piston mechanics in the host, which
+# is how an animation ends up on a different clock from the simulation that
+# decides the landing.
+flight_sim = nucleation.TickSimulation.from_snbt(
+    door, nucleation.TickSettleMode.InWorld, 15, -64, 0, ""
+)
+flight_sim.use_block(10, 4, 1)
+air = []
+for _ in range(40):
+    flight_sim.step()
+    air = json.loads(flight_sim.moving_blocks_json())
+    if air:
+        break
+expect(len(air) > 0, f"the door reports blocks in flight (got {len(air)})")
+STEP = {
+    "east": (1, 0, 0), "west": (-1, 0, 0), "up": (0, 1, 0),
+    "down": (0, -1, 0), "south": (0, 0, 1), "north": (0, 0, -1),
+}
+if air:
+    m = air[0]
+    expect(
+        not m["state"].startswith("minecraft:moving_piston"),
+        f"a flight names the block being carried, not the placeholder ({m['state']})",
+    )
+    d = STEP[m["dir"]]
+    expect(
+        [f + s for f, s in zip(m["from"], d)] == m["to"],
+        f"it travels one cell {m['dir']}: {m['from']} -> {m['to']}",
+    )
+    expect(
+        all(f["started"] == m["started"] and f["lands"] == m["lands"] for f in air),
+        "blocks dispatched together share one flight window",
+    )
+    expect(
+        m["lands"] > m["started"] and m["started"] == flight_sim.tick_count() - 1,
+        f"the window runs from dispatch to landing ({m['started']}..{m['lands']})",
+    )
+
+# A retracting piston is the one move where what lands is not what travels:
+# vanilla's PistonHeadRenderer draws a `piston_head` on the interpolated slot
+# and the body, EXTENDED=true, parked outside it.
+retractions = 0
+split = True
+for _ in range(120):
+    flight_sim.step()
+    for f in json.loads(flight_sim.moving_blocks_json()):
+        if f["source_piston"] and not f["extending"]:
+            retractions += 1
+            if (
+                not f["carried"].startswith("minecraft:piston_head")
+                or "extended=true" not in (f["remains"] or "")
+                or "extended=false" not in f["state"]
+            ):
+                split = False
+        elif f["carried"] != f["state"] or f["remains"] is not None:
+            split = False
+        # A moving arm comes in two lengths — the game shortens it while the
+        # head is beside its body, or the shaft passes through the piston.
+        if f["carried"].startswith("minecraft:piston_head"):
+            short = f["carried_short"] or ""
+            if "short=true" not in short or short.replace("short=true", "short=false") != f["carried"]:
+                split = False
+        elif f["carried_short"] is not None:
+            split = False
+expect(retractions > 0, f"the door's pistons retract ({retractions} flight-ticks seen)")
+expect(
+    split,
+    "a retraction carries a piston_head and parks an extended body; "
+    "every other move carries itself and parks nothing",
+)
+
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(0 if failed == 0 else 1)

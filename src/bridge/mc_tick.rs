@@ -1495,6 +1495,82 @@ pub mod ffi {
             let _ = write!(out, "{}", super::updates_wave(&self.sim, u64::from(tick)));
         }
 
+        /// Every block a piston currently has in flight, as JSON:
+        /// `[{"to":[x,y,z],"from":[x,y,z],"state":"...","carried":"...",
+        ///    "carried_short":"..."|null,"remains":"..."|null,"dir":"east",
+        ///    "extending":bool,"started":T,"lands":T,"source_piston":bool}]`.
+        ///
+        /// Draw `carried` travelling `from` -> `to`, and `remains` (when it is
+        /// not null) parked at `to` for the whole move. They differ from
+        /// `state` — what actually lands — only for a retracting piston, whose
+        /// body stays put while its head comes home; vanilla's
+        /// `PistonHeadRenderer` splits exactly these two slots.
+        ///
+        /// `carried_short` is the same arm with `short=true`. Draw it while the
+        /// head is **within half a block of its body** — `progress <= 0.5`
+        /// extending, `progress >= 0.5` retracting — or the shaft passes
+        /// visibly through the back of the piston as it comes home. Which form
+        /// to use is yours; naming the state is the engine's.
+        ///
+        /// What a renderer needs to animate a stroke, from the simulator that
+        /// dispatched it. The block-change stream cannot answer this: it says a
+        /// cell became a `moving_piston` placeholder, not which block set off,
+        /// which cell it left, or which tick it arrives — so a host that
+        /// reconstructs strokes from changes is reimplementing piston mechanics
+        /// downstream of the engine, and animating on a clock the simulation
+        /// does not share. That desync is what draws a block twice, leaves a
+        /// gap where one should be, and shears a piston head off its load.
+        ///
+        /// `started` and `lands` are tick numbers in the engine's frame, where
+        /// [`Self::tick_count`] counts *completed* ticks: after stepping to
+        /// `tick_count == t`, a flight's progress is
+        /// `(t - started) / (lands - started)`, clamped to 1. Draw it while it
+        /// is listed and drop it when it stops being listed — the same call
+        /// that stops reporting it is the tick the real block is written, so
+        /// there is no frame with both and none with neither.
+        pub fn moving_blocks_json(&self, out: &mut DiplomatWrite) {
+            let mut json = String::from("[");
+            for (i, m) in self.sim.moving_blocks().iter().enumerate() {
+                if i > 0 {
+                    json.push(',');
+                }
+                let state = self.sim.registry().descriptor(m.state).unwrap_or("?");
+                let carried = self.sim.registry().descriptor(m.carried).unwrap_or("?");
+                let quoted = |s: Option<mc_tick::StateId>| {
+                    match s.and_then(|s| self.sim.registry().descriptor(s)) {
+                        Some(descriptor) => format!("\"{descriptor}\""),
+                        None => "null".to_string(),
+                    }
+                };
+                let carried_short = quoted(m.carried_short);
+                let remains = quoted(m.remains);
+                let _ = write!(
+                    json,
+                    "{{\"to\":[{},{},{}],\"from\":[{},{},{}],\"state\":\"{}\",\
+                     \"carried\":\"{}\",\"carried_short\":{},\"remains\":{},\
+                     \"dir\":\"{}\",\"extending\":{},\"started\":{},\"lands\":{},\
+                     \"source_piston\":{}}}",
+                    m.to.x,
+                    m.to.y,
+                    m.to.z,
+                    m.from.x,
+                    m.from.y,
+                    m.from.z,
+                    state,
+                    carried,
+                    carried_short,
+                    remains,
+                    m.travel.name(),
+                    m.extending,
+                    m.started_on,
+                    m.lands_on,
+                    m.source_piston
+                );
+            }
+            json.push(']');
+            let _ = write!(out, "{json}");
+        }
+
         pub fn changes_json(&self, out: &mut DiplomatWrite) {
             let mut json = String::from("[");
             for (i, change) in self.sim.recorded().iter().enumerate() {

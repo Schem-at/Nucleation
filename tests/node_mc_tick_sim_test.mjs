@@ -108,5 +108,74 @@ expect(
   "the 6x6 door's pistons move after the lever click",
 );
 
+// --- what the engine currently has in flight ---
+//
+// The renderer's answer to "which block is sliding, from where, arriving
+// when". Reconstructing it from `changesJson` is a reimplementation of piston
+// mechanics in the host, which is how an animation ends up on a different
+// clock from the simulation that decides the landing.
+const flightSim = TickSimulation.fromSnbt(door, TickSettleMode.InWorld, 15, -64, 0, "");
+flightSim.useBlock(10, 4, 1);
+let air = [];
+for (let t = 0; t < 40 && air.length === 0; t++) {
+  flightSim.step();
+  air = JSON.parse(flightSim.movingBlocksJson());
+}
+expect(air.length > 0, `the door reports blocks in flight (got ${air.length})`);
+const m = air[0] ?? {};
+expect(
+  typeof m.state === "string" && !m.state.startsWith("minecraft:moving_piston"),
+  `a flight names the block being carried, not the placeholder (${m.state})`,
+);
+const step = { east: [1, 0, 0], west: [-1, 0, 0], up: [0, 1, 0], down: [0, -1, 0], south: [0, 0, 1], north: [0, 0, -1] };
+const d = step[m.dir] ?? [0, 0, 0];
+expect(
+  m.from?.every?.((v, i) => v + d[i] === m.to[i]),
+  `it travels one cell ${m.dir}: ${JSON.stringify(m.from)} -> ${JSON.stringify(m.to)}`,
+);
+expect(
+  air.every((f) => f.started === m.started && f.lands === m.lands),
+  "blocks dispatched together share one flight window",
+);
+expect(
+  m.lands > m.started && m.started === flightSim.tickCount() - 1,
+  `the window is the tick it set off to the tick it lands (${m.started}..${m.lands} at tick ${flightSim.tickCount()})`,
+);
+
+// A retracting piston is the one move where what lands is not what travels:
+// vanilla's PistonHeadRenderer draws a `piston_head` on the interpolated slot
+// and the body, EXTENDED=true, parked outside it. Run the door long enough for
+// its pistons to come home and check the split holds everywhere.
+let retractions = 0;
+let split = true;
+for (let t = 0; t < 120; t++) {
+  flightSim.step();
+  for (const f of JSON.parse(flightSim.movingBlocksJson())) {
+    const retracting = f.source_piston && !f.extending;
+    if (retracting) {
+      retractions++;
+      if (
+        !f.carried.startsWith("minecraft:piston_head") ||
+        !(f.remains ?? "").includes("extended=true") ||
+        !f.state.includes("extended=false")
+      ) split = false;
+    } else if (f.carried !== f.state || f.remains !== null) split = false;
+    // A moving arm comes in two lengths — the game shortens it while the head
+    // is beside its body, or the shaft passes through the back of the piston.
+    if (f.carried.startsWith("minecraft:piston_head")) {
+      if (
+        !f.carried_short?.includes("short=true") ||
+        f.carried_short.replace("short=true", "short=false") !== f.carried
+      ) split = false;
+    } else if (f.carried_short !== null) split = false;
+  }
+}
+expect(retractions > 0, `the door's pistons retract (${retractions} flight-ticks seen)`);
+expect(
+  split,
+  "a retraction carries a piston_head and parks an extended body; every other move carries itself and parks nothing; " +
+    "every moving arm offers both lengths",
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
