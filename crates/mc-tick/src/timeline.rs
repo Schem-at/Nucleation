@@ -6,7 +6,7 @@
 //! block deltas, and the piston strokes needed to project a selected range into
 //! an external animation format.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::behaviour::BlockChange;
 use crate::piston::{TRIGGER_CONTRACT, TRIGGER_DROP, TRIGGER_EXTEND};
@@ -119,6 +119,24 @@ fn fingerprint(
     let mut bytes = [0u8; 16];
     bytes.copy_from_slice(&hasher.finalize().as_bytes()[..16]);
     StateFingerprint(u128::from_le_bytes(bytes))
+}
+
+/// A frame without its blocks — enough to *find* a recurrence, not to confirm
+/// one.
+///
+/// Cycle detection indexes on fingerprints and then verifies candidates
+/// against full block vectors. Keeping only the index for the scan is what
+/// lets a whole run be examined without ever holding more than one world.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FrameDigest {
+    /// Tick whose boundary this digest represents.
+    pub tick: u64,
+    /// Absolute-position fingerprint.
+    pub exact: StateFingerprint,
+    /// Fingerprint after subtracting the non-air bounding-box minimum.
+    pub translated: StateFingerprint,
+    /// Non-air bounding-box minimum.
+    pub origin: Pos,
 }
 
 /// One external action applied between ticks.
@@ -308,6 +326,8 @@ pub struct RunTimeline {
     pub inputs: Vec<InputAction>,
     /// Ordered successfully dispatched piston strokes.
     pub pistons: Vec<PistonEvent>,
+    /// The world as recording began.
+    pub initial: StateFrame,
     /// Initial frame followed by one frame after each completed tick.
     pub frames: Vec<StateFrame>,
 }
@@ -418,6 +438,84 @@ impl RunTimeline {
     pub fn initial_frame(&self, selection: TimelineSelection) -> &StateFrame {
         &self.frames[selection.frame_index]
     }
+
+    /// The visible world at `tick`, rebuilt from the initial frame and the
+    /// change log.
+    ///
+    /// `None` outside `start_tick..=end_tick`. Every change carries `from` as
+    /// well as `to`, so the log is a complete description of the run — the
+    /// recorder does not need to keep a snapshot per tick to be able to answer
+    /// this, it only needs the one it started from.
+    pub fn frame_at(&self, tick: u64, registry: &StateRegistry) -> Option<StateFrame> {
+        if tick < self.start_tick || tick > self.end_tick {
+            return None;
+        }
+        let mut blocks = self.seed();
+        self.apply_through(&mut blocks, tick);
+        Some(StateFrame::from_blocks(
+            tick,
+            blocks.into_iter().collect(),
+            registry,
+        ))
+    }
+
+    /// One digest per tick boundary, in order, in a single replay pass.
+    pub fn digests(&self, registry: &StateRegistry) -> Vec<FrameDigest> {
+        let mut blocks = self.seed();
+        let mut out = Vec::with_capacity((self.end_tick - self.start_tick + 1) as usize);
+        let mut next = 0usize;
+        for tick in self.start_tick..=self.end_tick {
+            while let Some(change) = self.changes.get(next) {
+                if change.tick >= tick {
+                    break;
+                }
+                apply(&mut blocks, change);
+                next += 1;
+            }
+            let frame = StateFrame::from_blocks(
+                tick,
+                blocks.iter().map(|(pos, state)| (*pos, *state)).collect(),
+                registry,
+            );
+            out.push(FrameDigest {
+                tick: frame.tick,
+                exact: frame.exact,
+                translated: frame.translated,
+                origin: frame.origin,
+            });
+        }
+        out
+    }
+
+    /// The world as recording began.
+    fn seed(&self) -> BTreeMap<Pos, StateId> {
+        self.initial
+            .blocks
+            .iter()
+            .map(|(pos, state)| (*pos, *state))
+            .collect()
+    }
+
+    /// Apply every change that ran *before* `tick`.
+    ///
+    /// A frame labelled `t` is the boundary after tick `t - 1` completed, so a
+    /// change recorded during tick `t` belongs to the frame after it.
+    fn apply_through(&self, blocks: &mut BTreeMap<Pos, StateId>, tick: u64) {
+        for change in &self.changes {
+            if change.tick >= tick {
+                break;
+            }
+            apply(blocks, change);
+        }
+    }
+}
+
+fn apply(blocks: &mut BTreeMap<Pos, StateId>, change: &BlockChange) {
+    if change.to == StateId::AIR {
+        blocks.remove(&change.pos);
+    } else {
+        blocks.insert(change.pos, change.to);
+    }
 }
 
 fn cycle(kind: CycleKind, first: &StateFrame, second: &StateFrame) -> Cycle {
@@ -459,6 +557,7 @@ impl TimelineRecorder {
             changes: changes.to_vec(),
             inputs: self.inputs.clone(),
             pistons: self.pistons.clone(),
+            initial: self.frames[0].clone(),
             frames: self.frames.clone(),
         }
     }
@@ -536,6 +635,7 @@ mod tests {
             }],
             inputs: Vec::new(),
             pistons: Vec::new(),
+            initial: initial.clone(),
             frames: vec![initial, moved, still],
         };
         let report = timeline.detect_cycles();

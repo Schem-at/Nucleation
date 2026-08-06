@@ -76,8 +76,8 @@ pub use sim::{Checkpoint, MovingBlock, Simulation, StopReason};
 pub use state::{StateError, StateId, StateRegistry};
 pub use structure::{Structure, StructureError};
 pub use timeline::{
-    Cycle, CycleKind, CycleReport, InputAction, PistonAction, PistonEvent, RunTimeline,
-    StateFingerprint, StateFrame, TimelineError, TimelineSelection,
+    Cycle, CycleKind, CycleReport, FrameDigest, InputAction, PistonAction, PistonEvent,
+    RunTimeline, StateFingerprint, StateFrame, TimelineError, TimelineSelection,
 };
 pub use vanilla::{intern_companions, register_all, register_all_at, Descriptor, VanillaRules};
 pub use world::World;
