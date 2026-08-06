@@ -127,22 +127,29 @@ impl ResourcePackSource {
         // reads to whichever spelling the pack actually has, so these mobs
         // render with their skins instead of the missing-texture tile.
         for (wanted, candidates) in [
-            ("entity/pig/temperate_pig", ["entity/pig/pig_temperate", "entity/pig/pig"]),
-            ("entity/cow/temperate_cow", ["entity/cow/cow_temperate", "entity/cow/cow"]),
+            (
+                "entity/pig/temperate_pig",
+                ["entity/pig/pig_temperate", "entity/pig/pig"],
+            ),
+            (
+                "entity/cow/temperate_cow",
+                ["entity/cow/cow_temperate", "entity/cow/cow"],
+            ),
             (
                 "entity/chicken/temperate_chicken",
                 ["entity/chicken/chicken_temperate", "entity/chicken/chicken"],
             ),
-            ("entity/cat/tabby", ["entity/cat/cat_tabby", "entity/cat/tabby"]),
+            (
+                "entity/cat/tabby",
+                ["entity/cat/cat_tabby", "entity/cat/tabby"],
+            ),
             ("entity/bat", ["entity/bat/bat", "entity/bat"]),
             ("entity/blaze", ["entity/blaze/blaze", "entity/blaze"]),
         ] {
             if pack.get_texture(wanted).is_some() {
                 continue;
             }
-            if let Some(texture) =
-                candidates.iter().find_map(|c| pack.get_texture(c).cloned())
-            {
+            if let Some(texture) = candidates.iter().find_map(|c| pack.get_texture(c).cloned()) {
                 pack.add_texture("minecraft", wanted, texture);
             }
         }
@@ -2203,12 +2210,18 @@ mod tests {
             lod_level: 0,
         };
 
-        let glb = output.to_glb().expect("to_glb should succeed for a minimal mesh");
+        let glb = output
+            .to_glb()
+            .expect("to_glb should succeed for a minimal mesh");
         let usdz = output
             .to_usdz()
             .expect("to_usdz should succeed for a minimal mesh");
 
-        assert_eq!(&glb[0..4], b"glTF", "GLB container must start with the glTF magic");
+        assert_eq!(
+            &glb[0..4],
+            b"glTF",
+            "GLB container must start with the glTF magic"
+        );
         assert_eq!(
             &usdz[0..4],
             b"PK\x03\x04",

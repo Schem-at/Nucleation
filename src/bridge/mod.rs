@@ -19,10 +19,10 @@ pub mod diff;
 pub mod distance_field;
 pub mod field;
 pub mod geo;
-#[cfg(feature = "meshing")]
-pub mod meshing;
 #[cfg(feature = "mc-tick")]
 pub mod mc_tick;
+#[cfg(feature = "meshing")]
+pub mod meshing;
 pub mod nbt;
 #[cfg(feature = "rendering")]
 pub mod rendering;

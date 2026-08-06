@@ -61,7 +61,11 @@ pub(crate) fn simulate_placement_into(
         return Ok(1);
     }
 
-    check_volume((bb.max.0 - bb.min.0 + 1, bb.max.1 - bb.min.1 + 1, bb.max.2 - bb.min.2 + 1))?;
+    check_volume((
+        bb.max.0 - bb.min.0 + 1,
+        bb.max.1 - bb.min.1 + 1,
+        bb.max.2 - bb.min.2 + 1,
+    ))?;
 
     // The world is the schematic *without* the new block; gametest SNBT
     // rebases everything to the bounding box's low corner, so the engine
@@ -130,7 +134,6 @@ pub(crate) fn simulate_placement_into(
     Ok(written)
 }
 
-
 /// Whether a block's simulated behaviour depends on block-entity data.
 ///
 /// Only the ones whose *absence changes the run*: a comparator without
@@ -166,8 +169,11 @@ fn block_entity_audit(schematic: &crate::UniversalSchematic) -> String {
     use std::collections::{HashMap, HashSet};
     use std::fmt::Write as _;
 
-    let have: HashSet<(i32, i32, i32)> =
-        schematic.get_block_entities_as_list().into_iter().map(|be| be.position).collect();
+    let have: HashSet<(i32, i32, i32)> = schematic
+        .get_block_entities_as_list()
+        .into_iter()
+        .map(|be| be.position)
+        .collect();
 
     let mut missing: HashMap<String, u32> = HashMap::new();
     for (pos, state) in schematic.iter_blocks() {
@@ -219,8 +225,6 @@ fn block_entity_audit(schematic: &crate::UniversalSchematic) -> String {
     json
 }
 
-
-
 /// The sentence shown to whoever is holding a structure that will not load.
 ///
 /// Two very different failures reach the same `parse` call and they need
@@ -263,7 +267,10 @@ fn updates_json_range(sim: &mc_tick::Simulation, from: u64, to: u64) -> String {
             json.push(',');
         }
         first = false;
-        let state = sim.registry().descriptor(update.state).unwrap_or("minecraft:air");
+        let state = sim
+            .registry()
+            .descriptor(update.state)
+            .unwrap_or("minecraft:air");
         let kind = match update.kind {
             mc_tick::UpdateKind::Neighbor => "neighbor",
             mc_tick::UpdateKind::Shape => "shape",
@@ -301,15 +308,19 @@ fn phase_legend() -> Vec<&'static str> {
 fn phase_code(update: &mc_tick::UpdateRecord) -> usize {
     match update.phase {
         None => 0,
-        Some(phase) => {
-            mc_tick::PHASE_ORDER.iter().position(|p| *p == phase).map_or(0, |i| i + 1)
-        }
+        Some(phase) => mc_tick::PHASE_ORDER
+            .iter()
+            .position(|p| *p == phase)
+            .map_or(0, |i| i + 1),
     }
 }
 
 /// A direction's index into [`mc_tick::ALL_DIRS`].
 fn dir_code(dir: mc_tick::Dir) -> usize {
-    mc_tick::ALL_DIRS.iter().position(|d| *d == dir).unwrap_or(0)
+    mc_tick::ALL_DIRS
+        .iter()
+        .position(|d| *d == dir)
+        .unwrap_or(0)
 }
 
 /// Per-tick, per-cell update counts — the resolution playback runs at.
@@ -398,7 +409,11 @@ fn updates_wave(sim: &mc_tick::Simulation, tick: u64) -> String {
             continue;
         }
         let sep = if n > 0 { "," } else { "" };
-        let _ = write!(pos, "{sep}{},{},{}", update.pos.x, update.pos.y, update.pos.z);
+        let _ = write!(
+            pos,
+            "{sep}{},{},{}",
+            update.pos.x, update.pos.y, update.pos.z
+        );
         let _ = write!(
             kinds,
             "{sep}{}",
@@ -410,7 +425,11 @@ fn updates_wave(sim: &mc_tick::Simulation, tick: u64) -> String {
         let _ = write!(phases_arr, "{sep}{}", phase_code(update));
         let _ = write!(froms, "{sep}{}", dir_code(update.from));
         let index = *seen.entry(update.state).or_insert_with(|| {
-            table.push(sim.registry().descriptor(update.state).unwrap_or("minecraft:air"));
+            table.push(
+                sim.registry()
+                    .descriptor(update.state)
+                    .unwrap_or("minecraft:air"),
+            );
             table.len() - 1
         });
         let _ = write!(states_arr, "{sep}{index}");
@@ -418,8 +437,14 @@ fn updates_wave(sim: &mc_tick::Simulation, tick: u64) -> String {
     }
 
     let mut json = String::new();
-    let _ = write!(json, "{{\"tick\":{tick},\"n\":{n},\"pos\":[{pos}],\"kind\":[{kinds}],");
-    let _ = write!(json, "\"phase\":[{phases_arr}],\"from\":[{froms}],\"state\":[{states_arr}],");
+    let _ = write!(
+        json,
+        "{{\"tick\":{tick},\"n\":{n},\"pos\":[{pos}],\"kind\":[{kinds}],"
+    );
+    let _ = write!(
+        json,
+        "\"phase\":[{phases_arr}],\"from\":[{froms}],\"state\":[{states_arr}],"
+    );
     json.push_str("\"states\":[");
     for (i, descriptor) in table.iter().enumerate() {
         let _ = write!(json, "{}\"{descriptor}\"", if i > 0 { "," } else { "" });
@@ -529,10 +554,21 @@ fn wire_simulation(
             .find(|(p, _)| p == pos)
             .map(|(_, e)| *e)
             .ok_or_else(|| format!("inventory at {pos:?} with no block"))?;
-        let name = structure.palette[entry].split('[').next().unwrap_or_default().to_string();
+        let name = structure.palette[entry]
+            .split('[')
+            .next()
+            .unwrap_or_default()
+            .to_string();
         let slots = mc_tick::vanilla::container_slots(&name)
             .ok_or_else(|| format!("{name} has an inventory but no slot count"))?;
-        sim.set_inventory(*pos, mc_tick::Inventory { slots, stacks: stacks.clone() });
+        sim.set_inventory(
+            *pos,
+            mc_tick::Inventory {
+                slots,
+                stacks: stacks.clone(),
+                blocked_slots: structure.blocked_slots_at(*pos),
+            },
+        );
     }
     mc_tick::intern_companions(sim.registry_mut());
     {
@@ -603,8 +639,17 @@ fn wire_simulation(
             // this list. Standing alone it is scaffolding like a villager, and a
             // blaze that should fly or fight refuses by name.
             mc_tick::structure::SpawnedEntity::Body(body) => {
-                if let Err(why) = sim.spawn_authored_body(body) {
-                    refused.push(why);
+                match sim.spawn_authored_body(body) {
+                    Ok(vehicle) => {
+                        for rider in &body.passengers {
+                            if let Err(why) = sim.spawn_authored_rider(vehicle, rider) {
+                                refused.push(why);
+                            }
+                        }
+                    }
+                    Err(why) => {
+                        refused.push(why);
+                    }
                 }
             }
         }
@@ -665,7 +710,12 @@ fn non_air_stats(sim: &mc_tick::Simulation) -> (u32, f64, i32, i32) {
             max = pos.x;
         }
     }
-    (n, if n == 0 { f64::NAN } else { sum / f64::from(n) }, min, max)
+    (
+        n,
+        if n == 0 { f64::NAN } else { sum / f64::from(n) },
+        min,
+        max,
+    )
 }
 
 /// Build a Structure directly from a flat genome-cell array — the GA fast
@@ -716,6 +766,7 @@ fn structure_from_blocks(
         palette: palette.to_vec(),
         blocks,
         inventories: Vec::new(),
+        inventory_blocked_slots: Vec::new(),
         comparator_outputs: Vec::new(),
         block_entities: Vec::new(),
         entities: Vec::new(),
@@ -788,7 +839,15 @@ fn fly_metrics(
         // which is the version every captured trace came from.
         None,
     )?;
-    fly_on(&mut sim, kick, eval_ticks, seed, must_move_by_tick, need_period, early_exit)
+    fly_on(
+        &mut sim,
+        kick,
+        eval_ticks,
+        seed,
+        must_move_by_tick,
+        need_period,
+        early_exit,
+    )
 }
 
 /// The flight itself, on an already-wired sim (fresh, quiet-settled).
@@ -859,11 +918,7 @@ fn fly_on(
         if t == mid_tick {
             com_mid = com;
         }
-        if early_exit
-            && t == EARLY_TICK
-            && sim.is_quiescent()
-            && (com - start_com).abs() < 0.25
-        {
+        if early_exit && t == EARLY_TICK && sim.is_quiescent() && (com - start_com).abs() < 0.25 {
             frozen = true;
             if mid_tick > t {
                 com_mid = com;
@@ -986,8 +1041,7 @@ pub mod ffi {
             origin_z: i32,
             extra_states: &DiplomatStr,
         ) -> Result<Box<TickSimulation>, NucleationError> {
-            let snbt =
-                std::str::from_utf8(snbt).map_err(|_| NucleationError::InvalidArgument)?;
+            let snbt = std::str::from_utf8(snbt).map_err(|_| NucleationError::InvalidArgument)?;
             let extra =
                 std::str::from_utf8(extra_states).map_err(|_| NucleationError::InvalidArgument)?;
             super::clear_last_error();
@@ -995,7 +1049,10 @@ pub mod ffi {
                 super::set_last_error(super::structure_parse_detail(&e, false));
                 // An entity we cannot model is not a malformed file, so it
                 // reports as a simulator limit rather than a parse failure.
-                if matches!(e, mc_tick::structure::StructureError::UnsupportedEntity { .. }) {
+                if matches!(
+                    e,
+                    mc_tick::structure::StructureError::UnsupportedEntity { .. }
+                ) {
                     NucleationError::Simulation
                 } else {
                     NucleationError::Parse
@@ -1005,8 +1062,11 @@ pub mod ffi {
                 super::set_last_error(e);
                 NucleationError::InvalidArgument
             })?;
-            let extras: Vec<&str> =
-                extra.split(';').map(str::trim).filter(|s| !s.is_empty()).collect();
+            let extras: Vec<&str> = extra
+                .split(';')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .collect();
             let sim = super::wire_simulation(
                 &structure,
                 mc_tick::Pos::new(origin_x, origin_y, origin_z),
@@ -1024,7 +1084,10 @@ pub mod ffi {
                 super::set_last_error(e);
                 NucleationError::Simulation
             })?;
-            Ok(Box::new(TickSimulation { sim, checkpoints: Vec::new() }))
+            Ok(Box::new(TickSimulation {
+                sim,
+                checkpoints: Vec::new(),
+            }))
         }
 
         /// Load from a schematic (any format nucleation can read), rendered
@@ -1062,8 +1125,11 @@ pub mod ffi {
                 super::set_last_error(super::structure_parse_detail(&e, true));
                 NucleationError::Simulation
             })?;
-            let extras: Vec<&str> =
-                extra.split(';').map(str::trim).filter(|s| !s.is_empty()).collect();
+            let extras: Vec<&str> = extra
+                .split(';')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .collect();
             let sim = super::wire_simulation(
                 &structure,
                 mc_tick::Pos::new(origin_x, origin_y, origin_z),
@@ -1081,7 +1147,10 @@ pub mod ffi {
                 super::set_last_error(e);
                 NucleationError::Simulation
             })?;
-            Ok(Box::new(TickSimulation { sim, checkpoints: Vec::new() }))
+            Ok(Box::new(TickSimulation {
+                sim,
+                checkpoints: Vec::new(),
+            }))
         }
 
         /// GA fast path: construct from a flat genome-cell array — no SNBT
@@ -1126,7 +1195,10 @@ pub mod ffi {
                 None,
             )
             .map_err(|_| NucleationError::Simulation)?;
-            Ok(Box::new(TickSimulation { sim, checkpoints: Vec::new() }))
+            Ok(Box::new(TickSimulation {
+                sim,
+                checkpoints: Vec::new(),
+            }))
         }
 
         /// Evaluate a whole batch of kicked flights inside the engine — one
@@ -1166,9 +1238,7 @@ pub mod ffi {
                 .collect();
             let extras: Vec<&str> = pal.iter().map(String::as_str).collect();
             let volume = (bx.max(0) as usize) * (by.max(0) as usize) * (bz.max(0) as usize);
-            if volume == 0
-                || cells.len() % volume != 0
-                || kicks.len() != (cells.len() / volume) * 3
+            if volume == 0 || cells.len() % volume != 0 || kicks.len() != (cells.len() / volume) * 3
             {
                 return Err(NucleationError::InvalidArgument);
             }
@@ -1178,10 +1248,9 @@ pub mod ffi {
             // genome restore + place. Construction cost is paid once per
             // batch instead of once per machine.
             let empty = vec![air_index; volume];
-            let empty_structure = super::structure_from_blocks(
-                bx, by, bz, travel, x_off, &pal, &empty, air_index,
-            )
-            .map_err(|_| NucleationError::InvalidArgument)?;
+            let empty_structure =
+                super::structure_from_blocks(bx, by, bz, travel, x_off, &pal, &empty, air_index)
+                    .map_err(|_| NucleationError::InvalidArgument)?;
             let mut sim = super::wire_simulation(
                 &empty_structure,
                 mc_tick::Pos::new(0, 0, 0),
@@ -1194,10 +1263,9 @@ pub mod ffi {
             let mut json = String::from("[");
             for g in 0..n_genomes {
                 let slice = &cells[g * volume..(g + 1) * volume];
-                let structure = super::structure_from_blocks(
-                    bx, by, bz, travel, x_off, &pal, slice, air_index,
-                )
-                .map_err(|_| NucleationError::InvalidArgument)?;
+                let structure =
+                    super::structure_from_blocks(bx, by, bz, travel, x_off, &pal, slice, air_index)
+                        .map_err(|_| NucleationError::InvalidArgument)?;
                 sim.restore(&pristine);
                 {
                     let (registry, world) = sim.registry_and_world_mut();
@@ -1291,8 +1359,7 @@ pub mod ffi {
             z: i32,
             state: &DiplomatStr,
         ) -> Result<(), NucleationError> {
-            let state =
-                std::str::from_utf8(state).map_err(|_| NucleationError::InvalidArgument)?;
+            let state = std::str::from_utf8(state).map_err(|_| NucleationError::InvalidArgument)?;
             let id = self
                 .sim
                 .registry()
@@ -1305,7 +1372,11 @@ pub mod ffi {
         /// The block state descriptor at a position (`minecraft:air` for empty).
         pub fn get_block(&self, x: i32, y: i32, z: i32, out: &mut DiplomatWrite) {
             let id = self.sim.world().get(mc_tick::Pos::new(x, y, z));
-            let descriptor = self.sim.registry().descriptor(id).unwrap_or("minecraft:air");
+            let descriptor = self
+                .sim
+                .registry()
+                .descriptor(id)
+                .unwrap_or("minecraft:air");
             let _ = write!(out, "{descriptor}");
         }
 
@@ -1393,12 +1464,7 @@ pub mod ffi {
         ///
         /// The whole log for a 6x6 door's cycle is megabytes; a scrubber only
         /// ever shows one tick, so it should ask for one tick.
-        pub fn updates_json_between(
-            &self,
-            from_tick: u32,
-            to_tick: u32,
-            out: &mut DiplomatWrite,
-        ) {
+        pub fn updates_json_between(&self, from_tick: u32, to_tick: u32, out: &mut DiplomatWrite) {
             let _ = write!(
                 out,
                 "{}",
@@ -1412,12 +1478,7 @@ pub mod ffi {
         /// cells:[{p:[x,y,z], n, nb, sh, ph:[…]}]}]}`, where `nb`/`sh` split
         /// neighbour from shape and `ph` indexes the `phases` legend. Collapses
         /// a tick's tens of thousands of updates into a few hundred cells.
-        pub fn updates_heat_json(
-            &self,
-            from_tick: u32,
-            to_tick: u32,
-            out: &mut DiplomatWrite,
-        ) {
+        pub fn updates_heat_json(&self, from_tick: u32, to_tick: u32, out: &mut DiplomatWrite) {
             let _ = write!(
                 out,
                 "{}",
@@ -1506,8 +1567,12 @@ pub mod ffi {
                     "{{\"id\":{},\"kind\":\"{}\",\"pos\":[{},{},{}],\"vel\":[{},{},{}]}}",
                     cart.id,
                     cart.kind,
-                    cart.pos[0], cart.pos[1], cart.pos[2],
-                    cart.vel[0], cart.vel[1], cart.vel[2],
+                    cart.pos[0],
+                    cart.pos[1],
+                    cart.pos[2],
+                    cart.vel[0],
+                    cart.vel[1],
+                    cart.vel[2],
                 );
             }
             json.push_str("],\"frozen\":[");
@@ -1584,9 +1649,8 @@ pub mod ffi {
                 let to = self.sim.registry().descriptor(change.to).unwrap_or("");
                 let row = rows.entry(change.tick).or_default();
                 row.changes += 1;
-                let named = |needle: &str| {
-                    super::is_named(from, needle) || super::is_named(to, needle)
-                };
+                let named =
+                    |needle: &str| super::is_named(from, needle) || super::is_named(to, needle);
                 if named("piston") {
                     row.piston += 1;
                 }
@@ -1724,10 +1788,9 @@ pub mod ffi {
         ) -> Result<(), NucleationError> {
             let palette =
                 std::str::from_utf8(palette).map_err(|_| NucleationError::InvalidArgument)?;
-            let json = super::machine_graph_batch(
-                bx, by, bz, travel, x_off, palette, cells, air_index,
-            )
-            .map_err(|_| NucleationError::InvalidArgument)?;
+            let json =
+                super::machine_graph_batch(bx, by, bz, travel, x_off, palette, cells, air_index)
+                    .map_err(|_| NucleationError::InvalidArgument)?;
             let _ = write!(out, "{json}");
             Ok(())
         }
@@ -1839,8 +1902,14 @@ mod tests {
             .set_block_from_string(1, 1, 0, "minecraft:redstone_wire{simulate=true}")
             .expect("simulated placement");
         let wire = schem.get_block(1, 1, 0).expect("wire exists").to_string();
-        assert!(wire.contains("power=15"), "wire next to a redstone block reads 15, got {wire}");
-        assert!(wire.contains("west=side"), "wire connects toward the block powering it, got {wire}");
+        assert!(
+            wire.contains("power=15"),
+            "wire next to a redstone block reads 15, got {wire}"
+        );
+        assert!(
+            wire.contains("west=side"),
+            "wire connects toward the block powering it, got {wire}"
+        );
     }
 
     /// The tag on an isolated placement (or the first block of an empty
@@ -1887,8 +1956,8 @@ mod tests {
         let mut cells = engine_b.to_vec();
         cells.extend_from_slice(&lone_slime);
 
-        let json = machine_graph_batch(4, 1, 2, 26, 1, PALETTE, &cells, 0)
-            .expect("batch analysis runs");
+        let json =
+            machine_graph_batch(4, 1, 2, 26, 1, PALETTE, &cells, 0).expect("batch analysis runs");
 
         // [rejected, rejected_for_sustained, engine, payload, dead, "codes"]
         let rows: Vec<&str> = json
@@ -1914,7 +1983,11 @@ mod tests {
             "a lone slime block cannot move, got {}",
             rows[1]
         );
-        assert!(rows[1].contains("no_piston"), "and the reason is why: {}", rows[1]);
+        assert!(
+            rows[1].contains("no_piston"),
+            "and the reason is why: {}",
+            rows[1]
+        );
     }
 
     /// A 1.12 build must reach the engine flattened.
@@ -1939,14 +2012,19 @@ mod tests {
         );
 
         let snbt = to_gametest_snbt(&schem);
-        assert!(snbt.contains("minecraft:slime_block"), "slime block not flattened: {snbt}");
-        assert!(snbt.contains("minecraft:stone_bricks"), "stone brick not flattened: {snbt}");
+        assert!(
+            snbt.contains("minecraft:slime_block"),
+            "slime block not flattened: {snbt}"
+        );
+        assert!(
+            snbt.contains("minecraft:stone_bricks"),
+            "stone brick not flattened: {snbt}"
+        );
         assert!(
             !snbt.contains("\"minecraft:slime\""),
             "the 1.12 id survived into the engine's input: {snbt}"
         );
     }
-
 
     #[test]
     fn modern_builds_are_passed_through_untouched() {
@@ -1967,10 +2045,22 @@ mod tests {
 
         let json = block_entity_audit(&schem);
         assert!(json.contains("\"missing_total\":3"), "{json}");
-        assert!(json.contains("\"name\":\"minecraft:comparator\",\"count\":2"), "{json}");
-        assert!(json.contains("\"name\":\"minecraft:furnace\",\"count\":1"), "{json}");
-        assert!(!json.contains("stone"), "a block with no ticking NBT was reported: {json}");
-        assert!(json.contains("2 comparators"), "summary not written: {json}");
+        assert!(
+            json.contains("\"name\":\"minecraft:comparator\",\"count\":2"),
+            "{json}"
+        );
+        assert!(
+            json.contains("\"name\":\"minecraft:furnace\",\"count\":1"),
+            "{json}"
+        );
+        assert!(
+            !json.contains("stone"),
+            "a block with no ticking NBT was reported: {json}"
+        );
+        assert!(
+            json.contains("2 comparators"),
+            "summary not written: {json}"
+        );
     }
 
     #[test]
@@ -2019,7 +2109,10 @@ mod tests {
         assert!(schem.add_entity(cart));
 
         let mut stack = HashMap::new();
-        stack.insert("id".to_string(), NbtValue::String("minecraft:redstone".into()));
+        stack.insert(
+            "id".to_string(),
+            NbtValue::String("minecraft:redstone".into()),
+        );
         stack.insert("count".to_string(), NbtValue::Byte(7));
         let mut item = Entity::new("minecraft:item".into(), (11.5, 1.0, 6.5));
         item.nbt.insert("Item".into(), NbtValue::Compound(stack));
@@ -2034,7 +2127,11 @@ mod tests {
         match &parsed.entities[0] {
             mc_tick::structure::SpawnedEntity::Minecart(cart) => {
                 assert_eq!(cart.kind, "minecraft:minecart");
-                assert_eq!(cart.pos, [0.5, 0.0625, 0.5], "position not shifted into structure space");
+                assert_eq!(
+                    cart.pos,
+                    [0.5, 0.0625, 0.5],
+                    "position not shifted into structure space"
+                );
                 assert_eq!(cart.motion, [0.25, 0.0, -0.5]);
             }
             other => panic!("expected a minecart, got {other:?}"),
@@ -2122,7 +2219,10 @@ mod tests {
 
         match &parsed.entities[0] {
             mc_tick::structure::SpawnedEntity::Minecart(cart) => {
-                assert_eq!(cart.motion[0], 4.27987680632209e-59, "denormal mangled: {snbt}");
+                assert_eq!(
+                    cart.motion[0], 4.27987680632209e-59,
+                    "denormal mangled: {snbt}"
+                );
                 assert_eq!(cart.motion[1], 0.0);
                 assert!(
                     cart.motion[2].is_nan(),
@@ -2161,7 +2261,11 @@ mod tests {
         match &parsed.entities[0] {
             mc_tick::structure::SpawnedEntity::Minecart(cart) => {
                 assert_eq!(cart.motion[0], f64::INFINITY);
-                assert_eq!(cart.motion[1], f64::NEG_INFINITY, "the sign was lost: {snbt}");
+                assert_eq!(
+                    cart.motion[1],
+                    f64::NEG_INFINITY,
+                    "the sign was lost: {snbt}"
+                );
             }
             other => panic!("expected a minecart, got {other:?}"),
         }
@@ -2181,7 +2285,10 @@ mod tests {
     /// simulation rather than off the text, because the question is what
     /// `Entity.load` did with the token, not whether the token was written.
     fn nan_carts(sim: &mc_tick::Simulation) -> usize {
-        sim.minecarts().iter().filter(|c| c.vel.iter().any(|v| v.is_nan())).count()
+        sim.minecarts()
+            .iter()
+            .filter(|c| c.vel.iter().any(|v| v.is_nan()))
+            .count()
     }
 
     /// Load gametest SNBT through the shipped bridge entry point.
@@ -2210,9 +2317,14 @@ mod tests {
 
         schem.metadata.source_data_version = Some(4082);
         let snbt = to_gametest_snbt(&schem);
-        assert!(snbt.contains("DataVersion: 4082"), "the file's own version must win: {snbt}");
+        assert!(
+            snbt.contains("DataVersion: 4082"),
+            "the file's own version must win: {snbt}"
+        );
         assert_eq!(
-            mc_tick::Structure::parse(&snbt).expect("parses").data_version,
+            mc_tick::Structure::parse(&snbt)
+                .expect("parses")
+                .data_version,
             Some(4082),
             "and it must survive being read back"
         );
@@ -2288,7 +2400,10 @@ mod tests {
             Some(mc_tick::motion::FIRST_NAN_DROPPING_DATA_VERSION);
 
         let snbt = to_gametest_snbt(&schematic);
-        assert!(snbt.contains("DataVersion: 4671"), "the restamp must reach the text");
+        assert!(
+            snbt.contains("DataVersion: 4671"),
+            "the restamp must reach the text"
+        );
         let sim = from_snbt(&snbt);
         assert_eq!(
             sim.motion_semantics(),
@@ -2349,7 +2464,10 @@ mod tests {
              place, so neither may we. First few: {:?}",
             at_rest.recorded().iter().take(4).collect::<Vec<_>>()
         );
-        assert!(at_rest.is_quiescent(), "a build at rest has nothing pending");
+        assert!(
+            at_rest.is_quiescent(),
+            "a build at rest has nothing pending"
+        );
 
         // The control. Placement *should* perturb this build, and if it does
         // not then the assertion above is passing for the wrong reason.
@@ -2399,7 +2517,11 @@ mod tests {
         );
 
         let riders = sim.riders();
-        assert_eq!(riders.len(), 2, "two blazes ride two of the four plain carts");
+        assert_eq!(
+            riders.len(),
+            2,
+            "two blazes ride two of the four plain carts"
+        );
         let mut seats: Vec<f64> = riders
             .iter()
             .map(|(_, kind, pos)| {
@@ -2476,7 +2598,10 @@ mod tests {
             let error = wire_with_entities(entity)
                 .err()
                 .unwrap_or_else(|| panic!("{expected} needs behaviour that does not exist"));
-            assert!(error.contains(expected), "refusal does not name the type: {error}");
+            assert!(
+                error.contains(expected),
+                "refusal does not name the type: {error}"
+            );
         }
     }
 
@@ -2504,7 +2629,11 @@ mod tests {
             .collect();
         assert_eq!(
             frozen,
-            ["minecraft:dragon_fireball", "minecraft:small_fireball", "minecraft:villager"],
+            [
+                "minecraft:dragon_fireball",
+                "minecraft:small_fireball",
+                "minecraft:villager"
+            ],
             "each keeps its own identity, because each has its own hitbox"
         );
     }
