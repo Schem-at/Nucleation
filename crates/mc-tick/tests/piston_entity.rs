@@ -53,14 +53,20 @@ fn build() -> Simulation {
     }
     // The redstone blocks the capture drops in at t2 are not in the structure,
     // so their state has to exist in the registry before the run.
-    sim.registry_mut().intern("minecraft:redstone_block").expect("a real block");
+    sim.registry_mut()
+        .intern("minecraft:redstone_block")
+        .expect("a real block");
     mc_tick::intern_companions(sim.registry_mut());
     {
         let mut table = std::mem::take(sim.behaviours_mut());
         mc_tick::register_all(sim.registry_mut(), &mut table);
         *sim.behaviours_mut() = table;
     }
-    assert_eq!(sim.unknown_report(), None, "a partially-simulated world proves nothing");
+    assert_eq!(
+        sim.unknown_report(),
+        None,
+        "a partially-simulated world proves nothing"
+    );
     let (solidity, frictions, heights, webs) = mc_tick::vanilla::physics_tables(sim.registry());
     sim.set_physics_tables(solidity, frictions, heights, webs);
     let (water_kinds, bubble_kinds) = mc_tick::vanilla::fluid_tables(sim.registry());
@@ -71,10 +77,20 @@ fn build() -> Simulation {
     // `Entity.deltaMovement` directly and does not go through `Entity.load`,
     // which is why the NaN is taken verbatim here rather than through
     // `MotionSemantics`.
-    sim.spawn_minecart("minecraft:minecart".into(), [3.5, 1.0, 1.5], [0.0, 0.0, 0.0]);
-    sim.spawn_minecart("minecraft:minecart".into(), [3.5, 1.0, 3.5], [0.0, 0.0, f64::NAN]);
-    sim.spawn_frozen_entity("minecraft:small_fireball".into(), [3.5, 1.0, 5.5]).unwrap();
-    sim.spawn_frozen_entity("minecraft:dragon_fireball".into(), [3.5, 1.0, 7.5]).unwrap();
+    sim.spawn_minecart(
+        "minecraft:minecart".into(),
+        [3.5, 1.0, 1.5],
+        [0.0, 0.0, 0.0],
+    );
+    sim.spawn_minecart(
+        "minecraft:minecart".into(),
+        [3.5, 1.0, 3.5],
+        [0.0, 0.0, f64::NAN],
+    );
+    sim.spawn_frozen_entity("minecraft:small_fireball".into(), [3.5, 1.0, 5.5])
+        .unwrap();
+    sim.spawn_frozen_entity("minecraft:dragon_fireball".into(), [3.5, 1.0, 7.5])
+        .unwrap();
     let order = structure.placement_order(
         mc_tick::vanilla::is_collision_full_cube,
         mc_tick::vanilla::has_dynamic_shape,
@@ -91,7 +107,11 @@ fn xs(sim: &Simulation) -> Vec<f64> {
         let body = sim
             .entity_bodies()
             .iter()
-            .find(|b| !b.is_minecart && b.min[2] < f64::from(lane) + 0.5 && b.max[2] > f64::from(lane) + 0.5)
+            .find(|b| {
+                !b.is_minecart
+                    && b.min[2] < f64::from(lane) + 0.5
+                    && b.max[2] > f64::from(lane) + 0.5
+            })
             .unwrap_or_else(|| panic!("the frozen body in lane z={lane}"));
         out.push((body.min[0] + body.max[0]) / 2.0);
     }
@@ -100,7 +120,9 @@ fn xs(sim: &Simulation) -> Vec<f64> {
 
 fn power(sim: &mut Simulation, on: bool) {
     let state = if on {
-        sim.registry_mut().intern("minecraft:redstone_block").unwrap()
+        sim.registry_mut()
+            .intern("minecraft:redstone_block")
+            .unwrap()
     } else {
         mc_tick::StateId::AIR
     };
@@ -120,7 +142,11 @@ fn power(sim: &mut Simulation, on: bool) {
 fn a_piston_displaces_every_entity_by_the_depth_of_its_own_hitbox() {
     let mut sim = build();
     let start = xs(&sim);
-    assert_eq!(start, vec![3.5; 4], "all four start centred in the head's slot");
+    assert_eq!(
+        start,
+        vec![3.5; 4],
+        "all four start centred in the head's slot"
+    );
 
     power(&mut sim, true);
     let mut seen: Vec<Vec<f64>> = vec![start];
@@ -137,18 +163,32 @@ fn a_piston_displaces_every_entity_by_the_depth_of_its_own_hitbox() {
         3,
         "vanilla moves them exactly twice — half a block each — and then stops; saw {seen:?}"
     );
-    assert_eq!(seen[1], AFTER_FIRST_STEP.to_vec(), "after the first half-block step");
+    assert_eq!(
+        seen[1],
+        AFTER_FIRST_STEP.to_vec(),
+        "after the first half-block step"
+    );
     let finals: Vec<f64> = AFTER_EXTENSION.iter().map(|(_, x)| *x).collect();
-    assert_eq!(seen[2], finals, "after the second, which is where vanilla leaves them");
+    assert_eq!(
+        seen[2], finals,
+        "after the second, which is where vanilla leaves them"
+    );
 
     // No velocity is imparted. `moveEntityByPiston` calls `entity.move` and
     // never touches `deltaMovement`, so the nan cart keeps its NaN and the
     // others keep their zero — the capture reads (0, 0, 0) for all four.
     let carts = sim.minecarts();
-    assert_eq!(carts[0].vel, [0.0, 0.0, 0.0], "an ordinary cart gains nothing");
+    assert_eq!(
+        carts[0].vel,
+        [0.0, 0.0, 0.0],
+        "an ordinary cart gains nothing"
+    );
     assert_eq!(carts[1].vel[0], 0.0);
     assert_eq!(carts[1].vel[1], 0.0);
-    assert!(carts[1].vel[2].is_nan(), "the nan cart is still a nan cart afterwards");
+    assert!(
+        carts[1].vel[2].is_nan(),
+        "the nan cart is still a nan cart afterwards"
+    );
 
     // Nothing was in a retracting arm's way, so the unmodelled path was never
     // reached — a real answer, not an absence of instrumentation.
@@ -166,7 +206,11 @@ fn retracting_past_an_entity_that_is_already_clear_moves_it_nowhere() {
     let extended = xs(&sim);
     power(&mut sim, false);
     sim.run(15);
-    assert_eq!(xs(&sim), extended, "the arm never reaches them on the way back");
+    assert_eq!(
+        xs(&sim),
+        extended,
+        "the arm never reaches them on the way back"
+    );
     assert!(
         sim.piston_retract_contacts().is_empty(),
         "and it never even touched them, which is why doing nothing is correct here"

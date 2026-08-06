@@ -27,8 +27,19 @@ const FLYER: &str = include_str!("../tests/corpus/structures/flying_machine_east
 /// actuation then silently does nothing.
 fn sim(snbt: &str, settle: SettleMode) -> Simulation {
     let structure = Structure::parse(snbt).expect("fixture parses");
-    let actuators = ["minecraft:redstone_block".to_string(), "minecraft:air".to_string()];
-    mc_test::build_sim(&structure, Pos::new(0, 0, 0), settle, &actuators, &[], None, "bench")
+    let actuators = [
+        "minecraft:redstone_block".to_string(),
+        "minecraft:air".to_string(),
+    ];
+    mc_test::build_sim(
+        &structure,
+        Pos::new(0, 0, 0),
+        settle,
+        &actuators,
+        &[],
+        None,
+        "bench",
+    )
 }
 
 fn changes(s: &Simulation) -> usize {
@@ -71,12 +82,16 @@ fn bench_bb(c: &mut Criterion) {
     let air = s.registry_mut().intern("minecraft:air").expect("air");
     s.record();
     s.place_block(Pos::new(31, 7, 13), air); // mine the obsidian: the trigger
-    // Long enough to be unambiguously running: the first stroke lands around
-    // t6 and the machine is in full swing by t30.
+                                             // Long enough to be unambiguously running: the first stroke lands around
+                                             // t6 and the machine is in full swing by t30.
     for _ in 0..30 {
         s.step();
     }
-    assert!(changes(&s) > 50, "BB did not start: {} changes", changes(&s));
+    assert!(
+        changes(&s) > 50,
+        "BB did not start: {} changes",
+        changes(&s)
+    );
 
     timed_steps(c, "tick/bb", &mut s, 200);
 }
@@ -90,7 +105,10 @@ fn bench_adder_idle(c: &mut Criterion) {
     for _ in 0..200 {
         s.step();
     }
-    assert!(s.is_quiescent(), "adder had not settled; this would measure work, not idleness");
+    assert!(
+        s.is_quiescent(),
+        "adder had not settled; this would measure work, not idleness"
+    );
     timed_steps(c, "tick/adder32_idle", &mut s, 500);
 }
 
@@ -102,8 +120,10 @@ fn bench_adder_solve(c: &mut Criterion) {
         b.iter_batched(
             || Structure::parse(ADDER32).expect("parses"),
             |structure| {
-                let actuators =
-                    ["minecraft:redstone_block".to_string(), "minecraft:air".to_string()];
+                let actuators = [
+                    "minecraft:redstone_block".to_string(),
+                    "minecraft:air".to_string(),
+                ];
                 let mut s = mc_test::build_sim(
                     &structure,
                     Pos::new(0, 0, 0),
@@ -135,7 +155,10 @@ fn bench_adder_solve(c: &mut Criterion) {
             .contains("powered=true")
     };
     let sum: u64 = (0..32).filter(|i| bit(*i)).map(|i| 1u64 << i).sum();
-    assert_eq!(sum, 0xF0E2_1568, "adder computed {sum:#x}, fixture expects DEADBEEF+12345678+1");
+    assert_eq!(
+        sum, 0xF0E2_1568,
+        "adder computed {sum:#x}, fixture expects DEADBEEF+12345678+1"
+    );
 }
 
 /// A redstone-dense piston door: observers, clocks, wire, and a structure
@@ -150,7 +173,11 @@ fn bench_door(c: &mut Criterion) {
     for _ in 0..4 {
         s.step();
     }
-    assert!(changes(&s) > 10, "door did not open: {} changes", changes(&s));
+    assert!(
+        changes(&s) > 10,
+        "door did not open: {} changes",
+        changes(&s)
+    );
     timed_steps(c, "tick/door_6x6", &mut s, 100);
 }
 
@@ -158,7 +185,10 @@ fn bench_door(c: &mut Criterion) {
 /// because there is almost nothing in the world to spend it on.
 fn bench_flyer(c: &mut Criterion) {
     let mut s = sim(FLYER, SettleMode::Quiet);
-    let redstone = s.registry_mut().intern("minecraft:redstone_block").expect("interns");
+    let redstone = s
+        .registry_mut()
+        .intern("minecraft:redstone_block")
+        .expect("interns");
     let air = s.registry_mut().intern("minecraft:air").expect("interns");
     s.record();
     s.step();
@@ -170,10 +200,98 @@ fn bench_flyer(c: &mut Criterion) {
     for _ in 0..40 {
         s.step();
     }
-    let reach = |s: &Simulation| s.world().iter_non_air().map(|(p, _)| p.x).max().unwrap_or(0);
-    assert!(reach(&s) > 5, "flyer never took off; it reached x={}", reach(&s));
+    let reach = |s: &Simulation| {
+        s.world()
+            .iter_non_air()
+            .map(|(p, _)| p.x)
+            .max()
+            .unwrap_or(0)
+    };
+    assert!(
+        reach(&s) > 5,
+        "flyer never took off; it reached x={}",
+        reach(&s)
+    );
 
     timed_steps(c, "tick/flyer", &mut s, 200);
+}
+
+/// Opt-in timeline cost, beside the identical run with recording disabled.
+///
+/// Recorder setup and reset stay outside the timer. Each sample restores the
+/// same in-flight checkpoint, so this measures per-tick capture and hashing
+/// rather than construction, cloning an accumulated timeline, or world growth.
+fn bench_timeline_recording(c: &mut Criterion) {
+    fn in_flight() -> Simulation {
+        let mut s = sim(FLYER, SettleMode::Quiet);
+        let redstone = s
+            .registry_mut()
+            .intern("minecraft:redstone_block")
+            .expect("interns");
+        let air = s.registry_mut().intern("minecraft:air").expect("interns");
+        s.run(2);
+        s.place_block(Pos::new(2, 1, 1), redstone);
+        s.run(2);
+        s.place_block(Pos::new(2, 1, 1), air);
+        s.run(40);
+        let reach = s
+            .world()
+            .iter_non_air()
+            .map(|(p, _)| p.x)
+            .max()
+            .unwrap_or(0);
+        assert!(reach > 5, "flyer never took off; it reached x={reach}");
+        s
+    }
+
+    let mut plain = in_flight();
+    let plain_start = plain.checkpoint();
+    c.bench_function("recording/flyer_unrecorded", |b| {
+        b.iter_custom(|iters| {
+            let mut total = Duration::ZERO;
+            let mut done = 0;
+            while done < iters {
+                plain.restore(&plain_start);
+                let n = (iters - done).min(200);
+                let t0 = Instant::now();
+                plain.run(n);
+                total += t0.elapsed();
+                done += n;
+            }
+            total
+        })
+    });
+    assert!(
+        plain.recorded_timeline().is_none(),
+        "the unrecorded arm accidentally enabled the timeline"
+    );
+
+    let mut recorded = in_flight();
+    let recorded_start = recorded.checkpoint();
+    recorded.record_timeline();
+    recorded.step();
+    assert!(
+        recorded
+            .recorded_timeline()
+            .is_some_and(|timeline| timeline.frames.len() == 2),
+        "the recorded arm did not capture a verification frame"
+    );
+    c.bench_function("recording/flyer_recorded", |b| {
+        b.iter_custom(|iters| {
+            let mut total = Duration::ZERO;
+            let mut done = 0;
+            while done < iters {
+                recorded.restore(&recorded_start);
+                recorded.record_timeline();
+                let n = (iters - done).min(200);
+                let t0 = Instant::now();
+                recorded.run(n);
+                total += t0.elapsed();
+                done += n;
+            }
+            total
+        })
+    });
 }
 
 /// What a search pays per candidate: parse, place, settle, run, discard.
@@ -223,7 +341,13 @@ fn bench_construct(c: &mut Criterion) {
                 || Structure::parse(snbt).expect("parses"),
                 |structure| {
                     mc_test::build_sim(
-                        &structure, Pos::new(0, 0, 0), settle, &[], &[], None, "bench",
+                        &structure,
+                        Pos::new(0, 0, 0),
+                        settle,
+                        &[],
+                        &[],
+                        None,
+                        "bench",
                     )
                 },
                 BatchSize::SmallInput,
@@ -261,6 +385,7 @@ criterion_group!(
     bench_adder_solve,
     bench_door,
     bench_flyer,
+    bench_timeline_recording,
     bench_batch,
     bench_construct
 );

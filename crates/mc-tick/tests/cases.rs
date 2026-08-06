@@ -22,8 +22,8 @@ use mc_test as scenario;
 fn run_case(case_path: &Path) -> Result<(), String> {
     let text = std::fs::read_to_string(case_path)
         .map_err(|e| format!("reading {}: {e}", case_path.display()))?;
-    let case: scenario::Case = serde_json::from_str(&text)
-        .map_err(|e| format!("parsing {}: {e}", case_path.display()))?;
+    let case: scenario::Case =
+        serde_json::from_str(&text).map_err(|e| format!("parsing {}: {e}", case_path.display()))?;
     let label = &case.name;
 
     let structure_path = match &case.structure {
@@ -48,7 +48,10 @@ fn every_bundled_case_passes() {
         .expect("tests/cases must exist")
         .filter_map(|e| e.ok())
         .map(|e| e.path())
-        .filter(|p| p.file_name().is_some_and(|n| n.to_string_lossy().ends_with(".test.json")))
+        .filter(|p| {
+            p.file_name()
+                .is_some_and(|n| n.to_string_lossy().ends_with(".test.json"))
+        })
         .filter(|p| filter.is_empty() || p.to_string_lossy().contains(&filter))
         .collect();
     paths.sort();

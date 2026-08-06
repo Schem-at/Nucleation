@@ -5,7 +5,9 @@
 use mc_tick::{Pos, Simulation, Structure};
 
 fn main() {
-    let path = std::env::args().nth(1).expect("usage: dump_placed <file.snbt>");
+    let path = std::env::args()
+        .nth(1)
+        .expect("usage: dump_placed <file.snbt>");
     let text = std::fs::read_to_string(&path).expect("read structure");
     let structure = Structure::parse(&text).expect("parse structure");
     let mut sim = Simulation::new(structure.bounds(4));

@@ -16,7 +16,7 @@ const CORRIDOR: i32 = 40;
 enum Cell {
     SpE, // sticky piston facing east
     SpW,
-    PE, // regular piston facing east
+    PE,  // regular piston facing east
     ObE, // observer facing east (watching +x)
     ObW,
     Slime,
@@ -140,7 +140,10 @@ fn evaluate_with_kick(
         let (registry, world) = sim.registry_and_world_mut();
         structure.place(world, registry, Pos::new(0, 0, 0));
     }
-    let rb = sim.registry_mut().intern("minecraft:redstone_block").unwrap();
+    let rb = sim
+        .registry_mut()
+        .intern("minecraft:redstone_block")
+        .unwrap();
     mc_tick::intern_companions(sim.registry_mut());
     {
         let mut table = std::mem::take(sim.behaviours_mut());
@@ -301,7 +304,10 @@ fn is_observer(c: Cell) -> bool {
 
 fn run_candidates(candidates: Vec<Vec<Vec<Option<Cell>>>>, label: &str) -> usize {
     let total = candidates.len();
-    let workers = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(10);
+    let workers = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        .min(10);
     let chunk = total.div_ceil(workers);
     let winners = std::sync::Mutex::new(Vec::<String>::new());
     let winners_ref = &winners;
@@ -366,7 +372,10 @@ fn a_moved_observer_pulses_on_landing() {
         let (registry, world) = sim.registry_and_world_mut();
         structure.place(world, registry, Pos::new(0, 0, 0));
     }
-    let rb = sim.registry_mut().intern("minecraft:redstone_block").unwrap();
+    let rb = sim
+        .registry_mut()
+        .intern("minecraft:redstone_block")
+        .unwrap();
     mc_tick::intern_companions(sim.registry_mut());
     {
         let mut table = std::mem::take(sim.behaviours_mut());
@@ -461,7 +470,10 @@ fn a_placed_block_pulses_the_watching_observer() {
             sim.place_block(Pos::new(0, 0, 0), stone);
         }
         sim.step();
-        let lamp = sim.registry().descriptor(sim.world().get(Pos::new(2, 0, 0))).unwrap_or("");
+        let lamp = sim
+            .registry()
+            .descriptor(sim.world().get(Pos::new(2, 0, 0)))
+            .unwrap_or("");
         if lamp.contains("lit=true") && lit_at.is_none() {
             lit_at = Some(t);
         }
@@ -505,7 +517,10 @@ fn engine_b_variants() {
                     let (registry, world) = sim.registry_and_world_mut();
                     structure.place(world, registry, Pos::new(0, 0, 0));
                 }
-                let stone = sim.registry_mut().intern("minecraft:redstone_block").unwrap();
+                let stone = sim
+                    .registry_mut()
+                    .intern("minecraft:redstone_block")
+                    .unwrap();
                 mc_tick::intern_companions(sim.registry_mut());
                 {
                     let mut table = std::mem::take(sim.behaviours_mut());
@@ -551,8 +566,15 @@ fn engine_b_variants() {
 fn search_two_rows() {
     use Cell::*;
     let bottom_alpha: [Option<Cell>; 5] = [Some(SpE), Some(SpW), Some(Slime), Some(Honey), None];
-    let top_alpha: [Option<Cell>; 7] =
-        [Some(ObE), Some(ObW), Some(Slime), Some(Honey), Some(SpE), Some(SpW), None];
+    let top_alpha: [Option<Cell>; 7] = [
+        Some(ObE),
+        Some(ObW),
+        Some(Slime),
+        Some(Honey),
+        Some(SpE),
+        Some(SpW),
+        None,
+    ];
     for len in 2..=3usize {
         let combos = (bottom_alpha.len() * top_alpha.len()).pow(len as u32);
         let mut candidates = Vec::new();
@@ -581,23 +603,56 @@ fn search_two_rows() {
 #[test]
 #[ignore = "phase probe"]
 fn engine_b_phase_probe() {
-    let snbt = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/corpus/structures/flying_machine_east.snbt")).unwrap();
+    let snbt = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/corpus/structures/flying_machine_east.snbt"
+    ))
+    .unwrap();
     let structure = Structure::parse(&snbt).unwrap();
     let mut sim = Simulation::new(structure.bounds(4));
-    { let (registry, world) = sim.registry_and_world_mut(); structure.place(world, registry, Pos::new(0,0,0)); }
-    let rb = sim.registry_mut().intern("minecraft:redstone_block").unwrap();
+    {
+        let (registry, world) = sim.registry_and_world_mut();
+        structure.place(world, registry, Pos::new(0, 0, 0));
+    }
+    let rb = sim
+        .registry_mut()
+        .intern("minecraft:redstone_block")
+        .unwrap();
     mc_tick::intern_companions(sim.registry_mut());
-    { let mut table = std::mem::take(sim.behaviours_mut()); mc_tick::register_all_at(sim.registry_mut(), &mut table, Pos::new(0,0,0)); *sim.behaviours_mut() = table; }
-    let order = structure.placement_order(mc_tick::vanilla::is_collision_full_cube, mc_tick::vanilla::has_dynamic_shape);
+    {
+        let mut table = std::mem::take(sim.behaviours_mut());
+        mc_tick::register_all_at(sim.registry_mut(), &mut table, Pos::new(0, 0, 0));
+        *sim.behaviours_mut() = table;
+    }
+    let order = structure.placement_order(
+        mc_tick::vanilla::is_collision_full_cube,
+        mc_tick::vanilla::has_dynamic_shape,
+    );
     sim.place_on_place(&order);
     for t in 0..80u64 {
-        if t == 2 { sim.place_block(Pos::new(2,1,1), rb); }
-        if t == 4 { sim.place_block(Pos::new(2,1,1), mc_tick::StateId::AIR); }
+        if t == 2 {
+            sim.place_block(Pos::new(2, 1, 1), rb);
+        }
+        if t == 4 {
+            sim.place_block(Pos::new(2, 1, 1), mc_tick::StateId::AIR);
+        }
         sim.step();
         if t >= 58 && t <= 66 {
-            let mut cells: Vec<String> = sim.world().iter_non_air().map(|(p,s)| format!("({},{},{})={}", p.x,p.y,p.z, sim.registry().descriptor(s).unwrap_or("?"))).collect();
+            let mut cells: Vec<String> = sim
+                .world()
+                .iter_non_air()
+                .map(|(p, s)| {
+                    format!(
+                        "({},{},{})={}",
+                        p.x,
+                        p.y,
+                        p.z,
+                        sim.registry().descriptor(s).unwrap_or("?")
+                    )
+                })
+                .collect();
             cells.sort();
-            println!("t{}: {}", t+1, cells.join(" | "));
+            println!("t{}: {}", t + 1, cells.join(" | "));
         }
     }
 }

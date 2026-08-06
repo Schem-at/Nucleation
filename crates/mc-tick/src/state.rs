@@ -109,7 +109,10 @@ impl StateRegistry {
 
     /// The block `state` belongs to, ignoring its properties.
     pub fn block_of(&self, state: StateId) -> u16 {
-        self.block_of.get(state.raw() as usize).copied().unwrap_or(0)
+        self.block_of
+            .get(state.raw() as usize)
+            .copied()
+            .unwrap_or(0)
     }
 
     /// Whether two states are the same **block** — `BlockState.is(Block)`.
@@ -176,7 +179,9 @@ mod tests {
         // them would silently break every gate.
         let mut registry = StateRegistry::new();
         let off = registry.intern("minecraft:redstone_wire[power=0]").unwrap();
-        let on = registry.intern("minecraft:redstone_wire[power=15]").unwrap();
+        let on = registry
+            .intern("minecraft:redstone_wire[power=15]")
+            .unwrap();
         assert_ne!(off, on);
     }
 
@@ -232,7 +237,9 @@ impl StateSet {
     /// Whether `state` is in the set.
     pub fn contains(&self, state: &StateId) -> bool {
         let index = state.0 as usize;
-        self.bits.get(index / 64).is_some_and(|w| (w >> (index % 64)) & 1 == 1)
+        self.bits
+            .get(index / 64)
+            .is_some_and(|w| (w >> (index % 64)) & 1 == 1)
     }
 
     /// Whether nothing is in the set.

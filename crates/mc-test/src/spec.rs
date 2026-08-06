@@ -293,8 +293,8 @@ struct SuiteDoc {
 /// `{"format": 1, "cases": [...]}` object. `what` names the carrier file so an
 /// error says which build refused to parse.
 pub fn parse_suite(text: &str, what: &str) -> Result<Vec<Case>, String> {
-    let value: serde_json::Value =
-        serde_json::from_str(text).map_err(|e| format!("{what}: parsing the embedded test: {e}"))?;
+    let value: serde_json::Value = serde_json::from_str(text)
+        .map_err(|e| format!("{what}: parsing the embedded test: {e}"))?;
     let cases: Vec<Case> = match &value {
         serde_json::Value::Array(_) => serde_json::from_value(value.clone())
             .map_err(|e| format!("{what}: parsing the embedded tests: {e}"))?,
@@ -314,7 +314,9 @@ pub fn parse_suite(text: &str, what: &str) -> Result<Vec<Case>, String> {
             .map_err(|e| format!("{what}: parsing the embedded test: {e}"))?,
     };
     if cases.is_empty() {
-        return Err(format!("{what}: the suite has no cases — it would pass by saying nothing"));
+        return Err(format!(
+            "{what}: the suite has no cases — it would pass by saying nothing"
+        ));
     }
     Ok(cases)
 }

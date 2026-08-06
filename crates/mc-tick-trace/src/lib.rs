@@ -319,7 +319,11 @@ impl std::fmt::Display for Divergence {
 
 impl Trace {
     /// An empty trace for `structure`.
-    pub fn new(mc_version: impl Into<String>, structure: impl Into<String>, detail: Detail) -> Self {
+    pub fn new(
+        mc_version: impl Into<String>,
+        structure: impl Into<String>,
+        detail: Detail,
+    ) -> Self {
         Self {
             format_version: FORMAT_VERSION,
             mc_version: mc_version.into(),
@@ -476,10 +480,7 @@ impl Trace {
                         tick: expected.tick,
                         phase: Some(a.phase.clone()),
                         event_index: index,
-                        detail: format!(
-                            "phase differs: expected {}, got {}",
-                            a.phase, b.phase
-                        ),
+                        detail: format!("phase differs: expected {}, got {}", a.phase, b.phase),
                     });
                 }
                 if !kinds_match(&a.kind, &b.kind, tolerance) {
@@ -546,9 +547,7 @@ fn kinds_match(a: &EventKind, b: &EventKind, tolerance: f64) -> bool {
 }
 
 fn within(a: &[f64; 3], b: &[f64; 3], tolerance: f64) -> bool {
-    a.iter()
-        .zip(b)
-        .all(|(x, y)| (x - y).abs() <= tolerance)
+    a.iter().zip(b).all(|(x, y)| (x - y).abs() <= tolerance)
 }
 
 #[cfg(test)]
@@ -691,10 +690,19 @@ mod tests {
     #[test]
     fn differing_tick_counts_are_reported_before_event_comparison() {
         let expected = trace(vec![
-            TickRecord { tick: 0, events: vec![] },
-            TickRecord { tick: 1, events: vec![] },
+            TickRecord {
+                tick: 0,
+                events: vec![],
+            },
+            TickRecord {
+                tick: 1,
+                events: vec![],
+            },
         ]);
-        let actual = trace(vec![TickRecord { tick: 0, events: vec![] }]);
+        let actual = trace(vec![TickRecord {
+            tick: 0,
+            events: vec![],
+        }]);
         let d = expected.diff(&actual).unwrap();
         assert!(d.detail.contains("tick count differs"), "{}", d.detail);
     }

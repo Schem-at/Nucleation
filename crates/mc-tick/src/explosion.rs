@@ -95,7 +95,11 @@ pub fn move_box(
         }
         let positive = d > 0.0;
         // Cells the box would sweep through on this axis.
-        let lead = if positive { cur_max[axis] } else { cur_min[axis] };
+        let lead = if positive {
+            cur_max[axis]
+        } else {
+            cur_min[axis]
+        };
         let target = lead + d;
         let (lo, hi) = if positive {
             (lead.floor() as i32, target.floor() as i32)
@@ -134,8 +138,7 @@ pub fn move_box(
                             break 'scan;
                         }
                     } else if world.is_solid(cell) {
-                        let face =
-                            f64::from(step) + if positive { 0.0 } else { 1.0 };
+                        let face = f64::from(step) + if positive { 0.0 } else { 1.0 };
                         d = if positive {
                             (face - lead).max(0.0).min(d)
                         } else {
@@ -285,8 +288,7 @@ fn line_clear(from: [f64; 3], to: [f64; 3], world: &dyn CollisionWorld) -> bool 
         if delta[axis] > 0.0 {
             step[axis] = 1;
             t_delta[axis] = 1.0 / delta[axis];
-            t_max[axis] =
-                (f64::from(cell[axis]) + 1.0 - from[axis]) / delta[axis];
+            t_max[axis] = (f64::from(cell[axis]) + 1.0 - from[axis]) / delta[axis];
         } else if delta[axis] < 0.0 {
             step[axis] = -1;
             t_delta[axis] = -1.0 / delta[axis];

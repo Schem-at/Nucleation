@@ -56,9 +56,20 @@ const CORPUS_DIR: &str = "tests/corpus";
 enum Directive {
     Bounds(Bounds),
     Load(String),
-    Set { pos: Pos, descriptor: String },
-    Schedule { pos: Pos, delay: u64, priority: TickPriority },
-    Event { pos: Pos, id: u8, param: u8 },
+    Set {
+        pos: Pos,
+        descriptor: String,
+    },
+    Schedule {
+        pos: Pos,
+        delay: u64,
+        priority: TickPriority,
+    },
+    Event {
+        pos: Pos,
+        id: u8,
+        param: u8,
+    },
     Checkpoint,
     Restore,
     Reset,
@@ -67,7 +78,10 @@ enum Directive {
     Run(u64),
     RunUntilQuiescent(u64),
     ExpectTick(u64),
-    ExpectBlock { pos: Pos, descriptor: String },
+    ExpectBlock {
+        pos: Pos,
+        descriptor: String,
+    },
     ExpectQuiescent(bool),
     ExpectNonAirCount(usize),
     ExpectStop(StopReason),
@@ -195,7 +209,10 @@ fn parse_directive(tokens: &[&str]) -> Result<Directive, String> {
             tokens.get(1).unwrap_or(&"1000").parse().unwrap_or(1000),
         )),
         "load" => Ok(Directive::Load(
-            tokens.get(1).ok_or("load needs a structure file")?.to_string(),
+            tokens
+                .get(1)
+                .ok_or("load needs a structure file")?
+                .to_string(),
         )),
         "expect" => parse_expectation(&tokens[1..]),
         other => Err(format!("unknown directive {other:?}")),
@@ -313,21 +330,23 @@ fn run_case(directives: &[Directive]) -> Vec<String> {
                 }
             }
 
-            Directive::Set { pos, descriptor } => {
-                match sim.registry_mut().intern(descriptor) {
-                    Ok(id) => {
-                        if sim.world_mut().set(*pos, id).is_none() {
-                            failures.push(format!(
-                                "set {pos:?} {descriptor}: outside the region {:?}",
-                                bounds
-                            ));
-                        }
+            Directive::Set { pos, descriptor } => match sim.registry_mut().intern(descriptor) {
+                Ok(id) => {
+                    if sim.world_mut().set(*pos, id).is_none() {
+                        failures.push(format!(
+                            "set {pos:?} {descriptor}: outside the region {:?}",
+                            bounds
+                        ));
                     }
-                    Err(e) => failures.push(format!("intern {descriptor}: {e}")),
                 }
-            }
+                Err(e) => failures.push(format!("intern {descriptor}: {e}")),
+            },
 
-            Directive::Schedule { pos, delay, priority } => {
+            Directive::Schedule {
+                pos,
+                delay,
+                priority,
+            } => {
                 sim.schedule_tick(*pos, *delay, *priority);
             }
 
@@ -351,9 +370,7 @@ fn run_case(directives: &[Directive]) -> Vec<String> {
 
             Directive::Step => last_stop = sim.step(),
             Directive::Run(n) => last_stop = sim.run(*n),
-            Directive::RunUntilQuiescent(budget) => {
-                last_stop = sim.run_until_quiescent(*budget)
-            }
+            Directive::RunUntilQuiescent(budget) => last_stop = sim.run_until_quiescent(*budget),
 
             Directive::ExpectTick(expected) => {
                 let actual = sim.tick_count();
@@ -375,9 +392,7 @@ fn run_case(directives: &[Directive]) -> Vec<String> {
             Directive::ExpectQuiescent(want) => {
                 let actual = sim.is_quiescent();
                 if actual != *want {
-                    failures.push(format!(
-                        "expected quiescent={want}, got quiescent={actual}"
-                    ));
+                    failures.push(format!("expected quiescent={want}, got quiescent={actual}"));
                 }
             }
 
@@ -392,9 +407,7 @@ fn run_case(directives: &[Directive]) -> Vec<String> {
 
             Directive::ExpectStop(expected) => {
                 if last_stop != *expected {
-                    failures.push(format!(
-                        "expected stop {expected:?}, got {last_stop:?}"
-                    ));
+                    failures.push(format!("expected stop {expected:?}, got {last_stop:?}"));
                 }
             }
         }
@@ -516,10 +529,8 @@ fn a_malformed_case_reports_its_line() {
 
 #[test]
 fn expectation_failures_are_all_reported_not_just_the_first() {
-    let directives = parse_case(
-        "bounds 0 0 0 3 3 3\nrun 1\nexpect tick 99\nexpect non_air_count 5\n",
-    )
-    .unwrap();
+    let directives =
+        parse_case("bounds 0 0 0 3 3 3\nrun 1\nexpect tick 99\nexpect non_air_count 5\n").unwrap();
     let failures = run_case(&directives);
     assert_eq!(failures.len(), 2, "got: {failures:?}");
 }
@@ -533,7 +544,10 @@ fn load_reads_the_same_structures_the_oracle_runs() {
 
     assert_eq!(structure.size, (3, 3, 1));
     assert!(
-        structure.palette.iter().any(|d| d.starts_with("minecraft:piston")),
+        structure
+            .palette
+            .iter()
+            .any(|d| d.starts_with("minecraft:piston")),
         "palette: {:?}",
         structure.palette
     );

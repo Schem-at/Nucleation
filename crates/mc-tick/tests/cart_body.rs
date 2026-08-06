@@ -203,6 +203,8 @@ fn a_cart_rests_on_a_seated_passenger() {
             kind: "minecraft:blaze".to_string(),
             pos: [0.0; 3],
             motion: [0.0, -0.0784, 0.0],
+            leashed: false,
+            passengers: Vec::new(),
         }),
     )
     .expect("a blaze on a plain minecart is measured");

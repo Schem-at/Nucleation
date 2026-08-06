@@ -190,9 +190,7 @@ impl World {
             .iter()
             .enumerate()
             .filter(|(_, state)| **state != StateId::AIR)
-            .filter_map(|(index, state)| {
-                self.bounds.position_of(index).map(|pos| (pos, *state))
-            })
+            .filter_map(|(index, state)| self.bounds.position_of(index).map(|pos| (pos, *state)))
     }
 
     /// How many blocks are not air.

@@ -104,8 +104,7 @@ pub struct EntityBody {
 /// the free functions that forty call sites already use, while all the knowledge
 /// they report lives in one registration list.
 pub fn vanilla_entities() -> &'static crate::entity_kind::EntityTable {
-    static TABLE: std::sync::OnceLock<crate::entity_kind::EntityTable> =
-        std::sync::OnceLock::new();
+    static TABLE: std::sync::OnceLock<crate::entity_kind::EntityTable> = std::sync::OnceLock::new();
     TABLE.get_or_init(crate::vanilla::entity_table)
 }
 
@@ -171,7 +170,7 @@ pub fn blocks_a_cart(kind: &str) -> Option<bool> {
 /// `canBeCollidedWith() || isPushable()`, which applies only when the moving
 /// entity is itself a cart.
 pub fn hard_collides(kind: &str) -> bool {
-    matches!(kind, "minecraft:oak_boat")
+    matches!(kind, "minecraft:oak_boat" | "minecraft:pale_oak_boat")
 }
 
 /// Where a passenger sits relative to its vehicle's position, measured.
@@ -191,12 +190,21 @@ mod hitbox_tests {
     /// `BasePressurePlateBlock.TOUCH_AABB` at a cell, duplicated here so the
     /// geometry check does not depend on the block layer.
     fn touch(x: f64, y: f64, z: f64) -> ([f64; 3], [f64; 3]) {
-        ([x + 0.0625, y, z + 0.0625], [x + 0.9375, y + 0.25, z + 0.9375])
+        (
+            [x + 0.0625, y, z + 0.0625],
+            [x + 0.9375, y + 0.25, z + 0.9375],
+        )
     }
 
     fn presses(kind: &str, plate: [f64; 3], pos: [f64; 3]) -> bool {
         let (min, max) = body_aabb(kind, pos).expect("known entity");
-        let body = EntityBody { id: 0, kind: kind.into(), min, max, is_minecart: false };
+        let body = EntityBody {
+            id: 0,
+            kind: kind.into(),
+            min,
+            max,
+            is_minecart: false,
+        };
         let (tmin, tmax) = touch(plate[0], plate[1], plate[2]);
         body.intersects(tmin, tmax)
     }
@@ -236,8 +244,16 @@ mod hitbox_tests {
         // the height that just reaches it. 1.205 + h > 3.0 > 1.195 + h pins h to
         // (1.795, 1.805). `blaze_reach_villager_control.entities.log` is the
         // control — a 1.95-tall villager reaches both, so the rig can say yes.
-        assert!(presses("minecraft:blaze", [44.0, 3.0, 2.0], [43.9, 1.205, 2.5]));
-        assert!(!presses("minecraft:blaze", [48.0, 3.0, 2.0], [47.9, 1.195, 2.5]));
+        assert!(presses(
+            "minecraft:blaze",
+            [44.0, 3.0, 2.0],
+            [43.9, 1.205, 2.5]
+        ));
+        assert!(!presses(
+            "minecraft:blaze",
+            [48.0, 3.0, 2.0],
+            [47.9, 1.195, 2.5]
+        ));
         assert!(
             presses("minecraft:villager", [48.0, 3.0, 2.0], [47.9, 1.195, 2.5]),
             "the control: a taller body must reach the plate the blaze misses, or \
@@ -261,7 +277,10 @@ mod hitbox_tests {
             Some([0.0, 0.0, 0.0])
         );
         // Unmeasured pairs get nothing rather than a plausible default.
-        assert_eq!(passenger_attachment("minecraft:minecart", "minecraft:creeper"), None);
+        assert_eq!(
+            passenger_attachment("minecraft:minecart", "minecraft:creeper"),
+            None
+        );
         assert_eq!(
             passenger_attachment("minecraft:furnace_minecart", "minecraft:blaze"),
             None,
@@ -345,8 +364,10 @@ mod hitbox_tests {
             "minecraft:tnt_minecart",
             "minecraft:villager",
             "minecraft:blaze",
+            "minecraft:silverfish",
             // Not a `LivingEntity`, and it holds a cart up anyway.
             "minecraft:oak_boat",
+            "minecraft:pale_oak_boat",
         ] {
             assert_eq!(blocks_a_cart(kind), Some(true), "{kind} was measured solid");
         }
@@ -358,14 +379,22 @@ mod hitbox_tests {
             // A `LivingEntity` a cart falls straight through.
             "minecraft:armor_stand",
         ] {
-            assert_eq!(blocks_a_cart(kind), Some(false), "{kind} was measured transparent");
+            assert_eq!(
+                blocks_a_cart(kind),
+                Some(false),
+                "{kind} was measured transparent"
+            );
         }
         // Every kind with a hitbox has an answer here, and no kind without one
         // does — so a new entity cannot arrive with a box and no decision. A
         // zombie is the pointed example: `cart_body` measured it *stopped*, and
         // it still has no row, so it refuses rather than half-existing.
         for kind in ["minecraft:creeper", "minecraft:zombie"] {
-            assert_eq!(blocks_a_cart(kind), None, "{kind} has no box in this engine");
+            assert_eq!(
+                blocks_a_cart(kind),
+                None,
+                "{kind} has no box in this engine"
+            );
             assert_eq!(entity_dimensions(kind), None);
         }
     }
@@ -390,7 +419,14 @@ mod hitbox_tests {
     /// x = 5.322499990463257, whose east face is the boat's west face.
     #[test]
     fn the_boat_box_reproduces_the_captured_cart_rests() {
-        assert_eq!(entity_dimensions("minecraft:oak_boat"), Some((1.375, 0.5625)));
+        assert_eq!(
+            entity_dimensions("minecraft:oak_boat"),
+            Some((1.375, 0.5625))
+        );
+        assert_eq!(
+            entity_dimensions("minecraft:pale_oak_boat"),
+            Some((1.375, 0.5625))
+        );
         let (_, max) = body_aabb("minecraft:oak_boat", [2.5, 1.0, 16.5]).unwrap();
         assert_eq!(max[1], 1.5625, "a cart rests on the boat's top");
         let (min, _) = body_aabb("minecraft:oak_boat", [6.5, 1.0, 7.5]).unwrap();
@@ -405,8 +441,14 @@ mod hitbox_tests {
     /// on one. `sized(0.5F, 1.975F)`, and 1.975f is 1.9750000238418579.
     #[test]
     fn the_armor_stand_box_is_the_registrys_float() {
-        assert_eq!(entity_dimensions("minecraft:armor_stand"), Some((0.5, 1.975_f32 as f64)));
-        assert_eq!(entity_dimensions("minecraft:armor_stand").unwrap().1, 1.975_000_023_841_857_9);
+        assert_eq!(
+            entity_dimensions("minecraft:armor_stand"),
+            Some((0.5, 1.975_f32 as f64))
+        );
+        assert_eq!(
+            entity_dimensions("minecraft:armor_stand").unwrap().1,
+            1.975_000_023_841_857_9
+        );
     }
 
     /// Every row in the table is internally consistent.
@@ -440,13 +482,31 @@ mod hitbox_tests {
             );
             // A seat is only meaningful on something that can carry a rider, and
             // only the measured pairs answer at all.
-            assert_eq!(row.carries_passengers(), row.seat_for("minecraft:blaze").is_some());
-            assert_eq!(row.seat_for("minecraft:creeper"), None, "{kind}: unmeasured pairs refuse");
+            assert_eq!(
+                row.carries_passengers(),
+                row.seat_for("minecraft:blaze").is_some()
+                    || row.seat_for("minecraft:silverfish").is_some()
+            );
+            assert_eq!(
+                row.seat_for("minecraft:creeper"),
+                None,
+                "{kind}: unmeasured pairs refuse"
+            );
         }
         // The one vehicle with measured seats, so the assertion above is not
         // vacuously true for every row at once.
-        assert!(table.get("minecraft:minecart").unwrap().carries_passengers());
-        assert!(!table.get("minecraft:furnace_minecart").unwrap().carries_passengers());
+        assert!(table
+            .get("minecraft:minecart")
+            .unwrap()
+            .carries_passengers());
+        assert!(!table
+            .get("minecraft:furnace_minecart")
+            .unwrap()
+            .carries_passengers());
+        assert!(table
+            .get("minecraft:pale_oak_boat")
+            .unwrap()
+            .carries_passengers());
     }
 
     /// A boat carries no passenger, because nobody has measured one.
@@ -456,10 +516,29 @@ mod hitbox_tests {
     /// a chest cart: an attachment point is a property of two types and is not
     /// derivable from the boxes.
     #[test]
-    fn a_boat_has_no_measured_seat() {
-        for rider in ["minecraft:villager", "minecraft:blaze", "minecraft:armor_stand"] {
+    fn an_oak_boat_has_no_measured_seat() {
+        for rider in [
+            "minecraft:villager",
+            "minecraft:blaze",
+            "minecraft:armor_stand",
+        ] {
             assert_eq!(passenger_attachment("minecraft:oak_boat", rider), None);
         }
+    }
+
+    /// Vanilla 26.2 places the elevator's silverfish exactly 3/16 block above
+    /// its pale-oak boat after the first vehicle tick.
+    #[test]
+    fn the_elevator_boat_has_its_measured_silverfish_seat() {
+        assert_eq!(
+            passenger_attachment("minecraft:pale_oak_boat", "minecraft:silverfish"),
+            Some([0.0, 0.1875, 0.0])
+        );
+        assert_eq!(
+            entity_dimensions("minecraft:silverfish"),
+            Some((0.4_f32 as f64, 0.3_f32 as f64))
+        );
+        assert_eq!(blocks_a_cart("minecraft:silverfish"), Some(true));
     }
 }
 
@@ -745,10 +824,11 @@ fn water_interaction(entity: &ItemEntityState, world: &dyn CollisionWorld) -> (f
         for y in (min[1].floor() as i32)..=((max[1].ceil() as i32) - 1) {
             for z in (min[2].floor() as i32)..=((max[2].ceil() as i32) - 1) {
                 let cell = Pos::new(x, y, z);
-                let Some(kind) = world.water(cell) else { continue };
+                let Some(kind) = world.water(cell) else {
+                    continue;
+                };
                 let above = world.water(cell.offset(crate::pos::Dir::Up)).is_some();
-                let surface =
-                    f64::from(y) + f64::from(crate::fluid::surface_height(kind, above));
+                let surface = f64::from(y) + f64::from(crate::fluid::surface_height(kind, above));
                 if surface < min[1] {
                     continue;
                 }
@@ -800,7 +880,9 @@ fn apply_bubble_columns(entity: &mut ItemEntityState, world: &dyn CollisionWorld
         for y in ((min[1] + EPSILON).floor() as i32)..=((max[1] - EPSILON).floor() as i32) {
             for z in ((min[2] + EPSILON).floor() as i32)..=((max[2] - EPSILON).floor() as i32) {
                 let cell = Pos::new(x, y, z);
-                let Some(drag_down) = world.bubble(cell) else { continue };
+                let Some(drag_down) = world.bubble(cell) else {
+                    continue;
+                };
                 let vy = entity.vel[1];
                 entity.vel[1] = if world.is_air(cell.offset(crate::pos::Dir::Up)) {
                     if drag_down {
@@ -846,9 +928,8 @@ pub fn tick_item(entity: &mut ItemEntityState, world: &dyn CollisionWorld) -> bo
     }
 
     let horizontal_sqr = entity.vel[0] * entity.vel[0] + entity.vel[2] * entity.vel[2];
-    let resting = entity.on_ground
-        && horizontal_sqr <= 1.0e-5
-        && (entity.tick_count + entity.id) % 4 != 0;
+    let resting =
+        entity.on_ground && horizontal_sqr <= 1.0e-5 && (entity.tick_count + entity.id) % 4 != 0;
     if resting {
         // Even a rest-skipped tick re-applies block effects from the last
         // movements (`applyEffectsFromBlocksForLastMovements`): a sunk item in
@@ -1004,7 +1085,13 @@ pub(crate) fn collide_move_among(
 ) -> ([f64; 3], [bool; 3]) {
     let mut movement = movement;
     let mut hit = [false; 3];
-    let clipped = clip_boxes(min, max, 1, clip_axis(world, min, max, 1, movement[1]), obstacles);
+    let clipped = clip_boxes(
+        min,
+        max,
+        1,
+        clip_axis(world, min, max, 1, movement[1]),
+        obstacles,
+    );
     hit[1] = clipped != movement[1];
     min[1] += clipped;
     max[1] += clipped;
@@ -1046,9 +1133,9 @@ fn clip_boxes(
             return 0.0;
         }
         // A box only blocks this axis if it overlaps on the other two.
-        let clear = (0..3)
-            .filter(|other| *other != axis)
-            .any(|other| min[other] >= omax[other] - EPSILON || max[other] <= omin[other] + EPSILON);
+        let clear = (0..3).filter(|other| *other != axis).any(|other| {
+            min[other] >= omax[other] - EPSILON || max[other] <= omin[other] + EPSILON
+        });
         if clear {
             continue;
         }
@@ -1270,8 +1357,18 @@ mod tests {
     #[test]
     fn merging_prefers_the_larger_stack_and_discards_the_other() {
         let mut entities = ItemEntities::default();
-        entities.spawn(("minecraft:redstone".to_string(), 3), [0.4, 0.0, 0.5], [0.0; 3], 0);
-        entities.spawn(("minecraft:redstone".to_string(), 5), [0.6, 0.0, 0.5], [0.0; 3], 0);
+        entities.spawn(
+            ("minecraft:redstone".to_string(), 3),
+            [0.4, 0.0, 0.5],
+            [0.0; 3],
+            0,
+        );
+        entities.spawn(
+            ("minecraft:redstone".to_string(), 5),
+            [0.6, 0.0, 0.5],
+            [0.0; 3],
+            0,
+        );
         merge_neighbours(&mut entities, 0);
         let alive: Vec<_> = entities.items.iter().filter(|e| !e.removed).collect();
         assert_eq!(alive.len(), 1);

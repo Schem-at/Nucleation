@@ -86,9 +86,15 @@ fn build(repeater_delay: u8) -> Circuit {
     };
 
     // Lever and stone are inert; they only matter as power sources and cargo.
-    for (state, name) in [(lever_off, "lever"), (lever_on, "lever"), (stone, "stone"),
-                          (head, "piston_head"), (moving, "moving_piston")] {
-        sim.behaviours_mut().register(state, Box::new(Inert::new(name)));
+    for (state, name) in [
+        (lever_off, "lever"),
+        (lever_on, "lever"),
+        (stone, "stone"),
+        (head, "piston_head"),
+        (moving, "moving_piston"),
+    ] {
+        sim.behaviours_mut()
+            .register(state, Box::new(Inert::new(name)));
     }
 
     for (state, powered) in [(rep_off, false), (rep_on, true)] {
@@ -98,7 +104,10 @@ fn build(repeater_delay: u8) -> Circuit {
                 facing: Dir::West,
                 delay: repeater_delay,
                 powered,
-                states: StatePair { off: rep_off, on: rep_on },
+                states: StatePair {
+                    off: rep_off,
+                    on: rep_on,
+                },
                 locked: false,
                 locked_twin: None,
                 power: model.clone(),
@@ -113,7 +122,10 @@ fn build(repeater_delay: u8) -> Circuit {
                 facing: Dir::East,
                 extended,
                 sticky: false,
-                states: StatePair { off: piston_in, on: piston_out },
+                states: StatePair {
+                    off: piston_in,
+                    on: piston_out,
+                },
                 head,
                 moving,
                 moving_block: moving,
@@ -145,7 +157,15 @@ fn build(repeater_delay: u8) -> Circuit {
     sim.world_mut().set(cargo_at, stone);
     sim.mark_initial();
 
-    Circuit { sim, lever_off, lever_on, piston_out, head, lever_at, piston_at }
+    Circuit {
+        sim,
+        lever_off,
+        lever_on,
+        piston_out,
+        head,
+        lever_at,
+        piston_at,
+    }
 }
 
 #[test]
@@ -168,7 +188,11 @@ fn a_lever_drives_a_repeater_which_drives_a_piston() {
         c.head,
         "and placed its head"
     );
-    assert_eq!(c.sim.unknown_report(), None, "every block must be implemented");
+    assert_eq!(
+        c.sim.unknown_report(),
+        None,
+        "every block must be implemented"
+    );
 }
 
 #[test]

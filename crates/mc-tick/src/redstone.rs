@@ -263,7 +263,11 @@ mod tests {
         world.set(Pos::new(1, 1, 0), network.wire[0]);
 
         assert!(network.settle(&mut world) > 0);
-        assert_eq!(network.settle(&mut world), 0, "second settle must change nothing");
+        assert_eq!(
+            network.settle(&mut world),
+            0,
+            "second settle must change nothing"
+        );
     }
 
     #[test]

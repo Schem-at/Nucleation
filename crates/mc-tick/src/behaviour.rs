@@ -71,7 +71,10 @@ pub struct HopperState {
 
 impl Default for HopperState {
     fn default() -> Self {
-        Self { cooldown: 0, ticked_at: -1 }
+        Self {
+            cooldown: 0,
+            ticked_at: -1,
+        }
     }
 }
 
@@ -112,7 +115,6 @@ pub struct UpdateEntry {
     cursor: usize,
 }
 
-
 /// `MC_TICK_TRACE_UPDATES=1` — every neighbour update the engine asks for.
 ///
 /// Logged where the update is *requested*, which is where the game logs its
@@ -124,21 +126,27 @@ pub(crate) fn trace_update(kind: &str, pos: Pos) {
     }
 }
 
-
 /// `MC_TICK_TRACE_WRITE=x,y,z[;...]` — every write landing on a position.
 ///
 /// A divergence that is a *write* rather than an event is invisible in both the
 /// event log and the notification log, and that is where these have been
 /// hiding. This says who touched a block and with which flags.
 pub(crate) fn trace_write(kind: &str, pos: Pos, states: &StateRegistry, to: StateId) {
-    let Some(filter) = std::env::var_os("MC_TICK_TRACE_WRITE") else { return };
+    let Some(filter) = std::env::var_os("MC_TICK_TRACE_WRITE") else {
+        return;
+    };
     let wanted = filter.to_string_lossy().split(';').any(|t| {
         let c: Vec<i32> = t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
         c.len() == 3 && c[0] == pos.x && c[1] == pos.y && c[2] == pos.z
     });
     if wanted {
-        eprintln!("[write] {kind:<14} {} {} {} -> {}", pos.x, pos.y, pos.z,
-            states.descriptor(to).unwrap_or("?"));
+        eprintln!(
+            "[write] {kind:<14} {} {} {} -> {}",
+            pos.x,
+            pos.y,
+            pos.z,
+            states.descriptor(to).unwrap_or("?")
+        );
     }
 }
 
@@ -397,7 +405,9 @@ impl<'a> TickCtx<'a> {
         // Vanilla's `maxChainedNeighborUpdates`: a circuit that keeps
         // re-notifying itself reports rather than hangs.
         const MAX_UPDATE_CASCADE: usize = 1_000_000;
-        let Some(mut pump) = self.drain.take() else { return };
+        let Some(mut pump) = self.drain.take() else {
+            return;
+        };
         let Some(table) = self.behaviours else {
             self.drain = Some(pump);
             return;
@@ -409,7 +419,9 @@ impl<'a> TickCtx<'a> {
             while let Some(entry) = self.updates.pop() {
                 pump.pending.push(entry);
             }
-            let Some(top) = pump.pending.last_mut() else { break };
+            let Some(top) = pump.pending.last_mut() else {
+                break;
+            };
             let Some((pos, from, kind)) = top.next() else {
                 pump.pending.pop();
                 continue;
@@ -493,15 +505,24 @@ impl<'a> TickCtx<'a> {
         // before tick 0 still lands on tick `delay - 1` instead of underflowing.
         // A boundary delay of 0 stays 0: it would fire in the upcoming tick's
         // block-ticks phase either way.
-        let delay = if self.boundary { delay.saturating_sub(1) } else { delay };
+        let delay = if self.boundary {
+            delay.saturating_sub(1)
+        } else {
+            delay
+        };
         self.ticks.schedule(pos, self.tick, delay, priority);
     }
 
     /// Schedule a fluid tick at `pos`, with the same boundary folding as
     /// [`TickCtx::schedule`].
     pub fn schedule_fluid(&mut self, pos: Pos, delay: u64) {
-        let delay = if self.boundary { delay.saturating_sub(1) } else { delay };
-        self.fluids.schedule(pos, self.tick, delay, TickPriority::Normal);
+        let delay = if self.boundary {
+            delay.saturating_sub(1)
+        } else {
+            delay
+        };
+        self.fluids
+            .schedule(pos, self.tick, delay, TickPriority::Normal);
     }
 
     /// Queue a block event for this tick's block-events phase.
@@ -516,7 +537,12 @@ impl<'a> TickCtx<'a> {
                 self.states.descriptor(block).unwrap_or("?")
             );
         }
-        self.events.push(BlockEvent { pos, id, param, block });
+        self.events.push(BlockEvent {
+            pos,
+            id,
+            param,
+            block,
+        });
     }
 
     /// The state at `pos`.
@@ -524,13 +550,14 @@ impl<'a> TickCtx<'a> {
         self.world.get(pos)
     }
 
-
     /// `markAndNotifyBlock`'s indirect passes: the old state's, then — after the
     /// six-neighbour shape pass — the new state's. Both, because a connection
     /// that has just gone away still has to tell what it was reaching.
     fn indirect_shapes(&mut self, pos: Pos, state: StateId) {
         let Some(table) = self.behaviours else { return };
-        let Some(behaviour) = table.get(state) else { return };
+        let Some(behaviour) = table.get(state) else {
+            return;
+        };
         let targets = behaviour.indirect_shape_targets(self.world, pos);
         for (target, from) in targets {
             trace_update("shape", target);
@@ -591,7 +618,12 @@ impl<'a> TickCtx<'a> {
         }
         self.world.set(pos, state);
         if let Some(log) = self.log.as_deref_mut() {
-            log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
+            log.push(BlockChange {
+                tick: self.tick,
+                pos,
+                from: previous,
+                to: state,
+            });
         }
         self.reconcile_ticker(pos, previous, state);
         // `LevelChunk.setBlockState`: `onRemove` runs first, and only when
@@ -656,7 +688,12 @@ impl<'a> TickCtx<'a> {
         }
         self.world.set(pos, state);
         if let Some(log) = self.log.as_deref_mut() {
-            log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
+            log.push(BlockChange {
+                tick: self.tick,
+                pos,
+                from: previous,
+                to: state,
+            });
         }
         self.reconcile_ticker(pos, previous, state);
     }
@@ -673,14 +710,18 @@ impl<'a> TickCtx<'a> {
         }
         self.world.set(pos, state);
         if let Some(log) = self.log.as_deref_mut() {
-            log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
+            log.push(BlockChange {
+                tick: self.tick,
+                pos,
+                from: previous,
+                to: state,
+            });
         }
         self.reconcile_ticker(pos, previous, state);
         self.indirect_shapes(pos, previous);
         self.updates.push(UpdateEntry::neighbor_shapes(pos));
         self.indirect_shapes(pos, state);
     }
-
 
     /// Keep the block-entity tick list in step with a write — see
     /// [`TickCtx::tickers`]. Appended in write order, which is vanilla's
@@ -775,9 +816,8 @@ impl<'a> TickCtx<'a> {
                 continue;
             }
             let (emin, emax) = crate::minecart::cart_aabb(cart.pos);
-            let hit = (0..3).all(|axis| {
-                emin[axis] < center[axis] + 0.5 && emax[axis] > center[axis] - 0.5
-            });
+            let hit = (0..3)
+                .all(|axis| emin[axis] < center[axis] + 0.5 && emax[axis] > center[axis] - 0.5);
             if hit && found.is_none_or(|prev: usize| cart.id < self.minecarts[prev].id) {
                 found = Some(index);
             }
@@ -805,7 +845,11 @@ impl<'a> TickCtx<'a> {
         }
         let cell = {
             let pos = self.minecarts[cart].pos;
-            Pos::new(pos[0].floor() as i32, pos[1].floor() as i32, pos[2].floor() as i32)
+            Pos::new(
+                pos[0].floor() as i32,
+                pos[1].floor() as i32,
+                pos[2].floor() as i32,
+            )
         };
         let inv = self.minecarts[cart]
             .inventory
@@ -821,14 +865,25 @@ impl<'a> TickCtx<'a> {
             });
         }
         if let Some(log) = self.inv_log.as_deref_mut() {
-            log.push(InventoryChange { tick: self.tick, pos: cell, slot, from, to });
+            log.push(InventoryChange {
+                tick: self.tick,
+                pos: cell,
+                slot,
+                from,
+                to,
+            });
         }
         // The same `Plane.HORIZONTAL` sweep as [`TickCtx::set_inventory_slot`].
         for dir in [Dir::North, Dir::East, Dir::South, Dir::West] {
             let neighbor = cell.offset(dir);
             self.notify(neighbor, dir.opposite());
             let state = self.world.get(neighbor);
-            if self.conductors.get(state.raw() as usize).copied().unwrap_or(false) {
+            if self
+                .conductors
+                .get(state.raw() as usize)
+                .copied()
+                .unwrap_or(false)
+            {
                 self.notify(neighbor.offset(dir), dir.opposite());
             }
         }
@@ -891,7 +946,13 @@ impl<'a> TickCtx<'a> {
             });
         }
         if let Some(log) = self.inv_log.as_deref_mut() {
-            log.push(InventoryChange { tick: self.tick, pos, slot, from, to });
+            log.push(InventoryChange {
+                tick: self.tick,
+                pos,
+                slot,
+                from,
+                to,
+            });
         }
         // `Level.updateNeighbourForOutputSignal`: the four *horizontals*, in
         // `Direction.Plane.HORIZONTAL`'s declared order — NORTH, EAST,
@@ -910,7 +971,12 @@ impl<'a> TickCtx<'a> {
             let neighbor = pos.offset(dir);
             self.notify(neighbor, dir.opposite());
             let state = self.world.get(neighbor);
-            if self.conductors.get(state.raw() as usize).copied().unwrap_or(false) {
+            if self
+                .conductors
+                .get(state.raw() as usize)
+                .copied()
+                .unwrap_or(false)
+            {
                 self.notify(neighbor.offset(dir), dir.opposite());
             }
         }
@@ -927,7 +993,12 @@ impl<'a> TickCtx<'a> {
             let neighbor = pos.offset(dir);
             self.notify(neighbor, dir.opposite());
             let state = self.world.get(neighbor);
-            if self.conductors.get(state.raw() as usize).copied().unwrap_or(false) {
+            if self
+                .conductors
+                .get(state.raw() as usize)
+                .copied()
+                .unwrap_or(false)
+            {
                 self.notify(neighbor.offset(dir), dir.opposite());
             }
         }
@@ -1310,7 +1381,11 @@ mod tests {
         let behaviour = table.get(StateId(5)).expect("registered");
         assert_eq!(behaviour.name(), "source");
         assert_eq!(
-            behaviour.redstone_power(&World::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(1, 1, 1))), Pos::new(0, 0, 0), Dir::Up),
+            behaviour.redstone_power(
+                &World::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(1, 1, 1))),
+                Pos::new(0, 0, 0),
+                Dir::Up
+            ),
             15
         );
     }
@@ -1349,7 +1424,9 @@ mod tests {
         table.register(stone, Box::new(Inert::new("stone")));
         table.note_unknown_in(&world);
 
-        let report = table.unknown_report(&states).expect("observer is unhandled");
+        let report = table
+            .unknown_report(&states)
+            .expect("observer is unhandled");
         assert!(report.contains("minecraft:observer[facing=up]"), "{report}");
         assert!(!report.contains("minecraft:stone"), "{report}");
     }
@@ -1370,7 +1447,9 @@ mod tests {
     fn unknown_report_names_blocks_not_integers() {
         // A report saying StateId(37) is not actionable; a name is.
         let mut states = StateRegistry::new();
-        let piston = states.intern("minecraft:sticky_piston[facing=east]").unwrap();
+        let piston = states
+            .intern("minecraft:sticky_piston[facing=east]")
+            .unwrap();
         let mut table = BehaviourTable::new();
         table.note_unknown(piston);
         let report = table.unknown_report(&states).unwrap();

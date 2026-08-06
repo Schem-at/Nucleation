@@ -59,6 +59,12 @@ pub struct Structure {
     /// caller turns these into engine inventories at load time — the parser
     /// does not know how many slots a barrel has.
     pub inventories: Vec<(Pos, Vec<crate::inventory::ItemStack>)>,
+    /// Per-container insertion restrictions.
+    ///
+    /// This is the crafter block entity's `disabled_slots` int array, encoded
+    /// as a bit mask so an empty disabled slot survives parsing without being
+    /// forged into an item stack.
+    pub inventory_blocked_slots: Vec<(Pos, u16)>,
     /// Comparator block-entity output strengths, from `nbt` `OutputSignal`.
     ///
     /// What a comparator *emits* until it next re-evaluates. A door saved with
@@ -250,6 +256,21 @@ pub struct SpawnedBody {
     /// door's saved riders carry a finite gravity velocity beside vehicles whose
     /// velocity is NaN, and why the number is not evidence that they fall.
     pub motion: [f64; 3],
+    /// Whether the entity compound carried a vanilla leash attachment.
+    ///
+    /// Both the current lowercase `leash` tag and the legacy `Leash` compound
+    /// count. The target is deliberately not interpreted here: a litematic
+    /// preserves a fence knot's source-world coordinates even though it stores
+    /// the entity position relative to its region. The simulation only needs
+    /// the attachment's presence for the narrowly supported parked-boat case.
+    pub leashed: bool,
+    /// Entities riding this body.
+    ///
+    /// A boat passenger is just as load-bearing as a minecart passenger, so it
+    /// cannot be dropped merely because this motion class is represented as a
+    /// frozen body. The rider's authored position is retained for diagnostics;
+    /// simulation derives its live position from the measured seat.
+    pub passengers: Vec<SpawnedEntity>,
 }
 
 /// One authored item entity.
@@ -420,6 +441,14 @@ impl Structure {
         }
         placed
     }
+
+    /// Insertion-restriction mask authored for the container at `pos`.
+    pub fn blocked_slots_at(&self, pos: Pos) -> u16 {
+        self.inventory_blocked_slots
+            .iter()
+            .find_map(|(candidate, mask)| (*candidate == pos).then_some(*mask))
+            .unwrap_or(0)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -577,6 +606,29 @@ impl<'a> Parser<'a> {
     /// `[a, b, c]` of integers.
     fn int_list(&mut self) -> Result<Vec<i64>, StructureError> {
         self.eat(b'[')?;
+        let mut out = Vec::new();
+        loop {
+            if self.peek() == Some(b']') {
+                self.at += 1;
+                return Ok(out);
+            }
+            out.push(self.int()?);
+            match self.peek() {
+                Some(b',') => self.at += 1,
+                Some(b']') => {}
+                _ => return self.err("expected `,` or `]`"),
+            }
+        }
+    }
+
+    /// An NBT int array (`[I; 0, 2]`), also accepting a plain integer list for
+    /// hand-written fixtures.
+    fn int_array(&mut self) -> Result<Vec<i64>, StructureError> {
+        self.eat(b'[')?;
+        if self.peek() == Some(b'I') {
+            self.at += 1;
+            self.eat(b';')?;
+        }
         let mut out = Vec::new();
         loop {
             if self.peek() == Some(b']') {
@@ -776,7 +828,13 @@ impl<'a> Parser<'a> {
         match crate::entity::entity_behaviour(&id).map(crate::entity_kind::EntityBehaviour::motion)
         {
             Some(crate::entity_kind::EntityMotion::Frozen) => {
-                Ok(SpawnedEntity::Body(SpawnedBody { kind: id, pos, motion }))
+                Ok(SpawnedEntity::Body(SpawnedBody {
+                    kind: id,
+                    pos,
+                    motion,
+                    leashed: false,
+                    passengers: Vec::new(),
+                }))
             }
             _ => Err(StructureError::UnsupportedEntity {
                 entity_type: if id.is_empty() { "<no id>".to_string() } else { id },
@@ -798,6 +856,7 @@ impl<'a> Parser<'a> {
         let mut yaw = 0.0f64;
         let mut entity_id = String::new();
         let mut passengers: Vec<SpawnedEntity> = Vec::new();
+        let mut leashed = false;
         loop {
             if self.peek() == Some(b'}') {
                 self.at += 1;
@@ -864,6 +923,16 @@ impl<'a> Parser<'a> {
                                 let stack = self.item_entry()?;
                                 item = Some((stack.id, stack.count));
                             }
+                            // 26.2 writes `leash`; older saves used `Leash`.
+                            // The payload can be a block position or an entity
+                            // reference and is not portable across every
+                            // structure carrier, but its presence distinguishes
+                            // the measured tether-rest boat from a free-moving
+                            // boat whose velocity must still refuse.
+                            "leash" | "Leash" => {
+                                leashed = true;
+                                self.skip_value()?;
+                            }
                             // Riders. A list of entity compounds nested inside
                             // the vehicle's own — the one place in a world file
                             // where an entity is not at the top level, and the
@@ -911,7 +980,13 @@ impl<'a> Parser<'a> {
                 _ => self.err("item entity needs `pos` and `Item`"),
             },
             Some(crate::entity_kind::EntityMotion::Frozen) => match pos {
-                Some(pos) => Ok(SpawnedEntity::Body(SpawnedBody { kind: entity_id, pos, motion })),
+                Some(pos) => Ok(SpawnedEntity::Body(SpawnedBody {
+                    kind: entity_id,
+                    pos,
+                    motion,
+                    leashed,
+                    passengers,
+                })),
                 None => self.err("entity needs `pos`"),
             },
             // The cart classes are the one place a name still decides, and that
@@ -972,8 +1047,9 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// A block-entity `nbt` compound: the `Items` list and the comparator's
-    /// `OutputSignal`, skipping the rest.
+    /// A block-entity `nbt` compound: `Items`, crafter `disabled_slots`, the
+    /// comparator's `OutputSignal`, and a command block's `Command`, skipping
+    /// the rest.
     ///
     /// `OutputSignal` is not decoration. A comparator emits its *stored*
     /// block-entity strength rather than anything its block state carries, so a
@@ -982,16 +1058,25 @@ impl<'a> Parser<'a> {
     /// is true of a freshly placed one and false of a saved one.
     fn nbt_items(
         &mut self,
-    ) -> Result<(Vec<crate::inventory::ItemStack>, Option<u8>, Option<String>), StructureError>
+    ) -> Result<
+        (
+            Vec<crate::inventory::ItemStack>,
+            Option<u8>,
+            Option<String>,
+            Option<u16>,
+        ),
+        StructureError,
+    >
     {
         self.eat(b'{')?;
         let mut items = Vec::new();
         let mut output_signal = None;
         let mut command = None;
+        let mut blocked_slots = None;
         loop {
             if self.peek() == Some(b'}') {
                 self.at += 1;
-                return Ok((items, output_signal, command));
+                return Ok((items, output_signal, command, blocked_slots));
             }
             let key = self.key()?;
             self.eat(b':')?;
@@ -1011,6 +1096,15 @@ impl<'a> Parser<'a> {
                         self.at += 1;
                     }
                 }
+            } else if key == "disabled_slots" {
+                let mut mask = 0u16;
+                for slot in self.int_array()? {
+                    if !(0..=8).contains(&slot) {
+                        return self.err("crafter disabled slot must be in 0..=8");
+                    }
+                    mask |= 1 << slot;
+                }
+                blocked_slots = Some(mask);
             } else {
                 self.skip_value()?;
             }
@@ -1202,6 +1296,7 @@ impl<'a> Parser<'a> {
         let mut palette = None;
         let mut blocks: Option<Vec<(Pos, usize)>> = None;
         let mut inventories: Vec<(Pos, Vec<crate::inventory::ItemStack>)> = Vec::new();
+        let mut inventory_blocked_slots: Vec<(Pos, u16)> = Vec::new();
         let mut block_entities: Vec<Pos> = Vec::new();
         let mut comparator_outputs: Vec<(Pos, u8)> = Vec::new();
         let mut commands: Vec<(Pos, String)> = Vec::new();
@@ -1272,6 +1367,7 @@ impl<'a> Parser<'a> {
                         let mut items: Vec<crate::inventory::ItemStack> = Vec::new();
                         let mut output_signal: Option<u8> = None;
                         let mut command: Option<String> = None;
+                        let mut blocked_slots: Option<u16> = None;
                         let mut has_nbt = false;
                         loop {
                             if self.peek() == Some(b'}') {
@@ -1298,6 +1394,7 @@ impl<'a> Parser<'a> {
                                     items = parsed.0;
                                     output_signal = parsed.1;
                                     command = parsed.2;
+                                    blocked_slots = parsed.3;
                                     has_nbt = true;
                                 }
                                 _ => self.skip_value()?,
@@ -1309,8 +1406,11 @@ impl<'a> Parser<'a> {
                         match (pos, state) {
                             (Some(p), Some(s)) => {
                                 entries.push((p, s));
-                                if !items.is_empty() {
+                                if !items.is_empty() || blocked_slots.is_some() {
                                     inventories.push((p, items));
+                                }
+                                if let Some(mask) = blocked_slots {
+                                    inventory_blocked_slots.push((p, mask));
                                 }
                                 if has_nbt {
                                     block_entities.push(p);
@@ -1343,6 +1443,7 @@ impl<'a> Parser<'a> {
             palette: palette.ok_or(StructureError::Missing("palette"))?,
             blocks: blocks.ok_or(StructureError::Missing("blocks"))?,
             inventories,
+            inventory_blocked_slots,
             comparator_outputs,
             commands,
             block_entities,
@@ -1401,6 +1502,29 @@ mod tests {
         assert_eq!(s.size, (3, 2, 1));
         assert_eq!(s.blocks.len(), 2);
         assert_eq!(s.blocks[1], (Pos::new(1, 1, 0), 1));
+    }
+
+    #[test]
+    fn a_crafter_keeps_empty_disabled_slots_as_inventory_state() {
+        let text = r#"{
+            DataVersion: 4903,
+            size: [1, 1, 1],
+            palette: [{
+                Name: "minecraft:crafter",
+                Properties: {crafting: "false", orientation: "west_up", triggered: "false"}
+            }],
+            blocks: [{
+                pos: [0, 0, 0],
+                state: 0,
+                nbt: {Items: [], disabled_slots: [I; 0, 4]}
+            }],
+            entities: []
+        }"#;
+        let parsed = Structure::parse(text).expect("crafter block entity parses");
+        let pos = Pos::new(0, 0, 0);
+        assert_eq!(parsed.inventories, vec![(pos, Vec::new())]);
+        assert_eq!(parsed.blocked_slots_at(pos), (1 << 0) | (1 << 4));
+        assert_eq!(parsed.inventory_blocked_slots, vec![(pos, 17)]);
     }
 
     #[test]
@@ -1756,6 +1880,103 @@ mod tests {
         assert_eq!(s.entities[6].kind(), "minecraft:armor_stand");
         // None of them are items, so none reach the item-entity view.
         assert!(s.item_entities.is_empty());
+    }
+
+    /// The exact entity state from `boat_fence.litematic`.
+    ///
+    /// The lowercase `leash` array is the 26.2 spelling. Its source-world
+    /// coordinates are not useful after the litematic is moved, but the tag's
+    /// presence is: it distinguishes a tether-rest correction from an
+    /// unsupported free boat with the same nonzero Motion.
+    #[test]
+    fn the_boat_fence_entity_keeps_its_leash_and_motion() {
+        const TEXT: &str = r#"{
+            DataVersion: 4903,
+            size: [3, 7, 5],
+            palette: [{Name: "minecraft:oak_fence"}],
+            blocks: [{pos: [1, 6, 3], state: 0}],
+            entities: [{
+                pos: [1.488202109234411d, 0.04504328578133254d, 2.8126012571156025d],
+                blockPos: [1, 0, 2],
+                nbt: {
+                    id: "minecraft:oak_boat",
+                    Motion: [
+                        -0.00000000000000043238883150846266d,
+                        0.011681267954871115d,
+                        -0.00000000000000000000000000000000000000000000000000000000000000000000000000000000000036110308073897784d
+                    ],
+                    leash: [I; -23, -52, -46]
+                }
+            }]
+        }"#;
+
+        let structure = Structure::parse(TEXT).expect("the supplied boat fixture parses");
+        let SpawnedEntity::Body(boat) = &structure.entities[0] else {
+            panic!("expected the oak boat to remain a body");
+        };
+        assert_eq!(boat.kind, "minecraft:oak_boat");
+        assert!(boat.leashed, "the 26.2 lowercase leash tag was dropped");
+        assert_eq!(
+            boat.motion,
+            [
+                -4.323_888_315_084_626_6e-16,
+                0.011_681_267_954_871_115,
+                -3.611_030_807_389_778_4e-85,
+            ]
+        );
+        assert!(boat.passengers.is_empty());
+    }
+
+    /// A representative boat/rider pair from `Elevator Decorated.litematic`.
+    ///
+    /// Litematica keeps the nested rider's source-world `Pos` while the
+    /// top-level boat is region-relative. That mismatch is harmless: vanilla
+    /// and this engine both derive the live passenger position from the
+    /// vehicle seat. What must survive parsing is the relationship itself.
+    #[test]
+    fn the_elevator_boat_keeps_its_silverfish_passenger() {
+        const TEXT: &str = r#"{
+            DataVersion: 4903,
+            size: [23, 146, 31],
+            palette: [{Name: "minecraft:stone"}],
+            blocks: [],
+            entities: [{
+                pos: [5.6875d, 61.0625d, 16.748073537581092d],
+                nbt: {
+                    id: "minecraft:pale_oak_boat",
+                    UUID: [I; -2028611585, -1291040436, -1882018199, 1996411432],
+                    Motion: [-5e-324d, 0.0d, -0.000005059650645427016d],
+                    leash: {UUID: [I; -1279546162, 300368672, -1901651432, 933286764]},
+                    Passengers: [{
+                        id: "minecraft:silverfish",
+                        UUID: [I; 1031472237, 1891585571, -1719794062, 603555933],
+                        Pos: [-103.3125d, 4.25d, 128.7480735375811d],
+                        Motion: [-0.00455000002942979d, -0.0784000015258789d, 0.0000004362258015156135d]
+                    }]
+                }
+            }]
+        }"#;
+
+        let structure = Structure::parse(TEXT).expect("the elevator pair parses");
+        let SpawnedEntity::Body(boat) = &structure.entities[0] else {
+            panic!("expected a pale-oak boat body");
+        };
+        assert_eq!(boat.kind, "minecraft:pale_oak_boat");
+        assert!(boat.leashed);
+        assert_eq!(boat.passengers.len(), 1);
+        let SpawnedEntity::Body(rider) = &boat.passengers[0] else {
+            panic!("expected a frozen silverfish rider");
+        };
+        assert_eq!(rider.kind, "minecraft:silverfish");
+        assert_eq!(rider.pos, [-103.3125, 4.25, 128.748_073_537_581_1]);
+        assert_eq!(
+            rider.motion,
+            [
+                -0.004_550_000_029_429_79,
+                -0.078_400_001_525_878_9,
+                4.362_258_015_156_135e-7,
+            ]
+        );
     }
 
     /// A type with no representation at all is refused by name, in its own

@@ -49,14 +49,30 @@ fn cell_set(cells: &[Pos]) -> BTreeSet<(i32, i32, i32)> {
 #[test]
 fn canonical_engine_is_the_whole_six_block_machine() {
     let graph = graph_of(&corpus("flying_machine.snbt"));
-    assert!(!graph.rejected(), "the canonical flying machine must not be rejected");
-    assert_eq!(graph.engines.len(), 1, "one engine, not {}", graph.engines.len());
+    assert!(
+        !graph.rejected(),
+        "the canonical flying machine must not be rejected"
+    );
+    assert_eq!(
+        graph.engines.len(),
+        1,
+        "one engine, not {}",
+        graph.engines.len()
+    );
 
     let engine = cell_set(&graph.engines[0].cells);
     let expected: BTreeSet<(i32, i32, i32)> = (0..6).map(|x| (x, 0, 0)).collect();
     assert_eq!(engine, expected, "engine must be all six blocks");
-    assert!(graph.payload.is_empty(), "a minimal engine carries nothing: {:?}", graph.payload);
-    assert!(graph.dead_weight.is_empty(), "no dead weight: {:?}", graph.dead_weight);
+    assert!(
+        graph.payload.is_empty(),
+        "a minimal engine carries nothing: {:?}",
+        graph.payload
+    );
+    assert!(
+        graph.dead_weight.is_empty(),
+        "no dead weight: {:?}",
+        graph.dead_weight
+    );
 }
 
 /// The other half of the canonical test: bolt cargo on and the *engine must not
@@ -83,7 +99,10 @@ fn engine_holds_fixed_while_the_payload_grows() {
     let bare = graph_of(&corpus("flying_machine.snbt"));
     let loaded = graph_of(with_cargo);
 
-    assert!(!loaded.rejected(), "a loaded flying machine must not be rejected");
+    assert!(
+        !loaded.rejected(),
+        "a loaded flying machine must not be rejected"
+    );
     assert_eq!(loaded.engines.len(), 1);
 
     let bare_engine = cell_set(&bare.engines[0].cells);
@@ -105,8 +124,14 @@ fn engine_holds_fixed_while_the_payload_grows() {
 #[test]
 fn the_east_variant_classifies_as_one_engine_too() {
     let graph = graph_of(&corpus("flying_machine_east.snbt"));
-    assert!(!graph.rejected(), "flying_machine_east must not be rejected");
-    assert!(!graph.engines.is_empty(), "flying_machine_east has an engine");
+    assert!(
+        !graph.rejected(),
+        "flying_machine_east must not be rejected"
+    );
+    assert!(
+        !graph.engines.is_empty(),
+        "flying_machine_east has an engine"
+    );
 }
 
 /* ------------------------------------------------------------- the graph */
@@ -118,7 +143,11 @@ fn honey_and_slime_are_separate_groups() {
         {Name: \"minecraft:slime_block\"}, {Name: \"minecraft:honey_block\"}], \
         blocks: [{pos: [0, 0, 0], state: 0}, {pos: [1, 0, 0], state: 1}], entities: []}";
     let graph = graph_of(snbt);
-    assert_eq!(graph.groups.len(), 2, "slime and honey must not share a group");
+    assert_eq!(
+        graph.groups.len(),
+        2,
+        "slime and honey must not share a group"
+    );
 }
 
 /// A piston's `pushes` edge comes from `resolve_push`, so the twelve-block limit
@@ -143,7 +172,10 @@ fn the_push_limit_is_inherited_not_reimplemented() {
         .expect("one piston");
     assert!(!piston.can_extend, "thirteen blocks is over MAX_PUSH_DEPTH");
     assert!(
-        graph.rejections.iter().any(|r| r.code == "all_pistons_blocked"),
+        graph
+            .rejections
+            .iter()
+            .any(|r| r.code == "all_pistons_blocked"),
         "a machine whose only piston is over the limit is provably immobile"
     );
 }
@@ -159,7 +191,10 @@ fn a_piston_facing_immovable_is_rejected() {
         {pos: [0, 0, 0], state: 2}], entities: []}";
     let graph = graph_of(snbt);
     assert!(graph.rejected(), "a piston that cannot extend cannot fly");
-    assert!(graph.rejections.iter().any(|r| r.code == "all_pistons_blocked"));
+    assert!(graph
+        .rejections
+        .iter()
+        .any(|r| r.code == "all_pistons_blocked"));
 }
 
 /// A build with no piston at all cannot move.
@@ -205,8 +240,9 @@ fn ga_fitness(snbt: &str, kicks: &[Pos], ticks: u64) -> (f64, bool) {
     // `None` is the placement transient — every observer pulses once as the
     // build lands, which is the standard flying-machine starter and the protocol
     // the oracle-verified corpus capture uses. The rest are explicit kicks.
-    let starts: Vec<Option<Pos>> =
-        std::iter::once(None).chain(kicks.iter().map(|&k| Some(k))).collect();
+    let starts: Vec<Option<Pos>> = std::iter::once(None)
+        .chain(kicks.iter().map(|&k| Some(k)))
+        .collect();
     // A *corridor*, not a cube. `Structure::bounds(margin)` grows all three axes,
     // and a margin wide enough to fly down turns a 6x1x1 machine into a
     // hundred-thousand-cell world that takes longer to allocate than to tick.
@@ -221,7 +257,9 @@ fn ga_fitness(snbt: &str, kicks: &[Pos], ticks: u64) -> (f64, bool) {
             let (registry, world) = sim.registry_and_world_mut();
             structure.place(world, registry, Pos::new(0, 0, 0));
         }
-        let Ok(rb) = sim.registry_mut().intern("minecraft:redstone_block") else { continue };
+        let Ok(rb) = sim.registry_mut().intern("minecraft:redstone_block") else {
+            continue;
+        };
         mc_tick::intern_companions(sim.registry_mut());
         {
             let mut table = std::mem::take(sim.behaviours_mut());
@@ -240,7 +278,9 @@ fn ga_fitness(snbt: &str, kicks: &[Pos], ticks: u64) -> (f64, bool) {
         if start_kick.is_none() {
             sim.settle_with_order(&order);
         }
-        let Some((start_com, start_min, _, _)) = census(&sim, kick) else { continue };
+        let Some((start_com, start_min, _, _)) = census(&sim, kick) else {
+            continue;
+        };
         let mut mid_com = start_com;
         for t in 0..ticks {
             if start_kick.is_some() {
@@ -258,7 +298,9 @@ fn ga_fitness(snbt: &str, kicks: &[Pos], ticks: u64) -> (f64, bool) {
                 }
             }
         }
-        let Some((end_com, end_min, end_max, n1)) = census(&sim, kick) else { continue };
+        let Some((end_com, end_min, end_max, n1)) = census(&sim, kick) else {
+            continue;
+        };
         let disp = end_com - start_com;
         let mut penalty = 0.0;
         if disp > 0.5 && f64::from(end_min) < f64::from(start_min) + disp / 2.0 {
@@ -281,8 +323,12 @@ fn ga_fitness(snbt: &str, kicks: &[Pos], ticks: u64) -> (f64, bool) {
 
 /// `(centre x, min x, max x, count)` over every non-air cell but the kick.
 fn census(sim: &Simulation, ignore: Pos) -> Option<(f64, i32, i32, u32)> {
-    let xs: Vec<i32> =
-        sim.world().iter_non_air().filter(|(p, _)| *p != ignore).map(|(p, _)| p.x).collect();
+    let xs: Vec<i32> = sim
+        .world()
+        .iter_non_air()
+        .filter(|(p, _)| *p != ignore)
+        .map(|(p, _)| p.x)
+        .collect();
     if xs.is_empty() {
         return None;
     }
@@ -458,7 +504,10 @@ fn no_rejection_ever_discards_a_machine_that_moves() {
         sustained_false_rejects.len(),
         sustained_false_rejects.join("\n")
     );
-    assert!(rejected_total > 0, "a filter that never rejects anything is not being tested");
+    assert!(
+        rejected_total > 0,
+        "a filter that never rejects anything is not being tested"
+    );
 }
 
 /// The harness must be able to fly a machine that is known to fly — otherwise a
@@ -472,17 +521,25 @@ fn no_rejection_ever_discards_a_machine_that_moves() {
 /// throw it away, and a filter that is sound must not.
 #[test]
 fn known_good_machines_survive_both_filters() {
-    let kicks: Vec<Pos> =
-        (-1..=6).flat_map(|x| [Pos::new(x, 0, 0), Pos::new(x, 1, 0)]).collect();
+    let kicks: Vec<Pos> = (-1..=6)
+        .flat_map(|x| [Pos::new(x, 0, 0), Pos::new(x, 1, 0)])
+        .collect();
 
     let east = corpus("flying_machine_east.snbt");
     let (fit, sustained) = ga_fitness(&east, &kicks, 100);
-    assert!(fit > 9.0, "engine B travels a block every ten ticks; scored {fit:.2}");
+    assert!(
+        fit > 9.0,
+        "engine B travels a block every ten ticks; scored {fit:.2}"
+    );
     assert!(sustained, "engine B sustains flight");
 
     for name in ["flying_machine.snbt", "flying_machine_east.snbt"] {
         let graph = graph_of(&corpus(name));
-        assert!(!graph.rejected(), "{name} rejected outright: {:?}", graph.rejections);
+        assert!(
+            !graph.rejected(),
+            "{name} rejected outright: {:?}",
+            graph.rejections
+        );
         assert!(
             !graph.rejected_for_sustained(),
             "{name} rejected by the sustained filter: {:?}",
@@ -540,7 +597,8 @@ fn the_sustained_filter_keeps_every_machine_that_sustains_flight() {
             }
         }
         let flat: Vec<usize> = grid.iter().flatten().copied().collect();
-        if !flat.iter().any(|&c| (3..=6).contains(&c)) || !flat.iter().any(|&c| (7..=8).contains(&c))
+        if !flat.iter().any(|&c| (3..=6).contains(&c))
+            || !flat.iter().any(|&c| (7..=8).contains(&c))
         {
             continue;
         }
@@ -565,14 +623,20 @@ fn the_sustained_filter_keeps_every_machine_that_sustains_flight() {
             rejected += 1;
         }
         let (fit, sustained) = ga_fitness(&snbt, &kicks, 100);
-        let names: Vec<&str> =
-            grid.iter().flatten().map(|&c| ALPHABET[c]).map(short).collect();
+        let names: Vec<&str> = grid
+            .iter()
+            .flatten()
+            .map(|&c| ALPHABET[c])
+            .map(short)
+            .collect();
         let codes = graph.rejections.iter().map(|r| r.code).collect::<Vec<_>>();
         if fit > 0.5 {
             movers += 1;
             if graph.rejected() {
-                false_rejects
-                    .push(format!("[{}] scored {fit:.2}, rejected: {codes:?}", names.join(",")));
+                false_rejects.push(format!(
+                    "[{}] scored {fit:.2}, rejected: {codes:?}",
+                    names.join(",")
+                ));
             }
         }
         if sustained {
@@ -613,5 +677,8 @@ fn short(state: &str) -> &str {
     if state.is_empty() {
         return "_";
     }
-    state.split_once('[').map_or(state, |(n, _)| n).trim_start_matches("minecraft:")
+    state
+        .split_once('[')
+        .map_or(state, |(n, _)| n)
+        .trim_start_matches("minecraft:")
 }

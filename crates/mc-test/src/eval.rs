@@ -14,7 +14,11 @@ fn snapshot(sim: &Simulation) -> Snapshot {
     sim.world()
         .iter_non_air()
         .map(|(pos, id)| {
-            let descriptor = sim.registry().descriptor(id).unwrap_or("<unknown>").to_string();
+            let descriptor = sim
+                .registry()
+                .descriptor(id)
+                .unwrap_or("<unknown>")
+                .to_string();
             (pos, descriptor)
         })
         .collect()
@@ -44,7 +48,10 @@ fn restrict(snap: &Snapshot, region: Option<[[i32; 3]; 2]>) -> Snapshot {
 /// Failure diffs print at most this many lines; raise with MC_TICK_DIFF_LIMIT
 /// when authoring a case and you want the whole picture.
 fn diff_limit() -> usize {
-    std::env::var("MC_TICK_DIFF_LIMIT").ok().and_then(|v| v.parse().ok()).unwrap_or(20)
+    std::env::var("MC_TICK_DIFF_LIMIT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20)
 }
 
 fn diff(expected: &Snapshot, actual: &Snapshot) -> Vec<String> {
@@ -101,7 +108,9 @@ fn bounds_of(
         }
     }
     if count.is_none() && at_least.is_none() && at_most.is_none() {
-        return Some(format!("{what} needs \"count\", \"at_least\" or \"at_most\""));
+        return Some(format!(
+            "{what} needs \"count\", \"at_least\" or \"at_most\""
+        ));
     }
     None
 }
@@ -115,13 +124,19 @@ fn check_bounds(check: &Check, what: &str, got: usize) -> Option<String> {
 /// from a snapshot, because `peak-fill` asks this every tick.
 fn cell_filled(sim: &Simulation, pos: Pos) -> bool {
     let id = sim.world().get(pos);
-    sim.registry().descriptor(id).is_some_and(|d| d != "minecraft:air")
+    sim.registry()
+        .descriptor(id)
+        .is_some_and(|d| d != "minecraft:air")
 }
 
 /// The lowest y any entity occupies — box minimum for bodies, position for items.
 fn min_entity_y(sim: &Simulation) -> Option<f64> {
     let bodies = sim.entity_bodies().iter().map(|b| b.min[1]);
-    let items = sim.item_entities().iter().filter(|e| !e.removed).map(|e| e.pos[1]);
+    let items = sim
+        .item_entities()
+        .iter()
+        .filter(|e| !e.removed)
+        .map(|e| e.pos[1]);
     bodies.chain(items).fold(None, |acc: Option<f64>, y| {
         Some(match acc {
             None => y,
@@ -147,8 +162,16 @@ pub fn build_sim(
     motion_data_version: Option<i32>,
     label: &str,
 ) -> Simulation {
-    try_build_sim(structure, hash_origin, settle, extra_states, extra_inert, motion_data_version, label)
-        .unwrap_or_else(|report| panic!("{report}"))
+    try_build_sim(
+        structure,
+        hash_origin,
+        settle,
+        extra_states,
+        extra_inert,
+        motion_data_version,
+        label,
+    )
+    .unwrap_or_else(|report| panic!("{report}"))
 }
 
 /// [`build_sim`], reporting an unsimulable structure instead of panicking.
@@ -186,10 +209,21 @@ pub fn try_build_sim(
             .find(|(p, _)| p == pos)
             .map(|(_, e)| *e)
             .unwrap_or_else(|| panic!("{label}: inventory at {pos:?} with no block"));
-        let name = structure.palette[entry].split('[').next().unwrap_or_default().to_string();
+        let name = structure.palette[entry]
+            .split('[')
+            .next()
+            .unwrap_or_default()
+            .to_string();
         let slots = mc_tick::vanilla::container_slots(&name)
             .unwrap_or_else(|| panic!("{label}: {name} has an inventory but no slot count"));
-        sim.set_inventory(*pos, mc_tick::Inventory { slots, stacks: stacks.clone() });
+        sim.set_inventory(
+            *pos,
+            mc_tick::Inventory {
+                slots,
+                stacks: stacks.clone(),
+                blocked_slots: structure.blocked_slots_at(*pos),
+            },
+        );
     }
     // Action states (a placed redstone block) must exist before behaviours
     // and power rules bind — both key on the StateIds interned at
@@ -214,37 +248,40 @@ pub fn try_build_sim(
     // Unsupported commands (summon, data, queries) get no program: the block
     // powers on and runs nothing, like an unparseable command in game.
     for (pos, text) in &structure.commands {
-        let Some(parsed) = mc_tick::vanilla::parse_command(text) else { continue };
-        let program = match parsed {
-            mc_tick::vanilla::ParsedCommand::SetBlock { offset, state } => {
-                let state = sim.registry_mut().intern(&state).unwrap_or_else(|e| {
-                    panic!("{label}: interning command target {state}: {e:?}")
-                });
-                mc_tick::behaviour::CommandProgram::SetBlock { offset, state }
-            }
-            mc_tick::vanilla::ParsedCommand::Fill { a, b, state } => {
-                let state = sim.registry_mut().intern(&state).unwrap_or_else(|e| {
-                    panic!("{label}: interning command target {state}: {e:?}")
-                });
-                mc_tick::behaviour::CommandProgram::Fill { a, b, state }
-            }
-            mc_tick::vanilla::ParsedCommand::Summon { kind, offset, fuse } => {
-                // Leaked once per build, like the retype's item id.
-                mc_tick::behaviour::CommandProgram::Summon {
-                    kind: Box::leak(kind.into_boxed_str()),
-                    offset,
-                    fuse,
-                }
-            }
-            mc_tick::vanilla::ParsedCommand::RetypeNearestItem { radius, item } => {
-                // Leaked once per build: programs are build-time config and
-                // the id must live as long as the (Copy) program does.
-                mc_tick::behaviour::CommandProgram::RetypeNearestItem {
-                    radius,
-                    item: Box::leak(item.into_boxed_str()),
-                }
-            }
+        let Some(parsed) = mc_tick::vanilla::parse_command(text) else {
+            continue;
         };
+        let program =
+            match parsed {
+                mc_tick::vanilla::ParsedCommand::SetBlock { offset, state } => {
+                    let state = sim.registry_mut().intern(&state).unwrap_or_else(|e| {
+                        panic!("{label}: interning command target {state}: {e:?}")
+                    });
+                    mc_tick::behaviour::CommandProgram::SetBlock { offset, state }
+                }
+                mc_tick::vanilla::ParsedCommand::Fill { a, b, state } => {
+                    let state = sim.registry_mut().intern(&state).unwrap_or_else(|e| {
+                        panic!("{label}: interning command target {state}: {e:?}")
+                    });
+                    mc_tick::behaviour::CommandProgram::Fill { a, b, state }
+                }
+                mc_tick::vanilla::ParsedCommand::Summon { kind, offset, fuse } => {
+                    // Leaked once per build, like the retype's item id.
+                    mc_tick::behaviour::CommandProgram::Summon {
+                        kind: Box::leak(kind.into_boxed_str()),
+                        offset,
+                        fuse,
+                    }
+                }
+                mc_tick::vanilla::ParsedCommand::RetypeNearestItem { radius, item } => {
+                    // Leaked once per build: programs are build-time config and
+                    // the id must live as long as the (Copy) program does.
+                    mc_tick::behaviour::CommandProgram::RetypeNearestItem {
+                        radius,
+                        item: Box::leak(item.into_boxed_str()),
+                    }
+                }
+            };
         sim.set_command(*pos, program);
     }
     mc_tick::intern_companions(sim.registry_mut());
@@ -267,7 +304,8 @@ pub fn try_build_sim(
             })
             .collect();
         for id in ids {
-            sim.behaviours_mut().register(id, Box::new(mc_tick::Inert::new("case-inert")));
+            sim.behaviours_mut()
+                .register(id, Box::new(mc_tick::Inert::new("case-inert")));
         }
     }
     if let Some(report) = sim.unknown_report() {
@@ -277,8 +315,7 @@ pub fn try_build_sim(
         ));
     }
     {
-        let (physics, fluids, lava, rails) =
-            mc_tick::vanilla::environment_tables(sim.registry());
+        let (physics, fluids, lava, rails) = mc_tick::vanilla::environment_tables(sim.registry());
         let (solidity, frictions, heights, webs) = physics;
         sim.set_physics_tables(solidity, frictions, heights, webs);
         let (water_kinds, bubble_kinds) = fluids;
@@ -304,10 +341,17 @@ pub fn try_build_sim(
             // harness, so a spawn that refuses still panics rather than
             // dropping the entity.
             mc_tick::structure::SpawnedEntity::FurnaceMinecart(cart) => {
-                sim.spawn_authored_furnace_minecart(cart, None).unwrap_or_else(|e| panic!("{label}: {e}"));
+                sim.spawn_authored_furnace_minecart(cart, None)
+                    .unwrap_or_else(|e| panic!("{label}: {e}"));
             }
             mc_tick::structure::SpawnedEntity::Body(body) => {
-                sim.spawn_authored_body(body).unwrap_or_else(|e| panic!("{label}: {e}"));
+                let vehicle = sim
+                    .spawn_authored_body(body)
+                    .unwrap_or_else(|e| panic!("{label}: {e}"));
+                for rider in &body.passengers {
+                    sim.spawn_authored_rider(vehicle, rider)
+                        .unwrap_or_else(|e| panic!("{label}: {e}"));
+                }
             }
         }
     }
@@ -368,7 +412,12 @@ pub fn run_with(
 ) -> CaseResult {
     let start = std::time::Instant::now();
     let (ticks, outcome) = run_inner(structure, case, motion_data_version, options);
-    CaseResult { name: case.name.clone(), ticks, wall: start.elapsed(), outcome }
+    CaseResult {
+        name: case.name.clone(),
+        ticks,
+        wall: start.elapsed(),
+        outcome,
+    }
 }
 
 /// Wire `structure`, run `case`, and report every check that failed.
@@ -391,7 +440,11 @@ fn run_inner(
 ) -> (u64, Result<(), String>) {
     let label = &case.name;
     let hash_origin = Pos::new(case.origin[0], case.origin[1], case.origin[2]);
-    let action_states: Vec<String> = case.actions.iter().filter_map(|a| a.state.clone()).collect();
+    let action_states: Vec<String> = case
+        .actions
+        .iter()
+        .filter_map(|a| a.state.clone())
+        .collect();
     let mut sim = build_sim(
         structure,
         hash_origin,
@@ -455,101 +508,113 @@ fn run_inner(
     // The rest may bail early (a malformed check, an impossible action); the
     // closure keeps `?` working while the horizon still reaches the caller.
     let outcome = (|| -> Result<(), String> {
-    // `peak-fill` watches its cells on every tick, so its cell lists are parsed
-    // once up front — a typo in one should fail before the run, not after it.
-    let mut watched: Vec<(usize, Vec<Pos>, usize)> = Vec::new();
-    for (index, check) in case.checks.iter().enumerate() {
-        if check.expect != Expect::PeakFill {
-            continue;
+        // `peak-fill` watches its cells on every tick, so its cell lists are parsed
+        // once up front — a typo in one should fail before the run, not after it.
+        let mut watched: Vec<(usize, Vec<Pos>, usize)> = Vec::new();
+        for (index, check) in case.checks.iter().enumerate() {
+            if check.expect != Expect::PeakFill {
+                continue;
+            }
+            let cells = check
+                .cells
+                .as_ref()
+                .ok_or_else(|| format!("{label}: \"peak-fill\" needs a \"cells\" list"))?;
+            let parsed: Vec<Pos> = cells
+                .iter()
+                .map(|key| parse_pos(key).map_err(|e| format!("{label}: {e}")))
+                .collect::<Result<_, _>>()?;
+            watched.push((index, parsed, 0));
         }
-        let cells = check
-            .cells
-            .as_ref()
-            .ok_or_else(|| format!("{label}: \"peak-fill\" needs a \"cells\" list"))?;
-        let parsed: Vec<Pos> = cells
-            .iter()
-            .map(|key| parse_pos(key).map_err(|e| format!("{label}: {e}")))
-            .collect::<Result<_, _>>()?;
-        watched.push((index, parsed, 0));
-    }
 
-    let mut failures: Vec<String> = Vec::new();
-    // For the diagnostic dump: the first tick that pushed a failure.
-    let mut first_failing_tick: Option<u64> = None;
-    for tick in 0..=horizon {
-        let failures_before = failures.len();
-        for (_, cells, peak) in watched.iter_mut() {
-            let filled = cells.iter().filter(|pos| cell_filled(&sim, **pos)).count();
-            *peak = (*peak).max(filled);
-        }
-        // Checks first: a check at T sees the world after exactly T ticks,
-        // before any action scheduled at T fires.
-        for (index, check) in case.checks.iter().enumerate().filter(|(_, c)| c.tick == tick) {
-            let now = snapshot(&sim);
-            at_tick.entry(tick).or_insert_with(|| now.clone());
-            let (want, got) = match check.expect {
-                Expect::Initial => (restrict(&initial, check.region), restrict(&now, check.region)),
-                Expect::Changed => {
-                    if restrict(&initial, check.region) == restrict(&now, check.region) {
-                        failures.push(format!(
+        let mut failures: Vec<String> = Vec::new();
+        // For the diagnostic dump: the first tick that pushed a failure.
+        let mut first_failing_tick: Option<u64> = None;
+        for tick in 0..=horizon {
+            let failures_before = failures.len();
+            for (_, cells, peak) in watched.iter_mut() {
+                let filled = cells.iter().filter(|pos| cell_filled(&sim, **pos)).count();
+                *peak = (*peak).max(filled);
+            }
+            // Checks first: a check at T sees the world after exactly T ticks,
+            // before any action scheduled at T fires.
+            for (index, check) in case
+                .checks
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| c.tick == tick)
+            {
+                let now = snapshot(&sim);
+                at_tick.entry(tick).or_insert_with(|| now.clone());
+                let (want, got) = match check.expect {
+                    Expect::Initial => (
+                        restrict(&initial, check.region),
+                        restrict(&now, check.region),
+                    ),
+                    Expect::Changed => {
+                        if restrict(&initial, check.region) == restrict(&now, check.region) {
+                            failures.push(format!(
                             "{label}: tick {tick}: expected the world to have changed from initial, but it is identical"
                         ));
-                    }
-                    continue;
-                }
-                Expect::SameAs => {
-                    let reference_tick = check.as_tick.ok_or_else(|| {
-                        format!("{label}: tick {tick}: \"same-as\" needs \"as_tick\"")
-                    })?;
-                    let reference = at_tick.get(&reference_tick).ok_or_else(|| {
-                        format!(
-                            "{label}: tick {tick}: as_tick {reference_tick} has no snapshot — \
-                             it must be an earlier check's tick"
-                        )
-                    })?;
-                    (restrict(reference, check.region), restrict(&now, check.region))
-                }
-                Expect::Blocks => {
-                    let blocks = check.blocks.as_ref().ok_or_else(|| {
-                        format!("{label}: tick {tick}: \"blocks\" needs a \"blocks\" map")
-                    })?;
-                    for (key, want) in blocks {
-                        let pos = parse_pos(key)
-                            .map_err(|e| format!("{label}: tick {tick}: {e}"))?;
-                        let got = now.get(&pos).map(String::as_str).unwrap_or("minecraft:air");
-                        if !state_matches(want, got) {
-                            failures.push(format!(
-                                "{label}: tick {tick}: at {key}: expected {want}, got {got}"
-                            ));
                         }
+                        continue;
                     }
-                    continue;
-                }
-                Expect::Entities => {
-                    let expects = check.entities.as_ref().ok_or_else(|| {
-                        format!("{label}: tick {tick}: \"entities\" needs an \"entities\" list")
-                    })?;
-                    for expect in expects {
-                        let inside = |pos: [f64; 3], region: [[i32; 3]; 2]| {
-                            (0..3).all(|i| {
-                                pos[i] >= f64::from(region[0][i]) && pos[i] < f64::from(region[1][i] + 1)
-                            })
-                        };
-                        let carries = |entity_id: u32| {
-                            let held = sim.item_contents(entity_id).unwrap_or(&[]);
-                            let listed = match &expect.with_contents {
-                                None => true,
-                                Some(wanted) => wanted.iter().all(|w| {
-                                    held.iter().any(|s| s.id == w.id && s.count == w.count)
-                                }),
+                    Expect::SameAs => {
+                        let reference_tick = check.as_tick.ok_or_else(|| {
+                            format!("{label}: tick {tick}: \"same-as\" needs \"as_tick\"")
+                        })?;
+                        let reference = at_tick.get(&reference_tick).ok_or_else(|| {
+                            format!(
+                                "{label}: tick {tick}: as_tick {reference_tick} has no snapshot — \
+                             it must be an earlier check's tick"
+                            )
+                        })?;
+                        (
+                            restrict(reference, check.region),
+                            restrict(&now, check.region),
+                        )
+                    }
+                    Expect::Blocks => {
+                        let blocks = check.blocks.as_ref().ok_or_else(|| {
+                            format!("{label}: tick {tick}: \"blocks\" needs a \"blocks\" map")
+                        })?;
+                        for (key, want) in blocks {
+                            let pos =
+                                parse_pos(key).map_err(|e| format!("{label}: tick {tick}: {e}"))?;
+                            let got = now.get(&pos).map(String::as_str).unwrap_or("minecraft:air");
+                            if !state_matches(want, got) {
+                                failures.push(format!(
+                                    "{label}: tick {tick}: at {key}: expected {want}, got {got}"
+                                ));
+                            }
+                        }
+                        continue;
+                    }
+                    Expect::Entities => {
+                        let expects = check.entities.as_ref().ok_or_else(|| {
+                            format!("{label}: tick {tick}: \"entities\" needs an \"entities\" list")
+                        })?;
+                        for expect in expects {
+                            let inside = |pos: [f64; 3], region: [[i32; 3]; 2]| {
+                                (0..3).all(|i| {
+                                    pos[i] >= f64::from(region[0][i])
+                                        && pos[i] < f64::from(region[1][i] + 1)
+                                })
                             };
-                            let empty = match expect.empty_contents {
-                                Some(true) => held.iter().all(|s| s.count == 0),
-                                _ => true,
+                            let carries = |entity_id: u32| {
+                                let held = sim.item_contents(entity_id).unwrap_or(&[]);
+                                let listed = match &expect.with_contents {
+                                    None => true,
+                                    Some(wanted) => wanted.iter().all(|w| {
+                                        held.iter().any(|s| s.id == w.id && s.count == w.count)
+                                    }),
+                                };
+                                let empty = match expect.empty_contents {
+                                    Some(true) => held.iter().all(|s| s.count == 0),
+                                    _ => true,
+                                };
+                                listed && empty
                             };
-                            listed && empty
-                        };
-                        let (found, total) = match (&expect.item, &expect.kind) {
+                            let (found, total) = match (&expect.item, &expect.kind) {
                             (Some(item), None) => sim
                                 .item_entities()
                                 .iter()
@@ -577,257 +642,301 @@ fn run_inner(
                                 ))
                             }
                         };
-                        let ok = match expect.count {
-                            Some(count) => found == count,
-                            None => found > 0 || expect.items_total == Some(0),
-                        };
-                        if !ok {
-                            let what = expect.item.as_deref().or(expect.kind.as_deref()).unwrap_or("?");
-                            failures.push(format!(
+                            let ok = match expect.count {
+                                Some(count) => found == count,
+                                None => found > 0 || expect.items_total == Some(0),
+                            };
+                            if !ok {
+                                let what = expect
+                                    .item
+                                    .as_deref()
+                                    .or(expect.kind.as_deref())
+                                    .unwrap_or("?");
+                                failures.push(format!(
                                 "{label}: tick {tick}: expected {} {what} in {:?}, found {found}",
                                 expect.count.map_or("at least 1".to_string(), |c| c.to_string()),
                                 expect.region,
                             ));
-                        }
-                        if let Some(want_total) = expect.items_total {
-                            if total != want_total {
-                                let what = expect.item.as_deref().unwrap_or("?");
-                                failures.push(format!(
+                            }
+                            if let Some(want_total) = expect.items_total {
+                                if total != want_total {
+                                    let what = expect.item.as_deref().unwrap_or("?");
+                                    failures.push(format!(
                                     "{label}: tick {tick}: expected {want_total} {what} in total in {:?}, found {total} across {found} entities",
                                     expect.region,
                                 ));
+                                }
                             }
                         }
+                        continue;
                     }
-                    continue;
-                }
-                Expect::Air => {
-                    let region = check.region.ok_or_else(|| {
-                        format!("{label}: tick {tick}: \"air\" needs a \"region\"")
-                    })?;
-                    let blocking = restrict(&now, Some(region));
-                    if !blocking.is_empty() {
-                        let mut lines: Vec<String> =
-                            blocking.iter().map(|(p, d)| format!("  {p:?}: {d}")).collect();
-                        lines.truncate(diff_limit());
-                        failures.push(format!(
-                            "{label}: tick {tick}: expected region air, found {} blocks:\n{}",
-                            blocking.len(),
-                            lines.join("\n")
-                        ));
-                    }
-                    continue;
-                }
-                Expect::Quiescent => {
-                    if !sim.is_quiescent() {
-                        failures.push(format!(
-                            "{label}: tick {tick}: expected the machine to be at rest, but \
-                             something is still pending — this run has not finished"
-                        ));
-                    }
-                    continue;
-                }
-                Expect::EntityCount => {
-                    let got = sim.entity_bodies().len();
-                    if let Some(why) = check_bounds(check, "the entity count", got) {
-                        failures.push(format!("{label}: tick {tick}: {why}"));
-                    }
-                    continue;
-                }
-                Expect::Changes => {
-                    let got = sim.recorded().len();
-                    if let Some(why) = check_bounds(check, "the block-change count", got) {
-                        failures.push(format!("{label}: tick {tick}: {why}"));
-                    }
-                    continue;
-                }
-                Expect::Fill => {
-                    let cells = check.cells.as_ref().ok_or_else(|| {
-                        format!("{label}: tick {tick}: \"fill\" needs a \"cells\" list")
-                    })?;
-                    let mut filled = 0usize;
-                    let mut detail: Vec<String> = Vec::new();
-                    for key in cells {
-                        let pos =
-                            parse_pos(key).map_err(|e| format!("{label}: tick {tick}: {e}"))?;
-                        match now.get(&pos) {
-                            Some(descriptor) => {
-                                filled += 1;
-                                detail.push(format!("  {key}: {descriptor}"));
-                            }
-                            None => detail.push(format!("  {key}: air")),
-                        }
-                    }
-                    if let Some(why) =
-                        check_bounds(check, &format!("the fill of {} cells", cells.len()), filled)
-                    {
-                        detail.truncate(diff_limit());
-                        failures.push(format!(
-                            "{label}: tick {tick}: {why}\n{}",
-                            detail.join("\n")
-                        ));
-                    }
-                    continue;
-                }
-                Expect::PeakFill => {
-                    let (_, cells, peak) = watched
-                        .iter()
-                        .find(|(i, _, _)| *i == index)
-                        .expect("every peak-fill check is watched");
-                    if let Some(why) = check_bounds(
-                        check,
-                        &format!("the widest the {} cells ever got", cells.len()),
-                        *peak,
-                    ) {
-                        failures.push(format!("{label}: tick {tick}: {why}"));
-                    }
-                    continue;
-                }
-                Expect::MinEntityY => {
-                    let floor = check.y.ok_or_else(|| {
-                        format!("{label}: tick {tick}: \"min-entity-y\" needs a \"y\"")
-                    })?;
-                    if let Some(low) = min_entity_y(&sim) {
-                        if low < floor {
+                    Expect::Air => {
+                        let region = check.region.ok_or_else(|| {
+                            format!("{label}: tick {tick}: \"air\" needs a \"region\"")
+                        })?;
+                        let blocking = restrict(&now, Some(region));
+                        if !blocking.is_empty() {
+                            let mut lines: Vec<String> = blocking
+                                .iter()
+                                .map(|(p, d)| format!("  {p:?}: {d}"))
+                                .collect();
+                            lines.truncate(diff_limit());
                             failures.push(format!(
-                                "{label}: tick {tick}: an entity sits at y={low}, below the \
-                                 y={floor} floor — something left through the bottom"
+                                "{label}: tick {tick}: expected region air, found {} blocks:\n{}",
+                                blocking.len(),
+                                lines.join("\n")
                             ));
                         }
+                        continue;
                     }
-                    continue;
-                }
-                Expect::Riders => {
-                    let kind = check.kind.as_ref().ok_or_else(|| {
-                        format!("{label}: tick {tick}: \"riders\" needs a \"kind\"")
-                    })?;
-                    let want_seats = check.seats.as_ref().ok_or_else(|| {
-                        format!("{label}: tick {tick}: \"riders\" needs a \"seats\" list")
-                    })?;
-                    let mut seats: Vec<f64> = Vec::new();
-                    for (_, got_kind, pos) in sim.riders() {
-                        if &got_kind != kind {
+                    Expect::Quiescent => {
+                        if !sim.is_quiescent() {
                             failures.push(format!(
+                                "{label}: tick {tick}: expected the machine to be at rest, but \
+                             something is still pending — this run has not finished"
+                            ));
+                        }
+                        continue;
+                    }
+                    Expect::EntityCount => {
+                        let got = sim.entity_bodies().len();
+                        if let Some(why) = check_bounds(check, "the entity count", got) {
+                            failures.push(format!("{label}: tick {tick}: {why}"));
+                        }
+                        continue;
+                    }
+                    Expect::Changes => {
+                        let got = sim.recorded().len();
+                        if let Some(why) = check_bounds(check, "the block-change count", got) {
+                            failures.push(format!("{label}: tick {tick}: {why}"));
+                        }
+                        continue;
+                    }
+                    Expect::Fill => {
+                        let cells = check.cells.as_ref().ok_or_else(|| {
+                            format!("{label}: tick {tick}: \"fill\" needs a \"cells\" list")
+                        })?;
+                        let mut filled = 0usize;
+                        let mut detail: Vec<String> = Vec::new();
+                        for key in cells {
+                            let pos =
+                                parse_pos(key).map_err(|e| format!("{label}: tick {tick}: {e}"))?;
+                            match now.get(&pos) {
+                                Some(descriptor) => {
+                                    filled += 1;
+                                    detail.push(format!("  {key}: {descriptor}"));
+                                }
+                                None => detail.push(format!("  {key}: air")),
+                            }
+                        }
+                        if let Some(why) = check_bounds(
+                            check,
+                            &format!("the fill of {} cells", cells.len()),
+                            filled,
+                        ) {
+                            detail.truncate(diff_limit());
+                            failures.push(format!(
+                                "{label}: tick {tick}: {why}\n{}",
+                                detail.join("\n")
+                            ));
+                        }
+                        continue;
+                    }
+                    Expect::PeakFill => {
+                        let (_, cells, peak) = watched
+                            .iter()
+                            .find(|(i, _, _)| *i == index)
+                            .expect("every peak-fill check is watched");
+                        if let Some(why) = check_bounds(
+                            check,
+                            &format!("the widest the {} cells ever got", cells.len()),
+                            *peak,
+                        ) {
+                            failures.push(format!("{label}: tick {tick}: {why}"));
+                        }
+                        continue;
+                    }
+                    Expect::MinEntityY => {
+                        let floor = check.y.ok_or_else(|| {
+                            format!("{label}: tick {tick}: \"min-entity-y\" needs a \"y\"")
+                        })?;
+                        if let Some(low) = min_entity_y(&sim) {
+                            if low < floor {
+                                failures.push(format!(
+                                    "{label}: tick {tick}: an entity sits at y={low}, below the \
+                                 y={floor} floor — something left through the bottom"
+                                ));
+                            }
+                        }
+                        continue;
+                    }
+                    Expect::Riders => {
+                        let kind = check.kind.as_ref().ok_or_else(|| {
+                            format!("{label}: tick {tick}: \"riders\" needs a \"kind\"")
+                        })?;
+                        let want_seats = check.seats.as_ref().ok_or_else(|| {
+                            format!("{label}: tick {tick}: \"riders\" needs a \"seats\" list")
+                        })?;
+                        let mut seats: Vec<f64> = Vec::new();
+                        for (_, got_kind, pos) in sim.riders() {
+                            if &got_kind != kind {
+                                failures.push(format!(
                                 "{label}: tick {tick}: expected only {kind} riders, found {got_kind}"
                             ));
-                            continue;
+                                continue;
+                            }
+                            seats.push(pos[1]);
                         }
-                        seats.push(pos[1]);
-                    }
-                    seats.sort_by(f64::total_cmp);
-                    if seats.len() != want_seats.len()
-                        || seats.iter().zip(want_seats).any(|(a, b)| (a - b).abs() > 1.0e-9)
-                    {
-                        failures.push(format!(
+                        seats.sort_by(f64::total_cmp);
+                        if seats.len() != want_seats.len()
+                            || seats
+                                .iter()
+                                .zip(want_seats)
+                                .any(|(a, b)| (a - b).abs() > 1.0e-9)
+                        {
+                            failures.push(format!(
                             "{label}: tick {tick}: expected {kind} seats {want_seats:?}, got {seats:?}"
                         ));
+                        }
+                        continue;
                     }
-                    continue;
+                };
+                let mut lines = diff(&want, &got);
+                if !lines.is_empty() {
+                    let total = lines.len();
+                    lines.truncate(diff_limit());
+                    failures.push(format!(
+                        "{label}: tick {tick}: {total} blocks differ:\n{}",
+                        lines.join("\n")
+                    ));
                 }
-            };
-            let mut lines = diff(&want, &got);
-            if !lines.is_empty() {
-                let total = lines.len();
-                lines.truncate(diff_limit());
-                failures.push(format!(
-                    "{label}: tick {tick}: {total} blocks differ:\n{}",
-                    lines.join("\n")
-                ));
+            }
+            for action in case.actions.iter().filter(|a| a.tick == tick) {
+                match (&action.use_pos, &action.place, &action.state) {
+                    (Some(p), None, None) => sim.use_block(Pos::new(p[0], p[1], p[2])),
+                    (None, Some(p), Some(descriptor)) => {
+                        let state = sim
+                            .registry_mut()
+                            .intern(descriptor)
+                            .map_err(|e| format!("{label}: interning {descriptor}: {e:?}"))?;
+                        sim.place_block(Pos::new(p[0], p[1], p[2]), state);
+                    }
+                    _ => return Err(format!(
+                        "{label}: tick {tick}: an action is either \"use\" or \"place\"+\"state\""
+                    )),
+                }
+            }
+            if failures.len() > failures_before {
+                first_failing_tick.get_or_insert(tick);
+            }
+            if tick < horizon {
+                sim.step();
             }
         }
-        for action in case.actions.iter().filter(|a| a.tick == tick) {
-            match (&action.use_pos, &action.place, &action.state) {
-                (Some(p), None, None) => sim.use_block(Pos::new(p[0], p[1], p[2])),
-                (None, Some(p), Some(descriptor)) => {
-                    let state = sim
-                        .registry_mut()
-                        .intern(descriptor)
-                        .map_err(|e| format!("{label}: interning {descriptor}: {e:?}"))?;
-                    sim.place_block(Pos::new(p[0], p[1], p[2]), state);
-                }
-                _ => return Err(format!("{label}: tick {tick}: an action is either \"use\" or \"place\"+\"state\"")),
-            }
-        }
-        if failures.len() > failures_before {
-            first_failing_tick.get_or_insert(tick);
-        }
-        if tick < horizon {
-            sim.step();
-        }
-    }
 
-    // Opt-in event assertions, against the whole recorded change log. They run
-    // after the loop because `recorded()` persists everything with its tick.
-    for expect in &case.events {
-        if expect.kind != "block-changed" {
-            failures.push(format!(
+        // Opt-in event assertions, against the whole recorded change log. They run
+        // after the loop because `recorded()` persists everything with its tick.
+        for expect in &case.events {
+            if expect.kind != "block-changed" {
+                failures.push(format!(
                 "{label}: event kind {:?} is not one this runner understands (only \"block-changed\")",
                 expect.kind
             ));
-            continue;
+                continue;
+            }
+            let descriptor = |id| sim.registry().descriptor(id).unwrap_or("<unknown>");
+            let matched = sim
+                .recorded()
+                .iter()
+                .filter(|c| expect.tick.is_none_or(|t| c.tick == t + tick_base))
+                .filter(|c| expect.after.is_none_or(|a| c.tick >= a + tick_base))
+                .filter(|c| {
+                    expect
+                        .pos
+                        .is_none_or(|p| c.pos == Pos::new(p[0], p[1], p[2]))
+                })
+                .filter(|c| {
+                    expect
+                        .from
+                        .as_deref()
+                        .is_none_or(|w| state_matches(w, descriptor(c.from)))
+                })
+                .filter(|c| {
+                    expect
+                        .to
+                        .as_deref()
+                        .is_none_or(|w| state_matches(w, descriptor(c.to)))
+                })
+                .count();
+            let what = format!(
+                "the count of block-changed events{}{}{}{}{}",
+                expect
+                    .tick
+                    .map_or(String::new(), |t| format!(" at tick {t}")),
+                expect
+                    .after
+                    .map_or(String::new(), |a| format!(" from tick {a} on")),
+                expect.pos.map_or(String::new(), |p| format!(" at {p:?}")),
+                expect
+                    .from
+                    .as_deref()
+                    .map_or(String::new(), |w| format!(" from {w}")),
+                expect
+                    .to
+                    .as_deref()
+                    .map_or(String::new(), |w| format!(" to {w}")),
+            );
+            // All bounds absent means "it happened at least once".
+            let at_least = if expect.count.is_none()
+                && expect.at_least.is_none()
+                && expect.at_most.is_none()
+            {
+                Some(1)
+            } else {
+                expect.at_least
+            };
+            if let Some(why) = bounds_of(expect.count, at_least, expect.at_most, &what, matched) {
+                failures.push(format!("{label}: {why}"));
+            }
         }
-        let descriptor = |id| sim.registry().descriptor(id).unwrap_or("<unknown>");
-        let matched = sim
-            .recorded()
-            .iter()
-            .filter(|c| expect.tick.is_none_or(|t| c.tick == t + tick_base))
-            .filter(|c| expect.after.is_none_or(|a| c.tick >= a + tick_base))
-            .filter(|c| expect.pos.is_none_or(|p| c.pos == Pos::new(p[0], p[1], p[2])))
-            .filter(|c| expect.from.as_deref().is_none_or(|w| state_matches(w, descriptor(c.from))))
-            .filter(|c| expect.to.as_deref().is_none_or(|w| state_matches(w, descriptor(c.to))))
-            .count();
-        let what = format!(
-            "the count of block-changed events{}{}{}{}{}",
-            expect.tick.map_or(String::new(), |t| format!(" at tick {t}")),
-            expect.after.map_or(String::new(), |a| format!(" from tick {a} on")),
-            expect.pos.map_or(String::new(), |p| format!(" at {p:?}")),
-            expect.from.as_deref().map_or(String::new(), |w| format!(" from {w}")),
-            expect.to.as_deref().map_or(String::new(), |w| format!(" to {w}")),
-        );
-        // All bounds absent means "it happened at least once".
-        let at_least = if expect.count.is_none() && expect.at_least.is_none() && expect.at_most.is_none() {
-            Some(1)
+
+        // Diagnostics for every failure, opted into or not: the recorded block
+        // changes around the first failing tick. This is the harness answering
+        // "what actually happened" without a rerun.
+        if !failures.is_empty() {
+            let upto = first_failing_tick.unwrap_or(horizon);
+            let from = upto.saturating_sub(options.trace_window);
+            let mut log: Vec<String> = sim
+                .recorded()
+                .iter()
+                .filter(|c| c.tick >= from + tick_base && c.tick <= upto + tick_base)
+                .map(|c| {
+                    format!(
+                        "  tick {}: {:?}: {} -> {}",
+                        c.tick - tick_base,
+                        c.pos,
+                        sim.registry().descriptor(c.from).unwrap_or("<unknown>"),
+                        sim.registry().descriptor(c.to).unwrap_or("<unknown>"),
+                    )
+                })
+                .collect();
+            let total = log.len();
+            log.truncate(200);
+            failures.push(format!(
+                "{label}: event log, ticks {from}..={upto} ({total} block changes):\n{}",
+                if log.is_empty() {
+                    "  (none recorded)".to_string()
+                } else {
+                    log.join("\n")
+                }
+            ));
+        }
+
+        if failures.is_empty() {
+            Ok(())
         } else {
-            expect.at_least
-        };
-        if let Some(why) = bounds_of(expect.count, at_least, expect.at_most, &what, matched) {
-            failures.push(format!("{label}: {why}"));
+            Err(failures.join("\n"))
         }
-    }
-
-    // Diagnostics for every failure, opted into or not: the recorded block
-    // changes around the first failing tick. This is the harness answering
-    // "what actually happened" without a rerun.
-    if !failures.is_empty() {
-        let upto = first_failing_tick.unwrap_or(horizon);
-        let from = upto.saturating_sub(options.trace_window);
-        let mut log: Vec<String> = sim
-            .recorded()
-            .iter()
-            .filter(|c| c.tick >= from + tick_base && c.tick <= upto + tick_base)
-            .map(|c| {
-                format!(
-                    "  tick {}: {:?}: {} -> {}",
-                    c.tick - tick_base,
-                    c.pos,
-                    sim.registry().descriptor(c.from).unwrap_or("<unknown>"),
-                    sim.registry().descriptor(c.to).unwrap_or("<unknown>"),
-                )
-            })
-            .collect();
-        let total = log.len();
-        log.truncate(200);
-        failures.push(format!(
-            "{label}: event log, ticks {from}..={upto} ({total} block changes):\n{}",
-            if log.is_empty() { "  (none recorded)".to_string() } else { log.join("\n") }
-        ));
-    }
-
-    if failures.is_empty() {
-        Ok(())
-    } else {
-        Err(failures.join("\n"))
-    }
     })();
     (horizon, outcome)
 }

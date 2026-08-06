@@ -198,9 +198,9 @@ pub fn classify(descriptor: &str) -> PartKind {
             facing: parse_dir(prop(descriptor, "facing")),
             extended: prop(descriptor, "extended") == Some("true"),
         },
-        "minecraft:observer" => {
-            PartKind::Observer { facing: parse_dir(prop(descriptor, "facing")) }
-        }
+        "minecraft:observer" => PartKind::Observer {
+            facing: parse_dir(prop(descriptor, "facing")),
+        },
         "minecraft:slime_block" => PartKind::Slime,
         "minecraft:honey_block" => PartKind::Honey,
         _ if SOURCE_NAMES.contains(&name) => PartKind::Source,
@@ -399,7 +399,11 @@ impl MachineGraph {
 ///
 /// `movability` is the same trait object the tick loop uses, so `resolve_push`
 /// answers here exactly what it answers there.
-pub fn analyse(world: &World, registry: &StateRegistry, movability: &dyn Movability) -> MachineGraph {
+pub fn analyse(
+    world: &World,
+    registry: &StateRegistry,
+    movability: &dyn Movability,
+) -> MachineGraph {
     let table = PartTable::from_world(world, registry);
     let cells: Vec<Pos> = world.iter_non_air().map(|(p, _)| p).collect();
     if cells.is_empty() {
@@ -442,8 +446,10 @@ fn adhesion_groups(
     movability: &dyn Movability,
     cells: &[Pos],
 ) -> (Vec<Group>, HashMap<Pos, usize>) {
-    let sticky: HashMap<Pos, Option<Sticky>> =
-        cells.iter().map(|&p| (p, movability.sticky(world, p))).collect();
+    let sticky: HashMap<Pos, Option<Sticky>> = cells
+        .iter()
+        .map(|&p| (p, movability.sticky(world, p)))
+        .collect();
     let mut group_of: HashMap<Pos, usize> = HashMap::new();
     let mut groups: Vec<Group> = Vec::new();
     for &seed in cells {
@@ -461,7 +467,9 @@ fn adhesion_groups(
                 if group_of.contains_key(&next) {
                     continue;
                 }
-                let Some(&other) = sticky.get(&next) else { continue };
+                let Some(&other) = sticky.get(&next) else {
+                    continue;
+                };
                 if adheres(sticky[&pos], other) {
                     group_of.insert(next, id);
                     queue.push_back(next);
@@ -513,11 +521,15 @@ fn build_devices(
 ) -> Vec<Device> {
     let mut devices = Vec::new();
     for &pos in cells {
-        let Some(kind) = table.at(world, pos) else { continue };
+        let Some(kind) = table.at(world, pos) else {
+            continue;
+        };
         let (dk, facing, extended) = match kind {
-            PartKind::Piston { sticky, facing, extended } => {
-                (DeviceKind::Piston { sticky }, facing, extended)
-            }
+            PartKind::Piston {
+                sticky,
+                facing,
+                extended,
+            } => (DeviceKind::Piston { sticky }, facing, extended),
             PartKind::Observer { facing } => (DeviceKind::Observer, facing, false),
             PartKind::Source => (DeviceKind::Source, Dir::Up, false),
             _ => continue,
@@ -673,9 +685,10 @@ fn drive_edges(
             if target.id == src.id || !matches!(target.kind, DeviceKind::Piston { .. }) {
                 continue;
             }
-            if power_region(target.pos).into_iter().any(|c| {
-                c == emit || blobs.get(&c).is_some_and(|b| reach.contains(b))
-            }) {
+            if power_region(target.pos)
+                .into_iter()
+                .any(|c| c == emit || blobs.get(&c).is_some_and(|b| reach.contains(b)))
+            {
                 adj[src.id].push(target.id);
                 edges.push(Edge {
                     kind: EdgeKind::Powers,
@@ -806,13 +819,15 @@ fn classify_sections(graph: &mut MachineGraph, drive: &[Vec<usize>], occupied: &
         .collect();
 
     // Dead weight: neither driven nor driving.
-    let kicker_cells: HashSet<Pos> = graph.kickers.iter().map(|&i| graph.devices[i].pos).collect();
+    let kicker_cells: HashSet<Pos> = graph
+        .kickers
+        .iter()
+        .map(|&i| graph.devices[i].pos)
+        .collect();
     let mut dead: Vec<Pos> = occupied
         .iter()
         .copied()
-        .filter(|p| {
-            !engine_cells.contains(p) && !payload.contains(p) && !kicker_cells.contains(p)
-        })
+        .filter(|p| !engine_cells.contains(p) && !payload.contains(p) && !kicker_cells.contains(p))
         .collect();
     dead.sort_by_key(|p| (p.x, p.y, p.z));
     graph.dead_weight = dead;
@@ -830,7 +845,10 @@ fn self_translating(graph: &MachineGraph, set: &BTreeSet<usize>) -> bool {
             closure.extend(d.pull.iter().copied());
         }
     }
-    has_piston && set.iter().all(|&id| closure.contains(&graph.devices[id].pos))
+    has_piston
+        && set
+            .iter()
+            .all(|&id| closure.contains(&graph.devices[id].pos))
 }
 
 /// The engine's blocks: its devices plus the material that connects them.
@@ -841,7 +859,9 @@ fn self_translating(graph: &MachineGraph, set: &BTreeSet<usize>) -> bool {
 /// engine fixed while the payload varies.
 fn engine_cells_of(graph: &MachineGraph, devices: &[usize], occupied: &HashSet<Pos>) -> Vec<Pos> {
     let mut cells: BTreeSet<Pos> = devices.iter().map(|&i| graph.devices[i].pos).collect();
-    let Some(&anchor) = devices.first() else { return Vec::new() };
+    let Some(&anchor) = devices.first() else {
+        return Vec::new();
+    };
     let start = graph.devices[anchor].pos;
 
     let mut prev: HashMap<Pos, Pos> = HashMap::new();
@@ -878,7 +898,17 @@ fn simple_cycles(adj: &[Vec<usize>], max_cycles: usize, max_len: usize) -> Vec<V
     for start in 0..adj.len() {
         let mut path = vec![start];
         let mut on_path: HashSet<usize> = HashSet::from([start]);
-        walk(adj, start, start, &mut path, &mut on_path, &mut out, &mut seen, max_cycles, max_len);
+        walk(
+            adj,
+            start,
+            start,
+            &mut path,
+            &mut on_path,
+            &mut out,
+            &mut seen,
+            max_cycles,
+            max_len,
+        );
         if out.len() >= max_cycles {
             break;
         }
@@ -914,7 +944,9 @@ fn walk(
             // `next > start` keeps each cycle to one canonical rotation.
             path.push(next);
             on_path.insert(next);
-            walk(adj, start, next, path, on_path, out, seen, max_cycles, max_len);
+            walk(
+                adj, start, next, path, on_path, out, seen, max_cycles, max_len,
+            );
             on_path.remove(&next);
             path.pop();
         }
@@ -986,7 +1018,10 @@ fn reject(graph: &mut MachineGraph, drive: &[Vec<usize>]) {
     let any_can_extend = pistons.iter().any(|d| d.can_extend);
     if any_can_extend && !any_extended {
         let moves_a_device = pistons.iter().any(|p| {
-            p.push.iter().chain(p.pull.iter()).any(|c| device_cells.contains(c))
+            p.push
+                .iter()
+                .chain(p.pull.iter())
+                .any(|c| device_cells.contains(c))
         });
         if !moves_a_device {
             graph.rejections.push(Rejection {
@@ -1050,7 +1085,11 @@ impl MachineGraph {
             if i > 0 {
                 out.push(',');
             }
-            out.push_str(&format!("{{\"id\":{},\"cells\":{}}}", g.id, cells_json(&g.cells)));
+            out.push_str(&format!(
+                "{{\"id\":{},\"cells\":{}}}",
+                g.id,
+                cells_json(&g.cells)
+            ));
         }
         out.push_str("],\"devices\":[");
         for (i, d) in self.devices.iter().enumerate() {

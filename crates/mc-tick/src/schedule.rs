@@ -366,18 +366,39 @@ mod tests {
     #[test]
     fn events_drain_in_insertion_order_and_support_chaining() {
         let mut queue = EventQueue::new();
-        queue.push(BlockEvent { pos: pos(1), id: 0, param: 0, block: crate::state::StateId::AIR });
-        queue.push(BlockEvent { pos: pos(2), id: 1, param: 0, block: crate::state::StateId::AIR });
+        queue.push(BlockEvent {
+            pos: pos(1),
+            id: 0,
+            param: 0,
+            block: crate::state::StateId::AIR,
+        });
+        queue.push(BlockEvent {
+            pos: pos(2),
+            id: 1,
+            param: 0,
+            block: crate::state::StateId::AIR,
+        });
 
         let batch = queue.take();
-        assert_eq!(batch.iter().map(|e| e.pos.x).collect::<Vec<_>>(), vec![1, 2]);
+        assert_eq!(
+            batch.iter().map(|e| e.pos.x).collect::<Vec<_>>(),
+            vec![1, 2]
+        );
         assert!(queue.is_empty(), "take must leave the queue empty");
 
         // Handling a batch may enqueue the next one; that is the chaining the
         // block-events phase loops on.
-        queue.push(BlockEvent { pos: pos(3), id: 0, param: 0, block: crate::state::StateId::AIR });
+        queue.push(BlockEvent {
+            pos: pos(3),
+            id: 0,
+            param: 0,
+            block: crate::state::StateId::AIR,
+        });
         assert_eq!(queue.take().len(), 1);
-        assert!(queue.take().is_empty(), "chain terminates on an empty drain");
+        assert!(
+            queue.take().is_empty(),
+            "chain terminates on an empty drain"
+        );
     }
 
     #[test]
@@ -386,15 +407,39 @@ mod tests {
         // insertion-ordered but deduplicating. A piston notified from several
         // sides queues its extend event once, not once per side.
         let mut queue = EventQueue::new();
-        queue.push(BlockEvent { pos: pos(1), id: 0, param: 2, block: crate::state::StateId::AIR });
-        queue.push(BlockEvent { pos: pos(1), id: 0, param: 2, block: crate::state::StateId::AIR });
-        queue.push(BlockEvent { pos: pos(1), id: 1, param: 2, block: crate::state::StateId::AIR });
-        assert_eq!(queue.len(), 2, "identical events collapse, distinct ones do not");
+        queue.push(BlockEvent {
+            pos: pos(1),
+            id: 0,
+            param: 2,
+            block: crate::state::StateId::AIR,
+        });
+        queue.push(BlockEvent {
+            pos: pos(1),
+            id: 0,
+            param: 2,
+            block: crate::state::StateId::AIR,
+        });
+        queue.push(BlockEvent {
+            pos: pos(1),
+            id: 1,
+            param: 2,
+            block: crate::state::StateId::AIR,
+        });
+        assert_eq!(
+            queue.len(),
+            2,
+            "identical events collapse, distinct ones do not"
+        );
 
         // Dedup is against the *currently queued* batch only — once drained, the
         // same event may be queued again, which chained piston cycles rely on.
         queue.take();
-        queue.push(BlockEvent { pos: pos(1), id: 0, param: 2, block: crate::state::StateId::AIR });
+        queue.push(BlockEvent {
+            pos: pos(1),
+            id: 0,
+            param: 2,
+            block: crate::state::StateId::AIR,
+        });
         assert_eq!(queue.len(), 1);
     }
 

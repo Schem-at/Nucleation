@@ -9,6 +9,7 @@ license = "MIT"
 # edit->test loop, and every dependency added here is paid on every iteration for
 # the life of the project. Adding one is a decision, not a convenience.
 [dependencies]
+blake3 = "1"
 smallvec = "1"
 thiserror = "2"
 

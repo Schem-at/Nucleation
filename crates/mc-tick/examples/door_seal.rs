@@ -20,7 +20,9 @@ fn main() {
         .split(',')
         .map(|v| v.parse().unwrap())
         .collect();
-    let ticks: u64 = args[args.iter().position(|a| a == "--ticks").unwrap() + 1].parse().unwrap();
+    let ticks: u64 = args[args.iter().position(|a| a == "--ticks").unwrap() + 1]
+        .parse()
+        .unwrap();
 
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/corpus/structures")
@@ -53,17 +55,37 @@ fn main() {
         sim.set_comparator_output(*pos, *strength);
     }
     for (pos, stacks) in &structure.inventories {
-        if let Some(entry) = structure.blocks.iter().find(|(p, _)| p == pos).map(|(_, e)| *e) {
-            let name = structure.palette[entry].split('[').next().unwrap_or_default();
+        if let Some(entry) = structure
+            .blocks
+            .iter()
+            .find(|(p, _)| p == pos)
+            .map(|(_, e)| *e)
+        {
+            let name = structure.palette[entry]
+                .split('[')
+                .next()
+                .unwrap_or_default();
             if let Some(slots) = mc_tick::vanilla::container_slots(name) {
-                sim.set_inventory(*pos, mc_tick::Inventory { slots, stacks: stacks.clone() });
+                sim.set_inventory(
+                    *pos,
+                    mc_tick::Inventory {
+                        slots,
+                        stacks: stacks.clone(),
+                        blocked_slots: structure.blocked_slots_at(*pos),
+                    },
+                );
             }
         }
     }
     sim.record();
 
-    let air = sim.registry().get("minecraft:air").unwrap_or(mc_tick::StateId::AIR);
-    let (x0, x1, y0, y1, z0, z1) = (window[0], window[1], window[2], window[3], window[4], window[5]);
+    let air = sim
+        .registry()
+        .get("minecraft:air")
+        .unwrap_or(mc_tick::StateId::AIR);
+    let (x0, x1, y0, y1, z0, z1) = (
+        window[0], window[1], window[2], window[3], window[4], window[5],
+    );
     for tick in 0..ticks {
         for (pos, at) in &uses {
             if *at == tick {

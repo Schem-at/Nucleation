@@ -216,7 +216,13 @@ fn slope_distance(
             return u16::from(depth);
         }
         if depth < SLOPE_FIND_DISTANCE {
-            best = best.min(slope_distance(rules, world, target, depth + 1, dir.opposite()));
+            best = best.min(slope_distance(
+                rules,
+                world,
+                target,
+                depth + 1,
+                dir.opposite(),
+            ));
         }
     }
     best
@@ -225,11 +231,7 @@ fn slope_distance(
 /// `getSpread`: the minimum-hole-distance directions and what lands in each —
 /// the landing state is `getNewLiquid` at the target, not merely amount − 1,
 /// which is how converging flows take the stronger value.
-fn spread_directions(
-    rules: &dyn FluidWorld,
-    world: &World,
-    pos: Pos,
-) -> Vec<(Dir, WaterKind)> {
+fn spread_directions(rules: &dyn FluidWorld, world: &World, pos: Pos) -> Vec<(Dir, WaterKind)> {
     let mut best = 1000u16;
     let mut chosen: Vec<(Dir, WaterKind)> = Vec::new();
     for dir in HORIZONTALS {

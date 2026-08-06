@@ -80,11 +80,25 @@ fn main() {
         sim.set_comparator_output(*pos, *strength);
     }
     for (pos, stacks) in &structure.inventories {
-        let entry = structure.blocks.iter().find(|(p, _)| p == pos).map(|(_, e)| *e);
+        let entry = structure
+            .blocks
+            .iter()
+            .find(|(p, _)| p == pos)
+            .map(|(_, e)| *e);
         let Some(entry) = entry else { continue };
-        let name = structure.palette[entry].split('[').next().unwrap_or_default();
+        let name = structure.palette[entry]
+            .split('[')
+            .next()
+            .unwrap_or_default();
         if let Some(slots) = mc_tick::vanilla::container_slots(name) {
-            sim.set_inventory(*pos, mc_tick::Inventory { slots, stacks: stacks.clone() });
+            sim.set_inventory(
+                *pos,
+                mc_tick::Inventory {
+                    slots,
+                    stacks: stacks.clone(),
+                    blocked_slots: structure.blocked_slots_at(*pos),
+                },
+            );
         }
     }
     let order = structure.placement_order(
@@ -151,10 +165,16 @@ fn main() {
                 divergences += 1;
                 println!("tick {tick:4}: SCHEDULES DIFFER");
                 for entry in want.difference(&got) {
-                    println!("            V  ({},{},{}) fires at tick {}", entry.1, entry.2, entry.3, entry.0);
+                    println!(
+                        "            V  ({},{},{}) fires at tick {}",
+                        entry.1, entry.2, entry.3, entry.0
+                    );
                 }
                 for entry in got.difference(&want) {
-                    println!("            E  ({},{},{}) fires at tick {}", entry.1, entry.2, entry.3, entry.0);
+                    println!(
+                        "            E  ({},{},{}) fires at tick {}",
+                        entry.1, entry.2, entry.3, entry.0
+                    );
                 }
                 if !all {
                     println!("\nfirst divergence: pending schedules entering tick {tick}");
@@ -227,12 +247,22 @@ fn main() {
             .collect();
         if want != got {
             divergences += 1;
-            println!("tick {tick:4}: BLOCKS DIFFER  vanilla={} engine={}", want.len(), got.len());
+            println!(
+                "tick {tick:4}: BLOCKS DIFFER  vanilla={} engine={}",
+                want.len(),
+                got.len()
+            );
             for entry in want.difference(&got) {
-                println!("            V  ({},{},{}) {}", entry.0, entry.1, entry.2, entry.3);
+                println!(
+                    "            V  ({},{},{}) {}",
+                    entry.0, entry.1, entry.2, entry.3
+                );
             }
             for entry in got.difference(&want) {
-                println!("            E  ({},{},{}) {}", entry.0, entry.1, entry.2, entry.3);
+                println!(
+                    "            E  ({},{},{}) {}",
+                    entry.0, entry.1, entry.2, entry.3
+                );
             }
             if !all {
                 println!("\nfirst divergence: block changes during tick {tick}");

@@ -36,8 +36,7 @@ fn structure(name: &str) -> Structure {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/corpus/structures")
         .join(name);
-    let text = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     Structure::parse(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
 }
 
@@ -45,8 +44,7 @@ fn golden(name: &str) -> Trace {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/traces")
         .join(name);
-    let text = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     Trace::from_json(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
 }
 
@@ -152,7 +150,12 @@ fn engine_trace(sim: &Simulation, name: &str, ticks: u64, size: (i32, i32, i32))
                 continue;
             }
             let kind = match event {
-                mc_tick::sim::EntityEvent::Moved { id, entity_type, pos, velocity } => {
+                mc_tick::sim::EntityEvent::Moved {
+                    id,
+                    entity_type,
+                    pos,
+                    velocity,
+                } => {
                     let now = in_window(pos);
                     let was = visible.insert(*id, now).unwrap_or(true);
                     if now {
@@ -176,7 +179,10 @@ fn engine_trace(sim: &Simulation, name: &str, ticks: u64, size: (i32, i32, i32))
                     EventKind::EntityRemoved { id: *id }
                 }
             };
-            events.push(mc_tick_trace::TraceEvent { phase: "tick_end".to_string(), kind });
+            events.push(mc_tick_trace::TraceEvent {
+                phase: "tick_end".to_string(),
+                kind,
+            });
         }
         if !events.is_empty() {
             trace.ticks.push(mc_tick_trace::TickRecord { tick, events });
@@ -192,8 +198,7 @@ fn golden_entity_ids(trace: &Trace) -> Vec<u32> {
     let mut ids: Vec<u32> = Vec::new();
     for record in &trace.ticks {
         for event in &record.events {
-            if let EventKind::EntityMoved { id, .. } | EventKind::EntityRemoved { id } =
-                &event.kind
+            if let EventKind::EntityMoved { id, .. } | EventKind::EntityRemoved { id } = &event.kind
             {
                 if !ids.contains(id) {
                     ids.push(*id);
@@ -383,7 +388,11 @@ fn run_conformance_full(
             .unwrap_or_else(|| panic!("{label}: {name} has an inventory but no slot count"));
         sim.set_inventory(
             *pos,
-            mc_tick::Inventory { slots, stacks: stacks.clone() },
+            mc_tick::Inventory {
+                slots,
+                stacks: stacks.clone(),
+                blocked_slots: structure.blocked_slots_at(*pos),
+            },
         );
     }
 
@@ -440,9 +449,16 @@ fn run_conformance_full(
             // `spawn_authored_body` claims to model — it refuses one with real
             // velocity rather than flying or walking it wrongly. No id is passed
             // because a frozen body has no rest-flush cadence to line up.
-            mc_tick::structure::SpawnedEntity::Body(body) => sim
-                .spawn_authored_body(body)
-                .unwrap_or_else(|why| panic!("{label}: {why}")),
+            mc_tick::structure::SpawnedEntity::Body(body) => {
+                let vehicle = sim
+                    .spawn_authored_body(body)
+                    .unwrap_or_else(|why| panic!("{label}: {why}"));
+                for rider in &body.passengers {
+                    sim.spawn_authored_rider(vehicle, rider)
+                        .unwrap_or_else(|why| panic!("{label}: {why}"));
+                }
+                vehicle
+            }
             // A golden that contains one of these would otherwise be compared
             // against a run with the entity missing, which is worse than no
             // comparison; swap for a spawn call when the behaviour lands.
@@ -561,7 +577,10 @@ fn the_golden_traces_are_well_formed_and_from_the_right_version() {
     let trace = golden("piston_qc.json");
     assert_eq!(trace.mc_version, "26.2");
     assert_eq!(trace.format_version, mc_tick_trace::FORMAT_VERSION);
-    assert!(!trace.ticks.is_empty(), "a golden with no events proves nothing");
+    assert!(
+        !trace.ticks.is_empty(),
+        "a golden with no events proves nothing"
+    );
 }
 
 #[test]
@@ -571,7 +590,11 @@ fn piston_qc_matches_vanilla_tick_for_tick() {
 
 #[test]
 fn slime_adhesion_matches_vanilla_tick_for_tick() {
-    run_conformance("slime_drag.snbt", "slime_drag.json", "nucleation:slime_drag");
+    run_conformance(
+        "slime_drag.snbt",
+        "slime_drag.json",
+        "nucleation:slime_drag",
+    );
 }
 
 #[test]
@@ -595,7 +618,10 @@ fn the_manual_engine_runs_its_placement_cycle_tick_for_tick() {
         "nucleation:manual_engine",
         &[],
         &[],
-        Some(mc_tick::Bounds::new(Pos::new(0, -4, 0), Pos::new(15, 7, 15))),
+        Some(mc_tick::Bounds::new(
+            Pos::new(0, -4, 0),
+            Pos::new(15, 7, 15),
+        )),
         Settle::Placement,
     );
 }
@@ -630,7 +656,10 @@ fn clicking_the_manual_engine_advances_it_two_more_steps() {
         "nucleation:manual_engine_padded",
         &[],
         &[(30, Actuate::Use(Pos::new(13, 0, 2)))],
-        Some(mc_tick::Bounds::new(Pos::new(0, -4, 0), Pos::new(15, 7, 15))),
+        Some(mc_tick::Bounds::new(
+            Pos::new(0, -4, 0),
+            Pos::new(15, 7, 15),
+        )),
         Settle::Placement,
     );
 }
@@ -681,7 +710,11 @@ fn an_empty_container_turns_a_lit_comparator_off() {
 fn a_hopper_pulls_one_item_every_eight_ticks() {
     // A barrel above a hopper: one item moves per 8 game ticks, the first on
     // tick 0 — the hopper's block entity ticks in phase 9 of the very first tick.
-    run_conformance("hopper_pull.snbt", "hopper_pull.json", "nucleation:hopper_pull");
+    run_conformance(
+        "hopper_pull.snbt",
+        "hopper_pull.json",
+        "nucleation:hopper_pull",
+    );
 }
 
 #[test]
@@ -692,7 +725,11 @@ fn two_hoppers_race_in_block_entity_order() {
     // 7, so B forwards to the barrel on tick 7 — not 8. An engine with the
     // wrong block-entity order or without the tickedGameTime comparison gets
     // every following tick wrong.
-    run_conformance("hopper_race.snbt", "hopper_race.json", "nucleation:hopper_race");
+    run_conformance(
+        "hopper_race.snbt",
+        "hopper_race.json",
+        "nucleation:hopper_race",
+    );
 }
 
 #[test]
@@ -721,7 +758,10 @@ fn a_dropper_with_no_container_ejects_into_the_world() {
         "nucleation:dropper_into_barrel",
         &["minecraft:redstone_block"],
         &[
-            (0, Actuate::Place(Pos::new(1, 1, 0), "minecraft:redstone_block")),
+            (
+                0,
+                Actuate::Place(Pos::new(1, 1, 0), "minecraft:redstone_block"),
+            ),
             (2, Actuate::Place(Pos::new(1, 1, 0), "minecraft:air")),
         ],
     );
@@ -735,7 +775,10 @@ fn a_dropper_facing_a_container_transfers_into_it() {
         "nucleation:dropper_fill",
         &["minecraft:redstone_block"],
         &[
-            (0, Actuate::Place(Pos::new(0, 2, 0), "minecraft:redstone_block")),
+            (
+                0,
+                Actuate::Place(Pos::new(0, 2, 0), "minecraft:redstone_block"),
+            ),
             (2, Actuate::Place(Pos::new(0, 2, 0), "minecraft:air")),
         ],
     );
@@ -768,7 +811,10 @@ fn an_ejected_item_flies_the_mean_trajectory_within_jitter_bounds() {
         "nucleation:dropper_eject",
         &["minecraft:redstone_block"],
         &[
-            (0, Actuate::Place(Pos::new(0, 2, 0), "minecraft:redstone_block")),
+            (
+                0,
+                Actuate::Place(Pos::new(0, 2, 0), "minecraft:redstone_block"),
+            ),
             (2, Actuate::Place(Pos::new(0, 2, 0), "minecraft:air")),
         ],
         None,
@@ -782,7 +828,10 @@ fn an_ejected_item_flies_the_mean_trajectory_within_jitter_bounds() {
 fn bucket_actuations(lanes: &[i32]) -> Vec<(u64, Actuate)> {
     let mut actions = Vec::new();
     for z in lanes {
-        actions.push((10, Actuate::Place(Pos::new(0, 2, *z), "minecraft:redstone_block")));
+        actions.push((
+            10,
+            Actuate::Place(Pos::new(0, 2, *z), "minecraft:redstone_block"),
+        ));
     }
     for z in lanes {
         actions.push((12, Actuate::Place(Pos::new(0, 2, *z), "minecraft:air")));
@@ -888,7 +937,11 @@ fn resting_items_merge_on_the_slow_interval() {
     // gravity-accumulating velocity is flushed by collisions without the
     // position ever changing — so the only event in the whole trace is the
     // removal of the absorbed entity.
-    run_conformance("item_merge.snbt", "item_merge.json", "nucleation:item_merge");
+    run_conformance(
+        "item_merge.snbt",
+        "item_merge.json",
+        "nucleation:item_merge",
+    );
 }
 
 #[test]
@@ -910,7 +963,11 @@ fn breaking_a_dust_lines_source_drops_the_whole_line_in_one_tick() {
 fn dust_soft_powers_a_piston_through_the_block_it_sits_on() {
     // Same structure, no break: the dust strongly powers its floor block, the
     // conductor re-emits, and the piston extends on tick 0.
-    run_conformance("dust_line.snbt", "dust_softpower.json", "nucleation:dust_softpower");
+    run_conformance(
+        "dust_line.snbt",
+        "dust_softpower.json",
+        "nucleation:dust_softpower",
+    );
 }
 
 #[test]
@@ -1012,7 +1069,11 @@ fn a_falling_item_presses_a_wooden_plate() {
     // The Milestone B/C junction: an authored item falls nine ticks onto an
     // oak pressure plate; the plate and its lamp light on the landing tick and
     // stay lit while the item rests there.
-    run_conformance("plate_item.snbt", "plate_item.json", "nucleation:plate_item");
+    run_conformance(
+        "plate_item.snbt",
+        "plate_item.json",
+        "nucleation:plate_item",
+    );
 }
 
 #[test]
@@ -1026,7 +1087,10 @@ fn a_note_block_follows_neighbour_power_synchronously() {
         "nucleation:note_powered",
         &["minecraft:redstone_block"],
         &[
-            (0, Actuate::Place(Pos::new(1, 0, 0), "minecraft:redstone_block")),
+            (
+                0,
+                Actuate::Place(Pos::new(1, 0, 0), "minecraft:redstone_block"),
+            ),
             (2, Actuate::Place(Pos::new(1, 0, 0), "minecraft:air")),
         ],
     );
@@ -1205,7 +1269,11 @@ fn a_cart_powers_a_detector_rail_and_it_releases_twenty_ticks_later() {
     // `checkPressed` books a tick 20 later and only that recheck clears it, so
     // the golden shows power on tick 13 and off on tick 33 with the cart long
     // gone. The lamps then follow four ticks behind, on their own off-delay.
-    run_cart("detector_rail.snbt", "detector_rail.json", "nucleation:detector_rail");
+    run_cart(
+        "detector_rail.snbt",
+        "detector_rail.json",
+        "nucleation:detector_rail",
+    );
 }
 
 #[test]
@@ -1214,7 +1282,11 @@ fn a_detector_rail_strongly_powers_only_the_block_beneath_it() {
     // The dust here touches the block *under* the rail and nothing else — it
     // reads 15 — while the control dust under a plain rail one block along
     // stays dark for the whole run.
-    run_cart("detector_strong.snbt", "detector_strong.json", "nucleation:detector_strong");
+    run_cart(
+        "detector_strong.snbt",
+        "detector_strong.json",
+        "nucleation:detector_strong",
+    );
 }
 
 #[test]
@@ -1258,13 +1330,34 @@ fn a_weighted_plate_rechecks_every_ten_ticks_and_powers_the_block_it_stands_on()
         "nucleation:plate_recheck",
         &["minecraft:redstone_block"],
         &[
-            (1, Actuate::Place(Pos::new(7, 2, 0), "minecraft:redstone_block")),
-            (1, Actuate::Place(Pos::new(7, 2, 18), "minecraft:redstone_block")),
-            (3, Actuate::Place(Pos::new(9, 2, 22), "minecraft:redstone_block")),
-            (5, Actuate::Place(Pos::new(7, 2, 3), "minecraft:redstone_block")),
-            (9, Actuate::Place(Pos::new(7, 2, 6), "minecraft:redstone_block")),
-            (13, Actuate::Place(Pos::new(7, 2, 9), "minecraft:redstone_block")),
-            (19, Actuate::Place(Pos::new(7, 2, 12), "minecraft:redstone_block")),
+            (
+                1,
+                Actuate::Place(Pos::new(7, 2, 0), "minecraft:redstone_block"),
+            ),
+            (
+                1,
+                Actuate::Place(Pos::new(7, 2, 18), "minecraft:redstone_block"),
+            ),
+            (
+                3,
+                Actuate::Place(Pos::new(9, 2, 22), "minecraft:redstone_block"),
+            ),
+            (
+                5,
+                Actuate::Place(Pos::new(7, 2, 3), "minecraft:redstone_block"),
+            ),
+            (
+                9,
+                Actuate::Place(Pos::new(7, 2, 6), "minecraft:redstone_block"),
+            ),
+            (
+                13,
+                Actuate::Place(Pos::new(7, 2, 9), "minecraft:redstone_block"),
+            ),
+            (
+                19,
+                Actuate::Place(Pos::new(7, 2, 12), "minecraft:redstone_block"),
+            ),
         ],
     );
 }
@@ -1276,7 +1369,11 @@ fn weighted_plates_count_entities_and_the_two_kinds_scale_differently() {
     // maxWeight is 15 — one item, one level — and the heavy plate's is 150,
     // one level per ten. The golden holds six plates: light under 1/3/5 items
     // reading 1/3/5, heavy under 1/3/11 reading 1/1/2.
-    run_cart("weighted_plates.snbt", "weighted_plates.json", "nucleation:weighted_plates");
+    run_cart(
+        "weighted_plates.snbt",
+        "weighted_plates.json",
+        "nucleation:weighted_plates",
+    );
 }
 
 #[test]
@@ -1292,14 +1389,22 @@ fn powered_rails_accelerate_a_cart_past_the_movement_clamp() {
     // +0.06 along the motion every tick: the velocity grows well past 0.4
     // while the per-axis movement clamp holds the cart to 0.4 blocks a tick —
     // both visible in the golden's diverging velocity and constant stride.
-    run_cart("cart_boost.snbt", "cart_boost.json", "nucleation:cart_boost");
+    run_cart(
+        "cart_boost.snbt",
+        "cart_boost.json",
+        "nucleation:cart_boost",
+    );
 }
 
 #[test]
 fn unpowered_golden_rails_brake_a_cart_to_a_standstill() {
     // The braking branch: ×0.5 a tick with vy zeroed, then a dead stop the
     // tick the horizontal speed dips under 0.03.
-    run_cart("cart_brake.snbt", "cart_brake.json", "nucleation:cart_brake");
+    run_cart(
+        "cart_brake.snbt",
+        "cart_brake.json",
+        "nucleation:cart_brake",
+    );
 }
 
 #[test]
@@ -1307,14 +1412,22 @@ fn a_cart_rolls_down_a_slope_and_gains_speed() {
     // The ascending rail's 0.0078125 downhill pull, the y+1 seat, the corner
     // fixup as the cart crosses onto the low line, and the 0.05 height
     // correction feeding slope drop into speed.
-    run_cart("cart_slope.snbt", "cart_slope.json", "nucleation:cart_slope");
+    run_cart(
+        "cart_slope.snbt",
+        "cart_slope.json",
+        "nucleation:cart_slope",
+    );
 }
 
 #[test]
 fn a_cart_turns_a_corner_without_losing_the_rail() {
     // The chord projection through a north_west corner: eastbound velocity is
     // re-aimed north, the exit-crossing redirect included.
-    run_cart("cart_curve.snbt", "cart_curve.json", "nucleation:cart_curve");
+    run_cart(
+        "cart_curve.snbt",
+        "cart_curve.json",
+        "nucleation:cart_curve",
+    );
 }
 
 #[test]
@@ -1345,7 +1458,11 @@ fn two_touching_carts_shove_themselves_apart_and_a_third_amplifies_the_pair() {
     // last bit, all 80 ticks, and it only does so because the impulse is
     // vanilla's `0.05F` widened to double (0.05000000074505806). Plain `0.05`
     // drifts to about 1e-8, which is how the float literal was found.
-    run_cart("cart_collide.snbt", "cart_collide.json", "nucleation:cart_collide");
+    run_cart(
+        "cart_collide.snbt",
+        "cart_collide.json",
+        "nucleation:cart_collide",
+    );
 }
 
 #[test]
@@ -1354,7 +1471,11 @@ fn carts_with_no_rail_under_them_still_shove_each_other() {
     // survive `comeOffTrack`. It does, and the interaction with the grounded
     // halving is visible: the first tick the pair is still airborne so the
     // pushed cart takes the full 0.05, and from the second the x0.5 bites.
-    run_cart("cart_offrail.snbt", "cart_offrail.json", "nucleation:cart_offrail");
+    run_cart(
+        "cart_offrail.snbt",
+        "cart_offrail.json",
+        "nucleation:cart_offrail",
+    );
 }
 
 #[test]
@@ -1392,7 +1513,11 @@ fn a_furnace_cart_obeys_the_same_facing_gate_a_plain_one_does() {
     // `Rotation`, so all fifteen of the door's furnace carts loaded facing +X —
     // the axis their top row is strung out along. They shoved themselves apart
     // on tick 2 and walked the end cart off its ledge and out of the world.
-    run_cart("cart_furnace_yaw.snbt", "cart_furnace_yaw.json", "nucleation:cart_furnace_yaw");
+    run_cart(
+        "cart_furnace_yaw.snbt",
+        "cart_furnace_yaw.json",
+        "nucleation:cart_furnace_yaw",
+    );
 }
 
 #[test]
@@ -1408,7 +1533,11 @@ fn a_cart_hangs_off_a_ledge_whose_last_column_its_box_still_overlaps() {
     // * z=6 — the same cart clear of the ledge. It falls immediately and is
     //   removed. Without it, "the overhang cart did not move" would be equally
     //   consistent with gravity not running in this structure at all.
-    run_cart("cart_ledge.snbt", "cart_ledge.json", "nucleation:cart_ledge");
+    run_cart(
+        "cart_ledge.snbt",
+        "cart_ledge.json",
+        "nucleation:cart_ledge",
+    );
 }
 
 #[test]
@@ -1427,7 +1556,11 @@ fn chains_of_touching_carts_hold_because_carts_block_each_other() {
     // clips to nothing, and the zeroed axis means that cart goes on to push its
     // own neighbours from a standstill. Take the collision away and the first
     // tick is already wrong.
-    run_cart("cart_group.snbt", "cart_group.json", "nucleation:cart_group");
+    run_cart(
+        "cart_group.snbt",
+        "cart_group.json",
+        "nucleation:cart_group",
+    );
 }
 
 #[test]
@@ -1436,7 +1569,11 @@ fn a_five_cart_chain_absorbs_a_rammed_cart() {
     // touching at 0.98 and a sixth arriving at 0.4. The cascade runs the length
     // of the chain and the far end is spat out, which is how these builds move
     // a cart without a rail powering it.
-    run_cart("cart_chain.snbt", "cart_chain.json", "nucleation:cart_chain");
+    run_cart(
+        "cart_chain.snbt",
+        "cart_chain.json",
+        "nucleation:cart_chain",
+    );
 }
 
 #[test]
@@ -1452,7 +1589,11 @@ fn triples_behave_differently_when_they_have_room_to_move() {
     // impulse fits inside it, at 0.98 there is none. The 1.10 pair also pins
     // the `min(1/dist, 1)` scaling, which a touching pair cannot see because
     // its 1/dist is clamped.
-    run_cart("cart_triad.snbt", "cart_triad.json", "nucleation:cart_triad");
+    run_cart(
+        "cart_triad.snbt",
+        "cart_triad.json",
+        "nucleation:cart_triad",
+    );
 }
 
 #[test]
@@ -1525,9 +1666,15 @@ fn an_extended_piston_base_still_holds_up_the_cart_standing_on_it() {
         "nucleation:piston_cart_support",
         &["minecraft:redstone_block"],
         &[
-            (5, Actuate::Place(Pos::new(5, 1, 2), "minecraft:redstone_block")),
+            (
+                5,
+                Actuate::Place(Pos::new(5, 1, 2), "minecraft:redstone_block"),
+            ),
             (20, Actuate::Place(Pos::new(5, 1, 2), "minecraft:air")),
-            (5, Actuate::Place(Pos::new(5, 1, 7), "minecraft:redstone_block")),
+            (
+                5,
+                Actuate::Place(Pos::new(5, 1, 7), "minecraft:redstone_block"),
+            ),
             (20, Actuate::Place(Pos::new(5, 1, 7), "minecraft:air")),
         ],
         None,
@@ -1547,7 +1694,10 @@ fn a_redstone_block_lights_nine_golden_rails_and_no_more() {
         "nucleation:rails_chain",
         &["minecraft:redstone_block"],
         &[
-            (0, Actuate::Place(Pos::new(0, 1, 1), "minecraft:redstone_block")),
+            (
+                0,
+                Actuate::Place(Pos::new(0, 1, 1), "minecraft:redstone_block"),
+            ),
             (2, Actuate::Place(Pos::new(0, 1, 1), "minecraft:air")),
         ],
     );
@@ -1564,7 +1714,10 @@ fn powering_the_rails_launches_a_parked_cart_off_the_wall() {
         "nucleation:cart_launch",
         &["minecraft:redstone_block"],
         &[
-            (0, Actuate::Place(Pos::new(1, 2, 1), "minecraft:redstone_block")),
+            (
+                0,
+                Actuate::Place(Pos::new(1, 2, 1), "minecraft:redstone_block"),
+            ),
             (40, Actuate::Place(Pos::new(1, 2, 1), "minecraft:air")),
         ],
         None,
@@ -1591,7 +1744,12 @@ fn flipping_a_lever_lights_a_lamp_through_its_support_block() {
 }
 
 fn run_door(structure_file: &str, golden_file: &str, label: &str, lever: Option<(Pos, u64)>) {
-    run_door_cycle(structure_file, golden_file, label, &lever.into_iter().collect::<Vec<_>>());
+    run_door_cycle(
+        structure_file,
+        golden_file,
+        label,
+        &lever.into_iter().collect::<Vec<_>>(),
+    );
 }
 
 /// A door driven by any number of lever clicks — a full close/open cycle is
@@ -1796,7 +1954,11 @@ fn opposed_pistons_race_for_one_gap() {
     // (`Simulation::update_shape_at_edge`), not by the placement list. The
     // companion `piston_race_quiet` fixture isolates the other half — pistons
     // already powered when placed, where placement order *is* the tiebreak.
-    run_conformance("piston_race.snbt", "piston_race.json", "nucleation:piston_race");
+    run_conformance(
+        "piston_race.snbt",
+        "piston_race.json",
+        "nucleation:piston_race",
+    );
 }
 
 #[test]
@@ -1891,7 +2053,10 @@ fn a_trapdoor_toggles_open_and_shut_like_vanilla() {
         "nucleation:trapdoor_toggle",
         &["minecraft:redstone_block"],
         &[
-            (2, Actuate::Place(Pos::new(1, 0, 0), "minecraft:redstone_block")),
+            (
+                2,
+                Actuate::Place(Pos::new(1, 0, 0), "minecraft:redstone_block"),
+            ),
             (8, Actuate::Place(Pos::new(1, 0, 0), "minecraft:air")),
         ],
     );
@@ -1907,7 +2072,10 @@ fn a_piston_pushes_a_trapdoor_intact() {
         "nucleation:trapdoor_push",
         &["minecraft:redstone_block"],
         &[
-            (2, Actuate::Place(Pos::new(0, 1, 2), "minecraft:redstone_block")),
+            (
+                2,
+                Actuate::Place(Pos::new(0, 1, 2), "minecraft:redstone_block"),
+            ),
             (8, Actuate::Place(Pos::new(0, 1, 2), "minecraft:air")),
         ],
     );
@@ -1938,11 +2106,26 @@ fn a_piston_destroys_a_door_and_takes_the_other_half_with_it() {
         "nucleation:door_push",
         &["minecraft:redstone_block"],
         &[
-            (2, Actuate::Place(Pos::new(0, 1, 0), "minecraft:redstone_block")),
-            (2, Actuate::Place(Pos::new(0, 2, 3), "minecraft:redstone_block")),
-            (2, Actuate::Place(Pos::new(0, 1, 6), "minecraft:redstone_block")),
-            (2, Actuate::Place(Pos::new(0, 1, 9), "minecraft:redstone_block")),
-            (2, Actuate::Place(Pos::new(0, 1, 12), "minecraft:redstone_block")),
+            (
+                2,
+                Actuate::Place(Pos::new(0, 1, 0), "minecraft:redstone_block"),
+            ),
+            (
+                2,
+                Actuate::Place(Pos::new(0, 2, 3), "minecraft:redstone_block"),
+            ),
+            (
+                2,
+                Actuate::Place(Pos::new(0, 1, 6), "minecraft:redstone_block"),
+            ),
+            (
+                2,
+                Actuate::Place(Pos::new(0, 1, 9), "minecraft:redstone_block"),
+            ),
+            (
+                2,
+                Actuate::Place(Pos::new(0, 1, 12), "minecraft:redstone_block"),
+            ),
             (8, Actuate::Place(Pos::new(0, 1, 0), "minecraft:air")),
             (8, Actuate::Place(Pos::new(0, 2, 3), "minecraft:air")),
             (8, Actuate::Place(Pos::new(0, 1, 6), "minecraft:air")),
@@ -1962,7 +2145,10 @@ fn the_flying_machine_flies_as_vanilla_does() {
         "nucleation:flying_machine_east",
         &["minecraft:redstone_block"],
         &[
-            (2, Actuate::Place(Pos::new(2, 1, 1), "minecraft:redstone_block")),
+            (
+                2,
+                Actuate::Place(Pos::new(2, 1, 1), "minecraft:redstone_block"),
+            ),
             (4, Actuate::Place(Pos::new(2, 1, 1), "minecraft:air")),
         ],
         None,
@@ -1983,16 +2169,34 @@ fn the_shulker_pipeline_runs_as_vanilla_does() {
         "nucleation:shulker_pipeline",
         &["minecraft:redstone_block"],
         &[
-            (5, Actuate::Place(Pos::new(-1, 2, 1), "minecraft:redstone_block")),
-            (30, Actuate::Place(Pos::new(2, 0, 1), "minecraft:redstone_block")),
+            (
+                5,
+                Actuate::Place(Pos::new(-1, 2, 1), "minecraft:redstone_block"),
+            ),
+            (
+                30,
+                Actuate::Place(Pos::new(2, 0, 1), "minecraft:redstone_block"),
+            ),
             (34, Actuate::Place(Pos::new(2, 0, 1), "minecraft:air")),
-            (38, Actuate::Place(Pos::new(2, 0, 1), "minecraft:redstone_block")),
+            (
+                38,
+                Actuate::Place(Pos::new(2, 0, 1), "minecraft:redstone_block"),
+            ),
             (42, Actuate::Place(Pos::new(2, 0, 1), "minecraft:air")),
-            (46, Actuate::Place(Pos::new(1, 1, 2), "minecraft:redstone_block")),
-            (50, Actuate::Place(Pos::new(1, 4, 1), "minecraft:redstone_block")),
+            (
+                46,
+                Actuate::Place(Pos::new(1, 1, 2), "minecraft:redstone_block"),
+            ),
+            (
+                50,
+                Actuate::Place(Pos::new(1, 4, 1), "minecraft:redstone_block"),
+            ),
             (54, Actuate::Place(Pos::new(1, 4, 1), "minecraft:air")),
             (60, Actuate::Place(Pos::new(1, 1, 2), "minecraft:air")),
-            (82, Actuate::Place(Pos::new(2, 0, 1), "minecraft:redstone_block")),
+            (
+                82,
+                Actuate::Place(Pos::new(2, 0, 1), "minecraft:redstone_block"),
+            ),
             (86, Actuate::Place(Pos::new(2, 0, 1), "minecraft:air")),
         ],
     );

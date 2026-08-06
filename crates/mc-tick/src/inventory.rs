@@ -46,6 +46,13 @@ pub struct Inventory {
     pub slots: u32,
     /// The occupied slots.
     pub stacks: Vec<ItemStack>,
+    /// Slots that reject insertion.
+    ///
+    /// Vanilla's crafter stores this as its `disabled_slots` int array. A
+    /// disabled empty slot is deliberately distinct from an occupied one: it
+    /// contributes one to the crafter's comparator signal, but there is no item
+    /// for a hopper underneath to extract.
+    pub blocked_slots: u16,
 }
 
 /// The stack size everything is assumed to reach; see the module docs.
@@ -54,7 +61,11 @@ const ASSUMED_MAX_STACK: f32 = 64.0;
 impl Inventory {
     /// An empty container with `slots` slots.
     pub fn empty(slots: u32) -> Self {
-        Self { slots, stacks: Vec::new() }
+        Self {
+            slots,
+            stacks: Vec::new(),
+            blocked_slots: 0,
+        }
     }
 
     /// Whether nothing is stored.
@@ -81,7 +92,29 @@ impl Inventory {
     /// `AbstractContainerMenu.getRedstoneSignalFromContainer`, before dividing
     /// by the container size. Summable across a double chest's halves.
     pub fn fullness_sum(&self) -> f32 {
-        self.stacks.iter().map(|stack| f32::from(stack.count) / ASSUMED_MAX_STACK).sum()
+        self.stacks
+            .iter()
+            .map(|stack| f32::from(stack.count) / ASSUMED_MAX_STACK)
+            .sum()
+    }
+
+    /// Whether external insertion is forbidden for `slot`.
+    pub fn slot_blocked(&self, slot: u8) -> bool {
+        slot < 16 && self.blocked_slots & (1 << slot) != 0
+    }
+
+    /// `CrafterBlockEntity.getRedstoneSignal`: one strength for each occupied
+    /// or disabled slot, over the crafter's fixed nine slots.
+    pub fn crafter_signal(&self) -> u8 {
+        (0u8..9)
+            .filter(|slot| {
+                self.slot_blocked(*slot)
+                    || self
+                        .stacks
+                        .iter()
+                        .any(|stack| stack.slot == *slot && stack.count > 0)
+            })
+            .count() as u8
     }
 }
 
@@ -113,6 +146,7 @@ mod tests {
                     count,
                 })
                 .collect(),
+            blocked_slots: 0,
         }
     }
 
@@ -140,6 +174,30 @@ mod tests {
         // Fourteen full stacks: 14/27 * 14 = 7.26 -> 7, +1 = 8.
         let fourteen: Vec<(u8, u8)> = (0..14).map(|slot| (slot, 64)).collect();
         assert_eq!(barrel(fourteen).analog_signal(), 8);
+    }
+
+    #[test]
+    fn a_crafter_counts_disabled_and_occupied_slots_once_each() {
+        let mut crafter = Inventory::empty(9);
+        crafter.blocked_slots = 1;
+        assert_eq!(crafter.crafter_signal(), 1);
+
+        crafter.stacks.push(ItemStack {
+            slot: 1,
+            id: "minecraft:stone".to_string(),
+            count: 1,
+            contents: None,
+        });
+        assert_eq!(crafter.crafter_signal(), 2);
+
+        // Invalid save data cannot make the same slot contribute twice.
+        crafter.stacks.push(ItemStack {
+            slot: 0,
+            id: "minecraft:stone".to_string(),
+            count: 1,
+            contents: None,
+        });
+        assert_eq!(crafter.crafter_signal(), 2);
     }
 }
 

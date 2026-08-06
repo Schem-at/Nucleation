@@ -30,15 +30,15 @@
 #![forbid(unsafe_code)]
 
 pub mod behaviour;
+pub mod components;
 pub mod entity;
 pub mod entity_kind;
 pub mod explosion;
 pub mod fluid;
+pub mod inventory;
+pub mod machine_graph;
 pub mod minecart;
 pub mod motion;
-pub mod inventory;
-pub mod components;
-pub mod machine_graph;
 pub mod observer;
 pub mod phase;
 pub mod piston;
@@ -49,26 +49,35 @@ pub mod schedule;
 pub mod sim;
 pub mod state;
 pub mod structure;
-pub mod wire;
+pub mod timeline;
 pub mod vanilla;
+pub mod wire;
 pub mod world;
 
 pub use behaviour::{BehaviourTable, BlockBehaviour, Inert, TickCtx, UpdateKind, UpdateRecord};
-pub use components::{Comparator, PowerSource, Repeater, StatePair, Torch,
-    COMPARATOR_DELAY, REPEATER_TICKS_PER_DELAY, TORCH_DELAY};
+pub use components::{
+    Comparator, PowerSource, Repeater, StatePair, Torch, COMPARATOR_DELAY,
+    REPEATER_TICKS_PER_DELAY, TORCH_DELAY,
+};
+pub use entity::{ItemEntities, ItemEntityState};
+pub use inventory::{Inventory, ItemStack};
+pub use machine_graph::{analyse as analyse_machine, MachineGraph};
+pub use motion::MotionSemantics;
 pub use observer::{Observer, OBSERVER_PULSE_TICKS};
 pub use phase::{Phase, PHASE_ORDER};
-pub use machine_graph::{analyse as analyse_machine, MachineGraph};
-pub use piston::{resolve_push, Movability, Piston, PushPlan, MAX_PUSH_DEPTH,
-    TRIGGER_CONTRACT, TRIGGER_DROP, TRIGGER_EXTEND};
+pub use piston::{
+    resolve_push, Movability, Piston, PushPlan, MAX_PUSH_DEPTH, TRIGGER_CONTRACT, TRIGGER_DROP,
+    TRIGGER_EXTEND,
+};
 pub use pos::{Bounds, Dir, Pos, ALL_DIRS};
 pub use redstone::{RedstoneNetwork, MAX_POWER};
 pub use schedule::{BlockEvent, EventQueue, ScheduledTick, TickPriority, TickQueue};
 pub use sim::{Checkpoint, Simulation, StopReason};
 pub use state::{StateError, StateId, StateRegistry};
 pub use structure::{Structure, StructureError};
-pub use entity::{ItemEntities, ItemEntityState};
-pub use motion::MotionSemantics;
-pub use inventory::{Inventory, ItemStack};
+pub use timeline::{
+    Cycle, CycleKind, CycleReport, InputAction, PistonAction, PistonEvent, RunTimeline,
+    StateFingerprint, StateFrame, TimelineError, TimelineSelection,
+};
 pub use vanilla::{intern_companions, register_all, register_all_at, Descriptor, VanillaRules};
 pub use world::World;

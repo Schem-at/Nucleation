@@ -16,8 +16,14 @@ fn build() -> (Simulation, mc_tick::StateId) {
         max: Pos::new(8, 8, 8),
     });
     let stone = sim.registry_mut().intern("minecraft:smooth_stone").unwrap();
-    let block = sim.registry_mut().intern("minecraft:redstone_block").unwrap();
-    let wire = sim.registry_mut().intern("minecraft:redstone_wire").unwrap();
+    let block = sim
+        .registry_mut()
+        .intern("minecraft:redstone_block")
+        .unwrap();
+    let wire = sim
+        .registry_mut()
+        .intern("minecraft:redstone_wire")
+        .unwrap();
     for x in 0..4 {
         sim.world_mut().set(Pos::new(x, 0, 0), stone);
     }
@@ -40,8 +46,14 @@ fn a_hand_placed_wire_arrives_connected_and_powered() {
     sim.run_until_quiescent(50);
     let state = sim.world().get(Pos::new(1, 1, 0));
     let descriptor = sim.registry().descriptor(state).expect("a real state");
-    assert!(descriptor.contains("power=15"), "powered by the block beside it, got {descriptor}");
-    assert!(descriptor.contains("west=side"), "connected toward its source, got {descriptor}");
+    assert!(
+        descriptor.contains("power=15"),
+        "powered by the block beside it, got {descriptor}"
+    );
+    assert!(
+        descriptor.contains("west=side"),
+        "connected toward its source, got {descriptor}"
+    );
 }
 
 #[test]
@@ -57,7 +69,10 @@ fn a_hand_placed_repeater_reads_its_input() {
         max: Pos::new(8, 8, 8),
     });
     let stone = sim.registry_mut().intern("minecraft:smooth_stone").unwrap();
-    let block = sim.registry_mut().intern("minecraft:redstone_block").unwrap();
+    let block = sim
+        .registry_mut()
+        .intern("minecraft:redstone_block")
+        .unwrap();
     let repeater = sim
         .registry_mut()
         .intern("minecraft:repeater[delay=1,facing=west,locked=false,powered=false]")
@@ -78,7 +93,10 @@ fn a_hand_placed_repeater_reads_its_input() {
     sim.run_until_quiescent(50);
     let state = sim.world().get(Pos::new(1, 1, 0));
     let descriptor = sim.registry().descriptor(state).expect("a real state");
-    assert!(descriptor.contains("powered=true"), "lit by the block behind it, got {descriptor}");
+    assert!(
+        descriptor.contains("powered=true"),
+        "lit by the block behind it, got {descriptor}"
+    );
 }
 
 #[test]
@@ -90,5 +108,8 @@ fn the_actuator_write_still_leaves_a_wire_as_authored() {
     sim.run_until_quiescent(50);
     let state = sim.world().get(Pos::new(1, 1, 0));
     let descriptor = sim.registry().descriptor(state).expect("a real state");
-    assert_eq!(descriptor, "minecraft:redstone_wire", "an actuator write is verbatim");
+    assert_eq!(
+        descriptor, "minecraft:redstone_wire",
+        "an actuator write is verbatim"
+    );
 }

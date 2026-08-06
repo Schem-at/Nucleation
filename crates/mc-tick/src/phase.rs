@@ -169,6 +169,10 @@ mod tests {
         names.sort_unstable();
         let before = names.len();
         names.dedup();
-        assert_eq!(before, names.len(), "duplicate phase name in trace contract");
+        assert_eq!(
+            before,
+            names.len(),
+            "duplicate phase name in trace contract"
+        );
     }
 }

@@ -104,7 +104,11 @@ const SCHEDULE: &[(u64, i32, bool)] = &[
 /// are the capture's own decimals.
 type Lane = (i32, &'static [f64], &'static [u8]);
 const LANES: &[Lane] = &[
-    (1, &[4.84375, 4.33375, 4.15625, 4.66625, 4.84375], &[0, 1, 0]),
+    (
+        1,
+        &[4.84375, 4.33375, 4.15625, 4.66625, 4.84375],
+        &[0, 1, 0],
+    ),
     (3, &[4.84375, 4.33375, 4.15625], &[0]),
     (
         5,
@@ -134,7 +138,11 @@ const LANES: &[Lane] = &[
     (13, &[4.95], &[0, 1]),
     (17, &[4.84375, 4.33375, 3.83375], &[0]),
     (19, &[4.84375, 4.82375, 4.33375, 3.83375], &[0, 1, 0]),
-    (21, &[5.1, 4.59, 4.15625, 4.66625, 4.84375], &[0, 1, 0, 1, 0]),
+    (
+        21,
+        &[5.1, 4.59, 4.15625, 4.66625, 4.84375],
+        &[0, 1, 0, 1, 0],
+    ),
     (
         23,
         &[
@@ -152,7 +160,11 @@ const LANES: &[Lane] = &[
         &[0, 1, 0, 1, 0, 1],
     ),
     (27, &[5.0], &[0, 1]),
-    (29, &[4.84375, 4.33375, 4.15625, 4.66625, 4.84375], &[0, 1, 0]),
+    (
+        29,
+        &[4.84375, 4.33375, 4.15625, 4.66625, 4.84375],
+        &[0, 1, 0],
+    ),
     (31, &[4.84375, 4.33375, 4.15625, 4.66625, 4.84375], &[0]),
 ];
 
@@ -177,14 +189,20 @@ fn build() -> Simulation {
     }
     // The redstone blocks the capture drops in are not in the structure, so
     // their state has to exist in the registry before the run.
-    sim.registry_mut().intern("minecraft:redstone_block").expect("a real block");
+    sim.registry_mut()
+        .intern("minecraft:redstone_block")
+        .expect("a real block");
     mc_tick::intern_companions(sim.registry_mut());
     {
         let mut table = std::mem::take(sim.behaviours_mut());
         mc_tick::register_all(sim.registry_mut(), &mut table);
         *sim.behaviours_mut() = table;
     }
-    assert_eq!(sim.unknown_report(), None, "a partially-simulated world proves nothing");
+    assert_eq!(
+        sim.unknown_report(),
+        None,
+        "a partially-simulated world proves nothing"
+    );
     let (solidity, frictions, heights, webs) = mc_tick::vanilla::physics_tables(sim.registry());
     sim.set_physics_tables(solidity, frictions, heights, webs);
     let (water_kinds, bubble_kinds) = mc_tick::vanilla::fluid_tables(sim.registry());
@@ -237,7 +255,10 @@ fn plate_power(sim: &Simulation, z: i32) -> u8 {
 type Observed = (Vec<Vec<f64>>, Vec<Vec<u8>>, Vec<u8>);
 fn run() -> Observed {
     let mut sim = build();
-    let redstone = sim.registry_mut().intern("minecraft:redstone_block").unwrap();
+    let redstone = sim
+        .registry_mut()
+        .intern("minecraft:redstone_block")
+        .unwrap();
     let mut xs: Vec<Vec<f64>> = LANES.iter().map(|_| Vec::new()).collect();
     let mut powers: Vec<Vec<u8>> = LANES.iter().map(|_| Vec::new()).collect();
     let mut empty: Vec<u8> = Vec::new();
@@ -281,7 +302,11 @@ fn every_lane_of_the_capture_agrees_with_vanilla() {
             "lane z={z}: the plate's power disagrees with the capture"
         );
     }
-    assert_eq!(empty, vec![0], "lane z={EMPTY_LANE} has no fireball, so its plate must never fire");
+    assert_eq!(
+        empty,
+        vec![0],
+        "lane z={EMPTY_LANE} has no fireball, so its plate must never fire"
+    );
 }
 
 /// The door's own gadget, named: the retraction returns the fireball to its
@@ -303,8 +328,15 @@ fn the_replica_returns_the_fireball_flush_against_the_piston_base() {
     );
     let start = xs[lane].first().unwrap();
     let end = xs[lane].last().unwrap();
-    assert_eq!(end, start, "its east face ends flush on x = 5.0, exactly where it started");
-    assert_eq!(powers[lane], vec![0, 1, 0], "and the plate presses on the way, then releases");
+    assert_eq!(
+        end, start,
+        "its east face ends flush on x = 5.0, exactly where it started"
+    );
+    assert_eq!(
+        powers[lane],
+        vec![0, 1, 0],
+        "and the plate presses on the way, then releases"
+    );
 }
 
 /// The clip is a distance to a surface, not a fixed amount.
@@ -327,17 +359,40 @@ fn the_clip_is_the_room_left_to_the_surface() {
         xs[replica][1], xs[east][1],
         "the two lanes must reach the clip from different places"
     );
-    assert_eq!(xs[replica][2] - HALF, 4.0, "clipped flush against the arriving block");
-    assert_eq!(xs[east][2] - HALF, 4.0, "and so is a lane that started 0.25625 further east");
+    assert_eq!(
+        xs[replica][2] - HALF,
+        4.0,
+        "clipped flush against the arriving block"
+    );
+    assert_eq!(
+        xs[east][2] - HALF,
+        4.0,
+        "and so is a lane that started 0.25625 further east"
+    );
     // Retraction, the other half. Lane z=5 retracts twice from two different
     // places — 0.02 out of the head's own eject, and 0.1775 out of a full
     // stroke — and lands the *east* face on the piston's own square both times.
     let twice = LANES.iter().position(|(z, _, _)| *z == 5).unwrap();
     assert_eq!(xs[twice][1], 4.82375, "the eject leaves it 0.02 short");
-    assert_eq!(xs[twice][2] + HALF, 5.0, "so the pulled block's sweep is clipped to 0.02");
-    assert_eq!(xs[twice][5], 4.66625, "and a full stroke leaves it 0.1775 short");
-    assert_eq!(xs[twice][6] + HALF, 5.0, "clipped to 0.1775, against the same face");
-    assert_eq!(xs[replica][4] + HALF, 5.0, "which is where the door's own fireball ends");
+    assert_eq!(
+        xs[twice][2] + HALF,
+        5.0,
+        "so the pulled block's sweep is clipped to 0.02"
+    );
+    assert_eq!(
+        xs[twice][5], 4.66625,
+        "and a full stroke leaves it 0.1775 short"
+    );
+    assert_eq!(
+        xs[twice][6] + HALF,
+        5.0,
+        "clipped to 0.1775, against the same face"
+    );
+    assert_eq!(
+        xs[replica][4] + HALF,
+        5.0,
+        "which is where the door's own fireball ends"
+    );
 }
 
 /// The negative controls, from the same rig: with nothing in the way there is
@@ -353,14 +408,29 @@ fn the_clip_is_the_room_left_to_the_surface() {
 fn with_nothing_in_the_way_the_sweep_is_not_clipped() {
     let (xs, powers, _) = run();
     let nopush = LANES.iter().position(|(z, _, _)| *z == 17).unwrap();
-    assert_eq!(xs[nopush], vec![4.84375, 4.33375, 3.83375], "0.51 then a full 0.5");
-    assert_eq!(powers[nopush], vec![0], "and it ends out of the plate's reach");
+    assert_eq!(
+        xs[nopush],
+        vec![4.84375, 4.33375, 3.83375],
+        "0.51 then a full 0.5"
+    );
+    assert_eq!(
+        powers[nopush],
+        vec![0],
+        "and it ends out of the plate's reach"
+    );
 
     let nopull = LANES.iter().position(|(z, _, _)| *z == 19).unwrap();
-    assert_eq!(xs[nopull][1], 4.82375, "the head's eject alone, and no sweep behind it");
+    assert_eq!(
+        xs[nopull][1], 4.82375,
+        "the head's eject alone, and no sweep behind it"
+    );
 
     let extend_only = LANES.iter().position(|(z, _, _)| *z == 3).unwrap();
-    assert_eq!(powers[extend_only], vec![0], "a piston that never comes back never presses it");
+    assert_eq!(
+        powers[extend_only],
+        vec![0],
+        "a piston that never comes back never presses it"
+    );
 }
 
 /// The same rig with bodies wide enough to make *when* the clip starts matter.
@@ -383,7 +453,13 @@ mod wide_bodies {
         // The replica: 0.51 free, then 0.49 — clipped against x = 3.0, the cell
         // the pushed *quartz* is arriving in, because the cell the pushed piston
         // arrives in is one the box already overlaps by then.
-        (1, "minecraft:dragon_fireball", [4.5, 1.875, 1.5], &[4.5, 3.99, 3.5], true),
+        (
+            1,
+            "minecraft:dragon_fireball",
+            [4.5, 1.875, 1.5],
+            &[4.5, 3.99, 3.5],
+            true,
+        ),
         // Starts extended and retracts: the wide-body round trip. The outward
         // quarter is the head's drag clipped against the retracting base's
         // 12/16 slab (`retracting_base_box`), and the return quarter is
@@ -397,7 +473,13 @@ mod wide_bodies {
             true,
         ),
         // Nothing to push, so nothing to clip: 0.51 then a full 0.5.
-        (17, "minecraft:dragon_fireball", [4.5, 1.875, 17.5], &[4.5, 3.99, 3.49], true),
+        (
+            17,
+            "minecraft:dragon_fireball",
+            [4.5, 1.875, 17.5],
+            &[4.5, 3.99, 3.49],
+            true,
+        ),
         // The same round trip with a 0.98 x 0.7 cart, whose `0.98F` float slop
         // survives both quarters.
         (
@@ -439,7 +521,9 @@ mod wide_bodies {
             let (registry, world) = sim.registry_and_world_mut();
             structure.place(world, registry, Pos::new(0, 0, 0));
         }
-        sim.registry_mut().intern("minecraft:redstone_block").expect("a real block");
+        sim.registry_mut()
+            .intern("minecraft:redstone_block")
+            .expect("a real block");
         mc_tick::intern_companions(sim.registry_mut());
         {
             let mut table = std::mem::take(sim.behaviours_mut());
@@ -458,7 +542,8 @@ mod wide_bodies {
             if kind.ends_with("minecart") {
                 sim.spawn_minecart((*kind).into(), *at, [0.0, 0.0, 0.0]);
             } else {
-                sim.spawn_frozen_entity((*kind).into(), *at).expect("a measured hitbox");
+                sim.spawn_frozen_entity((*kind).into(), *at)
+                    .expect("a measured hitbox");
             }
         }
         let order = structure.placement_order(
@@ -468,7 +553,10 @@ mod wide_bodies {
         sim.place_on_place(&order);
         sim.settle_with_order(&order);
 
-        let redstone = sim.registry_mut().intern("minecraft:redstone_block").unwrap();
+        let redstone = sim
+            .registry_mut()
+            .intern("minecraft:redstone_block")
+            .unwrap();
         let mut xs: Vec<Vec<f64>> = WIDE.iter().map(|_| Vec::new()).collect();
         for tick in 0..=24u64 {
             for &(at, z, on) in SCHEDULE {
@@ -521,7 +609,11 @@ mod wide_bodies {
             0.49000000000000021,
             "and the second is clipped to 0.49"
         );
-        assert_eq!(xs[nopush][1] - xs[nopush][2], 0.5, "with nothing to push, a full 0.5");
+        assert_eq!(
+            xs[nopush][1] - xs[nopush][2],
+            0.5,
+            "with nothing to push, a full 0.5"
+        );
     }
 
     /// A **disagreement**, recorded rather than dropped: retraction's law has no

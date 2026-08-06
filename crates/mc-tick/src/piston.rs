@@ -153,16 +153,15 @@ pub struct PushPlan {
 /// Mirrors `PistonStructureResolver.resolve` for the straight-line case: walk
 /// forward while blocks are movable, stop at the first empty space, and refuse if
 /// the column exceeds [`MAX_PUSH_DEPTH`] or ends in something immovable.
-pub fn resolve_push(
-    world: &World,
-    movability: &dyn Movability,
-    piston: Pos,
-    dir: Dir,
-) -> PushPlan {
+pub fn resolve_push(world: &World, movability: &dyn Movability, piston: Pos, dir: Dir) -> PushPlan {
     let start = piston.offset(dir);
     let mut to_push: Vec<Pos> = Vec::new();
     let mut to_destroy: Vec<Pos> = Vec::new();
-    let failed = PushPlan { to_push: Vec::new(), to_destroy: Vec::new(), possible: false };
+    let failed = PushPlan {
+        to_push: Vec::new(),
+        to_destroy: Vec::new(),
+        possible: false,
+    };
 
     // `resolve()`: the start block must be pushable at all, then one line from
     // it, then a branching pass over every sticky block collected.
@@ -170,23 +169,52 @@ pub fn resolve_push(
         // `resolve()`: a start block that breaks is collected and the push
         // still goes ahead — with nothing to carry.
         if movability.destroys(world, start) {
-            return PushPlan { to_push, to_destroy: vec![start], possible: true };
+            return PushPlan {
+                to_push,
+                to_destroy: vec![start],
+                possible: true,
+            };
         }
         return failed;
     }
-    if !add_block_line(world, movability, piston, dir, start, dir, &mut to_push, &mut to_destroy) {
+    if !add_block_line(
+        world,
+        movability,
+        piston,
+        dir,
+        start,
+        dir,
+        &mut to_push,
+        &mut to_destroy,
+    ) {
         // The partial list, not an empty one: a refusal that reports nothing
         // collected cannot be told apart from a refusal at the first block, and
         // those have completely different causes.
-        return PushPlan { to_push, to_destroy, possible: false };
+        return PushPlan {
+            to_push,
+            to_destroy,
+            possible: false,
+        };
     }
     let mut index = 0;
     while index < to_push.len() {
         let pos = to_push[index];
         if movability.sticky(world, pos).is_some()
-            && !add_branching_blocks(world, movability, piston, dir, pos, &mut to_push, &mut to_destroy)
+            && !add_branching_blocks(
+                world,
+                movability,
+                piston,
+                dir,
+                pos,
+                &mut to_push,
+                &mut to_destroy,
+            )
         {
-            return PushPlan { to_push, to_destroy, possible: false };
+            return PushPlan {
+                to_push,
+                to_destroy,
+                possible: false,
+            };
         }
         index += 1;
     }
@@ -200,7 +228,11 @@ pub fn resolve_push(
     // a branch pulled sideways by slime has no meaningful position on that axis,
     // and the order is observable anyway, because the moving block entities land
     // in creation order and each landing notifies its neighbours.
-    PushPlan { to_push, to_destroy, possible: true }
+    PushPlan {
+        to_push,
+        to_destroy,
+        possible: true,
+    }
 }
 
 /// `PistonStructureResolver.addBlockLine`.
@@ -290,7 +322,9 @@ fn add_block_line(
             for index in 0..=(collision + added).min(to_push.len().saturating_sub(1)) {
                 let pos = to_push[index];
                 if movability.sticky(world, pos).is_some()
-                    && !add_branching_blocks(world, movability, piston, push_dir, pos, to_push, to_destroy)
+                    && !add_branching_blocks(
+                        world, movability, piston, push_dir, pos, to_push, to_destroy,
+                    )
                 {
                     return false;
                 }
@@ -390,7 +424,9 @@ fn add_branching_blocks(
         if movability.is_empty(world, neighbour) {
             continue;
         }
-        if !add_block_line(world, movability, piston, push_dir, neighbour, dir, to_push, to_destroy) {
+        if !add_block_line(
+            world, movability, piston, push_dir, neighbour, dir, to_push, to_destroy,
+        ) {
             return false;
         }
     }
@@ -403,7 +439,12 @@ fn add_branching_blocks(
 /// the piston. Unlike a push there is no column ahead to shove — only the pulled
 /// block and whatever adheres to it — so a blocked destination simply means that
 /// piece stays put rather than cancelling the retraction.
-pub fn resolve_pull(world: &World, movability: &dyn Movability, piston: Pos, facing: Dir) -> PushPlan {
+pub fn resolve_pull(
+    world: &World,
+    movability: &dyn Movability,
+    piston: Pos,
+    facing: Dir,
+) -> PushPlan {
     // `PistonStructureResolver` has no separate retract path. Constructed with
     // `extending = false` it sets `pushDirection = dir.getOpposite()` and
     // `startPos = pos.relative(dir, 2)`, and `resolve()` is then the same
@@ -420,7 +461,11 @@ pub fn resolve_pull(world: &World, movability: &dyn Movability, piston: Pos, fac
     // slime block a row below, and *that* one carries a piston and a panel.
     let push_dir = facing.opposite();
     let start = piston.offset(facing).offset(facing);
-    let failed = PushPlan { to_push: Vec::new(), to_destroy: Vec::new(), possible: false };
+    let failed = PushPlan {
+        to_push: Vec::new(),
+        to_destroy: Vec::new(),
+        possible: false,
+    };
 
     if movability.is_empty(world, start) || !movability.is_movable(world, start) {
         return failed;
@@ -475,7 +520,11 @@ pub fn resolve_pull(world: &World, movability: &dyn Movability, piston: Pos, fac
         index += 1;
     }
 
-    PushPlan { possible: true, to_push, to_destroy }
+    PushPlan {
+        possible: true,
+        to_push,
+        to_destroy,
+    }
 }
 
 /// A piston.
@@ -615,7 +664,12 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 .iter()
                 .filter(|d| **d != Dir::Down)
                 .filter(|d| {
-                    self.power.is_powered(ctx.world, ctx.comparator_out, above.offset(**d), d.opposite())
+                    self.power.is_powered(
+                        ctx.world,
+                        ctx.comparator_out,
+                        above.offset(**d),
+                        d.opposite(),
+                    )
                 })
                 .map(|d| format!("qc:{d:?}"))
                 .collect();
@@ -635,7 +689,9 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                         let neighbor = pos.offset(*d);
                         format!(
                             "direct:{d:?}={}",
-                            ctx.states.descriptor(ctx.world.get(neighbor)).unwrap_or("?")
+                            ctx.states
+                                .descriptor(ctx.world.get(neighbor))
+                                .unwrap_or("?")
                         )
                     }),
             );
@@ -737,7 +793,11 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                         .iter()
                         .map(|p| {
                             let d = ctx.states.descriptor(ctx.world.get(*p)).unwrap_or("?");
-                            format!("{:?}{}", (p.x, p.y, p.z), d.trim_start_matches("minecraft:"))
+                            format!(
+                                "{:?}{}",
+                                (p.x, p.y, p.z),
+                                d.trim_start_matches("minecraft:")
+                            )
                         })
                         .collect();
                     eprintln!(
@@ -873,7 +933,10 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                         to,
                         *state,
                         PISTON_MOVE_TICKS,
-                        Some(Sweep { travel: self.facing, extending: true }),
+                        Some(Sweep {
+                            travel: self.facing,
+                            extending: true,
+                        }),
                     );
                 }
                 // The head slot is itself in motion until the move completes.
@@ -883,7 +946,10 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     head_slot,
                     self.head,
                     PISTON_MOVE_TICKS,
-                    Some(Sweep { travel: self.facing, extending: true }),
+                    Some(Sweep {
+                        travel: self.facing,
+                        extending: true,
+                    }),
                 );
 
                 // `moveBlocks`' tail: `updateNeighborsAt` for every position a
@@ -944,7 +1010,8 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // because "powered" and "quasi-powered" fail in different ways.
                 if std::env::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
                     f.to_string_lossy().split(';').any(|t| {
-                        let c: Vec<i32> = t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+                        let c: Vec<i32> =
+                            t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
                         c.len() == 3 && c[0] == pos.x && c[1] == pos.y && c[2] == pos.z
                     })
                 }) {
@@ -966,23 +1033,32 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                                         .descriptor(ctx.world.get(Pos::new(x, y, z)))
                                         .unwrap_or("?")
                                         .trim_start_matches("minecraft:");
-                                    let mark = if (x, y, z) == (pos.x, pos.y, pos.z) { "*" } else { " " };
+                                    let mark = if (x, y, z) == (pos.x, pos.y, pos.z) {
+                                        "*"
+                                    } else {
+                                        " "
+                                    };
                                     format!("{mark}{:<38}", &d[..d.len().min(38)])
                                 })
                                 .collect();
                             eprintln!("    y{y:<3}{}", row.join(""));
                         }
                     }
-                    for (label, base, skip) in
-                        [("direct", pos, Some(self.facing)), ("qc", pos.offset(Dir::Up), Some(Dir::Down))]
-                    {
+                    for (label, base, skip) in [
+                        ("direct", pos, Some(self.facing)),
+                        ("qc", pos.offset(Dir::Up), Some(Dir::Down)),
+                    ] {
                         for dir in crate::pos::ALL_DIRS {
                             if Some(dir) == skip {
                                 continue;
                             }
                             let at = base.offset(dir);
-                            let emits =
-                                self.power.is_powered(ctx.world, ctx.comparator_out, at, dir.opposite());
+                            let emits = self.power.is_powered(
+                                ctx.world,
+                                ctx.comparator_out,
+                                at,
+                                dir.opposite(),
+                            );
                             eprintln!(
                                 "    {label:<7}{dir:?} {:?} {} => {}",
                                 (at.x, at.y, at.z),
@@ -1059,9 +1135,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     // `finalTick` lands through `setBlock`, so `onPlace` runs
                     // for whatever landed — same hook as the short-pulse drop
                     // below, and a no-op for the air a source piston leaves.
-                    if let Some(behaviour) =
-                        ctx.behaviours.and_then(|table| table.get(state))
-                    {
+                    if let Some(behaviour) = ctx.behaviours.and_then(|table| table.get(state)) {
                         behaviour.on_placed(ctx, head);
                     }
                     ctx.drain();
@@ -1077,7 +1151,10 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     pos,
                     self.states.get(false),
                     PISTON_MOVE_TICKS,
-                    Some(Sweep { travel: self.facing.opposite(), extending: false }),
+                    Some(Sweep {
+                        travel: self.facing.opposite(),
+                        extending: false,
+                    }),
                 );
 
                 if self.sticky {
@@ -1162,7 +1239,11 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                                         .descriptor(ctx.world.get(*p))
                                         .unwrap_or_default()
                                         .to_string();
-                                    format!("{:?}{}", (p.x, p.y, p.z), d.trim_start_matches("minecraft:"))
+                                    format!(
+                                        "{:?}{}",
+                                        (p.x, p.y, p.z),
+                                        d.trim_start_matches("minecraft:")
+                                    )
                                 })
                                 .collect();
                             eprintln!(
@@ -1180,10 +1261,8 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                                 .iter()
                                 .map(|from| (*from, ctx.world.get(*from)))
                                 .collect();
-                            let destinations: Vec<Pos> = carried
-                                .iter()
-                                .map(|(from, _)| from.offset(back))
-                                .collect();
+                            let destinations: Vec<Pos> =
+                                carried.iter().map(|(from, _)| from.offset(back)).collect();
                             // Backwards, exactly as the extension path walks it.
                             // `moveBlocks` is one method for both strokes and
                             // always runs `for (i = toPush.size() - 1; i >= 0;
@@ -1202,10 +1281,13 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                                 ctx.set_shape_only(to, self.moving_block);
                                 ctx.drain();
                                 ctx.defer(
-                        to,
-                        *state,
-                        PISTON_MOVE_TICKS,
-                                    Some(Sweep { travel: back, extending: false }),
+                                    to,
+                                    *state,
+                                    PISTON_MOVE_TICKS,
+                                    Some(Sweep {
+                                        travel: back,
+                                        extending: false,
+                                    }),
                                 );
                             }
                             for (from, _) in &carried {
@@ -1333,7 +1415,10 @@ mod tests {
             facing: Dir::East,
             extended,
             sticky,
-            states: StatePair { off: RETRACTED, on: EXTENDED },
+            states: StatePair {
+                off: RETRACTED,
+                on: EXTENDED,
+            },
             head: HEAD,
             moving: MOVING,
             moving_block: MOVING,
@@ -1352,22 +1437,31 @@ mod tests {
         events: &'a mut EventQueue,
         states: &'a StateRegistry,
     ) -> TickCtx<'a> {
-        TickCtx { drain: None, behaviours: None, world, ticks, events, states, tick: 0,
+        TickCtx {
+            drain: None,
+            behaviours: None,
+            world,
+            ticks,
+            events,
+            states,
+            tick: 0,
             boundary: false,
-        fluids: Box::leak(Box::new(TickQueue::new())),
-        updates: Box::leak(Box::new(Vec::new())),
-        moves: Box::leak(Box::new(Vec::new())),
-        toggles: Box::leak(Box::new(Vec::new())),
-        comparator_out: Box::leak(Box::new(Default::default())),
-        inventories: Box::leak(Box::new(Default::default())),
-        hopper_state: Box::leak(Box::new(Default::default())),
-        commands: Box::leak(Box::new(Default::default())),
-        command_powered: Box::leak(Box::new(Default::default())),
-        tickers: Box::leak(Box::new(Default::default())),
-        item_entities: Box::leak(Box::new(Default::default())),
+            fluids: Box::leak(Box::new(TickQueue::new())),
+            updates: Box::leak(Box::new(Vec::new())),
+            moves: Box::leak(Box::new(Vec::new())),
+            toggles: Box::leak(Box::new(Vec::new())),
+            comparator_out: Box::leak(Box::new(Default::default())),
+            inventories: Box::leak(Box::new(Default::default())),
+            hopper_state: Box::leak(Box::new(Default::default())),
+            commands: Box::leak(Box::new(Default::default())),
+            command_powered: Box::leak(Box::new(Default::default())),
+            tickers: Box::leak(Box::new(Default::default())),
+            item_entities: Box::leak(Box::new(Default::default())),
             minecarts: Box::leak(Box::new(Vec::new())),
             conductors: &[],
-        inv_log: None, log: None }
+            inv_log: None,
+            log: None,
+        }
     }
 
     #[test]
@@ -1396,7 +1490,10 @@ mod tests {
 
         assert_eq!(e.len(), 1, "must queue a block event");
         assert!(t.is_empty(), "must NOT schedule a block tick");
-        assert!(Phase::BlockTicks < Phase::BlockEvents, "and events run later");
+        assert!(
+            Phase::BlockTicks < Phase::BlockEvents,
+            "and events run later"
+        );
     }
 
     #[test]
@@ -1419,20 +1516,26 @@ mod tests {
             let mut ctx = TickCtx {
                 drain: None,
                 behaviours: None,
-                world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
-            boundary: false,
-                updates: &mut Vec::new(), moves: &mut ctx_moves,
+                world: &mut w,
+                ticks: &mut t,
+                fluids: &mut TickQueue::new(),
+                events: &mut e,
+                states: &s,
+                tick: 0,
+                boundary: false,
+                updates: &mut Vec::new(),
+                moves: &mut ctx_moves,
                 toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
-            inventories: &mut Default::default(),
-            hopper_state: &mut Default::default(),
-            commands: &Default::default(),
-            command_powered: &mut Default::default(),
-            tickers: &mut Default::default(),
-            item_entities: &mut Default::default(),
-            minecarts: Box::leak(Box::new(Vec::new())),
-            conductors: &[],
-            inv_log: None,
+                inventories: &mut Default::default(),
+                hopper_state: &mut Default::default(),
+                commands: &Default::default(),
+                command_powered: &mut Default::default(),
+                tickers: &mut Default::default(),
+                item_entities: &mut Default::default(),
+                minecarts: Box::leak(Box::new(Vec::new())),
+                conductors: &[],
+                inv_log: None,
                 log: None,
             };
             assert!(p.on_block_event(&mut ctx, pos, TRIGGER_EXTEND, 0));
@@ -1446,10 +1549,15 @@ mod tests {
 
         // The real states are deferred to the block-entities phase, two ticks out,
         // exactly as the captured trace shows.
-        let mut resolved: Vec<_> = ctx_moves.iter().map(|m| (m.pos, m.state, m.resolve_on)).collect();
+        let mut resolved: Vec<_> = ctx_moves
+            .iter()
+            .map(|m| (m.pos, m.state, m.resolve_on))
+            .collect();
         resolved.sort_by_key(|(p, _, _)| (p.x, p.y, p.z));
-        assert!(resolved.iter().all(|(_, _, on)| *on == PISTON_MOVE_TICKS),
-            "all writes land {PISTON_MOVE_TICKS} ticks later: {resolved:?}");
+        assert!(
+            resolved.iter().all(|(_, _, on)| *on == PISTON_MOVE_TICKS),
+            "all writes land {PISTON_MOVE_TICKS} ticks later: {resolved:?}"
+        );
         assert_eq!(resolved[0].1, HEAD, "head resolves into the first slot");
         assert_eq!(resolved[1].1, STONE, "column lands one east");
     }
@@ -1468,7 +1576,11 @@ mod tests {
         // `possible`, and it is worth far more to be able to see *how far* a
         // refused resolve got than to have it come back empty.
         assert!(!plan.possible, "nothing moves, not even the movable part");
-        assert_eq!(plan.to_push, vec![Pos::new(1, 1, 0)], "collected up to the obsidian");
+        assert_eq!(
+            plan.to_push,
+            vec![Pos::new(1, 1, 0)],
+            "collected up to the obsidian"
+        );
     }
 
     #[test]
@@ -1536,19 +1648,26 @@ mod tests {
             let mut ctx = TickCtx {
                 drain: None,
                 behaviours: None,
-                world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
-            boundary: false,
-                updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
+                world: &mut w,
+                ticks: &mut t,
+                fluids: &mut TickQueue::new(),
+                events: &mut e,
+                states: &s,
+                tick: 0,
+                boundary: false,
+                updates: &mut Vec::new(),
+                moves: &mut pulled,
+                toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
-            inventories: &mut Default::default(),
-            hopper_state: &mut Default::default(),
-            commands: &Default::default(),
-            command_powered: &mut Default::default(),
-            tickers: &mut Default::default(),
-            item_entities: &mut Default::default(),
-            minecarts: Box::leak(Box::new(Vec::new())),
-            conductors: &[],
-            inv_log: None,
+                inventories: &mut Default::default(),
+                hopper_state: &mut Default::default(),
+                commands: &Default::default(),
+                command_powered: &mut Default::default(),
+                tickers: &mut Default::default(),
+                item_entities: &mut Default::default(),
+                minecarts: Box::leak(Box::new(Vec::new())),
+                conductors: &[],
+                inv_log: None,
                 log: None,
             };
             assert!(p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0));
@@ -1559,9 +1678,9 @@ mod tests {
         // captured: extended=true -> moving_piston -> extended=false.
         assert_eq!(w.get(pos), MOVING, "the base itself is in motion");
         assert!(
-            pulled.iter().any(|m| m.pos == pos
-                && m.state == RETRACTED
-                && m.resolve_on == PISTON_MOVE_TICKS),
+            pulled
+                .iter()
+                .any(|m| m.pos == pos && m.state == RETRACTED && m.resolve_on == PISTON_MOVE_TICKS),
             "the base must resolve to retracted: {pulled:?}"
         );
         assert_eq!(w.get(Pos::new(1, 1, 0)), MOVING, "head slot is in motion");
@@ -1598,30 +1717,41 @@ mod tests {
             let mut ctx = TickCtx {
                 drain: None,
                 behaviours: None,
-                world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
-            boundary: false,
-                updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
+                world: &mut w,
+                ticks: &mut t,
+                fluids: &mut TickQueue::new(),
+                events: &mut e,
+                states: &s,
+                tick: 0,
+                boundary: false,
+                updates: &mut Vec::new(),
+                moves: &mut pulled,
+                toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
-            inventories: &mut Default::default(),
-            hopper_state: &mut Default::default(),
-            commands: &Default::default(),
-            command_powered: &mut Default::default(),
-            tickers: &mut Default::default(),
-            item_entities: &mut Default::default(),
-            minecarts: Box::leak(Box::new(Vec::new())),
-            conductors: &[],
-            inv_log: None,
+                inventories: &mut Default::default(),
+                hopper_state: &mut Default::default(),
+                commands: &Default::default(),
+                command_powered: &mut Default::default(),
+                tickers: &mut Default::default(),
+                item_entities: &mut Default::default(),
+                minecarts: Box::leak(Box::new(Vec::new())),
+                conductors: &[],
+                inv_log: None,
                 log: None,
             };
             p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0);
         }
 
         assert!(
-            pulled.iter().any(|m| m.pos == Pos::new(1, 1, 0) && m.state == SLIME),
+            pulled
+                .iter()
+                .any(|m| m.pos == Pos::new(1, 1, 0) && m.state == SLIME),
             "slime pulled into the head slot: {pulled:?}"
         );
         assert!(
-            pulled.iter().any(|m| m.pos == Pos::new(1, 2, 0) && m.state == STONE),
+            pulled
+                .iter()
+                .any(|m| m.pos == Pos::new(1, 2, 0) && m.state == STONE),
             "and the block stuck to it came along: {pulled:?}"
         );
     }
@@ -1653,19 +1783,26 @@ mod tests {
             let mut ctx = TickCtx {
                 drain: None,
                 behaviours: None,
-                world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
-            boundary: false,
-                updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
+                world: &mut w,
+                ticks: &mut t,
+                fluids: &mut TickQueue::new(),
+                events: &mut e,
+                states: &s,
+                tick: 0,
+                boundary: false,
+                updates: &mut Vec::new(),
+                moves: &mut pulled,
+                toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
-            inventories: &mut Default::default(),
-            hopper_state: &mut Default::default(),
-            commands: &Default::default(),
-            command_powered: &mut Default::default(),
-            tickers: &mut Default::default(),
-            item_entities: &mut Default::default(),
-            minecarts: Box::leak(Box::new(Vec::new())),
-            conductors: &[],
-            inv_log: None,
+                inventories: &mut Default::default(),
+                hopper_state: &mut Default::default(),
+                commands: &Default::default(),
+                command_powered: &mut Default::default(),
+                tickers: &mut Default::default(),
+                item_entities: &mut Default::default(),
+                minecarts: Box::leak(Box::new(Vec::new())),
+                conductors: &[],
+                inv_log: None,
                 log: None,
             };
             p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0);
@@ -1675,8 +1812,16 @@ mod tests {
             pulled.iter().all(|m| m.pos == pos),
             "a block still in motion cannot be grabbed — only the base travels: {pulled:?}"
         );
-        assert_eq!(w.get(pos), MOVING, "the piston still retracts, via its placeholder");
-        assert_eq!(w.get(Pos::new(2, 1, 0)), MOVING, "the dropped block is left in flight");
+        assert_eq!(
+            w.get(pos),
+            MOVING,
+            "the piston still retracts, via its placeholder"
+        );
+        assert_eq!(
+            w.get(Pos::new(2, 1, 0)),
+            MOVING,
+            "the dropped block is left in flight"
+        );
     }
 
     #[test]
@@ -1728,9 +1873,18 @@ mod tests {
         let plan = resolve_push(&w, &p.movability, pos, Dir::East);
 
         assert!(plan.possible);
-        assert!(plan.to_push.contains(&Pos::new(1, 1, 0)), "the slime itself");
-        assert!(plan.to_push.contains(&Pos::new(1, 2, 0)), "dragged from above");
-        assert!(plan.to_push.contains(&Pos::new(1, 0, 0)), "dragged from below");
+        assert!(
+            plan.to_push.contains(&Pos::new(1, 1, 0)),
+            "the slime itself"
+        );
+        assert!(
+            plan.to_push.contains(&Pos::new(1, 2, 0)),
+            "dragged from above"
+        );
+        assert!(
+            plan.to_push.contains(&Pos::new(1, 0, 0)),
+            "dragged from below"
+        );
     }
 
     #[test]
@@ -1800,7 +1954,10 @@ mod tests {
 
         let p = piston(false, false);
         let plan = resolve_push(&w, &p.movability, pos, Dir::East);
-        assert!(plan.to_push.contains(&Pos::new(1, 2, 0)), "slime sticks to slime");
+        assert!(
+            plan.to_push.contains(&Pos::new(1, 2, 0)),
+            "slime sticks to slime"
+        );
     }
 
     #[test]
@@ -1821,7 +1978,10 @@ mod tests {
         let p = piston(false, false);
         let plan = resolve_push(&w, &p.movability, pos, Dir::East);
         assert!(plan.possible, "the branch is abandoned, the push survives");
-        assert!(plan.to_push.contains(&Pos::new(1, 1, 0)), "the slime still moves");
+        assert!(
+            plan.to_push.contains(&Pos::new(1, 1, 0)),
+            "the slime still moves"
+        );
         assert!(
             !plan.to_push.contains(&Pos::new(1, 2, 0)),
             "the obsidian is left behind"
@@ -2014,7 +2174,11 @@ pub fn sweep_displacement(
         block_max[i] = origin[i] + 1.0 + shift;
     }
     // `PistonMath.getMovementArea`: the slab in front of the leading face.
-    let leading = if sign > 0.0 { block_max[axis] } else { block_min[axis] };
+    let leading = if sign > 0.0 {
+        block_max[axis]
+    } else {
+        block_min[axis]
+    };
     let (slab_lo, slab_hi) = if sign > 0.0 {
         (leading, leading + PISTON_STEP)
     } else {
@@ -2310,9 +2474,17 @@ pub fn base_fix_displacement(
     // `getMovement(cell, outward, box)`: the cell's outward face to the entity's
     // inward one.
     let (cell_face, inward_face, clipped_face) = if outward > 0.0 {
-        (lo[axis] + 1.0, entity_min[axis], entity_min[axis].max(lo[axis]))
+        (
+            lo[axis] + 1.0,
+            entity_min[axis],
+            entity_min[axis].max(lo[axis]),
+        )
     } else {
-        (lo[axis], entity_max[axis], entity_max[axis].min(lo[axis] + 1.0))
+        (
+            lo[axis],
+            entity_max[axis],
+            entity_max[axis].min(lo[axis] + 1.0),
+        )
     };
     let d1 = outward * (cell_face - inward_face) + PISTON_OVERSHOOT;
     let d2 = outward * (cell_face - clipped_face) + PISTON_OVERSHOOT;
@@ -2403,7 +2575,11 @@ pub fn inside_eject_displacement(
         }
     }
     // Along the piston, in `u`: 0 at the square's inner face, 1 at its outer.
-    let inner = if outward > 0.0 { origin[axis] } else { origin[axis] + 1.0 };
+    let inner = if outward > 0.0 {
+        origin[axis]
+    } else {
+        origin[axis] + 1.0
+    };
     let depth = |world: f64| outward * (world - inner);
     let (trailing, leading) = if outward > 0.0 {
         (depth(entity_min[axis]), depth(entity_max[axis]))
@@ -2516,12 +2692,20 @@ pub fn shove_shape_boxes(
     progress: f64,
     source_piston: bool,
 ) -> Vec<SweptBox> {
-    let facing = if sweep.extending { sweep.travel } else { sweep.travel.opposite() };
+    let facing = if sweep.extending {
+        sweep.travel
+    } else {
+        sweep.travel.opposite()
+    };
     let axis = axis_of(facing);
     let (dx, dy, dz) = facing.delta();
     let sign = f64::from([dx, dy, dz][axis]);
     // `getExtendedProgress`: how far the shape still is from home, along facing.
-    let behind = if sweep.extending { progress - 1.0 } else { 1.0 - progress };
+    let behind = if sweep.extending {
+        progress - 1.0
+    } else {
+        1.0 - progress
+    };
     let mut origin = [
         f64::from(destination.x),
         f64::from(destination.y),
@@ -2544,7 +2728,11 @@ pub fn shove_shape_boxes(
                 wmin[i] = origin[i] + bmin[i];
                 wmax[i] = origin[i] + bmax[i];
             }
-            SweptBox { min: wmin, max: wmax, arm: is_arm }
+            SweptBox {
+                min: wmin,
+                max: wmax,
+                arm: is_arm,
+            }
         })
         .collect()
 }
@@ -2623,8 +2811,7 @@ pub fn moved_shape_displacement(
             slab_max[axis] = leading;
         }
         // `AABB.intersects` — strict, a face exactly touching is not a hit.
-        let touches = (0..3)
-            .all(|i| entity_min[i] < slab_max[i] && entity_max[i] > slab_min[i]);
+        let touches = (0..3).all(|i| entity_min[i] < slab_max[i] && entity_max[i] > slab_min[i]);
         if !touches {
             continue;
         }
@@ -2661,7 +2848,11 @@ mod sweep_tests {
         // (kind, half-width, [pos after step 1, pos after step 2])
         let cases: [(&str, f64, [f64; 2]); 3] = [
             // minecart and NaN minecart — one hitbox, one answer
-            ("minecart", crate::minecart::CART_HALF_WIDTH, [4.000000009536743, 4.500000009536743]),
+            (
+                "minecart",
+                crate::minecart::CART_HALF_WIDTH,
+                [4.000000009536743, 4.500000009536743],
+            ),
             ("small_fireball", 0.15625, [3.66625, 4.16625]),
             ("dragon_fireball", 0.5, [4.01, 4.51]),
         ];
@@ -2695,8 +2886,16 @@ mod sweep_tests {
     fn head_ejection_reproduces_piston_pull_to_the_last_bit() {
         // (kind, half-width, vanilla's final centre x)
         let cases: [(&str, f64, f64); 4] = [
-            ("minecart", crate::minecart::CART_HALF_WIDTH, 3.510_000_009_536_743),
-            ("nan minecart", crate::minecart::CART_HALF_WIDTH, 3.510_000_009_536_743),
+            (
+                "minecart",
+                crate::minecart::CART_HALF_WIDTH,
+                3.510_000_009_536_743,
+            ),
+            (
+                "nan minecart",
+                crate::minecart::CART_HALF_WIDTH,
+                3.510_000_009_536_743,
+            ),
             ("small_fireball", 0.156_25, 3.176_25),
             ("dragon_fireball", 0.5, 3.52),
         ];
@@ -2764,7 +2963,11 @@ mod sweep_tests {
                 }
             }
             assert_eq!(moved, steps, "start {start}: number of steps that moved it");
-            let want = if steps == 0 && start < 3.0 || start > 4.0 { start - HALF } else { 3.02 };
+            let want = if steps == 0 && start < 3.0 || start > 4.0 {
+                start - HALF
+            } else {
+                3.02
+            };
             assert_eq!(x - HALF, want, "start {start}: trailing face");
         }
     }
@@ -2794,16 +2997,16 @@ mod sweep_tests {
         const HEIGHT: f64 = 0.3125;
         // (spawn y, does vanilla eject it) — read straight off the capture.
         let cases: [(f64, bool); 11] = [
-            (0.5, false),      // wholly below the vacated block
-            (0.7, false),      // box overlaps it by 0.0125; feet do not
-            (0.95, false),     // box overlaps it by 0.2625; feet do not
-            (1.0, true),       // feet exactly on the floor of it
+            (0.5, false),  // wholly below the vacated block
+            (0.7, false),  // box overlaps it by 0.0125; feet do not
+            (0.95, false), // box overlaps it by 0.2625; feet do not
+            (1.0, true),   // feet exactly on the floor of it
             (1.34375, true),
-            (1.6875, true),    // box top exactly flush with the block above
+            (1.6875, true), // box top exactly flush with the block above
             (1.7, true),
-            (1.875, true),     // the record door's own y
-            (1.99, true),      // feet barely inside; centre is a block higher
-            (2.0, false),      // feet exactly on the block above: refused
+            (1.875, true), // the record door's own y
+            (1.99, true),  // feet barely inside; centre is a block higher
+            (2.0, false),  // feet exactly on the block above: refused
             (2.5, false),
         ];
         let x = 4.843_75;
@@ -2820,7 +3023,11 @@ mod sweep_tests {
                 // decimal spelling.
                 let d = got.expect("y {y}: ejected");
                 assert!(d < 0.0, "y {y}: nudged back against the head, got {d}");
-                assert_eq!(x + HALF + d, 5.0 - PISTON_EJECT_CLEARANCE, "y {y}: trailing face");
+                assert_eq!(
+                    x + HALF + d,
+                    5.0 - PISTON_EJECT_CLEARANCE,
+                    "y {y}: trailing face"
+                );
             } else {
                 assert_eq!(got, None, "y {y}: left alone");
             }
@@ -2840,7 +3047,10 @@ mod sweep_tests {
         // Head in block (3,2,1) leaving for the piston at (2,2,1).
         let min = [3.95, 1.02, 1.0];
         let max = [4.95, 2.02, 2.0];
-        assert_eq!(head_eject_displacement(Pos::new(2, 2, 1), Dir::West, min, max), None);
+        assert_eq!(
+            head_eject_displacement(Pos::new(2, 2, 1), Dir::West, min, max),
+            None
+        );
         // ...but the block the sticky piston pulls into (3,2,1) sweeps it.
         assert_eq!(
             sweep_displacement(Pos::new(3, 2, 1), Dir::West, 0.0, min, max),
@@ -2862,7 +3072,7 @@ mod sweep_tests {
         let cases: [(f64, bool, bool); 4] = [
             (4.15, true, true),
             (4.10, true, true),
-            (3.60, false, true), // shallow: the overlap, not the cap
+            (3.60, false, true),  // shallow: the overlap, not the cap
             (3.20, false, false), // behind the first slab entirely
         ];
         for (start, capped, touched) in cases {
@@ -2949,7 +3159,10 @@ mod sweep_tests {
 
     /// A small fireball's box, the 0.3125 cube every horizontal lane uses.
     fn fireball(x: f64, y: f64, z: f64) -> ([f64; 3], [f64; 3]) {
-        ([x - 0.15625, y, z - 0.15625], [x + 0.15625, y + 0.3125, z + 0.15625])
+        (
+            [x - 0.15625, y, z - 0.15625],
+            [x + 0.15625, y + 0.3125, z + 0.15625],
+        )
     }
 
     /// A minecart's box: 0.98 wide, 0.7 tall, standing on the floor at y = 1.
@@ -3051,7 +3264,10 @@ mod sweep_tests {
         // The same fireball outside the column is untouched on the second step
         // too, so this is a gate and not a delay.
         let (min, max) = fireball(2.5, 1.0, 1.5);
-        assert_eq!(inside_eject_displacement(piston, Dir::West, PISTON_STEP, min, max), None);
+        assert_eq!(
+            inside_eject_displacement(piston, Dir::West, PISTON_STEP, min, max),
+            None
+        );
         assert_eq!(head_eject_displacement(piston, Dir::West, min, max), None);
     }
 
@@ -3082,7 +3298,7 @@ mod sweep_tests {
             (2.65125, 0.2650),
             (2.64625, 0.2700),
             (2.40725, 0.5090),
-            (2.40625, 0.5100), // again exactly 0.51, and again taken
+            (2.40625, 0.5100),  // again exactly 0.51, and again taken
             (2.40615, -0.3224), // 0.5101, so it retreats instead
             (2.40525, -0.3215),
         ];
@@ -3090,13 +3306,19 @@ mod sweep_tests {
             let (min, max) = fireball(x, 1.34375, 1.5);
             let got = -inside_eject_displacement(piston, Dir::West, 0.0, min, max)
                 .expect("every lane here is inside the square");
-            assert!((got - want).abs() < HAIR, "x={x}: got {got}, capture says {want}");
+            assert!(
+                (got - want).abs() < HAIR,
+                "x={x}: got {got}, capture says {want}"
+            );
         }
         // The seam. Vanilla moves this one 0.51; the law says 0.5099.
         let (min, max) = fireball(2.65635, 1.34375, 1.5);
         let got = -inside_eject_displacement(piston, Dir::West, 0.0, min, max).unwrap();
         assert!((got - 0.5099).abs() < HAIR, "the law's answer moved: {got}");
-        assert!((got - 0.51).abs() > 1e-5, "vanilla says 0.51 and this now agrees — retest the seam");
+        assert!(
+            (got - 0.51).abs() > 1e-5,
+            "vanilla says 0.51 and this now agrees — retest the seam"
+        );
     }
 
     /// `piston_pull_inside`: the same law on the vertical axis, which is where

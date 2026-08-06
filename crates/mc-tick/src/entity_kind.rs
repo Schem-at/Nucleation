@@ -230,7 +230,10 @@ impl EntityBehaviour for EntityKind {
     }
 
     fn seat_for(&self, rider: &str) -> Option<[f64; 3]> {
-        self.seats.iter().find(|(kind, _)| *kind == rider).map(|(_, seat)| *seat)
+        self.seats
+            .iter()
+            .find(|(kind, _)| *kind == rider)
+            .map(|(_, seat)| *seat)
     }
 
     fn carries_passengers(&self) -> bool {
@@ -253,7 +256,9 @@ impl std::fmt::Debug for EntityTable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut names: Vec<&str> = self.entries.keys().copied().collect();
         names.sort_unstable();
-        f.debug_struct("EntityTable").field("kinds", &names).finish()
+        f.debug_struct("EntityTable")
+            .field("kinds", &names)
+            .finish()
     }
 }
 
@@ -261,7 +266,9 @@ impl EntityTable {
     /// An empty table. Nothing is known until something is registered, and a
     /// kind that is not registered is refused by name.
     pub fn new() -> Self {
-        Self { entries: HashMap::new() }
+        Self {
+            entries: HashMap::new(),
+        }
     }
 
     /// Register `behaviour`, replacing any previous entry for its name.

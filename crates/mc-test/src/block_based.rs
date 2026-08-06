@@ -44,7 +44,11 @@ pub fn synthesize_block_based(
     let mut starts: Vec<Pos> = Vec::new();
     let mut accepts: Vec<Pos> = Vec::new();
     for (pos, entry) in &structure.blocks {
-        let descriptor = structure.palette.get(*entry).map(String::as_str).unwrap_or_default();
+        let descriptor = structure
+            .palette
+            .get(*entry)
+            .map(String::as_str)
+            .unwrap_or_default();
         if !descriptor.starts_with("minecraft:test_block") {
             continue;
         }
@@ -130,18 +134,42 @@ mod tests {
     #[test]
     fn a_block_based_rig_synthesizes_a_runnable_case() {
         let structure = Structure::parse(RIG).expect("parses");
-        let spec = synthesize_block_based(&structure, "rig", 20, &["minecraft:sponge".to_string()], (0, 0, 0))
-            .expect("test blocks found");
+        let spec = synthesize_block_based(
+            &structure,
+            "rig",
+            20,
+            &["minecraft:sponge".to_string()],
+            (0, 0, 0),
+        )
+        .expect("test blocks found");
         let cases = crate::parse_suite(&spec, "rig").expect("the synthesized spec must parse");
         assert_eq!(cases.len(), 1);
         let case = &cases[0];
-        assert_eq!(case.inert, vec!["minecraft:sponge"], "test_block needs no assertion now");
+        assert_eq!(
+            case.inert,
+            vec!["minecraft:sponge"],
+            "test_block needs no assertion now"
+        );
         assert_eq!(case.setup, 10, "vanilla's setup_ticks, honoured");
-        assert_eq!(case.actions.len(), 1, "one start: a constant signal, never cleared");
+        assert_eq!(
+            case.actions.len(),
+            1,
+            "one start: a constant signal, never cleared"
+        );
         assert_eq!(case.events.len(), 1, "one accept, one latch claim");
-        assert_eq!(case.events[0].pos, Some([2, 0, 0]), "the claim sits on the accept itself");
-        assert_eq!(case.events[0].to.as_deref(), Some("minecraft:test_block[fired=true]"));
-        assert_eq!(case.events[0].after, None, "a latch during the pulse window is vanilla");
+        assert_eq!(
+            case.events[0].pos,
+            Some([2, 0, 0]),
+            "the claim sits on the accept itself"
+        );
+        assert_eq!(
+            case.events[0].to.as_deref(),
+            Some("minecraft:test_block[fired=true]")
+        );
+        assert_eq!(
+            case.events[0].after, None,
+            "a latch during the pulse window is vanilla"
+        );
         assert_eq!(case.checks[0].tick, 20);
     }
 
@@ -157,8 +185,8 @@ mod tests {
     #[test]
     fn the_synthesized_rig_actually_passes_its_own_run() {
         let structure = Structure::parse(RIG).expect("parses");
-        let spec =
-            synthesize_block_based(&structure, "rig", 20, &[], (0, 0, 0)).expect("test blocks found");
+        let spec = synthesize_block_based(&structure, "rig", 20, &[], (0, 0, 0))
+            .expect("test blocks found");
         let cases = crate::parse_suite(&spec, "rig").expect("parses");
         crate::run(&structure, &cases[0], None).expect("the synthesized claim must hold");
     }

@@ -104,7 +104,11 @@ pub fn connecting_side(
         && rules.sturdy_up(world, side)
         && rules.should_connect_to(world, side.offset(Dir::Up), None);
     if climbs {
-        let out = if rules.full_block(world, side) { WireSide::Up } else { WireSide::Side };
+        let out = if rules.full_block(world, side) {
+            WireSide::Up
+        } else {
+            WireSide::Side
+        };
         trace_side(rules, world, pos, dir, out, can_connect_up, true);
         return out;
     }
@@ -138,7 +142,9 @@ fn trace_side(
     can_connect_up: bool,
     climbed: bool,
 ) {
-    let Some(filter) = std::env::var_os("MC_TICK_TRACE_SIDE") else { return };
+    let Some(filter) = std::env::var_os("MC_TICK_TRACE_SIDE") else {
+        return;
+    };
     let wanted = filter.to_string_lossy().split(';').any(|t| {
         let c: Vec<i32> = t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
         c.len() == 3 && c[0] == pos.x && c[1] == pos.y && c[2] == pos.z
@@ -256,12 +262,7 @@ pub fn java_hash_order(pos: Pos, origin: Pos) -> Vec<Pos> {
 }
 
 /// `DefaultRedstoneWireEvaluator.updatePowerStrength` for the wire at `pos`.
-pub fn update_power_strength(
-    rules: &dyn WireWorld,
-    ctx: &mut TickCtx<'_>,
-    pos: Pos,
-    current: u8,
-) {
+pub fn update_power_strength(rules: &dyn WireWorld, ctx: &mut TickCtx<'_>, pos: Pos, current: u8) {
     let block = rules.block_signal(ctx, pos);
     let target = if block == 15 {
         15
@@ -298,7 +299,11 @@ pub fn update_neighbours_of_neighbouring_wires(
     }
     for dir in HORIZONTAL {
         let side = pos.offset(dir);
-        let step = if rules.conductor(ctx.world, side) { Dir::Up } else { Dir::Down };
+        let step = if rules.conductor(ctx.world, side) {
+            Dir::Up
+        } else {
+            Dir::Down
+        };
         check_corner_change_at(rules, ctx, side.offset(step));
     }
 }
@@ -347,10 +352,14 @@ impl<R: WireWorld + Clone + 'static> BlockBehaviour for Wire<R> {
         // before EAST. A loop written against the wrong one emits the same set
         // of updates in a different sequence, and redstone is order-sensitive.
         const HORIZONTAL: [Dir; 4] = [Dir::North, Dir::East, Dir::South, Dir::West];
-        let Some((_, sides)) = self.rules.wire_shape(world, pos) else { return Vec::new() };
+        let Some((_, sides)) = self.rules.wire_shape(world, pos) else {
+            return Vec::new();
+        };
         let mut out = Vec::new();
         for dir in HORIZONTAL {
-            let Some(index) = side_index(dir) else { continue };
+            let Some(index) = side_index(dir) else {
+                continue;
+            };
             if sides[index] == WireSide::None {
                 continue;
             }
@@ -414,11 +423,15 @@ impl<R: WireWorld + Clone + 'static> BlockBehaviour for Wire<R> {
         if from == Dir::Down {
             return;
         }
-        let Some((power, current)) = self.rules.wire_shape(ctx.world, pos) else { return };
+        let Some((power, current)) = self.rules.wire_shape(ctx.world, pos) else {
+            return;
+        };
         let sides = if from == Dir::Up {
             connection_state(&self.rules, ctx.world, pos, current)
         } else {
-            let Some(index) = side_index(from) else { return };
+            let Some(index) = side_index(from) else {
+                return;
+            };
             let is_cross = current.iter().all(|s| s.connected());
             let can_connect_up = !self.rules.conductor(ctx.world, pos.offset(Dir::Up));
             let side = connecting_side(&self.rules, ctx.world, pos, from, can_connect_up);
@@ -433,7 +446,9 @@ impl<R: WireWorld + Clone + 'static> BlockBehaviour for Wire<R> {
         if sides == current {
             return;
         }
-        let Some(state) = self.rules.wire_with_shape(power, sides) else { return };
+        let Some(state) = self.rules.wire_with_shape(power, sides) else {
+            return;
+        };
         // A shape write, so it carries on through the shape pass without
         // notifying neighbours — the wire re-faces itself, and the dust beyond
         // it re-faces in turn.
@@ -462,7 +477,6 @@ mod tests {
     }
 }
 
-
 #[cfg(test)]
 mod hash_order_ground_truth {
     use super::*;
@@ -475,20 +489,132 @@ mod hash_order_ground_truth {
     #[test]
     fn the_hash_order_matches_real_java() {
         let cases: &[(Pos, &[(i32, i32, i32)])] = &[
-            (Pos::new(2, 2, 3), &[(2,3,3),(2,2,2),(1,2,3),(2,2,3),(2,1,3),(2,2,4),(3,2,3)]),
-            (Pos::new(1, 10, 4), &[(1,11,4),(1,10,3),(0,10,4),(1,10,4),(1,9,4),(1,10,5),(2,10,4)]),
-            (Pos::new(2, 2, 2), &[(2,3,2),(2,2,1),(1,2,2),(2,2,2),(2,1,2),(2,2,3),(3,2,2)]),
-            (Pos::new(3, 2, 2), &[(3,3,2),(3,2,1),(2,2,2),(3,2,2),(3,1,2),(3,2,3),(4,2,2)]),
-            (Pos::new(4, 7, 2), &[(4,6,2),(4,7,3),(5,7,2),(4,8,2),(4,7,1),(3,7,2),(4,7,2)]),
-            (Pos::new(11, 7, 4), &[(11,8,4),(11,7,3),(10,7,4),(11,7,4),(11,6,4),(11,7,5),(12,7,4)]),
-            (Pos::new(2, 5, 3), &[(2,5,3),(2,4,3),(2,5,4),(3,5,3),(2,6,3),(2,5,2),(1,5,3)]),
-            (Pos::new(13, 5, 3), &[(13,6,3),(13,5,2),(12,5,3),(13,5,3),(13,4,3),(13,5,4),(14,5,3)]),
-            (Pos::new(0, 0, 0), &[(0,0,0),(0,0,-1),(-1,0,0),(0,0,1),(1,0,0),(0,-1,0),(0,1,0)]),
-            (Pos::new(7, 5, 1), &[(7,6,1),(7,5,0),(6,5,1),(7,5,1),(7,4,1),(7,5,2),(8,5,1)]),
+            (
+                Pos::new(2, 2, 3),
+                &[
+                    (2, 3, 3),
+                    (2, 2, 2),
+                    (1, 2, 3),
+                    (2, 2, 3),
+                    (2, 1, 3),
+                    (2, 2, 4),
+                    (3, 2, 3),
+                ],
+            ),
+            (
+                Pos::new(1, 10, 4),
+                &[
+                    (1, 11, 4),
+                    (1, 10, 3),
+                    (0, 10, 4),
+                    (1, 10, 4),
+                    (1, 9, 4),
+                    (1, 10, 5),
+                    (2, 10, 4),
+                ],
+            ),
+            (
+                Pos::new(2, 2, 2),
+                &[
+                    (2, 3, 2),
+                    (2, 2, 1),
+                    (1, 2, 2),
+                    (2, 2, 2),
+                    (2, 1, 2),
+                    (2, 2, 3),
+                    (3, 2, 2),
+                ],
+            ),
+            (
+                Pos::new(3, 2, 2),
+                &[
+                    (3, 3, 2),
+                    (3, 2, 1),
+                    (2, 2, 2),
+                    (3, 2, 2),
+                    (3, 1, 2),
+                    (3, 2, 3),
+                    (4, 2, 2),
+                ],
+            ),
+            (
+                Pos::new(4, 7, 2),
+                &[
+                    (4, 6, 2),
+                    (4, 7, 3),
+                    (5, 7, 2),
+                    (4, 8, 2),
+                    (4, 7, 1),
+                    (3, 7, 2),
+                    (4, 7, 2),
+                ],
+            ),
+            (
+                Pos::new(11, 7, 4),
+                &[
+                    (11, 8, 4),
+                    (11, 7, 3),
+                    (10, 7, 4),
+                    (11, 7, 4),
+                    (11, 6, 4),
+                    (11, 7, 5),
+                    (12, 7, 4),
+                ],
+            ),
+            (
+                Pos::new(2, 5, 3),
+                &[
+                    (2, 5, 3),
+                    (2, 4, 3),
+                    (2, 5, 4),
+                    (3, 5, 3),
+                    (2, 6, 3),
+                    (2, 5, 2),
+                    (1, 5, 3),
+                ],
+            ),
+            (
+                Pos::new(13, 5, 3),
+                &[
+                    (13, 6, 3),
+                    (13, 5, 2),
+                    (12, 5, 3),
+                    (13, 5, 3),
+                    (13, 4, 3),
+                    (13, 5, 4),
+                    (14, 5, 3),
+                ],
+            ),
+            (
+                Pos::new(0, 0, 0),
+                &[
+                    (0, 0, 0),
+                    (0, 0, -1),
+                    (-1, 0, 0),
+                    (0, 0, 1),
+                    (1, 0, 0),
+                    (0, -1, 0),
+                    (0, 1, 0),
+                ],
+            ),
+            (
+                Pos::new(7, 5, 1),
+                &[
+                    (7, 6, 1),
+                    (7, 5, 0),
+                    (6, 5, 1),
+                    (7, 5, 1),
+                    (7, 4, 1),
+                    (7, 5, 2),
+                    (8, 5, 1),
+                ],
+            ),
         ];
         for (pos, want) in cases {
-            let got: Vec<(i32, i32, i32)> =
-                java_hash_order(*pos, Pos::new(0, 0, 0)).iter().map(|p| (p.x, p.y, p.z)).collect();
+            let got: Vec<(i32, i32, i32)> = java_hash_order(*pos, Pos::new(0, 0, 0))
+                .iter()
+                .map(|p| (p.x, p.y, p.z))
+                .collect();
             let want: Vec<(i32, i32, i32)> = want.to_vec();
             assert_eq!(got, want, "hash order for {pos:?}");
         }
@@ -522,11 +648,27 @@ mod hash_origin_matters {
 
         assert_eq!(
             at_origin,
-            vec![(5, 3, 1), (5, 2, 0), (4, 2, 1), (5, 2, 1), (5, 1, 1), (5, 2, 2), (6, 2, 1)],
+            vec![
+                (5, 3, 1),
+                (5, 2, 0),
+                (4, 2, 1),
+                (5, 2, 1),
+                (5, 1, 1),
+                (5, 2, 2),
+                (6, 2, 1)
+            ],
         );
         assert_eq!(
             in_world,
-            vec![(5, 2, 1), (5, 1, 1), (5, 2, 2), (6, 2, 1), (5, 3, 1), (5, 2, 0), (4, 2, 1)],
+            vec![
+                (5, 2, 1),
+                (5, 1, 1),
+                (5, 2, 2),
+                (6, 2, 1),
+                (5, 3, 1),
+                (5, 2, 0),
+                (4, 2, 1)
+            ],
         );
         assert_ne!(at_origin, in_world, "the offset must not be a no-op");
     }

@@ -29,7 +29,10 @@ const MASK: u64 = (1 << 48) - 1;
 impl JavaRandom {
     /// Seed exactly as `Random.setSeed`: scramble with the multiplier.
     pub fn new(seed: i64) -> Self {
-        Self { seed: (seed as u64 ^ MULTIPLIER) & MASK, cached_gaussian: None }
+        Self {
+            seed: (seed as u64 ^ MULTIPLIER) & MASK,
+            cached_gaussian: None,
+        }
     }
 
     /// The LCG step: `next(bits)`.
@@ -118,7 +121,10 @@ mod tests {
         let mut r = JavaRandom::new(42);
         assert_eq!([r.next_int(10), r.next_int(10), r.next_int(10)], [0, 3, 8]);
         let mut r = JavaRandom::new(42);
-        assert_eq!([r.next_int(16), r.next_int(16), r.next_int(16)], [11, 0, 10]);
+        assert_eq!(
+            [r.next_int(16), r.next_int(16), r.next_int(16)],
+            [11, 0, 10]
+        );
         // bound 1 consumes a draw (vanilla's reservoir sampling relies on it).
         let mut r = JavaRandom::new(12345);
         assert_eq!(r.next_int(1), 0);

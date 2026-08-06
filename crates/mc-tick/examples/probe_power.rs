@@ -30,7 +30,10 @@ fn main() {
         .position(|a| a == "--origin")
         .and_then(|i| args.get(i + 1))
         .map(|v| {
-            let c: Vec<i32> = v.split(',').map(|p| p.parse().expect("--origin x,y,z")).collect();
+            let c: Vec<i32> = v
+                .split(',')
+                .map(|p| p.parse().expect("--origin x,y,z"))
+                .collect();
             Pos::new(c[0], c[1], c[2])
         })
         .unwrap_or_default();
@@ -97,11 +100,18 @@ fn main() {
             .unwrap_or("minecraft:air")
             .to_string()
     };
-    println!("tick {}: {target:?} = {}", sim.tick_count(), describe(target));
+    println!(
+        "tick {}: {target:?} = {}",
+        sim.tick_count(),
+        describe(target)
+    );
     // The direct neighbours, then the quasi-connectivity ring: a piston reads
     // the block above it and *that* block's neighbours, so a build can power one
     // from a block touching it nowhere.
-    for (label, at) in [("", target), ("above ", target.offset(mc_tick::pos::Dir::Up))] {
+    for (label, at) in [
+        ("", target),
+        ("above ", target.offset(mc_tick::pos::Dir::Up)),
+    ] {
         println!("  {label}{at:?} {}", describe(at));
         for dir in mc_tick::pos::ALL_DIRS {
             let n = at.offset(dir);

@@ -23,7 +23,10 @@ fn flyer() -> Simulation {
     // after the behaviour table is built gets an id and no behaviour, so
     // placing it is a write nothing reacts to — the machine just sits there.
     // This is what the case runner does with its actions' `state` fields.
-    let actuators = ["minecraft:redstone_block".to_string(), "minecraft:air".to_string()];
+    let actuators = [
+        "minecraft:redstone_block".to_string(),
+        "minecraft:air".to_string(),
+    ];
     mc_test::build_sim(
         &structure,
         Pos::new(0, 0, 0),
@@ -36,7 +39,10 @@ fn flyer() -> Simulation {
 }
 
 fn kick(sim: &mut Simulation) {
-    let redstone = sim.registry_mut().intern("minecraft:redstone_block").expect("interns");
+    let redstone = sim
+        .registry_mut()
+        .intern("minecraft:redstone_block")
+        .expect("interns");
     let air = sim.registry_mut().intern("minecraft:air").expect("interns");
     // The timing the bundled case uses: redstone in at tick 2, out at tick 4.
     // Kicking at tick 0 instead does nothing — the machine has not finished
@@ -81,22 +87,33 @@ fn growth_costs_little_and_the_engine_is_fast() {
     // enlarged up front so no reallocation happens mid-flight. Any difference
     // between the two is what growth costs.
     let mut roomy = flyer();
-    roomy.registry_and_world_mut().1.grow_to_include(Pos::new(600, 8, 8));
+    roomy
+        .registry_and_world_mut()
+        .1
+        .grow_to_include(Pos::new(600, 8, 8));
     kick(&mut roomy);
 
-    println!("\nflying machine (6 blocks, travels ~{} blocks):", ticks / 10);
+    println!(
+        "\nflying machine (6 blocks, travels ~{} blocks):",
+        ticks / 10
+    );
     let a = run("region grows to follow", &mut growing, ticks);
     let b = run("region pre-sized", &mut roomy, ticks);
-    println!(
-        "  growth overhead: {:+.1}%",
-        (b / a - 1.0) * 100.0
-    );
+    println!("  growth overhead: {:+.1}%", (b / a - 1.0) * 100.0);
 
     // Both must have actually flown, or this measured an engine sitting still.
     let reach = |sim: &Simulation| {
-        sim.world().iter_non_air().map(|(p, _)| p.x).max().unwrap_or(i32::MIN)
+        sim.world()
+            .iter_non_air()
+            .map(|(p, _)| p.x)
+            .max()
+            .unwrap_or(i32::MIN)
     };
-    println!("  reached x = {} (grown) / {} (pre-sized)", reach(&growing), reach(&roomy));
+    println!(
+        "  reached x = {} (grown) / {} (pre-sized)",
+        reach(&growing),
+        reach(&roomy)
+    );
     assert!(reach(&growing) > 300, "the growing run never got moving");
     assert_eq!(reach(&growing), reach(&roomy), "growth changed the flight");
 }

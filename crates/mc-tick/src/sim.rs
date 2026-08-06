@@ -292,6 +292,8 @@ pub struct Simulation {
     /// The log kept after recording was switched off, so that stopping the
     /// recorder does not destroy what it recorded. `None` while recording.
     upd_saved: Option<Vec<crate::behaviour::UpdateRecord>>,
+    /// Rich run recording, independently opt-in from the conformance log.
+    timeline: Option<crate::timeline::TimelineRecorder>,
     /// The phase currently executing, `None` between ticks.
     phase: Option<Phase>,
     /// Whether a tick's phase walk is currently executing.
@@ -317,6 +319,54 @@ pub struct Simulation {
     /// Held from construction so `reset` is exactly "as loaded" rather than
     /// "as I last remembered to snapshot".
     initial: Checkpoint,
+}
+
+/// Whether a saved body is the one nonzero-motion frozen pose we can identify
+/// without pretending to have general boat physics.
+///
+/// `boat_fence.litematic` is a boat hanging almost vertically from a fence
+/// knot. Vanilla saves its tether-rest correction as
+/// `(roundoff, 0.011681267954871115, roundoff)` even though its authored pose is
+/// the stable collision geometry the build needs. The leash tag proves this is
+/// that bounded state rather than a free boat. The envelope is intentionally
+/// one-sided and tight: no horizontal travel beyond floating-point dust, and
+/// less than 1/64 block/tick upward. A falling, rowing or swinging boat still
+/// refuses until real boat/leash physics exists.
+fn supported_parked_boat(body: &crate::structure::SpawnedBody, motion: [f64; 3]) -> bool {
+    const HORIZONTAL_DUST: f64 = 2.0 * f64::EPSILON;
+    const MAX_TETHER_REST_RISE: f64 = 1.0 / 64.0;
+
+    if body.kind == "minecraft:oak_boat" {
+        return body.leashed
+            && motion[0].abs() <= HORIZONTAL_DUST
+            && (0.0..=MAX_TETHER_REST_RISE).contains(&motion[1])
+            && motion[2].abs() <= HORIZONTAL_DUST;
+    }
+
+    // `Elevator Decorated.litematic` contains 24 vertical chains of eight pale
+    // oak boats. Each carries one silverfish; seven boats in each chain are
+    // leashed to the next boat and the root is not. Vanilla 26.2 measures the
+    // silverfish seat at [0, 0.1875, 0]. The settled save's tether corrections
+    // are horizontal only and bounded below 1/4096 block/tick; every free root
+    // contains floating-point dust only. This identifies that authored rest
+    // network without accepting a free rowing, falling or drifting boat.
+    let silverfish_rider = matches!(
+        body.passengers.as_slice(),
+        [crate::structure::SpawnedEntity::Body(rider)]
+            if rider.kind == "minecraft:silverfish"
+    );
+    let tether_residue = body.leashed
+        && motion[0].abs() <= 1.0 / 4096.0
+        && motion[1] == 0.0
+        && motion[2].abs() <= 1.0 / 4096.0;
+    let free_root_at_rest = !body.leashed
+        && motion[0].abs() <= HORIZONTAL_DUST
+        && motion[1].abs() <= HORIZONTAL_DUST
+        && motion[2].abs() <= HORIZONTAL_DUST;
+
+    body.kind == "minecraft:pale_oak_boat"
+        && silverfish_rider
+        && (tether_residue || free_root_at_rest)
 }
 
 impl Simulation {
@@ -384,6 +434,7 @@ impl Simulation {
             inv_log: None,
             upd_log: None,
             upd_saved: None,
+            timeline: None,
             phase: None,
             in_tick: false,
             ticking: None,
@@ -409,6 +460,7 @@ impl Simulation {
     /// Off by default: the tick loop should not pay for observability nobody asked
     /// for, and a simulation used for timing runs millions of ticks.
     pub fn record(&mut self) {
+        self.timeline = None;
         self.log = Some(Vec::new());
         self.inv_log = Some(Vec::new());
         self.ent_log = Some(Vec::new());
@@ -419,6 +471,28 @@ impl Simulation {
         for cart in &self.minecarts {
             self.entity_snapshot.insert(cart.id, cart.pos);
         }
+    }
+
+    /// Start a rich run timeline, including block deltas, input markers,
+    /// piston strokes, and a canonical visible-world fingerprint per tick.
+    ///
+    /// This is separate from [`Simulation::record`] because state snapshots
+    /// deliberately cost work. With timeline recording off the tick loop only
+    /// pays one predictable `Option` check at the tick boundary.
+    pub fn record_timeline(&mut self) {
+        self.record();
+        self.timeline = Some(crate::timeline::TimelineRecorder::new(
+            self.tick,
+            &self.world,
+            &self.registry,
+        ));
+    }
+
+    /// Clone the timeline recorded since [`Simulation::record_timeline`].
+    pub fn recorded_timeline(&self) -> Option<crate::timeline::RunTimeline> {
+        self.timeline
+            .as_ref()
+            .map(|timeline| timeline.finish(self.log.as_deref().unwrap_or(&[])))
     }
 
     /// The entity events recorded since [`Simulation::record`].
@@ -642,8 +716,14 @@ impl Simulation {
     /// differs between them — box, solidity to a cart, seats — is entirely in
     /// [`crate::vanilla::entity_table`].
     ///
-    /// Refuses one that is actually *moving*, and the bar is lower than it
-    /// looks. The record doors' fireballs are caught mid-flight by a
+    /// Refuses one that is actually *moving*, with one measured exception: a
+    /// leashed oak boat at tether rest may carry a sub-1/64 upward correction
+    /// and floating-point dust horizontally. `boat_fence.litematic` is that
+    /// state, and its authored pose is kept as the stationary hard collider.
+    /// Free, falling, rowing and swinging boats still refuse.
+    ///
+    /// Otherwise the bar is lower than it looks. The record doors' fireballs
+    /// are caught mid-flight by a
     /// piston-and-cobweb trick and have zero motion, so modelling them as a
     /// stationary box is what the game does with them — but a fireball with real
     /// velocity is a projectile and there is no projectile physics here; a
@@ -660,7 +740,7 @@ impl Simulation {
         body: &crate::structure::SpawnedBody,
     ) -> Result<u32, String> {
         let motion = self.motion_semantics.load_motion(body.motion, [0.0; 3]);
-        if motion.iter().any(|v| *v != 0.0) {
+        if motion.iter().any(|v| *v != 0.0) && !supported_parked_boat(body, motion) {
             return Err(format!(
                 "{} at {:?} has Motion {:?}: this engine models it only as a frozen \
                  hitbox, and has no projectile physics, mob AI, flight or gravity to \
@@ -671,7 +751,7 @@ impl Simulation {
         self.spawn_frozen_entity(body.kind.clone(), body.pos)
     }
 
-    /// Seat a passenger on a minecart.
+    /// Seat a passenger on a measured vehicle.
     ///
     /// A rider has no physics and no position of its own. Vanilla's
     /// `Entity.rideTick` zeroes the passenger's velocity, ticks it, and then the
@@ -701,13 +781,23 @@ impl Simulation {
         vehicle_id: u32,
         rider: &crate::structure::SpawnedEntity,
     ) -> Result<u32, String> {
-        let Some(vehicle) = self.minecarts.iter().find(|c| c.id == vehicle_id) else {
+        let vehicle_kind = self
+            .minecarts
+            .iter()
+            .find(|cart| cart.id == vehicle_id && !cart.removed)
+            .map(|cart| cart.kind.clone())
+            .or_else(|| {
+                self.bodies
+                    .iter()
+                    .find(|body| body.id == vehicle_id)
+                    .map(|body| body.kind.clone())
+            });
+        let Some(vehicle_kind) = vehicle_kind else {
             return Err(format!(
-                "passenger seated on entity {vehicle_id}, which is not a minecart in \
-                 this simulation: only a cart's seat has been measured"
+                "passenger seated on missing entity {vehicle_id}: its vehicle did not \
+                 spawn, so its seat cannot be derived"
             ));
         };
-        let vehicle_kind = vehicle.kind.clone();
         let rider_kind = rider.kind().to_string();
         let Some(seat) = crate::entity::passenger_attachment(&vehicle_kind, &rider_kind) else {
             return Err(format!(
@@ -1918,8 +2008,28 @@ impl Simulation {
             crate::entity::BodyPhysics::Frozen { pos }
             | crate::entity::BodyPhysics::Ballistic { pos, .. } => Some(pos),
             crate::entity::BodyPhysics::Rider { vehicle, seat } => {
-                let cart = self.minecarts.iter().find(|c| c.id == vehicle && !c.removed)?;
-                Some([cart.pos[0] + seat[0], cart.pos[1] + seat[1], cart.pos[2] + seat[2]])
+                let vehicle_pos = self
+                    .minecarts
+                    .iter()
+                    .find(|cart| cart.id == vehicle && !cart.removed)
+                    .map(|cart| cart.pos)
+                    .or_else(|| {
+                        self.bodies.iter().find_map(|candidate| {
+                            if candidate.id != vehicle {
+                                return None;
+                            }
+                            match candidate.physics {
+                                crate::entity::BodyPhysics::Frozen { pos }
+                                | crate::entity::BodyPhysics::Ballistic { pos, .. } => Some(pos),
+                                crate::entity::BodyPhysics::Rider { .. } => None,
+                            }
+                        })
+                    })?;
+                Some([
+                    vehicle_pos[0] + seat[0],
+                    vehicle_pos[1] + seat[1],
+                    vehicle_pos[2] + seat[2],
+                ])
             }
         }
     }
@@ -2251,6 +2361,13 @@ impl Simulation {
         self.in_tick = false;
         self.phase = None;
         self.tick += 1;
+        if let Some(timeline) = self.timeline.as_mut() {
+            timeline.frames.push(crate::timeline::StateFrame::capture(
+                self.tick,
+                &self.world,
+                &self.registry,
+            ));
+        }
         // Burnout only looks back a fixed window, so anything older is dead weight.
         let horizon = self.tick.saturating_sub(crate::components::TORCH_BURNOUT_WINDOW);
         self.toggles.retain(|(_, t)| *t >= horizon);
@@ -2925,6 +3042,13 @@ impl Simulation {
     /// exactly as a block placed between server ticks behaves. Breaking a block
     /// is placing air.
     pub fn place_block(&mut self, pos: Pos, state: StateId) {
+        if let Some(timeline) = self.timeline.as_mut() {
+            timeline.inputs.push(crate::timeline::InputAction::PlaceBlock {
+                tick: self.tick,
+                pos,
+                state,
+            });
+        }
         let previous = self.world.get(pos);
         if previous == state {
             return;
@@ -2995,6 +3119,12 @@ impl Simulation {
     /// last-completed-tick time. Captured with a note block and an observer: the
     /// note cycles on the click's tick, the observer pulses one tick later.
     pub fn use_block(&mut self, pos: Pos) {
+        if let Some(timeline) = self.timeline.as_mut() {
+            timeline.inputs.push(crate::timeline::InputAction::UseBlock {
+                tick: self.tick,
+                pos,
+            });
+        }
         let state = self.world.get(pos);
         let Some(behaviour) = self.behaviours.get(state) else {
             if state != StateId::AIR {
@@ -3605,6 +3735,14 @@ impl Simulation {
                     self.unknown_seen.push(state);
                     continue;
                 };
+                let piston = self.timeline.as_ref().and_then(|_| {
+                    crate::timeline::piston_event(
+                        self.tick,
+                        event,
+                        self.registry.descriptor(state).unwrap_or_default(),
+                        self.log.as_ref().map_or(0, Vec::len),
+                    )
+                });
                 let mut ctx = TickCtx {
                     drain: Some(crate::behaviour::Drain {
                         pending: &mut self.pending,
@@ -3661,6 +3799,11 @@ impl Simulation {
                 }
                 if !handled {
                     refused.push(event);
+                }
+                if handled {
+                    if let (Some(timeline), Some(piston)) = (self.timeline.as_mut(), piston) {
+                        timeline.pistons.push(piston);
+                    }
                 }
                 self.propagate();
             }
@@ -3807,6 +3950,7 @@ mod tests {
                     count: 64,
                     contents: None,
                 }],
+                blocked_slots: 0,
             },
         );
         assert_eq!(s.inventory(pos).unwrap().analog_signal(), 1);
@@ -3943,6 +4087,115 @@ mod tests {
         assert!(report.contains("minecraft:observer"), "{report}");
     }
 
+    /// `boat_fence.litematic` saves a leashed boat at tether rest with a small
+    /// upward correction rather than zero Motion. That exact bounded state is
+    /// a stationary hard collider; removing the leash or adding real travel
+    /// must still refuse rather than broadening this into guessed boat physics.
+    #[test]
+    fn a_parked_leashed_boat_accepts_only_the_measured_rest_residue() {
+        let mut s = sim();
+        let fixture = crate::structure::SpawnedBody {
+            kind: "minecraft:oak_boat".to_string(),
+            pos: [1.488_202_109_234_411, 0.045_043_285_781_332_54, 2.812_601_257_115_602_5],
+            motion: [
+                -4.323_888_315_084_626_6e-16,
+                0.011_681_267_954_871_115,
+                -3.611_030_807_389_778_4e-85,
+            ],
+            leashed: true,
+            passengers: Vec::new(),
+        };
+
+        let id = s
+            .spawn_authored_body(&fixture)
+            .expect("the supplied tether-rest boat is supported");
+        let boat = s.entity_bodies().iter().find(|body| body.id == id).expect("spawned body");
+        assert_eq!(boat.kind, "minecraft:oak_boat");
+        assert_eq!(
+            [(boat.min[0] + boat.max[0]) / 2.0, boat.min[1], (boat.min[2] + boat.max[2]) / 2.0],
+            fixture.pos,
+            "the authored tether-rest pose is the frozen collision pose"
+        );
+
+        let mut free = fixture.clone();
+        free.leashed = false;
+        assert!(
+            s.spawn_authored_body(&free).expect_err("a free moving boat has no physics").contains(
+                "has Motion"
+            )
+        );
+
+        let mut swinging = fixture;
+        swinging.motion[0] = 0.001;
+        assert!(
+            s.spawn_authored_body(&swinging)
+                .expect_err("horizontal boat travel is not a tether-rest residue")
+                .contains("has Motion")
+        );
+    }
+
+    /// The decorated elevator's vehicle/rider pair is admitted only in the
+    /// measured settled envelope, and the silverfish is seated from the boat
+    /// rather than from Litematica's stale source-world passenger position.
+    #[test]
+    fn the_elevator_boat_seats_its_silverfish_and_rejects_real_travel() {
+        let mut s = sim();
+        let rider = crate::structure::SpawnedEntity::Body(crate::structure::SpawnedBody {
+            kind: "minecraft:silverfish".to_string(),
+            pos: [-103.3125, 4.25, 128.748_073_537_581_1],
+            motion: [
+                -0.004_550_000_029_429_79,
+                -0.078_400_001_525_878_9,
+                4.362_258_015_156_135e-7,
+            ],
+            leashed: false,
+            passengers: Vec::new(),
+        });
+        let fixture = crate::structure::SpawnedBody {
+            kind: "minecraft:pale_oak_boat".to_string(),
+            pos: [5.6875, 61.0625, 16.748_073_537_581_092],
+            motion: [-5e-324, 0.0, -5.059_650_645_427_016e-6],
+            leashed: true,
+            passengers: vec![rider.clone()],
+        };
+
+        let boat = s.spawn_authored_body(&fixture).expect("the tether-rest boat is supported");
+        let silverfish = s
+            .spawn_authored_rider(boat, &rider)
+            .expect("the vanilla-measured pale-oak boat seat is supported");
+        let body = s
+            .entity_bodies()
+            .iter()
+            .find(|body| body.id == silverfish)
+            .expect("silverfish body");
+        assert_eq!(
+            [(body.min[0] + body.max[0]) / 2.0, body.min[1], (body.min[2] + body.max[2]) / 2.0],
+            [fixture.pos[0], fixture.pos[1] + 0.1875, fixture.pos[2]]
+        );
+
+        let mut root = fixture.clone();
+        root.leashed = false;
+        root.motion = [0.0, 0.0, -2e-323];
+        s.spawn_authored_body(&root)
+            .expect("an elevator chain root contains floating-point dust only");
+
+        let mut riderless = fixture.clone();
+        riderless.passengers.clear();
+        assert!(
+            s.spawn_authored_body(&riderless)
+                .expect_err("the passenger relationship identifies the elevator fixture")
+                .contains("has Motion")
+        );
+
+        let mut drifting = fixture;
+        drifting.motion[2] = 1.0 / 2048.0;
+        assert!(
+            s.spawn_authored_body(&drifting)
+                .expect_err("a boat outside the captured tether-rest envelope must refuse")
+                .contains("has Motion")
+        );
+    }
+
     /// A rider's box is its vehicle's position plus the seat, always.
     ///
     /// This is `Entity.positionRider`, and the assertion is that the rider has
@@ -3964,6 +4217,8 @@ mod tests {
                     // seated from its vehicle, not from the file.
                     pos: [999.0, 999.0, 999.0],
                     motion: [0.0, -0.0784, 0.0],
+                    leashed: false,
+                    passengers: Vec::new(),
                 }),
             )
             .expect("a blaze on a plain minecart is measured");
@@ -4013,6 +4268,8 @@ mod tests {
                     kind: "minecraft:blaze".to_string(),
                     pos: [4.0, 2.2, 8.0],
                     motion: [0.0; 3],
+                    leashed: false,
+                    passengers: Vec::new(),
                 }),
             )
             .expect_err("no furnace-cart seat has been measured");

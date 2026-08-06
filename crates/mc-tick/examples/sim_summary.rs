@@ -32,10 +32,25 @@ fn main() {
         sim.mark_block_entity(*pos);
     }
     for (pos, stacks) in &structure.inventories {
-        let entry = structure.blocks.iter().find(|(p, _)| p == pos).map(|(_, e)| *e).unwrap();
-        let name = structure.palette[entry].split('[').next().unwrap_or_default();
+        let entry = structure
+            .blocks
+            .iter()
+            .find(|(p, _)| p == pos)
+            .map(|(_, e)| *e)
+            .unwrap();
+        let name = structure.palette[entry]
+            .split('[')
+            .next()
+            .unwrap_or_default();
         if let Some(slots) = mc_tick::vanilla::container_slots(name) {
-            sim.set_inventory(*pos, mc_tick::Inventory { slots, stacks: stacks.clone() });
+            sim.set_inventory(
+                *pos,
+                mc_tick::Inventory {
+                    slots,
+                    stacks: stacks.clone(),
+                    blocked_slots: structure.blocked_slots_at(*pos),
+                },
+            );
         }
     }
     let order = structure.placement_order(

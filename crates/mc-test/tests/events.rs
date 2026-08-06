@@ -49,7 +49,10 @@ fn a_failing_check_dumps_the_event_window() {
     let report = run_with(&structure, &case, None, &RunOptions { trace_window: 4 })
         .outcome
         .expect_err("the lamp did light");
-    assert!(report.contains("event log"), "the dump must be present: {report}");
+    assert!(
+        report.contains("event log"),
+        "the dump must be present: {report}"
+    );
     assert!(report.contains("redstone_lamp"), "{report}");
 }
 

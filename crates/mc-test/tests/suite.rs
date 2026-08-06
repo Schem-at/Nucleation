@@ -27,12 +27,18 @@ fn a_format_object_is_a_suite() {
 fn an_unknown_format_is_refused() {
     let text = format!(r#"{{"format":2,"cases":[{ONE}]}}"#);
     let err = parse_suite(&text, "f").expect_err("format 2 is the future");
-    assert!(err.contains("format"), "the error must name the problem: {err}");
+    assert!(
+        err.contains("format"),
+        "the error must name the problem: {err}"
+    );
 }
 
 #[test]
 fn an_empty_suite_is_refused() {
-    for text in [r#"[]"#.to_string(), r#"{"format":1,"cases":[]}"#.to_string()] {
+    for text in [
+        r#"[]"#.to_string(),
+        r#"{"format":1,"cases":[]}"#.to_string(),
+    ] {
         let err = parse_suite(&text, "f").expect_err("empty suites pass vacuously");
         assert!(err.contains("no cases"), "{err}");
     }

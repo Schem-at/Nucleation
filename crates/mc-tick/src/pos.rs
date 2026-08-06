@@ -73,16 +73,35 @@ pub enum Dir {
 /// Every direction, in the game's declaration order.
 /// `NeighborUpdater.UPDATE_ORDER` — the order one `updateNeighborsAt` entry
 /// dispatches its six notifications.
-pub const UPDATE_ORDER: [Dir; 6] = [Dir::West, Dir::East, Dir::Down, Dir::Up, Dir::North, Dir::South];
+pub const UPDATE_ORDER: [Dir; 6] = [
+    Dir::West,
+    Dir::East,
+    Dir::Down,
+    Dir::Up,
+    Dir::North,
+    Dir::South,
+];
 
 /// `Block.UPDATE_SHAPE_ORDER` — the order a placed block receives its shape
 /// updates in `updateFromNeighbourShapes`.
-pub const UPDATE_SHAPE_ORDER: [Dir; 6] =
-    [Dir::West, Dir::East, Dir::North, Dir::South, Dir::Down, Dir::Up];
+pub const UPDATE_SHAPE_ORDER: [Dir; 6] = [
+    Dir::West,
+    Dir::East,
+    Dir::North,
+    Dir::South,
+    Dir::Down,
+    Dir::Up,
+];
 
 /// `Direction.values()` — Java's enum order, where vanilla iterates it.
-pub const JAVA_DIRECTIONS: [Dir; 6] =
-    [Dir::Down, Dir::Up, Dir::North, Dir::South, Dir::West, Dir::East];
+pub const JAVA_DIRECTIONS: [Dir; 6] = [
+    Dir::Down,
+    Dir::Up,
+    Dir::North,
+    Dir::South,
+    Dir::West,
+    Dir::East,
+];
 
 /// Every direction, in this crate's own canonical order.
 pub const ALL_DIRS: [Dir; 6] = [

@@ -77,14 +77,31 @@ fn main() {
         sim.set_comparator_output(*pos, *strength);
     }
     for (pos, stacks) in &structure.inventories {
-        let entry = structure.blocks.iter().find(|(p, _)| p == pos).map(|(_, e)| *e);
+        let entry = structure
+            .blocks
+            .iter()
+            .find(|(p, _)| p == pos)
+            .map(|(_, e)| *e);
         let Some(entry) = entry else { continue };
-        let name = structure.palette[entry].split('[').next().unwrap_or_default();
+        let name = structure.palette[entry]
+            .split('[')
+            .next()
+            .unwrap_or_default();
         if let Some(slots) = mc_tick::vanilla::container_slots(name) {
-            sim.set_inventory(*pos, mc_tick::Inventory { slots, stacks: stacks.clone() });
+            sim.set_inventory(
+                *pos,
+                mc_tick::Inventory {
+                    slots,
+                    stacks: stacks.clone(),
+                    blocked_slots: structure.blocked_slots_at(*pos),
+                },
+            );
         }
     }
-    let air = sim.registry().get("minecraft:air").unwrap_or(mc_tick::StateId::AIR);
+    let air = sim
+        .registry()
+        .get("minecraft:air")
+        .unwrap_or(mc_tick::StateId::AIR);
     {
         let order = structure.placement_order(
             mc_tick::vanilla::is_collision_full_cube,
@@ -92,21 +109,26 @@ fn main() {
         );
         // onPlace runs whatever the placement flags; the settle pass does not.
         // `--in-world` ticks the world exactly as loaded, with no placement pass.
-    //
-    // A placement recomputes what a running machine has already settled:
-    // repeater LOCKED, wire connection shapes, and the live power a wire is
-    // carrying. Reproducing a door that was *built* rather than stamped means
-    // not re-deriving any of it — the states in the file are the truth.
-    let in_world = args.iter().any(|a| a == "--in-world");
-    if !in_world {
-        sim.place_on_place(&order);
-    }
+        //
+        // A placement recomputes what a running machine has already settled:
+        // repeater LOCKED, wire connection shapes, and the live power a wire is
+        // carrying. Reproducing a door that was *built* rather than stamped means
+        // not re-deriving any of it — the states in the file are the truth.
+        let in_world = args.iter().any(|a| a == "--in-world");
+        if !in_world {
+            sim.place_on_place(&order);
+        }
         if settle {
             sim.settle_with_order(&order);
         }
     }
     sim.record();
-    let horizon = golden.ticks.last().map(|t| t.tick + 1).unwrap_or(0).max(to.min(4096));
+    let horizon = golden
+        .ticks
+        .last()
+        .map(|t| t.tick + 1)
+        .unwrap_or(0)
+        .max(to.min(4096));
     for tick in 0..horizon {
         for (pos, at) in &uses {
             if *at == tick {
@@ -125,7 +147,11 @@ fn main() {
     let keep = |pos: (i32, i32, i32)| match region {
         None => true,
         Some((lo, hi)) => {
-            pos.0 >= lo.0 && pos.0 <= hi.0 && pos.1 >= lo.1 && pos.1 <= hi.1 && pos.2 >= lo.2
+            pos.0 >= lo.0
+                && pos.0 <= hi.0
+                && pos.1 >= lo.1
+                && pos.1 <= hi.1
+                && pos.2 >= lo.2
                 && pos.2 <= hi.2
         }
     };
@@ -193,7 +219,10 @@ fn main() {
         }
     }
     match first_divergence {
-        None => println!("\nidentical across {} ticks", vanilla.len().max(engine.len())),
+        None => println!(
+            "\nidentical across {} ticks",
+            vanilla.len().max(engine.len())
+        ),
         Some(tick) => {
             println!("\nfirst divergence: tick {tick}");
             std::process::exit(1);

@@ -133,10 +133,22 @@ mod tests {
     /// record door's own save.
     #[test]
     fn the_version_boundary_is_where_the_bisect_put_it() {
-        assert_eq!(MotionSemantics::for_data_version(4082), MotionSemantics::ClampAbsTen);
-        assert_eq!(MotionSemantics::for_data_version(4556), MotionSemantics::ClampAbsTen);
-        assert_eq!(MotionSemantics::for_data_version(4671), MotionSemantics::DropNonFinite);
-        assert_eq!(MotionSemantics::for_data_version(4903), MotionSemantics::DropNonFinite);
+        assert_eq!(
+            MotionSemantics::for_data_version(4082),
+            MotionSemantics::ClampAbsTen
+        );
+        assert_eq!(
+            MotionSemantics::for_data_version(4556),
+            MotionSemantics::ClampAbsTen
+        );
+        assert_eq!(
+            MotionSemantics::for_data_version(4671),
+            MotionSemantics::DropNonFinite
+        );
+        assert_eq!(
+            MotionSemantics::for_data_version(4903),
+            MotionSemantics::DropNonFinite
+        );
     }
 
     /// The `nanprobe` table, byte-identical bytecode to the game's:
@@ -148,8 +160,14 @@ mod tests {
         assert!(out[0].is_nan(), "dcmpl takes the keep branch for NaN");
         assert_eq!(out[1], 0.0);
         assert_eq!(out[2], 0.0);
-        assert_eq!(s.load_motion([0.5, -0.5, 10.0], [0.0; 3]), [0.5, -0.5, 10.0]);
-        assert_eq!(s.load_motion([f64::NEG_INFINITY, 0.0, 0.0], [0.0; 3])[0], 0.0);
+        assert_eq!(
+            s.load_motion([0.5, -0.5, 10.0], [0.0; 3]),
+            [0.5, -0.5, 10.0]
+        );
+        assert_eq!(
+            s.load_motion([f64::NEG_INFINITY, 0.0, 0.0], [0.0; 3])[0],
+            0.0
+        );
     }
 
     /// The door's own six carts: `Motion.z` NaN with a finite `Motion.x`
@@ -168,17 +186,26 @@ mod tests {
     #[test]
     fn post_4671_drops_the_whole_vector_not_just_the_bad_component() {
         let s = MotionSemantics::DropNonFinite;
-        assert_eq!(s.load_motion([-0.542609, -0.05605, f64::NAN], [0.0; 3]), [0.0; 3]);
+        assert_eq!(
+            s.load_motion([-0.542609, -0.05605, f64::NAN], [0.0; 3]),
+            [0.0; 3]
+        );
         assert_eq!(s.load_motion([0.5, 0.0, 0.0], [0.0; 3]), [0.5, 0.0, 0.0]);
         // The guard leaves the *previous* velocity, which is not always zero.
-        assert_eq!(s.load_motion([f64::NAN, 0.0, 0.0], [0.25, 0.0, 0.0]), [0.25, 0.0, 0.0]);
+        assert_eq!(
+            s.load_motion([f64::NAN, 0.0, 0.0], [0.25, 0.0, 0.0]),
+            [0.25, 0.0, 0.0]
+        );
     }
 
     /// 26.2 does not clamp large finite velocities — that was the old path's
     /// job, and conflating the two would silently zero a fast cart.
     #[test]
     fn the_ten_clamp_is_not_carried_forward() {
-        assert_eq!(MotionSemantics::DropNonFinite.load_motion([99.0, 0.0, 0.0], [0.0; 3])[0], 99.0);
+        assert_eq!(
+            MotionSemantics::DropNonFinite.load_motion([99.0, 0.0, 0.0], [0.0; 3])[0],
+            99.0
+        );
     }
 
     #[test]

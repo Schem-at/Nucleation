@@ -171,7 +171,8 @@ pub trait PowerSource: Send + Sync {
     /// comparators walk segments so a double chest reads and fills as the
     /// single 54-slot container it is in game.
     fn container_segments(&self, world: &World, pos: Pos) -> Option<Vec<(Pos, u32)>> {
-        self.container_slots_at(world, pos).map(|slots| vec![(pos, slots)])
+        self.container_slots_at(world, pos)
+            .map(|slots| vec![(pos, slots)])
     }
 
     /// Whether the block at `pos` is a hopper — the destination-cooldown rule
@@ -277,7 +278,12 @@ fn schedule_diode(
     } else {
         facing.opposite()
     };
-    let input = power.is_powered(ctx.world, ctx.comparator_out, pos.offset(input_side), input_side.opposite());
+    let input = power.is_powered(
+        ctx.world,
+        ctx.comparator_out,
+        pos.offset(input_side),
+        input_side.opposite(),
+    );
 
     if input == powered {
         return;
@@ -366,7 +372,9 @@ impl<P: PowerSource> Repeater<P> {
         for side in perpendicular(self.facing) {
             let neighbour = pos.offset(side);
             if self.power.is_diode(world, neighbour)
-                && self.power.is_powered(world, outs, neighbour, side.opposite())
+                && self
+                    .power
+                    .is_powered(world, outs, neighbour, side.opposite())
             {
                 return true;
             }
@@ -441,9 +449,12 @@ impl<P: PowerSource> BlockBehaviour for Repeater<P> {
         } else {
             self.facing.opposite()
         };
-        let should_turn_on =
-            self.power
-                .is_powered(ctx.world, ctx.comparator_out, pos.offset(input_side), input_side.opposite());
+        let should_turn_on = self.power.is_powered(
+            ctx.world,
+            ctx.comparator_out,
+            pos.offset(input_side),
+            input_side.opposite(),
+        );
         // `DiodeBlock.tick` writes with flag **2** — no neighbour updates — and
         // the notification comes from `onPlace`, which runs on every write and
         // carries no block-changed guard: `updateNeighborsInFront`, reaching
@@ -462,7 +473,11 @@ impl<P: PowerSource> BlockBehaviour for Repeater<P> {
             ctx.set_shape_only(pos, self.states.get(true));
             self.update_neighbours_in_front(ctx, pos);
             if !should_turn_on {
-                ctx.schedule(pos, self.delay_ticks(), crate::schedule::TickPriority::VeryHigh);
+                ctx.schedule(
+                    pos,
+                    self.delay_ticks(),
+                    crate::schedule::TickPriority::VeryHigh,
+                );
             }
         }
     }
@@ -532,9 +547,12 @@ impl<P: PowerSource> BlockBehaviour for Torch<P> {
 
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         let support = pos.offset(self.attached);
-        let powered = self
-            .power
-            .is_powered(ctx.world, ctx.comparator_out, support, self.attached.opposite());
+        let powered = self.power.is_powered(
+            ctx.world,
+            ctx.comparator_out,
+            support,
+            self.attached.opposite(),
+        );
         // A torch is lit exactly when its support is *not* powered.
         let pending = ctx.ticks.will_tick_this_tick(pos);
         // `MC_TICK_TRACE_NOTIFY` covers torches too: whether a torch schedules
@@ -542,7 +560,11 @@ impl<P: PowerSource> BlockBehaviour for Torch<P> {
         // placement cascade is not the world anyone can see afterwards.
         if let Some(filter) = std::env::var_os("MC_TICK_TRACE_NOTIFY") {
             let key = format!("{},{},{}", pos.x, pos.y, pos.z);
-            if filter.to_string_lossy().split(';').any(|want| want.trim() == key) {
+            if filter
+                .to_string_lossy()
+                .split(';')
+                .any(|want| want.trim() == key)
+            {
                 eprintln!(
                     "        torch ({key}) lit={} powered={powered} pending={pending} support {:?}",
                     self.lit,
@@ -557,9 +579,12 @@ impl<P: PowerSource> BlockBehaviour for Torch<P> {
 
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         let support = pos.offset(self.attached);
-        let powered = self
-            .power
-            .is_powered(ctx.world, ctx.comparator_out, support, self.attached.opposite());
+        let powered = self.power.is_powered(
+            ctx.world,
+            ctx.comparator_out,
+            support,
+            self.attached.opposite(),
+        );
         if self.lit != powered {
             return;
         }
@@ -641,9 +666,14 @@ impl<P: PowerSource> Comparator<P> {
     ) -> u8 {
         let back = self.input_side();
         let rear_pos = pos.offset(back);
-        let redstone = self.power.signal_strength(world, outs, rear_pos, back.opposite());
+        let redstone = self
+            .power
+            .signal_strength(world, outs, rear_pos, back.opposite());
         let mut rear = redstone;
-        if let Some(analog) = self.power.analog_signal(world, inventories, carts, rear_pos) {
+        if let Some(analog) = self
+            .power
+            .analog_signal(world, inventories, carts, rear_pos)
+        {
             rear = analog;
         } else if rear < 15 && self.power.is_conductor(world, rear_pos) {
             if let Some(analog) =
@@ -698,7 +728,13 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
         if ctx.ticks.will_tick_this_tick(pos) {
             return;
         }
-        let output = self.output_strength(ctx.world, ctx.comparator_out, ctx.inventories, ctx.minecarts, pos);
+        let output = self.output_strength(
+            ctx.world,
+            ctx.comparator_out,
+            ctx.inventories,
+            ctx.minecarts,
+            pos,
+        );
         let stored = ctx.stored_comparator_output(pos);
         let should_be_on = output > 0;
 
@@ -728,7 +764,13 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
     /// fired, and the opposed pistons on the door's other side won a race they
     /// lose in the real game.
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
-        let output = self.output_strength(ctx.world, ctx.comparator_out, ctx.inventories, ctx.minecarts, pos);
+        let output = self.output_strength(
+            ctx.world,
+            ctx.comparator_out,
+            ctx.inventories,
+            ctx.minecarts,
+            pos,
+        );
         let stored = ctx.stored_comparator_output(pos);
         ctx.store_comparator_output(pos, output);
         if stored == output && self.mode != ComparatorMode::Compare {
@@ -828,7 +870,10 @@ impl<P: PowerSource> Hopper<P> {
             // container cart overlapping that cell is the target instead.
             return self.eject_into_cart(ctx, pos, target);
         };
-        if segments.iter().all(|(seg, slots)| inventory_is_full(ctx, *seg, *slots)) {
+        if segments
+            .iter()
+            .all(|(seg, slots)| inventory_is_full(ctx, *seg, *slots))
+        {
             return false;
         }
         for slot in 0..HOPPER_SLOTS {
@@ -839,11 +884,7 @@ impl<P: PowerSource> Hopper<P> {
                     {
                         let carried = ctx.take_slot_contents(pos, slot);
                         let remaining = count - 1;
-                        ctx.set_inventory_slot(
-                            pos,
-                            slot,
-                            (remaining > 0).then(|| (id, remaining)),
-                        );
+                        ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id, remaining)));
                         ctx.set_slot_contents(*seg, target_slot, carried);
                         return true;
                     }
@@ -928,11 +969,7 @@ impl<P: PowerSource> Hopper<P> {
                 if let Some(target_slot) = cart_insert_one(ctx, &self.power, cart, &id) {
                     let carried = ctx.take_slot_contents(pos, slot);
                     let remaining = count - 1;
-                    ctx.set_inventory_slot(
-                        pos,
-                        slot,
-                        (remaining > 0).then(|| (id, remaining)),
-                    );
+                    ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id, remaining)));
                     ctx.set_cart_slot_contents(cart, target_slot, carried);
                     return true;
                 }
@@ -969,8 +1006,16 @@ impl<P: PowerSource> Hopper<P> {
     /// reports success — and takes the cooldown — when the entity was fully
     /// consumed; a partial absorb modifies both sides and returns false.
     fn suck_entities(&self, ctx: &mut TickCtx<'_>, pos: Pos) -> bool {
-        let suck_min = [f64::from(pos.x), f64::from(pos.y) + 0.6875, f64::from(pos.z)];
-        let suck_max = [f64::from(pos.x) + 1.0, f64::from(pos.y) + 2.0, f64::from(pos.z) + 1.0];
+        let suck_min = [
+            f64::from(pos.x),
+            f64::from(pos.y) + 0.6875,
+            f64::from(pos.z),
+        ];
+        let suck_max = [
+            f64::from(pos.x) + 1.0,
+            f64::from(pos.y) + 2.0,
+            f64::from(pos.z) + 1.0,
+        ];
         for index in 0..ctx.item_entities.items.len() {
             let (item_id, count, intersects) = {
                 let entity = &ctx.item_entities.items[index];
@@ -992,9 +1037,14 @@ impl<P: PowerSource> Hopper<P> {
             let mut absorbed = 0u8;
             let mut landed_slot = None;
             while absorbed < count {
-                let Some(slot) =
-                    insert_one(ctx, &self.power, None, pos, u32::from(HOPPER_SLOTS), &item_id)
-                else {
+                let Some(slot) = insert_one(
+                    ctx,
+                    &self.power,
+                    None,
+                    pos,
+                    u32::from(HOPPER_SLOTS),
+                    &item_id,
+                ) else {
                     break;
                 };
                 landed_slot = Some(slot);
@@ -1025,8 +1075,12 @@ impl<P: PowerSource> BlockBehaviour for Hopper<P> {
     /// written silently.
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         let powered = crate::pos::ALL_DIRS.iter().any(|dir| {
-            self.power
-                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
         });
         let enabled = !powered;
         if enabled != self.enabled {
@@ -1099,7 +1153,11 @@ pub(crate) fn rail_pops_off<P: PowerSource>(
     }
     ctx.item_entities.spawn(
         (item.to_string(), 1),
-        [f64::from(pos.x) + 0.5, f64::from(pos.y) + 0.5, f64::from(pos.z) + 0.5],
+        [
+            f64::from(pos.x) + 0.5,
+            f64::from(pos.y) + 0.5,
+            f64::from(pos.z) + 0.5,
+        ],
         [0.0; 3],
         10,
     );
@@ -1111,12 +1169,13 @@ fn inventory_is_full(ctx: &TickCtx<'_>, pos: Pos, slots: u32) -> bool {
     let Some(inventory) = ctx.inventories.get(&pos) else {
         return slots == 0;
     };
-    let occupied = inventory
-        .stacks
-        .iter()
-        .filter(|stack| stack.count >= MERGE_LIMIT)
-        .count() as u32;
-    occupied >= slots
+    (0..slots.min(255) as u8).all(|slot| {
+        inventory.slot_blocked(slot)
+            || inventory
+                .stacks
+                .iter()
+                .any(|stack| stack.slot == slot && stack.count >= MERGE_LIMIT)
+    })
 }
 
 /// `HopperBlockEntity.addItem`/`tryMoveInItem`: place one `id` item into the
@@ -1137,6 +1196,13 @@ fn insert_one<P: PowerSource>(
         .get(&target)
         .is_none_or(crate::inventory::Inventory::is_empty);
     for slot in 0..target_slots.min(255) as u8 {
+        if ctx
+            .inventories
+            .get(&target)
+            .is_some_and(|inventory| inventory.slot_blocked(slot))
+        {
+            continue;
+        }
         match ctx.inventory_slot(target, slot) {
             None => {
                 ctx.set_inventory_slot(target, slot, Some((id.to_string(), 1)));
@@ -1177,7 +1243,10 @@ fn cart_insert_one<P: PowerSource>(
     cart: usize,
     id: &str,
 ) -> Option<u8> {
-    let slots = ctx.minecarts[cart].inventory.as_ref().map_or(0, |inv| inv.slots);
+    let slots = ctx.minecarts[cart]
+        .inventory
+        .as_ref()
+        .map_or(0, |inv| inv.slots);
     for slot in 0..slots.min(255) as u8 {
         match ctx.cart_slot(cart, slot) {
             None => {
@@ -1211,14 +1280,25 @@ pub struct TripWire {
 impl TripWire {
     fn occupied(ctx: &TickCtx<'_>, pos: Pos) -> bool {
         let min = [f64::from(pos.x), f64::from(pos.y), f64::from(pos.z)];
-        let max = [f64::from(pos.x) + 1.0, f64::from(pos.y) + 0.5, f64::from(pos.z) + 1.0];
-        let items = ctx.item_entities.items.iter().filter(|item| !item.removed).map(|item| {
-            crate::entity::item_aabb(item.pos)
-        });
-        let others = ctx.item_entities.others.iter().map(|body| (body.min, body.max));
-        items.chain(others).any(|(emin, emax)| {
-            (0..3).all(|axis| emin[axis] < max[axis] && emax[axis] > min[axis])
-        })
+        let max = [
+            f64::from(pos.x) + 1.0,
+            f64::from(pos.y) + 0.5,
+            f64::from(pos.z) + 1.0,
+        ];
+        let items = ctx
+            .item_entities
+            .items
+            .iter()
+            .filter(|item| !item.removed)
+            .map(|item| crate::entity::item_aabb(item.pos));
+        let others = ctx
+            .item_entities
+            .others
+            .iter()
+            .map(|body| (body.min, body.max));
+        items
+            .chain(others)
+            .any(|(emin, emax)| (0..3).all(|axis| emin[axis] < max[axis] && emax[axis] > min[axis]))
     }
 }
 
@@ -1297,8 +1377,12 @@ pub struct Dropper<P: PowerSource> {
 impl<P: PowerSource> Dropper<P> {
     fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
         crate::pos::ALL_DIRS.iter().any(|dir| {
-            self.power
-                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
         })
     }
 }
@@ -1322,8 +1406,9 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
         // choice, which the conformance goldens were recorded against (their
         // dispensers hold one stack, where the two rules agree).
         let chosen = if ctx.item_entities.rng.is_some() {
-            let occupied: Vec<u8> =
-                (0..slots).filter(|s| ctx.inventory_slot(pos, *s).is_some()).collect();
+            let occupied: Vec<u8> = (0..slots)
+                .filter(|s| ctx.inventory_slot(pos, *s).is_some())
+                .collect();
             let rng = ctx.item_entities.rng.as_mut().expect("checked above");
             let mut chosen = None;
             for (i, s) in occupied.iter().enumerate() {
@@ -1366,7 +1451,11 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
                     // way a vanilla snapshot diff sees it (net across the tick).
                     ctx.inventories.insert(
                         front,
-                        crate::inventory::Inventory { slots: 27, stacks: Vec::new() },
+                        crate::inventory::Inventory {
+                            slots: 27,
+                            stacks: Vec::new(),
+                            blocked_slots: 0,
+                        },
                     );
                     for stack in carried.unwrap_or_default() {
                         ctx.set_inventory_slot(
@@ -1396,14 +1485,16 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
         // burning, and this engine burns nothing — changes no outcome.)
         if self.dispenser && id == "minecraft:armor_stand" {
             let front = pos.offset(self.facing);
-            ctx.item_entities.pending_spawns.push(crate::entity::PendingSpawn::Body {
-                kind: "minecraft:armor_stand",
-                pos: [
-                    f64::from(front.x) + 0.5,
-                    f64::from(front.y),
-                    f64::from(front.z) + 0.5,
-                ],
-            });
+            ctx.item_entities
+                .pending_spawns
+                .push(crate::entity::PendingSpawn::Body {
+                    kind: "minecraft:armor_stand",
+                    pos: [
+                        f64::from(front.x) + 0.5,
+                        f64::from(front.y),
+                        f64::from(front.z) + 0.5,
+                    ],
+                });
             let remaining = count - 1;
             ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id.clone(), remaining)));
             return;
@@ -1460,9 +1551,7 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
                             // re-render, so server-side this is the same
                             // neighbour-updating write.
                             ctx.set(front, StateId::AIR);
-                            consume_with_remainder(
-                                ctx, pos, slot, &id, count, item, self.facing,
-                            );
+                            consume_with_remainder(ctx, pos, slot, &id, count, item, self.facing);
                             return;
                         }
                         crate::vanilla::BucketPickupOutcome::Unmeasured => panic!(
@@ -1538,8 +1627,7 @@ fn spawn_dispensed_item(ctx: &mut TickCtx<'_>, pos: Pos, facing: Dir, id: &str) 
     let (dx, dy, dz) = facing.delta();
     let vertical = dy != 0;
     let x = f64::from(pos.x) + 0.5 + 0.7 * f64::from(dx);
-    let y =
-        f64::from(pos.y) + 0.5 + 0.7 * f64::from(dy) - if vertical { 0.125 } else { 0.15625 };
+    let y = f64::from(pos.y) + 0.5 + 0.7 * f64::from(dy) - if vertical { 0.125 } else { 0.15625 };
     let z = f64::from(pos.z) + 0.5 + 0.7 * f64::from(dz);
     let vel = if let Some(rng) = ctx.item_entities.rng.as_mut() {
         let speed = rng.next_double() * 0.1 + 0.2;
@@ -1552,7 +1640,8 @@ fn spawn_dispensed_item(ctx: &mut TickCtx<'_>, pos: Pos, facing: Dir, id: &str) 
     } else {
         [f64::from(dx) * 0.25, 0.2, f64::from(dz) * 0.25]
     };
-    ctx.item_entities.spawn((id.to_string(), 1), [x, y, z], vel, 10)
+    ctx.item_entities
+        .spawn((id.to_string(), 1), [x, y, z], vel, 10)
 }
 
 /// `DefaultDispenseItemBehavior.consumeWithRemainder`: shrink the dispensed
@@ -1680,8 +1769,12 @@ pub struct Lamp<P: PowerSource> {
 impl<P: PowerSource> Lamp<P> {
     fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
         crate::pos::ALL_DIRS.iter().any(|dir| {
-            self.power
-                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
         })
     }
 }
@@ -1747,8 +1840,12 @@ pub struct CommandBlock<P: PowerSource> {
 impl<P: PowerSource> CommandBlock<P> {
     fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
         crate::pos::ALL_DIRS.iter().any(|dir| {
-            self.power
-                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
         })
     }
 }
@@ -1763,7 +1860,9 @@ impl<P: PowerSource> BlockBehaviour for CommandBlock<P> {
     }
 
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
-        let Some(program) = ctx.commands.get(&pos).copied() else { return };
+        let Some(program) = ctx.commands.get(&pos).copied() else {
+            return;
+        };
         match program {
             crate::behaviour::CommandProgram::SetBlock { offset, state } => {
                 let target = Pos::new(pos.x + offset.0, pos.y + offset.1, pos.z + offset.2);
@@ -1802,8 +1901,11 @@ impl<P: PowerSource> BlockBehaviour for CommandBlock<P> {
                 // Nearest live item entity within `radius` of the block
                 // centre; `limit=1` semantics. Distance is euclidean, like
                 // the selector's.
-                let centre =
-                    [f64::from(pos.x) + 0.5, f64::from(pos.y) + 0.5, f64::from(pos.z) + 0.5];
+                let centre = [
+                    f64::from(pos.x) + 0.5,
+                    f64::from(pos.y) + 0.5,
+                    f64::from(pos.z) + 0.5,
+                ];
                 let mut best: Option<(usize, f64)> = None;
                 for (index, entity) in ctx.item_entities.items.iter().enumerate() {
                     if entity.removed {
@@ -1846,8 +1948,12 @@ pub struct TestAccept<P: PowerSource> {
 impl<P: PowerSource> TestAccept<P> {
     fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
         crate::pos::ALL_DIRS.iter().any(|dir| {
-            self.power
-                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
         })
     }
 }
@@ -1884,8 +1990,12 @@ pub struct Trapdoor<P: PowerSource> {
 impl<P: PowerSource> Trapdoor<P> {
     fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
         crate::pos::ALL_DIRS.iter().any(|dir| {
-            self.power
-                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
         })
     }
 }
@@ -1926,15 +2036,22 @@ pub struct CopperBulb<P: PowerSource> {
 impl<P: PowerSource> CopperBulb<P> {
     fn check_and_flip(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         let powered = crate::pos::ALL_DIRS.iter().any(|dir| {
-            self.power
-                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
         });
         if powered == self.powered {
             return;
         }
         // Losing power leaves the light where it is; only gaining it toggles.
         let lit = if powered { !self.lit } else { self.lit };
-        ctx.set(pos, self.states[usize::from(lit) * 2 + usize::from(powered)]);
+        ctx.set(
+            pos,
+            self.states[usize::from(lit) * 2 + usize::from(powered)],
+        );
     }
 }
 
@@ -1993,8 +2110,12 @@ pub struct Door<P: PowerSource> {
 impl<P: PowerSource> Door<P> {
     fn signal_at(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
         crate::pos::ALL_DIRS.iter().any(|dir| {
-            self.power
-                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
         })
     }
 }
@@ -2047,7 +2168,11 @@ pub struct PressurePlate<P: PowerSource> {
 impl<P: PowerSource> PressurePlate<P> {
     fn pressed_by_item(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
         // BasePressurePlateBlock.TOUCH_AABB: the plate cell inset by a pixel.
-        let min = [f64::from(pos.x) + 0.0625, f64::from(pos.y), f64::from(pos.z) + 0.0625];
+        let min = [
+            f64::from(pos.x) + 0.0625,
+            f64::from(pos.y),
+            f64::from(pos.z) + 0.0625,
+        ];
         let max = [
             f64::from(pos.x) + 0.9375,
             f64::from(pos.y) + 0.25,
@@ -2139,8 +2264,16 @@ fn write_plate(ctx: &mut TickCtx<'_>, pos: Pos, state: StateId) {
 /// constants there are literally `14.0, 0.5, 14.0, 14.0, 4.0`.
 fn touch_aabb(pos: Pos) -> ([f64; 3], [f64; 3]) {
     (
-        [f64::from(pos.x) + 0.0625, f64::from(pos.y), f64::from(pos.z) + 0.0625],
-        [f64::from(pos.x) + 0.9375, f64::from(pos.y) + 0.25, f64::from(pos.z) + 0.9375],
+        [
+            f64::from(pos.x) + 0.0625,
+            f64::from(pos.y),
+            f64::from(pos.z) + 0.0625,
+        ],
+        [
+            f64::from(pos.x) + 0.9375,
+            f64::from(pos.y) + 0.25,
+            f64::from(pos.z) + 0.9375,
+        ],
     )
 }
 
@@ -2203,7 +2336,9 @@ impl WeightedPlate {
         if signal == self.power {
             return;
         }
-        let Some(&state) = self.states.get(usize::from(signal)) else { return };
+        let Some(&state) = self.states.get(usize::from(signal)) else {
+            return;
+        };
         write_plate(ctx, pos, state);
     }
 }
@@ -2270,7 +2405,11 @@ pub struct DetectorRail<P: PowerSource> {
 
 impl<P: PowerSource> DetectorRail<P> {
     fn occupied(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
-        let min = [f64::from(pos.x) + 0.2, f64::from(pos.y), f64::from(pos.z) + 0.2];
+        let min = [
+            f64::from(pos.x) + 0.2,
+            f64::from(pos.y),
+            f64::from(pos.z) + 0.2,
+        ];
         let max = [
             f64::from(pos.x) + 0.8,
             f64::from(pos.y) + 0.8,
@@ -2372,9 +2511,10 @@ impl<P: PowerSource> NoteBlock<P> {
         outs: &crate::behaviour::ComparatorOutputs,
         pos: Pos,
     ) -> bool {
-        crate::pos::ALL_DIRS
-            .iter()
-            .any(|dir| self.power.is_powered(world, outs, pos.offset(*dir), dir.opposite()))
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power
+                .is_powered(world, outs, pos.offset(*dir), dir.opposite())
+        })
     }
 
     /// Queue the "play a note" block event, if the instrument can sound.
@@ -2501,10 +2641,16 @@ mod tests {
                 facing: Dir::East,
                 delay: property,
                 powered: false,
-                states: StatePair { off: StateId(1), on: StateId(2) },
+                states: StatePair {
+                    off: StateId(1),
+                    on: StateId(2),
+                },
                 locked: false,
                 locked_twin: None,
-                power: Sources { powered: vec![], diodes: vec![] },
+                power: Sources {
+                    powered: vec![],
+                    diodes: vec![],
+                },
             };
             assert_eq!(repeater.delay_ticks(), expected, "delay={property}");
         }
@@ -2520,10 +2666,16 @@ mod tests {
             facing: Dir::East,
             delay: 1,
             powered: false,
-            states: StatePair { off: StateId(1), on: StateId(2) },
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
             locked: false,
             locked_twin: None,
-            power: Sources { powered: vec![source], diodes: vec![] },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
         };
         let mut ctx = TickCtx {
             drain: None,
@@ -2566,10 +2718,16 @@ mod tests {
             facing: Dir::East,
             delay: 1,
             powered: true,
-            states: StatePair { off: StateId(1), on: StateId(2) },
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
             locked: false,
             locked_twin: None,
-            power: Sources { powered: vec![], diodes: vec![] },
+            power: Sources {
+                powered: vec![],
+                diodes: vec![],
+            },
         };
         let mut ctx = TickCtx {
             drain: None,
@@ -2615,7 +2773,10 @@ mod tests {
             facing: Dir::East,
             delay: 1,
             powered: false,
-            states: StatePair { off: StateId(1), on: StateId(2) },
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
             locked: false,
             locked_twin: None,
             power: Sources {
@@ -2666,10 +2827,16 @@ mod tests {
             facing: Dir::East,
             delay: 2,
             powered: false,
-            states: StatePair { off: StateId(1), on: StateId(2) },
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
             locked: false,
             locked_twin: None,
-            power: Sources { powered: vec![source], diodes: vec![] },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
         };
         let pos = Pos::new(0, 1, 0);
         let mut ctx = TickCtx {
@@ -2717,8 +2884,14 @@ mod tests {
         let torch = Torch {
             attached: Dir::Down,
             lit: true,
-            states: StatePair { off: StateId(1), on: StateId(2) },
-            power: Sources { powered: vec![source], diodes: vec![] },
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
         };
         let mut ctx = TickCtx {
             drain: None,
@@ -2766,8 +2939,14 @@ mod tests {
         let torch = Torch {
             attached: Dir::Down,
             lit: true,
-            states: StatePair { off: unlit, on: lit },
-            power: Sources { powered: vec![source], diodes: vec![] },
+            states: StatePair {
+                off: unlit,
+                on: lit,
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
         };
         let mut ctx = TickCtx {
             drain: None,
@@ -2796,7 +2975,11 @@ mod tests {
         };
         torch.on_scheduled_tick(&mut ctx, torch_pos);
 
-        assert_eq!(world.get(torch_pos), unlit, "powered support unlights the torch");
+        assert_eq!(
+            world.get(torch_pos),
+            unlit,
+            "powered support unlights the torch"
+        );
     }
 
     #[test]
@@ -2804,12 +2987,21 @@ mod tests {
         let torch = Torch {
             attached: Dir::Down,
             lit: true,
-            states: StatePair { off: StateId(1), on: StateId(2) },
-            power: Sources { powered: vec![], diodes: vec![] },
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            power: Sources {
+                powered: vec![],
+                diodes: vec![],
+            },
         };
         let world = World::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(1, 1, 1)));
         assert_eq!(torch.redstone_power(&world, Pos::new(0, 1, 0), Dir::Up), 15);
-        assert_eq!(torch.redstone_power(&world, Pos::new(0, 1, 0), Dir::North), 15);
+        assert_eq!(
+            torch.redstone_power(&world, Pos::new(0, 1, 0), Dir::North),
+            15
+        );
         assert_eq!(
             torch.redstone_power(&world, Pos::new(0, 1, 0), Dir::Down),
             0,
@@ -2827,8 +3019,14 @@ mod tests {
             facing: Dir::East,
             powered: false,
             mode: ComparatorMode::Subtract,
-            states: StatePair { off: StateId(1), on: StateId(2) },
-            power: Sources { powered: vec![source], diodes: vec![] },
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
         };
         let mut ctx = TickCtx {
             drain: None,
@@ -2859,7 +3057,10 @@ mod tests {
 
         let due = ticks.drain_due(COMPARATOR_DELAY);
         assert_eq!(due.len(), 1);
-        assert_eq!(due[0].target, COMPARATOR_DELAY, "always 2, unlike a repeater");
+        assert_eq!(
+            due[0].target, COMPARATOR_DELAY,
+            "always 2, unlike a repeater"
+        );
     }
 
     #[test]
@@ -2879,7 +3080,10 @@ mod tests {
             facing: Dir::East,
             delay: 1,
             powered: false,
-            states: StatePair { off: StateId(1), on: StateId(2) },
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
             locked: false,
             locked_twin: None,
             power: Sources {
@@ -2931,7 +3135,10 @@ mod tests {
             facing: Dir::East,
             delay: 1,
             powered: false,
-            states: StatePair { off: StateId(1), on: StateId(2) },
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
             locked: false,
             locked_twin: None,
             power: Sources {
@@ -2996,9 +3203,21 @@ mod tests {
     fn compare_mode_is_all_or_nothing() {
         // Both captured: rear 15 / side 14 passed 15 through, while rear 13 against
         // a side of 14 left the comparator unpowered and its output dust at 0.
-        assert_eq!(ComparatorMode::Compare.output(15, 14), 15, "side loses, pass through");
-        assert_eq!(ComparatorMode::Compare.output(13, 14), 0, "side wins, output nothing");
-        assert_eq!(ComparatorMode::Compare.output(15, 15), 15, "a tie still passes");
+        assert_eq!(
+            ComparatorMode::Compare.output(15, 14),
+            15,
+            "side loses, pass through"
+        );
+        assert_eq!(
+            ComparatorMode::Compare.output(13, 14),
+            0,
+            "side wins, output nothing"
+        );
+        assert_eq!(
+            ComparatorMode::Compare.output(15, 15),
+            15,
+            "a tie still passes"
+        );
     }
 
     #[test]
@@ -3012,8 +3231,14 @@ mod tests {
             facing: Dir::East,
             powered: true,
             mode: ComparatorMode::Subtract,
-            states: StatePair { off: StateId(1), on: StateId(2) },
-            power: Sources { powered: vec![source], diodes: vec![] },
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
         };
         // Input arrives on the facing side, so output leaves the opposite side.
         assert_eq!(comparator.redstone_power(&world, pos, Dir::West), 15);
@@ -3038,8 +3263,14 @@ mod tests {
         let torch = Torch {
             attached: Dir::Down,
             lit: true,
-            states: StatePair { off: unlit, on: lit },
-            power: Sources { powered: vec![source], diodes: vec![] },
+            states: StatePair {
+                off: unlit,
+                on: lit,
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
         };
 
         // Pre-load the history with the maximum allowed toggles inside the window.
@@ -3087,13 +3318,20 @@ mod tests {
         world.set(Pos::new(0, 0, 0), source);
         world.set(pos, lit);
 
-        let mut toggles: Vec<(Pos, u64)> =
-            (0..MAX_RECENT_TOGGLES - 1).map(|t| (pos, t as u64)).collect();
+        let mut toggles: Vec<(Pos, u64)> = (0..MAX_RECENT_TOGGLES - 1)
+            .map(|t| (pos, t as u64))
+            .collect();
         let torch = Torch {
             attached: Dir::Down,
             lit: true,
-            states: StatePair { off: unlit, on: lit },
-            power: Sources { powered: vec![source], diodes: vec![] },
+            states: StatePair {
+                off: unlit,
+                on: lit,
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
         };
         let mut ctx = TickCtx {
             drain: None,
@@ -3137,13 +3375,20 @@ mod tests {
         world.set(pos, lit);
 
         // Plenty of toggles, but all long expired.
-        let mut toggles: Vec<(Pos, u64)> =
-            (0..MAX_RECENT_TOGGLES * 2).map(|t| (pos, t as u64)).collect();
+        let mut toggles: Vec<(Pos, u64)> = (0..MAX_RECENT_TOGGLES * 2)
+            .map(|t| (pos, t as u64))
+            .collect();
         let torch = Torch {
             attached: Dir::Down,
             lit: true,
-            states: StatePair { off: unlit, on: lit },
-            power: Sources { powered: vec![source], diodes: vec![] },
+            states: StatePair {
+                off: unlit,
+                on: lit,
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
         };
         let mut ctx = TickCtx {
             drain: None,
@@ -3172,7 +3417,11 @@ mod tests {
         };
         torch.on_scheduled_tick(&mut ctx, pos);
 
-        assert_eq!(world.get(pos), unlit, "expired toggles must not burn it out");
+        assert_eq!(
+            world.get(pos),
+            unlit,
+            "expired toggles must not burn it out"
+        );
     }
 
     /// A power model with per-position strengths, needed to exercise priming.
@@ -3220,7 +3469,10 @@ mod tests {
             facing: Dir::East,
             powered,
             mode: ComparatorMode::Subtract,
-            states: StatePair { off: StateId(1), on: StateId(2) },
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
             power: levels,
         }
     }
@@ -3233,7 +3485,10 @@ mod tests {
         let (mut world, mut ticks, mut events, states) = ctx_parts();
         let pos = Pos::new(0, 1, 0);
         let comparator = primed_comparator(
-            Levels { levels: vec![(pos.offset(Dir::East), 9)], diodes: vec![] },
+            Levels {
+                levels: vec![(pos.offset(Dir::East), 9)],
+                diodes: vec![],
+            },
             true,
         );
 
@@ -3275,7 +3530,10 @@ mod tests {
         let (mut world, mut ticks, mut events, states) = ctx_parts();
         let pos = Pos::new(0, 1, 0);
         let comparator = primed_comparator(
-            Levels { levels: vec![(pos.offset(Dir::East), 15)], diodes: vec![] },
+            Levels {
+                levels: vec![(pos.offset(Dir::East), 15)],
+                diodes: vec![],
+            },
             true,
         );
         let mut stored = std::collections::HashMap::new();
@@ -3319,7 +3577,10 @@ mod tests {
         let (mut world, mut ticks, mut events, states) = ctx_parts();
         let pos = Pos::new(0, 1, 0);
         let comparator = primed_comparator(
-            Levels { levels: vec![(pos.offset(Dir::East), 9)], diodes: vec![] },
+            Levels {
+                levels: vec![(pos.offset(Dir::East), 9)],
+                diodes: vec![],
+            },
             false,
         );
         let mut stored = std::collections::HashMap::new();
@@ -3403,7 +3664,11 @@ mod tests {
         comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
 
         let due = ticks.drain_due(COMPARATOR_DELAY);
-        assert_eq!(due[0].priority, TickPriority::High, "diode-fed comparators prioritise");
+        assert_eq!(
+            due[0].priority,
+            TickPriority::High,
+            "diode-fed comparators prioritise"
+        );
     }
 
     #[test]
@@ -3448,7 +3713,10 @@ impl<P: PowerSource> crate::behaviour::BlockBehaviour for Leaves<P> {
     /// its own tick is running — which is precisely when a piston has just set
     /// a log down beside it.
     fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
-        let distance = self.rules.leaf_distance(ctx.world, pos.offset(from)).saturating_add(1);
+        let distance = self
+            .rules
+            .leaf_distance(ctx.world, pos.offset(from))
+            .saturating_add(1);
         if distance != 1 || self.distance != distance {
             ctx.schedule(pos, 1, TickPriority::Normal);
         }
@@ -3465,7 +3733,11 @@ impl<P: PowerSource> crate::behaviour::BlockBehaviour for Leaves<P> {
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         let mut nearest = 7u8;
         for dir in crate::pos::JAVA_DIRECTIONS {
-            nearest = nearest.min(self.rules.leaf_distance(ctx.world, pos.offset(dir)).saturating_add(1));
+            nearest = nearest.min(
+                self.rules
+                    .leaf_distance(ctx.world, pos.offset(dir))
+                    .saturating_add(1),
+            );
             if nearest == 1 {
                 break;
             }
@@ -3502,7 +3774,14 @@ impl crate::behaviour::BlockBehaviour for Lever {
     fn on_used(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         // pull: setBlock (entry 1, via set), then updateNeighbours —
         // updateNeighborsAt(pos) again and at the support block.
-        ctx.set(pos, if self.powered { self.states.off } else { self.states.on });
+        ctx.set(
+            pos,
+            if self.powered {
+                self.states.off
+            } else {
+                self.states.on
+            },
+        );
         ctx.update_neighbors_at(pos);
         ctx.update_neighbors_at(pos.offset(self.attached));
     }

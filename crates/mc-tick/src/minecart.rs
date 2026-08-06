@@ -636,7 +636,9 @@ fn push_boxes_overlap(a: &MinecartState, b: &MinecartState) -> bool {
     let (amin, amax) = cart_aabb(a.pos);
     let (bmin, bmax) = cart_aabb(b.pos);
     let inflate = [PUSH_INFLATE, 0.0, PUSH_INFLATE];
-    (0..3).all(|axis| amin[axis] - inflate[axis] < bmax[axis] && amax[axis] + inflate[axis] > bmin[axis])
+    (0..3).all(|axis| {
+        amin[axis] - inflate[axis] < bmax[axis] && amax[axis] + inflate[axis] > bmin[axis]
+    })
 }
 
 /// `AbstractMinecart.push(Entity)` for a cart pushing a cart.
@@ -718,9 +720,23 @@ fn push(this: &mut MinecartState, other: &mut MinecartState) {
     //   this.setDeltaMovement(v.multiply(0.2, 1.0, 0.2));
     //   this.push(mid - d0, 0.0, mid - d1);   // = setDeltaMovement(v.add(..))
     set_delta(this, [tx * 0.2, this.vel[1], tz * 0.2]);
-    set_delta(this, [this.vel[0] + (mid_x - d0), this.vel[1], this.vel[2] + (mid_z - d1)]);
+    set_delta(
+        this,
+        [
+            this.vel[0] + (mid_x - d0),
+            this.vel[1],
+            this.vel[2] + (mid_z - d1),
+        ],
+    );
     set_delta(other, [ox * 0.2, other.vel[1], oz * 0.2]);
-    set_delta(other, [other.vel[0] + (mid_x + d0), other.vel[1], other.vel[2] + (mid_z + d1)]);
+    set_delta(
+        other,
+        [
+            other.vel[0] + (mid_x + d0),
+            other.vel[1],
+            other.vel[2] + (mid_z + d1),
+        ],
+    );
 }
 
 /// `Entity.setDeltaMovement`: **a non-finite vector is silently dropped.**
@@ -1230,9 +1246,14 @@ pub struct PoweredRail<P: PowerSource> {
 
 impl<P: PowerSource> PoweredRail<P> {
     fn has_neighbor_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
-        crate::pos::ALL_DIRS
-            .iter()
-            .any(|dir| self.power.is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite()))
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
+        })
     }
 
     /// The powered rail at `pos`, from its descriptor.
@@ -1325,14 +1346,7 @@ impl<P: PowerSource> PoweredRail<P> {
         if self.same_rail_with_power(ctx, stepped, forward, distance, expect) {
             return true;
         }
-        descend
-            && self.same_rail_with_power(
-                ctx,
-                Pos::new(x, y - 1, z),
-                forward,
-                distance,
-                expect,
-            )
+        descend && self.same_rail_with_power(ctx, Pos::new(x, y - 1, z), forward, distance, expect)
     }
 
     /// `isSameRailWithPower`: shape-compatible, already powered, and fed.
@@ -1361,7 +1375,8 @@ impl<P: PowerSource> PoweredRail<P> {
         if incompatible || !powered {
             return false;
         }
-        self.has_neighbor_signal(ctx, pos) || self.find_signal(ctx, pos, shape, forward, distance + 1)
+        self.has_neighbor_signal(ctx, pos)
+            || self.find_signal(ctx, pos, shape, forward, distance + 1)
     }
 }
 
@@ -1392,7 +1407,14 @@ impl<P: PowerSource + 'static> BlockBehaviour for PoweredRail<P> {
         if target == self.powered {
             return;
         }
-        ctx.set(pos, if target { self.states.on } else { self.states.off });
+        ctx.set(
+            pos,
+            if target {
+                self.states.on
+            } else {
+                self.states.off
+            },
+        );
         // updateState also updates the neighbours of the block below (and
         // above, on slopes) — how the change reaches components hanging off
         // the rail's support block.

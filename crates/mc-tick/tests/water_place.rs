@@ -18,7 +18,10 @@ fn a_placed_water_source_spreads_without_a_neighbour_poke() {
         max: Pos::new(12, 8, 12),
     });
     let stone = sim.registry_mut().intern("minecraft:smooth_stone").unwrap();
-    let water = sim.registry_mut().intern("minecraft:water[level=0]").unwrap();
+    let water = sim
+        .registry_mut()
+        .intern("minecraft:water[level=0]")
+        .unwrap();
     for x in 0..9 {
         for z in 0..9 {
             sim.world_mut().set(Pos::new(x, 0, z), stone);
