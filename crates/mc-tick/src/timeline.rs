@@ -270,15 +270,13 @@ pub struct CycleReport {
     pub translated: Option<Cycle>,
 }
 
-/// A half-open tick range and the frame used as its initial scene.
+/// A half-open tick range.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimelineSelection {
     /// Included boundary tick.
     pub start_tick: u64,
     /// Excluded boundary tick.
     pub end_tick: u64,
-    /// Index of `start_tick` in [`RunTimeline::frames`].
-    pub frame_index: usize,
 }
 
 impl TimelineSelection {
@@ -339,45 +337,82 @@ impl RunTimeline {
     /// complete block/state vectors, and translated matches subtract only one
     /// bounding-box origin: rotations, reflections, and symmetric sub-builds
     /// cannot become false translation matches.
-    pub fn detect_cycles(&self) -> CycleReport {
+    ///
+    /// The scan runs over one replay pass of digests; only the handful of
+    /// candidates that survive the tick-only guards are ever rebuilt into full
+    /// frames. A world that merely sits still therefore materialises nothing.
+    pub fn detect_cycles(&self, registry: &StateRegistry) -> CycleReport {
+        let digests = self.digests(registry);
         let mut exact_seen: HashMap<StateFingerprint, Vec<usize>> = HashMap::new();
         let mut translated_seen: HashMap<StateFingerprint, Vec<usize>> = HashMap::new();
         let mut report = CycleReport::default();
 
-        for (index, frame) in self.frames.iter().enumerate() {
+        for (index, digest) in digests.iter().enumerate() {
             if report.exact.is_none() {
-                if let Some(previous) = exact_seen.get(&frame.exact) {
-                    for &before in previous {
-                        let first = &self.frames[before];
-                        if self.changed_between(first.tick, frame.tick) && first.same_exact(frame) {
-                            report.exact = Some(cycle(CycleKind::Exact, first, frame));
-                            break;
-                        }
-                    }
+                if let Some(previous) = exact_seen.get(&digest.exact) {
+                    let candidates: Vec<u64> = previous
+                        .iter()
+                        .map(|&before| digests[before].tick)
+                        .filter(|&tick| self.changed_between(tick, digest.tick))
+                        .collect();
+                    report.exact =
+                        self.verify(CycleKind::Exact, &candidates, digest.tick, registry);
                 }
             }
-            exact_seen.entry(frame.exact).or_default().push(index);
+            exact_seen.entry(digest.exact).or_default().push(index);
 
             if report.translated.is_none() {
-                if let Some(previous) = translated_seen.get(&frame.translated) {
-                    for &before in previous {
-                        let first = &self.frames[before];
-                        if first.origin != frame.origin
-                            && self.changed_between(first.tick, frame.tick)
-                            && first.same_translated(frame)
-                        {
-                            report.translated = Some(cycle(CycleKind::Translated, first, frame));
-                            break;
-                        }
-                    }
+                if let Some(previous) = translated_seen.get(&digest.translated) {
+                    let candidates: Vec<u64> = previous
+                        .iter()
+                        .map(|&before| &digests[before])
+                        .filter(|first| {
+                            first.origin != digest.origin
+                                && self.changed_between(first.tick, digest.tick)
+                        })
+                        .map(|first| first.tick)
+                        .collect();
+                    report.translated =
+                        self.verify(CycleKind::Translated, &candidates, digest.tick, registry);
                 }
             }
             translated_seen
-                .entry(frame.translated)
+                .entry(digest.translated)
                 .or_default()
                 .push(index);
         }
         report
+    }
+
+    /// Rebuild `second` and each candidate `first` and return the earliest
+    /// candidate that really is a recurrence of `kind`.
+    ///
+    /// Candidates arrive in ascending tick order and the first that verifies
+    /// wins, which is what makes the earlier frame the cycle's start.
+    fn verify(
+        &self,
+        kind: CycleKind,
+        candidates: &[u64],
+        tick: u64,
+        registry: &StateRegistry,
+    ) -> Option<Cycle> {
+        if candidates.is_empty() {
+            return None;
+        }
+        let second = self.frame_at(tick, registry)?;
+        for &candidate in candidates {
+            let Some(first) = self.frame_at(candidate, registry) else {
+                continue;
+            };
+            let matched = match kind {
+                CycleKind::Exact => first.same_exact(&second),
+                CycleKind::Translated => first.same_translated(&second),
+            };
+            if matched {
+                return Some(cycle(kind, &first, &second));
+            }
+        }
+        None
     }
 
     fn changed_between(&self, start: u64, end: u64) -> bool {
@@ -398,17 +433,14 @@ impl RunTimeline {
                 end: end_tick,
             });
         }
-        let frame_index = self
-            .frames
-            .binary_search_by_key(&start_tick, |frame| frame.tick)
-            .map_err(|_| TimelineError::MissingTick(start_tick))?;
-        self.frames
-            .binary_search_by_key(&end_tick, |frame| frame.tick)
-            .map_err(|_| TimelineError::MissingTick(end_tick))?;
+        for tick in [start_tick, end_tick] {
+            if tick < self.start_tick || tick > self.end_tick {
+                return Err(TimelineError::MissingTick(tick));
+            }
+        }
         Ok(TimelineSelection {
             start_tick,
             end_tick,
-            frame_index,
         })
     }
 
@@ -424,8 +456,12 @@ impl RunTimeline {
     }
 
     /// Select one detected cycle of `kind`.
-    pub fn select_cycle(&self, kind: CycleKind) -> Result<TimelineSelection, TimelineError> {
-        let report = self.detect_cycles();
+    pub fn select_cycle(
+        &self,
+        kind: CycleKind,
+        registry: &StateRegistry,
+    ) -> Result<TimelineSelection, TimelineError> {
+        let report = self.detect_cycles(registry);
         let found = match kind {
             CycleKind::Exact => report.exact,
             CycleKind::Translated => report.translated,
@@ -434,9 +470,14 @@ impl RunTimeline {
         self.select_ticks(found.start_tick, found.end_tick)
     }
 
-    /// Initial state frame for `selection`.
-    pub fn initial_frame(&self, selection: TimelineSelection) -> &StateFrame {
-        &self.frames[selection.frame_index]
+    /// Initial state frame for `selection`, rebuilt by replay.
+    pub fn initial_frame(
+        &self,
+        selection: TimelineSelection,
+        registry: &StateRegistry,
+    ) -> StateFrame {
+        self.frame_at(selection.start_tick, registry)
+            .unwrap_or_else(|| self.initial.clone())
     }
 
     /// The visible world at `tick`, rebuilt from the initial frame and the
@@ -627,18 +668,29 @@ mod tests {
         let timeline = RunTimeline {
             start_tick: 0,
             end_tick: 2,
-            changes: vec![BlockChange {
-                tick: 0,
-                pos: Pos::new(0, 0, 0),
-                from: stone,
-                to: StateId::AIR,
-            }],
+            // The block moves one step east during tick 0 and then sits still.
+            // Detection replays this log, so the log — not just the frame
+            // vector — has to describe that motion.
+            changes: vec![
+                BlockChange {
+                    tick: 0,
+                    pos: Pos::new(0, 0, 0),
+                    from: stone,
+                    to: StateId::AIR,
+                },
+                BlockChange {
+                    tick: 0,
+                    pos: Pos::new(1, 0, 0),
+                    from: StateId::AIR,
+                    to: stone,
+                },
+            ],
             inputs: Vec::new(),
             pistons: Vec::new(),
             initial: initial.clone(),
             frames: vec![initial, moved, still],
         };
-        let report = timeline.detect_cycles();
+        let report = timeline.detect_cycles(&registry);
         let translated = report.translated.expect("translated recurrence");
         assert_eq!(translated.period, 1);
         assert_eq!(translated.drift, Pos::new(1, 0, 0));

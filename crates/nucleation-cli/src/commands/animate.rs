@@ -277,8 +277,8 @@ fn run_export(mut config: RunConfig<'_>) -> Result<ExportSummary, String> {
     let timeline = sim
         .recorded_timeline()
         .ok_or_else(|| "timeline recorder unexpectedly stopped".to_string())?;
-    let cycles = timeline.detect_cycles();
-    let selection = select_range(&timeline, config.range)?;
+    let cycles = timeline.detect_cycles(sim.registry());
+    let selection = select_range(&timeline, config.range, sim.registry())?;
     let initial = selected_schematic(&timeline, selection, sim.registry())?;
     let (timeline_json, projection) =
         project_timeline(&timeline, selection, sim.registry(), config.tick_ms)?;
@@ -386,19 +386,13 @@ fn apply_action(sim: &mut Simulation, action: &ScheduledAction) -> Result<(), St
 fn select_range(
     timeline: &RunTimeline,
     request: RangeRequest,
+    registry: &StateRegistry,
 ) -> Result<TimelineSelection, String> {
     match request {
-        RangeRequest::All => {
-            let end = timeline
-                .frames
-                .last()
-                .ok_or_else(|| "recording has no frames".to_string())?
-                .tick;
-            timeline.select_ticks(timeline.start_tick, end)
-        }
+        RangeRequest::All => timeline.select_ticks(timeline.start_tick, timeline.end_tick),
         RangeRequest::Ticks(start, end) => timeline.select_ticks(start, end),
         RangeRequest::BetweenActions(index) => timeline.select_between_actions(index),
-        RangeRequest::Cycle(kind) => timeline.select_cycle(kind),
+        RangeRequest::Cycle(kind) => timeline.select_cycle(kind, registry),
     }
     .map_err(|e| e.to_string())
 }
@@ -408,7 +402,7 @@ fn selected_schematic(
     selection: TimelineSelection,
     registry: &StateRegistry,
 ) -> Result<nucleation::UniversalSchematic, String> {
-    let frame = timeline.initial_frame(selection);
+    let frame = timeline.initial_frame(selection, registry);
     let mut schematic = nucleation::UniversalSchematic::new(format!(
         "mc-tick {}..{}",
         selection.start_tick, selection.end_tick
@@ -433,7 +427,7 @@ fn project_timeline(
     registry: &StateRegistry,
     tick_ms: f32,
 ) -> Result<(String, ProjectionWarnings), String> {
-    let origin = timeline.initial_frame(selection).origin;
+    let origin = timeline.initial_frame(selection, registry).origin;
     let mut events = Vec::new();
     let mut warnings = ProjectionWarnings::default();
     let mut piston_index = 0;

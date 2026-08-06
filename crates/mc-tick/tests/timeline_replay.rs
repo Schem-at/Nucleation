@@ -86,6 +86,44 @@ fn every_replayed_frame_equals_the_one_the_recorder_stored() {
 }
 
 #[test]
+fn cycles_found_by_replay_still_describe_the_flying_machine() {
+    const FLYER: &str = include_str!("corpus/structures/flying_machine_east.snbt");
+    let mut sim = sim(FLYER);
+    let redstone = sim
+        .registry_mut()
+        .intern("minecraft:redstone_block")
+        .unwrap();
+    let air = sim.registry_mut().intern("minecraft:air").unwrap();
+    sim.record_timeline();
+    // The kick block has to be taken away again or the machine stalls after a
+    // single step and never translates — the same script the CLI runs.
+    sim.place_block(Pos::new(2, 1, 1), redstone);
+    sim.run(2);
+    sim.place_block(Pos::new(2, 1, 1), air);
+    sim.run(58);
+    let timeline = sim.recorded_timeline().expect("timeline");
+
+    let report = timeline.detect_cycles(sim.registry());
+    let translated = report
+        .translated
+        .expect("a flying machine repeats itself, displaced");
+    assert!(translated.period > 0);
+    assert!(
+        translated.drift.x != 0,
+        "it travels along x: {translated:?}"
+    );
+
+    // The selection resolves to the same span, and its initial frame is the
+    // world at that tick.
+    let selection = timeline
+        .select_cycle(mc_tick::CycleKind::Translated, sim.registry())
+        .expect("selectable");
+    assert_eq!(selection.start_tick, translated.start_tick);
+    let frame = timeline.initial_frame(selection, sim.registry());
+    assert_eq!(frame.tick, translated.start_tick);
+}
+
+#[test]
 fn digests_cover_every_tick_of_the_run_in_order() {
     let mut recorded = sim(DOOR);
     recorded.record_timeline();

@@ -37,7 +37,7 @@ fn door_has_an_exact_active_cycle() {
 
     let timeline = sim.recorded_timeline().expect("timeline");
     let cycle = timeline
-        .detect_cycles()
+        .detect_cycles(sim.registry())
         .exact
         .expect("door should return to an earlier absolute state");
     assert_eq!(cycle.kind, CycleKind::Exact);
@@ -46,7 +46,9 @@ fn door_has_an_exact_active_cycle() {
         cycle.period > 1,
         "an active door cycle is not a stationary tick"
     );
-    assert!(timeline.select_cycle(CycleKind::Exact).is_ok());
+    assert!(timeline
+        .select_cycle(CycleKind::Exact, sim.registry())
+        .is_ok());
 }
 
 #[test]
@@ -58,13 +60,17 @@ fn bb_fingerprint_tracks_westward_motion() {
     sim.run(500);
 
     let timeline = sim.recorded_timeline().expect("timeline");
-    let first = timeline.frames.first().expect("initial frame");
-    let last = timeline.frames.last().expect("last frame");
+    let first = timeline
+        .frame_at(timeline.start_tick, sim.registry())
+        .expect("initial frame");
+    let last = timeline
+        .frame_at(timeline.end_tick, sim.registry())
+        .expect("last frame");
     assert!(
         last.origin.x < first.origin.x,
         "the recorded bounding box should follow BB west"
     );
-    if let Some(cycle) = timeline.detect_cycles().translated {
+    if let Some(cycle) = timeline.detect_cycles(sim.registry()).translated {
         assert!(cycle.drift.x < 0, "BB should only drift west: {cycle:?}");
         assert_eq!((cycle.drift.y, cycle.drift.z), (0, 0));
     }
@@ -87,7 +93,7 @@ fn small_flyer_has_a_translated_cycle_east() {
 
     let timeline = sim.recorded_timeline().expect("timeline");
     let cycle = timeline
-        .detect_cycles()
+        .detect_cycles(sim.registry())
         .translated
         .expect("flyer should repeat after translating");
     assert!(cycle.drift.x > 0, "flyer should drift east: {cycle:?}");
@@ -112,7 +118,7 @@ fn settled_adder_does_not_claim_a_translated_cycle() {
 
     let timeline = sim.recorded_timeline().expect("timeline");
     assert!(
-        timeline.detect_cycles().translated.is_none(),
+        timeline.detect_cycles(sim.registry()).translated.is_none(),
         "a stationary computer must not be reported as a flying machine"
     );
 }
