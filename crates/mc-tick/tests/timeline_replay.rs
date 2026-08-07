@@ -198,3 +198,34 @@ fn a_rewind_ends_the_recording_instead_of_corrupting_it() {
          a world the restore just rewound past"
     );
 }
+
+/// Stopping is not rewinding. A rewind discards a recording because the log
+/// stops describing the world; stopping leaves the log true and merely ends
+/// it — the span must stay readable, and it must stop growing.
+#[test]
+fn stopping_a_recording_keeps_it_and_stops_the_log_growing() {
+    let mut sim = sim(DOOR);
+    sim.record_timeline();
+    sim.use_block(Pos::new(10, 4, 1));
+    sim.run(20);
+
+    let stopped = sim.stop_timeline().expect("a recording was running");
+    let changes_at_stop = stopped.changes.len();
+    assert!(changes_at_stop > 0, "the door did something worth recording");
+    assert_eq!(stopped.end_tick, sim.tick_count(), "the span ends where the run was");
+
+    // The simulation carries on; the recording does not.
+    sim.run(40);
+    assert!(
+        sim.recorded_timeline().is_none(),
+        "nothing is recording after a stop"
+    );
+    assert_eq!(
+        stopped.changes.len(),
+        changes_at_stop,
+        "and the span already taken did not grow behind the caller's back"
+    );
+    // It is still a usable recording.
+    assert!(stopped.frame_at(stopped.end_tick, sim.registry()).is_some());
+    assert!(sim.stop_timeline().is_none(), "stopping twice is not an error");
+}

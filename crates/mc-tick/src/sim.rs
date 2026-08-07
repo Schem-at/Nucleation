@@ -561,6 +561,28 @@ impl Simulation {
         ));
     }
 
+    /// End the run timeline, returning it, and stop recording.
+    ///
+    /// Distinct from what [`Simulation::restore`] does. A rewind *discards* a
+    /// recording, because the log no longer describes the world; stopping
+    /// leaves the log true and simply ends the span. The caller keeps the
+    /// result — the returned [`RunTimeline`](crate::timeline::RunTimeline)
+    /// owns its own copy of the changes, so it cannot grow afterwards no
+    /// matter how long the simulation runs on.
+    ///
+    /// The change log itself is deliberately left switched on. It is not the
+    /// timeline's private property: [`Simulation::record`] enables it for
+    /// conformance comparison and [`Simulation::recorded`] serves it to
+    /// callers who never asked for a timeline at all, so switching it off here
+    /// would pull it out from under them. A caller that wants the log to stop
+    /// costing memory must say so itself.
+    ///
+    /// `None` if nothing was recording. Stopping twice is not an error.
+    pub fn stop_timeline(&mut self) -> Option<crate::timeline::RunTimeline> {
+        let recorder = self.timeline.take()?;
+        Some(recorder.finish(self.log.as_deref().unwrap_or(&[]), self.tick))
+    }
+
     /// Clone the timeline recorded since [`Simulation::record_timeline`].
     pub fn recorded_timeline(&self) -> Option<crate::timeline::RunTimeline> {
         self.timeline
