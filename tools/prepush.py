@@ -14,6 +14,17 @@ ROOT = Path(__file__).resolve().parent.parent
 CHECKS: list[tuple[str, list[str]]] = [
     ("cargo test", ["cargo", "test"]),
     ("bridge builds", ["cargo", "build", "--lib", "--features", "bridge"]),
+    # Every prior gate here built the union of features. `mc_tick.rs` once
+    # reached into the meshing bridge module for its base64 helper, which
+    # only broke on `bridge,mc-tick` without `meshing` — a combination no
+    # other check exercises. Build it directly so that class of breakage
+    # fails here instead of surviving to a downstream feature-set nobody
+    # tries at review time.
+    ("bridge+mc-tick builds", ["cargo", "build", "--lib", "--features", "bridge,mc-tick"]),
+    # Same shape, in the CLI: `render` didn't imply `mesh`, so `animate.rs`
+    # (gated on `any(mesh, render)`, and using `nucleation::tick_timeline`)
+    # broke under a `render`-only build while `mesh`-only stayed green.
+    ("cli render builds", ["cargo", "check", "-p", "nucleation-cli", "--features", "render"]),
     ("bindings fresh", ["bash", "-c", "./tools/gen-bindings.sh && git diff --exit-code -- bindings"]),
     ("bridge coverage", ["python3", "tools/check_bridge_coverage.py"]),
     # The sdist is staged from a *copy* of the tree, so it can be broken by

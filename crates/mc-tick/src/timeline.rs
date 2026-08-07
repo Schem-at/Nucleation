@@ -278,6 +278,12 @@ pub struct CycleReport {
 }
 
 /// A half-open tick range.
+///
+/// The fields are private on purpose: the only way to build one is through a
+/// `select_*` constructor on [`RunTimeline`], which validates both bounds
+/// against the recorded span. Do not re-publish them — see
+/// [`RunTimeline::initial_frame`] for why an out-of-range selection used to be
+/// reachable, and what that cost.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimelineSelection {
     /// Included boundary tick.

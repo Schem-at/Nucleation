@@ -13,7 +13,12 @@ fn utf8(bytes: &[u8]) -> Result<&str, NucleationError> {
     std::str::from_utf8(bytes).map_err(|_| NucleationError::InvalidArgument)
 }
 
-fn b64(bytes: &[u8]) -> String {
+/// Standard base64 encode, shared with other bridge modules that need it but
+/// aren't otherwise gated on `meshing` (e.g. `mc_tick`'s `selection_schematic_b64`)
+/// — this module is unconditionally part of `bridge`, so it's reachable from any
+/// feature combination that has `bridge` on. Keep this the only encoder: a second
+/// copy is how the two stop agreeing.
+pub(crate) fn b64(bytes: &[u8]) -> String {
     use base64::Engine as _;
     base64::engine::general_purpose::STANDARD.encode(bytes)
 }

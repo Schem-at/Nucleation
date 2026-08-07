@@ -453,6 +453,15 @@ class TickSimulation internal constructor (
     *
     *Called again, it restarts from the current tick, and the previously
     *stopped span is released.
+    *
+    *Starting a recording also wipes the plain block-change log that
+    *[TickSimulation::changes_json] and [TickSimulation::changes_count]
+    *read back to empty — a separate reset from
+    *[TickSimulation::record_updates]/[TickSimulation::clear_updates],
+    *which govern a different log. A host holding a cursor into the
+    *change log (the sim lab keeps a cumulative one) must reset that
+    *cursor when it calls this, or it will read past the end of a log
+    *that is no longer the one it was walking.
     */
     fun recordTimeline(): Unit {
 

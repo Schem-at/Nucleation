@@ -1476,6 +1476,15 @@ pub mod ffi {
         ///
         /// Called again, it restarts from the current tick, and the previously
         /// stopped span is released.
+        ///
+        /// Starting a recording also wipes the plain block-change log that
+        /// [`TickSimulation::changes_json`] and [`TickSimulation::changes_count`]
+        /// read back to empty — a separate reset from
+        /// [`TickSimulation::record_updates`]/[`TickSimulation::clear_updates`],
+        /// which govern a different log. A host holding a cursor into the
+        /// change log (the sim lab keeps a cumulative one) must reset that
+        /// cursor when it calls this, or it will read past the end of a log
+        /// that is no longer the one it was walking.
         pub fn record_timeline(&mut self) {
             self.stopped_timeline = None;
             self.sim.record_timeline();
@@ -1534,9 +1543,12 @@ pub mod ffi {
                 return;
             };
             // Counted straight off the three borrowed event vectors: this
-            // copies nothing, which is what makes it safe for a host to poll.
-            // Frames and digests are O(ticks x blocks) to rebuild and would
-            // answer a question the strip never asks.
+            // copies nothing, unlike the other timeline queries (no world-sized
+            // clone, no frame or digest rebuild). But it is not free — it is
+            // O(changes + inputs + pistons), re-scanning the whole accumulated
+            // log into a fresh `BTreeMap` on every call, so a host should choose
+            // its poll rate knowing the cost grows with the recording, not just
+            // call this as often as it likes.
             let mut active: std::collections::BTreeMap<u64, [u32; 3]> =
                 std::collections::BTreeMap::new();
             for change in timeline.changes {
@@ -1698,7 +1710,9 @@ pub mod ffi {
                 super::set_last_error(e.to_string());
                 NucleationError::Serialize
             })?;
-            super::super::meshing::write_b64(&data, out);
+            // `schematic`'s b64 helper, not `meshing`'s: this module is gated on
+            // `mc-tick` alone and must stay buildable without `meshing`.
+            let _ = write!(out, "{}", super::super::schematic::b64(&data));
             Ok(())
         }
 

@@ -20,7 +20,9 @@ image = "0.25.10"
 [features]
 # The `render` subcommand needs nucleation's GPU pipeline (wgpu). Off by
 # default so the CLI builds fast; everything else works without it.
-render = ["nucleation/rendering"]
+render = ["mesh", "nucleation/rendering"]
 # The `mesh` subcommand needs only the mesher, no GPU. `render` implies it
-# (nucleation's rendering feature builds on meshing).
+# (nucleation's rendering feature builds on meshing) — and `animate` (gated on
+# `any(mesh, render)`) uses `nucleation::tick_timeline`, so `render` must also
+# carry `mc-tick` the way `mesh` does, not just `nucleation/rendering`.
 mesh = ["nucleation/meshing", "nucleation/mc-tick"]
