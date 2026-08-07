@@ -355,8 +355,11 @@ impl RunTimeline {
                         .map(|&before| digests[before].tick)
                         .filter(|&tick| self.changed_between(tick, digest.tick))
                         .collect();
-                    report.exact =
-                        self.verify(CycleKind::Exact, &candidates, digest.tick, registry);
+                    if let Some(found) =
+                        self.verify(CycleKind::Exact, &candidates, digest.tick, registry)
+                    {
+                        report.exact = Some(found);
+                    }
                 }
             }
             exact_seen.entry(digest.exact).or_default().push(index);
@@ -372,8 +375,11 @@ impl RunTimeline {
                         })
                         .map(|first| first.tick)
                         .collect();
-                    report.translated =
-                        self.verify(CycleKind::Translated, &candidates, digest.tick, registry);
+                    if let Some(found) =
+                        self.verify(CycleKind::Translated, &candidates, digest.tick, registry)
+                    {
+                        report.translated = Some(found);
+                    }
                 }
             }
             translated_seen
@@ -476,8 +482,19 @@ impl RunTimeline {
         selection: TimelineSelection,
         registry: &StateRegistry,
     ) -> StateFrame {
+        // Not a silent fallback: a selection pointing outside the recorded
+        // span is a caller bug, and quietly handing back the run's first frame
+        // would export the wrong scene with nothing to notice it by.
+        // `TimelineSelection`'s fields are public, so this is reachable by
+        // construction even though the `select_*` constructors cannot produce
+        // it.
         self.frame_at(selection.start_tick, registry)
-            .unwrap_or_else(|| self.initial.clone())
+            .unwrap_or_else(|| {
+                panic!(
+                    "selection starts at tick {} which is outside the recorded span {}..={}",
+                    selection.start_tick, self.start_tick, self.end_tick
+                )
+            })
     }
 
     /// The visible world at `tick`, rebuilt from the initial frame and the

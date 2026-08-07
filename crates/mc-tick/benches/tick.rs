@@ -273,7 +273,7 @@ fn bench_timeline_recording(c: &mut Criterion) {
     assert!(
         recorded
             .recorded_timeline()
-            .is_some_and(|timeline| timeline.end_tick == 1),
+            .is_some_and(|timeline| timeline.end_tick == timeline.start_tick + 1),
         "the recorded arm did not capture a verification frame"
     );
     c.bench_function("recording/flyer_recorded", |b| {

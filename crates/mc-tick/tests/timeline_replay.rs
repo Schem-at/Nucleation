@@ -96,7 +96,7 @@ fn cycles_found_by_replay_still_describe_the_flying_machine() {
     let air = sim.registry_mut().intern("minecraft:air").unwrap();
     sim.record_timeline();
     // The kick block has to be taken away again or the machine stalls after a
-    // single step and never translates — the same script the CLI runs.
+    // single step and never translates.
     sim.place_block(Pos::new(2, 1, 1), redstone);
     sim.run(2);
     sim.place_block(Pos::new(2, 1, 1), air);
