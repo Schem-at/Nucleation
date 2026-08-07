@@ -618,13 +618,73 @@ impl TimelineRecorder {
         }
     }
 
-    pub(crate) fn finish(&self, changes: &[BlockChange], end_tick: u64) -> RunTimeline {
-        RunTimeline {
+    pub(crate) fn view<'a>(&'a self, changes: &'a [BlockChange], end_tick: u64) -> TimelineView<'a> {
+        TimelineView {
             start_tick: self.start_tick,
             end_tick,
-            changes: changes.to_vec(),
-            inputs: self.inputs.clone(),
-            pistons: self.pistons.clone(),
+            changes,
+            inputs: &self.inputs,
+            pistons: &self.pistons,
+            initial: &self.initial,
+        }
+    }
+}
+
+/// The same six parts as [`RunTimeline`], borrowed rather than copied.
+///
+/// A [`RunTimeline`] is expensive to hand out: its `initial` frame lists every
+/// non-air block in the world, which on a real build is tens of thousands of
+/// entries, so producing one copies close to a megabyte before the caller has
+/// read a single field. Plenty of questions — how many changes landed on each
+/// tick, when the inputs were, where the piston strokes fell — need none of
+/// that. This is what those questions should read.
+///
+/// It exists so a recording in progress and a finished
+/// [`RunTimeline`] can be read through one type: see
+/// [`Simulation::timeline_view`](crate::Simulation::timeline_view) for the
+/// former and [`TimelineView::of`] for the latter.
+#[derive(Debug, Clone, Copy)]
+pub struct TimelineView<'a> {
+    /// Tick at which recording began.
+    pub start_tick: u64,
+    /// Tick the span currently ends at — the live tick while still recording.
+    pub end_tick: u64,
+    /// Ordered block deltas.
+    pub changes: &'a [BlockChange],
+    /// Ordered external inputs.
+    pub inputs: &'a [InputAction],
+    /// Ordered successfully dispatched piston strokes.
+    pub pistons: &'a [PistonEvent],
+    /// The world as recording began.
+    pub initial: &'a StateFrame,
+}
+
+impl<'a> TimelineView<'a> {
+    /// Borrow a finished timeline's parts.
+    pub fn of(timeline: &'a RunTimeline) -> Self {
+        Self {
+            start_tick: timeline.start_tick,
+            end_tick: timeline.end_tick,
+            changes: &timeline.changes,
+            inputs: &timeline.inputs,
+            pistons: &timeline.pistons,
+            initial: &timeline.initial,
+        }
+    }
+
+    /// Copy into an owned [`RunTimeline`].
+    ///
+    /// **Costs a full copy of the initial frame** — every non-air block in the
+    /// world — plus the whole change log. Call it once for work that genuinely
+    /// needs a whole timeline (replaying frames, detecting cycles, cutting a
+    /// selection); never once per query in a loop.
+    pub fn to_timeline(&self) -> RunTimeline {
+        RunTimeline {
+            start_tick: self.start_tick,
+            end_tick: self.end_tick,
+            changes: self.changes.to_vec(),
+            inputs: self.inputs.to_vec(),
+            pistons: self.pistons.to_vec(),
             initial: self.initial.clone(),
         }
     }

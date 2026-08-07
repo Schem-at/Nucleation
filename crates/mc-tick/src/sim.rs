@@ -579,15 +579,36 @@ impl Simulation {
     ///
     /// `None` if nothing was recording. Stopping twice is not an error.
     pub fn stop_timeline(&mut self) -> Option<crate::timeline::RunTimeline> {
-        let recorder = self.timeline.take()?;
-        Some(recorder.finish(self.log.as_deref().unwrap_or(&[]), self.tick))
+        let finished = self.recorded_timeline()?;
+        self.timeline = None;
+        Some(finished)
+    }
+
+    /// Borrow the timeline recording in progress, copying nothing.
+    ///
+    /// Prefer this to [`Simulation::recorded_timeline`] for anything that only
+    /// reads the event vectors — counting per-tick activity, finding the
+    /// inputs, listing piston strokes. Materialising a whole
+    /// [`RunTimeline`](crate::timeline::RunTimeline) copies the initial frame,
+    /// which is every non-air block in the world, and a caller that polls is
+    /// then copying it over and over.
+    ///
+    /// `None` if nothing is recording.
+    pub fn timeline_view(&self) -> Option<crate::timeline::TimelineView<'_>> {
+        self.timeline
+            .as_ref()
+            .map(|recorder| recorder.view(self.log.as_deref().unwrap_or(&[]), self.tick))
     }
 
     /// Clone the timeline recorded since [`Simulation::record_timeline`].
+    ///
+    /// **Copies the initial frame** — every non-air block in the world — along
+    /// with the whole change log. Right for work that needs a whole timeline
+    /// (replay, cycle detection, cutting a selection); use
+    /// [`Simulation::timeline_view`] for anything that just reads the events.
     pub fn recorded_timeline(&self) -> Option<crate::timeline::RunTimeline> {
-        self.timeline
-            .as_ref()
-            .map(|timeline| timeline.finish(self.log.as_deref().unwrap_or(&[]), self.tick))
+        self.timeline_view()
+            .map(|view| view.to_timeline())
     }
 
     /// The entity events recorded since [`Simulation::record`].

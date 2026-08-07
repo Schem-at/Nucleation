@@ -1488,10 +1488,21 @@ pub mod ffi {
         /// readable until the next [`TickSimulation::record_timeline`]. Every
         /// timeline reader resolves through here so that they cannot disagree
         /// about which recording the host is looking at.
-        fn timeline(&self) -> Option<mc_tick::timeline::RunTimeline> {
-            self.sim
-                .recorded_timeline()
-                .or_else(|| self.stopped_timeline.clone())
+        ///
+        /// It hands back a **borrowed** view because most readers only want the
+        /// event vectors, and a host draws a timeline strip by polling. An
+        /// owned `RunTimeline` carries the initial frame — every non-air block
+        /// in the world, near a megabyte on a real build — so resolving to one
+        /// here would copy that on every poll, which is the unbounded copying
+        /// this recording model exists to avoid. Readers that genuinely need a
+        /// whole timeline call `.to_timeline()` on the result, and say in their
+        /// own docs that they pay for it.
+        fn timeline(&self) -> Option<mc_tick::timeline::TimelineView<'_>> {
+            self.sim.timeline_view().or_else(|| {
+                self.stopped_timeline
+                    .as_ref()
+                    .map(mc_tick::timeline::TimelineView::of)
+            })
         }
 
         /// Where the recorded run was busy, as JSON:
@@ -1509,18 +1520,19 @@ pub mod ffi {
                 let _ = write!(out, "{{\"start\":0,\"end\":0,\"ticks\":[]}}");
                 return;
             };
-            // Counted straight off the three ordered event vectors. Frames and
-            // digests are O(ticks x blocks) to rebuild and would answer a
-            // question the strip never asks.
+            // Counted straight off the three borrowed event vectors: this
+            // copies nothing, which is what makes it safe for a host to poll.
+            // Frames and digests are O(ticks x blocks) to rebuild and would
+            // answer a question the strip never asks.
             let mut active: std::collections::BTreeMap<u64, [u32; 3]> =
                 std::collections::BTreeMap::new();
-            for change in &timeline.changes {
+            for change in timeline.changes {
                 active.entry(change.tick).or_default()[0] += 1;
             }
-            for input in &timeline.inputs {
+            for input in timeline.inputs {
                 active.entry(input.tick()).or_default()[1] += 1;
             }
-            for piston in &timeline.pistons {
+            for piston in timeline.pistons {
                 active.entry(piston.tick).or_default()[2] += 1;
             }
             let mut json = format!(
