@@ -23,4 +23,4 @@ image = "0.25.10"
 render = ["nucleation/rendering"]
 # The `mesh` subcommand needs only the mesher, no GPU. `render` implies it
 # (nucleation's rendering feature builds on meshing).
-mesh = ["nucleation/meshing"]
+mesh = ["nucleation/meshing", "nucleation/mc-tick"]

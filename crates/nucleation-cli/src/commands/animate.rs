@@ -4,11 +4,10 @@
 use std::path::{Path, PathBuf};
 
 use mc_test::mc_tick::{
-    vanilla::Descriptor, Cycle, CycleKind, Dir, PistonAction, Pos, RunTimeline, Simulation,
-    StateRegistry, Structure, TimelineSelection,
+    Cycle, CycleKind, Pos, RunTimeline, Simulation, StateRegistry, Structure, TimelineSelection,
 };
 use mc_test::SettleMode;
-use serde_json::{json, Map, Value};
+use serde_json::Value;
 
 use crate::usage_and_exit;
 
@@ -31,13 +30,6 @@ enum RangeRequest {
     Ticks(u64, u64),
     BetweenActions(usize),
     Cycle(CycleKind),
-}
-
-#[derive(Debug, Default, PartialEq, Eq)]
-struct ProjectionWarnings {
-    dropped_non_sticky_retractions: usize,
-    dropped_short_pulse_retractions: usize,
-    projected_pistons: usize,
 }
 
 pub(crate) fn animate_main(args: impl Iterator<Item = String>) {
@@ -279,9 +271,13 @@ fn run_export(mut config: RunConfig<'_>) -> Result<ExportSummary, String> {
         .ok_or_else(|| "timeline recorder unexpectedly stopped".to_string())?;
     let cycles = timeline.detect_cycles(sim.registry());
     let selection = select_range(&timeline, config.range, sim.registry())?;
-    let initial = selected_schematic(&timeline, selection, sim.registry())?;
-    let (timeline_json, projection) =
-        project_timeline(&timeline, selection, sim.registry(), config.tick_ms)?;
+    let initial = nucleation::tick_timeline::selection_schematic(&timeline, selection, sim.registry())?;
+    let (timeline_json, projection) = nucleation::tick_timeline::mesher_timeline_json(
+        &timeline,
+        selection,
+        sim.registry(),
+        config.tick_ms,
+    )?;
 
     if let Some(path) = config.timeline_out {
         let pretty: Value = serde_json::from_str(&timeline_json)
@@ -397,112 +393,6 @@ fn select_range(
     .map_err(|e| e.to_string())
 }
 
-fn selected_schematic(
-    timeline: &RunTimeline,
-    selection: TimelineSelection,
-    registry: &StateRegistry,
-) -> Result<nucleation::UniversalSchematic, String> {
-    let frame = timeline.initial_frame(selection, registry);
-    let mut schematic = nucleation::UniversalSchematic::new(format!(
-        "mc-tick {}..{}",
-        selection.start_tick, selection.end_tick
-    ));
-    for (pos, state) in &frame.blocks {
-        let descriptor = registry
-            .descriptor(*state)
-            .ok_or_else(|| format!("state {} has no descriptor", state.raw()))?;
-        schematic.set_block_from_string(
-            pos.x - frame.origin.x,
-            pos.y - frame.origin.y,
-            pos.z - frame.origin.z,
-            descriptor,
-        )?;
-    }
-    Ok(schematic)
-}
-
-fn project_timeline(
-    timeline: &RunTimeline,
-    selection: TimelineSelection,
-    registry: &StateRegistry,
-    tick_ms: f32,
-) -> Result<(String, ProjectionWarnings), String> {
-    let origin = timeline.initial_frame(selection, registry).origin;
-    let mut events = Vec::new();
-    let mut warnings = ProjectionWarnings::default();
-    let mut piston_index = 0;
-
-    for change_index in 0..=timeline.changes.len() {
-        while let Some(piston) = timeline.pistons.get(piston_index) {
-            if piston.change_index != change_index {
-                break;
-            }
-            if selection.contains(piston.tick) {
-                match piston.action {
-                    PistonAction::Extend => {
-                        events.push(json!({
-                            "kind": "piston",
-                            "tick": relative_tick(piston.tick, selection.start_tick)?,
-                            "pos": [piston.pos.x, piston.pos.y, piston.pos.z],
-                            "action": "extend",
-                            "dir": dir_name(piston.dir),
-                        }));
-                        warnings.projected_pistons += 1;
-                    }
-                    PistonAction::Retract if piston.sticky => {
-                        events.push(json!({
-                            "kind": "piston",
-                            "tick": relative_tick(piston.tick, selection.start_tick)?,
-                            "pos": [piston.pos.x, piston.pos.y, piston.pos.z],
-                            "action": "retract",
-                            "dir": dir_name(piston.dir),
-                        }));
-                        warnings.projected_pistons += 1;
-                    }
-                    PistonAction::Retract => warnings.dropped_non_sticky_retractions += 1,
-                    PistonAction::Drop => warnings.dropped_short_pulse_retractions += 1,
-                }
-            }
-            piston_index += 1;
-        }
-        let Some(change) = timeline.changes.get(change_index) else {
-            continue;
-        };
-        if !selection.contains(change.tick) {
-            continue;
-        }
-        let descriptor = registry
-            .descriptor(change.to)
-            .ok_or_else(|| format!("state {} has no descriptor", change.to.raw()))?;
-        let parsed = Descriptor::parse(descriptor);
-        let props: Map<String, Value> = parsed
-            .properties
-            .into_iter()
-            .map(|(key, value)| (key, Value::String(value)))
-            .collect();
-        events.push(json!({
-            "kind": "set_block",
-            "tick": relative_tick(change.tick, selection.start_tick)?,
-            "pos": [change.pos.x, change.pos.y, change.pos.z],
-            "block": parsed.name,
-            "props": props,
-        }));
-    }
-
-    serde_json::to_string(&json!({
-        "origin": [origin.x, origin.y, origin.z],
-        "tick_ms": tick_ms,
-        "events": events,
-    }))
-    .map(|json| (json, warnings))
-    .map_err(|e| format!("encoding mesher timeline: {e}"))
-}
-
-fn relative_tick(tick: u64, start: u64) -> Result<u32, String> {
-    u32::try_from(tick - start)
-        .map_err(|_| format!("selected range is too long for the mesher's u32 ticks"))
-}
-
 fn format_cycle(cycle: Option<Cycle>) -> String {
     match cycle {
         None => "none".to_string(),
@@ -516,10 +406,6 @@ fn format_cycle(cycle: Option<Cycle>) -> String {
             cycle.drift.z
         ),
     }
-}
-
-fn dir_name(dir: Dir) -> &'static str {
-    dir.name()
 }
 
 fn parse_settle(value: &str) -> SettleMode {
@@ -609,7 +495,6 @@ fn fail(message: String) -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mc_test::mc_tick::{Bounds, InputAction, StateId};
 
     #[test]
     fn action_and_range_syntax_is_unambiguous() {
@@ -626,51 +511,5 @@ mod tests {
             )
         );
         assert_eq!(parse_span("12..40").unwrap(), (12, 40));
-    }
-
-    #[test]
-    fn projection_preserves_same_tick_piston_before_block_delta_order() {
-        let mut sim = Simulation::new(Bounds::new(Pos::new(-3, -1, -1), Pos::new(3, 1, 1)));
-        let piston = sim
-            .registry_mut()
-            .intern("minecraft:sticky_piston[facing=east,extended=false]")
-            .unwrap();
-        let stone = sim.registry_mut().intern("minecraft:stone").unwrap();
-        sim.world_mut().set(Pos::new(0, 0, 0), piston);
-        sim.record_timeline();
-        sim.place_block(Pos::new(1, 0, 0), stone);
-        sim.step();
-        let mut timeline = sim.recorded_timeline().unwrap();
-        timeline.pistons.push(mc_test::mc_tick::PistonEvent {
-            tick: 0,
-            pos: Pos::new(0, 0, 0),
-            action: PistonAction::Extend,
-            dir: Dir::East,
-            sticky: true,
-            change_index: 0,
-        });
-        let selection = timeline.select_ticks(0, 1).unwrap();
-        let (encoded, warnings) =
-            project_timeline(&timeline, selection, sim.registry(), 50.0).unwrap();
-        let decoded: Value = serde_json::from_str(&encoded).unwrap();
-        let events = decoded["events"].as_array().unwrap();
-        assert_eq!(events[0]["kind"], "piston");
-        assert_eq!(events[1]["kind"], "set_block");
-        assert_eq!(
-            warnings,
-            ProjectionWarnings {
-                projected_pistons: 1,
-                ..ProjectionWarnings::default()
-            }
-        );
-        assert_eq!(
-            timeline.inputs[0],
-            InputAction::PlaceBlock {
-                tick: 0,
-                pos: Pos::new(1, 0, 0),
-                state: stone,
-            }
-        );
-        assert_ne!(stone, StateId::AIR);
     }
 }
