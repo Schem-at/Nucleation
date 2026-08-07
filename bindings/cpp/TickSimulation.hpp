@@ -75,6 +75,14 @@ namespace capi {
 
     void TickSimulation_timeline_activity_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
 
+    void TickSimulation_timeline_cycles_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct TickSimulation_animation_timeline_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} TickSimulation_animation_timeline_json_result;
+    TickSimulation_animation_timeline_json_result TickSimulation_animation_timeline_json(const diplomat::capi::TickSimulation* self, uint32_t start_tick, uint32_t end_tick, float tick_ms, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct TickSimulation_selection_schematic_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} TickSimulation_selection_schematic_b64_result;
+    TickSimulation_selection_schematic_b64_result TickSimulation_selection_schematic_b64(const diplomat::capi::TickSimulation* self, uint32_t start_tick, uint32_t end_tick, diplomat::capi::DiplomatWrite* write);
+
     uint32_t TickSimulation_updates_count(const diplomat::capi::TickSimulation* self);
 
     void TickSimulation_updates_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
@@ -348,6 +356,60 @@ inline void TickSimulation::timeline_activity_json_write(W& writeable) const {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     diplomat::capi::TickSimulation_timeline_activity_json(this->AsFFI(),
         &write);
+}
+
+inline std::string TickSimulation::timeline_cycles_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_timeline_cycles_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::timeline_cycles_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_timeline_cycles_json(this->AsFFI(),
+        &write);
+}
+
+inline diplomat::result<std::string, NucleationError> TickSimulation::animation_timeline_json(uint32_t start_tick, uint32_t end_tick, float tick_ms) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::TickSimulation_animation_timeline_json(this->AsFFI(),
+        start_tick,
+        end_tick,
+        tick_ms,
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> TickSimulation::animation_timeline_json_write(uint32_t start_tick, uint32_t end_tick, float tick_ms, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::TickSimulation_animation_timeline_json(this->AsFFI(),
+        start_tick,
+        end_tick,
+        tick_ms,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> TickSimulation::selection_schematic_b64(uint32_t start_tick, uint32_t end_tick) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::TickSimulation_selection_schematic_b64(this->AsFFI(),
+        start_tick,
+        end_tick,
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> TickSimulation::selection_schematic_b64_write(uint32_t start_tick, uint32_t end_tick, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::TickSimulation_selection_schematic_b64(this->AsFFI(),
+        start_tick,
+        end_tick,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline uint32_t TickSimulation::updates_count() const {

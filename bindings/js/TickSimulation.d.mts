@@ -231,6 +231,65 @@ export class TickSimulation {
     timelineActivityJson(): string;
 
     /**
+     * Exact and translated recurrence in the timeline a read query would
+     * resolve to (see {@link Self::timeline}), as JSON:
+     * `{"exact":{"start":T,"end":T,"period":N,"drift":[x,y,z]}|null,
+     * "translated":{...}|null}`.
+     *
+     * **An absent cycle is `null`, not an error.** Most builds — an
+     * adder, a door — never repeat their own state, and that is the
+     * ordinary outcome, not a failed search.
+     *
+     * **O(ticks × blocks): replays the whole recorded span to build one
+     * digest per tick boundary**, then rebuilds full frames for the
+     * handful of candidates that survive. This is an on-demand "find
+     * cycles" action for a host UI button, never something to call per
+     * tick or per frame — poll {@link Self::timeline_activity_json} instead.
+     *
+     * Materialises the whole recorded timeline once to answer this call
+     * (an owned `RunTimeline`'s `initial` frame copies every non-air
+     * block) — acceptable for one on-demand press, not for a loop.
+     *
+     * `{"exact":null,"translated":null}` when nothing has been recorded.
+     */
+    timelineCyclesJson(): string;
+
+    /**
+     * Project `[start_tick, end_tick)` of the timeline a read query would
+     * resolve to (see {@link Self::timeline}) into the animated-GLB mesher's
+     * `Timeline` JSON — `{"origin":[x,y,z],"tick_ms":F,
+     * "events":[{"kind":"set_block"|"piston",...}]}` — via
+     * `crate::tick_timeline::mesher_timeline_json`.
+     *
+     * **Materialises the whole recorded timeline to answer this call**
+     * (an owned `RunTimeline`'s `initial` frame copies every non-air
+     * block in the world) — this is an on-demand "export this
+     * selection" action, not something to call per frame or poll.
+     *
+     * Fails if no timeline has been recorded, or if `start_tick..
+     * end_tick` is empty or outside the recorded span.
+     */
+    animationTimelineJson(startTick: number, endTick: number, tickMs: number): string;
+
+    /**
+     * The selection's starting scene — `[start_tick, end_tick)` of the
+     * timeline a read query would resolve to (see {@link Self::timeline}) —
+     * as schematic bytes, base64-encoded.
+     *
+     * A WASM handle cannot cross a worker boundary, so this exists for a
+     * host to hand the bytes to a worker, which rebuilds the schematic
+     * with `Schematic.fromData`.
+     *
+     * **Materialises the whole recorded timeline to answer this call**
+     * — see {@link Self::animation_timeline_json}; an on-demand export
+     * action, not a per-frame poll.
+     *
+     * Fails if no timeline has been recorded, or if `start_tick..
+     * end_tick` is empty or outside the recorded span.
+     */
+    selectionSchematicB64(startTick: number, endTick: number): string;
+
+    /**
      * How many updates have been recorded — page before pulling them.
      */
     updatesCount(): number;

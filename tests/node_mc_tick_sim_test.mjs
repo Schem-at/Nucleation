@@ -199,5 +199,39 @@ expect(
   `the door has idle ticks that were skipped (${activity.ticks.length} of ${activity.end - activity.start + 1})`,
 );
 
+// --- cycles, projection, and a selection's schematic ---
+const cycles = JSON.parse(tl.timelineCyclesJson());
+expect("exact" in cycles && "translated" in cycles, "cycles report has both kinds");
+
+// A flying machine repeats itself displaced; an absent cycle is null, not an error.
+const fly = TickSimulation.fromSnbt(
+  fs.readFileSync("crates/mc-tick/tests/corpus/structures/flying_machine_east.snbt", "utf8"),
+  TickSettleMode.InWorld, 0, 0, 0, "",
+);
+// Kick timing matches the CLI's verified `--place 2:...=redstone_block
+// --place 4:...=air` (see GLOBAL CONSTRAINTS): 2 quiet ticks, a 2-tick pulse,
+// then run to 60. A kick held longer (e.g. placed at tick 0) does not launch
+// this machine at all — placement timing is load-bearing here, not cosmetic.
+fly.recordTimeline();
+fly.run(2);
+fly.placeBlock(2, 1, 1, RB);
+fly.run(2);
+fly.placeBlock(2, 1, 1, "minecraft:air");
+fly.run(56);
+const flyCycles = JSON.parse(fly.timelineCyclesJson());
+expect(flyCycles.translated !== null, "the flying machine repeats itself, displaced");
+expect(flyCycles.translated.drift[0] !== 0, `it travels along x (drift ${flyCycles.translated.drift})`);
+
+const projected = JSON.parse(fly.animationTimelineJson(0, 20, 50.0));
+expect(Array.isArray(projected.events) && projected.events.length > 0, "the projection has events");
+expect(
+  projected.events.every((e) => e.kind === "piston" || e.kind === "set_block"),
+  "every event is one the mesher understands",
+);
+expect(typeof projected.tick_ms === "number" && projected.origin.length === 3, "origin and tick_ms are present");
+
+const seed = fly.selectionSchematicB64(0, 20);
+expect(seed.length > 0, "the selection's initial schematic comes back as bytes");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

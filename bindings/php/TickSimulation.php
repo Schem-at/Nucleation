@@ -238,6 +238,30 @@ final class TickSimulation {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function timelineCyclesJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->TickSimulation_timeline_cycles_json($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function animationTimelineJson( $start_tick,  $end_tick,  $tick_ms) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->TickSimulation_animation_timeline_json($this->ptr, $start_tick, $end_tick, $tick_ms, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function selectionSchematicB64( $start_tick,  $end_tick) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->TickSimulation_selection_schematic_b64($this->ptr, $start_tick, $end_tick, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function updatesCount() {
         $ret = Lib::ffi()->TickSimulation_updates_count($this->ptr);
         return $ret;

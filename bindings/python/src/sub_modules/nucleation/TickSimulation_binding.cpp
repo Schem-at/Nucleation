@@ -14,6 +14,7 @@ void add_TickSimulation_binding(nb::module_ mod) {
 
     nb::class_<nucleation::TickSimulation> opaque(mod, "TickSimulation", nb::type_slots(nucleation_TickSimulation_slots));
     opaque
+        .def("animation_timeline_json", &nucleation::TickSimulation::animation_timeline_json, "start_tick"_a, "end_tick"_a, "tick_ms"_a)
         .def_static("block_entity_audit_json", &nucleation::TickSimulation::block_entity_audit_json, "schematic"_a)
         .def("changes_count", &nucleation::TickSimulation::changes_count)
         .def("changes_json", &nucleation::TickSimulation::changes_json)
@@ -45,11 +46,13 @@ void add_TickSimulation_binding(nb::module_ mod) {
         .def("restore", &nucleation::TickSimulation::restore, "id"_a)
         .def("run", &nucleation::TickSimulation::run, "ticks"_a)
         .def("run_until_quiescent", &nucleation::TickSimulation::run_until_quiescent, "budget"_a)
+        .def("selection_schematic_b64", &nucleation::TickSimulation::selection_schematic_b64, "start_tick"_a, "end_tick"_a)
         .def("set_rng_seed", &nucleation::TickSimulation::set_rng_seed, "seed"_a)
         .def("step", &nucleation::TickSimulation::step)
         .def("stop_timeline", &nucleation::TickSimulation::stop_timeline)
         .def("tick_count", &nucleation::TickSimulation::tick_count)
         .def("timeline_activity_json", &nucleation::TickSimulation::timeline_activity_json)
+        .def("timeline_cycles_json", &nucleation::TickSimulation::timeline_cycles_json)
         .def("updates_count", &nucleation::TickSimulation::updates_count)
         .def("updates_heat_json", &nucleation::TickSimulation::updates_heat_json, "from_tick"_a, "to_tick"_a)
         .def("updates_json", &nucleation::TickSimulation::updates_json)

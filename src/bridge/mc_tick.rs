@@ -296,6 +296,19 @@ fn updates_json_range(sim: &mc_tick::Simulation, from: u64, to: u64) -> String {
     json
 }
 
+/// One detected cycle as `{"start":T,"end":T,"period":N,"drift":[x,y,z]}`, or
+/// `null` when none was found — a build with no recurrence is normal, not an
+/// error.
+fn cycle_json(cycle: Option<mc_tick::Cycle>) -> String {
+    match cycle {
+        None => "null".to_string(),
+        Some(c) => format!(
+            "{{\"start\":{},\"end\":{},\"period\":{},\"drift\":[{},{},{}]}}",
+            c.start_tick, c.end_tick, c.period, c.drift.x, c.drift.y, c.drift.z
+        ),
+    }
+}
+
 /// The phase legend shared by the compact update views: index 0 is a boundary
 /// dispatch (outside the phase walk), then [`mc_tick::PHASE_ORDER`].
 fn phase_legend() -> Vec<&'static str> {
@@ -1551,6 +1564,142 @@ pub mod ffi {
             }
             json.push_str("]}");
             let _ = write!(out, "{json}");
+        }
+
+        /// Exact and translated recurrence in the timeline a read query would
+        /// resolve to (see [`Self::timeline`]), as JSON:
+        /// `{"exact":{"start":T,"end":T,"period":N,"drift":[x,y,z]}|null,
+        ///   "translated":{...}|null}`.
+        ///
+        /// **An absent cycle is `null`, not an error.** Most builds — an
+        /// adder, a door — never repeat their own state, and that is the
+        /// ordinary outcome, not a failed search.
+        ///
+        /// **O(ticks × blocks): replays the whole recorded span to build one
+        /// digest per tick boundary**, then rebuilds full frames for the
+        /// handful of candidates that survive. This is an on-demand "find
+        /// cycles" action for a host UI button, never something to call per
+        /// tick or per frame — poll [`Self::timeline_activity_json`] instead.
+        ///
+        /// Materialises the whole recorded timeline once to answer this call
+        /// (an owned `RunTimeline`'s `initial` frame copies every non-air
+        /// block) — acceptable for one on-demand press, not for a loop.
+        ///
+        /// `{"exact":null,"translated":null}` when nothing has been recorded.
+        pub fn timeline_cycles_json(&self, out: &mut DiplomatWrite) {
+            let Some(view) = self.timeline() else {
+                let _ = write!(out, "{{\"exact\":null,\"translated\":null}}");
+                return;
+            };
+            let timeline = view.to_timeline();
+            let report = timeline.detect_cycles(self.sim.registry());
+            let _ = write!(
+                out,
+                "{{\"exact\":{},\"translated\":{}}}",
+                super::cycle_json(report.exact),
+                super::cycle_json(report.translated)
+            );
+        }
+
+        /// Project `[start_tick, end_tick)` of the timeline a read query would
+        /// resolve to (see [`Self::timeline`]) into the animated-GLB mesher's
+        /// `Timeline` JSON — `{"origin":[x,y,z],"tick_ms":F,
+        /// "events":[{"kind":"set_block"|"piston",...}]}` — via
+        /// `crate::tick_timeline::mesher_timeline_json`.
+        ///
+        /// **Materialises the whole recorded timeline to answer this call**
+        /// (an owned `RunTimeline`'s `initial` frame copies every non-air
+        /// block in the world) — this is an on-demand "export this
+        /// selection" action, not something to call per frame or poll.
+        ///
+        /// Fails if no timeline has been recorded, or if `start_tick..
+        /// end_tick` is empty or outside the recorded span.
+        pub fn animation_timeline_json(
+            &self,
+            start_tick: u32,
+            end_tick: u32,
+            tick_ms: f32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let Some(view) = self.timeline() else {
+                super::set_last_error("no timeline has been recorded on this simulation");
+                return Err(NucleationError::NotFound);
+            };
+            // One materialisation for this call: `select_ticks` and the
+            // projection below both need an owned `RunTimeline` to read, and
+            // there is nothing else in this call to share the copy with.
+            let timeline = view.to_timeline();
+            let selection = timeline
+                .select_ticks(u64::from(start_tick), u64::from(end_tick))
+                .map_err(|e| {
+                    super::set_last_error(e.to_string());
+                    NucleationError::InvalidArgument
+                })?;
+            // The `ProjectionWarnings` are discarded here: the host has no
+            // channel to show them yet, and inventing one before anything
+            // needs it is YAGNI.
+            let (json, _warnings) = crate::tick_timeline::mesher_timeline_json(
+                &timeline,
+                selection,
+                self.sim.registry(),
+                tick_ms,
+            )
+            .map_err(|e| {
+                super::set_last_error(e);
+                NucleationError::Simulation
+            })?;
+            let _ = write!(out, "{json}");
+            Ok(())
+        }
+
+        /// The selection's starting scene — `[start_tick, end_tick)` of the
+        /// timeline a read query would resolve to (see [`Self::timeline`]) —
+        /// as schematic bytes, base64-encoded.
+        ///
+        /// A WASM handle cannot cross a worker boundary, so this exists for a
+        /// host to hand the bytes to a worker, which rebuilds the schematic
+        /// with `Schematic.fromData`.
+        ///
+        /// **Materialises the whole recorded timeline to answer this call**
+        /// — see [`Self::animation_timeline_json`]; an on-demand export
+        /// action, not a per-frame poll.
+        ///
+        /// Fails if no timeline has been recorded, or if `start_tick..
+        /// end_tick` is empty or outside the recorded span.
+        pub fn selection_schematic_b64(
+            &self,
+            start_tick: u32,
+            end_tick: u32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let Some(view) = self.timeline() else {
+                super::set_last_error("no timeline has been recorded on this simulation");
+                return Err(NucleationError::NotFound);
+            };
+            let timeline = view.to_timeline();
+            let selection = timeline
+                .select_ticks(u64::from(start_tick), u64::from(end_tick))
+                .map_err(|e| {
+                    super::set_last_error(e.to_string());
+                    NucleationError::InvalidArgument
+                })?;
+            let schematic = crate::tick_timeline::selection_schematic(
+                &timeline,
+                selection,
+                self.sim.registry(),
+            )
+            .map_err(|e| {
+                super::set_last_error(e);
+                NucleationError::Simulation
+            })?;
+            // Same serialisation `Schematic::to_schematic_b64` uses, so a
+            // worker's `Schematic.fromData` reads this back identically.
+            let data = crate::formats::schematic::to_schematic(&schematic).map_err(|e| {
+                super::set_last_error(e.to_string());
+                NucleationError::Serialize
+            })?;
+            super::super::meshing::write_b64(&data, out);
+            Ok(())
         }
 
         /// How many updates have been recorded — page before pulling them.

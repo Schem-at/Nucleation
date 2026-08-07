@@ -72,6 +72,14 @@ void TickSimulation_stop_timeline(TickSimulation* self);
 
 void TickSimulation_timeline_activity_json(const TickSimulation* self, DiplomatWrite* write);
 
+void TickSimulation_timeline_cycles_json(const TickSimulation* self, DiplomatWrite* write);
+
+typedef struct TickSimulation_animation_timeline_json_result {union { NucleationError err;}; bool is_ok;} TickSimulation_animation_timeline_json_result;
+TickSimulation_animation_timeline_json_result TickSimulation_animation_timeline_json(const TickSimulation* self, uint32_t start_tick, uint32_t end_tick, float tick_ms, DiplomatWrite* write);
+
+typedef struct TickSimulation_selection_schematic_b64_result {union { NucleationError err;}; bool is_ok;} TickSimulation_selection_schematic_b64_result;
+TickSimulation_selection_schematic_b64_result TickSimulation_selection_schematic_b64(const TickSimulation* self, uint32_t start_tick, uint32_t end_tick, DiplomatWrite* write);
+
 uint32_t TickSimulation_updates_count(const TickSimulation* self);
 
 void TickSimulation_updates_json(const TickSimulation* self, DiplomatWrite* write);
