@@ -24,7 +24,7 @@ pub fn selection_schematic(
     let frame = timeline.initial_frame(selection, registry);
     let mut schematic = crate::UniversalSchematic::new(format!(
         "mc-tick {}..{}",
-        selection.start_tick, selection.end_tick
+        selection.start_tick(), selection.end_tick()
     ));
     for (pos, state) in &frame.blocks {
         let descriptor = registry
@@ -61,7 +61,7 @@ pub fn mesher_timeline_json(
                     PistonAction::Extend => {
                         events.push(json!({
                             "kind": "piston",
-                            "tick": relative_tick(piston.tick, selection.start_tick)?,
+                            "tick": relative_tick(piston.tick, selection.start_tick())?,
                             "pos": [piston.pos.x, piston.pos.y, piston.pos.z],
                             "action": "extend",
                             "dir": piston.dir.name(),
@@ -71,7 +71,7 @@ pub fn mesher_timeline_json(
                     PistonAction::Retract if piston.sticky => {
                         events.push(json!({
                             "kind": "piston",
-                            "tick": relative_tick(piston.tick, selection.start_tick)?,
+                            "tick": relative_tick(piston.tick, selection.start_tick())?,
                             "pos": [piston.pos.x, piston.pos.y, piston.pos.z],
                             "action": "retract",
                             "dir": piston.dir.name(),
@@ -101,7 +101,7 @@ pub fn mesher_timeline_json(
             .collect();
         events.push(json!({
             "kind": "set_block",
-            "tick": relative_tick(change.tick, selection.start_tick)?,
+            "tick": relative_tick(change.tick, selection.start_tick())?,
             "pos": [change.pos.x, change.pos.y, change.pos.z],
             "block": parsed.name,
             "props": props,

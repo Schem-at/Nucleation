@@ -281,12 +281,22 @@ pub struct CycleReport {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimelineSelection {
     /// Included boundary tick.
-    pub start_tick: u64,
+    start_tick: u64,
     /// Excluded boundary tick.
-    pub end_tick: u64,
+    end_tick: u64,
 }
 
 impl TimelineSelection {
+    /// First tick of the selection.
+    pub fn start_tick(&self) -> u64 {
+        self.start_tick
+    }
+
+    /// Last tick of the selection.
+    pub fn end_tick(&self) -> u64 {
+        self.end_tick
+    }
+
     /// Whether an event at `tick` belongs to the half-open range.
     pub fn contains(self, tick: u64) -> bool {
         tick >= self.start_tick && tick < self.end_tick
@@ -481,25 +491,20 @@ impl RunTimeline {
         self.select_ticks(found.start_tick, found.end_tick)
     }
 
-    /// Initial state frame for `selection`, rebuilt by replay.
+    /// Initial state frame for `selection`.
+    ///
+    /// Infallible by construction: `TimelineSelection` can only be built by
+    /// the `select_*` methods, which reject any tick outside the recorded
+    /// span. That is why the fields are private — an out-of-range selection
+    /// used to be reachable, and the choice was between a wrong scene and a
+    /// panic, in a bridge where a panic aborts the host page.
     pub fn initial_frame(
         &self,
         selection: TimelineSelection,
         registry: &StateRegistry,
     ) -> StateFrame {
-        // Not a silent fallback: a selection pointing outside the recorded
-        // span is a caller bug, and quietly handing back the run's first frame
-        // would export the wrong scene with nothing to notice it by.
-        // `TimelineSelection`'s fields are public, so this is reachable by
-        // construction even though the `select_*` constructors cannot produce
-        // it.
         self.frame_at(selection.start_tick, registry)
-            .unwrap_or_else(|| {
-                panic!(
-                    "selection starts at tick {} which is outside the recorded span {}..={}",
-                    selection.start_tick, self.start_tick, self.end_tick
-                )
-            })
+            .expect("a selection is validated against the recorded span when it is built")
     }
 
     /// The visible world at `tick`, rebuilt from the initial frame and the

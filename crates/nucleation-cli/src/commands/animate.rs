@@ -355,8 +355,8 @@ fn run_export(mut config: RunConfig<'_>) -> Result<ExportSummary, String> {
         status: format!(
             "{operation} {} ticks {}..{} -> {} ({}, {} bytes); {cycle_text}",
             super::io::display_name(config.input),
-            selection.start_tick,
-            selection.end_tick,
+            selection.start_tick(),
+            selection.end_tick(),
             super::io::display_out(config.output),
             config.container,
             size

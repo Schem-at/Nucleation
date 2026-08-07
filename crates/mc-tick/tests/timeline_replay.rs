@@ -97,7 +97,7 @@ fn cycles_found_by_replay_still_describe_the_flying_machine() {
     let selection = timeline
         .select_cycle(mc_tick::CycleKind::Translated, sim.registry())
         .expect("selectable");
-    assert_eq!(selection.start_tick, translated.start_tick);
+    assert_eq!(selection.start_tick(), translated.start_tick);
     let frame = timeline.initial_frame(selection, sim.registry());
     assert_eq!(frame.tick, translated.start_tick);
 }
@@ -156,6 +156,28 @@ fn a_recording_is_a_seed_and_a_log_not_a_world_per_tick() {
     assert!(timeline
         .frame_at(timeline.end_tick, sim.registry())
         .is_some());
+}
+
+/// A selection can only come from the `select_*` constructors, which validate
+/// against the recorded span — so `initial_frame` has no unreachable branch to
+/// panic in. Stage 3 runs this in WASM, where a panic aborts the page.
+#[test]
+fn every_selection_yields_the_frame_at_its_own_start() {
+    let mut sim = sim(DOOR);
+    sim.record_timeline();
+    sim.use_block(Pos::new(10, 4, 1));
+    sim.run(40);
+    let timeline = sim.recorded_timeline().expect("timeline");
+
+    for (start, end) in [(1u64, 5u64), (0, 40), (12, 13)] {
+        let selection = timeline.select_ticks(start, end).expect("in range");
+        assert_eq!(selection.start_tick(), start);
+        assert_eq!(selection.end_tick(), end);
+        let frame = timeline.initial_frame(selection, sim.registry());
+        assert_eq!(frame.tick, start, "the frame is the one the selection names");
+    }
+    assert!(timeline.select_ticks(0, 9_999).is_err(), "out of span is refused");
+    assert!(timeline.select_ticks(5, 5).is_err(), "an empty range is refused");
 }
 
 #[test]

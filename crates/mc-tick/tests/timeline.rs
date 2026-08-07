@@ -102,7 +102,7 @@ fn small_flyer_has_a_translated_cycle_east() {
     let between = timeline
         .select_between_actions(0)
         .expect("kick-to-removal range");
-    assert_eq!((between.start_tick, between.end_tick), (2, 4));
+    assert_eq!((between.start_tick(), between.end_tick()), (2, 4));
 }
 
 #[test]
