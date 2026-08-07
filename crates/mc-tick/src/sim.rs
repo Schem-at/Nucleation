@@ -537,6 +537,21 @@ impl Simulation {
     /// This is separate from [`Simulation::record`] because state snapshots
     /// deliberately cost work. With timeline recording off the tick loop only
     /// pays one predictable `Option` check at the tick boundary.
+    ///
+    /// # Invariant: the change log must describe every mutation since `start_tick`
+    ///
+    /// [`crate::timeline::RunTimeline`] keeps exactly one whole-world
+    /// [`StateFrame`](crate::timeline::StateFrame) at `start_tick` plus the
+    /// change log, and rebuilds every other frame by replaying that log in
+    /// tick order. That only reproduces the world that was actually there if
+    /// *every* write since recording began went through the log — a mutation
+    /// that bypasses it (a raw `world.set`, or a rewind that swaps the world
+    /// out from under the log entirely) makes replay confidently wrong with
+    /// nothing to notice it by. [`Simulation::restore`] and
+    /// [`Simulation::reset`] uphold this by ending the recording rather than
+    /// letting it go stale; anything else that writes to the world outside
+    /// the normal tick/behaviour path must do the same or must not run while
+    /// a timeline is active.
     pub fn record_timeline(&mut self) {
         self.record();
         self.timeline = Some(crate::timeline::TimelineRecorder::new(
@@ -2598,7 +2613,13 @@ impl Simulation {
     /// additive and monotonic, and ids already handed out must keep meaning the
     /// same thing. Rolling it back would invalidate every `StateId` a caller
     /// holds.
+    ///
+    /// A run timeline, if one is recording, is dropped: rewinding `tick` and
+    /// `world` out from under it leaves the change log describing a branch
+    /// that no longer exists, and replay has no way to notice. See
+    /// [`Simulation::record_timeline`].
     pub fn restore(&mut self, checkpoint: &Checkpoint) {
+        self.timeline = None;
         self.tick = checkpoint.tick;
         self.world = checkpoint.world.clone();
         self.ticks = checkpoint.ticks.clone();
@@ -2665,6 +2686,10 @@ impl Simulation {
     }
 
     /// Return to the state at construction, or at the last [`Simulation::mark_initial`].
+    ///
+    /// Delegates to [`Simulation::restore`], which drops any recording
+    /// timeline for the same reason: rewinding past it would leave the
+    /// change log describing a branch that no longer exists.
     pub fn reset(&mut self) {
         let initial = self.initial.clone();
         self.restore(&initial);
@@ -2785,6 +2810,10 @@ impl Simulation {
     /// a comparator's `updateNeighborsInFront` fires into the repeater beside
     /// it, and whether that repeater exists yet decides whether it books a tick
     /// during placement or waits to be woken later.
+    ///
+    /// Writes straight to the world via `world.set` rather than through the
+    /// change log, so it must not be used while a timeline is recording — see
+    /// the invariant on [`Simulation::record_timeline`].
     pub fn place_on_place(&mut self, order: &[Pos]) {
         let index: std::collections::HashMap<Pos, usize> =
             order.iter().enumerate().map(|(i, pos)| (*pos, i)).collect();

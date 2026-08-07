@@ -79,7 +79,13 @@ impl StateFrame {
             .unwrap_or_default();
         let exact = fingerprint(&blocks, Pos::default(), registry);
         let translated = fingerprint(&blocks, origin, registry);
-        Self { tick, exact, translated, origin, blocks }
+        Self {
+            tick,
+            exact,
+            translated,
+            origin,
+            blocks,
+        }
     }
 
     fn same_exact(&self, other: &Self) -> bool {

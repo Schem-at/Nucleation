@@ -112,7 +112,10 @@ fn digests_cover_every_tick_of_the_run_in_order() {
 
     let digests = timeline.digests(recorded.registry());
     let ticks: Vec<u64> = digests.iter().map(|d| d.tick).collect();
-    assert_eq!(ticks, (timeline.start_tick..=timeline.end_tick).collect::<Vec<_>>());
+    assert_eq!(
+        ticks,
+        (timeline.start_tick..=timeline.end_tick).collect::<Vec<_>>()
+    );
     for digest in &digests {
         let frame = timeline
             .frame_at(digest.tick, recorded.registry())
@@ -150,5 +153,26 @@ fn a_recording_is_a_seed_and_a_log_not_a_world_per_tick() {
         timeline.changes.len(),
     );
     // And it still answers for any tick in the run, from that seed alone.
-    assert!(timeline.frame_at(timeline.end_tick, sim.registry()).is_some());
+    assert!(timeline
+        .frame_at(timeline.end_tick, sim.registry())
+        .is_some());
+}
+
+#[test]
+fn a_rewind_ends_the_recording_instead_of_corrupting_it() {
+    // Replay is only correct while the change log describes every mutation
+    // since the timeline began. `restore` rewinds the world out from under
+    // that log without touching it, so the recording must end rather than
+    // silently start describing a world that no longer exists.
+    let mut sim = sim(DOOR);
+    sim.record_timeline();
+    let checkpoint = sim.checkpoint();
+    sim.use_block(Pos::new(10, 4, 1));
+    sim.run(5);
+    sim.restore(&checkpoint);
+    assert!(
+        sim.recorded_timeline().is_none(),
+        "restoring mid-recording must drop the timeline, not leave it describing \
+         a world the restore just rewound past"
+    );
 }

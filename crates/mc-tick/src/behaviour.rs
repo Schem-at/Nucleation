@@ -702,6 +702,11 @@ impl<'a> TickCtx<'a> {
     }
 
     /// Set a block without notifying anything, for loading a structure.
+    ///
+    /// Unlike [`TickCtx::set_quiet`], this writes straight to the world and
+    /// records nothing, so it must not be used while a timeline is
+    /// recording — see the invariant on
+    /// [`crate::sim::Simulation::record_timeline`].
     pub fn set_silent(&mut self, pos: Pos, state: StateId) {
         self.world.set(pos, state);
     }
