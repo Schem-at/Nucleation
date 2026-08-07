@@ -90,6 +90,43 @@ export class MeshResult {
     }
 
     /**
+     * A schematic plus a run timeline, as an animated GLB, base64-encoded.
+     *
+     * `timeline_json` is what `TickSimulation::animation_timeline_json`
+     * produces, and `schematic` the scene it starts from
+     * (`selection_schematic_b64`). Static rather than a method on a mesh
+     * because the animation is built from the schematic and the timeline
+     * together — there is no intermediate `MeshResult` to hang it off.
+     */
+    static animatedGlbB64(schematic, pack, timelineJson) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const timelineJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, timelineJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.MeshResult_animated_glb_b64(diplomatReceive.buffer, schematic.ffiValue, pack.ffiValue, timelineJsonSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
      * The mesh as a binary GLB, base64-encoded.
      */
     glbDataB64() {

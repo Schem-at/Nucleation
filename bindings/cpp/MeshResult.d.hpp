@@ -46,6 +46,19 @@ public:
   inline static diplomat::result<std::unique_ptr<MeshResult>, NucleationError> create_usdz(const Schematic& schematic, const ResourcePack& pack, const MeshConfig& config);
 
   /**
+   * A schematic plus a run timeline, as an animated GLB, base64-encoded.
+   *
+   * `timeline_json` is what `TickSimulation::animation_timeline_json`
+   * produces, and `schematic` the scene it starts from
+   * (`selection_schematic_b64`). Static rather than a method on a mesh
+   * because the animation is built from the schematic and the timeline
+   * together — there is no intermediate `MeshResult` to hang it off.
+   */
+  inline static diplomat::result<std::string, NucleationError> animated_glb_b64(const Schematic& schematic, const ResourcePack& pack, std::string_view timeline_json);
+  template<typename W>
+  inline static diplomat::result<std::monostate, NucleationError> animated_glb_b64_write(const Schematic& schematic, const ResourcePack& pack, std::string_view timeline_json, W& writeable_output);
+
+  /**
    * The mesh as a binary GLB, base64-encoded.
    */
   inline diplomat::result<std::string, NucleationError> glb_data_b64() const;

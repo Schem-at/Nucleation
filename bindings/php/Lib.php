@@ -663,6 +663,8 @@ typedef struct MeshResult_create_result { union { MeshResult* ok; NucleationErro
 MeshResult_create_result MeshResult_create(Schematic* schematic, ResourcePack* pack, MeshConfig* config);
 typedef struct MeshResult_create_usdz_result { union { MeshResult* ok; NucleationError err; }; bool is_ok; } MeshResult_create_usdz_result;
 MeshResult_create_usdz_result MeshResult_create_usdz(Schematic* schematic, ResourcePack* pack, MeshConfig* config);
+typedef struct MeshResult_animated_glb_b64_result { union { NucleationError err; }; bool is_ok; } MeshResult_animated_glb_b64_result;
+MeshResult_animated_glb_b64_result MeshResult_animated_glb_b64(Schematic* schematic, ResourcePack* pack, DiplomatStringView timeline_json, DiplomatWrite* write);
 typedef struct MeshResult_glb_data_b64_result { union { NucleationError err; }; bool is_ok; } MeshResult_glb_data_b64_result;
 MeshResult_glb_data_b64_result MeshResult_glb_data_b64(MeshResult* self, DiplomatWrite* write);
 typedef struct MeshResult_usdz_data_b64_result { union { NucleationError err; }; bool is_ok; } MeshResult_usdz_data_b64_result;

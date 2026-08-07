@@ -415,6 +415,29 @@ pub mod ffi {
                 .map_err(|_| NucleationError::Mesh)
         }
 
+        /// A schematic plus a run timeline, as an animated GLB, base64-encoded.
+        ///
+        /// `timeline_json` is what `TickSimulation::animation_timeline_json`
+        /// produces, and `schematic` the scene it starts from
+        /// (`selection_schematic_b64`). Static rather than a method on a mesh
+        /// because the animation is built from the schematic and the timeline
+        /// together — there is no intermediate `MeshResult` to hang it off.
+        pub fn animated_glb_b64(
+            schematic: &Schematic,
+            pack: &ResourcePack,
+            timeline_json: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let json = std::str::from_utf8(timeline_json)
+                .map_err(|_| NucleationError::InvalidArgument)?;
+            let data = schematic
+                .0
+                .to_animated_glb(&pack.0, json)
+                .map_err(|_| NucleationError::Mesh)?;
+            super::write_b64(&data, out);
+            Ok(())
+        }
+
         /// The mesh as a binary GLB, base64-encoded.
         pub fn glb_data_b64(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
             let data = self.0.to_glb().map_err(|_| NucleationError::Serialize)?;

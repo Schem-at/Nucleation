@@ -9,6 +9,7 @@ internal interface MeshResultLib: Library {
     fun MeshResult_destroy(handle: Pointer)
     fun MeshResult_create(schematic: Pointer, pack: Pointer, config: Pointer): ResultPointerInt
     fun MeshResult_create_usdz(schematic: Pointer, pack: Pointer, config: Pointer): ResultPointerInt
+    fun MeshResult_animated_glb_b64(schematic: Pointer, pack: Pointer, timelineJson: Slice, write: Pointer): ResultUnitInt
     fun MeshResult_glb_data_b64(handle: Pointer, write: Pointer): ResultUnitInt
     fun MeshResult_usdz_data_b64(handle: Pointer, write: Pointer): ResultUnitInt
     fun MeshResult_nucm_data_b64(handle: Pointer, write: Pointer): Unit
@@ -77,6 +78,33 @@ class MeshResult internal constructor (
                 return returnOpaque.ok()
             } else {
                 return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+
+        /** A schematic plus a run timeline, as an animated GLB, base64-encoded.
+        *
+        *`timeline_json` is what `TickSimulation::animation_timeline_json`
+        *produces, and `schematic` the scene it starts from
+        *(`selection_schematic_b64`). Static rather than a method on a mesh
+        *because the animation is built from the schematic and the timeline
+        *together — there is no intermediate `MeshResult` to hang it off.
+        */
+        fun animatedGlbB64(schematic: Schematic, pack: ResourcePack, timelineJson: String): Result<String> {
+            val timelineJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(timelineJson)
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.MeshResult_animated_glb_b64(schematic.handle, pack.handle, timelineJsonSliceMemory.slice, write);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+
+                    val returnString = DW.writeToString(write)
+                    return returnString.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                timelineJsonSliceMemory.close()
             }
         }
     }

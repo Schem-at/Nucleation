@@ -30,6 +30,25 @@ final class MeshResult {
         return new MeshResult($result->ok, true);
     }
 
+    public static function animatedGlbB64( $schematic,  $pack, string $timeline_json) {
+        $__n2 = strlen($timeline_json);
+        $__view2 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n2 > 0) {
+            $__buf2 = Lib::ffi()->new("uint8_t[" . $__n2 . "]", false);
+            \FFI::memcpy($__buf2, $timeline_json, $__n2);
+            $__view2->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf2[0]));
+        } else {
+            $__view2->data = null;
+        }
+        $__view2->len = $__n2;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->MeshResult_animated_glb_b64($schematic->ptr, $pack->ptr, $__view2, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function glbDataB64() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         $result = Lib::ffi()->MeshResult_glb_data_b64($this->ptr, $write);

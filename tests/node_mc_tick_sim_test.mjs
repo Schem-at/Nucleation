@@ -8,7 +8,7 @@
 // 6x6 in-world door — asserting the same end states through the bindings.
 
 import fs from "node:fs";
-import { TickSimulation, TickSettleMode } from "../bindings/js/index.mjs";
+import { TickSimulation, TickSettleMode, ResourcePack, Schematic, MeshResult } from "../bindings/js/index.mjs";
 
 let pass = 0;
 let fail = 0;
@@ -232,6 +232,32 @@ expect(typeof projected.tick_ms === "number" && projected.origin.length === 3, "
 
 const seed = fly.selectionSchematicB64(0, 20);
 expect(seed.length > 0, "the selection's initial schematic comes back as bytes");
+
+// --- record, project, export ---
+const packPath = "apps/sim-lab-wasm/public/pack/mesher-pack.zip";
+if (fs.existsSync(packPath)) {
+  const packZip = fs.readFileSync(packPath);
+  const rp = ResourcePack.fromBytes(new Uint8Array(packZip));
+  const seedSchem = Schematic.fromData(Buffer.from(seed, "base64"));
+  const glbB64 = MeshResult.animatedGlbB64(seedSchem, rp, fly.animationTimelineJson(0, 20, 50.0));
+  const glb = Buffer.from(glbB64, "base64");
+  expect(glb.length > 1000, `an animated GLB comes back (${glb.length} bytes)`);
+  expect(glb.toString("ascii", 0, 4) === "glTF", "and it is really a GLB");
+
+  // Parse the GLB's JSON chunk and check for animation channels — the
+  // property that distinguishes an animated export from a static mesh.
+  const jsonChunkLength = glb.readUInt32LE(12);
+  const gltf = JSON.parse(glb.toString("utf8", 20, 20 + jsonChunkLength));
+  expect(
+    Array.isArray(gltf.animations) && gltf.animations.length > 0,
+    `the GLB has animations (${gltf.animations?.length ?? 0})`,
+  );
+  const channelCount = (gltf.animations ?? []).reduce((n, a) => n + (a.channels?.length ?? 0), 0);
+  expect(channelCount > 0, `the animation(s) have channels (${channelCount})`);
+  expect(Array.isArray(gltf.nodes) && gltf.nodes.length > 0, `the GLB has nodes (${gltf.nodes?.length ?? 0})`);
+} else {
+  console.log(`  skip animated GLB export — ${packPath} is absent (build artifact, not source)`);
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

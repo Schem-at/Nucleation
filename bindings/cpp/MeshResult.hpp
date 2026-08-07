@@ -29,6 +29,9 @@ namespace capi {
     typedef struct MeshResult_create_usdz_result {union {diplomat::capi::MeshResult* ok; diplomat::capi::NucleationError err;}; bool is_ok;} MeshResult_create_usdz_result;
     MeshResult_create_usdz_result MeshResult_create_usdz(const diplomat::capi::Schematic* schematic, const diplomat::capi::ResourcePack* pack, const diplomat::capi::MeshConfig* config);
 
+    typedef struct MeshResult_animated_glb_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} MeshResult_animated_glb_b64_result;
+    MeshResult_animated_glb_b64_result MeshResult_animated_glb_b64(const diplomat::capi::Schematic* schematic, const diplomat::capi::ResourcePack* pack, diplomat::capi::DiplomatStringView timeline_json, diplomat::capi::DiplomatWrite* write);
+
     typedef struct MeshResult_glb_data_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} MeshResult_glb_data_b64_result;
     MeshResult_glb_data_b64_result MeshResult_glb_data_b64(const diplomat::capi::MeshResult* self, diplomat::capi::DiplomatWrite* write);
 
@@ -63,6 +66,25 @@ inline diplomat::result<std::unique_ptr<MeshResult>, NucleationError> MeshResult
         pack.AsFFI(),
         config.AsFFI());
     return result.is_ok ? diplomat::result<std::unique_ptr<MeshResult>, NucleationError>(diplomat::Ok<std::unique_ptr<MeshResult>>(std::unique_ptr<MeshResult>(MeshResult::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<MeshResult>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> MeshResult::animated_glb_b64(const Schematic& schematic, const ResourcePack& pack, std::string_view timeline_json) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::MeshResult_animated_glb_b64(schematic.AsFFI(),
+        pack.AsFFI(),
+        {timeline_json.data(), timeline_json.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> MeshResult::animated_glb_b64_write(const Schematic& schematic, const ResourcePack& pack, std::string_view timeline_json, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::MeshResult_animated_glb_b64(schematic.AsFFI(),
+        pack.AsFFI(),
+        {timeline_json.data(), timeline_json.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline diplomat::result<std::string, NucleationError> MeshResult::glb_data_b64() const {

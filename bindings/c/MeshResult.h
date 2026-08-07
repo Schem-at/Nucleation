@@ -26,6 +26,9 @@ MeshResult_create_result MeshResult_create(const Schematic* schematic, const Res
 typedef struct MeshResult_create_usdz_result {union {MeshResult* ok; NucleationError err;}; bool is_ok;} MeshResult_create_usdz_result;
 MeshResult_create_usdz_result MeshResult_create_usdz(const Schematic* schematic, const ResourcePack* pack, const MeshConfig* config);
 
+typedef struct MeshResult_animated_glb_b64_result {union { NucleationError err;}; bool is_ok;} MeshResult_animated_glb_b64_result;
+MeshResult_animated_glb_b64_result MeshResult_animated_glb_b64(const Schematic* schematic, const ResourcePack* pack, DiplomatStringView timeline_json, DiplomatWrite* write);
+
 typedef struct MeshResult_glb_data_b64_result {union { NucleationError err;}; bool is_ok;} MeshResult_glb_data_b64_result;
 MeshResult_glb_data_b64_result MeshResult_glb_data_b64(const MeshResult* self, DiplomatWrite* write);
 

@@ -29,6 +29,17 @@ export class MeshResult {
     static createUsdz(schematic: Schematic, pack: ResourcePack, config: MeshConfig): MeshResult;
 
     /**
+     * A schematic plus a run timeline, as an animated GLB, base64-encoded.
+     *
+     * `timeline_json` is what `TickSimulation::animation_timeline_json`
+     * produces, and `schematic` the scene it starts from
+     * (`selection_schematic_b64`). Static rather than a method on a mesh
+     * because the animation is built from the schematic and the timeline
+     * together — there is no intermediate `MeshResult` to hang it off.
+     */
+    static animatedGlbB64(schematic: Schematic, pack: ResourcePack, timelineJson: string): string;
+
+    /**
      * The mesh as a binary GLB, base64-encoded.
      */
     glbDataB64(): string;

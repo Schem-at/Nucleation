@@ -15,6 +15,7 @@ void add_MeshResult_binding(nb::module_ mod) {
 
     nb::class_<nucleation::MeshResult> opaque(mod, "MeshResult", nb::type_slots(nucleation_MeshResult_slots));
     opaque
+        .def_static("animated_glb_b64", &nucleation::MeshResult::animated_glb_b64, "schematic"_a, "pack"_a, "timeline_json"_a)
         .def("bounds", &nucleation::MeshResult::bounds)
         .def_static("create", std::move(maybe_op_unwrap(&nucleation::MeshResult::create)), "schematic"_a, "pack"_a, "config"_a)
         .def_static("create_usdz", std::move(maybe_op_unwrap(&nucleation::MeshResult::create_usdz)), "schematic"_a, "pack"_a, "config"_a)
