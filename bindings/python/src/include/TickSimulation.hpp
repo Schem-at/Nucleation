@@ -69,6 +69,12 @@ namespace capi {
 
     void TickSimulation_clear_updates(nucleation::capi::TickSimulation* self);
 
+    void TickSimulation_record_timeline(nucleation::capi::TickSimulation* self);
+
+    void TickSimulation_stop_timeline(nucleation::capi::TickSimulation* self);
+
+    void TickSimulation_timeline_activity_json(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
     uint32_t TickSimulation_updates_count(const nucleation::capi::TickSimulation* self);
 
     void TickSimulation_updates_json(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
@@ -320,6 +326,28 @@ inline void nucleation::TickSimulation::record_updates(bool on) {
 
 inline void nucleation::TickSimulation::clear_updates() {
     nucleation::capi::TickSimulation_clear_updates(this->AsFFI());
+}
+
+inline void nucleation::TickSimulation::record_timeline() {
+    nucleation::capi::TickSimulation_record_timeline(this->AsFFI());
+}
+
+inline void nucleation::TickSimulation::stop_timeline() {
+    nucleation::capi::TickSimulation_stop_timeline(this->AsFFI());
+}
+
+inline std::string nucleation::TickSimulation::timeline_activity_json() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::TickSimulation_timeline_activity_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void nucleation::TickSimulation::timeline_activity_json_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::TickSimulation_timeline_activity_json(this->AsFFI(),
+        &write);
 }
 
 inline uint32_t nucleation::TickSimulation::updates_count() const {

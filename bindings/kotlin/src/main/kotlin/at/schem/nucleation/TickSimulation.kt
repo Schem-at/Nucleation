@@ -28,6 +28,9 @@ internal interface TickSimulationLib: Library {
     fun TickSimulation_block_entity_audit_json(schematic: Pointer, write: Pointer): Unit
     fun TickSimulation_record_updates(handle: Pointer, on: Boolean): Unit
     fun TickSimulation_clear_updates(handle: Pointer): Unit
+    fun TickSimulation_record_timeline(handle: Pointer): Unit
+    fun TickSimulation_stop_timeline(handle: Pointer): Unit
+    fun TickSimulation_timeline_activity_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_updates_count(handle: Pointer): FFIUint32
     fun TickSimulation_updates_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_updates_json_between(handle: Pointer, fromTick: FFIUint32, toTick: FFIUint32, write: Pointer): Unit
@@ -436,6 +439,55 @@ class TickSimulation internal constructor (
 
         val returnVal = lib.TickSimulation_clear_updates(handle);
 
+    }
+
+    /** Start recording a run timeline from the current tick.
+    *
+    *A timeline is what makes a span of simulation reviewable after the
+    *fact: block deltas, the inputs that caused them and the piston
+    *strokes they drove, plus one whole-world frame to replay them from.
+    *Off by default — a simulation used for timing should not pay for it.
+    *
+    *Called again, it restarts from the current tick, and the previously
+    *stopped span is released.
+    */
+    fun recordTimeline(): Unit {
+
+        val returnVal = lib.TickSimulation_record_timeline(handle);
+
+    }
+
+    /** End the recording, keeping the span readable.
+    *
+    *This is a host's Stop button, and it is not a rewind: the span stays
+    *readable and exportable until the next
+    *[TickSimulation::record_timeline], while the simulation is free to
+    *run on without the recording following it. No-op if nothing was
+    *recording.
+    */
+    fun stopTimeline(): Unit {
+
+        val returnVal = lib.TickSimulation_stop_timeline(handle);
+
+    }
+
+    /** Where the recorded run was busy, as JSON:
+    *`{"start":T,"end":T,"ticks":[{"tick":T,"changes":N,"inputs":N,
+    *"pistons":N}]}`.
+    *
+    *The strip a host draws to let someone pick a span worth exporting.
+    *Only ticks that did something appear: an idle tick is **absent**
+    *rather than present with zeroes, so a build that sits still does not
+    *advance the strip and a long quiet run stays cheap to send.
+    *
+    *`{"start":0,"end":0,"ticks":[]}` when nothing has been recorded.
+    */
+    fun timelineActivityJson(): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.TickSimulation_timeline_activity_json(handle, write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
     }
 
     /** How many updates have been recorded — page before pulling them.

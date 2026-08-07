@@ -224,6 +224,20 @@ final class TickSimulation {
         Lib::ffi()->TickSimulation_clear_updates($this->ptr);
     }
 
+    public function recordTimeline() {
+        Lib::ffi()->TickSimulation_record_timeline($this->ptr);
+    }
+
+    public function stopTimeline() {
+        Lib::ffi()->TickSimulation_stop_timeline($this->ptr);
+    }
+
+    public function timelineActivityJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->TickSimulation_timeline_activity_json($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function updatesCount() {
         $ret = Lib::ffi()->TickSimulation_updates_count($this->ptr);
         return $ret;

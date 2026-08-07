@@ -994,6 +994,12 @@ pub mod ffi {
     pub struct TickSimulation {
         pub(crate) sim: mc_tick::Simulation,
         pub(crate) checkpoints: Vec<mc_tick::sim::Checkpoint>,
+        /// The span the last [`TickSimulation::stop_timeline`] ended.
+        ///
+        /// Stop must end a recording *and keep it*: a host's Stop button leaves
+        /// the span selectable and exportable, which it cannot be if stopping
+        /// threw it away.
+        pub(crate) stopped_timeline: Option<mc_tick::timeline::RunTimeline>,
     }
 
     impl TickSimulation {
@@ -1087,6 +1093,7 @@ pub mod ffi {
             Ok(Box::new(TickSimulation {
                 sim,
                 checkpoints: Vec::new(),
+                stopped_timeline: None,
             }))
         }
 
@@ -1150,6 +1157,7 @@ pub mod ffi {
             Ok(Box::new(TickSimulation {
                 sim,
                 checkpoints: Vec::new(),
+                stopped_timeline: None,
             }))
         }
 
@@ -1198,6 +1206,7 @@ pub mod ffi {
             Ok(Box::new(TickSimulation {
                 sim,
                 checkpoints: Vec::new(),
+                stopped_timeline: None,
             }))
         }
 
@@ -1443,6 +1452,93 @@ pub mod ffi {
         /// before recording the next.
         pub fn clear_updates(&mut self) {
             self.sim.clear_updates();
+        }
+
+        /// Start recording a run timeline from the current tick.
+        ///
+        /// A timeline is what makes a span of simulation reviewable after the
+        /// fact: block deltas, the inputs that caused them and the piston
+        /// strokes they drove, plus one whole-world frame to replay them from.
+        /// Off by default — a simulation used for timing should not pay for it.
+        ///
+        /// Called again, it restarts from the current tick, and the previously
+        /// stopped span is released.
+        pub fn record_timeline(&mut self) {
+            self.stopped_timeline = None;
+            self.sim.record_timeline();
+        }
+
+        /// End the recording, keeping the span readable.
+        ///
+        /// This is a host's Stop button, and it is not a rewind: the span stays
+        /// readable and exportable until the next
+        /// [`TickSimulation::record_timeline`], while the simulation is free to
+        /// run on without the recording following it. No-op if nothing was
+        /// recording.
+        pub fn stop_timeline(&mut self) {
+            if let Some(timeline) = self.sim.stop_timeline() {
+                self.stopped_timeline = Some(timeline);
+            }
+        }
+
+        /// Which timeline a read query answers from.
+        ///
+        /// The live recorder if one is running, otherwise the span the last
+        /// [`TickSimulation::stop_timeline`] ended — a stopped span stays
+        /// readable until the next [`TickSimulation::record_timeline`]. Every
+        /// timeline reader resolves through here so that they cannot disagree
+        /// about which recording the host is looking at.
+        fn timeline(&self) -> Option<mc_tick::timeline::RunTimeline> {
+            self.sim
+                .recorded_timeline()
+                .or_else(|| self.stopped_timeline.clone())
+        }
+
+        /// Where the recorded run was busy, as JSON:
+        /// `{"start":T,"end":T,"ticks":[{"tick":T,"changes":N,"inputs":N,
+        ///   "pistons":N}]}`.
+        ///
+        /// The strip a host draws to let someone pick a span worth exporting.
+        /// Only ticks that did something appear: an idle tick is **absent**
+        /// rather than present with zeroes, so a build that sits still does not
+        /// advance the strip and a long quiet run stays cheap to send.
+        ///
+        /// `{"start":0,"end":0,"ticks":[]}` when nothing has been recorded.
+        pub fn timeline_activity_json(&self, out: &mut DiplomatWrite) {
+            let Some(timeline) = self.timeline() else {
+                let _ = write!(out, "{{\"start\":0,\"end\":0,\"ticks\":[]}}");
+                return;
+            };
+            // Counted straight off the three ordered event vectors. Frames and
+            // digests are O(ticks x blocks) to rebuild and would answer a
+            // question the strip never asks.
+            let mut active: std::collections::BTreeMap<u64, [u32; 3]> =
+                std::collections::BTreeMap::new();
+            for change in &timeline.changes {
+                active.entry(change.tick).or_default()[0] += 1;
+            }
+            for input in &timeline.inputs {
+                active.entry(input.tick()).or_default()[1] += 1;
+            }
+            for piston in &timeline.pistons {
+                active.entry(piston.tick).or_default()[2] += 1;
+            }
+            let mut json = format!(
+                "{{\"start\":{},\"end\":{},\"ticks\":[",
+                timeline.start_tick, timeline.end_tick
+            );
+            for (i, (tick, counts)) in active.iter().enumerate() {
+                if i > 0 {
+                    json.push(',');
+                }
+                let _ = write!(
+                    json,
+                    "{{\"tick\":{},\"changes\":{},\"inputs\":{},\"pistons\":{}}}",
+                    tick, counts[0], counts[1], counts[2]
+                );
+            }
+            json.push_str("]}");
+            let _ = write!(out, "{json}");
         }
 
         /// How many updates have been recorded — page before pulling them.

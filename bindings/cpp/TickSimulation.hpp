@@ -69,6 +69,12 @@ namespace capi {
 
     void TickSimulation_clear_updates(diplomat::capi::TickSimulation* self);
 
+    void TickSimulation_record_timeline(diplomat::capi::TickSimulation* self);
+
+    void TickSimulation_stop_timeline(diplomat::capi::TickSimulation* self);
+
+    void TickSimulation_timeline_activity_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
+
     uint32_t TickSimulation_updates_count(const diplomat::capi::TickSimulation* self);
 
     void TickSimulation_updates_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
@@ -320,6 +326,28 @@ inline void TickSimulation::record_updates(bool on) {
 
 inline void TickSimulation::clear_updates() {
     diplomat::capi::TickSimulation_clear_updates(this->AsFFI());
+}
+
+inline void TickSimulation::record_timeline() {
+    diplomat::capi::TickSimulation_record_timeline(this->AsFFI());
+}
+
+inline void TickSimulation::stop_timeline() {
+    diplomat::capi::TickSimulation_stop_timeline(this->AsFFI());
+}
+
+inline std::string TickSimulation::timeline_activity_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_timeline_activity_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::timeline_activity_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_timeline_activity_json(this->AsFFI(),
+        &write);
 }
 
 inline uint32_t TickSimulation::updates_count() const {

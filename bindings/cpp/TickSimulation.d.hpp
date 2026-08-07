@@ -218,6 +218,46 @@ public:
   inline void clear_updates();
 
   /**
+   * Start recording a run timeline from the current tick.
+   *
+   * A timeline is what makes a span of simulation reviewable after the
+   * fact: block deltas, the inputs that caused them and the piston
+   * strokes they drove, plus one whole-world frame to replay them from.
+   * Off by default — a simulation used for timing should not pay for it.
+   *
+   * Called again, it restarts from the current tick, and the previously
+   * stopped span is released.
+   */
+  inline void record_timeline();
+
+  /**
+   * End the recording, keeping the span readable.
+   *
+   * This is a host's Stop button, and it is not a rewind: the span stays
+   * readable and exportable until the next
+   * {@link TickSimulation::record_timeline}, while the simulation is free to
+   * run on without the recording following it. No-op if nothing was
+   * recording.
+   */
+  inline void stop_timeline();
+
+  /**
+   * Where the recorded run was busy, as JSON:
+   * `{"start":T,"end":T,"ticks":[{"tick":T,"changes":N,"inputs":N,
+   * "pistons":N}]}`.
+   *
+   * The strip a host draws to let someone pick a span worth exporting.
+   * Only ticks that did something appear: an idle tick is **absent**
+   * rather than present with zeroes, so a build that sits still does not
+   * advance the strip and a long quiet run stays cheap to send.
+   *
+   * `{"start":0,"end":0,"ticks":[]}` when nothing has been recorded.
+   */
+  inline std::string timeline_activity_json() const;
+  template<typename W>
+  inline void timeline_activity_json_write(W& writeable_output) const;
+
+  /**
    * How many updates have been recorded — page before pulling them.
    */
   inline uint32_t updates_count() const;

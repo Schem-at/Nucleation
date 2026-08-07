@@ -66,6 +66,12 @@ void TickSimulation_record_updates(TickSimulation* self, bool on);
 
 void TickSimulation_clear_updates(TickSimulation* self);
 
+void TickSimulation_record_timeline(TickSimulation* self);
+
+void TickSimulation_stop_timeline(TickSimulation* self);
+
+void TickSimulation_timeline_activity_json(const TickSimulation* self, DiplomatWrite* write);
+
 uint32_t TickSimulation_updates_count(const TickSimulation* self);
 
 void TickSimulation_updates_json(const TickSimulation* self, DiplomatWrite* write);

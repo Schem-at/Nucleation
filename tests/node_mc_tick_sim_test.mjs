@@ -177,5 +177,27 @@ expect(
     "every moving arm offers both lengths",
 );
 
+// --- the event timeline ---
+const tl = TickSimulation.fromSnbt(door, TickSettleMode.InWorld, 15, -64, 0, "");
+tl.recordTimeline();
+tl.useBlock(10, 4, 1);
+tl.run(40);
+tl.stopTimeline();
+// A stopped span stays readable — that is what makes it exportable.
+const activity = JSON.parse(tl.timelineActivityJson());
+expect(activity.ticks.length > 0, `the door records activity (${activity.ticks.length} active ticks)`);
+expect(
+  activity.ticks.every((t) => t.changes > 0 || t.inputs > 0 || t.pistons > 0),
+  "every listed tick did something — idle ticks are absent, so a still build does not advance the strip",
+);
+expect(
+  activity.ticks.every((t, i, a) => i === 0 || t.tick > a[i - 1].tick),
+  "ticks are strictly ascending",
+);
+expect(
+  activity.ticks.length < activity.end - activity.start + 1,
+  `the door has idle ticks that were skipped (${activity.ticks.length} of ${activity.end - activity.start + 1})`,
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
