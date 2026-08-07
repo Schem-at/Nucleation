@@ -2479,13 +2479,6 @@ impl Simulation {
         self.in_tick = false;
         self.phase = None;
         self.tick += 1;
-        if let Some(timeline) = self.timeline.as_mut() {
-            timeline.frames.push(crate::timeline::StateFrame::of(
-                self.tick,
-                &self.world,
-                &self.registry,
-            ));
-        }
         // Burnout only looks back a fixed window, so anything older is dead weight.
         let horizon = self.tick.saturating_sub(crate::components::TORCH_BURNOUT_WINDOW);
         self.toggles.retain(|(_, t)| *t >= horizon);

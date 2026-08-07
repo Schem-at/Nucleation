@@ -65,27 +65,6 @@ fn a_replayed_frame_matches_the_world_the_simulation_had() {
 }
 
 #[test]
-fn every_replayed_frame_equals_the_one_the_recorder_stored() {
-    // The anti-drift check in its most direct form: while the recorder still
-    // keeps a frame per tick, a replayed frame must equal the stored one for
-    // every tick of the run. Task 5 removes the storage this compares
-    // against, so this test is why removing it is safe.
-    let mut recorded = sim(DOOR);
-    recorded.record_timeline();
-    recorded.use_block(Pos::new(10, 4, 1));
-    recorded.run(40);
-    let timeline = recorded.recorded_timeline().expect("timeline");
-
-    assert!(timeline.frames.len() > 1, "the run recorded frames to compare");
-    for stored in &timeline.frames {
-        let replayed = timeline
-            .frame_at(stored.tick, recorded.registry())
-            .unwrap_or_else(|| panic!("no replayed frame for tick {}", stored.tick));
-        assert_eq!(&replayed, stored, "replay differs at tick {}", stored.tick);
-    }
-}
-
-#[test]
 fn cycles_found_by_replay_still_describe_the_flying_machine() {
     const FLYER: &str = include_str!("corpus/structures/flying_machine_east.snbt");
     let mut sim = sim(FLYER);
@@ -142,4 +121,34 @@ fn digests_cover_every_tick_of_the_run_in_order() {
         assert_eq!(digest.translated, frame.translated);
         assert_eq!(digest.origin, frame.origin);
     }
+}
+
+#[test]
+fn a_recording_is_a_seed_and_a_log_not_a_world_per_tick() {
+    // The structural half of this — that `RunTimeline` has no `frames` field —
+    // is enforced by the compiler once every reader is gone. What is worth
+    // asserting at runtime is the shape of what remains: exactly one
+    // whole-world copy, and a log that tracks activity rather than build size
+    // times ticks. A stored-frame recorder would fail the second assertion by
+    // two orders of magnitude on this fixture.
+    let mut sim = sim(DOOR);
+    sim.record_timeline();
+    sim.use_block(Pos::new(10, 4, 1));
+    sim.run(200);
+    let timeline = sim.recorded_timeline().expect("timeline");
+
+    let blocks = timeline.initial.blocks.len();
+    assert!(blocks > 100, "the door is a real build, not a toy");
+    assert_eq!(
+        timeline.initial.tick, timeline.start_tick,
+        "the one snapshot held is the one recording started from"
+    );
+    assert!(
+        timeline.changes.len() < blocks * 4,
+        "a 200-tick door recorded {} changes against {blocks} blocks — the log \
+         should be activity-shaped, not world-shaped",
+        timeline.changes.len(),
+    );
+    // And it still answers for any tick in the run, from that seed alone.
+    assert!(timeline.frame_at(timeline.end_tick, sim.registry()).is_some());
 }

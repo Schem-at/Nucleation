@@ -1,10 +1,11 @@
 //! Opt-in simulation-run recording, cycle detection, and range selection.
 //!
 //! A [`RunTimeline`] is deliberately richer than the animation mesher's event
-//! format. It retains the player inputs that caused a run, canonical state
-//! fingerprints, complete state frames for collision-free cycle verification,
-//! block deltas, and the piston strokes needed to project a selected range into
-//! an external animation format.
+//! format. It retains the player inputs that caused a run, the one whole-world
+//! [`StateFrame`] recording started from, canonical state fingerprints, block
+//! deltas, and the piston strokes needed to project a selected range into an
+//! external animation format. Every other frame is rebuilt on demand from the
+//! seed and the change log rather than stored.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -326,8 +327,6 @@ pub struct RunTimeline {
     pub pistons: Vec<PistonEvent>,
     /// The world as recording began.
     pub initial: StateFrame,
-    /// Initial frame followed by one frame after each completed tick.
-    pub frames: Vec<StateFrame>,
 }
 
 impl RunTimeline {
@@ -593,18 +592,18 @@ fn cycle(kind: CycleKind, first: &StateFrame, second: &StateFrame) -> Cycle {
 #[derive(Debug, Clone)]
 pub(crate) struct TimelineRecorder {
     pub(crate) start_tick: u64,
+    pub(crate) initial: StateFrame,
     pub(crate) inputs: Vec<InputAction>,
     pub(crate) pistons: Vec<PistonEvent>,
-    pub(crate) frames: Vec<StateFrame>,
 }
 
 impl TimelineRecorder {
     pub(crate) fn new(tick: u64, world: &World, registry: &StateRegistry) -> Self {
         Self {
             start_tick: tick,
+            initial: StateFrame::of(tick, world, registry),
             inputs: Vec::new(),
             pistons: Vec::new(),
-            frames: vec![StateFrame::of(tick, world, registry)],
         }
     }
 
@@ -615,8 +614,7 @@ impl TimelineRecorder {
             changes: changes.to_vec(),
             inputs: self.inputs.clone(),
             pistons: self.pistons.clone(),
-            initial: self.frames[0].clone(),
-            frames: self.frames.clone(),
+            initial: self.initial.clone(),
         }
     }
 }
@@ -680,8 +678,6 @@ mod tests {
         let mut registry = StateRegistry::new();
         let stone = registry.intern("minecraft:stone").unwrap();
         let initial = frame(0, &[(Pos::new(0, 0, 0), stone)], &registry);
-        let moved = frame(1, &[(Pos::new(1, 0, 0), stone)], &registry);
-        let still = frame(2, &[(Pos::new(1, 0, 0), stone)], &registry);
         let timeline = RunTimeline {
             start_tick: 0,
             end_tick: 2,
@@ -704,8 +700,7 @@ mod tests {
             ],
             inputs: Vec::new(),
             pistons: Vec::new(),
-            initial: initial.clone(),
-            frames: vec![initial, moved, still],
+            initial,
         };
         let report = timeline.detect_cycles(&registry);
         let translated = report.translated.expect("translated recurrence");
@@ -742,7 +737,6 @@ mod tests {
         let timeline = timeline.expect("timeline");
         assert_eq!(timeline.inputs.len(), 1);
         assert_eq!(timeline.changes.len(), 1);
-        assert_eq!(timeline.frames.len(), 2);
     }
 
     #[test]
