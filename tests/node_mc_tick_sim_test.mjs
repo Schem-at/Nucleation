@@ -233,6 +233,48 @@ expect(typeof projected.tick_ms === "number" && projected.origin.length === 3, "
 const seed = fly.selectionSchematicB64(0, 20);
 expect(seed.length > 0, "the selection's initial schematic comes back as bytes");
 
+// --- pinned bridge-vs-CLI agreement ---
+//
+// `nucleation-cli animate crates/mc-tick/tests/corpus/structures/flying_machine_east.snbt
+// --ticks 60 --place 2:2,1,1=minecraft:redstone_block --place 4:2,1,1=minecraft:air`
+// prints these exact numbers (verified by hand against this run — see GLOBAL
+// CONSTRAINTS in the task brief):
+//   exact:      start=0 end=7  period=7  drift=(0,0,0)
+//   translated: start=5 end=15 period=10 drift=(-1,0,0)
+// `Placement` settle reproduces the CLI's own numbers exactly; `InWorld` settle
+// (the case above) legitimately gives different numbers because it simulates
+// more of the world around the kick. Pinning this here catches a sign or
+// period regression in either the bridge or the CLI path.
+const pinned = TickSimulation.fromSnbt(
+  fs.readFileSync("crates/mc-tick/tests/corpus/structures/flying_machine_east.snbt", "utf8"),
+  TickSettleMode.Placement, 0, 0, 0, "",
+);
+pinned.recordTimeline();
+pinned.run(2);
+pinned.placeBlock(2, 1, 1, RB);
+pinned.run(2);
+pinned.placeBlock(2, 1, 1, "minecraft:air");
+pinned.run(56);
+const pinnedCycles = JSON.parse(pinned.timelineCyclesJson());
+const pExact = pinnedCycles.exact;
+const pTranslated = pinnedCycles.translated;
+expect(
+  pExact !== null &&
+    pExact.start === 0 &&
+    pExact.end === 7 &&
+    pExact.period === 7 &&
+    JSON.stringify(pExact.drift) === JSON.stringify([0, 0, 0]),
+  `exact cycle matches the CLI's pinned numbers (got ${JSON.stringify(pExact)})`,
+);
+expect(
+  pTranslated !== null &&
+    pTranslated.start === 5 &&
+    pTranslated.end === 15 &&
+    pTranslated.period === 10 &&
+    JSON.stringify(pTranslated.drift) === JSON.stringify([-1, 0, 0]),
+  `translated cycle matches the CLI's pinned numbers (got ${JSON.stringify(pTranslated)})`,
+);
+
 // --- record, project, export ---
 const packPath = "apps/sim-lab-wasm/public/pack/mesher-pack.zip";
 if (fs.existsSync(packPath)) {

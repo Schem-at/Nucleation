@@ -178,5 +178,154 @@ expect(
     "every other move carries itself and parks nothing",
 )
 
+# --- the event timeline ---
+tl = nucleation.TickSimulation.from_snbt(
+    door, nucleation.TickSettleMode.InWorld, 15, -64, 0, ""
+)
+tl.record_timeline()
+tl.use_block(10, 4, 1)
+tl.run(40)
+tl.stop_timeline()
+# A stopped span stays readable — that is what makes it exportable.
+activity = json.loads(tl.timeline_activity_json())
+expect(
+    len(activity["ticks"]) > 0,
+    f"the door records activity ({len(activity['ticks'])} active ticks)",
+)
+expect(
+    all(t["changes"] > 0 or t["inputs"] > 0 or t["pistons"] > 0 for t in activity["ticks"]),
+    "every listed tick did something — idle ticks are absent, so a still build does not advance the strip",
+)
+expect(
+    all(
+        activity["ticks"][i]["tick"] > activity["ticks"][i - 1]["tick"]
+        for i in range(1, len(activity["ticks"]))
+    ),
+    "ticks are strictly ascending",
+)
+expect(
+    len(activity["ticks"]) < activity["end"] - activity["start"] + 1,
+    "the door has idle ticks that were skipped "
+    f"({len(activity['ticks'])} of {activity['end'] - activity['start'] + 1})",
+)
+
+# --- cycles, projection, and a selection's schematic ---
+cycles = json.loads(tl.timeline_cycles_json())
+expect("exact" in cycles and "translated" in cycles, "cycles report has both kinds")
+
+# A flying machine repeats itself displaced; an absent cycle is null, not an error.
+fly_snbt = (ROOT / "crates/mc-tick/tests/corpus/structures/flying_machine_east.snbt").read_text()
+fly = nucleation.TickSimulation.from_snbt(
+    fly_snbt, nucleation.TickSettleMode.InWorld, 0, 0, 0, ""
+)
+# Kick timing matches the CLI's verified `--place 2:...=redstone_block
+# --place 4:...=air` (see GLOBAL CONSTRAINTS): 2 quiet ticks, a 2-tick pulse,
+# then run to 60. A kick held longer (e.g. placed at tick 0) does not launch
+# this machine at all — placement timing is load-bearing here, not cosmetic.
+fly.record_timeline()
+fly.run(2)
+fly.place_block(2, 1, 1, RB)
+fly.run(2)
+fly.place_block(2, 1, 1, AIR)
+fly.run(56)
+fly_cycles = json.loads(fly.timeline_cycles_json())
+expect(fly_cycles["translated"] is not None, "the flying machine repeats itself, displaced")
+expect(
+    fly_cycles["translated"]["drift"][0] != 0,
+    f"it travels along x (drift {fly_cycles['translated']['drift']})",
+)
+
+projected = json.loads(fly.animation_timeline_json(0, 20, 50.0))
+expect(
+    isinstance(projected["events"], list) and len(projected["events"]) > 0,
+    "the projection has events",
+)
+expect(
+    all(e["kind"] in ("piston", "set_block") for e in projected["events"]),
+    "every event is one the mesher understands",
+)
+expect(
+    isinstance(projected["tick_ms"], (int, float)) and len(projected["origin"]) == 3,
+    "origin and tick_ms are present",
+)
+
+seed = fly.selection_schematic_b64(0, 20)
+expect(len(seed) > 0, "the selection's initial schematic comes back as bytes")
+
+# --- pinned bridge-vs-CLI agreement ---
+#
+# `nucleation-cli animate crates/mc-tick/tests/corpus/structures/flying_machine_east.snbt
+# --ticks 60 --place 2:2,1,1=minecraft:redstone_block --place 4:2,1,1=minecraft:air`
+# prints these exact numbers (verified by hand against this run — see GLOBAL
+# CONSTRAINTS in the task brief):
+#   exact:      start=0 end=7  period=7  drift=(0,0,0)
+#   translated: start=5 end=15 period=10 drift=(-1,0,0)
+# `Placement` settle reproduces the CLI's own numbers exactly; `InWorld` settle
+# (the case above) legitimately gives different numbers because it simulates
+# more of the world around the kick. Pinning this here catches a sign or
+# period regression in either the bridge or the CLI path.
+pinned = nucleation.TickSimulation.from_snbt(
+    fly_snbt, nucleation.TickSettleMode.Placement, 0, 0, 0, ""
+)
+pinned.record_timeline()
+pinned.run(2)
+pinned.place_block(2, 1, 1, RB)
+pinned.run(2)
+pinned.place_block(2, 1, 1, AIR)
+pinned.run(56)
+pinned_cycles = json.loads(pinned.timeline_cycles_json())
+exact = pinned_cycles["exact"]
+translated = pinned_cycles["translated"]
+expect(
+    exact is not None
+    and exact["start"] == 0
+    and exact["end"] == 7
+    and exact["period"] == 7
+    and exact["drift"] == [0, 0, 0],
+    f"exact cycle matches the CLI's pinned numbers (got {exact})",
+)
+expect(
+    translated is not None
+    and translated["start"] == 5
+    and translated["end"] == 15
+    and translated["period"] == 10
+    and translated["drift"] == [-1, 0, 0],
+    f"translated cycle matches the CLI's pinned numbers (got {translated})",
+)
+
+# --- record, project, export ---
+pack_path = ROOT / "apps/sim-lab-wasm/public/pack/mesher-pack.zip"
+if pack_path.exists():
+    import base64
+    import struct
+
+    rp = nucleation.ResourcePack.from_bytes(pack_path.read_bytes())
+    seed_schem = nucleation.Schematic.from_data(base64.b64decode(seed))
+    glb_b64 = nucleation.MeshResult.animated_glb_b64(
+        seed_schem, rp, fly.animation_timeline_json(0, 20, 50.0)
+    )
+    glb = base64.b64decode(glb_b64)
+    expect(len(glb) > 1000, f"an animated GLB comes back ({len(glb)} bytes)")
+    expect(glb[0:4] == b"glTF", "and it is really a GLB")
+
+    # Parse the GLB's JSON chunk and check for animation channels — the
+    # property that distinguishes an animated export from a static mesh.
+    json_chunk_length = struct.unpack_from("<I", glb, 12)[0]
+    gltf = json.loads(glb[20 : 20 + json_chunk_length].decode("utf8"))
+    animations = gltf.get("animations") or []
+    expect(
+        isinstance(gltf.get("animations"), list) and len(animations) > 0,
+        f"the GLB has animations ({len(animations)})",
+    )
+    channel_count = sum(len(a.get("channels") or []) for a in animations)
+    expect(channel_count > 0, f"the animation(s) have channels ({channel_count})")
+    nodes = gltf.get("nodes") or []
+    expect(
+        isinstance(gltf.get("nodes"), list) and len(nodes) > 0,
+        f"the GLB has nodes ({len(nodes)})",
+    )
+else:
+    print(f"  skip animated GLB export — {pack_path} is absent (build artifact, not source)")
+
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(0 if failed == 0 else 1)
