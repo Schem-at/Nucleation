@@ -41,8 +41,10 @@
 use mc_tick::{Pos, Structure};
 use nucleation::formats::gametest::to_gametest_snbt;
 
-#[path = "../crates/mc-tick/tests/support/scenario.rs"]
-mod scenario;
+// The scenario vocabulary moved out of mc-tick's test support and into the
+// mc-test crate, which is where every carrier now reads it from. Aliased
+// rather than renamed at each call site: the name says what it is.
+use mc_test as scenario;
 
 fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
     args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).map(String::as_str)
@@ -154,6 +156,10 @@ fn main() {
         &structure,
         Pos::new(0, 0, 0),
         settle,
+        &[],
+        // No extra inert states: an inspector takes the build as authored and
+        // reports what it measures, rather than deciding for the caller which
+        // components should be treated as dead.
         &[],
         schematic.metadata.source_data_version,
         "inspect",
