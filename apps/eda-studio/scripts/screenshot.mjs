@@ -63,47 +63,22 @@ try {
   check(states.length === 2 && states.every((x) => x === "routed"), `demo buses routed (${states})`);
   await page.screenshot({ path: path.join(docs, "01-demo-crossing.png") });
 
-  // 2. gate drag reroutes exactly 2 segments
+  // 2. gate drag reroutes exactly 2 segments. Target (12,2,12) is OFF both
+  //    corridors (bus A runs z=8, bus B runs x=8): dropping the gate ON a
+  //    corridor routes fine but SHORTS the buses — real, and caught by
+  //    check(), so assert cleanliness too.
   const drag = await page.evaluate(() => {
     const s = window.__edaStudio();
-    return s.moveGate("bus0", "g0", [8, 2, 12]);
+    const report = s.moveGate("bus0", "g0", [12, 2, 12]);
+    return { report, clean: s.check().clean };
   });
-  check(drag.state === "routed" && drag.rerouted_segments === 2,
-    `gate drag ${JSON.stringify(drag)}`);
+  check(drag.report.state === "routed" && drag.report.rerouted_segments === 2 && drag.clean,
+    `gate drag ${JSON.stringify(drag.report)} clean=${drag.clean}`);
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(docs, "02-gate-drag.png") });
 
-  // 3. place a compiled HDL cell (cmp4 BLIF) and drag it through bus B
-  const blif = readFileSync(path.join(root, "testdata", "cmp4.blif"), "utf8");
-  const placed = await page.evaluate((blifText) => {
-    const s = window.__edaStudio();
-    const core = window.__edaCore;
-    const cell = core.Hdl.compileBlif(blifText, "cmp4", false);
-    cell.setCellContractJson(core.Hdl.compileBlifContract(blifText, "cmp4"));
-    s.addCellSchematic("cmp4", cell, "file");
-    const inst = s.placeInstance("cmp4", [24, 0, 24]);
-    return { inst: inst.name, blocks: cell.blockCount() };
-  }, blif);
-  check(placed.blocks > 0, `hdl cell placed (${placed.blocks} blocks) as ${placed.inst}`);
-
-  const through = await page.evaluate((inst) => {
-    const s = window.__edaStudio();
-    const report = s.moveInstance(inst, [6, 0, 2]); // through bus B's corridor
-    return { report, states: [...s.buses.keys()].map((b) => `${b}=${s.busState(b)}`) };
-  }, placed.inst);
-  check(true, `instance drag-through: ${JSON.stringify(through)}`);
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: path.join(docs, "03-instance-through-bus.png") });
-
-  const away = await page.evaluate((inst) => {
-    const s = window.__edaStudio();
-    const report = s.moveInstance(inst, [26, 0, 26]);
-    return { report, states: [...s.buses.keys()].map((b) => `${b}=${s.busState(b)}`) };
-  }, placed.inst);
-  check(away.states.every((x) => x.endsWith("=routed")),
-    `drag away re-heals: ${JSON.stringify(away.states)}`);
-
-  // 4. bake + typed poke through the embedded contract
+  // 3. bake + typed poke through the embedded contract — BEFORE the
+  //    drag-through test, which deliberately leaves buses failed
   const poke = await page.evaluate(() => {
     const s = window.__edaStudio();
     s.bake(4000);
@@ -115,7 +90,52 @@ try {
   check(poke.a === 0x55 && poke.b === 0xaa,
     `bake + poke a_out=0x${poke.a.toString(16)} b_out=0x${poke.b.toString(16)}`);
   await page.waitForTimeout(300);
-  await page.screenshot({ path: path.join(docs, "04-baked-poke.png") });
+  await page.screenshot({ path: path.join(docs, "03-baked-poke.png") });
+
+  // 4. place a compiled HDL cell (and2 BLIF — cmp4 is 284x66x213, the node
+  //    smoke covers it; the canvas demo wants a cell-sized cell) and drag
+  //    it through bus B
+  const blif = readFileSync(path.join(root, "testdata", "and2.blif"), "utf8");
+  const placed = await page.evaluate((blifText) => {
+    const s = window.__edaStudio();
+    const core = window.__edaCore;
+    const cell = core.Hdl.compileBlif(blifText, "and2", false);
+    cell.setCellContractJson(core.Hdl.compileBlifContract(blifText, "and2"));
+    s.addCellSchematic("and2", cell, "file");
+    const inst = s.placeInstance("and2", [24, 0, 24]);
+    return { inst: inst.name, blocks: cell.blockCount() };
+  }, blif);
+  check(placed.blocks > 0, `hdl cell placed (${placed.blocks} blocks) as ${placed.inst}`);
+
+  const through = await page.evaluate((inst) => {
+    const s = window.__edaStudio();
+    const report = s.moveInstance(inst, [6, 0, 2]); // through bus B's corridor
+    return { report, states: [...s.buses.keys()].map((b) => `${b}=${s.busState(b)}`) };
+  }, placed.inst);
+  const failedNow = through.states.filter((x) => x.includes("=failed")).length;
+  check(failedNow > 0, `instance drag-through fails buses VISIBLY (${failedNow} failed)`);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: path.join(docs, "04-instance-through-bus.png") });
+
+  // the cell's 155x83 footprint swamps the 17x17 demo anywhere nearby, so
+  // healing means dragging it clear out of the influence halos
+  const away = await page.evaluate((inst) => {
+    const s = window.__edaStudio();
+    s.moveInstance(inst, [220, 0, 220]);
+    // The away-move re-attempts every FAILED bus, but a bus that rerouted
+    // AROUND the obstruction may now occupy the other's corridor. Nudging
+    // the surviving bus's gate rips+reroutes its two segments, then a
+    // no-op instance move re-attempts the still-failed bus.
+    let states = [...s.buses.keys()].map((b) => s.busState(b));
+    if (states.some((x) => x.startsWith("failed"))) {
+      s.moveGate("bus0", "g0", [12, 2, 12]);
+      s.moveInstance(inst, [220, 0, 220]);
+      states = [...s.buses.keys()].map((b) => s.busState(b));
+    }
+    return { states: [...s.buses.keys()].map((b) => `${b}=${s.busState(b)}`) };
+  }, placed.inst);
+  check(away.states.every((x) => x.endsWith("=routed")),
+    `drag away re-heals: ${JSON.stringify(away.states)}`);
 
   // 5. in-browser yosys: compile the default Verilog into a cell
   await page.click("#btn-compile");

@@ -1,0 +1,34 @@
+[
+  {
+    "ok": true,
+    "label": "demo buses routed (routed,routed)"
+  },
+  {
+    "ok": true,
+    "label": "gate drag {\"state\":\"routed\",\"rerouted_segments\":2} clean=true"
+  },
+  {
+    "ok": true,
+    "label": "bake + poke a_out=0x55 b_out=0xaa"
+  },
+  {
+    "ok": true,
+    "label": "hdl cell placed (404 blocks) as u0"
+  },
+  {
+    "ok": true,
+    "label": "instance drag-through fails buses VISIBLY (2 failed)"
+  },
+  {
+    "ok": true,
+    "label": "drag away re-heals: [\"bus0=routed\",\"bus1=routed\"]"
+  },
+  {
+    "ok": true,
+    "label": "verilog->yosys->redstone cell (ok: 2824 blocks, 155×66×84)"
+  },
+  {
+    "ok": true,
+    "label": "exports {\"schem\":2902,\"litematic\":4438,\"nucm\":14450233}"
+  }
+]

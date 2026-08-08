@@ -226,37 +226,30 @@ export class Studio {
 
   // -- scene extraction ------------------------------------------------------
 
-  /** The flattened document split into render layers: named regions
-   *  (`bus:x`, `inst:y`) with per-bus colors, plus the loose remainder.
+  /** The flattened document split into render layers.
    *
-   *  Deliberately avoids the dense dumps (`getAllBlocksJson`, region
-   *  `blocksJson`): both materialize every in-bounds AIR cell, and one
-   *  placed HDL cell has a multi-million-cell bounding volume — enough to
-   *  exhaust wasm memory. Instead: ONE non-air dump of the flat artifact,
-   *  classified in JS against each region's box list (`boxesJson`). */
+   *  flatten() writes each layer into a NAMED SCHEMATIC REGION
+   *  (`inst:{name}`, `bus:{name}`) plus the default region for the loose
+   *  base; each is read back with the per-region NON-AIR dump. The dense
+   *  dumps (`getAllBlocksJson`, DefinitionRegion `blocksJson`) are
+   *  deliberately avoided: they materialize every in-bounds air cell, and
+   *  one placed HDL cell has a multi-million-cell bounding volume —
+   *  enough to exhaust wasm memory. */
   layers(): LayerBlocks[] {
     const flat = this.design.flatten();
     const s = flat.raw;
-    let all: LayerBlocks["blocks"];
-    try {
-      all = JSON.parse(s.getNonAirBlocksJson());
-    } catch {
-      // engine predates the non-air dump: dense fallback, filtered here.
-      // Safe only while the design is small (the dense dump can OOM).
-      all = (JSON.parse(s.getAllBlocksJson()) as LayerBlocks["blocks"])
-        .filter((b) => b.name !== "minecraft:air");
-    }
-    const names = JSON.parse(this.core.SchematicRegions.namesJson(s)) as string[];
-    // bus layers claim blocks first (an instance bbox may overlap a bus run)
-    const rank = (n: string) => (n.startsWith("bus:") ? 0 : n.startsWith("inst:") ? 1 : 2);
-    const defs: { name: string; boxes: number[]; layer: LayerBlocks }[] = [];
+    const names = JSON.parse(s.regionNamesJson()) as string[];
+    const layers: LayerBlocks[] = [];
+    const claimed = new Set<string>();
     for (const name of names) {
-      let boxes: number[];
+      if (!name.startsWith("bus:") && !name.startsWith("inst:")) continue;
+      let blocks: LayerBlocks["blocks"];
       try {
-        boxes = JSON.parse(this.core.SchematicRegions.get(s, name).boxesJson());
+        blocks = JSON.parse(s.getRegionNonAirBlocksJson(name));
       } catch {
         continue;
       }
+      for (const b of blocks) claimed.add(`${b.x},${b.y},${b.z}`);
       let color: number | null = null;
       let failed = false;
       if (name.startsWith("bus:")) {
@@ -264,21 +257,11 @@ export class Studio {
         color = this.buses.get(busName)?.color ?? null;
         failed = this.busState(busName).startsWith("failed");
       }
-      defs.push({ name, boxes, layer: { layer: name, color, failed, blocks: [] } });
+      layers.push({ layer: name, color, failed, blocks });
     }
-    defs.sort((a, b) => rank(a.name) - rank(b.name));
-    const loose: LayerBlocks = { layer: "loose", color: null, failed: false, blocks: [] };
-    const inBoxes = (boxes: number[], x: number, y: number, z: number) => {
-      for (let i = 0; i + 5 < boxes.length; i += 6) {
-        if (x >= boxes[i] && y >= boxes[i + 1] && z >= boxes[i + 2] &&
-            x <= boxes[i + 3] && y <= boxes[i + 4] && z <= boxes[i + 5]) return true;
-      }
-      return false;
-    };
-    for (const b of all) {
-      const def = defs.find((d) => inBoxes(d.boxes, b.x, b.y, b.z));
-      (def ? def.layer : loose).blocks.push(b);
-    }
-    return [...defs.map((d) => d.layer), loose];
+    const all = JSON.parse(s.getNonAirBlocksJson()) as LayerBlocks["blocks"];
+    const loose = all.filter((b) => !claimed.has(`${b.x},${b.y},${b.z}`));
+    layers.push({ layer: "loose", color: null, failed: false, blocks: loose });
+    return layers;
   }
 }

@@ -118,9 +118,10 @@ async function boot() {
     const ports: PortMarker[] = [...studio.ports.values()].map((p) => ({
       name: p.name, kind: p.kind, anchor: p.anchor, step: p.step, width: p.width,
     }));
-    const gates: GateMarker[] = [...studio.buses.values()].flatMap((b) =>
-      b.gates.map((g) => ({ bus: b.name, name: g.name, anchor: g.anchor })),
-    );
+    const gates: GateMarker[] = [...studio.buses.values()].flatMap((b) => {
+      const width = studio.ports.get(b.driver)?.width ?? 1;
+      return b.gates.map((g) => ({ bus: b.name, name: g.name, anchor: g.anchor, step: g.step, width }));
+    });
     const instances: InstanceMarker[] = [...studio.instances.values()].map((i) => ({
       name: i.name, at: i.at, rot: i.rot,
       dims: studio.cells.get(i.cell)?.dims ?? [1, 1, 1],
