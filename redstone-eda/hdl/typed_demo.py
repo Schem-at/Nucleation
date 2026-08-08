@@ -33,7 +33,7 @@ BLIF = os.path.join(HDL_DIR, "build", "%s.blif" % TOP)
 
 def reference_model(blif_path):
     """The pure-Python prim-graph eval, prepared exactly like main()."""
-    inputs, outputs, raw_nodes = h.parse_blif(blif_path)
+    inputs, outputs, raw_nodes, _latches = h.parse_blif(blif_path)
     nodes, consts = h.fold(inputs, raw_nodes)
     comp = h.Compiler(inputs, outputs, nodes, consts)
     po_val = {po: comp.value(po, 1) for po in outputs}

@@ -23,7 +23,12 @@ that compiler already knows how to place, route, audit and simulate:
                exhaustive vs a pure-Python eval of the same prim graph ->
                bake at rest -> .schem
 
-Combinational only: .latch / .subckt / .gate are rejected.
+Sequential (.latch, rising-edge, single clock) compiles through the RUST
+pipeline only (--rust): nucleation.Hdl places a verified master-slave
+repeater-lock DFF bank + clock spine + feedback corridors, and this file's
+independent clocked model (raw BLIF truth tables + latch state) drives the
+fixed-tick verification protocol.  The pure-Python geometry path stays
+combinational-only; .subckt / .gate are rejected everywhere.
 """
 import argparse
 import itertools
@@ -44,8 +49,12 @@ import nets
 
 # ---- yosys ----------------------------------------------------------------
 def run_yosys(verilog, top, blif):
+    # dffunmap legalises enable/reset DFF cells ($_DFFE_PP_ ...) into plain
+    # $_DFF_P_ + muxes (write_blif only emits .latch for plain DFFs); the
+    # second abc maps those muxes back into LUTs.  No-ops combinationally.
     script = ("read_verilog %s; hierarchy -check -top %s; "
-              "synth -top %s -lut 4; opt_clean; write_blif %s"
+              "synth -top %s -lut 4; dffunmap; abc -lut 4; opt_clean; "
+              "write_blif %s"
               % (verilog, top, top, blif))
     r = subprocess.run(["yosys", "-q", "-p", script],
                        capture_output=True, text=True)
@@ -72,7 +81,7 @@ def parse_blif(path):
         if line:
             lines.append(line)
 
-    inputs, outputs, raw_nodes = [], [], {}
+    inputs, outputs, raw_nodes, latches = [], [], {}, []
     cur = None
     for line in lines:
         tok = line.split()
@@ -87,8 +96,26 @@ def parse_blif(path):
         elif tok[0] == ".names":
             cur = tok[-1]
             raw_nodes[cur] = (tok[1:-1], [])
-        elif tok[0] in (".latch", ".subckt", ".gate", ".mlatch"):
-            raise Unsupported("combinational only: found %s" % tok[0])
+        elif tok[0] == ".latch":
+            # .latch <input> <output> [<type> <control>] [<init>]
+            a = tok[1:]
+            if len(a) == 2:
+                d, q, ttype, ctrl, init = a[0], a[1], None, None, "3"
+            elif len(a) == 3:
+                d, q, ttype, ctrl, init = a[0], a[1], None, None, a[2]
+            elif len(a) == 4:
+                d, q, ttype, ctrl, init = a[0], a[1], a[2], a[3], "3"
+            elif len(a) == 5:
+                d, q, ttype, ctrl, init = a[0], a[1], a[2], a[3], a[4]
+            else:
+                raise Unsupported(".latch expects 2-5 arguments")
+            if ttype not in (None, "re"):
+                raise Unsupported("only rising-edge latches: got %s" % ttype)
+            latches.append(dict(d=d, q=q, control=ctrl,
+                                init=1 if init == "1" else 0))
+            cur = None
+        elif tok[0] in (".subckt", ".gate", ".mlatch"):
+            raise Unsupported("flat .names/.latch only: found %s" % tok[0])
         elif tok[0].startswith("."):
             cur = None                       # .default_input_arrival etc
         elif cur is not None:
@@ -96,7 +123,7 @@ def parse_blif(path):
                 raw_nodes[cur][1].append(("", tok[0]))
             else:
                 raw_nodes[cur][1].append((tok[0], tok[1]))
-    return inputs, outputs, raw_nodes
+    return inputs, outputs, raw_nodes, latches
 
 
 def tt_of(ins, rows):
@@ -408,6 +435,147 @@ class Compiler:
         return val
 
 
+# ---- independent clocked reference (raw truth tables + latch state) -------
+def eval_raw(raw_nodes, env):
+    """Evaluate the raw BLIF covers over env (PIs + latch outputs); shares
+    no code with either compiler."""
+    val = dict(env)
+    progress = True
+    while progress:
+        progress = False
+        for name, (ins, rows) in raw_nodes.items():
+            if name in val or not all(i in val for i in ins):
+                continue
+            if not rows:
+                v = 0
+            else:
+                onset = rows[0][1] == "1"
+                hit = any(all(c == "-" or int(c) == val[ins[i]]
+                              for i, c in enumerate(pat))
+                          for pat, _o in rows)
+                v = int(hit == onset)
+            val[name] = v
+            progress = True
+    return val
+
+
+# ---- Rust sequential path --------------------------------------------------
+def run_rust_seq(args, blif_path, inputs, outputs, raw_nodes, latches):
+    """Sequential parity: the Rust pipeline compiles the .latch design (DFF
+    bank + clock spine + wrap corridors, initial state baked); this file's
+    independent clocked model drives the fixed-tick protocol — set input
+    levers, wait (measured) for the D ports, pulse the clock lever, compare
+    every Q rail and output probe against the stepped model.  Never
+    run_until_quiescent after the placement settle."""
+    import json
+    import nucleation as n
+
+    text = open(blif_path).read()
+    report = json.loads(n.Hdl.compile_blif_report(text, args.top))
+    clock = report["clock"]
+    real_pis = report["inputs"]              # .inputs minus the clock net
+    print("rust: %d blocks, %d latches, clock %s (est min period %d gt)"
+          % (report["blocks"], len(report["latches"]), clock["net"],
+             clock["est_min_period_gt"]))
+    b = n.Hdl.compile_blif(text, args.top, False)
+    if args.no_sim:
+        if args.out:
+            b.save_to_file(args.out)
+            print("saved (rust, unbaked)", args.out)
+        return 0
+
+    tmp = os.path.join(os.environ.get("TMPDIR", "/tmp"), "_hdl_rust_seq.schem")
+    b.save_to_file(tmp)
+    tight = n.Schematic.open(tmp)
+    sim = n.TickSimulation.from_schematic(tight, n.TickSettleMode.Placement,
+                                          0, 0, 0, rs.EXTRA_STATES)
+    sim.run_until_quiescent(4000)            # reset-by-bake: at-rest settle
+    s = rs.Sim(sim, tuple(report["bounds"][0]))
+    print("rust: placed; at-rest quiescent:", s.sim.is_quiescent())
+    probes = report["probes"]
+    po_report = {o["name"]: o for o in report["outputs"]}
+    lv = rs.Levers(s, [tuple(l["pos"]) for l in report["levers"]])
+    clk_lever = tuple(clock["lever"])
+
+    state = [l["init"] for l in latches]
+    rl = report["latches"]
+
+    def model(bits):
+        env = {net: bits[i] for i, net in enumerate(real_pis)}
+        for l, st in zip(latches, state):
+            env[l["q"]] = st
+        return eval_raw(raw_nodes, env)
+
+    def q_and_pos_match(val):
+        for l, rlat, st in zip(latches, rl, state):
+            if int(s.on(*probes[rlat["q_rail"]])) != st:
+                return False
+        for po in outputs:
+            ro = po_report[po]
+            if "probe" in ro and int(s.on(*probes[ro["probe"]])) != val[po]:
+                return False
+        return True
+
+    # init: the baked state must already be standing
+    ok = True
+    val0 = model([0] * len(real_pis))
+    if not q_and_pos_match(val0):
+        print("   INIT WRONG: baked state not standing after settle")
+        ok = False
+
+    rnd = random.Random(args.seed)
+    steps = args.steps
+    cap, high = 800, 40
+    max_setup = max_edge = 0
+    for si in range(steps):
+        bits = [rnd.getrandbits(1) for _ in real_pis]
+        for i, want in enumerate(bits):      # fixed-tick lever discipline
+            if lv.state[i] != bool(want):
+                s.use(*lv.positions[i])
+                lv.state[i] = bool(want)
+                run_gt(s, 2)
+        val = model(bits)
+        t = 0                                # measured input-settle margin
+        while t < cap:
+            good = all(("d_vid" not in rlat)  # const D is tied at the cell
+                       or int(s.on(*probes[rlat["d_probe"]])) == val[l["d"]]
+                       for l, rlat in zip(latches, rl))
+            if good:
+                break
+            run_gt(s, 1)
+            t += 1
+        max_setup = max(max_setup, t)
+        run_gt(s, 4)
+        s.use(*clk_lever)                    # rising edge
+        run_gt(s, high)
+        s.use(*clk_lever)                    # falling edge
+        state = [val[l["d"]] for l in latches]
+        val2 = model(bits)
+        t = 0                                # measured post-edge margin
+        while t < cap and not q_and_pos_match(val2):
+            run_gt(s, 1)
+            t += 1
+        max_edge = max(max_edge, t)
+        run_gt(s, 4)
+        if not q_and_pos_match(val2):
+            print("   STEP %d WRONG (want Q=%s)" % (si, state))
+            ok = False
+            break
+    if ok:
+        print("PASS (rust seq) %s: init + %d clocked steps, measured "
+              "setup %d gt, edge %d gt, min period %d gt"
+              % (args.top, steps, max_setup, max_edge,
+                 max_setup + high + max_edge))
+    if args.out and ok:
+        b.save_to_file(args.out)
+        print("saved (rust, baked-by-construction)", args.out)
+    return 0 if ok else 1
+
+
+def run_gt(sim, ticks):
+    sim.sim.run(ticks)
+
+
 # ---- Rust parity path -----------------------------------------------------
 def run_rust(args, blif_path, inputs, outputs, comp, po_val):
     """Parity proof for the built-in compiler: the SAME BLIF goes through the
@@ -493,6 +661,8 @@ def main():
                     help="random cases; 0 = exhaustive when <=12 inputs")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--no-sim", action="store_true")
+    ap.add_argument("--steps", type=int, default=24,
+                    help="clocked steps for sequential verification")
     ap.add_argument("--rust", action="store_true",
                     help="compile with the built-in Rust pipeline "
                          "(nucleation.Hdl, crates/nucleation-hdl) and verify "
@@ -508,7 +678,20 @@ def main():
         run_yosys(args.verilog, args.top, blif)
         print("yosys: %s -> %s" % (args.verilog, blif))
 
-    inputs, outputs, raw_nodes = parse_blif(blif)
+    inputs, outputs, raw_nodes, latches = parse_blif(blif)
+    if latches:
+        clocks = {l["control"] for l in latches}
+        assert len(clocks) == 1 and None not in clocks, "single clock only"
+        clock = clocks.pop()
+        real_pis = [i for i in inputs if i != clock]
+        print("blif: sequential — %d latches on %s, %d data inputs"
+              % (len(latches), clock, len(real_pis)))
+        if not args.rust:
+            print("sequential designs compile through the Rust pipeline: "
+                  "re-run with --rust (the pure-Python geometry path is "
+                  "combinational-only)")
+            return 2
+        return run_rust_seq(args, blif, real_pis, outputs, raw_nodes, latches)
     nodes, consts = fold(inputs, raw_nodes)
     print("blif: %d inputs %s, %d outputs, %d nodes, %d const nets"
           % (len(inputs), inputs, len(outputs), len(nodes), len(consts)))
