@@ -121,6 +121,35 @@ Landed on that table (`materials.py`, all sim-gated):
   the crossing tiles into a bus router on crossing demand; influence-map
   bookkeeping (notes-material-model.md §4).
 
+## Dense vertical buses + 8x8 crossing (LANDED)
+
+The material model cashed out as a bus form (`bus8_probe.py`,
+`bus8_cross.py`; showcase `bus8_run.schem`, `bus_cross8.schem`):
+
+- **2y-pitch vertical bus, 1 block wide**: bit n dust at y=1+2n on
+  slab-top separators (the probed UNDER dust/slab/dust stack); solid only
+  under repeaters.  Cross-section for 8 bits: **1 wide x 16 tall = 16
+  cells** (2 cells/bit).  The flat 2z-pitch form spends 15x2 = 30+ cells of
+  cross-section and 15 columns of ground footprint for the same 8 bits —
+  the vertical form is ~2x denser in section and 15x narrower on the
+  ground, and it leaves the ground plane free for logic.
+- **Refresh in-stack**: block-sandwich stations staggered diagonally (bit n
+  at x = stage+n) so each repeater's solid floor lands on the bit below's
+  station blocks (block-on-block, inert), never on live dust.  Max clean
+  pitch stays the probed 18 (15 dust + 3 station); verified 96/96 over a
+  40-block run with two refresh stages, incl. the ss1 worst case (bit 7).
+- **8x8 crossing as ONE tower**: interleave the two buses (A odd y, B even
+  y); at the shared column every level is a station entry block, so the 64
+  bit-pair isolations collapse into a 3x3-ground x 17-tall core with 16
+  repeaters (1/bit, doubling as the refresh).  A flat 8x8 crossing would
+  need 64 pairwise crossing tiles over a ~16x16 ground area.  Verified
+  432/432 (27 patterns x 16 outputs) incl. 8 random joint patterns.
+- **Deferred**: whole-stack ±1y shift tiles (the alternation law generalizes
+  to stacked buses on paper — glass separators at the step column, solid
+  under the landing — but it is unprobed); bus-router integration
+  (stamping the tower on crossing demand); T-junctions/taps off a vertical
+  bus (exit-block strong-power leak makes mid-run taps nontrivial).
+
 
 What is actually weak, drawn from the session docs, the deferred lists in
 `demos/README.md` / `showcase/README.md`, `CORE_PROPOSALS.md`, and
