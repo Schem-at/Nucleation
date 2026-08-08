@@ -1,0 +1,18 @@
+[package]
+name = "nucleation-routing"
+version = "0.1.0"
+edition = "2021"
+description = "The redstone fabric for pnr-core: design rules, via templates, signal budget, cell templates, buses, DRC and STA over a voxel workspace"
+license = "MIT"
+
+# Like mc-tick, this crate deliberately does NOT depend on nucleation (the
+# main crate depends on it, behind the `routing` feature — the reverse edge
+# would be a cycle). It works over a plain voxel workspace of block-state
+# strings; the bridge converts UniversalSchematic both ways.
+# Deterministic and wasm32-unknown-unknown clean: no fs, no threads, no
+# unseeded randomness.
+[dependencies]
+pnr-core = { path = "../pnr-core" }
+
+[lints.rust]
+missing_docs = "warn"
