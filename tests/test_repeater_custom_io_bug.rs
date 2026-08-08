@@ -68,6 +68,8 @@ fn test_repeater_middle_wires_power_bug() {
     inputs.insert(
         "a".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 4)], // Input wire at top
@@ -78,6 +80,8 @@ fn test_repeater_middle_wires_power_bug() {
     outputs.insert(
         "out".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(1, 1, 0)], // Output wire at bottom

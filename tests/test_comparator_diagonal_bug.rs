@@ -75,6 +75,8 @@ fn test_comparator_diagonal_equal_inputs() {
     inputs.insert(
         "a".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 2)], // Input at top-left
@@ -85,6 +87,8 @@ fn test_comparator_diagonal_equal_inputs() {
     outputs.insert(
         "out".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(1, 1, 0)], // Output at bottom
@@ -176,6 +180,8 @@ fn test_comparator_diagonal_control() {
     inputs.insert(
         "back_input".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(1, 1, 2)],
@@ -184,6 +190,8 @@ fn test_comparator_diagonal_control() {
     inputs.insert(
         "side_input".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 1)],
@@ -194,6 +202,8 @@ fn test_comparator_diagonal_control() {
     outputs.insert(
         "out".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(1, 1, 0)],
