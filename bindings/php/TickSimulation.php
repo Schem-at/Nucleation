@@ -297,6 +297,10 @@ final class TickSimulation {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function clearChanges() {
+        Lib::ffi()->TickSimulation_clear_changes($this->ptr);
+    }
+
     public function changesJson() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         Lib::ffi()->TickSimulation_changes_json($this->ptr, $write);

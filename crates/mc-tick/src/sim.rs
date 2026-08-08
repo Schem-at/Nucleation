@@ -2336,6 +2336,20 @@ impl Simulation {
         self.log.as_deref().unwrap_or(&[])
     }
 
+    /// Discard the recorded block changes, leaving recording as it was.
+    ///
+    /// The log grows for as long as recording runs, so a long-lived instance
+    /// that records across many actions needs a way to free it without
+    /// stopping — the block-change counterpart to
+    /// [`Simulation::clear_updates`]. Do not call [`Simulation::record`] to
+    /// achieve this: that reallocates all three of its logs and also ends
+    /// any [`Simulation::record_timeline`] in progress, which this must not.
+    pub fn clear_recorded(&mut self) {
+        if let Some(log) = self.log.as_mut() {
+            log.clear();
+        }
+    }
+
     /// Start (or stop) recording every delivered update.
     ///
     /// Off by default and deliberately separate from [`Simulation::record`]:

@@ -301,5 +301,30 @@ if (fs.existsSync(packPath)) {
   console.log(`  skip animated GLB export — ${packPath} is absent (build artifact, not source)`);
 }
 
+// --- dropping a consumed change log ---
+//
+// The log grows for as long as the simulation runs and nothing empties it, so
+// a long-running host accumulates every block change forever. A host that has
+// already consumed the changes needs to say so.
+const clr = TickSimulation.fromSnbt(door, TickSettleMode.InWorld, 15, -64, 0, "");
+clr.useBlock(10, 4, 1);
+clr.run(20);
+const before = Number(clr.changesCount());
+expect(before > 0, `the door recorded changes (${before})`);
+clr.clearChanges();
+expect(Number(clr.changesCount()) === 0, "clearChanges empties the log");
+expect(JSON.parse(clr.changesJson()).length === 0, "and changesJson agrees");
+// This door has already fully opened and settled by tick 20 (verified: it
+// never produces another change no matter how much longer it runs), so a
+// second lever click is needed to give the still-recording sim something new
+// to see — otherwise the assertion below would hold vacuously even if
+// clearChanges had secretly turned recording off.
+clr.useBlock(10, 4, 1);
+clr.run(20);
+expect(
+  Number(clr.changesCount()) > 0,
+  "recording continues after a clear — it drops what happened, it does not stop recording",
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

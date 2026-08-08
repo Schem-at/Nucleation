@@ -1842,6 +1842,21 @@ pub mod ffi {
             let _ = write!(out, "{json}");
         }
 
+        /// Drop the recorded block changes without stopping recording.
+        ///
+        /// The log grows for as long as the simulation runs and nothing
+        /// empties it, so a long-running host — a browser session driving
+        /// thousands of ticks — accumulates every block change forever. A
+        /// host that has already consumed [`TickSimulation::changes_json`]
+        /// can say so here and keep recording on. A host holding a cursor
+        /// into the change log must reset that cursor when it calls this, or
+        /// it will read past the end of a log that is no longer the one it
+        /// was walking — the same hazard [`TickSimulation::record_timeline`]
+        /// names for its own reset of this log.
+        pub fn clear_changes(&mut self) {
+            self.sim.clear_recorded();
+        }
+
         pub fn changes_json(&self, out: &mut DiplomatWrite) {
             let mut json = String::from("[");
             for (i, change) in self.sim.recorded().iter().enumerate() {

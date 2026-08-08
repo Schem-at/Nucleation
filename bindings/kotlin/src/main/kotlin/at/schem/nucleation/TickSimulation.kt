@@ -40,6 +40,7 @@ internal interface TickSimulationLib: Library {
     fun TickSimulation_updates_heat_json(handle: Pointer, fromTick: FFIUint32, toTick: FFIUint32, write: Pointer): Unit
     fun TickSimulation_updates_wave_json(handle: Pointer, tick: FFIUint32, write: Pointer): Unit
     fun TickSimulation_moving_blocks_json(handle: Pointer, write: Pointer): Unit
+    fun TickSimulation_clear_changes(handle: Pointer): Unit
     fun TickSimulation_changes_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_item_entities_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_motion_semantics(handle: Pointer, write: Pointer): Unit
@@ -691,6 +692,24 @@ class TickSimulation internal constructor (
 
         val returnString = DW.writeToString(write)
         return returnString
+    }
+
+    /** Drop the recorded block changes without stopping recording.
+    *
+    *The log grows for as long as the simulation runs and nothing
+    *empties it, so a long-running host — a browser session driving
+    *thousands of ticks — accumulates every block change forever. A
+    *host that has already consumed [TickSimulation::changes_json]
+    *can say so here and keep recording on. A host holding a cursor
+    *into the change log must reset that cursor when it calls this, or
+    *it will read past the end of a log that is no longer the one it
+    *was walking — the same hazard [TickSimulation::record_timeline]
+    *names for its own reset of this log.
+    */
+    fun clearChanges(): Unit {
+
+        val returnVal = lib.TickSimulation_clear_changes(handle);
+
     }
 
     fun changesJson(): String {

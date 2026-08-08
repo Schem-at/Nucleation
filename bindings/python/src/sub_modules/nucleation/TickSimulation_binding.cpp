@@ -19,6 +19,7 @@ void add_TickSimulation_binding(nb::module_ mod) {
         .def("changes_count", &nucleation::TickSimulation::changes_count)
         .def("changes_json", &nucleation::TickSimulation::changes_json)
         .def("checkpoint", &nucleation::TickSimulation::checkpoint)
+        .def("clear_changes", &nucleation::TickSimulation::clear_changes)
         .def("clear_updates", &nucleation::TickSimulation::clear_updates)
         .def_static("eval_flight_batch", &nucleation::TickSimulation::eval_flight_batch, "bx"_a, "by"_a, "bz"_a, "travel"_a, "x_off"_a, "palette"_a, "cells"_a, "air_index"_a, "kicks"_a, "eval_ticks"_a, "seed"_a, "must_move_by_tick"_a, "need_period"_a, "early_exit"_a)
         .def("events_summary_json", &nucleation::TickSimulation::events_summary_json)

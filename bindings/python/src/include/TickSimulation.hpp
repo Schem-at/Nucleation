@@ -95,6 +95,8 @@ namespace capi {
 
     void TickSimulation_moving_blocks_json(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    void TickSimulation_clear_changes(nucleation::capi::TickSimulation* self);
+
     void TickSimulation_changes_json(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
     void TickSimulation_item_entities_json(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
@@ -495,6 +497,10 @@ inline void nucleation::TickSimulation::moving_blocks_json_write(W& writeable) c
     nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
     nucleation::capi::TickSimulation_moving_blocks_json(this->AsFFI(),
         &write);
+}
+
+inline void nucleation::TickSimulation::clear_changes() {
+    nucleation::capi::TickSimulation_clear_changes(this->AsFFI());
 }
 
 inline std::string nucleation::TickSimulation::changes_json() const {

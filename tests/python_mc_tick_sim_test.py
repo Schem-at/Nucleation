@@ -327,5 +327,32 @@ if pack_path.exists():
 else:
     print(f"  skip animated GLB export — {pack_path} is absent (build artifact, not source)")
 
+# --- dropping a consumed change log ---
+#
+# The log grows for as long as the simulation runs and nothing empties it, so
+# a long-running host accumulates every block change forever. A host that has
+# already consumed the changes needs to say so.
+clr = nucleation.TickSimulation.from_snbt(
+    door, nucleation.TickSettleMode.InWorld, 15, -64, 0, ""
+)
+clr.use_block(10, 4, 1)
+clr.run(20)
+before = clr.changes_count()
+expect(before > 0, f"the door recorded changes ({before})")
+clr.clear_changes()
+expect(clr.changes_count() == 0, "clear_changes empties the log")
+expect(len(json.loads(clr.changes_json())) == 0, "and changes_json agrees")
+# This door has already fully opened and settled by tick 20 (verified: it
+# never produces another change no matter how much longer it runs), so a
+# second lever click is needed to give the still-recording sim something new
+# to see — otherwise the assertion below would hold vacuously even if
+# clear_changes had secretly turned recording off.
+clr.use_block(10, 4, 1)
+clr.run(20)
+expect(
+    clr.changes_count() > 0,
+    "recording continues after a clear — it drops what happened, it does not stop recording",
+)
+
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(0 if failed == 0 else 1)

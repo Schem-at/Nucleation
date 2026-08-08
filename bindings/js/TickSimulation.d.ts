@@ -377,6 +377,21 @@ export class TickSimulation {
      */
     movingBlocksJson(): string;
 
+    /**
+     * Drop the recorded block changes without stopping recording.
+     *
+     * The log grows for as long as the simulation runs and nothing
+     * empties it, so a long-running host — a browser session driving
+     * thousands of ticks — accumulates every block change forever. A
+     * host that has already consumed {@link TickSimulation::changes_json}
+     * can say so here and keep recording on. A host holding a cursor
+     * into the change log must reset that cursor when it calls this, or
+     * it will read past the end of a log that is no longer the one it
+     * was walking — the same hazard {@link TickSimulation::record_timeline}
+     * names for its own reset of this log.
+     */
+    clearChanges(): void;
+
     changesJson(): string;
 
     /**
