@@ -22,6 +22,8 @@
 //! - [`bus`]: `BusSpec` / `BusPort` and abutment compatibility.
 //! - [`region`]: include/exclude routing regions.
 //! - [`drc`]: shorts, support, decay, and repeater-cycle detection.
+//! - [`lvs`]: intended-netlist vs extracted-conduction comparison (opens,
+//!   shorts, repeater rings).
 //! - [`sta`]: static timing (torch 1 rt, repeater delay, dust free) over
 //!   `pnr-core`'s delay DAG.
 
@@ -32,6 +34,7 @@ pub mod bus;
 pub mod cell;
 pub mod drc;
 pub mod fabric;
+pub mod lvs;
 pub mod nets;
 pub mod region;
 pub mod router;
@@ -44,6 +47,7 @@ pub use bus::{Axis, BusPort, BusSpec, Encoding, Face, InOut};
 pub use cell::{CellTemplate, EdgeContract, Fragment};
 pub use drc::{drc, DrcOptions, Violation};
 pub use fabric::NetSpec;
+pub use lvs::{lvs, IntentNet, LvsOpen, LvsReport, LvsShort};
 pub use pnr_core::{Aabb, Pos};
 pub use region::RoutingRegion;
 pub use router::{NetRoute, RedstoneRouter, RouteError, RouteResult};
