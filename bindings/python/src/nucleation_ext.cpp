@@ -57,6 +57,7 @@ void add_Scripting_binding(nb::module_);
 void add_FieldProgram_binding(nb::module_);
 void add_FieldProgramBuilder_binding(nb::module_);
 void add_Sdf_binding(nb::module_);
+void add_CellExecutor_binding(nb::module_);
 void add_CircuitBuilder_binding(nb::module_);
 void add_ExecutionMode_binding(nb::module_);
 void add_IoLayout_binding(nb::module_);
@@ -212,6 +213,7 @@ NB_MODULE(nucleation, mod)
     add_FieldProgram_binding(mod);
     add_FieldProgramBuilder_binding(mod);
     add_Sdf_binding(mod);
+    add_CellExecutor_binding(mod);
     add_CircuitBuilder_binding(mod);
     add_ExecutionMode_binding(mod);
     add_IoLayout_binding(mod);

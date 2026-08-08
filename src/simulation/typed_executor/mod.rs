@@ -134,7 +134,7 @@ pub use crate::io_contract::{
 };
 
 // Public API
-pub use backend::{BackendCircuitExecutor, MchprsBackend, SimBackend};
+pub use backend::{standard_io_extra_states, BackendCircuitExecutor, MchprsBackend, SimBackend};
 #[cfg(all(feature = "bridge", feature = "mc-tick"))]
 pub use backend::McTickBackend;
 pub use compiled::{COMPILED_MAGIC, COMPILED_VERSION};

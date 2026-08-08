@@ -56,6 +56,7 @@ require_once __DIR__ . '/Scripting.php';
 require_once __DIR__ . '/FieldProgram.php';
 require_once __DIR__ . '/FieldProgramBuilder.php';
 require_once __DIR__ . '/Sdf.php';
+require_once __DIR__ . '/CellExecutor.php';
 require_once __DIR__ . '/CircuitBuilder.php';
 require_once __DIR__ . '/ExecutionMode.php';
 require_once __DIR__ . '/IoLayout.php';

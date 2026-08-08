@@ -110,6 +110,8 @@ export { FieldProgramBuilder } from "./FieldProgramBuilder.mjs"
 
 export { Sdf } from "./Sdf.mjs"
 
+export { CellExecutor } from "./CellExecutor.mjs"
+
 export { CircuitBuilder } from "./CircuitBuilder.mjs"
 
 export { ExecutionMode } from "./ExecutionMode.mjs"

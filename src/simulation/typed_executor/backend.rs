@@ -142,6 +142,44 @@ impl SimBackend for MchprsBackend {
     }
 }
 
+/// The block states redstone IO hardware can visit at runtime — interned up
+/// front so late-placed or state-flipping cells never sit inert in the tick
+/// engine (the `redstone-eda/rs.py` EXTRA_STATES list, Rust-side, plus the
+/// probed material-model blocks).
+pub fn standard_io_extra_states() -> Vec<String> {
+    let dirs = ["north", "south", "east", "west"];
+    let mut out = Vec::new();
+    for d in dirs {
+        for p in ["true", "false"] {
+            out.push(format!("minecraft:lever[face=floor,facing={d},powered={p}]"));
+            out.push(format!("minecraft:lever[face=wall,facing={d},powered={p}]"));
+            out.push(format!("minecraft:redstone_wall_torch[facing={d},lit={p}]"));
+        }
+        for delay in [1, 2] {
+            for locked in ["true", "false"] {
+                for powered in ["true", "false"] {
+                    out.push(format!(
+                        "minecraft:repeater[facing={d},delay={delay},locked={locked},powered={powered}]"
+                    ));
+                }
+            }
+        }
+    }
+    for lit in ["true", "false"] {
+        out.push(format!("minecraft:redstone_torch[lit={lit}]"));
+        out.push(format!("minecraft:redstone_lamp[lit={lit}]"));
+    }
+    for b in [
+        "minecraft:glass",
+        "minecraft:white_stained_glass",
+        "minecraft:smooth_stone_slab[type=top,waterlogged=false]",
+        "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]",
+    ] {
+        out.push(b.to_string());
+    }
+    out
+}
+
 /// The vanilla-accurate mc-tick backend. No signal injection: inputs are
 /// levers, driven with toggle-to-target + settle-per-flip (see module docs).
 #[cfg(all(feature = "bridge", feature = "mc-tick"))]
