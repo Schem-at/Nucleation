@@ -2343,11 +2343,35 @@ impl Simulation {
     /// stopping — the block-change counterpart to
     /// [`Simulation::clear_updates`]. Do not call [`Simulation::record`] to
     /// achieve this: that reallocates all three of its logs and also ends
-    /// any [`Simulation::record_timeline`] in progress, which this must not.
-    pub fn clear_recorded(&mut self) {
+    /// any [`Simulation::record_timeline`] in progress.
+    ///
+    /// **Refuses while a run timeline ([`Simulation::record_timeline`]) is
+    /// recording**, and leaves the log untouched — it does *not* preserve the
+    /// timeline by clearing around it, because there is no way to do that. A
+    /// timeline is a seed frame at `start_tick` plus this log; every reader
+    /// that replays it ([`Simulation::recorded_timeline`],
+    /// [`Simulation::timeline_view`], and everything built on those —
+    /// `frame_at`, `digests`, `detect_cycles`, animation and selection
+    /// export) trusts that the log describes every mutation since
+    /// `start_tick`. Emptying it here would leave the seed with nothing to
+    /// replay forward from, and every [`crate::timeline::PistonEvent`]'s
+    /// `change_index` — an index into this same log, held by the recorder —
+    /// would point past a log that had just gotten shorter. Both failures
+    /// are silent to every caller downstream: replay does not error, it just
+    /// answers wrong.
+    ///
+    /// Returns `true` if the log was actually cleared, `false` if the call
+    /// was refused. A caller that ignores the return value is exactly the
+    /// host this guards against: one that believes it freed memory which in
+    /// fact kept growing.
+    pub fn clear_recorded(&mut self) -> bool {
+        if self.timeline.is_some() {
+            return false;
+        }
         if let Some(log) = self.log.as_mut() {
             log.clear();
         }
+        true
     }
 
     /// Start (or stop) recording every delivered update.

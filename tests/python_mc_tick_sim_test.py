@@ -345,8 +345,9 @@ expect(len(json.loads(clr.changes_json())) == 0, "and changes_json agrees")
 # This door has already fully opened and settled by tick 20 (verified: it
 # never produces another change no matter how much longer it runs), so a
 # second lever click is needed to give the still-recording sim something new
-# to see — otherwise the assertion below would hold vacuously even if
-# clear_changes had secretly turned recording off.
+# to see — otherwise the door would stay quiescent and the assertion below
+# would fail regardless of whether clear_changes had secretly turned
+# recording off, telling us nothing about which one happened.
 clr.use_block(10, 4, 1)
 clr.run(20)
 expect(

@@ -317,8 +317,9 @@ expect(JSON.parse(clr.changesJson()).length === 0, "and changesJson agrees");
 // This door has already fully opened and settled by tick 20 (verified: it
 // never produces another change no matter how much longer it runs), so a
 // second lever click is needed to give the still-recording sim something new
-// to see — otherwise the assertion below would hold vacuously even if
-// clearChanges had secretly turned recording off.
+// to see — otherwise the door would stay quiescent and the assertion below
+// would fail regardless of whether clearChanges had secretly turned
+// recording off, telling us nothing about which one happened.
 clr.useBlock(10, 4, 1);
 clr.run(20);
 expect(

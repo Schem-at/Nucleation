@@ -298,7 +298,8 @@ final class TickSimulation {
     }
 
     public function clearChanges() {
-        Lib::ffi()->TickSimulation_clear_changes($this->ptr);
+        $ret = Lib::ffi()->TickSimulation_clear_changes($this->ptr);
+        return $ret;
     }
 
     public function changesJson() {

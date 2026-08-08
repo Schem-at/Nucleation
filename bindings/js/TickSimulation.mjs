@@ -867,11 +867,25 @@ export class TickSimulation {
      * it will read past the end of a log that is no longer the one it
      * was walking — the same hazard {@link TickSimulation::record_timeline}
      * names for its own reset of this log.
+     *
+     * Refuses — and leaves the log untouched — while
+     * {@link TickSimulation::record_timeline} is recording: a run timeline
+     * is a seed frame plus this same log, and every timeline reader
+     * trusts that the log describes every mutation since recording
+     * began. Clearing it out from under a live recording would make
+     * replay silently wrong rather than fail loudly. Returns `true` if
+     * the log was cleared, `false` if the call was refused — following
+     * {@link TickSimulation::run_until_quiescent}'s convention of reporting
+     * whether the call achieved what it was asked, rather than swallowing
+     * a no-op.
      */
     clearChanges() {
-    wasm.TickSimulation_clear_changes(this.ffiValue);
 
-        try {}
+        const result = wasm.TickSimulation_clear_changes(this.ffiValue);
+
+        try {
+            return result;
+        }
 
         finally {
             diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();

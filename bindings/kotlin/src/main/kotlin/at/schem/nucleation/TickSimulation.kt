@@ -40,7 +40,7 @@ internal interface TickSimulationLib: Library {
     fun TickSimulation_updates_heat_json(handle: Pointer, fromTick: FFIUint32, toTick: FFIUint32, write: Pointer): Unit
     fun TickSimulation_updates_wave_json(handle: Pointer, tick: FFIUint32, write: Pointer): Unit
     fun TickSimulation_moving_blocks_json(handle: Pointer, write: Pointer): Unit
-    fun TickSimulation_clear_changes(handle: Pointer): Unit
+    fun TickSimulation_clear_changes(handle: Pointer): Byte
     fun TickSimulation_changes_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_item_entities_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_motion_semantics(handle: Pointer, write: Pointer): Unit
@@ -705,11 +705,22 @@ class TickSimulation internal constructor (
     *it will read past the end of a log that is no longer the one it
     *was walking — the same hazard [TickSimulation::record_timeline]
     *names for its own reset of this log.
+    *
+    *Refuses — and leaves the log untouched — while
+    *[TickSimulation::record_timeline] is recording: a run timeline
+    *is a seed frame plus this same log, and every timeline reader
+    *trusts that the log describes every mutation since recording
+    *began. Clearing it out from under a live recording would make
+    *replay silently wrong rather than fail loudly. Returns `true` if
+    *the log was cleared, `false` if the call was refused — following
+    *[TickSimulation::run_until_quiescent]'s convention of reporting
+    *whether the call achieved what it was asked, rather than swallowing
+    *a no-op.
     */
-    fun clearChanges(): Unit {
+    fun clearChanges(): Boolean {
 
         val returnVal = lib.TickSimulation_clear_changes(handle);
-
+        return (returnVal > 0)
     }
 
     fun changesJson(): String {

@@ -265,6 +265,39 @@ fn the_change_log_is_sorted_by_tick() {
 /// correct result here is *no* cycle at all; what this test pins is that the
 /// long, candidate-heavy, all-quiet tail still produces that same no-cycle
 /// answer once `changed_between` searches instead of scanning.
+/// `clear_recorded` must refuse while a run timeline is recording, and say
+/// so: a timeline is a seed frame plus the change log, and replay trusts that
+/// the log describes every mutation since `start_tick`. Clearing it out from
+/// under a live recording leaves a seed with nothing to replay against, and
+/// every later read — `frame_at` among them — would silently reconstruct the
+/// wrong world.
+#[test]
+fn clear_recorded_refuses_during_a_run_timeline_and_replay_stays_correct() {
+    let mut recorded = sim(DOOR);
+    recorded.record_timeline();
+    recorded.use_block(Pos::new(10, 4, 1));
+    recorded.run(40);
+
+    let cleared = recorded.clear_recorded();
+    assert!(
+        !cleared,
+        "clear_recorded must refuse while a run timeline is recording"
+    );
+
+    let timeline = recorded.recorded_timeline().expect("timeline");
+    let end_tick = timeline.end_tick;
+    let oracle = oracle_at(end_tick);
+    let want = StateFrame::of(end_tick, oracle.world(), oracle.registry());
+    let got = timeline
+        .frame_at(end_tick, recorded.registry())
+        .unwrap_or_else(|| panic!("no frame for tick {end_tick}"));
+    assert_eq!(
+        got, want,
+        "a refused clear must leave replay reconstructing the same world an \
+         independent simulation reaches by stepping to the same tick"
+    );
+}
+
 #[test]
 fn cycle_detection_is_unchanged_on_a_settled_build() {
     let mut sim = sim(DOOR);

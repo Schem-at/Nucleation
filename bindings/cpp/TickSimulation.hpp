@@ -95,7 +95,7 @@ namespace capi {
 
     void TickSimulation_moving_blocks_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
 
-    void TickSimulation_clear_changes(diplomat::capi::TickSimulation* self);
+    bool TickSimulation_clear_changes(diplomat::capi::TickSimulation* self);
 
     void TickSimulation_changes_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
 
@@ -499,8 +499,9 @@ inline void TickSimulation::moving_blocks_json_write(W& writeable) const {
         &write);
 }
 
-inline void TickSimulation::clear_changes() {
-    diplomat::capi::TickSimulation_clear_changes(this->AsFFI());
+inline bool TickSimulation::clear_changes() {
+    auto result = diplomat::capi::TickSimulation_clear_changes(this->AsFFI());
+    return result;
 }
 
 inline std::string TickSimulation::changes_json() const {

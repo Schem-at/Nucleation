@@ -4,6 +4,14 @@
  * accumulated log, then throw away everything before a cursor. That is
  * O(total changes) per frame and unbounded over a session. After the fix it
  * consumes and clears, so a drain costs what the last batch produced.
+ *
+ * `http://localhost:8455/` is where `vite preview` serves the app's `dist/`
+ * build — run that (or `npm run preview` in this app) before this script.
+ *
+ * `placeBlock(31, 7, 13, "minecraft:air")` is BB-specific: it is BB's kick
+ * block, and this build does nothing at all until it is kicked. Pass a
+ * different `<BB>` fixture and this probe will step 400 quiescent ticks and
+ * report meaningless, near-zero numbers for both samples.
  */
 import { chromium } from "playwright";
 const b = await chromium.launch(); const p = await b.newPage();
@@ -12,7 +20,7 @@ await p.setInputFiles("input[type=file]", process.argv[2]);
 await p.waitForSelector(".status.ready", { timeout: 300000 });
 console.log(await p.evaluate(async () => {
   const w = window.simlab.world, out = [];
-  w.sim.placeBlock(31, 7, 13, "minecraft:air");
+  w.sim.placeBlock(31, 7, 13, "minecraft:air"); // BB's kick block; see header
   const sample = () => {
     const t0 = performance.now();
     const got = w.drainChanges().length;

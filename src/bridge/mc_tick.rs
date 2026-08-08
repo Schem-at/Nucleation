@@ -1853,8 +1853,19 @@ pub mod ffi {
         /// it will read past the end of a log that is no longer the one it
         /// was walking — the same hazard [`TickSimulation::record_timeline`]
         /// names for its own reset of this log.
-        pub fn clear_changes(&mut self) {
-            self.sim.clear_recorded();
+        ///
+        /// Refuses — and leaves the log untouched — while
+        /// [`TickSimulation::record_timeline`] is recording: a run timeline
+        /// is a seed frame plus this same log, and every timeline reader
+        /// trusts that the log describes every mutation since recording
+        /// began. Clearing it out from under a live recording would make
+        /// replay silently wrong rather than fail loudly. Returns `true` if
+        /// the log was cleared, `false` if the call was refused — following
+        /// [`TickSimulation::run_until_quiescent`]'s convention of reporting
+        /// whether the call achieved what it was asked, rather than swallowing
+        /// a no-op.
+        pub fn clear_changes(&mut self) -> bool {
+            self.sim.clear_recorded()
         }
 
         pub fn changes_json(&self, out: &mut DiplomatWrite) {

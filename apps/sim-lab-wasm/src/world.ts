@@ -1032,13 +1032,18 @@ export class World {
     } catch {
       return [];
     }
-    // Only clear once the read above has actually succeeded.
+    // `JSON.parse` succeeds on `"null"`, so `parsed` can be `null` here —
+    // `parsed?.changes` (not `parsed.changes`) is what keeps that from
+    // throwing outside this try/catch, in the frame loop.
+    const all: Any[] = Array.isArray(parsed) ? parsed : (parsed?.changes ?? []);
+    // Only clear once the payload above has been fully and successfully
+    // interpreted into `all` — clearing any earlier (including on a `null`
+    // parse) would drop changes we never actually read.
     try {
       this.sim.clearChanges?.();
     } catch {
       /* nothing to clear, or engine doesn't support it */
     }
-    const all: Any[] = Array.isArray(parsed) ? parsed : (parsed.changes ?? []);
     return all
       .map((c: Any) => ({
         pos: [c.x ?? c.pos?.[0], c.y ?? c.pos?.[1], c.z ?? c.pos?.[2]] as [number, number, number],
