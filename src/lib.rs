@@ -23,6 +23,7 @@ pub mod fingerprint;
 pub mod formats;
 pub mod geo;
 pub mod insign;
+pub mod io_contract;
 mod item;
 mod metadata;
 pub mod nbt;

@@ -1830,6 +1830,24 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Parse the schematic's IO-contract insign annotations (`#cell`
+        /// header, `bus.*` port annotations, `#route_zone` zones) to JSON:
+        /// `{"cell": ..., "buses": [...], "route_zones": {...}}`.
+        pub fn compile_io_contracts_json(
+            &self,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let signs: Vec<([i32; 3], String)> = crate::insign::extract_signs(&self.0)
+                .into_iter()
+                .map(|s| (s.pos, s.text))
+                .collect();
+            let data = crate::io_contract::insign_ext::contracts_json(&signs)
+                .map_err(|_| NucleationError::Parse)?;
+            let json = serde_json::to_string(&data).map_err(|_| NucleationError::Serialize)?;
+            let _ = write!(out, "{}", json);
+            Ok(())
+        }
+
         /// Every region's palette, as a JSON object mapping region name → array of
         /// block names (the default region under `"default"`).
         pub fn all_palettes_json(&self, out: &mut DiplomatWrite) {
