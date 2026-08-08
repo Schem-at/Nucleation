@@ -74,6 +74,30 @@ Design_check_result Design_check(const Design* self, DiplomatWrite* write);
 typedef struct Design_bake_result {union {Schematic* ok; NucleationError err;}; bool is_ok;} Design_bake_result;
 Design_bake_result Design_bake(const Design* self, uint32_t budget);
 
+typedef struct Design_to_nucm_b64_result {union { NucleationError err;}; bool is_ok;} Design_to_nucm_b64_result;
+Design_to_nucm_b64_result Design_to_nucm_b64(const Design* self, DiplomatWrite* write);
+
+typedef struct Design_from_nucm_result {union {Design* ok; NucleationError err;}; bool is_ok;} Design_from_nucm_result;
+Design_from_nucm_result Design_from_nucm(DiplomatU8View data);
+
+typedef struct Design_save_nucm_result {union { NucleationError err;}; bool is_ok;} Design_save_nucm_result;
+Design_save_nucm_result Design_save_nucm(const Design* self, DiplomatStringView path);
+
+typedef struct Design_load_nucm_result {union {Design* ok; NucleationError err;}; bool is_ok;} Design_load_nucm_result;
+Design_load_nucm_result Design_load_nucm(DiplomatStringView path);
+
+typedef struct Design_to_litematic_b64_result {union { NucleationError err;}; bool is_ok;} Design_to_litematic_b64_result;
+Design_to_litematic_b64_result Design_to_litematic_b64(const Design* self, DiplomatWrite* write);
+
+typedef struct Design_from_litematic_result {union {Design* ok; NucleationError err;}; bool is_ok;} Design_from_litematic_result;
+Design_from_litematic_result Design_from_litematic(DiplomatU8View data);
+
+typedef struct Design_export_litematic_result {union { NucleationError err;}; bool is_ok;} Design_export_litematic_result;
+Design_export_litematic_result Design_export_litematic(const Design* self, DiplomatStringView path);
+
+typedef struct Design_import_litematic_result {union {Design* ok; NucleationError err;}; bool is_ok;} Design_import_litematic_result;
+Design_import_litematic_result Design_import_litematic(DiplomatStringView path);
+
 void Design_destroy(Design* self);
 
 

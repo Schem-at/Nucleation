@@ -77,6 +77,30 @@ namespace capi {
     typedef struct Design_bake_result {union {diplomat::capi::Schematic* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Design_bake_result;
     Design_bake_result Design_bake(const diplomat::capi::Design* self, uint32_t budget);
 
+    typedef struct Design_to_nucm_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_to_nucm_b64_result;
+    Design_to_nucm_b64_result Design_to_nucm_b64(const diplomat::capi::Design* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_from_nucm_result {union {diplomat::capi::Design* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Design_from_nucm_result;
+    Design_from_nucm_result Design_from_nucm(diplomat::capi::DiplomatU8View data);
+
+    typedef struct Design_save_nucm_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_save_nucm_result;
+    Design_save_nucm_result Design_save_nucm(const diplomat::capi::Design* self, diplomat::capi::DiplomatStringView path);
+
+    typedef struct Design_load_nucm_result {union {diplomat::capi::Design* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Design_load_nucm_result;
+    Design_load_nucm_result Design_load_nucm(diplomat::capi::DiplomatStringView path);
+
+    typedef struct Design_to_litematic_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_to_litematic_b64_result;
+    Design_to_litematic_b64_result Design_to_litematic_b64(const diplomat::capi::Design* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_from_litematic_result {union {diplomat::capi::Design* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Design_from_litematic_result;
+    Design_from_litematic_result Design_from_litematic(diplomat::capi::DiplomatU8View data);
+
+    typedef struct Design_export_litematic_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_export_litematic_result;
+    Design_export_litematic_result Design_export_litematic(const diplomat::capi::Design* self, diplomat::capi::DiplomatStringView path);
+
+    typedef struct Design_import_litematic_result {union {diplomat::capi::Design* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Design_import_litematic_result;
+    Design_import_litematic_result Design_import_litematic(diplomat::capi::DiplomatStringView path);
+
     void Design_destroy(Design* self);
 
     } // extern "C"
@@ -363,6 +387,68 @@ inline diplomat::result<std::unique_ptr<Schematic>, NucleationError> Design::bak
     auto result = diplomat::capi::Design_bake(this->AsFFI(),
         budget);
     return result.is_ok ? diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Ok<std::unique_ptr<Schematic>>(std::unique_ptr<Schematic>(Schematic::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Design::to_nucm_b64() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_to_nucm_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::to_nucm_b64_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_to_nucm_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Design>, NucleationError> Design::from_nucm(diplomat::span<const uint8_t> data) {
+    auto result = diplomat::capi::Design_from_nucm({data.data(), data.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<Design>, NucleationError>(diplomat::Ok<std::unique_ptr<Design>>(std::unique_ptr<Design>(Design::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Design>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Design::save_nucm(std::string_view path) const {
+    auto result = diplomat::capi::Design_save_nucm(this->AsFFI(),
+        {path.data(), path.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Design>, NucleationError> Design::load_nucm(std::string_view path) {
+    auto result = diplomat::capi::Design_load_nucm({path.data(), path.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<Design>, NucleationError>(diplomat::Ok<std::unique_ptr<Design>>(std::unique_ptr<Design>(Design::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Design>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Design::to_litematic_b64() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_to_litematic_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::to_litematic_b64_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_to_litematic_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Design>, NucleationError> Design::from_litematic(diplomat::span<const uint8_t> data) {
+    auto result = diplomat::capi::Design_from_litematic({data.data(), data.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<Design>, NucleationError>(diplomat::Ok<std::unique_ptr<Design>>(std::unique_ptr<Design>(Design::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Design>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Design::export_litematic(std::string_view path) const {
+    auto result = diplomat::capi::Design_export_litematic(this->AsFFI(),
+        {path.data(), path.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Design>, NucleationError> Design::import_litematic(std::string_view path) {
+    auto result = diplomat::capi::Design_import_litematic({path.data(), path.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<Design>, NucleationError>(diplomat::Ok<std::unique_ptr<Design>>(std::unique_ptr<Design>(Design::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Design>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline const diplomat::capi::Design* Design::AsFFI() const {

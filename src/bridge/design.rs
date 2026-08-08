@@ -395,6 +395,95 @@ pub mod ffi {
                 Err(NucleationError::Simulation)
             }
         }
+
+        /// Serialize the FULL design document to `.nucm` project-tier
+        /// bytes (magic `NUCM`): cells deduped by content hash, instance
+        /// transforms, ports with scanned hardware, every bus layer with
+        /// its fragment, runs and `intended`/`routed`/`failed: reason`
+        /// state, and the loose base layer. Base64 across the bridge.
+        pub fn to_nucm_b64(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
+            let bytes = self.0.to_nucm_bytes().map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::Serialize
+            })?;
+            let _ = write!(out, "{}", crate::bridge::schematic::b64(&bytes));
+            Ok(())
+        }
+
+        /// Reopen a `.nucm` design document from raw bytes. The reloaded
+        /// design is the same model mid-edit: rerouting works.
+        pub fn from_nucm(data: &[u8]) -> Result<Box<Design>, NucleationError> {
+            let d = crate::design::Design::from_nucm_bytes(data).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::Parse
+            })?;
+            Ok(Box::new(Design(d)))
+        }
+
+        /// Save the `.nucm` project document to a file. Not available in
+        /// JS: the WASM build has no filesystem — use `to_nucm_b64`.
+        #[diplomat::attr(js, disable)]
+        pub fn save_nucm(&self, path: &DiplomatStr) -> Result<(), NucleationError> {
+            let bytes = self.0.to_nucm_bytes().map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::Serialize
+            })?;
+            std::fs::write(utf8(path)?, bytes).map_err(|_| NucleationError::Io)
+        }
+
+        /// Load a `.nucm` project document from a file. Not available in
+        /// JS — read the bytes yourself and use `from_nucm`.
+        #[diplomat::attr(js, disable)]
+        pub fn load_nucm(path: &DiplomatStr) -> Result<Box<Design>, NucleationError> {
+            let bytes = std::fs::read(utf8(path)?).map_err(|_| NucleationError::Io)?;
+            Self::from_nucm(&bytes)
+        }
+
+        /// Export the design as a LAYERED `.litematic` (interchange tier):
+        /// one named region per layer (`inst:{name}`, `bus:{name}`, loose
+        /// base) plus the design manifest as a root-level
+        /// `NucleationDesign` tag. Opens in Litematica as a plain
+        /// multi-region litematic; reimports as a design whose cell
+        /// references have degraded to embedded copies. Base64 across the
+        /// bridge.
+        pub fn to_litematic_b64(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
+            let bytes = self.0.to_litematic_layered_bytes().map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::Serialize
+            })?;
+            let _ = write!(out, "{}", crate::bridge::schematic::b64(&bytes));
+            Ok(())
+        }
+
+        /// Import a layered `.litematic` (with a `NucleationDesign`
+        /// manifest) from raw bytes; a plain litematic errors loudly —
+        /// open those with `Schematic.from_litematic`.
+        pub fn from_litematic(data: &[u8]) -> Result<Box<Design>, NucleationError> {
+            let d = crate::design::Design::from_litematic_layered_bytes(data).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::Parse
+            })?;
+            Ok(Box::new(Design(d)))
+        }
+
+        /// Export the layered `.litematic` to a file. Not available in JS
+        /// — use `to_litematic_b64`.
+        #[diplomat::attr(js, disable)]
+        pub fn export_litematic(&self, path: &DiplomatStr) -> Result<(), NucleationError> {
+            let bytes = self.0.to_litematic_layered_bytes().map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::Serialize
+            })?;
+            std::fs::write(utf8(path)?, bytes).map_err(|_| NucleationError::Io)
+        }
+
+        /// Import a layered `.litematic` from a file. Not available in JS
+        /// — read the bytes yourself and use `from_litematic`.
+        #[diplomat::attr(js, disable)]
+        pub fn import_litematic(path: &DiplomatStr) -> Result<Box<Design>, NucleationError> {
+            let bytes = std::fs::read(utf8(path)?).map_err(|_| NucleationError::Io)?;
+            Self::from_litematic(&bytes)
+        }
     }
 
     fn utf8(s: &DiplomatStr) -> Result<&str, NucleationError> {

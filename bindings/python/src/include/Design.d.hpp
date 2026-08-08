@@ -187,6 +187,67 @@ public:
    */
   inline nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError> bake(uint32_t budget) const;
 
+  /**
+   * Serialize the FULL design document to `.nucm` project-tier
+   * bytes (magic `NUCM`): cells deduped by content hash, instance
+   * transforms, ports with scanned hardware, every bus layer with
+   * its fragment, runs and `intended`/`routed`/`failed: reason`
+   * state, and the loose base layer. Base64 across the bridge.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> to_nucm_b64() const;
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> to_nucm_b64_write(W& writeable_output) const;
+
+  /**
+   * Reopen a `.nucm` design document from raw bytes. The reloaded
+   * design is the same model mid-edit: rerouting works.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Design>, nucleation::NucleationError> from_nucm(nucleation::diplomat::span<const uint8_t> data);
+
+  /**
+   * Save the `.nucm` project document to a file. Not available in
+   * JS: the WASM build has no filesystem — use `to_nucm_b64`.
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> save_nucm(std::string_view path) const;
+
+  /**
+   * Load a `.nucm` project document from a file. Not available in
+   * JS — read the bytes yourself and use `from_nucm`.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Design>, nucleation::NucleationError> load_nucm(std::string_view path);
+
+  /**
+   * Export the design as a LAYERED `.litematic` (interchange tier):
+   * one named region per layer (`inst:{name}`, `bus:{name}`, loose
+   * base) plus the design manifest as a root-level
+   * `NucleationDesign` tag. Opens in Litematica as a plain
+   * multi-region litematic; reimports as a design whose cell
+   * references have degraded to embedded copies. Base64 across the
+   * bridge.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> to_litematic_b64() const;
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> to_litematic_b64_write(W& writeable_output) const;
+
+  /**
+   * Import a layered `.litematic` (with a `NucleationDesign`
+   * manifest) from raw bytes; a plain litematic errors loudly —
+   * open those with `Schematic.from_litematic`.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Design>, nucleation::NucleationError> from_litematic(nucleation::diplomat::span<const uint8_t> data);
+
+  /**
+   * Export the layered `.litematic` to a file. Not available in JS
+   * — use `to_litematic_b64`.
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> export_litematic(std::string_view path) const;
+
+  /**
+   * Import a layered `.litematic` from a file. Not available in JS
+   * — read the bytes yourself and use `from_litematic`.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Design>, nucleation::NucleationError> import_litematic(std::string_view path);
+
     inline const nucleation::capi::Design* AsFFI() const;
     inline nucleation::capi::Design* AsFFI();
     inline static const nucleation::Design* FromFFI(const nucleation::capi::Design* ptr);

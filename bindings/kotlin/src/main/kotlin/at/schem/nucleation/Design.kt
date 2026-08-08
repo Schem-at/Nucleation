@@ -26,6 +26,14 @@ internal interface DesignLib: Library {
     fun Design_flatten(handle: Pointer): ResultPointerInt
     fun Design_check(handle: Pointer, write: Pointer): ResultUnitInt
     fun Design_bake(handle: Pointer, budget: FFIUint32): ResultPointerInt
+    fun Design_to_nucm_b64(handle: Pointer, write: Pointer): ResultUnitInt
+    fun Design_from_nucm(data: Slice): ResultPointerInt
+    fun Design_save_nucm(handle: Pointer, path: Slice): ResultUnitInt
+    fun Design_load_nucm(path: Slice): ResultPointerInt
+    fun Design_to_litematic_b64(handle: Pointer, write: Pointer): ResultUnitInt
+    fun Design_from_litematic(data: Slice): ResultPointerInt
+    fun Design_export_litematic(handle: Pointer, path: Slice): ResultUnitInt
+    fun Design_import_litematic(path: Slice): ResultPointerInt
 }
 /** A composition document: loose blocks + cell instances + bus layers
 *over a shared coordinate space.
@@ -99,6 +107,99 @@ class Design internal constructor (
                 }
             } finally {
                 nameSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Reopen a `.nucm` design document from raw bytes. The reloaded
+        *design is the same model mid-edit: rerouting works.
+        */
+        fun fromNucm(data: UByteArray): Result<Design> {
+            val dataSliceMemory = PrimitiveArrayTools.borrow(data)
+
+            val returnVal = lib.Design_from_nucm(dataSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = Design(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                dataSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Load a `.nucm` project document from a file. Not available in
+        *JS — read the bytes yourself and use `from_nucm`.
+        */
+        fun loadNucm(path: String): Result<Design> {
+            val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
+
+            val returnVal = lib.Design_load_nucm(pathSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = Design(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                pathSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Import a layered `.litematic` (with a `NucleationDesign`
+        *manifest) from raw bytes; a plain litematic errors loudly —
+        *open those with `Schematic.from_litematic`.
+        */
+        fun fromLitematic(data: UByteArray): Result<Design> {
+            val dataSliceMemory = PrimitiveArrayTools.borrow(data)
+
+            val returnVal = lib.Design_from_litematic(dataSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = Design(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                dataSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Import a layered `.litematic` from a file. Not available in JS
+        *— read the bytes yourself and use `from_litematic`.
+        */
+        fun importLitematic(path: String): Result<Design> {
+            val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
+
+            val returnVal = lib.Design_import_litematic(pathSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = Design(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                pathSliceMemory.close()
             }
         }
     }
@@ -482,6 +583,84 @@ class Design internal constructor (
             return returnOpaque.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Serialize the FULL design document to `.nucm` project-tier
+    *bytes (magic `NUCM`): cells deduped by content hash, instance
+    *transforms, ports with scanned hardware, every bus layer with
+    *its fragment, runs and `intended`/`routed`/`failed: reason`
+    *state, and the loose base layer. Base64 across the bridge.
+    */
+    fun toNucmB64(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_to_nucm_b64(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Save the `.nucm` project document to a file. Not available in
+    *JS: the WASM build has no filesystem — use `to_nucm_b64`.
+    */
+    fun saveNucm(path: String): Result<Unit> {
+        val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
+
+        val returnVal = lib.Design_save_nucm(handle, pathSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            pathSliceMemory.close()
+        }
+    }
+
+    /** Export the design as a LAYERED `.litematic` (interchange tier):
+    *one named region per layer (`inst:{name}`, `bus:{name}`, loose
+    *base) plus the design manifest as a root-level
+    *`NucleationDesign` tag. Opens in Litematica as a plain
+    *multi-region litematic; reimports as a design whose cell
+    *references have degraded to embedded copies. Base64 across the
+    *bridge.
+    */
+    fun toLitematicB64(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_to_litematic_b64(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Export the layered `.litematic` to a file. Not available in JS
+    *— use `to_litematic_b64`.
+    */
+    fun exportLitematic(path: String): Result<Unit> {
+        val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
+
+        val returnVal = lib.Design_export_litematic(handle, pathSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            pathSliceMemory.close()
         }
     }
 

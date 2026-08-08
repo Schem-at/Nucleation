@@ -150,4 +150,37 @@ export class Design {
      * the `mc-tick` feature, else errors).
      */
     bake(budget: number): Schematic;
+
+    /**
+     * Serialize the FULL design document to `.nucm` project-tier
+     * bytes (magic `NUCM`): cells deduped by content hash, instance
+     * transforms, ports with scanned hardware, every bus layer with
+     * its fragment, runs and `intended`/`routed`/`failed: reason`
+     * state, and the loose base layer. Base64 across the bridge.
+     */
+    toNucmB64(): string;
+
+    /**
+     * Reopen a `.nucm` design document from raw bytes. The reloaded
+     * design is the same model mid-edit: rerouting works.
+     */
+    static fromNucm(data: Array<number>): Design;
+
+    /**
+     * Export the design as a LAYERED `.litematic` (interchange tier):
+     * one named region per layer (`inst:{name}`, `bus:{name}`, loose
+     * base) plus the design manifest as a root-level
+     * `NucleationDesign` tag. Opens in Litematica as a plain
+     * multi-region litematic; reimports as a design whose cell
+     * references have degraded to embedded copies. Base64 across the
+     * bridge.
+     */
+    toLitematicB64(): string;
+
+    /**
+     * Import a layered `.litematic` (with a `NucleationDesign`
+     * manifest) from raw bytes; a plain litematic errors loudly —
+     * open those with `Schematic.from_litematic`.
+     */
+    static fromLitematic(data: Array<number>): Design;
 }
