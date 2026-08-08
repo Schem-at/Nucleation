@@ -1,5 +1,84 @@
 # Improvements — honest and prioritized
 
+## Circuit-level optimizations (LANDED)
+
+Three user-suggested optimizations, probe-verified in mc-tick
+(`probe_station.py`, 20/20 expectations) and landed behind the full gate
+suite (rca2 32/32, rca4 512/512, adder4 512/512 + reload re-check, demos
+1–4, seg7 16/16, cmp4 256/256, popcnt4 16/16, seq_probe, accumulator 24/24,
+test_router incl. a station-exercising net).
+
+**1. Block-sandwich repeater stations** (`router.py` emit): dust → block →
+repeater → block → dust.  Probed semantics: the entry block fires the
+repeater from a ss1 dust arrival (15-dust max run, same as inline); the exit
+block re-emits a strong fresh 15 — so one repeater covers 18 cells of run
+instead of 16, and the blocks need no supports.  Hazards, all probed: the
+exit block powers EVERY adjacent dust at 15 (leak — `dust_ok` now keeps
+later routes out of its 6-neighbourhood via `Router.strong`); dust atop
+either block joins the net diagonally; and the trunk dust must be a straight
+line flanked only by solids — any connectable neighbour (dust, repeater,
+torch), own net included, bends its shape off the block face and kills the
+drive (this exact case broke the FA cell's cin route against a port-stub
+repeater before `station_ok` learned to check it).  Emission falls back to
+an inline repeater wherever `station_ok` says no.
+
+**Comparator variant for analog trunks — better than expected**: probed
+dust(ssN) → block → comparator(compare) → block → dust reads back EXACTLY N
+(tested N=12 and N=8; through-block rear read and through-block re-emit each
+preserve ss).  So block-sandwich comparator stations ARE usable on HexAnalog
+trunks; the "comparator needs a direct back input" worry is false in
+mc-tick.  Not yet wired into any emitter — recorded here as verified physics.
+
+**2. Refresh intervals at measured max pitch, margin 2** (was REFRESH=5 /
+run 6 / run_path 5 — debugging-era):
+- Tap-free routes: a repeater fires from ss1, so true max is 15 dust between
+  refreshes; set 14 (last dust at ss3).  `router.REFRESH`,
+  `build_ppa.PPA.ROUTE_REPEAT`, `build_adder.run_path`.
+- First refresh stays within 5–6 cells (source strength unknown at a cell
+  port), and a refresh is banked at the last straight cell before a
+  repeater-free tail (stairs/landings) — at pitch 14 a tail could otherwise
+  start on a nearly-spent budget and die.
+- **Rails: RAIL_REPEAT=12 is NOT over-conservative — unchanged.**  A rail is
+  tapped from the side; the tap dust reads rail−1 and a tap on a ss1 rail
+  cell never flips its torch (probe G).  So rails need ss≥2 everywhere:
+  worst gap 13 (12 + bad-column skip) → min rail ss 4 = floor 2 + margin 2.
+  Same reason stations don't pay on rails: the tap floor binds, not the
+  repeater's input floor.
+
+**3. Double-inversion elimination** (`hdl/hdl2redstone.py`
+`Compiler.peephole`, before `levelise` — levelise's own buffers are
+structural): collapses every pure buffer node (OR-of-AND over one literal)
+by aliasing.  Dual-rail construction turns a BLIF NOT into a buffer of the
+complement rail, so NOT(NOT(x)) chains collapse to nothing and consumers
+take the already-available polarity rail — this IS the polarity-aware
+selection.  Proven on a synthetic 4-deep NOT chain (4 nodes collapsed,
+sim-verified 4/4); on yosys-synthesized seg7/cmp4/popcnt4 it removes 0 —
+`opt_clean` already leaves no such chains, honest result.  The Kogge-Stone
+netlist's `i < s` pass-through buffers are deliberately NOT touched: they
+re-drive each prefix stage's rails and removing them changes the far-route
+channel discipline.
+
+Measured on the regenerated, fully re-verified artifacts (total block count
+is invariant — a repeater swaps 1:1 with a dust cell; the win is repeater
+count, i.e. delay and STA):
+
+| artifact | blocks | repeaters | torches | STA critical path |
+|---|---|---|---|---|
+| ripple_carry_adder_4bit | 3362 → 3362 | 85 → **82** (−3.5%) | 112 | n/a (non-PPA) |
+| rca4_cells | 988 → 988 | 84 → **80** (−4.8%) | 0 | n/a (comparator cells) |
+| hdl/seg7 | 8627 → 8627 | 340 → **316** (−7.1%) | 167 | 37 → **35** rt |
+| hdl/cmp4 | 13873 → 13873 | 610 → **532** (−12.8%) | 190 | 48 → **43** rt (−10%) |
+| hdl/popcnt4 | 4419 → 4419 | 181 → **163** (−9.9%) | 99 | 29 → **27** rt |
+
+ks32 / alu8 / mult4x4 were NOT regenerated (multi-hour sweeps; their tracked
+schems remain artifacts of the old, more conservative pitch and stay valid).
+`hdl2redstone` now also prints the STA critical path on every run.
+
+Deferred from this round: stations in `build_ppa.run`/rails (STA repeater
+attribution walks dust labels and would miss station repeaters; rails don't
+benefit anyway — see above), and comparator stations on HexAnalog trunks.
+
+
 What is actually weak, drawn from the session docs, the deferred lists in
 `demos/README.md` / `showcase/README.md`, `CORE_PROPOSALS.md`, and
 `ROUTING_CRATE_DESIGN.md`. P1 = blocks or silently corrupts real use;

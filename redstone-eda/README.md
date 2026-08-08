@@ -43,7 +43,7 @@ under `bindings/python/rust/`, `EXTRA_STATES` interning, bounding-box traps).
 | `router.py`, `nets.py`, `audit.py`, `timing.py`, `test_router.py` | Python prototypes of router, dust-adjacency/short checker, structural support audit, and STA — the spec and test vectors for `crates/nucleation-routing` |
 | `build_adder.py`, `build_ppa.py`, `build_alu.py`, `mult4.py` | Netlist builders: RCA, the Kogge-Stone PLA compiler (channel-routed rails), 8-bit ALU, stacked 4x4 multiplier |
 | `seq_cells.py`, `seq_counter.py`, `seq_register4.py`, `seq_probe.py`, `seq_README.md` | Sequential logic: repeater-lock latch, master-slave DFF (characterized: setup 0 / hold 3 / clk->Q 10 gt), register, synchronous counter |
-| `probe_comp.py`, `probe_rep_side.py`, `probe_vert.py` | Micro-probes that settled physics questions (comparator sides, repeater side-locks, vertical conduction) |
+| `probe_comp.py`, `probe_rep_side.py`, `probe_vert.py`, `probe_station.py` | Micro-probes that settled physics questions (comparator sides, repeater side-locks, vertical conduction, block-sandwich repeater/comparator stations + refresh-pitch floors) |
 | `hdl/` | The Verilog flow: yosys -> BLIF -> `hdl2redstone.py` -> dual-rail PLA stages -> verified `.schem` (seg7, cmp4, popcnt4 examples) |
 | `compositor/` | Compositor MVP: compose characterized cells (register + adder = accumulator), mixed-level `functional_sim.py`, HexAnalog (4 bits on one wire's signal strength), annealing demo |
 | `demos/` | Four end-to-end bridge demos: route+DRC+conduction, introspection (`conduction_trace`/`read_probes`/`bake_to`), cell composition, analysis (`drc`/`sta`/repeater-cycle) |
