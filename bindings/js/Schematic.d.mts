@@ -353,6 +353,13 @@ export class Schematic {
     getAllBlocksJson(): string;
 
     /**
+     * Every non-air block of ONE named region (a flattened design names
+     * one per layer: `inst:{name}`, `bus:{name}`), same JSON shape as
+     * `get_all_blocks_json`. Unknown region names error.
+     */
+    getRegionNonAirBlocksJson(regionName: string): string;
+
+    /**
      * Every non-air block, same JSON shape as `get_all_blocks_json`.
      * `block_count()`-sized regardless of the bounding volume.
      */

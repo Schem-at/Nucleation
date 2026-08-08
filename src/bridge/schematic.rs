@@ -1040,6 +1040,41 @@ pub mod ffi {
             let _ = write!(out, "{}", json);
         }
 
+        /// Every non-air block of ONE named region (a flattened design names
+        /// one per layer: `inst:{name}`, `bus:{name}`), same JSON shape as
+        /// `get_all_blocks_json`. Unknown region names error.
+        pub fn get_region_non_air_blocks_json(
+            &self,
+            region_name: &str,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let region = self.0.get_region(region_name).ok_or_else(|| {
+                crate::bridge::set_last_error_detail(format!(
+                    "no region named `{region_name}`"
+                ));
+                NucleationError::NotFound
+            })?;
+            let items: Vec<serde_json::Value> = region
+                .blocks
+                .iter()
+                .enumerate()
+                .filter_map(|(index, block_index)| {
+                    let block = &region.palette[*block_index];
+                    if block.name == "minecraft:air" {
+                        return None;
+                    }
+                    let (x, y, z) = region.index_to_coords(index);
+                    Some(block_json(
+                        &crate::block_position::BlockPosition { x, y, z },
+                        block,
+                    ))
+                })
+                .collect();
+            let json = serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string());
+            let _ = write!(out, "{}", json);
+            Ok(())
+        }
+
         /// Every non-air block, same JSON shape as `get_all_blocks_json`.
         /// `block_count()`-sized regardless of the bounding volume.
         pub fn get_non_air_blocks_json(&self, out: &mut DiplomatWrite) {

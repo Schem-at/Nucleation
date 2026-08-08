@@ -443,6 +443,15 @@ public:
   inline void get_all_blocks_json_write(W& writeable_output) const;
 
   /**
+   * Every non-air block of ONE named region (a flattened design names
+   * one per layer: `inst:{name}`, `bus:{name}`), same JSON shape as
+   * `get_all_blocks_json`. Unknown region names error.
+   */
+  inline nucleation::diplomat::result<nucleation::diplomat::result<std::string, nucleation::NucleationError>, nucleation::diplomat::Utf8Error> get_region_non_air_blocks_json(std::string_view region_name) const;
+  template<typename W>
+  inline nucleation::diplomat::result<nucleation::diplomat::result<std::monostate, nucleation::NucleationError>, nucleation::diplomat::Utf8Error> get_region_non_air_blocks_json_write(std::string_view region_name, W& writeable_output) const;
+
+  /**
    * Every non-air block, same JSON shape as `get_all_blocks_json`.
    * `block_count()`-sized regardless of the bounding volume.
    */

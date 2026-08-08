@@ -69,6 +69,7 @@ internal interface SchematicLib: Library {
     fun Schematic_get_entities_snbt_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_add_entity_from_snbt(handle: Pointer, snbt: Slice): ResultUnitInt
     fun Schematic_get_all_blocks_json(handle: Pointer, write: Pointer): Unit
+    fun Schematic_get_region_non_air_blocks_json(handle: Pointer, regionName: Slice, write: Pointer): ResultUnitInt
     fun Schematic_get_non_air_blocks_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_get_chunk_blocks_json(handle: Pointer, offsetX: Int, offsetY: Int, offsetZ: Int, width: Int, height: Int, length: Int, write: Pointer): Unit
     fun Schematic_get_chunks_json(handle: Pointer, chunkWidth: Int, chunkHeight: Int, chunkLength: Int, write: Pointer): Unit
@@ -1284,6 +1285,28 @@ class Schematic internal constructor (
 
         val returnString = DW.writeToString(write)
         return returnString
+    }
+
+    /** Every non-air block of ONE named region (a flattened design names
+    *one per layer: `inst:{name}`, `bus:{name}`), same JSON shape as
+    *`get_all_blocks_json`. Unknown region names error.
+    */
+    fun getRegionNonAirBlocksJson(regionName: String): Result<String> {
+        val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_get_region_non_air_blocks_json(handle, regionNameSliceMemory.slice, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionNameSliceMemory.close()
+        }
     }
 
     /** Every non-air block, same JSON shape as `get_all_blocks_json`.

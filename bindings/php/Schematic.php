@@ -883,6 +883,25 @@ final class Schematic {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function getRegionNonAirBlocksJson(string $region_name) {
+        $__n0 = strlen($region_name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region_name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Schematic_get_region_non_air_blocks_json($this->ptr, $__view0, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function getNonAirBlocksJson() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         Lib::ffi()->Schematic_get_non_air_blocks_json($this->ptr, $write);

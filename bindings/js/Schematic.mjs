@@ -1528,6 +1528,39 @@ export class Schematic {
     }
 
     /**
+     * Every non-air block of ONE named region (a flattened design names
+     * one per layer: `inst:{name}`, `bus:{name}`), same JSON shape as
+     * `get_all_blocks_json`. Unknown region names error.
+     */
+    getRegionNonAirBlocksJson(regionName) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const regionNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, regionName)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Schematic_get_region_non_air_blocks_json(diplomatReceive.buffer, this.ffiValue, regionNameSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
      * Every non-air block, same JSON shape as `get_all_blocks_json`.
      * `block_count()`-sized regardless of the bounding volume.
      */
