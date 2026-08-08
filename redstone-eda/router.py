@@ -29,6 +29,7 @@ import heapq
 
 import rs
 import nets
+import materials as _mt
 
 H_MOVES = ((1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1))
 
@@ -64,8 +65,12 @@ class Router:
                 return False
         sup = (x, y - 1, z)
         s = self.b.cells.get(sup)
-        if s is not None and not self.b.solid_at(*sup):
-            return False                            # support cell blocked
+        if s is not None and not self.b.solid_at(*sup) and not _mt.sturdy(s):
+            return False        # support cell blocked (probed: transparent
+            #                     and slab-top supports carry dust legally;
+            #                     the router still PLACES only solid supports.
+            #                     TODO: exploit glass supports/diode-aware
+            #                     costs for denser routing)
         if s is None:
             below = (x, y - 2, z)
             if "redstone_wire" in self.b.cells.get(below, ""):
@@ -151,6 +156,13 @@ class Router:
                     continue        # solid corner above the lower dust cuts the diagonal
                 if mv == "down" and self.b.solid_at(q[0], y, q[2]):
                     continue        # same rule, descending
+                # NOTE (probed diode, probe_materials.py): a step whose upper
+                # dust sits on a TRANSPARENT support conducts up only.  The
+                # router never places transparent supports and today's builds
+                # never route over them, so descent stays legal; when glass
+                # exploitation lands, "down" moves must check the current
+                # cell's support for conductivity (a naive guard here changes
+                # A* paths in ways the emitter was never verified for).
                 if isinstance(mv, tuple):
                     dx, dz = mv[1], mv[2]
                     entry = (x + dx, y, z + dz)

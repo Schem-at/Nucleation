@@ -79,6 +79,49 @@ attribution walks dust labels and would miss station repeaters; rails don't
 benefit anyway — see above), and comparator stations on HexAnalog trunks.
 
 
+## Material model: transparent supports + crossing tiles (LANDED)
+
+Probed and landed per `notes-material-model.md` (the user's spec; PROBED
+table now recorded there).  `probe_materials.py` (7/7 controls) pinned the
+mc-tick facts: glass / stained glass / slab-top SUPPORT dust but conduct no
+weak power and never cut a diagonal (the cut rule runs on CONDUCTIVITY);
+slab-bottom and air are vanilla-illegal supports the sim happily ticks
+anyway (static-audit concern); and the **transparent diode** — a 1-y step
+whose upper dust sits on a non-conductor conducts UP only, so every
+bidirectional climb must keep its upper dust on solid.
+
+Landed on that table (`materials.py`, all sim-gated):
+
+- **`half_slope_2line`** — two independent lines climbing 1 y per 2 x in
+  adjacent z-rows, interleaved at 1-y offset: glass under climb-lowers,
+  solid under climb-uppers, solid caps above the lower line at the 1-y
+  columns.  Verified 4 combos x both directions (9/9) **including the
+  negative control: transparent caps mix the levels**, so the alternation
+  is proven load-bearing, not decorative.
+- **`crossing_parity`** + **`crossing_dipunder`** — two verified 90-degree
+  crossing tile families; in both, a block-sandwich station's ENTRY block
+  doubles as the isolation (it cuts the through dust's up-diagonals and
+  blocks the trunk's down-read).  Parity: crossing bus at +1 y rides its
+  entry block over the through dust.  Dip-under: the crossing bus steps
+  down 1 onto glass, runs under the entry block (which needs no support —
+  that is what frees the cell), steps back up; both steps keep uppers on
+  solid so the tile conducts both ways.  `crossing_tiles.py` verifies 4
+  combos per tile (conduction + per-bit isolation) and saves
+  `crossing_tiles.schem` baked at rest.
+- **Model/checker integration**: `nets.py` gained material classes
+  (`material`, conductor-backed `is_solid`, `step_conducts_down`);
+  `audit.py` gained `is_sturdy` (floor components legal on glass/slab-top,
+  still illegal on slab-bottom/air); `router.py` `dust_ok` accepts existing
+  transparent supports; glass/slab states interned in `rs.EXTRA_STATES`.
+  Full gate suite re-run green (test_router, rca2 32/32, demo1,
+  accumulator, seg7 16/16).
+- **Deferred**: router *exploitation* of transparent supports (placing
+  glass, diode-aware descent — a naive down-move guard measurably broke
+  A*/emitter interplay and was backed out, see note in `router.py`); wiring
+  the crossing tiles into a bus router on crossing demand; influence-map
+  bookkeeping (notes-material-model.md §4).
+
+
 What is actually weak, drawn from the session docs, the deferred lists in
 `demos/README.md` / `showcase/README.md`, `CORE_PROPOSALS.md`, and
 `ROUTING_CRATE_DESIGN.md`. P1 = blocks or silently corrupts real use;

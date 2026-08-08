@@ -43,7 +43,8 @@ under `bindings/python/rust/`, `EXTRA_STATES` interning, bounding-box traps).
 | `router.py`, `nets.py`, `audit.py`, `timing.py`, `test_router.py` | Python prototypes of router, dust-adjacency/short checker, structural support audit, and STA — the spec and test vectors for `crates/nucleation-routing` |
 | `build_adder.py`, `build_ppa.py`, `build_alu.py`, `mult4.py` | Netlist builders: RCA, the Kogge-Stone PLA compiler (channel-routed rails), 8-bit ALU, stacked 4x4 multiplier |
 | `seq_cells.py`, `seq_counter.py`, `seq_register4.py`, `seq_probe.py`, `seq_README.md` | Sequential logic: repeater-lock latch, master-slave DFF (characterized: setup 0 / hold 3 / clk->Q 10 gt), register, synchronous counter |
-| `probe_comp.py`, `probe_rep_side.py`, `probe_vert.py`, `probe_station.py` | Micro-probes that settled physics questions (comparator sides, repeater side-locks, vertical conduction, block-sandwich repeater/comparator stations + refresh-pitch floors) |
+| `probe_comp.py`, `probe_rep_side.py`, `probe_vert.py`, `probe_station.py`, `probe_materials.py` | Micro-probes that settled physics questions (comparator sides, repeater side-locks, vertical conduction, block-sandwich repeater/comparator stations + refresh-pitch floors, the material table: glass/slab supports, conductivity-based cuts, the transparent diode) |
+| `materials.py`, `crossing_tiles.py`, `notes-material-model.md` | Material-aware patterns on the probed table: the 2-line half slope (transparent/solid alternation, 1-y pitch), and the two 90-degree crossing tiles (y-parity and dip-under; a station's entry block doubles as the isolation) |
 | `hdl/` | The Verilog flow: yosys -> BLIF -> `hdl2redstone.py` -> dual-rail PLA stages -> verified `.schem` (seg7, cmp4, popcnt4 examples) |
 | `compositor/` | Compositor MVP: compose characterized cells (register + adder = accumulator), mixed-level `functional_sim.py`, HexAnalog (4 bits on one wire's signal strength), annealing demo |
 | `demos/` | Four end-to-end bridge demos: route+DRC+conduction, introspection (`conduction_trace`/`read_probes`/`bake_to`), cell composition, analysis (`drc`/`sta`/repeater-cycle) |
@@ -54,7 +55,7 @@ under `bindings/python/rust/`, `EXTRA_STATES` interning, bounding-box traps).
 
 ## The gallery
 
-Eleven pieces, 217,759 blocks, 1,148 verification cases/checks. Full
+Twelve pieces, 217,826 blocks, 1,156 verification cases/checks. Full
 verification-evidence table in `showcase/README.md`; regenerate any piece with
 `~/eda-venv/bin/python showcase/showcase_<name>.py` (each exits non-zero unless
 its verification is perfect).
@@ -72,6 +73,7 @@ its verification is perfect).
 | `counter4` | 1,973 | The sequential loop closed: register + FA increment | 24 steps mod 16, min period 100 gt |
 | `accumulator4` | 2,059 | Compositor MVP composition | 24/24 clocked steps, DRC clean, LVS opens=0 |
 | `hexanalog_trunk` | 556 | 4 bits on one wire's signal strength + decoder | encode/decode 16/16 exhaustive |
+| `crossing_tiles` | 67 | Both 90° bus-crossing tiles (y-parity + glass dip-under), station entry block as isolation | 4 combos x 2 tiles, per-bit conduction + isolation; regen `crossing_tiles.py` |
 
 ## Architecture
 

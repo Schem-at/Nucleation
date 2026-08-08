@@ -7,16 +7,50 @@ signals are touching, and where.
 
 Redstone dust connects to dust at the 4 horizontal neighbours, and diagonally
 one step up/down, with the up-diagonal blocked when the cell above the LOWER
-dust is solid (that is exactly what the rail lids exploit).
+dust is a CONDUCTOR (that is exactly what the rail lids exploit).
+
+Material model (probe_materials.py, PROBED table in notes-material-model.md):
+the cut rule runs on conductivity, not solidity.  Glass, stained glass and
+both slab halves are non-conductors -- they never cut a diagonal -- while
+still (glass / slab-top) supporting dust.  `is_solid` here has always meant
+"conductor" (stone / lamp / concrete hints); the material classes make that
+explicit and keep transparent supports from cutting.
+
+The diode: a diagonal step whose UPPER dust sits on a non-conductor passes
+signal UP only (`step_conducts_down`).  `neighbours` stays symmetric on
+purpose -- for short checking, a one-way electrical touch is still a short.
 """
+import materials as _mt
 
 DUST_KEY = "redstone_wire"
 SOLID_HINTS = ("minecraft:stone", "redstone_lamp", "concrete")
 
 
+def material(cells, pos):
+    """Material class at pos: air/solid/transparent/slab_top/slab_bottom/other."""
+    return _mt.classify(cells.get(pos))
+
+
 def is_solid(cells, pos):
+    """Does the block at pos cut diagonals / conduct weak power?
+
+    Conductor semantics (probed): true for the solid hints, false for air,
+    glass, stained glass and slabs -- identical to the historical hint list
+    for every block the suites place, now backed by the material table."""
     b = cells.get(pos)
-    return b is not None and any(h in b for h in SOLID_HINTS)
+    if b is None:
+        return False
+    if any(h in b for h in SOLID_HINTS):
+        return True
+    return _mt.conductor(b)
+
+
+def step_conducts_down(cells, lower, upper):
+    """May power flow DOWN a diagonal step (upper -> lower)?
+
+    Only if the upper dust's support is a conductor (the probed transparent
+    diode): the lower dust's up-read is gated on that side block."""
+    return is_solid(cells, (upper[0], upper[1] - 1, upper[2]))
 
 
 def neighbours(cells, pos):

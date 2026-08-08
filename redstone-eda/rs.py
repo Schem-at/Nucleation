@@ -30,6 +30,12 @@ EXTRA_STATES = ";".join(
     + ["minecraft:repeater[facing=%s,delay=%d,locked=%s,powered=%s]" % (d, dl, lk, pw)
        for d in DIRS for dl in (1, 2) for lk in ("true", "false")
        for pw in ("true", "false")]
+    # Material-model blocks (probe_materials.py): transparent supports and
+    # slabs.  These have no powered variants, but interning them here keeps
+    # late placements (routers, templates) from creating inert states.
+    + ["minecraft:glass", "minecraft:white_stained_glass",
+       "minecraft:smooth_stone_slab[type=top,waterlogged=false]",
+       "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]"]
 )
 
 
