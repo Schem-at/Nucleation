@@ -545,6 +545,10 @@ void TickSimulation_use_block(TickSimulation* self, int32_t x, int32_t y, int32_
 typedef struct TickSimulation_place_block_result { union { NucleationError err; }; bool is_ok; } TickSimulation_place_block_result;
 TickSimulation_place_block_result TickSimulation_place_block(TickSimulation* self, int32_t x, int32_t y, int32_t z, DiplomatStringView state);
 void TickSimulation_get_block(TickSimulation* self, int32_t x, int32_t y, int32_t z, DiplomatWrite* write);
+typedef struct TickSimulation_read_probes_result { union { NucleationError err; }; bool is_ok; } TickSimulation_read_probes_result;
+TickSimulation_read_probes_result TickSimulation_read_probes(TickSimulation* self, DiplomatStringView positions_json, DiplomatWrite* write);
+void TickSimulation_conduction_trace(TickSimulation* self, int32_t x, int32_t y, int32_t z, DiplomatWrite* write);
+uint32_t TickSimulation_bake_to(TickSimulation* self, Schematic* schematic);
 uint32_t TickSimulation_checkpoint(TickSimulation* self);
 typedef struct TickSimulation_restore_result { union { NucleationError err; }; bool is_ok; } TickSimulation_restore_result;
 TickSimulation_restore_result TickSimulation_restore(TickSimulation* self, uint32_t id);

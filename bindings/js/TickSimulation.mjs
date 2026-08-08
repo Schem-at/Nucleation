@@ -382,6 +382,100 @@ export class TickSimulation {
     }
 
     /**
+     * Batched block-state reads: `positions_json` is `[[x,y,z], ...]`,
+     * the answer a JSON array of descriptors in the same order
+     * (`"minecraft:air"` for empty).
+     *
+     * A verification sweep over a computational build is thousands of
+     * probe reads per settle; one boundary call per sweep instead of one
+     * per probe is the difference between the FFI being the throughput
+     * ceiling and not.
+     */
+    readProbes(positionsJson) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const positionsJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, positionsJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.TickSimulation_read_probes(diplomatReceive.buffer, this.ffiValue, positionsJsonSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Who powers this cell and why — a power-source tree from the
+     * simulation's current state, as JSON.
+     *
+     * Each node carries `pos`, `state`, `kind` (`wire` / `conductor` /
+     * `source` / `block`), the `power` the cell carries or emits, and
+     * `inputs`: the per-side contributions that explain it, each with a
+     * `mechanism` (`block_signal`, `wire`, `wire_up`, `wire_down`,
+     * `strong`, `signal`), the arriving `power`, and a recursive
+     * `source` node. Cycles stop with `"cycle": true`. Coordinates are
+     * the same structure-local space `get_block` reads.
+     *
+     * This is the static complement of running the sim: an open (a dead
+     * route that settles quiescent) shows up as an empty `inputs` list
+     * exactly where the feed should have been.
+     */
+    conductionTrace(x, y, z) {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.TickSimulation_conduction_trace(this.ffiValue, x, y, z, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * Write every settled non-air state back into `schematic` — the bulk
+     * form of `{simulate=true}`: settle once, keep the world the engine
+     * ended on. Returns how many blocks changed.
+     *
+     * The schematic's bounding-box minimum corresponds to the
+     * simulation's `(0, 0, 0)`, which is exactly how `from_schematic`
+     * loaded it. A file baked this way carries real wire connections and
+     * power in its palette, loads quiescent under `InWorld`, and renders
+     * correctly in any static consumer. Cells the simulation turned into
+     * air (a popped-off component) are left as the schematic had them.
+     */
+    bakeTo(schematic) {
+
+        const result = wasm.TickSimulation_bake_to(this.ffiValue, schematic.ffiValue);
+
+        try {
+            return result;
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
      * Snapshot the entire simulation; returns a checkpoint id.
      */
     checkpoint() {

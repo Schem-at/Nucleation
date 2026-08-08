@@ -155,6 +155,54 @@ public:
   inline void get_block_write(int32_t x, int32_t y, int32_t z, W& writeable_output) const;
 
   /**
+   * Batched block-state reads: `positions_json` is `[[x,y,z], ...]`,
+   * the answer a JSON array of descriptors in the same order
+   * (`"minecraft:air"` for empty).
+   *
+   * A verification sweep over a computational build is thousands of
+   * probe reads per settle; one boundary call per sweep instead of one
+   * per probe is the difference between the FFI being the throughput
+   * ceiling and not.
+   */
+  inline diplomat::result<std::string, NucleationError> read_probes(std::string_view positions_json) const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> read_probes_write(std::string_view positions_json, W& writeable_output) const;
+
+  /**
+   * Who powers this cell and why — a power-source tree from the
+   * simulation's current state, as JSON.
+   *
+   * Each node carries `pos`, `state`, `kind` (`wire` / `conductor` /
+   * `source` / `block`), the `power` the cell carries or emits, and
+   * `inputs`: the per-side contributions that explain it, each with a
+   * `mechanism` (`block_signal`, `wire`, `wire_up`, `wire_down`,
+   * `strong`, `signal`), the arriving `power`, and a recursive
+   * `source` node. Cycles stop with `"cycle": true`. Coordinates are
+   * the same structure-local space `get_block` reads.
+   *
+   * This is the static complement of running the sim: an open (a dead
+   * route that settles quiescent) shows up as an empty `inputs` list
+   * exactly where the feed should have been.
+   */
+  inline std::string conduction_trace(int32_t x, int32_t y, int32_t z) const;
+  template<typename W>
+  inline void conduction_trace_write(int32_t x, int32_t y, int32_t z, W& writeable_output) const;
+
+  /**
+   * Write every settled non-air state back into `schematic` — the bulk
+   * form of `{simulate=true}`: settle once, keep the world the engine
+   * ended on. Returns how many blocks changed.
+   *
+   * The schematic's bounding-box minimum corresponds to the
+   * simulation's `(0, 0, 0)`, which is exactly how `from_schematic`
+   * loaded it. A file baked this way carries real wire connections and
+   * power in its palette, loads quiescent under `InWorld`, and renders
+   * correctly in any static consumer. Cells the simulation turned into
+   * air (a popped-off component) are left as the schematic had them.
+   */
+  inline uint32_t bake_to(Schematic& schematic) const;
+
+  /**
    * Snapshot the entire simulation; returns a checkpoint id.
    */
   inline uint32_t checkpoint();

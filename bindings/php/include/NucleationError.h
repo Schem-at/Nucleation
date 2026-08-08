@@ -13,7 +13,9 @@
 
 
 
-// No Content
+
+
+void NucleationError_detail(NucleationError self, DiplomatWrite* write);
 
 
 

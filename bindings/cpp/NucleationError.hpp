@@ -16,7 +16,11 @@
 
 namespace diplomat {
 namespace capi {
+    extern "C" {
 
+    void NucleationError_detail(diplomat::capi::NucleationError self, diplomat::capi::DiplomatWrite* write);
+
+    } // extern "C"
 } // namespace capi
 } // namespace
 
@@ -43,5 +47,19 @@ inline NucleationError NucleationError::FromFFI(diplomat::capi::NucleationError 
         default:
             std::abort();
     }
+}
+
+inline std::string NucleationError::detail() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::NucleationError_detail(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void NucleationError::detail_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::NucleationError_detail(this->AsFFI(),
+        &write);
 }
 #endif // NucleationError_HPP

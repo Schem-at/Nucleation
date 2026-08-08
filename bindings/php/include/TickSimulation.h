@@ -53,6 +53,13 @@ TickSimulation_place_block_result TickSimulation_place_block(TickSimulation* sel
 
 void TickSimulation_get_block(const TickSimulation* self, int32_t x, int32_t y, int32_t z, DiplomatWrite* write);
 
+typedef struct TickSimulation_read_probes_result {union { NucleationError err;}; bool is_ok;} TickSimulation_read_probes_result;
+TickSimulation_read_probes_result TickSimulation_read_probes(const TickSimulation* self, DiplomatStringView positions_json, DiplomatWrite* write);
+
+void TickSimulation_conduction_trace(const TickSimulation* self, int32_t x, int32_t y, int32_t z, DiplomatWrite* write);
+
+uint32_t TickSimulation_bake_to(const TickSimulation* self, Schematic* schematic);
+
 uint32_t TickSimulation_checkpoint(TickSimulation* self);
 
 typedef struct TickSimulation_restore_result {union { NucleationError err;}; bool is_ok;} TickSimulation_restore_result;

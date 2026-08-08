@@ -192,6 +192,36 @@ final class TickSimulation {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function readProbes(string $positions_json) {
+        $__n0 = strlen($positions_json);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $positions_json, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->TickSimulation_read_probes($this->ptr, $__view0, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function conductionTrace( $x,  $y,  $z) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->TickSimulation_conduction_trace($this->ptr, $x, $y, $z, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function bakeTo( $schematic) {
+        $ret = Lib::ffi()->TickSimulation_bake_to($this->ptr, $schematic->ptr);
+        return $ret;
+    }
+
     public function checkpoint() {
         $ret = Lib::ffi()->TickSimulation_checkpoint($this->ptr);
         return $ret;

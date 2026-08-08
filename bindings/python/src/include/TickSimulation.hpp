@@ -56,6 +56,13 @@ namespace capi {
 
     void TickSimulation_get_block(const nucleation::capi::TickSimulation* self, int32_t x, int32_t y, int32_t z, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    typedef struct TickSimulation_read_probes_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} TickSimulation_read_probes_result;
+    TickSimulation_read_probes_result TickSimulation_read_probes(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatStringView positions_json, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    void TickSimulation_conduction_trace(const nucleation::capi::TickSimulation* self, int32_t x, int32_t y, int32_t z, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    uint32_t TickSimulation_bake_to(const nucleation::capi::TickSimulation* self, nucleation::capi::Schematic* schematic);
+
     uint32_t TickSimulation_checkpoint(nucleation::capi::TickSimulation* self);
 
     typedef struct TickSimulation_restore_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} TickSimulation_restore_result;
@@ -290,6 +297,49 @@ inline void nucleation::TickSimulation::get_block_write(int32_t x, int32_t y, in
         y,
         z,
         &write);
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::TickSimulation::read_probes(std::string_view positions_json) const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::TickSimulation_read_probes(this->AsFFI(),
+        {positions_json.data(), positions_json.size()},
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::TickSimulation::read_probes_write(std::string_view positions_json, W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::TickSimulation_read_probes(this->AsFFI(),
+        {positions_json.data(), positions_json.size()},
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline std::string nucleation::TickSimulation::conduction_trace(int32_t x, int32_t y, int32_t z) const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::TickSimulation_conduction_trace(this->AsFFI(),
+        x,
+        y,
+        z,
+        &write);
+    return output;
+}
+template<typename W>
+inline void nucleation::TickSimulation::conduction_trace_write(int32_t x, int32_t y, int32_t z, W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::TickSimulation_conduction_trace(this->AsFFI(),
+        x,
+        y,
+        z,
+        &write);
+}
+
+inline uint32_t nucleation::TickSimulation::bake_to(nucleation::Schematic& schematic) const {
+    auto result = nucleation::capi::TickSimulation_bake_to(this->AsFFI(),
+        schematic.AsFFI());
+    return result;
 }
 
 inline uint32_t nucleation::TickSimulation::checkpoint() {

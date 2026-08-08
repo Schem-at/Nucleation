@@ -37,5 +37,17 @@ export class NucleationError {
     static Generation : NucleationError;
 
 
+    /**
+     * Why the last failing bridge call on this thread failed, in words.
+     *
+     * The enum cannot carry a message across the FFI, so a caught error
+     * is a bare variant — `InvalidArgument` — while the layer that
+     * refused already knew it was "19.2M cells over the 8M cap". Modules
+     * that know the story record it; this reads it back, so an exception
+     * handler holding the error value can ask it for the words. Empty
+     * when the last detail-carrying call succeeded.
+     */
+    detail(): string;
+
     constructor(value: NucleationError | string );
 }
