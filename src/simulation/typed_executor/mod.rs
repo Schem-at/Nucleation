@@ -114,6 +114,7 @@
 //!     .build();
 //! ```
 
+pub mod backend;
 mod compiled;
 mod executor;
 pub mod insign_io;
@@ -133,6 +134,9 @@ pub use crate::io_contract::{
 };
 
 // Public API
+pub use backend::{BackendCircuitExecutor, MchprsBackend, SimBackend};
+#[cfg(all(feature = "bridge", feature = "mc-tick"))]
+pub use backend::McTickBackend;
 pub use compiled::{COMPILED_MAGIC, COMPILED_VERSION};
 pub use executor::{
     ExecutionMode, ExecutionResult, IoLayoutInfo, LayoutInfo, OutputCondition, StateMode,

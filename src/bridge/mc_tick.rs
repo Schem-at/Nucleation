@@ -509,7 +509,7 @@ fn check_volume(size: (i32, i32, i32)) -> Result<(), String> {
     Ok(())
 }
 
-fn wire_simulation(
+pub(crate) fn wire_simulation(
     structure: &mc_tick::Structure,
     hash_origin: mc_tick::Pos,
     settle: ffi::TickSettleMode,
@@ -2384,7 +2384,7 @@ fn conduction_trace_json(sim: &mc_tick::Simulation, pos: mc_tick::Pos) -> String
 /// Write every settled non-air state of `sim` back into `schem`, mapping the
 /// simulation's `(0, 0, 0)` onto the schematic's bounding-box minimum — the
 /// inverse of how `from_schematic` loaded it. Returns how many blocks changed.
-fn bake_into(sim: &mc_tick::Simulation, schem: &mut crate::UniversalSchematic) -> u32 {
+pub(crate) fn bake_into(sim: &mc_tick::Simulation, schem: &mut crate::UniversalSchematic) -> u32 {
     let (mx, my, mz) = schem.get_bounding_box().min;
     let mut changed = 0u32;
     for (pos, id) in sim.world().iter_non_air() {
