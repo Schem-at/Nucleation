@@ -196,10 +196,18 @@ P2 = limits scale/quality; P3 = worth doing when touched.
 ## Architecture
 
 - **P2 Migrate the Python toolchain into the crates, progressively.** The
-  router/checkers/STA are ported; the PLA compiler, cell library, and the
-  verification harness are still Python-only. The Python files are the spec —
-  keep them as executable tests while the crates absorb the logic
-  (`ROUTING_CRATE_DESIGN.md` roadmap).
+  router/checkers/STA are ported; ~~the PLA compiler, cell library, and the
+  verification harness are still Python-only~~ **DONE for the HDL flow**:
+  `crates/nucleation-hdl` ports the whole BLIF -> PLA pipeline
+  (`hdl/hdl2redstone.py` + `build_ppa.py`: parse/fold, QM, peephole,
+  levelise, slice packing, full geometry emission) plus the mc-tick
+  verification harness (feature `mc-tick`), bridged as `Hdl.compile_blif` /
+  `Hdl.compile_blif_report` in every binding; `hdl2redstone.py --rust`
+  proves parity in-sim against the Python reference model. Still
+  Python-only: the hand-written generators (`build_ppa.py`'s Kogge-Stone
+  netlist, ALU/mult), the cell library, and audit/nets/timing for the HDL
+  flow (the routing crate carries its own ports of those). The Python files
+  remain the spec and executable tests.
 - **P2 Genlib mapping onto the comparator cells.** yosys ABC mapping onto the
   verified cell library instead of raw PLA columns should shrink HDL output
   roughly 3x and reuses characterized cells (roadmap E2).

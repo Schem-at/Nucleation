@@ -408,6 +408,80 @@ class Compiler:
         return val
 
 
+# ---- Rust parity path -----------------------------------------------------
+def run_rust(args, blif_path, inputs, outputs, comp, po_val):
+    """Parity proof for the built-in compiler: the SAME BLIF goes through the
+    Rust pipeline (nucleation.Hdl -> crates/nucleation-hdl, a line-by-line
+    port of this file + build_ppa.py), and the RUST-built geometry is driven
+    in mc-tick against THIS file's reference model.  The Python compile path
+    above stays as the reference implementation."""
+    import json
+    import nucleation as n
+
+    text = open(blif_path).read()
+    report = json.loads(n.Hdl.compile_blif_report(text, args.top))
+    assert report["inputs"] == list(inputs), (report["inputs"], inputs)
+    b = n.Hdl.compile_blif(text, args.top, False)
+    print("rust: %d blocks, %d prims over %d levels (peephole -%d)"
+          % (report["blocks"], report["prims"], report["levels"],
+             report["peephole_removed"]))
+    if args.no_sim:
+        if args.out:
+            b.save_to_file(args.out)
+            print("saved (rust, unbaked)", args.out)
+        return 0
+
+    # tighten round-trip, exactly rs.Build.sim: the engine sizes its world
+    # from the ALLOCATED region, and a .schem save normalises it
+    tmp = os.path.join(os.environ.get("TMPDIR", "/tmp"), "_hdl_rust.schem")
+    b.save_to_file(tmp)
+    tight = n.Schematic.open(tmp)
+    sim = n.TickSimulation.from_schematic(tight, n.TickSettleMode.Placement,
+                                          0, 0, 0, rs.EXTRA_STATES)
+    sim.run_until_quiescent(4000)
+    s = rs.Sim(sim, tuple(report["bounds"][0]))
+    print("rust: placed; quiescent:", s.sim.is_quiescent())
+    # one lever per PI, emitted in .inputs order -- drive by order
+    lv = rs.Levers(s, [tuple(l["pos"]) for l in report["levers"]])
+    probes = report["probes"]
+    po_report = {o["name"]: o for o in report["outputs"]}
+
+    n_in = len(inputs)
+    if args.cases or n_in > 12:
+        rnd = random.Random(args.seed)
+        m = args.cases or 512
+        cases = [0, (1 << n_in) - 1] + [rnd.getrandbits(n_in) for _ in range(m)]
+    else:
+        cases = list(range(1 << n_in))
+    print("rust: checking %d cases (%s)" % (len(cases),
+          "exhaustive" if not args.cases and n_in <= 12 else "sampled"))
+
+    bad = 0
+    for c in cases:
+        bits = [(c >> i) & 1 for i in range(n_in)]
+        lv.set(bits)
+        want = comp.eval(bits)
+        for po in outputs:
+            v = po_val[po]
+            w = v[1] if isinstance(v, tuple) else want[v]
+            ro = po_report[po]
+            g = ro["const"] if "const" in ro else int(s.on(*probes[ro["probe"]]))
+            if g != w:
+                bad += 1
+                if bad <= 5:
+                    print("   RUST WRONG %s inputs=%s got %d want %d"
+                          % (po, format(c, "0%db" % n_in), g, w))
+                break
+    print("rust outputs correct: %d/%d" % (len(cases) - bad, len(cases)))
+    if bad:
+        return 1
+    print("PASS (rust) %s: %d/%d cases" % (args.top, len(cases), len(cases)))
+    if args.out:
+        n.Hdl.compile_blif(text, args.top, True).save_to_file(args.out)
+        print("saved (rust, baked at rest)", args.out)
+    return 0
+
+
 # ---- driver ---------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -419,6 +493,11 @@ def main():
                     help="random cases; 0 = exhaustive when <=12 inputs")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--no-sim", action="store_true")
+    ap.add_argument("--rust", action="store_true",
+                    help="compile with the built-in Rust pipeline "
+                         "(nucleation.Hdl, crates/nucleation-hdl) and verify "
+                         "ITS build in mc-tick against this file's Python "
+                         "reference model")
     args = ap.parse_args()
 
     blif = args.blif
@@ -443,6 +522,8 @@ def main():
               for po, v in po_val.items()}
     print("peephole: collapsed %d buffer/double-inversion nodes" % removed)
     comp.levelise()
+    if args.rust:
+        return run_rust(args, blif, inputs, outputs, comp, po_val)
     stages = comp.stages()
     n_prims = len(comp.val_terms)
     print("prims: %d nodes over %d levels (incl. complements/buffers/splits)"

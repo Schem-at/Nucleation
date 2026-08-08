@@ -29,6 +29,33 @@ module. `--blif x.blif` skips yosys and consumes a hand-made BLIF;
 `--no-sim` stops after the structural audit + net-short check; `--cases N`
 samples instead of exhausting (automatic above 12 inputs).
 
+## Built-in Rust compiler (`--rust`)
+
+The whole BLIF -> PLA pipeline is BUILT IN now: `crates/nucleation-hdl` is a
+line-by-line Rust port of this file + `../build_ppa.py` (parse/fold, QM
+off-set covers, peephole, levelise + buffers, slice packing, rails/
+inverters/columns/routes/lids), exposed to every binding as the `Hdl`
+opaque — `Hdl.compile_blif(blif, name, bake) -> Schematic` and
+`Hdl.compile_blif_report(blif, name) -> JSON` (stats, probe and lever
+coordinates). Its own gate lives in
+`cargo test -p nucleation-hdl --features mc-tick` (seg7 16/16, popcnt4
+16/16, cmp4 256/256, exhaustive, vs the pure-Rust prim-graph eval).
+
+```sh
+python3 hdl/hdl2redstone.py --blif hdl/build/seg7.blif --top seg7 --rust
+```
+
+`--rust` is the parity proof: the SAME BLIF goes through the Rust compiler,
+and the Rust-built geometry is driven in mc-tick against THIS file's Python
+reference model. This Python path stays as the executable reference.
+
+Because the core compile path is dependency-free and wasm-clean
+(`cargo check --target wasm32-unknown-unknown -p nucleation-hdl`), a fully
+in-browser flow is one step away: YoWASP's `yosys.wasm` (the upstream
+yosys built for WebAssembly, `pip/npm install yowasp-yosys`) synthesises
+Verilog to BLIF client-side, and `Hdl.compile_blif` in the wasm binding
+turns that BLIF into a schematic without a server round-trip.
+
 ## Examples (all verified exhaustively)
 
 | design    | function                        | inputs | cases | result |
