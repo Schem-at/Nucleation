@@ -289,6 +289,39 @@ class Compiler:
             parts.append(pv)
         self.emit(vid, [[p] for p in parts], depth + 1)
 
+    # -- peephole: collapse buffers / double inversions ---------------------
+    def peephole(self):
+        """Alias away pure buffer nodes: v = OR-of-AND over a single literal
+        is just that literal.  Only this provably-equivalent rewrite is done.
+
+        This is where double inversions die: dual-rail construction turns a
+        BLIF NOT into a buffer of the complement rail (the on-set of ~x as a
+        function of x's rails IS x.n), so NOT(NOT(x)) chains arrive here as
+        buffer chains and collapse to nothing.  It is also the polarity-aware
+        selection: a consumer of a collapsed chain taps the already-available
+        rail directly instead of re-inverting.  Each removed node saves a
+        full PLA column (tap torch + gate torch = 2 rt) plus its rail.
+
+        Must run BEFORE levelise(): the buffers levelise inserts enforce the
+        single-hop routing discipline and are structural, not redundant.
+        """
+        self._alias = {}
+        for v, terms in self.val_terms.items():
+            if len(terms) == 1 and len(terms[0]) == 1:
+                self._alias[v] = terms[0][0]
+        for v in self._alias:
+            del self.val_terms[v]
+        for v, terms in self.val_terms.items():
+            self.val_terms[v] = [sorted({self.resolve(u) for u in t})
+                                 for t in terms]
+        return len(self._alias)
+
+    def resolve(self, v):
+        """Follow buffer aliases to the surviving vid."""
+        while v in getattr(self, "_alias", {}):
+            v = self._alias[v]
+        return v
+
     # -- levels + single-hop buffering --------------------------------------
     def levelise(self):
         def lv(v):
@@ -405,6 +438,10 @@ def main():
     po_val = {}
     for po in outputs:
         po_val[po] = comp.value(po, 1)       # ('const', b) or a vid
+    removed = comp.peephole()
+    po_val = {po: (v if isinstance(v, tuple) else comp.resolve(v))
+              for po, v in po_val.items()}
+    print("peephole: collapsed %d buffer/double-inversion nodes" % removed)
     comp.levelise()
     stages = comp.stages()
     n_prims = len(comp.val_terms)
@@ -428,6 +465,14 @@ def main():
         print("   SHORT %s <-> %s  at %s / %s" % (la, lb, pa, pb))
     if any(problems.values()) or shorts:
         return 1
+
+    import timing
+    arrival, _whence = timing.analyze(ppa)
+    sinks = [v for v in po_val.values() if not isinstance(v, tuple)]
+    if sinks:
+        worst = max(sinks, key=lambda s: arrival.get(s, 0))
+        print("STA: critical path -> %s = %d rt (%d gt)"
+              % (worst, arrival[worst], 2 * arrival[worst]))
     if args.no_sim:
         return 0
 
