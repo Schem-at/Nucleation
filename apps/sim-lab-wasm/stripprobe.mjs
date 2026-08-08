@@ -1,6 +1,6 @@
 /** Does the activity strip draw what the brief claims it draws?
  *
- * Three things must hold:
+ * Four things must hold:
  *
  *  1. **One column per active tick, not per tick in the span.** At a strip
  *     width wide enough that bucketing does not engage, the number of
@@ -18,6 +18,19 @@
  *     — but each column's first/last tick must still be a real recorded
  *     tick, and the summed counts across all columns must equal the
  *     unbucketed total (nothing dropped, nothing double-counted).
+ *  4. **An input-only, change-free tick is still visible.** A right-click on
+ *     a block whose `on_used` writes nothing (`crates/mc-tick/src/sim.rs`'s
+ *     `use_block` logs the `InputAction` *before* checking whether the block
+ *     has a behaviour at all, let alone one that changes anything) yields
+ *     `{changes: 0, inputs: 1}` — a real entry in `ticks`, which per
+ *     `TickSimulation::timeline_activity_json` means *something happened*.
+ *     It must render at a nonzero, selectable height with its input mark,
+ *     not `height: 0` (invisible and — for Task 4's selection — unclickable).
+ *     Proven reachable through the app's own click handler: `App.tsx`'s
+ *     `act()` calls `world.sim.useBlock(...hit.pos)` on *any* solid block the
+ *     crosshair hits, unconditionally — the `INTERACTIVE` regex only picks
+ *     the outline colour, it does not gate the click. Right-clicking a plain
+ *     block (a diamond_block on BB) hits this path for real.
  *
  * Same harness shape as `verify-handover.mjs` / `uiprobe.mjs`: real page,
  * real engine, `window.simlab` for the console-equivalent calls a human
@@ -236,6 +249,76 @@ if (!kick) {
   );
 }
 await pb.close();
+
+// ============================================================================
+// Part C (BB again, fresh): an input-only tick (no block changes) is still
+// a visible, marked column — not `height: 0`.
+// ============================================================================
+const pc = await openPage(busyFixture);
+await pc.click('button:has-text("record")');
+await pc.waitForTimeout(50);
+
+const inputOnly = await pc.evaluate(() => {
+  const w = window.simlab.world;
+  const [dx, dy, dz] = w.dims;
+  const INTERACTIVE = /lever|button|note_block|trapdoor|_door|_gate|repeater|comparator|daylight/;
+  // Find a plain, non-interactive solid block and right-click it through
+  // exactly the call the app's own click handler makes (`App.tsx`'s `act()`:
+  // `world.sim.useBlock(...hit.pos)` then drain/apply) — not a mock of the
+  // input path, the same one.
+  for (let x = 0; x < dx; x++)
+    for (let y = 0; y < dy; y++)
+      for (let z = 0; z < dz; z++) {
+        const s = w.blockAt(x, y, z);
+        if (s === "minecraft:air" || INTERACTIVE.test(s)) continue;
+        const before = w.sim.changesCount?.() ?? 0;
+        w.sim.useBlock(x, y, z);
+        const ch = w.drainChanges();
+        w.applyChanges(ch);
+        if (ch.length === 0 && w.sim.changesCount?.() === before) {
+          return { pos: [x, y, z], state: s };
+        }
+        // This block's use did change something — not our case; the block
+        // itself is now used, but that's still fine, keep scanning others.
+      }
+  return null;
+});
+
+if (!inputOnly) {
+  console.log("❌ could not find a plain block whose use produces zero changes on this fixture");
+  failures++;
+} else {
+  console.log(`input-only tick: used ${inputOnly.state} @ ${inputOnly.pos.join(",")}, 0 block changes`);
+  await pc.waitForTimeout(300); // let the poll timer pick this up
+
+  const col = await pc.evaluate(() => {
+    const w = window.simlab.world;
+    const activity = JSON.parse(w.sim.timelineActivityJson());
+    const zeroChangeInput = activity.ticks.find((t) => t.inputs > 0 && t.changes === 0);
+    const el = [...document.querySelectorAll(".timeline-col")].find(
+      (e) => Number(e.dataset.inputs) > 0 && Number(e.dataset.changes) === 0,
+    );
+    return {
+      groundTruth: zeroChangeInput ?? null,
+      found: !!el,
+      hasInputClass: el?.classList.contains("has-input") ?? false,
+      heightPct: el ? parseFloat(el.style.height) : null,
+    };
+  });
+  check(
+    "engine actually recorded a zero-change input tick (ground truth)",
+    !!col.groundTruth,
+    JSON.stringify(col.groundTruth),
+  );
+  check("a column exists for that tick", col.found);
+  check("it carries the input mark", col.hasInputClass);
+  check(
+    "it renders at a nonzero, selectable height (not height:0)",
+    col.heightPct !== null && col.heightPct > 0,
+    `height: ${col.heightPct}%`,
+  );
+}
+await pc.close();
 
 console.log("errors:", errs.length ? errs.slice(0, 3) : "none");
 console.log(

@@ -6,6 +6,11 @@
   --ink: #e7eaf0;
   --dim: #8b93a3;
   --accent: #6fd66a;
+  /* The throttled-rate readout's existing amber (`.tick.throttled`) and the
+   * timeline strip's piston mark share this: a second boolean state that
+   * must read distinctly from `--accent` (already claimed by inputs) and
+   * would be invisible drawn from `--line`/`--dim` alone. */
+  --warn: #e8c14a;
 }
 
 * { box-sizing: border-box; }
@@ -126,7 +131,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 .timeline-col.has-input { background: var(--accent); opacity: 0.85; }
 /* A mark distinguishing ticks with a piston stroke. Layered on top of (not
  * instead of) the input colour, since a tick can be both. */
-.timeline-col.has-piston { box-shadow: inset 0 0 0 1px #e8c14a; }
+.timeline-col.has-piston { box-shadow: inset 0 0 0 1px var(--warn); }
 
 /* Fixed so the timeline strip above it can be pinned by pixel offset rather
  * than measured at runtime. */

@@ -76,14 +76,30 @@ function bucketColumns(ticks: Activity["ticks"], widthPx: number): Column[] {
   return out;
 }
 
+/** How short a column may render and still be visible and selectable. Not
+ * just a stylistic minimum: Task 4 builds a click-to-select target on top of
+ * these columns, and a `height: 0` column is not clickable. */
+const PRESENCE_FLOOR = 0.06;
+
 /** Log-scaled column height, 0..1. Linear would flatten every tick beside a
  * 500-change one to invisible — a piston tick (single-digit changes) and a
  * mass-update tick differ by orders of magnitude, and log scaling is what
- * keeps both readable in the same strip. */
+ * keeps both readable in the same strip.
+ *
+ * `changes` may legitimately be zero here: `TickSimulation::timeline_activity_json`
+ * puts a tick in `ticks` when it has changes, inputs, *or* pistons — an
+ * `InputAction::UseBlock` on a block whose `on_used` writes nothing (a
+ * plain right-click that changes no state) is exactly that case, and it is
+ * reachable through the app's own click handler, not just a theoretical
+ * engine output. Presence in `ticks` means something happened, so every
+ * such column renders at or above the floor regardless of `changes` — the
+ * floor is about being there at all, not about magnitude. Only the
+ * changes-bearing range above it is log-scaled.
+ */
 function heightFrac(changes: number, maxChanges: number): number {
-  if (changes <= 0 || maxChanges <= 0) return 0;
+  if (changes <= 0 || maxChanges <= 0) return PRESENCE_FLOOR;
   const v = Math.log1p(changes) / Math.log1p(maxChanges);
-  return Math.max(0.06, Math.min(1, v));
+  return Math.max(PRESENCE_FLOOR, Math.min(1, v));
 }
 
 /** Used for the very first render, before the strip's own width has been
