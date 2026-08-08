@@ -92,12 +92,22 @@ bidirectional climb must keep its upper dust on solid.
 
 Landed on that table (`materials.py`, all sim-gated):
 
+- **Predicate refactor (2026-08-08)**: `materials.py` is now architected as
+  primitive predicates (`sturdy`, `conducts`, `cuts_diagonal ==
+  conducts`) + laws (`step_conducts` — the transparent diode;
+  `cap_is_harmful` — only if a diagonal is in use) + cell choosers
+  (`pick_support`, `separator`) that COMPUTE every pattern cell from its
+  constraints and refuse over-constrained cells.  Consequence: transparent
+  appears ONLY where a diagonal must survive; support cells the
+  computation shows unconstrained went glass -> solid, and all gates
+  re-passed (empirical confirmation of the model).
 - **`half_slope_2line`** — two independent lines climbing 1 y per 2 x in
-  adjacent z-rows, interleaved at 1-y offset: glass under climb-lowers,
-  solid under climb-uppers, solid caps above the lower line at the 1-y
-  columns.  Verified 4 combos x both directions (9/9) **including the
-  negative control: transparent caps mix the levels**, so the alternation
-  is proven load-bearing, not decorative.
+  adjacent z-rows, interleaved at 1-y offset: solid under climb-uppers
+  (diode law), solid caps severing the cross-line diagonal at the 1-y
+  columns (legal by the cap law: that dust is flat there).  Verified 4
+  combos x both directions (9/9) **including the negative control:
+  transparent caps mix the levels**, so the cap is proven load-bearing,
+  not decorative.
 - **`crossing_parity`** + **`crossing_dipunder`** — two verified 90-degree
   crossing tile families; in both, a block-sandwich station's ENTRY block
   doubles as the isolation (it cuts the through dust's up-diagonals and
@@ -126,35 +136,71 @@ Landed on that table (`materials.py`, all sim-gated):
 The material model cashed out as a bus form (`bus8_probe.py`,
 `bus8_cross.py`; showcase `bus8_run.schem`, `bus_cross8.schem`):
 
-- **2y-pitch vertical bus, 1 block wide**: bit n dust at y=1+2n on
-  slab-top separators (the probed UNDER dust/slab/dust stack); solid only
-  under repeaters.  Cross-section for 8 bits: **1 wide x 16 tall = 16
-  cells** (2 cells/bit).  The flat 2z-pitch form spends 15x2 = 30+ cells of
-  cross-section and 15 columns of ground footprint for the same 8 bits —
-  the vertical form is ~2x denser in section and 15x narrower on the
-  ground, and it leaves the ground plane free for logic.
-- **Refresh in-stack**: block-sandwich stations staggered diagonally (bit n
-  at x = stage+n) so each repeater's solid floor lands on the bit below's
-  station blocks (block-on-block, inert), never on live dust.  Max clean
-  pitch stays the probed 18 (15 dust + 3 station); verified 96/96 over a
-  40-block run with two refresh stages, incl. the ss1 worst case (bit 7).
-- **8x8 crossing as ONE tower**: interleave the two buses (A odd y, B even
-  y); at the shared column every level is a station entry block, so the 64
-  bit-pair isolations collapse into a 3x3-ground x 17-tall core with 16
-  repeaters (1/bit, doubling as the refresh).  A flat 8x8 crossing would
-  need 64 pairwise crossing tiles over a ~16x16 ground area.  Verified
+- **2y-pitch vertical bus, 1 block wide (v2)**: bit n dust at y=1+2n over
+  full SOLID separator layers — NO transparent blocks: a straight run has
+  no diagonals in use, so the cap law says a conductor layer is harmless
+  (probed P1: caps over a live run conduct + dust/solid/dust isolated).
+  Cross-section for 8 bits: **1 wide x 16 tall = 16 cells** (2 cells/bit).
+  The flat 2z-pitch form spends 15x2 = 30+ cells of cross-section and 15
+  columns of ground footprint for the same 8 bits — the vertical form is
+  ~2x denser in section and 15x narrower on the ground, and it leaves the
+  ground plane free for logic.
+- **Refresh in-stack (v2)**: block-sandwich stations in ALIGNED columns
+  (every bit's entry at the same x; v1's diagonal stagger removed — the
+  repeater floor capping the bit below's live dust is exactly probe P1,
+  harmless; P2 shows even v1's solid 'lid' floors were never electrically
+  load-bearing).  Max clean pitch stays the probed 18 (15 dust + 3
+  station); verified 96/96 over a 40-block run with two refresh stages,
+  incl. the ss1 worst case (bit 7).
+- **8x8 crossing v2 at CANONICAL levels** (`bus_cross8.schem`): both buses
+  at the SAME levels y=2+2n — a bus's level never depends on crossing
+  history (composability).  Bus B dips 1 down, passes under A's level
+  through its own station (entry blocks interleaving A's in the shared
+  column), climbs back up; the dip's two slope-transition supports per bit
+  are the ONLY glass (each sits above the lower dust of the bit below's
+  step diagonal; the paired solids are diode + cross-bit sever — the
+  alternation, now probed at stack scale).  Core 3x7 ground x 17 tall, 16
+  repeaters (1/bit, doubling as the refresh), 512 blocks.  Verified
   432/432 (27 patterns x 16 outputs) incl. 8 random joint patterns.
-- **Deferred**: whole-stack ±1y shift tiles (the alternation law generalizes
-  to stacked buses on paper — glass separators at the step column, solid
-  under the landing — but it is unprobed); bus-router integration
-  (stamping the tower on crossing demand); T-junctions/taps off a vertical
-  bus (exit-block strong-power leak makes mid-run taps nontrivial).
+- **v1 tower kept** (`bus_cross8_tower.schem`, 432/432): 3x3-ground core,
+  zero glass — genuine wins — but B shifts to even levels (the
+  composability defect v2 removes).  A flat 8x8 crossing would need 64
+  pairwise crossing tiles over a ~16x16 ground area.
+- **Deferred**: bus-router integration (stamping the crossing on demand);
+  T-junctions/taps off a vertical bus (exit-block strong-power leak makes
+  mid-run taps nontrivial).
 
 
 What is actually weak, drawn from the session docs, the deferred lists in
 `demos/README.md` / `showcase/README.md`, `CORE_PROPOSALS.md`, and
 `ROUTING_CRATE_DESIGN.md`. P1 = blocks or silently corrupts real use;
 P2 = limits scale/quality; P3 = worth doing when touched.
+
+## Typed HDL cells: CellContract from the compiler (LANDED)
+
+`nucleation-hdl` now derives a `CellContract` at compile time
+(`contract.rs`): vector-port grouping (`a[i]` and `aN` conventions) into
+typed word ports, levers/probes mapped per bit, nearest-face + bus-pitch
+geometry, bounds keepout, and an **estimated** delay table (levelization
+depth x 2rt — ordering-grade, not measured). The hand-rolled JSON is
+schema-checked by nucleation: `bridge::hdl::cell_contract` parses it into
+the real `io_contract::CellContract` (round-trip asserted in tests), and
+`Hdl.compile_blif_contract` exposes it in every binding.
+
+Execution is typed end-to-end: `BackendCircuitExecutor::for_cell(schem,
+contract, extra_states)` over `McTickBackend` — cmp4 verified 64 sampled
+cases by port name/word only; `hdl/typed_demo.py` drives seg7 16/16 from
+Python with every coordinate read from the contract. Remaining gaps:
+
+- **P2 Bridge the typed executor.** Python interprets the contract itself;
+  a `TypedCell` opaque (load schematic + contract, set/read by name) would
+  remove that duplication in every binding.
+- **P2 Measured characterization.** Replace the estimated `delays_rt` with
+  a scripted executor sweep per port pair, and measure `drive_strength`;
+  then flip the contract to measured and set `initial_state` from bake.
+- **P3 `bridge-full` omits `hdl`/`routing`** — wheels silently lose the
+  surface unless `NUCLEATION_FEATURES="bridge-full,hdl,routing"` is set
+  (bit the wheel rebuild here; same class as the P1 wheel-drift note).
 
 ## Bridge gaps
 

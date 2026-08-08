@@ -40,6 +40,49 @@ Mechanism (mc-tick `vanilla.rs`/`wire.rs`, matches the probes exactly):
 - **EXTRA_STATES**: glass, white_stained_glass and
   smooth_stone_slab[type=top|bottom,waterlogged=false] are interned in
   rs.EXTRA_STATES so late (router/template) placements never sit inert.
+- **Bus probes (bus8_probe.py, 2026-08-08)**: P1 — a SOLID cap over a live
+  straight-run dust line is harmless (run conducts; a second driven line ON
+  the caps at 2y pitch, dust/solid/dust, is isolated in all 4 combos). P2 —
+  a repeater FIRES from a slab-top floor (sturdiness is static-legality
+  only), so solid repeater floors were never electrically load-bearing.
+
+## PRINCIPLE — materials derive from primitive predicates (materials.py)
+
+Every pattern is COMPUTED, never hardcoded, from three primitive predicates
+plus two laws (this is the expandability contract; new physics slots in as
+new predicates + laws):
+
+  predicates   sturdy(b)          may dust/repeaters sit on b (static)
+               conducts(b)        is_conductor: carries weak power
+               cuts_diagonal(b)   == conducts(b) — the cut law runs on
+                                  conductivity, not solidity
+  laws         step_conducts(upper_support, downhill)
+                                  transparent-diode law: a 1-y step passes
+                                  UP always, DOWN only if the UPPER dust's
+                                  support conducts
+               cap_is_harmful(cap, dust_uses_diagonal_here)
+                                  a cap above dust matters ONLY if that dust
+                                  is the lower end of an in-use diagonal
+
+`pick_support()` / `separator()` turn a cell's constraints (sever a
+diagonal? let one survive? diode?) into a material and assert it against
+the predicates; an over-constrained cell (must conduct AND must not) is
+refused — the geometry itself is wrong.
+
+**WHEN TRANSPARENCY**: a transparent block appears ONLY where a diagonal
+must survive — the cell sits directly above the lower dust of an in-use
+1-y step (slope transitions of interleaved lines, e.g. the 14 glass cells
+of bus_cross8 v2). Everywhere else — straight runs, separators, repeater
+floors, caps — SOLID is correct: straight dust has no diagonals in use
+(cap law), weak power never lights dust, and a conductor also severs any
+stray cross-net diagonal. Consequences landed 2026-08-08:
+  * bus8_run v2: slab separators -> full solid layers; the diagonal
+    station stagger removed (ALIGNED station columns; 96/96).
+  * half_slope_2line / crossing_dipunder: previously-glass support cells
+    that the computation shows unconstrained are now solid (gates re-pass
+    9/9 and 4/4 — empirical confirmation of the model).
+  * bus_cross8 v2: both buses at the SAME canonical levels; the dip's two
+    slope-transition supports per bit are the only glass (432/432).
 
 
 Captured 2026-08-08 from the user (domain expert input). ALL claims below must be
