@@ -1,0 +1,76 @@
+{
+ "cost_before": 39228.0,
+ "cost_after": 104.0,
+ "places_before": [
+  [
+   16,
+   18
+  ],
+  [
+   11,
+   8
+  ],
+  [
+   4,
+   34
+  ],
+  [
+   0,
+   17
+  ],
+  [
+   16,
+   28
+  ]
+ ],
+ "places_after": [
+  [
+   14,
+   3
+  ],
+  [
+   0,
+   5
+  ],
+  [
+   8,
+   16
+  ],
+  [
+   12,
+   27
+  ],
+  [
+   26,
+   30
+  ]
+ ],
+ "route_before": {
+  "routed_nets": 8,
+  "route_cells": 287,
+  "repaired_nets": [
+   "halo:714"
+  ],
+  "route_delay_rt": 39,
+  "violations": [],
+  "nets_check_shorts": 0,
+  "audit_clean": true,
+  "drc_hard": 0,
+  "drc_repeater_cycles": 0,
+  "lvs_opens": 0
+ },
+ "route_after": {
+  "routed_nets": 8,
+  "route_cells": 160,
+  "repaired_nets": [
+   "halo:714"
+  ],
+  "route_delay_rt": 16,
+  "violations": [],
+  "nets_check_shorts": 0,
+  "audit_clean": true,
+  "drc_hard": 0,
+  "drc_repeater_cycles": 0,
+  "lvs_opens": 0
+ }
+}

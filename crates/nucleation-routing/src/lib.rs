@@ -1,6 +1,6 @@
 //! The redstone fabric: Minecraft-specific place-and-route over `pnr-core`.
 //!
-//! Ported from the Python prototypes in `experiments/rca-4bit/` (`router.py`,
+//! Ported from the Python prototypes in `redstone-eda/` (`router.py`,
 //! `nets.py`, `audit.py`, `timing.py`, `cells.py`), which are the spec AND
 //! the test vectors — every design rule in [`fabric`] was paid for by a real
 //! in-sim bug, and each carries a regression test naming its provenance.
