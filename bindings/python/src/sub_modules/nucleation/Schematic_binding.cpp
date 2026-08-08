@@ -81,6 +81,7 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("get_chunks_with_strategy_json", &nucleation::Schematic::get_chunks_with_strategy_json, "chunk_width"_a, "chunk_height"_a, "chunk_length"_a, "strategy"_a, "camera_x"_a, "camera_y"_a, "camera_z"_a)
         .def("get_entities_json", &nucleation::Schematic::get_entities_json)
         .def("get_entities_snbt_json", &nucleation::Schematic::get_entities_snbt_json)
+        .def("get_non_air_blocks_json", &nucleation::Schematic::get_non_air_blocks_json)
         .def("has_region", &nucleation::Schematic::has_region, "region_name"_a)
         .def("lm_version", &nucleation::Schematic::lm_version)
         .def_static("load_from_file", std::move(maybe_op_unwrap(&nucleation::Schematic::load_from_file)), "path"_a)

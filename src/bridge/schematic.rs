@@ -1025,12 +1025,28 @@ pub mod ffi {
             Ok(())
         }
 
-        /// Every non-air block as a JSON array of
+        /// Every IN-BOUNDS cell as a JSON array of
         /// `{"x", "y", "z", "name", "properties"}` (the old `CBlockArray`).
+        /// Air cells are materialized too — on a large sparse build this
+        /// dump is `volume()`-sized and can exhaust wasm memory; renderers
+        /// and analyzers want `get_non_air_blocks_json`.
         pub fn get_all_blocks_json(&self, out: &mut DiplomatWrite) {
             let items: Vec<serde_json::Value> = self
                 .0
                 .iter_blocks()
+                .map(|(pos, block)| block_json(&pos, block))
+                .collect();
+            let json = serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string());
+            let _ = write!(out, "{}", json);
+        }
+
+        /// Every non-air block, same JSON shape as `get_all_blocks_json`.
+        /// `block_count()`-sized regardless of the bounding volume.
+        pub fn get_non_air_blocks_json(&self, out: &mut DiplomatWrite) {
+            let items: Vec<serde_json::Value> = self
+                .0
+                .iter_blocks()
+                .filter(|(_, block)| block.name != "minecraft:air")
                 .map(|(pos, block)| block_json(&pos, block))
                 .collect();
             let json = serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string());

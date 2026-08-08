@@ -69,6 +69,7 @@ internal interface SchematicLib: Library {
     fun Schematic_get_entities_snbt_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_add_entity_from_snbt(handle: Pointer, snbt: Slice): ResultUnitInt
     fun Schematic_get_all_blocks_json(handle: Pointer, write: Pointer): Unit
+    fun Schematic_get_non_air_blocks_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_get_chunk_blocks_json(handle: Pointer, offsetX: Int, offsetY: Int, offsetZ: Int, width: Int, height: Int, length: Int, write: Pointer): Unit
     fun Schematic_get_chunks_json(handle: Pointer, chunkWidth: Int, chunkHeight: Int, chunkLength: Int, write: Pointer): Unit
     fun Schematic_get_chunks_with_strategy_json(handle: Pointer, chunkWidth: Int, chunkHeight: Int, chunkLength: Int, strategy: Slice, cameraX: Float, cameraY: Float, cameraZ: Float, write: Pointer): Unit
@@ -1271,12 +1272,26 @@ class Schematic internal constructor (
         }
     }
 
-    /** Every non-air block as a JSON array of
+    /** Every IN-BOUNDS cell as a JSON array of
     *`{"x", "y", "z", "name", "properties"}` (the old `CBlockArray`).
+    *Air cells are materialized too — on a large sparse build this
+    *dump is `volume()`-sized and can exhaust wasm memory; renderers
+    *and analyzers want `get_non_air_blocks_json`.
     */
     fun getAllBlocksJson(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.Schematic_get_all_blocks_json(handle, write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
+    }
+
+    /** Every non-air block, same JSON shape as `get_all_blocks_json`.
+    *`block_count()`-sized regardless of the bounding volume.
+    */
+    fun getNonAirBlocksJson(): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_get_non_air_blocks_json(handle, write);
 
         val returnString = DW.writeToString(write)
         return returnString

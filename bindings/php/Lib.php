@@ -972,6 +972,7 @@ void Schematic_get_entities_snbt_json(Schematic* self, DiplomatWrite* write);
 typedef struct Schematic_add_entity_from_snbt_result { union { NucleationError err; }; bool is_ok; } Schematic_add_entity_from_snbt_result;
 Schematic_add_entity_from_snbt_result Schematic_add_entity_from_snbt(Schematic* self, DiplomatStringView snbt);
 void Schematic_get_all_blocks_json(Schematic* self, DiplomatWrite* write);
+void Schematic_get_non_air_blocks_json(Schematic* self, DiplomatWrite* write);
 void Schematic_get_chunk_blocks_json(Schematic* self, int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, DiplomatWrite* write);
 void Schematic_get_chunks_json(Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, DiplomatWrite* write);
 void Schematic_get_chunks_with_strategy_json(Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, DiplomatStringView strategy, float camera_x, float camera_y, float camera_z, DiplomatWrite* write);

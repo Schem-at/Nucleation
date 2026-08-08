@@ -1506,13 +1506,35 @@ export class Schematic {
     }
 
     /**
-     * Every non-air block as a JSON array of
+     * Every IN-BOUNDS cell as a JSON array of
      * `{"x", "y", "z", "name", "properties"}` (the old `CBlockArray`).
+     * Air cells are materialized too — on a large sparse build this
+     * dump is `volume()`-sized and can exhaust wasm memory; renderers
+     * and analyzers want `get_non_air_blocks_json`.
      */
     getAllBlocksJson() {
         const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
 
     wasm.Schematic_get_all_blocks_json(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * Every non-air block, same JSON shape as `get_all_blocks_json`.
+     * `block_count()`-sized regardless of the bounding volume.
+     */
+    getNonAirBlocksJson() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Schematic_get_non_air_blocks_json(this.ffiValue, write.buffer);
 
         try {
             return write.readString8();

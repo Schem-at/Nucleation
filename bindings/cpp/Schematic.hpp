@@ -194,6 +194,8 @@ namespace capi {
 
     void Schematic_get_all_blocks_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
 
+    void Schematic_get_non_air_blocks_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
+
     void Schematic_get_chunk_blocks_json(const diplomat::capi::Schematic* self, int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, diplomat::capi::DiplomatWrite* write);
 
     void Schematic_get_chunks_json(const diplomat::capi::Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, diplomat::capi::DiplomatWrite* write);
@@ -1061,6 +1063,20 @@ template<typename W>
 inline void Schematic::get_all_blocks_json_write(W& writeable) const {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     diplomat::capi::Schematic_get_all_blocks_json(this->AsFFI(),
+        &write);
+}
+
+inline std::string Schematic::get_non_air_blocks_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::Schematic_get_non_air_blocks_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void Schematic::get_non_air_blocks_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::Schematic_get_non_air_blocks_json(this->AsFFI(),
         &write);
 }
 

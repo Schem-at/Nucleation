@@ -883,6 +883,12 @@ final class Schematic {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function getNonAirBlocksJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->Schematic_get_non_air_blocks_json($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function getChunkBlocksJson( $offset_x,  $offset_y,  $offset_z,  $width,  $height,  $length) {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         Lib::ffi()->Schematic_get_chunk_blocks_json($this->ptr, $offset_x, $offset_y, $offset_z, $width, $height, $length, $write);

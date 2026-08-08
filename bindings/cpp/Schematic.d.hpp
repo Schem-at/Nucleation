@@ -429,12 +429,23 @@ public:
   inline diplomat::result<std::monostate, NucleationError> add_entity_from_snbt(std::string_view snbt);
 
   /**
-   * Every non-air block as a JSON array of
+   * Every IN-BOUNDS cell as a JSON array of
    * `{"x", "y", "z", "name", "properties"}` (the old `CBlockArray`).
+   * Air cells are materialized too — on a large sparse build this
+   * dump is `volume()`-sized and can exhaust wasm memory; renderers
+   * and analyzers want `get_non_air_blocks_json`.
    */
   inline std::string get_all_blocks_json() const;
   template<typename W>
   inline void get_all_blocks_json_write(W& writeable_output) const;
+
+  /**
+   * Every non-air block, same JSON shape as `get_all_blocks_json`.
+   * `block_count()`-sized regardless of the bounding volume.
+   */
+  inline std::string get_non_air_blocks_json() const;
+  template<typename W>
+  inline void get_non_air_blocks_json_write(W& writeable_output) const;
 
   /**
    * All blocks within a sub-region (chunk) of the schematic, as the same
