@@ -442,10 +442,21 @@ impl RunTimeline {
         None
     }
 
+    /// Whether any change landed in `[start, end)`.
+    ///
+    /// Binary search, not a scan. This is asked once per cycle candidate, and
+    /// a build that settles accumulates candidates whose spans are empty —
+    /// precisely the case a linear `any()` cannot short-circuit, so it walked
+    /// the whole log every time. The log is appended in tick order (pinned by
+    /// `the_change_log_is_sorted_by_tick`), so the first change at or after
+    /// `start` is one `partition_point` away.
     fn changed_between(&self, start: u64, end: u64) -> bool {
+        let first_at_or_after = self
+            .changes
+            .partition_point(|change| change.tick < start);
         self.changes
-            .iter()
-            .any(|change| change.tick >= start && change.tick < end)
+            .get(first_at_or_after)
+            .is_some_and(|change| change.tick < end)
     }
 
     /// Select an explicit half-open tick span.

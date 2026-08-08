@@ -229,3 +229,59 @@ fn stopping_a_recording_keeps_it_and_stops_the_log_growing() {
     assert!(stopped.frame_at(stopped.end_tick, sim.registry()).is_some());
     assert!(sim.stop_timeline().is_none(), "stopping twice is not an error");
 }
+
+/// The change log is ordered by tick, which is what lets `changed_between`
+/// binary-search it instead of scanning. If a recorder ever appended out of
+/// order the search would silently answer wrongly, so pin the ordering here
+/// rather than trusting it.
+#[test]
+fn the_change_log_is_sorted_by_tick() {
+    let mut sim = sim(DOOR);
+    sim.record_timeline();
+    sim.use_block(Pos::new(10, 4, 1));
+    sim.run(60);
+    let timeline = sim.recorded_timeline().expect("timeline");
+
+    assert!(timeline.changes.len() > 100, "the door is a real recording");
+    assert!(
+        timeline.changes.windows(2).all(|w| w[0].tick <= w[1].tick),
+        "the log must be non-decreasing in tick for a binary search to be sound"
+    );
+}
+
+/// A build that settles is the case the scan was worst at: a door clicked
+/// once opens (here, done recording changes by tick 15) and then sits
+/// through a long quiet tail (tick 16..120). Every one of those quiet ticks
+/// shares a fingerprint with its predecessor, so `detect_cycles` builds a
+/// candidate for each repetition and asks `changed_between` about a span
+/// that holds no changes — the case a linear `any()` cannot short-circuit,
+/// so it walked the whole log every time.
+///
+/// A door that is only ever opened does not revisit an earlier absolute
+/// state (open != closed), and `detect_cycles` deliberately discards
+/// stationary — no-change — candidates rather than reporting the tick after
+/// itself as a trivial "cycle" (see
+/// `cycle_candidates_are_verified_and_stationary_ticks_are_ignored`). So the
+/// correct result here is *no* cycle at all; what this test pins is that the
+/// long, candidate-heavy, all-quiet tail still produces that same no-cycle
+/// answer once `changed_between` searches instead of scanning.
+#[test]
+fn cycle_detection_is_unchanged_on_a_settled_build() {
+    let mut sim = sim(DOOR);
+    sim.record_timeline();
+    sim.use_block(Pos::new(10, 4, 1));
+    sim.run(40);
+    // Let it come to rest: the tail is all quiet ticks.
+    sim.run(80);
+    let timeline = sim.recorded_timeline().expect("timeline");
+
+    let report = timeline.detect_cycles(sim.registry());
+    assert!(
+        report.exact.is_none(),
+        "opening a door once never revisits an earlier absolute state"
+    );
+    assert!(
+        report.translated.is_none(),
+        "opening a door once never revisits an earlier translated state either"
+    );
+}
