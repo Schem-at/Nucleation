@@ -210,6 +210,31 @@ mod tests {
         assert_eq!(back, contract);
     }
 
+    const COUNTER4: &str = include_str!("../../crates/nucleation-hdl/tests/data/counter4.blif");
+
+    /// A SEQUENTIAL design's contract also parses as a typed CellContract:
+    /// the clock is a real Boolean input port (position = the spine lever)
+    /// and the `sequential` sidecar rides along without breaking the shared
+    /// schema (serde ignores unknown keys).
+    #[test]
+    fn sequential_contract_parses_with_a_clock_port() {
+        use crate::io_contract::IoType;
+
+        let compiled = nucleation_hdl::compile_blif(COUNTER4, "counter4").unwrap();
+        assert_eq!(compiled.latches.len(), 4);
+        let contract = super::cell_contract(&compiled).unwrap();
+        let clk = contract.io.get_input("clk").expect("clock input port");
+        assert_eq!(clk.io_type, IoType::Boolean);
+        assert_eq!(
+            clk.positions[0],
+            compiled.clock.as_ref().unwrap().lever,
+            "clock port position is the spine lever"
+        );
+        let q = contract.io.outputs.get("q").expect("state word output");
+        assert_eq!(q.io_type, IoType::UnsignedInt { bits: 4 });
+        assert!(compiled.cell_contract_json().contains("\"sequential\":"));
+    }
+
     /// The typed-cell promise end-to-end: compile cmp4, wrap schematic +
     /// contract in a `BackendCircuitExecutor` over the mc-tick oracle, and
     /// verify 64 sampled cases purely through port NAMES and word VALUES —

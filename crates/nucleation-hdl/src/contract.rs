@@ -340,6 +340,18 @@ impl Compiled {
                 bus_entries.push(format!("\"{}\":{}", esc(&p.name), b));
             }
         }
+        // The clock is a real input port (its position is the spine lever),
+        // flagged as such in the `sequential` sidecar below — the shared
+        // CellContract parser keeps the port and ignores the sidecar.
+        if let Some(ck) = &self.clock {
+            in_entries.push(format!(
+                "\"{}\":{{\"io_type\":\"Boolean\",\"layout\":\"OneToOne\",\
+                 \"positions\":[{}],\"face\":\"{}\",\"direction\":\"input\"}}",
+                esc(&ck.net),
+                pos_json(ck.lever),
+                nearest_face(&[ck.lever], bounds)
+            ));
+        }
         let mut out_entries = Vec::new();
         for p in &outputs {
             out_entries.push(format!(
@@ -372,15 +384,45 @@ impl Compiled {
         } else {
             format!(",\"buses\":{{{}}}", bus_entries.join(","))
         };
+        // Sequential sidecar: names the clock port (clock=true, in effect),
+        // carries the characterized period floor + the estimated compiled
+        // period, and the baked initial state — init-by-construction means
+        // the schematic ITSELF is the reset state. Unknown to the shared
+        // CellContract type (serde ignores it); documented in hdl/README.
+        let sequential = self.clock.as_ref().map_or(String::new(), |ck| {
+            let inits: Vec<String> = self
+                .latches
+                .iter()
+                .map(|l| format!("\"{}\":{}", esc(&l.q), l.init))
+                .collect();
+            format!(
+                ",\"sequential\":{{\"clock_port\":\"{}\",\"clock\":true,\
+                 \"est_min_period_gt\":{},\
+                 \"dff\":{{\"setup_gt\":{},\"hold_gt\":{},\"min_pulse_gt\":{},\
+                 \"clk_to_q_gt\":{},\"min_period_gt\":{},\
+                 \"spine_skew_per_repeater_gt\":{}}},\
+                 \"initial_state\":{{{}}}}}",
+                esc(&ck.net),
+                ck.est_min_period_gt,
+                crate::seq::DFF_SETUP_GT,
+                crate::seq::DFF_HOLD_GT,
+                crate::seq::DFF_MIN_PULSE_GT,
+                crate::seq::DFF_CLK_TO_Q_GT,
+                crate::seq::DFF_MIN_PERIOD_GT,
+                crate::seq::SPINE_SKEW_PER_REPEATER_GT,
+                inits.join(",")
+            )
+        });
         format!(
             "{{\"name\":\"{}\",\"io\":{{\"inputs\":{{{}}},\"outputs\":{{{}}}{}}},\
              \"physical\":{{\"keepouts\":[{{\"min\":[{x0},{y0},{z0}],\"max\":[{x1},{y1},{z1}]}}],\
-             \"delays_rt\":[{}],\"paste_safe\":false}}}}",
+             \"delays_rt\":[{}],\"paste_safe\":false}}{}}}",
             esc(&self.name),
             in_entries.join(","),
             out_entries.join(","),
             buses,
-            delays.join(",")
+            delays.join(","),
+            sequential
         )
     }
 }
@@ -481,6 +523,26 @@ mod tests {
         // every input bit resolved to a distinct lever cell
         let a_positions = json.split("\"a\":{").nth(1).unwrap();
         assert!(a_positions.contains("\"positions\":[["), "{json}");
+    }
+
+    #[test]
+    fn counter4_contract_flags_the_clock_and_bakes_initial_state() {
+        let c = crate::compile_blif(&fixture("counter4"), "counter4").unwrap();
+        let json = c.cell_contract_json();
+        // the clock is a real Boolean input port at the spine lever...
+        assert!(json.contains("\"clk\":{\"io_type\":\"Boolean\""), "{json}");
+        // ...flagged in the sequential sidecar with the characterized DFF
+        // table and the estimated compiled period
+        assert!(
+            json.contains("\"sequential\":{\"clock_port\":\"clk\",\"clock\":true"),
+            "{json}"
+        );
+        assert!(json.contains("\"clk_to_q_gt\":10"), "{json}");
+        assert!(json.contains("\"est_min_period_gt\":"), "{json}");
+        // init-by-construction: the baked state ships in the contract
+        assert!(json.contains("\"initial_state\":{\"q[0]\":0,\"q[1]\":0"), "{json}");
+        // the state word still groups into a typed output bus
+        assert!(json.contains("\"q\":{\"io_type\":{\"UnsignedInt\":{\"bits\":4}}"), "{json}");
     }
 
     #[test]
