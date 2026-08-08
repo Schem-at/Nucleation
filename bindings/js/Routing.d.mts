@@ -25,6 +25,30 @@ export class Routing {
     static routeNet(schematic: Schematic, sx: number, sy: number, sz: number, dx: number, dy: number, dz: number, label: string): string;
 
     /**
+     * Route every net in `nets_json` with negotiated congestion
+     * (pnr-core PathFinder) in one labelled workspace, write the
+     * geometry into the schematic, and write the JSON report
+     * (`routes` with per-net `path`/`delay_rt`, `notes`,
+     * `violations`). Supports per-net-class rule overrides
+     * (`classes`: io_contract `NetClassRule`s, with `region`
+     * resolving named route zones tagged on the schematic's
+     * DefinitionRegions), plus `bounds`, `budget` and `congestion`
+     * options — see `crate::routing::route_all_schematic` for the
+     * exact request shape.
+     */
+    static routeAll(schematic: Schematic, netsJson: string): string;
+
+    /**
+     * LVS v1: compare an intended netlist (`{"nets": [{"name",
+     * "terminals": [[x,y,z], ...]}]}`) against the conduction
+     * netlist extracted statically from the schematic (dust
+     * adjacency incl. cut diagonals plus repeater/comparator/torch
+     * through-component edges). Writes `{"clean", "matched",
+     * "opens", "shorts", "cycles"}`.
+     */
+    static lvs(schematic: Schematic, intentJson: string): string;
+
+    /**
      * Run design-rule checks (support audit, repeater-cycle detection,
      * optional decay) over the schematic. Writes a JSON array; each
      * element has `kind` plus violation-specific fields. Label-aware

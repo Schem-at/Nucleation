@@ -8,6 +8,8 @@ import com.sun.jna.Structure
 internal interface RoutingLib: Library {
     fun Routing_destroy(handle: Pointer)
     fun Routing_route_net(schematic: Pointer, sx: Int, sy: Int, sz: Int, dx: Int, dy: Int, dz: Int, label: Slice, write: Pointer): ResultUnitInt
+    fun Routing_route_all(schematic: Pointer, netsJson: Slice, write: Pointer): ResultUnitInt
+    fun Routing_lvs(schematic: Pointer, intentJson: Slice, write: Pointer): ResultUnitInt
     fun Routing_drc(schematic: Pointer, checkDecay: Boolean, write: Pointer): ResultUnitInt
     fun Routing_sta(schematic: Pointer, netlistJson: Slice, write: Pointer): ResultUnitInt
 }
@@ -62,6 +64,62 @@ class Routing internal constructor (
                 }
             } finally {
                 labelSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Route every net in `nets_json` with negotiated congestion
+        *(pnr-core PathFinder) in one labelled workspace, write the
+        *geometry into the schematic, and write the JSON report
+        *(`routes` with per-net `path`/`delay_rt`, `notes`,
+        *`violations`). Supports per-net-class rule overrides
+        *(`classes`: io_contract `NetClassRule`s, with `region`
+        *resolving named route zones tagged on the schematic's
+        *DefinitionRegions), plus `bounds`, `budget` and `congestion`
+        *options — see `crate::routing::route_all_schematic` for the
+        *exact request shape.
+        */
+        fun routeAll(schematic: Schematic, netsJson: String): Result<String> {
+            val netsJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(netsJson)
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.Routing_route_all(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, netsJsonSliceMemory.slice, write);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+
+                    val returnString = DW.writeToString(write)
+                    return returnString.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                netsJsonSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** LVS v1: compare an intended netlist (`{"nets": [{"name",
+        *"terminals": [[x,y,z], ...]}]}`) against the conduction
+        *netlist extracted statically from the schematic (dust
+        *adjacency incl. cut diagonals plus repeater/comparator/torch
+        *through-component edges). Writes `{"clean", "matched",
+        *"opens", "shorts", "cycles"}`.
+        */
+        fun lvs(schematic: Schematic, intentJson: String): Result<String> {
+            val intentJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(intentJson)
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.Routing_lvs(schematic.handle, intentJsonSliceMemory.slice, write);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+
+                    val returnString = DW.writeToString(write)
+                    return returnString.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                intentJsonSliceMemory.close()
             }
         }
         @JvmStatic

@@ -2,15 +2,14 @@
 //!
 //! New surface — no old `ffi/` counterpart. Thin wrappers over
 //! `crate::routing` (which itself re-exports `nucleation-routing`): route a
-//! net through a schematic, run DRC, run the STA upper bound. Structured
-//! results cross as JSON strings (PORTING.md rule 9). The full Workspace /
-//! route_all / cell-template API stays native-only until the compositor
-//! needs it bridged.
+//! net through a schematic, route many with negotiated congestion and
+//! per-net-class rules (`route_all`), run DRC, run LVS, run the STA upper
+//! bound. Structured results cross as JSON strings (PORTING.md rule 9).
+//! The full Workspace / cell-template API stays native-only until the
+//! compositor needs it bridged.
 //!
-//! Bindings for this module have not been regenerated yet: run
-//! `tools/gen-bindings.sh` with the `routing` feature enabled once this
-//! surface is wanted downstream. The module itself compiles under
-//! `--features bridge-full,routing`.
+//! Bindings are regenerated (`tools/gen-bindings.sh`); the module compiles
+//! under `--features bridge-full,routing`.
 
 #[diplomat::bridge]
 pub mod ffi {
@@ -56,6 +55,53 @@ pub mod ffi {
                 .map(|p| format!("[{},{},{}]", p.x, p.y, p.z))
                 .collect();
             let _ = write!(out, "[{}]", cells.join(","));
+            Ok(())
+        }
+
+        /// Route every net in `nets_json` with negotiated congestion
+        /// (pnr-core PathFinder) in one labelled workspace, write the
+        /// geometry into the schematic, and write the JSON report
+        /// (`routes` with per-net `path`/`delay_rt`, `notes`,
+        /// `violations`). Supports per-net-class rule overrides
+        /// (`classes`: io_contract `NetClassRule`s, with `region`
+        /// resolving named route zones tagged on the schematic's
+        /// DefinitionRegions), plus `bounds`, `budget` and `congestion`
+        /// options — see `crate::routing::route_all_schematic` for the
+        /// exact request shape.
+        pub fn route_all(
+            schematic: &mut Schematic,
+            nets_json: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let json =
+                core::str::from_utf8(nets_json).map_err(|_| NucleationError::InvalidArgument)?;
+            let report =
+                crate::routing::route_all_schematic(&mut schematic.0, json).map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::InvalidArgument
+                })?;
+            let _ = write!(out, "{report}");
+            Ok(())
+        }
+
+        /// LVS v1: compare an intended netlist (`{"nets": [{"name",
+        /// "terminals": [[x,y,z], ...]}]}`) against the conduction
+        /// netlist extracted statically from the schematic (dust
+        /// adjacency incl. cut diagonals plus repeater/comparator/torch
+        /// through-component edges). Writes `{"clean", "matched",
+        /// "opens", "shorts", "cycles"}`.
+        pub fn lvs(
+            schematic: &Schematic,
+            intent_json: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let json =
+                core::str::from_utf8(intent_json).map_err(|_| NucleationError::InvalidArgument)?;
+            let report = crate::routing::lvs_schematic(&schematic.0, json).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::InvalidArgument
+            })?;
+            let _ = write!(out, "{}", crate::routing::lvs_report_json(&report));
             Ok(())
         }
 

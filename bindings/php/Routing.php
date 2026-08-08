@@ -33,6 +33,44 @@ final class Routing {
         return Lib::readAndFreeWrite($write);
     }
 
+    public static function routeAll( $schematic, string $nets_json) {
+        $__n1 = strlen($nets_json);
+        $__view1 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n1 > 0) {
+            $__buf1 = Lib::ffi()->new("uint8_t[" . $__n1 . "]", false);
+            \FFI::memcpy($__buf1, $nets_json, $__n1);
+            $__view1->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf1[0]));
+        } else {
+            $__view1->data = null;
+        }
+        $__view1->len = $__n1;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Routing_route_all($schematic->ptr, $__view1, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public static function lvs( $schematic, string $intent_json) {
+        $__n1 = strlen($intent_json);
+        $__view1 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n1 > 0) {
+            $__buf1 = Lib::ffi()->new("uint8_t[" . $__n1 . "]", false);
+            \FFI::memcpy($__buf1, $intent_json, $__n1);
+            $__view1->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf1[0]));
+        } else {
+            $__view1->data = null;
+        }
+        $__view1->len = $__n1;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Routing_lvs($schematic->ptr, $__view1, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public static function drc( $schematic,  $check_decay) {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         $result = Lib::ffi()->Routing_drc($schematic->ptr, $check_decay, $write);

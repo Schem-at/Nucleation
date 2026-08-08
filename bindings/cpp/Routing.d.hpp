@@ -42,6 +42,34 @@ public:
   inline static diplomat::result<std::monostate, NucleationError> route_net_write(Schematic& schematic, int32_t sx, int32_t sy, int32_t sz, int32_t dx, int32_t dy, int32_t dz, std::string_view label, W& writeable_output);
 
   /**
+   * Route every net in `nets_json` with negotiated congestion
+   * (pnr-core PathFinder) in one labelled workspace, write the
+   * geometry into the schematic, and write the JSON report
+   * (`routes` with per-net `path`/`delay_rt`, `notes`,
+   * `violations`). Supports per-net-class rule overrides
+   * (`classes`: io_contract `NetClassRule`s, with `region`
+   * resolving named route zones tagged on the schematic's
+   * DefinitionRegions), plus `bounds`, `budget` and `congestion`
+   * options — see `crate::routing::route_all_schematic` for the
+   * exact request shape.
+   */
+  inline static diplomat::result<std::string, NucleationError> route_all(Schematic& schematic, std::string_view nets_json);
+  template<typename W>
+  inline static diplomat::result<std::monostate, NucleationError> route_all_write(Schematic& schematic, std::string_view nets_json, W& writeable_output);
+
+  /**
+   * LVS v1: compare an intended netlist (`{"nets": [{"name",
+   * "terminals": [[x,y,z], ...]}]}`) against the conduction
+   * netlist extracted statically from the schematic (dust
+   * adjacency incl. cut diagonals plus repeater/comparator/torch
+   * through-component edges). Writes `{"clean", "matched",
+   * "opens", "shorts", "cycles"}`.
+   */
+  inline static diplomat::result<std::string, NucleationError> lvs(const Schematic& schematic, std::string_view intent_json);
+  template<typename W>
+  inline static diplomat::result<std::monostate, NucleationError> lvs_write(const Schematic& schematic, std::string_view intent_json, W& writeable_output);
+
+  /**
    * Run design-rule checks (support audit, repeater-cycle detection,
    * optional decay) over the schematic. Writes a JSON array; each
    * element has `kind` plus violation-specific fields. Label-aware

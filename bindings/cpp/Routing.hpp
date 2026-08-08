@@ -23,6 +23,12 @@ namespace capi {
     typedef struct Routing_route_net_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Routing_route_net_result;
     Routing_route_net_result Routing_route_net(diplomat::capi::Schematic* schematic, int32_t sx, int32_t sy, int32_t sz, int32_t dx, int32_t dy, int32_t dz, diplomat::capi::DiplomatStringView label, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Routing_route_all_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Routing_route_all_result;
+    Routing_route_all_result Routing_route_all(diplomat::capi::Schematic* schematic, diplomat::capi::DiplomatStringView nets_json, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Routing_lvs_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Routing_lvs_result;
+    Routing_lvs_result Routing_lvs(const diplomat::capi::Schematic* schematic, diplomat::capi::DiplomatStringView intent_json, diplomat::capi::DiplomatWrite* write);
+
     typedef struct Routing_drc_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Routing_drc_result;
     Routing_drc_result Routing_drc(const diplomat::capi::Schematic* schematic, bool check_decay, diplomat::capi::DiplomatWrite* write);
 
@@ -60,6 +66,40 @@ inline diplomat::result<std::monostate, NucleationError> Routing::route_net_writ
         dy,
         dz,
         {label.data(), label.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Routing::route_all(Schematic& schematic, std::string_view nets_json) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Routing_route_all(schematic.AsFFI(),
+        {nets_json.data(), nets_json.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Routing::route_all_write(Schematic& schematic, std::string_view nets_json, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Routing_route_all(schematic.AsFFI(),
+        {nets_json.data(), nets_json.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Routing::lvs(const Schematic& schematic, std::string_view intent_json) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Routing_lvs(schematic.AsFFI(),
+        {intent_json.data(), intent_json.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Routing::lvs_write(const Schematic& schematic, std::string_view intent_json, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Routing_lvs(schematic.AsFFI(),
+        {intent_json.data(), intent_json.size()},
         &write);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
