@@ -1001,6 +1001,15 @@ export class World {
    *
    * Because the log is cleared here, nothing else may hold a cursor into
    * it — there is nothing left to track after this returns.
+   *
+   * Clear only what was successfully parsed: never clear anything not yet
+   * successfully read, or a malformed read would drop those changes for
+   * good (the engine's copy erased, ours never produced). If `clearChanges`
+   * itself is missing or throws, we deliberately keep going rather than
+   * fail the drain — the next call then re-reads and re-returns everything
+   * already returned this time, since there is no cursor left to skip past
+   * it. That relies on applying a change set being idempotent; it is not
+   * just a perf fallback.
    */
   drainChanges(): Change[] {
     if (!this.sim) return [];
@@ -1016,17 +1025,18 @@ export class World {
     } catch {
       return [];
     }
-    try {
-      this.sim.clearChanges?.();
-    } catch {
-      /* nothing to clear, or engine doesn't support it */
-    }
     if (!raw) return [];
     let parsed: Any;
     try {
       parsed = JSON.parse(raw);
     } catch {
       return [];
+    }
+    // Only clear once the read above has actually succeeded.
+    try {
+      this.sim.clearChanges?.();
+    } catch {
+      /* nothing to clear, or engine doesn't support it */
     }
     const all: Any[] = Array.isArray(parsed) ? parsed : (parsed.changes ?? []);
     return all
