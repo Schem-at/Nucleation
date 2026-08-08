@@ -21,6 +21,7 @@ pub mod io_mapping;
 pub mod io_type;
 pub mod layout_function;
 pub mod physical;
+pub mod routing;
 pub mod sort_strategy;
 pub mod value;
 
@@ -33,5 +34,6 @@ pub use physical::{
     CellContract, EdgeContract, EdgeWindow, Face, InitialState, PhysicalContract, PortDirection,
     PortPairDelay,
 };
+pub use routing::{NetClassRule, RouteZoneMode, RoutingRegion};
 pub use sort_strategy::SortStrategy;
 pub use value::Value;
