@@ -37,6 +37,21 @@ rm -rf bindings/c bindings/cpp bindings/js bindings/kotlin/src bindings/python/s
 "$DT" nanobind bindings/python/src -e "$ENTRY" -s --config-file tools/bindgen/nanobind.toml
 "$DT" php     bindings/php     -e "$ENTRY" -s --config-file tools/bindgen/php.toml
 
+# A `bool` return must reach JS as a real boolean, not the raw wasm i32. A
+# tool built before Nano112/diplomat@8fec8fc emits `return result;`, so every
+# bool-returning method silently hands back 0/1 while its .d.ts still says
+# `boolean` — and a caller comparing against `false` (the natural way to read
+# "did this succeed") takes the wrong branch. It compiles and type-checks, so
+# nothing else catches it. Unlike the php probe above this runs after the
+# wipe, which is safe: bindings/ is committed, so `git checkout bindings/`
+# undoes a failed run.
+grep -rq 'result === 1' bindings/js || {
+    echo "generated JS has no bool coercion; diplomat-tool predates the fix. Reinstall:" >&2
+    echo "  cargo install --git https://github.com/Nano112/diplomat --branch nanobind-public-api diplomat-tool --force" >&2
+    echo "then re-run this script (bindings/ is committed: 'git checkout bindings/' to reset)." >&2
+    exit 1
+}
+
 # Diplomat deliberately emits the same low-level surface for every language.
 # Reapply narrow target-specific compatibility layers after generation.
 python3 tools/patch-js-bindings.py
