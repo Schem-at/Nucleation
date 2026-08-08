@@ -32,6 +32,7 @@ import nets
 import materials as _mt
 
 H_MOVES = ((1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1))
+H_MOVES_XZ = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 
 class Router:
@@ -43,6 +44,19 @@ class Router:
         self.strong = {}            # station exit blocks: strongly powered
                                     # solids that re-emit 15 into ANY adjacent
                                     # dust -- later routes must keep clear
+        self.soft = {}              # pos -> (label, penalty): extra A* cost
+                                    # for FOREIGN nets entering the cell.
+                                    # Soft, not legal: port pockets stay
+                                    # crossable, but trunks stop parking in
+                                    # front of them (a legally-dead-ended
+                                    # foreign trunk can seal a pocket)
+        self.ss = {}                # dust pos -> estimated signal strength
+                                    # as emitted.  Lets a multi-source route
+                                    # resume the refresh budget mid-trunk --
+                                    # a branch leaving a trunk one cell
+                                    # before its repeater starts at ss1 and
+                                    # a corner dust there is DEAD (found by
+                                    # genlib seg7: n32's branch never fired)
 
     def in_bounds(self, p):
         if self.bounds is None:
@@ -92,15 +106,53 @@ class Router:
         finally:
             del self.b.cells[p]
 
+    def move_ok(self, p, q, label, friendly=None):
+        """Subclass hook: may the path step p -> q?  Base router: always.
+
+        CountingRouter (genlib fabric) uses this to ban own-net GRAZING:
+        a branch touching its own trunk on both sides of a repeater closes
+        a self-sustaining ring (the FA seam latch, rediscovered at fabric
+        scale: a d[1] corridor ring stayed lit after the lever went off)."""
+        return True
+
     def col_free(self, x, z, y0, y1):
         return all((x, y, z) not in self.b.cells for y in range(y0, y1 + 1))
+
+    def ladder_clear(self, x, z, y0, label, friendly=None):
+        """May a torch ladder occupy column (x, *, z) from base y0?
+
+        The ladder's torches power every horizontally adjacent dust and its
+        interior blocks are STRONG (that is how it climbs), so a ladder may
+        not stand beside a foreign dust, repeater or comparator -- in either
+        build order (emit marks its cells strong for LATER routes; this
+        guards against EXISTING neighbours)."""
+        ok = (friendly or set()) | {label}
+        for y in range(y0, y0 + 6):
+            for dx, dz in H_MOVES_XZ:
+                q = (x + dx, y, z + dz)
+                cell = self.b.cells.get(q)
+                if cell is None or self.b.solid_at(*q):
+                    continue
+                if "redstone_wire" in cell and self.labels.get(q) in ok:
+                    continue            # own net: a 15 re-emit is harmless
+                if ("redstone_wire" in cell or "repeater" in cell
+                        or "comparator" in cell or "torch" in cell
+                        or "lever" in cell):
+                    return False
+        return True
 
     # -- search -------------------------------------------------------------
     def find(self, src, dst, label, friendly=None, max_iter=1200000):
         friendly = (friendly or set()) | {label}
         # route-to-net: dst may be one cell or a set -- reaching ANY cell of
-        # the target net completes the route (multi-terminal joining)
+        # the target net completes the route (multi-terminal joining).
+        # route-FROM-net: src may likewise be a set of cells that are already
+        # electrically one net (a driver trunk); the search starts from all
+        # of them at g=0, so a branch may leave the trunk anywhere.  Emission
+        # is direction-correct because the path runs trunk -> sink.
         dsts = {dst} if isinstance(dst, tuple) else set(dst)
+        srcs = [src] if isinstance(src, tuple) else list(src)
+        self._dsts = dsts           # for move_ok subclass hooks
 
         def h(p):
             # weighted A* (eps=1.3): slightly suboptimal paths, much less
@@ -112,9 +164,13 @@ class Router:
         # Stairs cannot carry repeaters (chain capped at 4), and a stair may
         # not exactly REVERSE the previous stair: a switchback's support block
         # lands on the cell that cuts the previous diagonal.
-        start = (src, 0, None)
-        openq = [(h(src), 0, start)]
-        came, gbest = {start: (None, None)}, {start: 0}
+        openq, came, gbest = [], {}, {}
+        for s0 in srcs:
+            start = (s0, 0, None)
+            openq.append((h(s0), 0, start))
+            came[start] = (None, None)
+            gbest[start] = 0
+        heapq.heapify(openq)
         it = 0
         while openq:
             it += 1
@@ -152,6 +208,8 @@ class Router:
                     continue
                 if not self.dust_ok(q, label, friendly):
                     continue
+                if not self.move_ok(p, q, label, friendly):
+                    continue
                 if mv == "up" and self.b.solid_at(x, y + 1, z):
                     continue        # solid corner above the lower dust cuts the diagonal
                 if mv == "down" and self.b.solid_at(q[0], y, q[2]):
@@ -167,7 +225,10 @@ class Router:
                     dx, dz = mv[1], mv[2]
                     entry = (x + dx, y, z + dz)
                     if not (self.dust_ok(entry, label, friendly)
-                            and self.col_free(q[0], q[2], y, y + 4)):
+                            and self.move_ok(p, entry, label, friendly)
+                            and self.col_free(q[0], q[2], y, y + 4)
+                            and self.ladder_clear(q[0], q[2], y, label,
+                                                  friendly)):
                         continue    # entry cell + ladder column must be free
                 stair = mv in ("up", "down")
                 if stair and pdir is not None:
@@ -176,6 +237,10 @@ class Router:
                 nd = d + 1 if stair else 0
                 nq = (q, nd, (q[0] - x, q[2] - z) if stair else None)
                 ng = g + cost
+                if q in self.soft:
+                    slab, spen = self.soft[q]
+                    if slab not in friendly:
+                        ng += spen
                 if ng < gbest.get(nq, 1e18):
                     gbest[nq] = ng
                     came[nq] = (s, mv)
@@ -266,18 +331,30 @@ class Router:
                 self.b.stone(ex, py - 1, ez, "route")
                 self.labels[(ex, py, ez)] = label
                 self.b.put(ex, py, ez, rs.DUST)
+                self.ss[(ex, py, ez)] = max(1, 15 - since - 1)
                 # verified template: base, torch, block, torch, cap, exit dust
                 for k in range(3):
                     self.b.stone(x, py + 2 * k, z, "route")
                     if k < 2:
                         self.b.put(x, py + 2 * k + 1, z, rs.TORCH)
+                        # a ladder torch powers any adjacent dust, and the
+                        # block above it is STRONG-powered (that is how the
+                        # ladder climbs) -- both inject 15 into any foreign
+                        # dust that later snuggles up (genlib seg7: a d[0]
+                        # flyover read 15 off a neighbouring ladder block)
+                        self.strong[(x, py + 2 * k + 1, z)] = label
+                        self.strong[(x, py + 2 * k + 2, z)] = label
                 self.labels[(x, y, z)] = label
                 self.b.put(x, y, z, rs.DUST)
+                self.ss[(x, y, z)] = 15         # climb cap re-emits fresh
                 since = 0
                 i += 1
                 continue
             if "redstone_wire" in self.b.cells.get(p, ""):
-                since = self.REFRESH                    # reused own-net trunk
+                # reused own-net trunk: resume the budget from this cell's
+                # recorded strength (unknown cells assume worst case, which
+                # forces a refresh at the first straight cell after leaving)
+                since = 15 - self.ss.get(p, 1)
                 i += 1
                 continue
             prev = path[i - 1][0] if i else None
@@ -308,6 +385,12 @@ class Router:
                     self.b.put(p2[0], p2[1], p2[2], rs.repeater(d))
                     self.b.put(p3[0], p3[1], p3[2], rs.PALETTE["route"])
                     self.strong[p3] = label
+                    # the ENTRY block is an injection port: any later foreign
+                    # dust pointing into it fires the station's repeater and
+                    # writes a hard 15 onto this net (seen in genlib seg7:
+                    # a dead trunk went 0 -> 15 across a station).  Claim its
+                    # neighbourhood exactly like the exit's.
+                    self.strong[p] = label
                     self.stations += 1
                     since = 0
                     i += 3
@@ -319,6 +402,7 @@ class Router:
                 self.b.stone(x, y - 1, z, "route")
                 self.labels[p] = label
                 self.b.put(x, y, z, rs.DUST)
+                self.ss[p] = max(1, 15 - since)
             i += 1
 
     def route(self, src, dst, label, friendly=None):

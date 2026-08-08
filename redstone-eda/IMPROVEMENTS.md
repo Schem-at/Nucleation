@@ -338,3 +338,69 @@ Python with every coordinate read from the contract. Remaining gaps:
 - **P2 Golden-file tests for schems.** The showcase pieces are deterministic;
   regenerate-and-diff (or fingerprint-compare) against the tracked `.schem`s
   would catch regressions without re-running verification sweeps.
+
+## Genlib mapping onto comparator cells (LANDED, 2026-08-09)
+
+`genlib_map.py`: yosys `abc -genlib` maps Verilog onto a library of seven
+VERIFIED flat cells (torch INV, comparator-subtract AND2/XOR2, repeater-join
+OR2, and inverted tails), with areas/delays in the genlib taken from the
+measured fragments.  Levelized column placement; the A* maze router carries
+the inter-cell nets; exhaustive in-sim verification against a pure-Python
+eval of the mapped netlist gates every schematic before it may be saved.
+Saved (verified + baked): `showcase/genlib_seg7.schem`,
+`showcase/genlib_cmp4.schem`.
+
+Measured against the PLA fabric's tracked artifacts (same measurement:
+non-air blocks, tight bbox, structural STA):
+
+| design | fabric | blocks | bbox | volume | crit path | verified |
+|---|---|---|---|---|---|---|
+| seg7 | PLA (hdl/) | 8627 | 254x8x75 | 152400 | 35 rt | 16/16 |
+| seg7 | genlib cells | **6880** (-20%) | 128x7x100 | **89600** (-41%) | 35 rt | 16/16 |
+| cmp4 | PLA (hdl/) | 13873 | 271x8x135 | 292680 | 43 rt | 256/256 |
+| cmp4 | genlib cells | **3560** (**3.9x**) | 149x7x71 | **74053** (**4.0x**) | **28 rt** (-35%) | 256/256 |
+
+Honest reading: the ~3x-density hypothesis holds on cmp4 (3.9x blocks, 4.0x
+volume, 35% faster) where the PLA's dual-rail overhead dominates; seg7 —
+whose PLA is a single dense truth table, the shape PLAs are best at — gains
+only 20% blocks / 41% volume.  Cell area is a rounding error (814/558
+blocks); ROUTING is the fabric cost, so channel geometry sets density.
+TRICKS.md (community corpus) was reviewed; no new idiom was adopted this
+round — the comparator-subtract AND/XOR and block-sandwich stations that
+make the cells flat were already probed in cells.py/probe_station.py.
+
+Fabric physics the composition run flushed out (all now router rules, each
+found as a real in-sim failure of a 45-gate build):
+
+- **Analog arrivals kill comparator cells**: a wire legally delivers ss1;
+  a comparator cell fed at ss3 output ss0.  Every cell input port now has
+  a repeater directly behind it, so cells always see the verified
+  lever-strength condition (this is why cell delays grew ~1 rt).
+- **Own-net repeater rings at fabric scale**: a same-net branch grazing its
+  trunk on both sides of a repeater closes a self-sustaining ring that
+  LATCHES (nets.check is blind: one net).  `Router.move_ok` hook: new dust
+  may touch own-net dust only via its path predecessor or the destination
+  aperture.
+- **Strong-source injection**: station ENTRY blocks, torch-ladder torches
+  and their strong-powered blocks, and PI LEVERS all write 15 into any
+  adjacent foreign dust; none are in nets.py's dust-only model.  All are
+  now strong-claimed at emission (and ladders refuse to stand beside
+  existing foreign components — `ladder_clear`).
+- **Self-conflicting flyovers**: a path crossing 1 above its own earlier
+  segment lays its support ON the lower dust; crossing 2 above CAPS the
+  lower dust's diagonal (found dead at a corridor mouth).  Path post-check
+  + veto-retry.
+- **Port pockets seal**: parked foreign trunks legally fence a port's only
+  approach.  Fix stack: reserved self-refreshing 5-deep approach corridors
+  (mouth dust -> repeater -> port), soft cost halos near mouths, and hard
+  per-cell obstruction boxes (foreign nets may not route inside a cell's
+  claimed region at all).
+- **Trunk strength tracking**: `Router.ss` records estimated signal
+  strength per emitted dust; branches only start from cells >= ss4 and
+  emit resumes the refresh budget from the branch cell's recorded value.
+
+Caveat, recorded honestly: composition correctness is layout-sensitive —
+one spacing combination (COL_CHANNEL=16/CLEAR_Z=6) produced a 13/16 build
+while both looser and tighter combos verify 16/16, so at least one hazard
+class is still unmodelled.  The exhaustive verification gate is what makes
+the flow trustworthy; do not ship an unverified layout.
