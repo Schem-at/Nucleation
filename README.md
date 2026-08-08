@@ -75,6 +75,16 @@ interference, and type set in blocks.
 Every one is a few dozen lines. Open the [gallery](docs/gallery.md) for all ten
 with their code.
 
+## Redstone EDA
+
+An electronic-design-automation stack for redstone lives in
+[`redstone-eda/`](redstone-eda/README.md): Verilog in, exhaustively
+sim-verified `.schem` out — a PLA compiler, a verified comparator-cell
+library (combinational and sequential), place-and-route (`crates/pnr-core` +
+`crates/nucleation-routing` with a generated `Routing` bridge: DRC, LVS,
+STA), and a gallery of eleven baked-at-rest artifacts up to a 32-bit
+Kogge-Stone adder, every one proven in the tick simulator before saving.
+
 ## Documentation & development
 
 - [Documentation index](docs/README.md): per-language references and all
