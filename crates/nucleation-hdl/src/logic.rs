@@ -114,6 +114,8 @@ pub struct Compiler {
     memo: HashMap<(String, u8), Value>,
     pi_slice: HashMap<String, i32>,
     alias: HashMap<String, String>,
+    /// PIs driven externally (a DFF's Q wrap corridor) instead of by a lever.
+    external: HashSet<String>,
 }
 
 fn sanitize(net: &str) -> String {
@@ -175,6 +177,7 @@ impl Compiler {
             memo: HashMap::new(),
             pi_slice: HashMap::new(),
             alias: HashMap::new(),
+            external: HashSet::new(),
         };
         for (i, net) in comp.pis.clone().iter().enumerate() {
             for pol in [0u8, 1u8] {
@@ -186,6 +189,12 @@ impl Compiler {
         comp.level = level;
         comp.pi_slice = pi_slice;
         comp
+    }
+
+    /// Mark PIs as externally driven: their stage-0 rails get no lever, the
+    /// geometry compiler wires them from a DFF bank's Q corridors instead.
+    pub fn mark_external(&mut self, nets: &[String]) {
+        self.external.extend(nets.iter().cloned());
     }
 
     /// The prim-graph name of `net` at polarity `pol` (`.n` = complement rail).
@@ -432,9 +441,36 @@ impl Compiler {
                 levers: Vec::new(),
                 stride: None,
                 ext: Vec::new(),
+                seq: Vec::new(),
             });
         }
         stages
+    }
+
+    /// The highest level any prim sits at (0 when only stage-0 rails exist).
+    pub fn max_level(&self) -> i32 {
+        self.val_terms
+            .keys()
+            .map(|v| self.level[v])
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// Extend `vid` with buffer nodes up to `top` level and return the vid
+    /// that carries it there. Reuses the exact `levelise` buffer naming, so
+    /// chains merge with buffers levelise already made. Must run AFTER
+    /// `levelise` and BEFORE `stages`.
+    pub fn raise_to_level(&mut self, vid: &str, top: i32) -> String {
+        let mut prev = vid.to_string();
+        for l in self.level[vid] + 1..=top {
+            let b = format!("{vid}.b{l}");
+            if !self.val_terms.contains_key(&b) {
+                self.val_terms.insert(b.clone(), vec![vec![prev.clone()]]);
+                self.level.insert(b.clone(), l);
+            }
+            prev = b;
+        }
+        prev
     }
 
     /// Stage 0: one slice per PI, lever-driven rail, inverter torch making the
@@ -443,6 +479,7 @@ impl Compiler {
         let mut nodes = Vec::new();
         let mut invs = Vec::new();
         let mut levers = Vec::new();
+        let mut ext = Vec::new();
         for (i, net) in self.pis.iter().enumerate() {
             let p = self.vid(net, 1);
             let n = self.vid(net, 0);
@@ -456,7 +493,11 @@ impl Compiler {
                 ],
             ));
             invs.push((i as i32, rail.clone(), railn));
-            levers.push((i as i32, rail, 0usize));
+            if self.external.contains(net) {
+                ext.push((i as i32, rail, 0usize));
+            } else {
+                levers.push((i as i32, rail, 0usize));
+            }
         }
         Stage {
             name: "in".to_string(),
@@ -465,8 +506,23 @@ impl Compiler {
             inverters: invs,
             levers,
             stride: None,
-            ext: Vec::new(),
+            ext,
+            seq: Vec::new(),
         }
+    }
+
+    /// The stage-0 rail signal (`<vid>.lv`) of a PI net.
+    pub fn rail_of(&self, net: &str) -> String {
+        format!("{}.lv", self.vid(net, 1))
+    }
+
+    /// The stage-0 slice of a PI net.
+    pub fn slice_of_pi(&self, net: &str) -> i32 {
+        self.pis
+            .iter()
+            .position(|p| p == net)
+            .map(|i| i as i32)
+            .expect("a PI net")
     }
 
     /// Reference model: evaluate the prim graph for one input assignment.

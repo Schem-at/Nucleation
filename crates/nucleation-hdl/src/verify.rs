@@ -98,6 +98,13 @@ impl Sim {
         self.sim.run_until_quiescent(budget);
         self.sim.is_quiescent()
     }
+
+    /// Run exactly `gt` game ticks — the ONLY stepping clocked verification
+    /// uses after the initial placement settle (a clocked design may
+    /// oscillate; quiescence is not a fixpoint to wait for).
+    pub fn run_gt(&mut self, gt: u64) {
+        self.sim.run(gt);
+    }
 }
 
 fn prop<'a>(descriptor: &'a str, key: &str) -> Option<&'a str> {
@@ -285,6 +292,213 @@ pub fn verify(c: &Compiled, cases: &[u64], settle: u64) -> Result<VerifyReport, 
         cases: cases.len(),
         outputs_ok: cases.len() - bad,
         sig_bad,
+    })
+}
+
+/// One clocked verification run's outcome.
+#[derive(Debug, Clone)]
+pub struct ClockedReport {
+    /// Rising edges driven.
+    pub steps: usize,
+    /// Steps whose Q rails and primary outputs all matched the model.
+    pub steps_ok: usize,
+    /// The at-rest state matched the baked initial state.
+    pub init_ok: bool,
+    /// Max game ticks any step needed from the last input flip until every
+    /// D port matched the model — the measured input-to-edge margin.
+    pub measured_setup_gt: u64,
+    /// Max game ticks any step needed from the falling edge until every Q
+    /// rail and output matched — the measured state-propagation margin.
+    pub measured_edge_gt: u64,
+    /// The clock high phase used (covers min pulse + spine skew).
+    pub high_gt: u64,
+    /// Human-readable mismatch notes (first few only).
+    pub mismatches: Vec<String>,
+}
+
+impl ClockedReport {
+    /// True when the initial state and every step matched everywhere.
+    pub fn pass(&self) -> bool {
+        self.init_ok && self.steps_ok == self.steps && self.mismatches.is_empty()
+    }
+
+    /// The measured safe period: setup + high phase + post-edge margin.
+    pub fn measured_min_period_gt(&self) -> u64 {
+        self.measured_setup_gt + self.high_gt + self.measured_edge_gt
+    }
+}
+
+/// Drive a SEQUENTIAL design: reset-by-bake (the placement settle converges
+/// to the authored initial state — legal because a locked slave cuts every
+/// feedback loop at rest), then for each case fixed-tick stepping only:
+/// set the input levers, wait for the D ports to match the model (measuring
+/// the real input-to-edge margin instead of assuming one), pulse the clock
+/// lever high for `high_gt`, and after the falling edge wait for the Q rails
+/// and primary outputs to match the stepped model (measuring clk->Q through
+/// the wrap corridors). `cap_gt` bounds both waits; a design that cannot
+/// settle under the cap fails loudly with a mismatch note.
+pub fn verify_clocked(
+    c: &Compiled,
+    input_seq: &[u64],
+    high_gt: u64,
+    cap_gt: u64,
+) -> Result<ClockedReport, String> {
+    let clock = c
+        .clock
+        .as_ref()
+        .ok_or_else(|| "verify_clocked needs a sequential design".to_string())?;
+    let mut sim = simulate(&c.build, 4000)?;
+    let lever_names: Vec<String> = c.levers.iter().map(|(s, _)| s.clone()).collect();
+    let mut lv = Levers::new(&sim, c.levers.iter().map(|(_, p)| *p).collect());
+    let pi_of_lever: HashMap<String, usize> = c
+        .inputs
+        .iter()
+        .enumerate()
+        .map(|(i, net)| (format!("{}.lv", c.comp.vid(net, 1)), i))
+        .collect();
+    let n = c.inputs.len();
+    let mut mismatches: Vec<String> = Vec::new();
+    let note = |m: String, mm: &mut Vec<String>| {
+        if mm.len() < 8 {
+            mm.push(m);
+        }
+    };
+
+    // -- reset-by-bake: the settled world must sit at the declared state ----
+    let mut state: Vec<u8> = c.latches.iter().map(|l| l.init).collect();
+    let mut pi_bits: Vec<u8> = (0..n)
+        .map(|i| {
+            let (_, p) = c.levers[i];
+            u8::from(sim.powered(p.0, p.1, p.2).unwrap_or(false))
+        })
+        .collect();
+    let mut init_ok = true;
+    for (k, l) in c.latches.iter().enumerate() {
+        let p = c.probes[&l.q_rail];
+        if u8::from(sim.on(p.0, p.1, p.2)) != state[k] {
+            init_ok = false;
+            note(format!("init: {} rail != {}", l.q, state[k]), &mut mismatches);
+        }
+    }
+    let val0 = c.seq_eval(&pi_bits, &state);
+    for (po, want) in c.outputs_from(&val0) {
+        if let Some(crate::Value::Vid(vid)) = c
+            .outputs
+            .iter()
+            .find(|(o, _)| *o == po)
+            .map(|(_, v)| v.clone())
+        {
+            let p = c.probes[&vid];
+            if u8::from(sim.on(p.0, p.1, p.2)) != want {
+                init_ok = false;
+                note(format!("init: output {po} != {want}"), &mut mismatches);
+            }
+        }
+    }
+
+    let d_expected = |c: &Compiled, val: &HashMap<String, u8>| -> Vec<Option<u8>> {
+        c.latches
+            .iter()
+            .map(|l| match &l.d_val {
+                crate::Value::Const(_) => None, // tied at the cell, not probed
+                crate::Value::Vid(v) => Some(val[v]),
+            })
+            .collect()
+    };
+
+    let mut steps_ok = 0usize;
+    let mut measured_setup_gt = 0u64;
+    let mut measured_edge_gt = 0u64;
+    for (si, &case) in input_seq.iter().enumerate() {
+        // 1. inputs, one lever flip at a time, fixed 2 gt apart
+        let bits: Vec<u8> = (0..n).map(|i| ((case >> i) & 1) as u8).collect();
+        for (li, nm) in lever_names.iter().enumerate() {
+            let want = bits[pi_of_lever[nm]] == 1;
+            if lv.state[li] != want {
+                let (x, y, z) = lv.positions[li];
+                sim.use_block(x, y, z);
+                lv.state[li] = want;
+                sim.run_gt(2);
+            }
+        }
+        pi_bits = bits;
+
+        // 2. measured input-settle: step until every D port reads the model
+        let val = c.seq_eval(&pi_bits, &state);
+        let want_d = d_expected(c, &val);
+        let mut t = 0u64;
+        loop {
+            let ok = c.latches.iter().zip(&want_d).all(|(l, w)| match w {
+                None => true,
+                Some(w) => u8::from(sim.on(l.d_port.0, l.d_port.1, l.d_port.2)) == *w,
+            });
+            if ok {
+                break;
+            }
+            if t >= cap_gt {
+                note(
+                    format!("step {si}: D ports never settled under {cap_gt} gt"),
+                    &mut mismatches,
+                );
+                break;
+            }
+            sim.run_gt(1);
+            t += 1;
+        }
+        measured_setup_gt = measured_setup_gt.max(t);
+        sim.run_gt(4); // hold margin past the probe point
+
+        // 3. the edge: clock high for high_gt, then low
+        let (cx, cy, cz) = clock.lever;
+        sim.use_block(cx, cy, cz);
+        sim.run_gt(high_gt);
+        sim.use_block(cx, cy, cz);
+        state = c.latch_next(&val);
+
+        // 4. measured post-edge settle: Q rails + outputs match the stepped
+        //    model
+        let val2 = c.seq_eval(&pi_bits, &state);
+        let want_po = c.outputs_from(&val2);
+        let mut t = 0u64;
+        let mut ok;
+        loop {
+            ok = c.latches.iter().enumerate().all(|(k, l)| {
+                let p = c.probes[&l.q_rail];
+                u8::from(sim.on(p.0, p.1, p.2)) == state[k]
+            }) && want_po.iter().all(|(po, w)| {
+                match c.outputs.iter().find(|(o, _)| o == po).map(|(_, v)| v) {
+                    Some(crate::Value::Vid(vid)) => {
+                        let p = c.probes[vid];
+                        u8::from(sim.on(p.0, p.1, p.2)) == *w
+                    }
+                    _ => true,
+                }
+            });
+            if ok || t >= cap_gt {
+                break;
+            }
+            sim.run_gt(1);
+            t += 1;
+        }
+        measured_edge_gt = measured_edge_gt.max(t);
+        sim.run_gt(4);
+        if ok {
+            steps_ok += 1;
+        } else {
+            note(
+                format!("step {si}: state/outputs diverged (want Q={state:?})"),
+                &mut mismatches,
+            );
+        }
+    }
+    Ok(ClockedReport {
+        steps: input_seq.len(),
+        steps_ok,
+        init_ok,
+        measured_setup_gt,
+        measured_edge_gt,
+        high_gt,
+        mismatches,
     })
 }
 

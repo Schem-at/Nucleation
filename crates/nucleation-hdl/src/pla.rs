@@ -114,6 +114,9 @@ pub struct Stage {
     pub stride: Option<i32>,
     /// `(slice, signal, channel)` externally driven input rails.
     pub ext: Vec<(i32, String, usize)>,
+    /// Sequential cells (DFF bank) this stage carries — empty for
+    /// combinational stages. See [`crate::seq`].
+    pub seq: Vec<crate::seq::SeqCell>,
 }
 
 /// Per-node placed geometry.
@@ -173,8 +176,11 @@ pub struct Route {
 /// a route arrives having decayed on the way, so without it the rail starts
 /// at whatever trickle survived the journey and dies before the first column.
 pub fn rail_repeater_xs(x0: i32, x1: i32, drive: i32) -> BTreeSet<i32> {
-    // never on a tap or the inverter
-    let bad: Vec<i32> = std::iter::once(INV_X)
+    // never on a tap or the inverter; CH[0] stays dust too — a DFF bank's
+    // D spur taps its rail there (all bad offsets are isolated, so the
+    // worst refresh gap stays RAIL_REPEAT+1 and the rail ss floor holds)
+    let bad: Vec<i32> = [INV_X, CH[0]]
+        .into_iter()
         .chain(COL_A)
         .chain(COL_B)
         .chain(EXTRA_COLS)
@@ -342,6 +348,13 @@ pub fn plan(
         for (sl, src, dst) in &st.inverters {
             taps.entry(src.clone()).or_default().insert(*sl);
             taps.entry(dst.clone()).or_default().insert(*sl);
+        }
+        // a DFF bank taps its D signals: each non-constant D gets a rail in
+        // this band that the standard route machinery drives
+        for sc in &st.seq {
+            if let Some(d) = &sc.d {
+                taps.entry(d.clone()).or_default().insert(sc.slice);
+            }
         }
 
         // rail X span: from its drive point to the last slice that taps it
@@ -603,6 +616,11 @@ pub struct Pla {
     pub probe: BTreeMap<String, (i32, i32, i32)>,
     /// How many rail lids were placed.
     pub lids: usize,
+    /// Per DFF (in `Stage::seq` order): `(D port dust, Q port dust)` in
+    /// build coordinates.
+    pub seq_ports: Vec<((i32, i32, i32), (i32, i32, i32))>,
+    /// The clock lever cell, when a DFF bank was built.
+    pub clock_lever: Option<(i32, i32, i32)>,
 }
 
 impl Pla {
@@ -618,6 +636,8 @@ impl Pla {
             levers: Vec::new(),
             probe: BTreeMap::new(),
             lids: 0,
+            seq_ports: Vec::new(),
+            clock_lever: None,
         })
     }
 
@@ -868,6 +888,135 @@ impl Pla {
         Ok(())
     }
 
+    // -- sequential: DFF bank, clock spine, D spurs, Q wrap corridors --------
+    //
+    // Topology (documented in seq_README/DESIGN_SPEC): the bank is the LAST
+    // stage band. D signals are raised to the top combinational level, so
+    // their delivery is an ordinary next-stage route onto a bank rail; each
+    // DFF taps its D rail with a y3 flyover spur (support blocks double as
+    // caps over every rail row crossed). The clock is a dedicated y1 spine
+    // north of the DFF row — one lever, one dust branch per cell by
+    // adjacency. Q leaves east and wraps AROUND the fabric (south, then
+    // west of x=0, then north past stage 0) and re-enters its stage-0 input
+    // rail from the north — the rail is slot 0, the northernmost row of the
+    // input band, so the corridor lands on its west-end dust without
+    // crossing anything. Corridor rows/columns are pitched 2 apart with
+    // depths ordered by bank/stage-0 slice, which makes the whole wrap
+    // planar: no two corridors ever cross (same argument as the counter4
+    // feedback corridors, generalised).
+    fn build_seq(&mut self) -> Result<(), HdlError> {
+        let si = match self.stages.iter().position(|p| !p.st.seq.is_empty()) {
+            Some(i) => i,
+            None => return Ok(()),
+        };
+        let cells: Vec<crate::seq::SeqCell> = self.stages[si].st.seq.clone();
+        let zb = self.stages[si].z;
+        let nslots = self.stages[si]
+            .slot
+            .values()
+            .max()
+            .map_or(0, |m| m + 1);
+        let dz = zb + 3 * nslots + 6;
+        let spine_z = dz - 2;
+        let lo_slice = cells.iter().map(|c| c.slice).min().expect("seq not empty");
+        let hi_slice = cells.iter().map(|c| c.slice).max().expect("seq not empty");
+
+        // -- clock: lever + spine, one dust branch per DFF by adjacency ------
+        let lx = sx(lo_slice) - 3;
+        self.b.stone(lx, 0, spine_z, "route")?;
+        self.b.force(lx, 1, spine_z, LEVER_OFF);
+        self.clock_lever = Some((lx, 1, spine_z));
+        let mut since = 0;
+        for x in lx + 1..=sx(hi_slice) + 10 {
+            self.b.stone(x, 0, spine_z, "route")?;
+            since += 1;
+            // dense refresh (>=8) keeps every branch cell at ss>=6 so the
+            // in-cell clock column stays alive; the cell directly north of a
+            // clk_in port must stay dust so the branch is fed by adjacency
+            if since >= 8 && x.rem_euclid(SLICE_W) != 10 {
+                self.b.put(x, 1, spine_z, &repeater("west"))?;
+                since = 0;
+            } else {
+                self.dust(x, 1, spine_z, "clk")?;
+            }
+        }
+
+        for (k, sc) in cells.iter().enumerate() {
+            let x0 = sx(sc.slice);
+
+            // -- the DFF template, baked at its declared initial state ------
+            for ((cx, cy, cz), state, lab) in crate::seq::dff_cells(sc.init) {
+                let (gx, gy, gz) = (x0 + cx, cy, dz + cz);
+                if state.contains("concrete") {
+                    // structure: first role to claim a cell keeps its colour
+                    if !self.b.solid_at(gx, gy, gz) {
+                        self.b.put(gx, gy, gz, &state)?;
+                    }
+                } else {
+                    self.b.put(gx, gy, gz, &state)?;
+                }
+                if let Some(l) = lab {
+                    self.b
+                        .labels
+                        .insert((gx, gy, gz), format!("{}.{l}", sc.label));
+                }
+            }
+            let d_port = (x0, 1, dz);
+            let q_port = (x0 + 12, 1, dz);
+            self.seq_ports.push((d_port, q_port));
+            self.probe.insert(format!("{}.d", sc.label), d_port);
+            self.probe.insert(format!("{}.q", sc.label), q_port);
+
+            // -- D: spur off the bank rail, or a constant tie ----------------
+            match &sc.d {
+                Some(d) => {
+                    let rz = zb + 3 * self.stages[si].slot[d];
+                    // guarantee a fresh signal at the tap: force a rail
+                    // repeater just west of this slice (offset 16 is never a
+                    // tap/inverter column)
+                    self.b.force(x0 - 1, 1, rz, &repeater("west"));
+                    self.b.labels.remove(&(x0 - 1, 1, rz));
+                    // y3 flyover spur: supports double as caps over every
+                    // rail row crossed (incl. the clock spine), which also
+                    // severs the descent diagonals into foreign dust
+                    let mut path: Vec<(i32, i32, i32)> = vec![
+                        (x0, 1, rz + 1),
+                        (x0, 2, rz + 2),
+                        (x0, 3, rz + 3),
+                    ];
+                    path.extend((rz + 4..=dz - 2).map(|z| (x0, 3, z)));
+                    path.push((x0, 2, dz - 1));
+                    self.run(&path, d)?;
+                }
+                None => {
+                    if sc.d_const == 1 {
+                        // tie D high: torch replacing the D port dust (the
+                        // dust at local (1,1,0) carries it into the master)
+                        self.b.force(x0, 1, dz, TORCH);
+                        self.b.labels.remove(&(x0, 1, dz));
+                    }
+                    // d_const == 0: the D run floats at 0 by itself
+                }
+            }
+
+            // -- Q: wrap corridor east -> south -> west -> north -> into the
+            //    stage-0 input rail's west end from the north ---------------
+            let row_s = dz + 7 + 2 * k as i32; // south row (east cells deeper)
+            let col_w = -4 - 2 * k as i32; // west column
+            let row_n = -2 - 2 * k as i32; // north row (east entries deeper)
+            let ex = sx(sc.q_slice); // stage-0 entry column
+            let mut path: Vec<(i32, i32, i32)> = Vec::new();
+            path.extend((13..=15).map(|dx| (x0 + dx, 1, dz)));
+            path.extend((dz + 1..=row_s).map(|z| (x0 + 15, 1, z)));
+            path.extend((col_w..=x0 + 14).rev().map(|x| (x, 1, row_s)));
+            path.extend((row_n..row_s).rev().map(|z| (col_w, 1, z)));
+            path.extend((col_w + 1..=ex).map(|x| (x, 1, row_n)));
+            path.extend((row_n + 1..=-1).map(|z| (ex, 1, z)));
+            self.run(&path, &sc.q_rail)?;
+        }
+        Ok(())
+    }
+
     /// A rail lid is only load-bearing where a wire could actually drop into
     /// the rail: any dust in the four y=2 neighbours of a rail cell.
     fn place_lids(&mut self) -> Result<usize, HdlError> {
@@ -889,12 +1038,14 @@ impl Pla {
         Ok(n)
     }
 
-    /// Emit rails, inverters, node columns, routes and lids.
+    /// Emit rails, inverters, node columns, routes, the DFF bank (when a
+    /// stage carries sequential cells) and lids.
     pub fn build(&mut self) -> Result<(), HdlError> {
         self.build_rails()?;
         self.build_inverters()?;
         self.build_nodes()?;
         self.build_routes()?;
+        self.build_seq()?;
         self.lids = self.place_lids()?;
         Ok(())
     }

@@ -107,10 +107,131 @@ fn geometry_is_placed_probed_and_levered() {
 }
 
 #[test]
-fn sequential_blif_is_rejected_with_a_clear_error() {
-    let text = ".model d\n.inputs a clk\n.outputs q\n.latch a q re clk 0\n.end\n";
+fn hierarchy_directives_are_rejected_with_a_clear_error() {
+    let text = ".model d\n.inputs a\n.outputs q\n.subckt foo A=a Q=q\n.end\n";
     match compile_blif(text, "d").map(|_| ()) {
-        Err(HdlError::Unsupported(m)) => assert!(m.contains(".latch"), "{m}"),
-        other => panic!("expected Unsupported(.latch), got {other:?}"),
+        Err(HdlError::Unsupported(m)) => assert!(m.contains(".subckt"), "{m}"),
+        other => panic!("expected Unsupported(.subckt), got {other:?}"),
+    }
+}
+
+#[test]
+fn non_rising_edge_latches_are_rejected() {
+    let text = ".model d\n.inputs a clk\n.outputs q\n.latch a q fe clk 0\n.end\n";
+    match compile_blif(text, "d").map(|_| ()) {
+        Err(HdlError::Unsupported(m)) => assert!(m.contains("rising-edge"), "{m}"),
+        other => panic!("expected Unsupported(rising-edge), got {other:?}"),
+    }
+}
+
+#[test]
+fn multiple_clock_domains_are_rejected() {
+    let text = ".model d\n.inputs a c1 c2\n.outputs q r\n\
+                .latch a q re c1 0\n.latch a r re c2 0\n.end\n";
+    match compile_blif(text, "d").map(|_| ()) {
+        Err(HdlError::Unsupported(m)) => assert!(m.contains("clock domains"), "{m}"),
+        other => panic!("expected Unsupported(clock domains), got {other:?}"),
+    }
+}
+
+/// Independent clocked evaluation of the raw BLIF: latch outputs come from
+/// `state`, next state reads each latch's input net after the comb settle.
+fn step_blif(
+    blif: &Blif,
+    pi: &HashMap<String, u8>,
+    state: &[u8],
+) -> (HashMap<String, u8>, Vec<u8>) {
+    let mut env = pi.clone();
+    for (l, s) in blif.latches.iter().zip(state) {
+        env.insert(l.output.clone(), *s);
+    }
+    let val = eval_blif(blif, &env);
+    let next: Vec<u8> = blif.latches.iter().map(|l| val[&l.input]).collect();
+    (val, next)
+}
+
+/// The compiled sequential model must agree with the independent BLIF
+/// stepper on outputs AND next-state at every step of `cases`.
+fn check_seq_against_blif(name: &str, cases: &[u64]) {
+    let text = fixture(name);
+    let blif = parse_blif(&text).unwrap();
+    let compiled = compile_blif(&text, name).unwrap();
+    assert_eq!(compiled.latches.len(), blif.latches.len(), "{name}");
+    assert!(compiled.clock.is_some(), "{name}: no clock");
+    let mut state: Vec<u8> = blif.latches.iter().map(|l| l.init_bit()).collect();
+    let mut cstate: Vec<u8> = compiled.latches.iter().map(|l| l.init).collect();
+    assert_eq!(state, cstate, "{name}: baked init");
+    let n = compiled.inputs.len();
+    for (si, &case) in cases.iter().enumerate() {
+        let bits: Vec<u8> = (0..n).map(|i| ((case >> i) & 1) as u8).collect();
+        let pi: HashMap<String, u8> = compiled
+            .inputs
+            .iter()
+            .cloned()
+            .zip(bits.iter().copied())
+            .collect();
+        let (want, next) = step_blif(&blif, &pi, &state);
+        let val = compiled.seq_eval(&bits, &cstate);
+        for (po, got) in compiled.outputs_from(&val) {
+            assert_eq!(got, want[&po], "{name} step {si}: output {po}");
+        }
+        state = next;
+        cstate = compiled.latch_next(&val);
+        assert_eq!(cstate, state, "{name} step {si}: next state");
+    }
+}
+
+#[test]
+fn counter4_model_counts_like_the_blif() {
+    check_seq_against_blif("counter4", &vec![0u64; 40]);
+}
+
+#[test]
+fn fsm_model_matches_the_blif_on_a_long_input_tape() {
+    // every x pattern of 6 steps — 64 tapes woven into one long run
+    let tape: Vec<u64> = (0..64u64).flat_map(|w| (0..6).map(move |b| (w >> b) & 1)).collect();
+    check_seq_against_blif("fsm", &tape);
+}
+
+#[test]
+fn toggle1_model_starts_at_one_and_toggles_on_enable() {
+    check_seq_against_blif("toggle1", &[1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1]);
+}
+
+#[test]
+fn uart_tx_model_matches_the_blif_over_a_frame() {
+    // start pulse with data 0xA5, then idle inputs for the whole frame
+    let mut cases = vec![1u64 | (0xA5 << 1)];
+    cases.extend(std::iter::repeat(0xA5 << 1).take(25));
+    check_seq_against_blif("uart_tx", &cases);
+}
+
+#[test]
+fn seq_geometry_has_a_clock_lever_dff_ports_and_q_rail_probes() {
+    for name in ["counter4", "fsm", "toggle1", "uart_tx"] {
+        let c = compile_blif(&fixture(name), name).unwrap();
+        let clock = c.clock.as_ref().expect("clock");
+        let (x, y, z) = clock.lever;
+        assert!(c.build.cells[&(x, y, z)].contains("lever"), "{name}: clock lever");
+        assert_eq!(c.levers.len(), c.inputs.len(), "{name}: one lever per real PI");
+        for (k, l) in c.latches.iter().enumerate() {
+            assert!(
+                c.probes.contains_key(&l.q_rail),
+                "{name}: latch {k} q rail probed"
+            );
+            let q = l.q_port;
+            assert!(
+                c.build.cells[&(q.0, q.1, q.2)].contains("redstone_wire"),
+                "{name}: latch {k} Q port is dust"
+            );
+            // the slave repeater is baked at the declared initial state
+            let slave = (q.0 - 12 + 4, 1, q.2);
+            let s = &c.build.cells[&(slave.0, slave.1, slave.2)];
+            assert!(
+                s.contains(&format!("powered={}", l.init == 1)) && s.contains("locked=true"),
+                "{name}: latch {k} slave baked at Q={} ({s})",
+                l.init
+            );
+        }
     }
 }

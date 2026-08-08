@@ -3,9 +3,11 @@
 //! Port of `redstone-eda/hdl/hdl2redstone.py` (`parse_blif`, `tt_of`, `fold`)
 //! — that file is the verified spec; every rule here mirrors it line for line.
 //!
-//! Combinational only: `.latch` / `.subckt` / `.gate` / `.mlatch` are rejected
-//! with a clear error. `.names` covers become truth tables; constants are
-//! propagated and duplicate/constant inputs restricted away.
+//! `.names` covers become truth tables; constants are propagated and
+//! duplicate/constant inputs restricted away. `.latch` (rising-edge only) is
+//! parsed into [`Latch`] records — a latch output counts as a driven net for
+//! folding, exactly like a primary input. `.subckt` / `.gate` / `.mlatch`
+//! are rejected with a clear error.
 
 use std::collections::HashMap;
 
@@ -20,6 +22,30 @@ pub struct RawNode {
     pub rows: Vec<(String, String)>,
 }
 
+/// One `.latch` line: `\.latch <input> <output> [<type> <control>] [<init>]`.
+///
+/// Only rising-edge (`re`) latches are supported — that is what yosys
+/// `synth; write_blif` emits for `always @(posedge clk)` registers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Latch {
+    /// The D net (next state), computed by the combinational fabric.
+    pub input: String,
+    /// The Q net (current state); behaves like a primary input to the fabric.
+    pub output: String,
+    /// Clock net, when the 4/5-token form named one.
+    pub control: Option<String>,
+    /// Raw init digit: 0, 1, 2 (don't care) or 3 (unknown).
+    pub init: u8,
+}
+
+impl Latch {
+    /// The initial Q this latch is baked at: declared 0/1; don't-care and
+    /// unknown (2/3) bake at 0 — init-by-construction needs SOME state.
+    pub fn init_bit(&self) -> u8 {
+        u8::from(self.init == 1)
+    }
+}
+
 /// A parsed BLIF model: primary inputs/outputs plus `.names` nodes in file order.
 #[derive(Debug, Clone)]
 pub struct Blif {
@@ -29,6 +55,8 @@ pub struct Blif {
     pub outputs: Vec<String>,
     /// `.names` nodes keyed by output net, preserving file order.
     pub nodes: Vec<(String, RawNode)>,
+    /// `.latch` records, in file order.
+    pub latches: Vec<Latch>,
 }
 
 impl Blif {
@@ -65,6 +93,7 @@ pub fn parse_blif(text: &str) -> Result<Blif, HdlError> {
     let mut inputs: Vec<String> = Vec::new();
     let mut outputs: Vec<String> = Vec::new();
     let mut nodes: Vec<(String, RawNode)> = Vec::new();
+    let mut latches: Vec<Latch> = Vec::new();
     let mut index: HashMap<String, usize> = HashMap::new();
     let mut cur: Option<usize> = None;
     for line in &lines {
@@ -94,9 +123,13 @@ pub fn parse_blif(text: &str) -> Result<Blif, HdlError> {
                     nodes.push((out, node));
                 }
             }
-            ".latch" | ".subckt" | ".gate" | ".mlatch" => {
+            ".latch" => {
+                latches.push(parse_latch(&tok)?);
+                cur = None;
+            }
+            ".subckt" | ".gate" | ".mlatch" => {
                 return Err(HdlError::Unsupported(format!(
-                    "combinational only: found {}",
+                    "flat .names/.latch only: found {}",
                     tok[0]
                 )));
             }
@@ -113,7 +146,45 @@ pub fn parse_blif(text: &str) -> Result<Blif, HdlError> {
             }
         }
     }
-    Ok(Blif { inputs, outputs, nodes })
+    Ok(Blif { inputs, outputs, nodes, latches })
+}
+
+/// Parse one `.latch` token line (rising-edge only).
+fn parse_latch(tok: &[&str]) -> Result<Latch, HdlError> {
+    let parse_init = |s: &str| -> Result<u8, HdlError> {
+        match s {
+            "0" => Ok(0),
+            "1" => Ok(1),
+            "2" => Ok(2),
+            "3" => Ok(3),
+            other => Err(HdlError::Parse(format!("bad .latch init value {other}"))),
+        }
+    };
+    let (input, output, ttype, control, init) = match tok.len() {
+        3 => (tok[1], tok[2], None, None, 3),
+        4 => (tok[1], tok[2], None, None, parse_init(tok[3])?),
+        5 => (tok[1], tok[2], Some(tok[3]), Some(tok[4]), 3),
+        6 => (tok[1], tok[2], Some(tok[3]), Some(tok[4]), parse_init(tok[5])?),
+        n => {
+            return Err(HdlError::Parse(format!(
+                ".latch expects 2-5 arguments, got {}",
+                n - 1
+            )))
+        }
+    };
+    if let Some(t) = ttype {
+        if t != "re" {
+            return Err(HdlError::Unsupported(format!(
+                "only rising-edge (re) latches are supported, got {t}"
+            )));
+        }
+    }
+    Ok(Latch {
+        input: input.to_string(),
+        output: output.to_string(),
+        control: control.map(str::to_string),
+        init,
+    })
 }
 
 /// Truth table over `2**k` input assignments; entry `m` is the value when bit
@@ -199,7 +270,14 @@ pub fn fold(
         visit(i, blif, &index, &mut seen, &mut order)?;
     }
 
-    let pis: std::collections::HashSet<&str> = blif.inputs.iter().map(|s| s.as_str()).collect();
+    // Latch outputs are state: the combinational fabric reads them exactly
+    // like primary inputs.
+    let pis: std::collections::HashSet<&str> = blif
+        .inputs
+        .iter()
+        .map(|s| s.as_str())
+        .chain(blif.latches.iter().map(|l| l.output.as_str()))
+        .collect();
     let mut consts: HashMap<String, u8> = HashMap::new();
     let mut nodes: Vec<(String, Node)> = Vec::new();
     for &i in &order {
