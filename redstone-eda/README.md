@@ -110,6 +110,24 @@ Verilog ──yosys──> BLIF ──hdl2redstone──> PLA stages ──build
 The full design rationale — every rule paid for by a real in-sim bug — is in
 `ROUTING_CRATE_DESIGN.md`.
 
+## Two-layer API: wire core + veneer
+
+The `Design` surface users type is NOT the generated bridge. The wheel ships
+two layers (DESIGN_SPEC.md §11):
+
+- **wire core** — the generated Diplomat/nanobind extension
+  (`nucleation.core`): JSON-string arguments and positional splats, exact
+  bridge shapes, regenerated per release;
+- **veneer** — `bindings/python/nucleation/design.py`, a thin hand-written
+  overlay: keyword tuples (`declare_input("a_in", anchor=(1,2,8),
+  step=(0,2,0), width=8)`), `Gate`/`Style` dataclasses, a `Bus` handle
+  (`.state`, `.move_gate`, `.rip`), `CheckReport` (`.clean`,
+  `strict=True` raises), and `d.bake().executor()` with
+  `ex["a_in"] = 0x55; ex.settle(); ex["a_out"]` sugar. Zero logic beyond
+  marshalling — the JS veneer mirrors it 1:1.
+
+`compositor/design_demo2/3/4` are the acceptance tests of the veneer.
+
 ## Verification philosophy
 
 Nothing in this tree is trusted because it "looks right":

@@ -282,6 +282,48 @@ r = d.move_instance("c0", at=(4, 0, 8))   # now overlaps bus_a's fragment
 # half-routed fragment.
 ```
 
+## 11. API surface — generated wire core + idiomatic veneer
+
+The user-facing API is TWO layers, and only the top one is typed by hand:
+
+1. **Wire core (generated).** The Diplomat bridge (`src/bridge/design.rs`)
+   speaks the wire format: positional coordinate splats and JSON-string
+   arguments/returns (`route_bus(name, driver, sinks_json, gates_json,
+   style_json) -> state`). It is regenerated per binding and is NEVER the
+   surface users type. In the Python wheel it ships as the
+   `nucleation.nucleation` submodule (re-exported as `nucleation.core`).
+2. **Idiomatic veneer (hand-written, thin).** One small module per
+   language marshals native shapes into exactly those wire calls — zero
+   design/routing logic on the veneer side. Python:
+   `bindings/python/nucleation/design.py` (the package `__init__` star-
+   re-exports the core, then overlays the veneer), the Python sibling of
+   the C++ `bindings/python/custom/` extension point.
+
+The veneer surface (acceptance-tested by `compositor/design_demo2/3/4`):
+
+```python
+d = n.Design.for_schematic("crossing", s)
+d.declare_input("a_in", anchor=(1, 2, 8), step=(0, 2, 0), width=8, ty="uint")
+bus_a = d.route_bus("bus_a", driver="a_in", sinks=["a_out"],
+                    gates=[n.Gate(anchor=(8, 2, 8), step=(0, 2, 0))],
+                    style=n.Style(bus_block="minecraft:lime_concrete"))
+bus_a.state                      # live "intended" / "routed" / "failed: …"
+bus_a.move_gate(0, (8, 2, 12))   # by index or name -> reroute report dict
+bus_a.skew; bus_a.rule(max_len_rt=100); bus_a.rip()
+report = d.check()               # CheckReport: .clean/.drc/.lvs/.rules
+d.check(strict=True)             # raises DesignCheckError when dirty
+baked = d.bake(4000)             # Flat: core Schematic + .save()/.executor()
+ex = baked.executor()            # ex["a_in"] = 0x55; ex.settle(); ex["a_out"]
+d.move_instance("c0", at=(4, 0, 8))            # -> co-reroute report dict
+d.save("x.nucm"); d.save("x.litematic")        # tier dispatched by suffix
+```
+
+Dataclasses `Gate`/`Style` (plain dicts accepted), `Bus`/`CheckReport`/
+`Flat`/`Executor` handles; explicit wire methods stay reachable via
+`d.raw` / `nucleation.core`. **The JS veneer must mirror this module
+1:1** (same names, same shapes, `Object` literals where Python takes
+dataclasses) over the same generated wasm core.
+
 ## Phase 2 (in scope of the model; ✅ = landed on this branch)
 
 - ✅ interference co-reroute + drag APIs (`move_gate`, `move_instance`) —
