@@ -14,6 +14,13 @@ internal interface DesignLib: Library {
     fun Design_declare_input(handle: Pointer, name: Slice, ax: Int, ay: Int, az: Int, sx: Int, sy: Int, sz: Int, width: FFIUint8, ty: Slice): ResultUnitInt
     fun Design_declare_output(handle: Pointer, name: Slice, ax: Int, ay: Int, az: Int, sx: Int, sy: Int, sz: Int, width: FFIUint8, ty: Slice): ResultUnitInt
     fun Design_route_bus(handle: Pointer, name: Slice, driver: Slice, sinksJson: Slice, gatesJson: Slice, styleJson: Slice, write: Pointer): ResultUnitInt
+    fun Design_route_bus_or(handle: Pointer, name: Slice, driversJson: Slice, sinksJson: Slice, gatesJson: Slice, styleJson: Slice, write: Pointer): ResultUnitInt
+    fun Design_set_block(handle: Pointer, x: Int, y: Int, z: Int, block: Slice): ResultUnitInt
+    fun Design_move_instance(handle: Pointer, name: Slice, x: Int, y: Int, z: Int, rotY: Int, write: Pointer): ResultUnitInt
+    fun Design_add_gate(handle: Pointer, bus: Slice, gate: Slice, x: Int, y: Int, z: Int, sx: Int, sy: Int, sz: Int, write: Pointer): ResultUnitInt
+    fun Design_move_gate(handle: Pointer, bus: Slice, gate: Slice, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
+    fun Design_set_bus_rule(handle: Pointer, bus: Slice, ruleJson: Slice): ResultUnitInt
+    fun Design_bus_skew(handle: Pointer, name: Slice, write: Pointer): ResultUnitInt
     fun Design_bus_state(handle: Pointer, name: Slice, write: Pointer): ResultUnitInt
     fun Design_rip(handle: Pointer, name: Slice): ResultUnitInt
     fun Design_flatten(handle: Pointer): ResultPointerInt
@@ -215,6 +222,174 @@ class Design internal constructor (
             sinksJsonSliceMemory.close()
             gatesJsonSliceMemory.close()
             styleJsonSliceMemory.close()
+        }
+    }
+
+    /** Declare AND realize a wired-OR bus: `drivers_json` is a JSON
+    *array of port names — multiple drivers are legal ONLY through
+    *this explicit merge (`merge="or"`). Extra drivers join the
+    *trunk as diode-isolated dust-merge branches; the LVS intent
+    *stays ONE net per bit. Same shapes as `route_bus` otherwise.
+    */
+    fun routeBusOr(name: String, driversJson: String, sinksJson: String, gatesJson: String, styleJson: String): Result<String> {
+        val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
+        val driversJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(driversJson)
+        val sinksJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(sinksJson)
+        val gatesJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(gatesJson)
+        val styleJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(styleJson)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_route_bus_or(handle, nameSliceMemory.slice, driversJsonSliceMemory.slice, sinksJsonSliceMemory.slice, gatesJsonSliceMemory.slice, styleJsonSliceMemory.slice, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            nameSliceMemory.close()
+            driversJsonSliceMemory.close()
+            sinksJsonSliceMemory.close()
+            gatesJsonSliceMemory.close()
+            styleJsonSliceMemory.close()
+        }
+    }
+
+    /** Edit the loose block layer: plain `set_block` on the base
+    *schematic (participates in occupancy and flatten).
+    */
+    fun setBlock(x: Int, y: Int, z: Int, block: String): Result<Unit> {
+        val blockSliceMemory = PrimitiveArrayTools.borrowUtf8(block)
+
+        val returnVal = lib.Design_set_block(handle, x, y, z, blockSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            blockSliceMemory.close()
+        }
+    }
+
+    /** Drag an instance layer to a new position/rotation. The move
+    *itself ALWAYS succeeds (the document's truth); the affected bus
+    *set — fragments intersecting the old or new footprint +
+    *influence halo, plus every already-failed bus — is ripped and
+    *co-rerouted deterministically with bounded retry rounds.
+    *Writes `{"rerouted": [...], "failed": {name: reason}}`.
+    */
+    fun moveInstance(name: String, x: Int, y: Int, z: Int, rotY: Int): Result<String> {
+        val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_move_instance(handle, nameSliceMemory.slice, x, y, z, rotY, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            nameSliceMemory.close()
+        }
+    }
+
+    /** Add a gate to an existing bus (splitting the segment it lands
+    *in) and re-realize it. Writes the resulting bus state.
+    */
+    fun addGate(bus: String, gate: String, x: Int, y: Int, z: Int, sx: Int, sy: Int, sz: Int): Result<String> {
+        val busSliceMemory = PrimitiveArrayTools.borrowUtf8(bus)
+        val gateSliceMemory = PrimitiveArrayTools.borrowUtf8(gate)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_add_gate(handle, busSliceMemory.slice, gateSliceMemory.slice, x, y, z, sx, sy, sz, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            busSliceMemory.close()
+            gateSliceMemory.close()
+        }
+    }
+
+    /** Drag a gate: the anchor moves unconditionally, then EXACTLY the
+    *two adjacent segments are ripped and rerouted atomically. An
+    *unroutable move leaves the bus `failed: reason` — visible,
+    *never half-routed. Writes `{"state": "...",
+    *"rerouted_segments": n}`.
+    */
+    fun moveGate(bus: String, gate: String, x: Int, y: Int, z: Int): Result<String> {
+        val busSliceMemory = PrimitiveArrayTools.borrowUtf8(bus)
+        val gateSliceMemory = PrimitiveArrayTools.borrowUtf8(gate)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_move_gate(handle, busSliceMemory.slice, gateSliceMemory.slice, x, y, z, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            busSliceMemory.close()
+            gateSliceMemory.close()
+        }
+    }
+
+    /** Attach a net-class discipline to a bus (JSON `NetClassRule`:
+    *optional `max_len_rt` delay budget, `y_band` layer band, …);
+    *`check()` enforces it.
+    */
+    fun setBusRule(bus: String, ruleJson: String): Result<Unit> {
+        val busSliceMemory = PrimitiveArrayTools.borrowUtf8(bus)
+        val ruleJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(ruleJson)
+
+        val returnVal = lib.Design_set_bus_rule(handle, busSliceMemory.slice, ruleJsonSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            busSliceMemory.close()
+            ruleJsonSliceMemory.close()
+        }
+    }
+
+    /** Per-bus skew from the routed fragment: writes
+    *`{"per_bit_rt": [...], "skew_rt": n, "max_rt": n}`.
+    */
+    fun busSkew(name: String): Result<String> {
+        val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_bus_skew(handle, nameSliceMemory.slice, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            nameSliceMemory.close()
         }
     }
 

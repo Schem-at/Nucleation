@@ -168,6 +168,168 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Declare AND realize a wired-OR bus: `drivers_json` is a JSON
+        /// array of port names — multiple drivers are legal ONLY through
+        /// this explicit merge (`merge="or"`). Extra drivers join the
+        /// trunk as diode-isolated dust-merge branches; the LVS intent
+        /// stays ONE net per bit. Same shapes as `route_bus` otherwise.
+        pub fn route_bus_or(
+            &mut self,
+            name: &DiplomatStr,
+            drivers_json: &DiplomatStr,
+            sinks_json: &DiplomatStr,
+            gates_json: &DiplomatStr,
+            style_json: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let name = utf8(name)?;
+            let drivers: Vec<String> =
+                serde_json::from_str(utf8(drivers_json)?).map_err(|_| NucleationError::Parse)?;
+            let driver_refs: Vec<&str> = drivers.iter().map(String::as_str).collect();
+            let sinks: Vec<String> =
+                serde_json::from_str(utf8(sinks_json)?).map_err(|_| NucleationError::Parse)?;
+            let sink_refs: Vec<&str> = sinks.iter().map(String::as_str).collect();
+            let gates = parse_gates(utf8(gates_json)?)?;
+            let style = parse_style(utf8(style_json)?)?;
+            let state = self
+                .0
+                .route_bus_or(name, &driver_refs, &sink_refs, gates, style)
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::InvalidArgument
+                })?;
+            let _ = write!(out, "{}", state_str(&state));
+            Ok(())
+        }
+
+        /// Edit the loose block layer: plain `set_block` on the base
+        /// schematic (participates in occupancy and flatten).
+        pub fn set_block(
+            &mut self,
+            x: i32,
+            y: i32,
+            z: i32,
+            block: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            self.0.set_block((x, y, z), utf8(block)?).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::InvalidArgument
+            })
+        }
+
+        /// Drag an instance layer to a new position/rotation. The move
+        /// itself ALWAYS succeeds (the document's truth); the affected bus
+        /// set — fragments intersecting the old or new footprint +
+        /// influence halo, plus every already-failed bus — is ripped and
+        /// co-rerouted deterministically with bounded retry rounds.
+        /// Writes `{"rerouted": [...], "failed": {name: reason}}`.
+        pub fn move_instance(
+            &mut self,
+            name: &DiplomatStr,
+            x: i32,
+            y: i32,
+            z: i32,
+            rot_y: i32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let report = self
+                .0
+                .move_instance(utf8(name)?, (x, y, z), rot_y)
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::InvalidArgument
+                })?;
+            let _ = write!(out, "{}", report.to_json());
+            Ok(())
+        }
+
+        /// Add a gate to an existing bus (splitting the segment it lands
+        /// in) and re-realize it. Writes the resulting bus state.
+        #[allow(clippy::too_many_arguments)]
+        pub fn add_gate(
+            &mut self,
+            bus: &DiplomatStr,
+            gate: &DiplomatStr,
+            x: i32,
+            y: i32,
+            z: i32,
+            sx: i32,
+            sy: i32,
+            sz: i32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let state = self
+                .0
+                .add_gate(utf8(bus)?, utf8(gate)?, (x, y, z), (sx, sy, sz))
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::InvalidArgument
+                })?;
+            let _ = write!(out, "{}", state_str(&state));
+            Ok(())
+        }
+
+        /// Drag a gate: the anchor moves unconditionally, then EXACTLY the
+        /// two adjacent segments are ripped and rerouted atomically. An
+        /// unroutable move leaves the bus `failed: reason` — visible,
+        /// never half-routed. Writes `{"state": "...",
+        /// "rerouted_segments": n}`.
+        pub fn move_gate(
+            &mut self,
+            bus: &DiplomatStr,
+            gate: &DiplomatStr,
+            x: i32,
+            y: i32,
+            z: i32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let report = self
+                .0
+                .move_gate(utf8(bus)?, utf8(gate)?, (x, y, z))
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::InvalidArgument
+                })?;
+            let _ = write!(
+                out,
+                "{{\"state\":{:?},\"rerouted_segments\":{}}}",
+                state_str(&report.state),
+                report.rerouted_segments
+            );
+            Ok(())
+        }
+
+        /// Attach a net-class discipline to a bus (JSON `NetClassRule`:
+        /// optional `max_len_rt` delay budget, `y_band` layer band, …);
+        /// `check()` enforces it.
+        pub fn set_bus_rule(
+            &mut self,
+            bus: &DiplomatStr,
+            rule_json: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            let rule: crate::io_contract::NetClassRule =
+                serde_json::from_str(utf8(rule_json)?).map_err(|_| NucleationError::Parse)?;
+            self.0.set_bus_rule(utf8(bus)?, rule).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::NotFound
+            })
+        }
+
+        /// Per-bus skew from the routed fragment: writes
+        /// `{"per_bit_rt": [...], "skew_rt": n, "max_rt": n}`.
+        pub fn bus_skew(
+            &self,
+            name: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let json = self
+                .0
+                .bus_skew_json(utf8(name)?)
+                .ok_or(NucleationError::NotFound)?;
+            let _ = write!(out, "{json}");
+            Ok(())
+        }
+
         /// The lifecycle state of a bus: `"intended"`, `"routed"` or
         /// `"failed: reason"`.
         pub fn bus_state(

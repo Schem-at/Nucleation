@@ -67,6 +67,59 @@ export class Design {
     routeBus(name: string, driver: string, sinksJson: string, gatesJson: string, styleJson: string): string;
 
     /**
+     * Declare AND realize a wired-OR bus: `drivers_json` is a JSON
+     * array of port names — multiple drivers are legal ONLY through
+     * this explicit merge (`merge="or"`). Extra drivers join the
+     * trunk as diode-isolated dust-merge branches; the LVS intent
+     * stays ONE net per bit. Same shapes as `route_bus` otherwise.
+     */
+    routeBusOr(name: string, driversJson: string, sinksJson: string, gatesJson: string, styleJson: string): string;
+
+    /**
+     * Edit the loose block layer: plain `set_block` on the base
+     * schematic (participates in occupancy and flatten).
+     */
+    setBlock(x: number, y: number, z: number, block: string): void;
+
+    /**
+     * Drag an instance layer to a new position/rotation. The move
+     * itself ALWAYS succeeds (the document's truth); the affected bus
+     * set — fragments intersecting the old or new footprint +
+     * influence halo, plus every already-failed bus — is ripped and
+     * co-rerouted deterministically with bounded retry rounds.
+     * Writes `{"rerouted": [...], "failed": {name: reason}}`.
+     */
+    moveInstance(name: string, x: number, y: number, z: number, rotY: number): string;
+
+    /**
+     * Add a gate to an existing bus (splitting the segment it lands
+     * in) and re-realize it. Writes the resulting bus state.
+     */
+    addGate(bus: string, gate: string, x: number, y: number, z: number, sx: number, sy: number, sz: number): string;
+
+    /**
+     * Drag a gate: the anchor moves unconditionally, then EXACTLY the
+     * two adjacent segments are ripped and rerouted atomically. An
+     * unroutable move leaves the bus `failed: reason` — visible,
+     * never half-routed. Writes `{"state": "...",
+     * "rerouted_segments": n}`.
+     */
+    moveGate(bus: string, gate: string, x: number, y: number, z: number): string;
+
+    /**
+     * Attach a net-class discipline to a bus (JSON `NetClassRule`:
+     * optional `max_len_rt` delay budget, `y_band` layer band, …);
+     * `check()` enforces it.
+     */
+    setBusRule(bus: string, ruleJson: string): void;
+
+    /**
+     * Per-bus skew from the routed fragment: writes
+     * `{"per_bit_rt": [...], "skew_rt": n, "max_rt": n}`.
+     */
+    busSkew(name: string): string;
+
+    /**
      * The lifecycle state of a bus: `"intended"`, `"routed"` or
      * `"failed: reason"`.
      */

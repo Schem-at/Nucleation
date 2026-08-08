@@ -282,16 +282,27 @@ r = d.move_instance("c0", at=(4, 0, 8))   # now overlaps bus_a's fragment
 # half-routed fragment.
 ```
 
-## Phase 2 (deferred, in scope of the model)
+## Phase 2 (in scope of the model; ✅ = landed on this branch)
 
-- interference co-reroute + drag APIs (`move_gate`, `move_instance`,
-  cancellable, wasm-identical);
+- ✅ interference co-reroute + drag APIs (`move_gate`, `move_instance`) —
+  `src/design.rs`: `OccupancyIndex` (footprints + keepout/bounds+1 halos +
+  fragments), per-segment rip (`BusLayer::segments`, gate drag = exactly
+  its 2 adjacent segments), deterministic bounded co-reroute rounds,
+  implicit L corners for doglegs; acceptance `tests/design_drag.rs` +
+  `tests/design_typed_drag.rs`, demo
+  `compositor/design_demo3_drag.py`. Cancellation hooks remain open;
 - form-pivot adapter tiles (vertical stack ↔ flat lane at a gate) —
   hardware DONE and sim-verified (`pivot_tiles.py`/`pivot_tiles.md`,
   incl. the flat 90° corner); remaining work is the router-side stamping;
-- multi-driver wired-OR (`merge="or"`);
-- loose-layer editing APIs on the design document;
+- ✅ multi-driver wired-OR (`merge="or"`) — `route_bus_or`: dust-merge
+  branches, diode-isolated, ONE LVS intent net; multi-sink fanout trunks
+  landed with it (`route_bus` with N sinks = shared trunk + branches);
+- ✅ loose-layer editing APIs on the design document — `Design::set_block`
+  (tracked as the loose layer; participates in occupancy + flatten);
 - design-document serialization: `.nucm` project tier and `.litematic`
   layered-interchange tier (section 8);
 - HexAnalog drive/read in the executor (contract already models it);
-- STA/skew as a first-class `check()` stage with per-bus skew budgets.
+- ✅ STA/skew as a first-class `check()` stage — per-bus `per_bit_rt` /
+  `skew_rt` from fragment repeaters, design-level arrival + critical path
+  over the existing sta machinery, and `NetClassRule` enforcement
+  (`max_len_rt`, `y_band`) folded into `clean`.

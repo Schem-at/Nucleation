@@ -89,6 +89,69 @@ public:
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> route_bus_write(std::string_view name, std::string_view driver, std::string_view sinks_json, std::string_view gates_json, std::string_view style_json, W& writeable_output);
 
   /**
+   * Declare AND realize a wired-OR bus: `drivers_json` is a JSON
+   * array of port names — multiple drivers are legal ONLY through
+   * this explicit merge (`merge="or"`). Extra drivers join the
+   * trunk as diode-isolated dust-merge branches; the LVS intent
+   * stays ONE net per bit. Same shapes as `route_bus` otherwise.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> route_bus_or(std::string_view name, std::string_view drivers_json, std::string_view sinks_json, std::string_view gates_json, std::string_view style_json);
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> route_bus_or_write(std::string_view name, std::string_view drivers_json, std::string_view sinks_json, std::string_view gates_json, std::string_view style_json, W& writeable_output);
+
+  /**
+   * Edit the loose block layer: plain `set_block` on the base
+   * schematic (participates in occupancy and flatten).
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> set_block(int32_t x, int32_t y, int32_t z, std::string_view block);
+
+  /**
+   * Drag an instance layer to a new position/rotation. The move
+   * itself ALWAYS succeeds (the document's truth); the affected bus
+   * set — fragments intersecting the old or new footprint +
+   * influence halo, plus every already-failed bus — is ripped and
+   * co-rerouted deterministically with bounded retry rounds.
+   * Writes `{"rerouted": [...], "failed": {name: reason}}`.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> move_instance(std::string_view name, int32_t x, int32_t y, int32_t z, int32_t rot_y);
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> move_instance_write(std::string_view name, int32_t x, int32_t y, int32_t z, int32_t rot_y, W& writeable_output);
+
+  /**
+   * Add a gate to an existing bus (splitting the segment it lands
+   * in) and re-realize it. Writes the resulting bus state.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> add_gate(std::string_view bus, std::string_view gate, int32_t x, int32_t y, int32_t z, int32_t sx, int32_t sy, int32_t sz);
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> add_gate_write(std::string_view bus, std::string_view gate, int32_t x, int32_t y, int32_t z, int32_t sx, int32_t sy, int32_t sz, W& writeable_output);
+
+  /**
+   * Drag a gate: the anchor moves unconditionally, then EXACTLY the
+   * two adjacent segments are ripped and rerouted atomically. An
+   * unroutable move leaves the bus `failed: reason` — visible,
+   * never half-routed. Writes `{"state": "...",
+   * "rerouted_segments": n}`.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> move_gate(std::string_view bus, std::string_view gate, int32_t x, int32_t y, int32_t z);
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> move_gate_write(std::string_view bus, std::string_view gate, int32_t x, int32_t y, int32_t z, W& writeable_output);
+
+  /**
+   * Attach a net-class discipline to a bus (JSON `NetClassRule`:
+   * optional `max_len_rt` delay budget, `y_band` layer band, …);
+   * `check()` enforces it.
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> set_bus_rule(std::string_view bus, std::string_view rule_json);
+
+  /**
+   * Per-bus skew from the routed fragment: writes
+   * `{"per_bit_rt": [...], "skew_rt": n, "max_rt": n}`.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> bus_skew(std::string_view name) const;
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> bus_skew_write(std::string_view name, W& writeable_output) const;
+
+  /**
    * The lifecycle state of a bus: `"intended"`, `"routed"` or
    * `"failed: reason"`.
    */
