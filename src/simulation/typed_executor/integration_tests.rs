@@ -274,6 +274,8 @@ fn create_lamp_output_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMap
     inputs.insert(
         "in".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 0)],
@@ -284,6 +286,8 @@ fn create_lamp_output_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMap
     outputs.insert(
         "out".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(2, 1, 0)],
@@ -476,6 +480,8 @@ fn create_and_gate_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMappin
     inputs.insert(
         "a".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 0)],
@@ -486,6 +492,8 @@ fn create_and_gate_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMappin
     inputs.insert(
         "b".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 2)],
@@ -496,6 +504,8 @@ fn create_and_gate_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMappin
     outputs.insert(
         "output".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(4, 1, 1)],
@@ -619,6 +629,8 @@ fn create_xor_gate_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMappin
     inputs.insert(
         "a".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 0)],
@@ -629,6 +641,8 @@ fn create_xor_gate_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMappin
     inputs.insert(
         "b".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 2)],
@@ -639,6 +653,8 @@ fn create_xor_gate_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMappin
     outputs.insert(
         "output".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(5, 1, 1)],
@@ -717,6 +733,8 @@ fn create_d_latch_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMapping
     inputs.insert(
         "enable".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 3)],
@@ -727,6 +745,8 @@ fn create_d_latch_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMapping
     inputs.insert(
         "d".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(2, 1, 3)],
@@ -737,6 +757,8 @@ fn create_d_latch_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMapping
     outputs.insert(
         "q".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(2, 1, 0)],
@@ -811,6 +833,8 @@ fn create_adder_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMapping>)
     inputs.insert(
         "a".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::UnsignedInt { bits: 4 },
             layout: LayoutFunction::Packed4,
             positions: vec![(0, 0, 0)],
@@ -821,6 +845,8 @@ fn create_adder_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMapping>)
     inputs.insert(
         "b".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::UnsignedInt { bits: 4 },
             layout: LayoutFunction::Packed4,
             positions: vec![(0, 0, 2)],
@@ -831,6 +857,8 @@ fn create_adder_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMapping>)
     outputs.insert(
         "sum".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::UnsignedInt { bits: 4 },
             layout: LayoutFunction::Packed4,
             positions: vec![(10, 0, 0)],
@@ -1196,6 +1224,8 @@ fn create_inverter_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMappin
     inputs.insert(
         "input".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 0)],
@@ -1206,6 +1236,8 @@ fn create_inverter_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMappin
     outputs.insert(
         "output".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 3, 0)],
