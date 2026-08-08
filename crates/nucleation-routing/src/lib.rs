@@ -20,6 +20,8 @@
 //!   repeater insertion, ladder climbs).
 //! - [`cell`]: `Fragment` / `CellTemplate` stamping and edge contracts.
 //! - [`bus`]: `BusSpec` / `BusPort` and abutment compatibility.
+//! - [`pivot`]: the verified form-pivot tiles (v2h / h2v / flat90) and the
+//!   bus planner that stamps them implicitly when endpoint forms differ.
 //! - [`region`]: include/exclude routing regions.
 //! - [`drc`]: shorts, support, decay, and repeater-cycle detection.
 //! - [`lvs`]: intended-netlist vs extracted-conduction comparison (opens,
@@ -36,6 +38,7 @@ pub mod drc;
 pub mod fabric;
 pub mod lvs;
 pub mod nets;
+pub mod pivot;
 pub mod region;
 pub mod router;
 pub mod sta;
@@ -48,6 +51,7 @@ pub use cell::{CellTemplate, EdgeContract, Fragment};
 pub use drc::{drc, DrcOptions, Violation};
 pub use fabric::NetSpec;
 pub use lvs::{lvs, IntentNet, LvsOpen, LvsReport, LvsShort};
+pub use pivot::{pivot_for, pivot_fragment, route_bus, BusForm, BusRouteReport, PivotKind};
 pub use pnr_core::{Aabb, Pos};
 pub use region::RoutingRegion;
 pub use router::{NetRoute, RedstoneRouter, RouteError, RouteResult};

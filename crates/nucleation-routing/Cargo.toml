@@ -13,6 +13,16 @@ license = "MIT"
 # unseeded randomness.
 [dependencies]
 pnr-core = { path = "../pnr-core" }
+mc-tick = { path = "../mc-tick", version = "0.1.0", optional = true }
+
+[features]
+# In-sim verification of routed/stamped geometry against the tick engine.
+# Off by default: the core crate stays dependency-light and wasm-clean.
+mc-tick = ["dep:mc-tick"]
 
 [lints.rust]
 missing_docs = "warn"
+
+[[test]]
+name = "pivot_sim"
+required-features = ["mc-tick"]

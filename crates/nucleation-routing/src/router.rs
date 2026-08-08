@@ -48,6 +48,9 @@ pub enum RouteError {
         /// Cells still contested when the round budget ran out.
         contested: Vec<Pos>,
     },
+    /// A bus-level request was ill-formed (width/form mismatch no pivot
+    /// tile covers).
+    Bus(String),
 }
 
 /// One net for `route_all`.
