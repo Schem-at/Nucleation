@@ -63,6 +63,45 @@ pub fn drc_schematic(schem: &UniversalSchematic, opts: &DrcOptions) -> Vec<Viola
     drc(&ws, opts)
 }
 
+/// Render DRC violations as a JSON array (the bridge's wire format,
+/// shared with `Design::check`).
+pub fn violations_json(vs: &[Violation]) -> String {
+    let items: Vec<String> = vs
+        .iter()
+        .map(|v| match v {
+            Violation::Short {
+                label_a,
+                label_b,
+                at_a,
+                at_b,
+            } => format!(
+                "{{\"kind\":\"short\",\"label_a\":{label_a:?},\"label_b\":{label_b:?},\"at_a\":[{},{},{}],\"at_b\":[{},{},{}]}}",
+                at_a.x, at_a.y, at_a.z, at_b.x, at_b.y, at_b.z
+            ),
+            Violation::Floating { at, block } => format!(
+                "{{\"kind\":\"floating\",\"at\":[{},{},{}],\"block\":{block:?}}}",
+                at.x, at.y, at.z
+            ),
+            Violation::UnattachedWallTorch { at, anchor } => format!(
+                "{{\"kind\":\"unattached_wall_torch\",\"at\":[{},{},{}],\"anchor\":[{},{},{}]}}",
+                at.x, at.y, at.z, anchor.x, anchor.y, anchor.z
+            ),
+            Violation::RepeaterCycle { diodes } => {
+                let ds: Vec<String> = diodes
+                    .iter()
+                    .map(|p| format!("[{},{},{}]", p.x, p.y, p.z))
+                    .collect();
+                format!("{{\"kind\":\"repeater_cycle\",\"diodes\":[{}]}}", ds.join(","))
+            }
+            Violation::PowerStarved { at, distance } => format!(
+                "{{\"kind\":\"power_starved\",\"at\":[{},{},{}],\"distance\":{distance}}}",
+                at.x, at.y, at.z
+            ),
+        })
+        .collect();
+    format!("[{}]", items.join(","))
+}
+
 /// Intersection of two inclusive boxes; `Err` when they do not overlap.
 fn intersect_aabb(a: Aabb, b: Aabb) -> Result<Aabb, String> {
     let min = Pos::new(

@@ -196,6 +196,13 @@ fn to_schematic_v3(schematic: &UniversalSchematic, compression: Compression) -> 
             }
         }
     }
+    // The embedded cell contract, beside NucleationDefinitions: a saved cell
+    // is one artifact, schematic + contract, autodetected on open.
+    if let Some(contract) = &schematic.metadata.cell_contract {
+        if let NbtTag::Compound(ref mut metadata_compound) = metadata_tag {
+            metadata_compound.insert("NucleationCellContract", NbtTag::String(contract.clone()));
+        }
+    }
     schematic_data.insert("Metadata", metadata_tag);
 
     // Create the proper root structure with "Schematic" tag
@@ -281,6 +288,13 @@ fn to_schematic_v2(schematic: &UniversalSchematic, compression: Compression) -> 
             if let Ok(json) = serde_json::to_string(&schematic.definition_regions) {
                 metadata_compound.insert("NucleationDefinitions", NbtTag::String(json));
             }
+        }
+    }
+    // The embedded cell contract, beside NucleationDefinitions: a saved cell
+    // is one artifact, schematic + contract, autodetected on open.
+    if let Some(contract) = &schematic.metadata.cell_contract {
+        if let NbtTag::Compound(ref mut metadata_compound) = metadata_tag {
+            metadata_compound.insert("NucleationCellContract", NbtTag::String(contract.clone()));
         }
     }
     schematic_data.insert("Metadata", metadata_tag);
@@ -440,11 +454,15 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic> {
     // and Description there (and the Sponge v2/v3 spec puts them there), so
     // dropping them on read made `.litematic -> .schem` lose attribution.
     let mut file_metadata = crate::metadata::Metadata::default();
+    let mut cell_contract = None;
     if let Ok(metadata) = schem.get::<_, &NbtCompound>("Metadata") {
         if let Ok(json) = metadata.get::<_, &str>("NucleationDefinitions") {
             if let Ok(regions) = serde_json::from_str(json) {
                 definition_regions = regions;
             }
+        }
+        if let Ok(json) = metadata.get::<_, &str>("NucleationCellContract") {
+            cell_contract = Some(json.to_string());
         }
         if let Ok(parsed) = crate::metadata::Metadata::from_nbt(metadata) {
             file_metadata = parsed;
@@ -462,6 +480,7 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic> {
     schematic.metadata.name = Some(name);
     schematic.definition_regions = definition_regions;
     schematic.metadata.embedded_test = embedded_test;
+    schematic.metadata.cell_contract = cell_contract;
     // The root DataVersion is authoritative when present; a Metadata-carried
     // mc_version (our own writer emits one) fills in otherwise.
     schematic.metadata.mc_version = mc_version.or(schematic.metadata.mc_version);

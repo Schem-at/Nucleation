@@ -50,6 +50,18 @@ pub fn is_solid_block(block: &str) -> bool {
     SOLID_HINTS.iter().any(|h| block.contains(h))
 }
 
+/// Whether dust/repeaters may SIT on this block (static support legality).
+///
+/// Sturdiness is not conductivity (the probed material model,
+/// `redstone-eda/notes-material-model.md`): glass, stained glass and
+/// top-half slabs are full-cube supports that conduct nothing — they are
+/// exactly what a bus dip uses where a diagonal below must survive.
+pub fn is_sturdy_support(block: &str) -> bool {
+    is_solid_block(block)
+        || block.contains("glass")
+        || block.contains("slab") && block.contains("type=top")
+}
+
 /// Whether a block string is redstone dust.
 pub fn is_dust(block: &str) -> bool {
     block.contains(DUST_KEY)

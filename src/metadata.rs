@@ -35,6 +35,16 @@ pub struct Metadata {
     /// modules that know where to put it.
     #[serde(default, skip)]
     pub embedded_test: Option<String>,
+    /// The schematic's embedded [`CellContract`](crate::io_contract::CellContract)
+    /// as JSON — what makes a saved build a self-describing typed cell.
+    ///
+    /// Carried in the `.schem` `Metadata` compound as the
+    /// `NucleationCellContract` string (beside `NucleationDefinitions`) and
+    /// autodetected on open. File-carried provenance like
+    /// [`Metadata::embedded_test`]: not serialized here, written and read by
+    /// the format modules that know where to put it.
+    #[serde(default, skip)]
+    pub cell_contract: Option<String>,
 }
 
 impl Metadata {
@@ -59,6 +69,7 @@ impl Metadata {
             we_version,
             source_data_version: None,
             embedded_test: None,
+            cell_contract: None,
         }
     }
 

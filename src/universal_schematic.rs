@@ -1186,6 +1186,128 @@ impl UniversalSchematic {
         Ok(())
     }
 
+    /// Embed a [`CellContract`](crate::io_contract::CellContract) in this
+    /// schematic's metadata. The contract is carried through `.schem`
+    /// save/open (`NucleationCellContract` in the `Metadata` compound) and
+    /// autodetected on open — schematic + contract = one self-describing
+    /// typed cell.
+    pub fn set_cell_contract(
+        &mut self,
+        contract: &crate::io_contract::CellContract,
+    ) -> Result<(), String> {
+        self.metadata.cell_contract = Some(contract.to_json()?);
+        Ok(())
+    }
+
+    /// Embed a cell contract given as JSON, validating it parses as a real
+    /// [`CellContract`](crate::io_contract::CellContract) first.
+    pub fn set_cell_contract_json(&mut self, json: &str) -> Result<(), String> {
+        let contract = crate::io_contract::CellContract::from_json(json)?;
+        self.set_cell_contract(&contract)
+    }
+
+    /// The contract embedded in this schematic's metadata, if any.
+    /// Errors only when an embedded string exists but is not a valid
+    /// contract (a corrupt embed should be loud, not silently absent).
+    pub fn embedded_cell_contract(
+        &self,
+    ) -> Result<Option<crate::io_contract::CellContract>, String> {
+        match &self.metadata.cell_contract {
+            None => Ok(None),
+            Some(json) => crate::io_contract::CellContract::from_json(json)
+                .map(Some)
+                .map_err(|e| format!("embedded cell contract is invalid: {e}")),
+        }
+    }
+
+    /// Resolve this schematic's cell contract from its sources, in strict
+    /// precedence: embedded metadata (which `set_cell_contract` — the
+    /// explicit API — writes) over Insign signs. Returns the winning
+    /// contract plus loud warnings for any conflict between sources
+    /// (never a silent pick). `Ok(None)` = no source defines a contract.
+    ///
+    /// The Insign-derived source needs the `simulation` feature (the
+    /// sign → IoLayout compiler lives there); without it only the embedded
+    /// source is consulted.
+    pub fn resolve_cell_contract(
+        &self,
+    ) -> Result<Option<(crate::io_contract::CellContract, Vec<String>)>, String> {
+        let embedded = self.embedded_cell_contract()?;
+        let mut warnings = Vec::new();
+
+        #[cfg(feature = "simulation")]
+        let insign = self.cell_contract_from_insign(&mut warnings);
+        #[cfg(not(feature = "simulation"))]
+        let insign: Option<crate::io_contract::CellContract> = None;
+
+        match (embedded, insign) {
+            (Some(embedded), Some(signs)) => {
+                if embedded != signs {
+                    warnings.push(format!(
+                        "cell contract conflict: embedded metadata (cell `{}`, {} inputs, {} \
+                         outputs) disagrees with Insign signs (cell `{}`, {} inputs, {} \
+                         outputs); using the embedded contract",
+                        embedded.name,
+                        embedded.io.inputs.len(),
+                        embedded.io.outputs.len(),
+                        signs.name,
+                        signs.io.inputs.len(),
+                        signs.io.outputs.len(),
+                    ));
+                }
+                Ok(Some((embedded, warnings)))
+            }
+            (Some(embedded), None) => Ok(Some((embedded, warnings))),
+            (None, Some(signs)) => Ok(Some((signs, warnings))),
+            (None, None) => Ok(None),
+        }
+    }
+
+    /// Derive a contract from the schematic's Insign signs (`#$global`
+    /// cell header + `io.*` regions), or `None` when the signs define no
+    /// contract. Parse problems are reported as warnings, not errors: a
+    /// build with unrelated signs must still open.
+    #[cfg(feature = "simulation")]
+    fn cell_contract_from_insign(
+        &self,
+        warnings: &mut Vec<String>,
+    ) -> Option<crate::io_contract::CellContract> {
+        let signs: Vec<([i32; 3], String)> = crate::insign::extract_signs(self)
+            .into_iter()
+            .map(|s| (s.pos, s.text))
+            .collect();
+        if signs.is_empty() {
+            return None;
+        }
+        let header = match crate::io_contract::insign_ext::parse_cell_header(&signs) {
+            Ok(h) => h,
+            Err(e) => {
+                warnings.push(format!("Insign cell header did not parse: {e}"));
+                None
+            }
+        };
+        let layout =
+            match crate::simulation::typed_executor::parse_io_layout_from_insign(&signs, self) {
+                Ok(builder) => {
+                    let layout = builder.build();
+                    (!layout.inputs.is_empty() || !layout.outputs.is_empty()).then_some(layout)
+                }
+                Err(e) => {
+                    warnings.push(format!("Insign io.* regions did not parse: {e}"));
+                    None
+                }
+            };
+        let layout = layout?;
+        let name = header
+            .as_ref()
+            .map(|h| h.name.clone())
+            .or_else(|| self.metadata.name.clone())
+            .unwrap_or_else(|| "cell".to_string());
+        let mut contract = crate::io_contract::CellContract::new(name, layout);
+        contract.version = header.and_then(|h| h.version);
+        Some(contract)
+    }
+
     pub fn get_default_region_mut(&mut self) -> &mut Region {
         &mut self.default_region
     }

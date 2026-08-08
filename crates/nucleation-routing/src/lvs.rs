@@ -132,11 +132,22 @@ pub fn conduction_components(cells: &BTreeMap<Pos, String>) -> UnionFind<Pos> {
             if cells.get(&inp).is_some_and(|b| is_dust(b)) {
                 uf.union(p, &inp);
             } else if cells.get(&inp).is_some_and(|b| is_solid_block(b)) {
-                // Reading through a block: the dust sitting on that block
-                // is the common comparator/repeater feed.
+                // Reading through a block: the BLOCK is the junction. Dust
+                // sitting on it, dust beside it (weak-powering it — the
+                // bus8 station: dust → entry block → repeater) and any
+                // diode strongly powering it all feed this diode; unioning
+                // through the block also chains station → refresh repeater
+                // (block-fed repeater directly after an exit block).
+                uf.union(p, &inp);
                 let above = inp.offset(0, 1, 0);
                 if cells.get(&above).is_some_and(|b| is_dust(b)) {
                     uf.union(p, &above);
+                }
+                for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                    let q = inp.offset(dx, 0, dz);
+                    if q != *p && cells.get(&q).is_some_and(|b| is_dust(b)) {
+                        uf.union(p, &q);
+                    }
                 }
             }
             if cells.get(&outp).is_some_and(|b| is_dust(b)) {
@@ -263,6 +274,27 @@ mod tests {
                 dust_at(&mut cells, Pos::new(x, 1, 0));
             }
         }
+        let intent = [net("a", &[(0, 1, 0), (6, 1, 0)])];
+        let r = lvs(&cells, &intent);
+        assert_eq!(r.matched, vec!["a".to_string()], "{r:?}");
+        assert!(r.clean(), "{r:?}");
+    }
+
+    #[test]
+    fn station_dust_block_repeater_block_dust_is_one_net() {
+        // Provenance: the bus8 station (dust → entry block → repeater →
+        // exit block → dust). The dust BESIDE the in-block weak-powers it;
+        // without that edge every station read as an open.
+        let mut cells = BTreeMap::new();
+        dust_at(&mut cells, Pos::new(0, 1, 0));
+        dust_at(&mut cells, Pos::new(1, 1, 0));
+        cells.insert(Pos::new(2, 1, 0), "minecraft:magenta_concrete".to_string());
+        cells.insert(Pos::new(3, 1, 0), repeater("west", 1));
+        cells.insert(Pos::new(4, 1, 0), "minecraft:magenta_concrete".to_string());
+        // A refresh repeater directly block-fed by the exit block (the
+        // amended through-bus produced exactly this chain).
+        cells.insert(Pos::new(5, 1, 0), repeater("west", 1));
+        dust_at(&mut cells, Pos::new(6, 1, 0));
         let intent = [net("a", &[(0, 1, 0), (6, 1, 0)])];
         let r = lvs(&cells, &intent);
         assert_eq!(r.matched, vec!["a".to_string()], "{r:?}");

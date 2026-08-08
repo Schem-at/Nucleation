@@ -60,7 +60,13 @@ pub fn audit(cells: &BTreeMap<Pos, String>) -> AuditReport {
         }
         if NEEDS_FLOOR.iter().any(|k| block.contains(k)) {
             let below = p.offset(0, -1, 0);
-            if !solid(below) {
+            // Support legality is STURDINESS, not conductivity: glass and
+            // top-half slabs hold dust (probed material model — the bus
+            // dip's transparent supports must not read as floating).
+            let sturdy = cells
+                .get(&below)
+                .is_some_and(|b| crate::blocks::is_sturdy_support(b));
+            if !sturdy {
                 let name = block.split('[').next().unwrap_or(block).to_string();
                 report
                     .floating
@@ -88,6 +94,21 @@ mod tests {
         assert_eq!(r.floating[0].0, Pos::new(0, 1, 0));
         assert_eq!(r.floating[0].1, "minecraft:redstone_wire");
         assert_eq!(r.floating[1].0, Pos::new(2, 1, 0));
+    }
+
+    #[test]
+    fn glass_and_top_slabs_are_sturdy_supports() {
+        // Provenance: the bus dip (bus8_cross v2) rests dust on glass where
+        // a diagonal below must survive — sturdiness is not conductivity.
+        let mut cells = BTreeMap::new();
+        cells.insert(Pos::new(0, 0, 0), "minecraft:glass".to_string());
+        cells.insert(Pos::new(0, 1, 0), DUST.to_string());
+        cells.insert(
+            Pos::new(1, 0, 0),
+            "minecraft:smooth_stone_slab[type=top,waterlogged=false]".to_string(),
+        );
+        cells.insert(Pos::new(1, 1, 0), DUST.to_string());
+        assert!(audit(&cells).is_clean());
     }
 
     #[test]
