@@ -366,6 +366,15 @@ namespace capi {
     typedef struct Schematic_compile_insign_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_compile_insign_json_result;
     Schematic_compile_insign_json_result Schematic_compile_insign_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Schematic_set_cell_contract_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_set_cell_contract_json_result;
+    Schematic_set_cell_contract_json_result Schematic_set_cell_contract_json(diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView json);
+
+    typedef struct Schematic_cell_contract_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_cell_contract_json_result;
+    Schematic_cell_contract_json_result Schematic_cell_contract_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Schematic_resolve_cell_contract_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_resolve_cell_contract_json_result;
+    Schematic_resolve_cell_contract_json_result Schematic_resolve_cell_contract_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
+
     typedef struct Schematic_compile_io_contracts_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_compile_io_contracts_json_result;
     Schematic_compile_io_contracts_json_result Schematic_compile_io_contracts_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
 
@@ -1669,6 +1678,42 @@ template<typename W>
 inline diplomat::result<std::monostate, NucleationError> Schematic::compile_insign_json_write(W& writeable) const {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     auto result = diplomat::capi::Schematic_compile_insign_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::set_cell_contract_json(std::string_view json) {
+    auto result = diplomat::capi::Schematic_set_cell_contract_json(this->AsFFI(),
+        {json.data(), json.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Schematic::cell_contract_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Schematic_cell_contract_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Schematic::cell_contract_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Schematic_cell_contract_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Schematic::resolve_cell_contract_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Schematic_resolve_cell_contract_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Schematic::resolve_cell_contract_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Schematic_resolve_cell_contract_json(this->AsFFI(),
         &write);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }

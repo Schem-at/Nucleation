@@ -136,6 +136,9 @@ internal interface SchematicLib: Library {
     fun Schematic_allocated_dimensions(handle: Pointer): DimensionsNative
     fun Schematic_extract_signs_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_compile_insign_json(handle: Pointer, write: Pointer): ResultUnitInt
+    fun Schematic_set_cell_contract_json(handle: Pointer, json: Slice): ResultUnitInt
+    fun Schematic_cell_contract_json(handle: Pointer, write: Pointer): ResultUnitInt
+    fun Schematic_resolve_cell_contract_json(handle: Pointer, write: Pointer): ResultUnitInt
     fun Schematic_compile_io_contracts_json(handle: Pointer, write: Pointer): ResultUnitInt
     fun Schematic_all_palettes_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_default_region_palette_json(handle: Pointer, write: Pointer): Unit
@@ -2191,6 +2194,62 @@ class Schematic internal constructor (
     fun compileInsignJson(): Result<String> {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.Schematic_compile_insign_json(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Embed a `CellContract` (JSON) in the schematic's metadata,
+    *validating it parses first. The contract is carried through
+    *`.schem` save/open and autodetected on open — schematic +
+    *contract = one self-describing typed cell.
+    */
+    fun setCellContractJson(json: String): Result<Unit> {
+        val jsonSliceMemory = PrimitiveArrayTools.borrowUtf8(json)
+
+        val returnVal = lib.Schematic_set_cell_contract_json(handle, jsonSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            jsonSliceMemory.close()
+        }
+    }
+
+    /** The contract embedded in the schematic's metadata, as JSON.
+    *Errors with `NotFound` when none is embedded, `Parse` when an
+    *embedded string exists but is corrupt (loud, never silent).
+    */
+    fun cellContractJson(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_cell_contract_json(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Resolve the schematic's cell contract from its sources in
+    *strict precedence — embedded metadata over Insign signs — with
+    *loud conflict warnings. Writes `{"contract": ..., "warnings":
+    *[...]}`; errors with `NotFound` when no source defines one.
+    */
+    fun resolveCellContractJson(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_resolve_cell_contract_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
 

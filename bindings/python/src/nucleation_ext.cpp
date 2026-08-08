@@ -26,6 +26,7 @@ void add_PaletteBuilder_binding(nb::module_);
 void add_Shape_binding(nb::module_);
 void add_DefinitionRegion_binding(nb::module_);
 void add_SchematicRegions_binding(nb::module_);
+void add_Design_binding(nb::module_);
 void add_Diff_binding(nb::module_);
 void add_Fingerprint_binding(nb::module_);
 void add_DistanceField_binding(nb::module_);
@@ -180,6 +181,7 @@ NB_MODULE(nucleation, mod)
     add_Shape_binding(mod);
     add_DefinitionRegion_binding(mod);
     add_SchematicRegions_binding(mod);
+    add_Design_binding(mod);
     add_Diff_binding(mod);
     add_Fingerprint_binding(mod);
     add_DistanceField_binding(mod);

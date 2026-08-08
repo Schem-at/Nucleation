@@ -719,6 +719,29 @@ export class Schematic {
     compileInsignJson(): string;
 
     /**
+     * Embed a `CellContract` (JSON) in the schematic's metadata,
+     * validating it parses first. The contract is carried through
+     * `.schem` save/open and autodetected on open — schematic +
+     * contract = one self-describing typed cell.
+     */
+    setCellContractJson(json: string): void;
+
+    /**
+     * The contract embedded in the schematic's metadata, as JSON.
+     * Errors with `NotFound` when none is embedded, `Parse` when an
+     * embedded string exists but is corrupt (loud, never silent).
+     */
+    cellContractJson(): string;
+
+    /**
+     * Resolve the schematic's cell contract from its sources in
+     * strict precedence — embedded metadata over Insign signs — with
+     * loud conflict warnings. Writes `{"contract": ..., "warnings":
+     * [...]}`; errors with `NotFound` when no source defines one.
+     */
+    resolveCellContractJson(): string;
+
+    /**
      * Parse the schematic's IO-contract insign annotations (`#cell`
      * header, `bus.*` port annotations, `#route_zone` zones) to JSON:
      * `{"cell": ..., "buses": [...], "route_zones": {...}}`.

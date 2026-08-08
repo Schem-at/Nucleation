@@ -44,6 +44,8 @@ pub mod autostack;
 pub mod blocks;
 pub mod building;
 pub mod definition_region;
+#[cfg(feature = "routing")]
+pub mod design;
 pub mod diff;
 pub mod distance_field;
 pub mod field;

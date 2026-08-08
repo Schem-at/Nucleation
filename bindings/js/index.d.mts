@@ -48,6 +48,8 @@ export { DefinitionRegion } from "./DefinitionRegion.mjs"
 
 export { SchematicRegions } from "./SchematicRegions.mjs"
 
+export { Design } from "./Design.mjs"
+
 export { Diff } from "./Diff.mjs"
 
 export { Fingerprint } from "./Fingerprint.mjs"

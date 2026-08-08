@@ -25,6 +25,7 @@ require_once __DIR__ . '/PaletteBuilder.php';
 require_once __DIR__ . '/Shape.php';
 require_once __DIR__ . '/DefinitionRegion.php';
 require_once __DIR__ . '/SchematicRegions.php';
+require_once __DIR__ . '/Design.php';
 require_once __DIR__ . '/Diff.php';
 require_once __DIR__ . '/Fingerprint.php';
 require_once __DIR__ . '/DistanceField.php';

@@ -1830,6 +1830,64 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Embed a `CellContract` (JSON) in the schematic's metadata,
+        /// validating it parses first. The contract is carried through
+        /// `.schem` save/open and autodetected on open — schematic +
+        /// contract = one self-describing typed cell.
+        pub fn set_cell_contract_json(
+            &mut self,
+            json: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            let json =
+                core::str::from_utf8(json).map_err(|_| NucleationError::InvalidArgument)?;
+            self.0.set_cell_contract_json(json).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::Parse
+            })
+        }
+
+        /// The contract embedded in the schematic's metadata, as JSON.
+        /// Errors with `NotFound` when none is embedded, `Parse` when an
+        /// embedded string exists but is corrupt (loud, never silent).
+        pub fn cell_contract_json(
+            &self,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let contract = self
+                .0
+                .embedded_cell_contract()
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::Parse
+                })?
+                .ok_or(NucleationError::NotFound)?;
+            let json = contract.to_json().map_err(|_| NucleationError::Serialize)?;
+            let _ = write!(out, "{json}");
+            Ok(())
+        }
+
+        /// Resolve the schematic's cell contract from its sources in
+        /// strict precedence — embedded metadata over Insign signs — with
+        /// loud conflict warnings. Writes `{"contract": ..., "warnings":
+        /// [...]}`; errors with `NotFound` when no source defines one.
+        pub fn resolve_cell_contract_json(
+            &self,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let (contract, warnings) = self
+                .0
+                .resolve_cell_contract()
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::Parse
+                })?
+                .ok_or(NucleationError::NotFound)?;
+            let json = contract.to_json().map_err(|_| NucleationError::Serialize)?;
+            let ws: Vec<String> = warnings.iter().map(|w| format!("{w:?}")).collect();
+            let _ = write!(out, "{{\"contract\":{json},\"warnings\":[{}]}}", ws.join(","));
+            Ok(())
+        }
+
         /// Parse the schematic's IO-contract insign annotations (`#cell`
         /// header, `bus.*` port annotations, `#route_zone` zones) to JSON:
         /// `{"cell": ..., "buses": [...], "route_zones": {...}}`.

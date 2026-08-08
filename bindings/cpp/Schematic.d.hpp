@@ -853,6 +853,33 @@ public:
   inline diplomat::result<std::monostate, NucleationError> compile_insign_json_write(W& writeable_output) const;
 
   /**
+   * Embed a `CellContract` (JSON) in the schematic's metadata,
+   * validating it parses first. The contract is carried through
+   * `.schem` save/open and autodetected on open — schematic +
+   * contract = one self-describing typed cell.
+   */
+  inline diplomat::result<std::monostate, NucleationError> set_cell_contract_json(std::string_view json);
+
+  /**
+   * The contract embedded in the schematic's metadata, as JSON.
+   * Errors with `NotFound` when none is embedded, `Parse` when an
+   * embedded string exists but is corrupt (loud, never silent).
+   */
+  inline diplomat::result<std::string, NucleationError> cell_contract_json() const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> cell_contract_json_write(W& writeable_output) const;
+
+  /**
+   * Resolve the schematic's cell contract from its sources in
+   * strict precedence — embedded metadata over Insign signs — with
+   * loud conflict warnings. Writes `{"contract": ..., "warnings":
+   * [...]}`; errors with `NotFound` when no source defines one.
+   */
+  inline diplomat::result<std::string, NucleationError> resolve_cell_contract_json() const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> resolve_cell_contract_json_write(W& writeable_output) const;
+
+  /**
    * Parse the schematic's IO-contract insign annotations (`#cell`
    * header, `bus.*` port annotations, `#route_zone` zones) to JSON:
    * `{"cell": ..., "buses": [...], "route_zones": {...}}`.
