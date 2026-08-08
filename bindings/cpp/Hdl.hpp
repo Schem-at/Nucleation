@@ -26,6 +26,9 @@ namespace capi {
     typedef struct Hdl_compile_blif_report_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Hdl_compile_blif_report_result;
     Hdl_compile_blif_report_result Hdl_compile_blif_report(diplomat::capi::DiplomatStringView blif, diplomat::capi::DiplomatStringView name, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Hdl_compile_blif_contract_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Hdl_compile_blif_contract_result;
+    Hdl_compile_blif_contract_result Hdl_compile_blif_contract(diplomat::capi::DiplomatStringView blif, diplomat::capi::DiplomatStringView name, diplomat::capi::DiplomatWrite* write);
+
     void Hdl_destroy(Hdl* self);
 
     } // extern "C"
@@ -51,6 +54,23 @@ template<typename W>
 inline diplomat::result<std::monostate, NucleationError> Hdl::compile_blif_report_write(std::string_view blif, std::string_view name, W& writeable) {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     auto result = diplomat::capi::Hdl_compile_blif_report({blif.data(), blif.size()},
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Hdl::compile_blif_contract(std::string_view blif, std::string_view name) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Hdl_compile_blif_contract({blif.data(), blif.size()},
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Hdl::compile_blif_contract_write(std::string_view blif, std::string_view name, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Hdl_compile_blif_contract({blif.data(), blif.size()},
         {name.data(), name.size()},
         &write);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));

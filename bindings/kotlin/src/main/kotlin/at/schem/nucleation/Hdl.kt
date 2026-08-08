@@ -9,6 +9,7 @@ internal interface HdlLib: Library {
     fun Hdl_destroy(handle: Pointer)
     fun Hdl_compile_blif(blif: Slice, name: Slice, bake: Boolean): ResultPointerInt
     fun Hdl_compile_blif_report(blif: Slice, name: Slice, write: Pointer): ResultUnitInt
+    fun Hdl_compile_blif_contract(blif: Slice, name: Slice, write: Pointer): ResultUnitInt
 }
 /** Namespacing opaque for the HDL compiler entry points (static methods,
 *like `Routing`).
@@ -85,6 +86,39 @@ class Hdl internal constructor (
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
             val write = DW.lib.diplomat_buffer_write_create(0)
             val returnVal = lib.Hdl_compile_blif_report(blifSliceMemory.slice, nameSliceMemory.slice, write);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+
+                    val returnString = DW.writeToString(write)
+                    return returnString.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                blifSliceMemory.close()
+                nameSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Compile `blif` and write its typed-cell contract as JSON — the
+        *`CellContract` file format (name, `io` with typed ports/buses,
+        *`physical` sidecar). Vector ports (`a[0..3]` or `a0..a3`) group
+        *into word buses (LSB = index 0); single bits are boolean. Input
+        *port positions are the drive levers, output positions the dust
+        *probes, in the same schematic coordinates as `compile_blif`.
+        *
+        *The `physical.delays_rt` table is ESTIMATED from levelization
+        *depth (2 redstone ticks per level), not measured; `paste_safe`
+        *is false until proven. Pair with `compile_blif` for the
+        *schematic: schematic + this contract = an executable typed cell.
+        */
+        fun compileBlifContract(blif: String, name: String): Result<String> {
+            val blifSliceMemory = PrimitiveArrayTools.borrowUtf8(blif)
+            val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.Hdl_compile_blif_contract(blifSliceMemory.slice, nameSliceMemory.slice, write);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {

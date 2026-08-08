@@ -56,6 +56,37 @@ yosys built for WebAssembly, `pip/npm install yowasp-yosys`) synthesises
 Verilog to BLIF client-side, and `Hdl.compile_blif` in the wasm binding
 turns that BLIF into a schematic without a server round-trip.
 
+## Typed cells (`CellContract`)
+
+Every compile now derives a **typed-cell contract** alongside the schematic:
+`Hdl.compile_blif_contract(blif, name) -> JSON` in every binding, in the
+exact serde shape of nucleation's `io_contract::CellContract`.
+
+* Vector ports group back into words — both `a[0]..a[3]` (yosys) and
+  `a0..a3` conventions parse; index = bit significance (LSB first); single
+  bits are `Boolean`, words are `UnsignedInt` (unsigned by default).
+* Input port positions are the drive levers, output positions the dust
+  probes, with a `face` (nearest lateral bounds face) and `direction` per
+  port; uniformly pitched words also get a `buses` entry (spec + bit0).
+* The `physical` sidecar carries the build bounds as a keepout, a per
+  (input, output) `delays_rt` table **estimated** as levelization depth x
+  2rt (not measured characterization), and `paste_safe: false` until proven.
+
+In Rust the pair (schematic, contract) is directly executable:
+`BackendCircuitExecutor::for_cell(schem, &contract, extra_states)` wraps the
+mc-tick oracle so `set_input("a", Value::U32(11))` drives the lever bank and
+`read_output("f")` decodes the probe word — no coordinates in caller code
+(gate: cmp4 verified over 64 sampled cases this way, `src/bridge/hdl.rs`).
+Note the cell must be **baked** (or settled with `TickSettleMode.Placement`)
+before driving: the backend trusts saved block states.
+
+From Python there is no bridged executor surface yet; `typed_demo.py`
+interprets the contract directly (positions from the JSON, zero hardcoded
+coordinates) over `TickSimulation` and drives seg7 by name: `set d=0xB,
+read seg` — 16/16. Wheel builds need
+`NUCLEATION_FEATURES="bridge-full,hdl,routing"` (bridge-full alone omits
+the Hdl surface).
+
 ## Examples (all verified exhaustively)
 
 | design    | function                        | inputs | cases | result |

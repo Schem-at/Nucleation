@@ -115,6 +115,48 @@ export class Hdl {
         }
     }
 
+    /**
+     * Compile `blif` and write its typed-cell contract as JSON — the
+     * `CellContract` file format (name, `io` with typed ports/buses,
+     * `physical` sidecar). Vector ports (`a[0..3]` or `a0..a3`) group
+     * into word buses (LSB = index 0); single bits are boolean. Input
+     * port positions are the drive levers, output positions the dust
+     * probes, in the same schematic coordinates as `compile_blif`.
+     *
+     * The `physical.delays_rt` table is ESTIMATED from levelization
+     * depth (2 redstone ticks per level), not measured; `paste_safe`
+     * is false until proven. Pair with `compile_blif` for the
+     * schematic: schematic + this contract = an executable typed cell.
+     */
+    static compileBlifContract(blif, name) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const blifSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, blif)));
+        const nameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, name)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Hdl_compile_blif_contract(diplomatReceive.buffer, blifSlice.ptr, nameSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
     constructor(symbol, ptr, selfEdge) {
         return this.#internalConstructor(...arguments)
     }

@@ -359,6 +359,30 @@ impl BackendCircuitExecutor {
     }
 }
 
+#[cfg(all(feature = "bridge", feature = "mc-tick"))]
+impl BackendCircuitExecutor {
+    /// Typed executor for a saved cell — a schematic plus its
+    /// [`CellContract`](crate::io_contract::CellContract) — on the
+    /// vanilla-accurate mc-tick oracle. `set_input("a", 11)` drives the
+    /// lever bank the contract maps for port `a`; `read_output("f")`
+    /// decodes the probe word. No caller ever touches coordinates.
+    ///
+    /// `extra_states` follows the `TickSimulation` contract: every state a
+    /// run may create that is not in the schematic's palette (toggled
+    /// levers, unlit torches, powered dust) must be named up front.
+    pub fn for_cell(
+        schem: UniversalSchematic,
+        contract: &crate::io_contract::CellContract,
+        extra_states: &[&str],
+    ) -> Result<Self, String> {
+        let backend = McTickBackend::load(schem, extra_states)?;
+        Ok(BackendCircuitExecutor::new(
+            Box::new(backend),
+            contract.io.clone(),
+        ))
+    }
+}
+
 impl super::TypedCircuitExecutor {
     /// Run the typed IO contract on an explicit [`SimBackend`] — the
     /// constructor-choice seam from the design doc. The classic

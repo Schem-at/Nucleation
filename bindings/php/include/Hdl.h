@@ -23,6 +23,9 @@ Hdl_compile_blif_result Hdl_compile_blif(DiplomatStringView blif, DiplomatString
 typedef struct Hdl_compile_blif_report_result {union { NucleationError err;}; bool is_ok;} Hdl_compile_blif_report_result;
 Hdl_compile_blif_report_result Hdl_compile_blif_report(DiplomatStringView blif, DiplomatStringView name, DiplomatWrite* write);
 
+typedef struct Hdl_compile_blif_contract_result {union { NucleationError err;}; bool is_ok;} Hdl_compile_blif_contract_result;
+Hdl_compile_blif_contract_result Hdl_compile_blif_contract(DiplomatStringView blif, DiplomatStringView name, DiplomatWrite* write);
+
 void Hdl_destroy(Hdl* self);
 
 

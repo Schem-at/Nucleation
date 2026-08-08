@@ -38,4 +38,19 @@ export class Hdl {
      * coordinates).
      */
     static compileBlifReport(blif: string, name: string): string;
+
+    /**
+     * Compile `blif` and write its typed-cell contract as JSON — the
+     * `CellContract` file format (name, `io` with typed ports/buses,
+     * `physical` sidecar). Vector ports (`a[0..3]` or `a0..a3`) group
+     * into word buses (LSB = index 0); single bits are boolean. Input
+     * port positions are the drive levers, output positions the dust
+     * probes, in the same schematic coordinates as `compile_blif`.
+     *
+     * The `physical.delays_rt` table is ESTIMATED from levelization
+     * depth (2 redstone ticks per level), not measured; `paste_safe`
+     * is false until proven. Pair with `compile_blif` for the
+     * schematic: schematic + this contract = an executable typed cell.
+     */
+    static compileBlifContract(blif: string, name: string): string;
 }

@@ -13,12 +13,16 @@
 //! - [`pla`]: the PLA geometry compiler — rails with station-pitch
 //!   repeaters, input-stage inverter torches, AND columns, inter-stage
 //!   corridors — emitting cells + probe/lever metadata.
+//! - [`contract`]: compile-time typed-cell derivation — vector ports grouped
+//!   into word buses, levers/probes mapped to named ports, emitted as a
+//!   `CellContract`-shaped JSON document.
 //! - [`verify`] (feature `mc-tick`): exhaustive/sampled in-sim verification
 //!   against the pure-Rust prim-graph eval, with lever discipline.
 //!
 //! The core compile path has zero dependencies and is wasm-clean.
 
 pub mod blif;
+pub mod contract;
 pub mod logic;
 pub mod pla;
 #[cfg(feature = "mc-tick")]

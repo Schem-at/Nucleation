@@ -57,6 +57,23 @@ public:
   template<typename W>
   inline static nucleation::diplomat::result<std::monostate, nucleation::NucleationError> compile_blif_report_write(std::string_view blif, std::string_view name, W& writeable_output);
 
+  /**
+   * Compile `blif` and write its typed-cell contract as JSON — the
+   * `CellContract` file format (name, `io` with typed ports/buses,
+   * `physical` sidecar). Vector ports (`a[0..3]` or `a0..a3`) group
+   * into word buses (LSB = index 0); single bits are boolean. Input
+   * port positions are the drive levers, output positions the dust
+   * probes, in the same schematic coordinates as `compile_blif`.
+   *
+   * The `physical.delays_rt` table is ESTIMATED from levelization
+   * depth (2 redstone ticks per level), not measured; `paste_safe`
+   * is false until proven. Pair with `compile_blif` for the
+   * schematic: schematic + this contract = an executable typed cell.
+   */
+  inline static nucleation::diplomat::result<std::string, nucleation::NucleationError> compile_blif_contract(std::string_view blif, std::string_view name);
+  template<typename W>
+  inline static nucleation::diplomat::result<std::monostate, nucleation::NucleationError> compile_blif_contract_write(std::string_view blif, std::string_view name, W& writeable_output);
+
     inline const nucleation::capi::Hdl* AsFFI() const;
     inline nucleation::capi::Hdl* AsFFI();
     inline static const nucleation::Hdl* FromFFI(const nucleation::capi::Hdl* ptr);
