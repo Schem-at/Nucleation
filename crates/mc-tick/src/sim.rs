@@ -2528,6 +2528,15 @@ impl Simulation {
         &self.registry
     }
 
+    /// The stored comparator output strengths, by position.
+    ///
+    /// A comparator emits its block-entity strength, not its block state —
+    /// so any power query made outside a tick (a conduction trace, a
+    /// diagnostic) needs this map to read comparators truthfully.
+    pub fn comparator_outputs(&self) -> &crate::behaviour::ComparatorOutputs {
+        &self.comparator_out
+    }
+
     /// The state registry, mutably, for interning while loading.
     pub fn registry_mut(&mut self) -> &mut StateRegistry {
         &mut self.registry

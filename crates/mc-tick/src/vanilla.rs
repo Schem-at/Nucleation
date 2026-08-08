@@ -381,6 +381,218 @@ impl VanillaRules {
             self.signal_strength(world, &outs, pos, toward)
         )
     }
+
+    /// A power-source tree for `pos` — who powers this cell and why — as JSON.
+    ///
+    /// Every debugging session over a broken redstone build reconstructs this
+    /// by hand, one probe at a time; the engine already knows, so it says.
+    /// Each node reports the cell's state, what it carries or emits, and the
+    /// inputs that feed it, decomposed the way vanilla computes them:
+    ///
+    /// - a **wire** splits into per-neighbour `block_signal` (the non-wire
+    ///   signal each side pushes in) and `wire`/`wire_up`/`wire_down` steps
+    ///   (adjacent and diagonal dust, one level down each);
+    /// - a **conductor** lists the `strong` signals into it — what it
+    ///   re-emits on every face;
+    /// - anything else lists `signal` per side — `Level.getSignal` from each
+    ///   neighbour, the read a torch base, repeater rear or comparator side
+    ///   actually makes.
+    ///
+    /// Inputs recurse toward their sources. A cycle (a repeater ring holding
+    /// a phantom carry) stops with `"cycle": true`; depth caps with
+    /// `"truncated": true` so a long dust run stays readable. `outs` carries
+    /// the comparator block-entity strengths ([`crate::Simulation::comparator_outputs`]);
+    /// pass an empty map only if the build has no comparators.
+    pub fn conduction_trace(
+        &self,
+        registry: &StateRegistry,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+    ) -> String {
+        let mut out = String::new();
+        let mut path = Vec::new();
+        self.trace_node(registry, world, outs, pos, &mut path, &mut out);
+        out
+    }
+
+    fn trace_node(
+        &self,
+        registry: &StateRegistry,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        path: &mut Vec<Pos>,
+        out: &mut String,
+    ) {
+        use std::fmt::Write as _;
+        /// Deep enough for a full 15-cell dust run with sources behind it,
+        /// shallow enough that the tree stays a diagnostic and not a dump.
+        const MAX_DEPTH: usize = 24;
+        let state = world.get(pos);
+        let descriptor = registry.descriptor(state).unwrap_or("minecraft:air");
+        let _ = write!(
+            out,
+            "{{\"pos\":[{},{},{}],\"state\":\"{descriptor}\"",
+            pos.x, pos.y, pos.z
+        );
+        if path.contains(&pos) {
+            out.push_str(",\"cycle\":true}");
+            return;
+        }
+        if path.len() >= MAX_DEPTH {
+            out.push_str(",\"truncated\":true}");
+            return;
+        }
+
+        struct Input {
+            mechanism: &'static str,
+            dir: &'static str,
+            from: Pos,
+            power: u8,
+        }
+        let wire_power_at =
+            |p: Pos| self.wires.get(&world.get(p)).map(|(power, _)| *power);
+        let conductor_at = |p: Pos| self.conductors.contains(&world.get(p));
+        let mut inputs: Vec<Input> = Vec::new();
+        let kind;
+        let power;
+        if let Some((wire_power, _)) = self.wires.get(&state).copied() {
+            kind = "wire";
+            power = wire_power;
+            // `getBlockSignal`, decomposed per neighbour: the strongest
+            // non-wire signal each side pushes into the dust.
+            for dir in crate::pos::ALL_DIRS {
+                let n = pos.offset(dir);
+                let signal = self.signal_no_wire(world, outs, n, dir.opposite());
+                if signal > 0 {
+                    inputs.push(Input {
+                        mechanism: "block_signal",
+                        dir: dir_name(dir),
+                        from: n,
+                        power: signal,
+                    });
+                }
+            }
+            // `getIncomingWireSignal`, decomposed: adjacent dust and the
+            // up/down diagonals, each one level down. The up-diagonal is cut
+            // by a conductor over this dust, exactly as in vanilla.
+            let covered = conductor_at(pos.offset(Dir::Up));
+            for dir in [Dir::North, Dir::South, Dir::West, Dir::East] {
+                let side = pos.offset(dir);
+                if let Some(p) = wire_power_at(side) {
+                    if p > 1 {
+                        inputs.push(Input {
+                            mechanism: "wire",
+                            dir: dir_name(dir),
+                            from: side,
+                            power: p - 1,
+                        });
+                    }
+                }
+                if conductor_at(side) {
+                    if !covered {
+                        if let Some(p) = wire_power_at(side.offset(Dir::Up)) {
+                            if p > 1 {
+                                inputs.push(Input {
+                                    mechanism: "wire_up",
+                                    dir: dir_name(dir),
+                                    from: side.offset(Dir::Up),
+                                    power: p - 1,
+                                });
+                            }
+                        }
+                    }
+                } else if let Some(p) = wire_power_at(side.offset(Dir::Down)) {
+                    if p > 1 {
+                        inputs.push(Input {
+                            mechanism: "wire_down",
+                            dir: dir_name(dir),
+                            from: side.offset(Dir::Down),
+                            power: p - 1,
+                        });
+                    }
+                }
+            }
+        } else if self.conductors.contains(&state) {
+            kind = "conductor";
+            // What the conductor re-emits: the strongest strong signal into it.
+            power = self.direct_signal_to(world, outs, pos, true);
+            for dir in crate::pos::ALL_DIRS {
+                let n = pos.offset(dir);
+                let toward = dir.opposite();
+                let n_state = world.get(n);
+                // Mirrors `direct_signal_to`: dust strongly powers everything
+                // it powers weakly, components only out of `strong_into`.
+                let strong = if self.wires.contains_key(&n_state)
+                    || self.strong_into.get(&n_state) == Some(&toward)
+                {
+                    self.emitted(world, outs, n, toward, true)
+                } else {
+                    0
+                };
+                if strong > 0 {
+                    inputs.push(Input {
+                        mechanism: "strong",
+                        dir: dir_name(dir),
+                        from: n,
+                        power: strong,
+                    });
+                }
+            }
+        } else {
+            kind = if self.signal_sources.contains(&state) {
+                "source"
+            } else {
+                "block"
+            };
+            let mut best = 0u8;
+            for dir in crate::pos::ALL_DIRS {
+                best = best.max(self.emitted(world, outs, pos, dir, true));
+            }
+            power = best;
+            for dir in crate::pos::ALL_DIRS {
+                let n = pos.offset(dir);
+                let signal = self.signal_strength(world, outs, n, dir.opposite());
+                if signal > 0 {
+                    inputs.push(Input {
+                        mechanism: "signal",
+                        dir: dir_name(dir),
+                        from: n,
+                        power: signal,
+                    });
+                }
+            }
+        }
+        let _ = write!(out, ",\"kind\":\"{kind}\",\"power\":{power},\"inputs\":[");
+        path.push(pos);
+        for (i, input) in inputs.iter().enumerate() {
+            if i > 0 {
+                out.push(',');
+            }
+            let _ = write!(
+                out,
+                "{{\"mechanism\":\"{}\",\"dir\":\"{}\",\"power\":{},\"source\":",
+                input.mechanism, input.dir, input.power
+            );
+            self.trace_node(registry, world, outs, input.from, path, out);
+            out.push('}');
+        }
+        path.pop();
+        out.push_str("]}");
+    }
+}
+
+/// The lowercase name vanilla uses for a direction, for JSON.
+fn dir_name(dir: Dir) -> &'static str {
+    match dir {
+        Dir::Down => "down",
+        Dir::Up => "up",
+        Dir::North => "north",
+        Dir::South => "south",
+        Dir::West => "west",
+        Dir::East => "east",
+    }
 }
 
 impl crate::wire::WireWorld for VanillaRules {
@@ -3797,6 +4009,56 @@ pub fn intern_companions(registry: &mut StateRegistry) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A redstone block driving two dust cells: the second cell's trace names
+    /// the first as a one-level wire step, the first names the block as its
+    /// block signal — and the back-reference from the first cell to the
+    /// second stops as a cycle instead of recursing forever.
+    #[test]
+    fn a_conduction_trace_walks_back_to_the_source() {
+        let mut registry = StateRegistry::new();
+        let block = registry.intern("minecraft:redstone_block").unwrap();
+        let wire15 = registry
+            .intern("minecraft:redstone_wire[east=side,north=none,power=15,south=none,west=side]")
+            .unwrap();
+        let wire14 = registry
+            .intern("minecraft:redstone_wire[east=none,north=none,power=14,south=none,west=side]")
+            .unwrap();
+        let mut table = BehaviourTable::new();
+        let rules = register_all(&mut registry, &mut table);
+
+        let mut world = World::new(crate::pos::Bounds::new(
+            Pos::new(0, 0, 0),
+            Pos::new(3, 2, 1),
+        ));
+        world.set(Pos::new(0, 1, 0), block);
+        world.set(Pos::new(1, 1, 0), wire15);
+        world.set(Pos::new(2, 1, 0), wire14);
+
+        let outs = crate::behaviour::ComparatorOutputs::new();
+        let trace = rules.conduction_trace(&registry, &world, &outs, Pos::new(2, 1, 0));
+
+        assert!(
+            trace.starts_with("{\"pos\":[2,1,0]"),
+            "the root is the queried cell: {trace}"
+        );
+        assert!(
+            trace.contains("\"kind\":\"wire\",\"power\":14"),
+            "the dust reports the power it carries: {trace}"
+        );
+        assert!(
+            trace.contains("\"mechanism\":\"wire\",\"dir\":\"west\",\"power\":14"),
+            "the neighbour dust is a one-level step down: {trace}"
+        );
+        assert!(
+            trace.contains("\"state\":\"minecraft:redstone_block\""),
+            "the chain ends at the block that drives it: {trace}"
+        );
+        assert!(
+            trace.contains("\"cycle\":true"),
+            "the wire pair's mutual feed stops as a cycle: {trace}"
+        );
+    }
 
     #[test]
     fn descriptors_split_into_name_and_properties() {
