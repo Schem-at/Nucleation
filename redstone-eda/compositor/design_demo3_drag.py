@@ -1,5 +1,5 @@
-"""Design API acceptance, sketches (2) and (3) of DESIGN_SPEC.md, in PURE
-binding calls — the Phase 2 Lane A drag surface:
+"""Design API acceptance, sketches (2) and (3) of DESIGN_SPEC.md, on the
+idiomatic veneer — the Phase 2 Lane A drag surface:
 
   * gate drag: EXACTLY the two adjacent segments are ripped and rerouted,
     then typed walking-ones prove conduction through the embedded contract;
@@ -8,11 +8,8 @@ binding calls — the Phase 2 Lane A drag surface:
     component away re-attempts and reroutes it;
   * multi-sink trunk (1 driver -> 2 sinks) and the explicit wired-OR merge
     (`route_bus_or`), both verified in-sim;
-  * per-bus STA/skew via `bus_skew` and `max_len_rt` net-class rule
+  * per-bus STA/skew via `bus.skew` and `max_len_rt` net-class rule
     enforcement in `check()`.
-
-Everything goes through the generated `nucleation` wheel — no helper
-modules, no raw simulation coordinates after the ports are declared.
 """
 import json
 
@@ -23,7 +20,7 @@ DUST = "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=non
 LAMP = "minecraft:redstone_lamp[lit=false]"
 LEVER = "minecraft:lever[face=floor,facing=north,powered=false]"
 
-N, Y0, STEP = 8, 2, 2
+N, Y0, STEP = 8, 2, (0, 2, 0)
 
 GOOD = 0
 TOTAL = 0
@@ -39,7 +36,7 @@ def report(ok, label):
 
 def lever_bank(s, x, z, dx, dz):
     for i in range(N):
-        y = Y0 + STEP * i
+        y = Y0 + 2 * i
         s.set_block_from_string(x, y - 1, z, STONE)
         s.set_block_from_string(x, y, z, LEVER)
         s.set_block_from_string(x + dx, y - 1, z + dz, STONE)
@@ -49,21 +46,10 @@ def lever_bank(s, x, z, dx, dz):
 
 def lamp_bank(s, x, z):
     for i in range(N):
-        y = Y0 + STEP * i
+        y = Y0 + 2 * i
         s.set_block_from_string(x, y - 1, z, LAMP)
         s.set_block_from_string(x, y, z, DUST)
     return (x, Y0, z)
-
-
-def word(v):
-    return n.Value.from_u32(v)
-
-
-def executor(d):
-    baked = d.bake(4000)
-    cell = n.CellExecutor.for_schematic(baked)
-    cell.settle(4000)
-    return cell
 
 
 def part_gate_drag():
@@ -73,41 +59,38 @@ def part_gate_drag():
     a_in = lever_bank(s, 0, 8, 1, 0)
     a_out = lamp_bank(s, 24, 8)
     d = n.Design.for_schematic("drag", s)
-    d.declare_input("a_in", *a_in, 0, STEP, 0, N, "uint")
-    d.declare_output("a_out", *a_out, 0, STEP, 0, N, "uint")
-    gates = json.dumps([
-        {"name": "g0", "anchor": [8, 2, 8], "step": [0, 2, 0]},
-        {"name": "g1", "anchor": [16, 2, 8], "step": [0, 2, 0]},
-    ])
-    state = d.route_bus("bus_a", "a_in", '["a_out"]', gates, "{}")
-    report(state == "routed", "bus_a routed through g0 + g1 (%s)" % state)
-    report(json.loads(d.check())["clean"], "check clean before the drag")
+    d.declare_input("a_in", anchor=a_in, step=STEP, width=N, ty="uint")
+    d.declare_output("a_out", anchor=a_out, step=STEP, width=N, ty="uint")
+    bus = d.route_bus("bus_a", driver="a_in", sinks=["a_out"],
+                      gates=[n.Gate(anchor=(8, 2, 8), step=STEP),
+                             n.Gate(anchor=(16, 2, 8), step=STEP)])
+    report(bus.state == "routed", "bus_a routed through g0 + g1 (%s)" % bus.state)
+    report(d.check().clean, "check clean before the drag")
 
-    moved = json.loads(d.move_gate("bus_a", "g0", 8, 2, 12))
+    moved = bus.move_gate(0, (8, 2, 12))
     report(moved["state"] == "routed", "gate drag rerouted (%s)" % moved["state"])
     report(moved["rerouted_segments"] == 2,
            "EXACTLY 2 segments rerouted (%d)" % moved["rerouted_segments"])
-    report(json.loads(d.check())["clean"], "check clean after the drag")
+    report(d.check().clean, "check clean after the drag")
 
-    skew = json.loads(d.bus_skew("bus_a"))
+    skew = bus.skew
     report(len(skew["per_bit_rt"]) == N and skew["skew_rt"] == 0,
            "skew report: per-bit %s, skew %d rt" % (skew["per_bit_rt"], skew["skew_rt"]))
 
     # Net-class rule: an impossible delay budget turns check() dirty…
-    d.set_bus_rule("bus_a", '{"max_len_rt": 0}')
-    dirty = json.loads(d.check())
-    report(not dirty["clean"] and dirty["rules"], "max_len_rt=0 flags a rule violation")
+    bus.rule(max_len_rt=0)
+    dirty = d.check()
+    report(not dirty.clean and dirty.rules, "max_len_rt=0 flags a rule violation")
     # …a sane budget is enforced clean.
-    d.set_bus_rule("bus_a", '{"max_len_rt": 100}')
-    report(json.loads(d.check())["clean"], "max_len_rt=100 passes")
+    bus.rule(max_len_rt=100)
+    report(d.check().clean, "max_len_rt=100 passes")
 
-    cell = executor(d)
+    ex = d.bake(4000).executor()
     ok = True
     for i in range(N):
-        cell.set_input("a_in", word(1 << i))
-        cell.settle(400)
-        got = cell.read_output("a_out").as_u32()
-        ok = ok and got == 1 << i
+        ex["a_in"] = 1 << i
+        ex.settle(400)
+        ok = ok and ex["a_out"] == 1 << i
     report(ok, "typed walking-ones conduct after the drag")
 
 
@@ -118,8 +101,8 @@ def part_component_drag():
     a_in = lever_bank(s, 0, 8, 1, 0)
     a_out = lamp_bank(s, 16, 8)
     d = n.Design.for_schematic("blocker", s)
-    d.declare_input("a_in", *a_in, 0, STEP, 0, N, "uint")
-    d.declare_output("a_out", *a_out, 0, STEP, 0, N, "uint")
+    d.declare_input("a_in", anchor=a_in, step=STEP, width=N, ty="uint")
+    d.declare_output("a_out", anchor=a_out, step=STEP, width=N, ty="uint")
 
     cube = n.Schematic.create("cube")
     for x in range(3):
@@ -129,21 +112,21 @@ def part_component_drag():
     cube.set_cell_contract_json(json.dumps(
         {"name": "cube", "io": {"inputs": {}, "outputs": {}, "buses": {}}}))
     d.add_cell("cube", cube)
-    d.place("c0", "cube", 4, 0, 20, 0)
+    d.place("c0", "cube", at=(4, 0, 20))
 
-    state = d.route_bus("bus_a", "a_in", '["a_out"]', "[]", "{}")
-    report(state == "routed", "bus_a routed with c0 parked clear (%s)" % state)
+    bus = d.route_bus("bus_a", driver="a_in", sinks=["a_out"])
+    report(bus.state == "routed", "bus_a routed with c0 parked clear (%s)" % bus.state)
 
     # Drag c0 THROUGH the bus: move succeeds, bus fails visibly.
-    r = json.loads(d.move_instance("c0", 4, 0, 8, 0))
+    r = d.move_instance("c0", at=(4, 0, 8))
     report("bus_a" in r["failed"], "co-reroute failed VISIBLY: %s" % r["failed"])
-    report(d.bus_state("bus_a").startswith("failed"),
-           "bus state is the red layer (%s…)" % d.bus_state("bus_a")[:40])
+    report(bus.state.startswith("failed"),
+           "bus state is the red layer (%s…)" % bus.state[:40])
 
     # Drag it away: the FAILED bus is re-attempted and reroutes.
-    r = json.loads(d.move_instance("c0", 4, 0, 20, 0))
+    r = d.move_instance("c0", at=(4, 0, 20))
     report(r["rerouted"] == ["bus_a"], "dragged away -> rerouted %s" % r["rerouted"])
-    report(json.loads(d.check())["clean"], "check clean after recovery")
+    report(d.check().clean, "check clean after recovery")
 
 
 def part_fanout():
@@ -154,20 +137,18 @@ def part_fanout():
     a_out = lamp_bank(s, 16, 8)
     c_out = lamp_bank(s, 8, 16)
     d = n.Design.for_schematic("fanout", s)
-    d.declare_input("a_in", *a_in, 0, STEP, 0, N, "uint")
-    d.declare_output("a_out", *a_out, 0, STEP, 0, N, "uint")
-    d.declare_output("c_out", *c_out, 0, STEP, 0, N, "uint")
-    state = d.route_bus("fan", "a_in", '["a_out", "c_out"]', "[]", "{}")
-    report(state == "routed", "fanout trunk + branch routed (%s)" % state)
-    report(json.loads(d.check())["clean"], "fanout check clean")
-    cell = executor(d)
+    d.declare_input("a_in", anchor=a_in, step=STEP, width=N, ty="uint")
+    d.declare_output("a_out", anchor=a_out, step=STEP, width=N, ty="uint")
+    d.declare_output("c_out", anchor=c_out, step=STEP, width=N, ty="uint")
+    fan = d.route_bus("fan", driver="a_in", sinks=["a_out", "c_out"])
+    report(fan.state == "routed", "fanout trunk + branch routed (%s)" % fan.state)
+    report(d.check().clean, "fanout check clean")
+    ex = d.bake(4000).executor()
     ok = True
     for i in range(N):
-        cell.set_input("a_in", word(1 << i))
-        cell.settle(400)
-        a = cell.read_output("a_out").as_u32()
-        c = cell.read_output("c_out").as_u32()
-        ok = ok and a == 1 << i and c == 1 << i
+        ex["a_in"] = 1 << i
+        ex.settle(400)
+        ok = ok and ex["a_out"] == 1 << i and ex["c_out"] == 1 << i
     report(ok, "both sinks read every walking-one")
 
 
@@ -179,20 +160,18 @@ def part_wired_or():
     b_in = lever_bank(s, 8, 0, 0, 1)
     a_out = lamp_bank(s, 16, 8)
     d = n.Design.for_schematic("wor", s)
-    d.declare_input("a_in", *a_in, 0, STEP, 0, N, "uint")
-    d.declare_input("b_in", *b_in, 0, STEP, 0, N, "uint")
-    d.declare_output("a_out", *a_out, 0, STEP, 0, N, "uint")
-    state = d.route_bus_or("wor", '["a_in", "b_in"]', '["a_out"]', "[]", "{}")
-    report(state == "routed", "wired-OR routed (%s)" % state)
-    report(json.loads(d.check())["clean"], "wired-OR check clean (ONE LVS net)")
-    cell = executor(d)
+    d.declare_input("a_in", anchor=a_in, step=STEP, width=N, ty="uint")
+    d.declare_input("b_in", anchor=b_in, step=STEP, width=N, ty="uint")
+    d.declare_output("a_out", anchor=a_out, step=STEP, width=N, ty="uint")
+    wor = d.route_bus_or("wor", drivers=["a_in", "b_in"], sinks=["a_out"])
+    report(wor.state == "routed", "wired-OR routed (%s)" % wor.state)
+    report(d.check().clean, "wired-OR check clean (ONE LVS net)")
+    ex = d.bake(4000).executor()
     ok = True
     for a, b in [(0, 0), (0x55, 0xAA), (0xAA, 0x55), (0x0F, 0xF0), (0x81, 0x18)]:
-        cell.set_input("a_in", word(a))
-        cell.set_input("b_in", word(b))
-        cell.settle(400)
-        got = cell.read_output("a_out").as_u32()
-        ok = ok and got == (a | b)
+        ex["a_in"], ex["b_in"] = a, b
+        ex.settle(400)
+        ok = ok and ex["a_out"] == (a | b)
     report(ok, "sink reads a | b for every driven pair")
 
 
