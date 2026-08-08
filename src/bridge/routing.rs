@@ -7,11 +7,10 @@
 //! route_all / cell-template API stays native-only until the compositor
 //! needs it bridged.
 //!
-//! NOT YET REGISTERED in `bridge/mod.rs`: the bridge is a high-conflict
-//! area with an in-flight feature (see ROUTING_CRATE_DESIGN.md's backport
-//! plan). Once that lands, wire this up with
-//! `#[cfg(feature = "routing")] pub mod routing;` and regenerate bindings.
-//! The module compiles standalone under `--features bridge-full,routing`.
+//! Bindings for this module have not been regenerated yet: run
+//! `tools/gen-bindings.sh` with the `routing` feature enabled once this
+//! surface is wanted downstream. The module itself compiles under
+//! `--features bridge-full,routing`.
 
 #[diplomat::bridge]
 pub mod ffi {

@@ -55,6 +55,8 @@ pub mod meshing;
 pub mod nbt;
 #[cfg(feature = "rendering")]
 pub mod rendering;
+#[cfg(feature = "routing")]
+pub mod routing;
 pub mod schematic;
 pub mod schematic_builder;
 #[cfg(any(feature = "scripting-lua", feature = "scripting-js"))]
