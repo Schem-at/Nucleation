@@ -1,0 +1,25 @@
+[package]
+name = "nucleation-hdl"
+version = "0.1.0"
+edition = "2021"
+description = "HDL -> redstone: BLIF to a sim-verified dual-rail PLA build (port of redstone-eda/hdl)"
+license = "MIT"
+
+# The core compile path (BLIF parse -> logic prep -> PLA geometry) is
+# dependency-free and wasm-clean on purpose: it is the piece the browser
+# pipeline (YoWASP yosys -> this crate) needs. Verification against the tick
+# engine is opt-in behind `mc-tick`, exactly like nucleation's own gate.
+[dependencies]
+mc-tick = { path = "../mc-tick", version = "0.1.0", optional = true }
+
+[features]
+# In-sim verification: build the compiled cells into an mc-tick Simulation,
+# drive the levers, compare every probe against the pure-Rust prim-graph eval.
+mc-tick = ["dep:mc-tick"]
+
+[lints.rust]
+missing_docs = "warn"
+
+[[test]]
+name = "verify"
+required-features = ["mc-tick"]
