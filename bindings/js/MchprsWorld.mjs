@@ -195,7 +195,7 @@ export class MchprsWorld {
         const result = wasm.MchprsWorld_get_lever_power(this.ffiValue, x, y, z);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {
@@ -211,7 +211,7 @@ export class MchprsWorld {
         const result = wasm.MchprsWorld_is_lit(this.ffiValue, x, y, z);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {

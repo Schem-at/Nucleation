@@ -236,7 +236,7 @@ export class MeshResult {
         const result = wasm.MeshResult_has_transparency(this.ffiValue);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {

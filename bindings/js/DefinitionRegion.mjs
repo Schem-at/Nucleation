@@ -311,7 +311,7 @@ export class DefinitionRegion {
         const result = wasm.DefinitionRegion_is_empty(this.ffiValue);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {
@@ -344,7 +344,7 @@ export class DefinitionRegion {
         const result = wasm.DefinitionRegion_contains(this.ffiValue, x, y, z);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {
@@ -692,7 +692,7 @@ export class DefinitionRegion {
         const result = wasm.DefinitionRegion_is_contiguous(this.ffiValue);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {
@@ -826,7 +826,7 @@ export class DefinitionRegion {
         const result = wasm.DefinitionRegion_intersects_bounds(this.ffiValue, minX, minY, minZ, maxX, maxY, maxZ);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {

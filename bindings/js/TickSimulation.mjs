@@ -282,7 +282,7 @@ export class TickSimulation {
         const result = wasm.TickSimulation_run_until_quiescent(this.ffiValue, budget);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {
@@ -314,7 +314,7 @@ export class TickSimulation {
         const result = wasm.TickSimulation_is_quiescent(this.ffiValue);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {
@@ -884,7 +884,7 @@ export class TickSimulation {
         const result = wasm.TickSimulation_clear_changes(this.ffiValue);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {

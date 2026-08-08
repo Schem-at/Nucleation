@@ -78,7 +78,7 @@ export class MeshConfig {
         const result = wasm.MeshConfig_cull_hidden_faces(this.ffiValue);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {
@@ -107,7 +107,7 @@ export class MeshConfig {
         const result = wasm.MeshConfig_ambient_occlusion(this.ffiValue);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {
@@ -262,7 +262,7 @@ export class MeshConfig {
         const result = wasm.MeshConfig_cull_occluded_blocks(this.ffiValue);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {
@@ -292,7 +292,7 @@ export class MeshConfig {
         const result = wasm.MeshConfig_greedy_meshing(this.ffiValue);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {

@@ -87,7 +87,7 @@ export class Curve3D {
         const result = wasm.Curve3D_is_closed(this.ffiValue);
 
         try {
-            return result;
+            return result === 1;
         }
 
         finally {
