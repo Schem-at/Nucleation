@@ -16,6 +16,7 @@
 //! [`CellContract`] file; a cell library is a directory of them.
 
 pub mod bus;
+pub mod insign_ext;
 pub mod io_layout_builder;
 pub mod io_mapping;
 pub mod io_type;
@@ -26,6 +27,10 @@ pub mod sort_strategy;
 pub mod value;
 
 pub use bus::{BusEncoding, BusPort, BusSpec, Pitch};
+pub use insign_ext::{
+    parse_bus_annotations, parse_cell_header, parse_route_zones, BitOrder, BusAnnotation,
+    CellHeader, InsignContractError,
+};
 pub use io_layout_builder::{IoLayout, IoLayoutBuilder};
 pub use io_mapping::IoMapping;
 pub use io_type::IoType;
