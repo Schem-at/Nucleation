@@ -31,6 +31,7 @@
 
 pub mod behaviour;
 pub mod components;
+pub mod embed;
 pub mod entity;
 pub mod entity_kind;
 pub mod explosion;
