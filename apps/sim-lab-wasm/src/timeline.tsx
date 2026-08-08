@@ -1,15 +1,18 @@
-/** The activity strip: where the recorded run was busy.
+/** The activity strip: where the recorded run was busy, and — as of Task 4
+ * — where a tick range gets selected for export and where a detected cycle
+ * gets shown.
  *
  * Reads the same JSON `world.sim.timelineActivityJson()` produces — see
  * `TickSimulation::timeline_activity_json` in `src/bridge/mc_tick.rs` — and
  * nothing else. No engine reference, no polling of its own: `App.tsx` owns
- * the timer and hands this component the decoded JSON.
+ * the timer and the `timelineCyclesJson()` call, and hands this component
+ * decoded JSON plus the current selection.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-/** A tick range. Reused by the export-range selection this strip will grow
- * in a later task; read-only here (see Step 1 of the task brief). */
+/** A tick range. Used both for the export-range selection and for a
+ * detected cycle's span. */
 export type Span = { start: number; end: number };
 
 /** `TickSimulation::timeline_activity_json`'s exact shape. Ticks are only
@@ -20,6 +23,20 @@ export type Activity = {
   end: number;
   ticks: { tick: number; changes: number; inputs: number; pistons: number }[];
 };
+
+/** One recurrence match, exactly as `cycle_json` in `src/bridge/mc_tick.rs`
+ * writes it: `{"start":T,"end":T,"period":N,"drift":[x,y,z]}`. `start`/`end`
+ * line up with `Span` on purpose — a `CycleMatch` IS a `Span`, plus the
+ * period and drift the engine found. */
+export type CycleMatch = { start: number; end: number; period: number; drift: [number, number, number] };
+
+/** `TickSimulation::timeline_cycles_json`'s exact shape:
+ * `{"exact":CycleMatch|null,"translated":CycleMatch|null}`. Either or both
+ * may be `null` — most builds (an adder, a door) never repeat their own
+ * state, and that is the ordinary outcome, not a failed search. `null` on
+ * both sides, or the whole `Cycles` value being `null` before the button has
+ * ever been pressed, must render nothing and raise no error. */
+export type Cycles = { exact: CycleMatch | null; translated: CycleMatch | null };
 
 /** One drawn column: either a single active tick or a bucket of adjacent
  * ones (see the bucketing comment on `bucketColumns`). */
@@ -108,7 +125,55 @@ function heightFrac(changes: number, maxChanges: number): number {
  * conservative. */
 const FALLBACK_WIDTH_PX = 800;
 
-export function TimelineStrip({ activity }: { activity: Activity | null }): JSX.Element {
+/** Map an exact tick span onto the *current* column layout as a left/width
+ * fraction of the track (0..1 each), or `null` when the span does not
+ * overlap any drawn column (e.g. a stale selection from before the
+ * recording was cleared).
+ *
+ * Columns are laid out as equal-width flex items, so a tick's pixel
+ * position depends on which column *index* holds it, not on the tick number
+ * directly — this walks the current `columns` array to find that index.
+ * Deliberately takes `columns` fresh and does no caching of its own:
+ * `activity` re-polls every 250 ms while recording, so bucketing can shift
+ * under a live selection between renders, and the only thing that stays
+ * valid across that shift is the exact tick range itself (Decision 3, task
+ * brief hand-off — this is why `Span` is stored as ticks, never as column
+ * indices or pixel offsets).
+ */
+function ticksToFraction(columns: Column[], span: Span): { left: number; width: number } | null {
+  if (columns.length === 0) return null;
+  let startIdx = -1;
+  let endIdx = -1;
+  for (let i = 0; i < columns.length; i++) {
+    if (startIdx === -1 && columns[i].lastTick >= span.start) startIdx = i;
+    if (columns[i].firstTick <= span.end) endIdx = i;
+  }
+  if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) return null;
+  const n = columns.length;
+  return { left: startIdx / n, width: (endIdx - startIdx + 1) / n };
+}
+
+const pct = (v: number) => `${(v * 100).toFixed(3)}%`;
+
+export function TimelineStrip({
+  activity,
+  selection,
+  onSelect,
+  cycles,
+}: {
+  activity: Activity | null;
+  /** The current export-range selection, as exact ticks — never column
+   * indices. `null` means nothing is selected. */
+  selection: Span | null;
+  /** Fired on drag-release with the dragged span, or with `null` when a
+   * plain click (no drag) should clear the selection. Also fired when a
+   * cycle overlay is clicked, with that cycle's own span. */
+  onSelect: (span: Span | null) => void;
+  /** The last `timelineCyclesJson()` result, or `null` before the button has
+   * been pressed (or after activity resets). Rendered as shaded overlays;
+   * a `null` field within it is a normal "no recurrence found" outcome. */
+  cycles: Cycles | null;
+}): JSX.Element {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(FALLBACK_WIDTH_PX);
 
@@ -138,6 +203,58 @@ export function TimelineStrip({ activity }: { activity: Activity | null }): JSX.
     [columns],
   );
 
+  // Drag-to-select state. Anchor and current are captured as tick ranges
+  // straight off the column the pointer is over at the moment of the event
+  // — not as an index into `columns` — so a mid-drag re-render that
+  // reshuffles bucketing (a live poll landing during the gesture) cannot
+  // desync the drag from what the pointer is actually over.
+  const [dragAnchor, setDragAnchor] = useState<{ firstTick: number; lastTick: number } | null>(null);
+  const [dragCurrent, setDragCurrent] = useState<{ firstTick: number; lastTick: number } | null>(null);
+  const dragging = dragAnchor !== null;
+
+  useEffect(() => {
+    if (!dragging) return;
+    const commit = () => {
+      if (dragAnchor && dragCurrent) {
+        const sameColumn =
+          dragAnchor.firstTick === dragCurrent.firstTick && dragAnchor.lastTick === dragCurrent.lastTick;
+        if (sameColumn) {
+          // A click, not a drag: clears the selection.
+          onSelect(null);
+        } else {
+          // Normalise by tick order, not by which end was pressed first —
+          // a right-to-left drag must yield the same {start,end} as the
+          // equivalent left-to-right one (Decision 2). The outer edges of
+          // the dragged span: the earlier column's first tick through the
+          // later column's last tick (Decision 5).
+          const [earlier, later] =
+            dragAnchor.firstTick <= dragCurrent.firstTick ? [dragAnchor, dragCurrent] : [dragCurrent, dragAnchor];
+          onSelect({ start: earlier.firstTick, end: later.lastTick });
+        }
+      }
+      setDragAnchor(null);
+      setDragCurrent(null);
+    };
+    window.addEventListener("pointerup", commit);
+    return () => window.removeEventListener("pointerup", commit);
+  }, [dragging, dragAnchor, dragCurrent, onSelect]);
+
+  // Selection and cycle overlays are recomputed from the current `columns`
+  // on every render — never cached, never keyed off a stored index. See
+  // `ticksToFraction`'s doc comment for why (Decision 3).
+  const selectionFrac = useMemo(
+    () => (selection ? ticksToFraction(columns, selection) : null),
+    [columns, selection],
+  );
+  const exactFrac = useMemo(
+    () => (cycles?.exact ? ticksToFraction(columns, cycles.exact) : null),
+    [columns, cycles],
+  );
+  const translatedFrac = useMemo(
+    () => (cycles?.translated ? ticksToFraction(columns, cycles.translated) : null),
+    [columns, cycles],
+  );
+
   return (
     <div className="timeline" aria-label="run timeline activity">
       <div className="timeline-columns" ref={trackRef}>
@@ -147,33 +264,86 @@ export function TimelineStrip({ activity }: { activity: Activity | null }): JSX.
           </span>
         ) : (
           columns.map((c, i) => (
-            <span
+            // The full-height slot is the hit target, not the painted bar
+            // inside it: a `{changes:0}` column renders at only the 6%
+            // presence floor, and a pointer target limited to that sliver
+            // would make those same ticks ungrabbable — the identical
+            // defect Task 3 fixed one layer up for visibility (Decision 1).
+            <div
               key={i}
-              className={`timeline-col${c.inputs > 0 ? " has-input" : ""}${
-                c.pistons > 0 ? " has-piston" : ""
-              }`}
-              style={{ height: `${Math.round(heightFrac(c.changes, maxChanges) * 100)}%` }}
-              // Plain data, not just a tooltip: a bucketed column's exact
-              // tick range and conserved counts are asserted on directly by
-              // `stripprobe.mjs`, which has no other way to read what a
-              // column represents without reimplementing the bucketing.
+              className="timeline-col-hit"
               data-first-tick={c.firstTick}
               data-last-tick={c.lastTick}
-              data-changes={c.changes}
-              data-inputs={c.inputs}
-              data-pistons={c.pistons}
-              title={
-                (c.firstTick === c.lastTick
-                  ? `tick ${c.firstTick}`
-                  : `ticks ${c.firstTick}–${c.lastTick}`) +
-                ` · ${c.changes} change${c.changes === 1 ? "" : "s"}` +
-                (c.inputs ? ` · ${c.inputs} input${c.inputs === 1 ? "" : "s"}` : "") +
-                (c.pistons ? ` · ${c.pistons} piston${c.pistons === 1 ? "" : "s"}` : "")
-              }
-            />
+              onPointerDown={(e) => {
+                e.preventDefault();
+                const col = { firstTick: c.firstTick, lastTick: c.lastTick };
+                setDragAnchor(col);
+                setDragCurrent(col);
+              }}
+              onPointerEnter={() => {
+                if (dragging) setDragCurrent({ firstTick: c.firstTick, lastTick: c.lastTick });
+              }}
+            >
+              <span
+                className={`timeline-col${c.inputs > 0 ? " has-input" : ""}${
+                  c.pistons > 0 ? " has-piston" : ""
+                }`}
+                style={{ height: `${Math.round(heightFrac(c.changes, maxChanges) * 100)}%` }}
+                // Plain data, not just a tooltip: a bucketed column's exact
+                // tick range and conserved counts are asserted on directly by
+                // `stripprobe.mjs`, which has no other way to read what a
+                // column represents without reimplementing the bucketing.
+                data-first-tick={c.firstTick}
+                data-last-tick={c.lastTick}
+                data-changes={c.changes}
+                data-inputs={c.inputs}
+                data-pistons={c.pistons}
+                title={
+                  (c.firstTick === c.lastTick
+                    ? `tick ${c.firstTick}`
+                    : `ticks ${c.firstTick}–${c.lastTick}`) +
+                  ` · ${c.changes} change${c.changes === 1 ? "" : "s"}` +
+                  (c.inputs ? ` · ${c.inputs} input${c.inputs === 1 ? "" : "s"}` : "") +
+                  (c.pistons ? ` · ${c.pistons} piston${c.pistons === 1 ? "" : "s"}` : "")
+                }
+              />
+            </div>
           ))
         )}
+        {selectionFrac && (
+          <span
+            className="timeline-selection"
+            data-testid="timeline-selection"
+            style={{ left: pct(selectionFrac.left), width: pct(selectionFrac.width) }}
+          />
+        )}
+        {exactFrac && cycles?.exact && (
+          <span
+            className="timeline-cycle"
+            data-testid="timeline-cycle-exact"
+            style={{ left: pct(exactFrac.left), width: pct(exactFrac.width) }}
+            title={`exact cycle: ticks ${cycles.exact.start}–${cycles.exact.end} · period ${cycles.exact.period}`}
+            onClick={() => onSelect({ start: cycles.exact!.start, end: cycles.exact!.end })}
+          />
+        )}
+        {translatedFrac && cycles?.translated && (
+          <span
+            className="timeline-cycle"
+            data-testid="timeline-cycle-translated"
+            style={{ left: pct(translatedFrac.left), width: pct(translatedFrac.width) }}
+            title={
+              `translated cycle: ticks ${cycles.translated.start}–${cycles.translated.end} · ` +
+              `period ${cycles.translated.period} · drift ${cycles.translated.drift.join(",")}`
+            }
+            onClick={() => onSelect({ start: cycles.translated!.start, end: cycles.translated!.end })}
+          />
+        )}
       </div>
+      <span className="timeline-readout">
+        {selection
+          ? `sel ${selection.start}–${selection.end} (${selection.end - selection.start + 1} ticks)`
+          : "no selection"}
+      </span>
     </div>
   );
 }

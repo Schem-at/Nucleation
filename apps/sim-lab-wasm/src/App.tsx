@@ -12,7 +12,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { World, loader, CHUNK, type SettleName } from "./world";
 import { Player } from "./player";
 import { addDefaultLights } from "./mesher";
-import { TimelineStrip, type Activity } from "./timeline";
+import { TimelineStrip, type Activity, type Cycles, type Span } from "./timeline";
 
 type Status = { kind: "idle" | "loading" | "ready" | "error"; message?: string };
 
@@ -110,6 +110,15 @@ export default function App(): JSX.Element {
    * timeline-prerequisites work removed elsewhere. A 250 ms timer instead
    * bounds how often that cost is paid, independent of frame rate. */
   const [activity, setActivity] = useState<Activity | null>(null);
+  /** The export-range selection, as exact ticks — set by dragging on the
+   * strip or by clicking a detected cycle. `null` selects nothing. Reset
+   * whenever the recorded run it refers to goes away (a new file, a new
+   * recording), since a tick range from a previous run has no meaning
+   * against this one. */
+  const [selection, setSelection] = useState<Span | null>(null);
+  /** The last `timelineCyclesJson()` result, or `null` before "find cycles"
+   * has been pressed (or after the timeline it described was cleared). */
+  const [cycles, setCycles] = useState<Cycles | null>(null);
 
   useEffect(() => {
     runningRef.current = running;
@@ -141,6 +150,33 @@ export default function App(): JSX.Element {
     const id = setInterval(pollActivity, 250);
     return () => clearInterval(id);
   }, [recording, pollActivity]);
+
+  /** "find cycles": read `timelineCyclesJson()` exactly once, on the click
+   * that asked for it — never on a timer, never speculatively.
+   *
+   * Two reasons, both load-bearing:
+   *  - Cost: it replays the *entire* recorded timeline against every block
+   *    to build one digest per tick boundary (O(ticks × blocks)), on the
+   *    main thread. That is fine for one on-demand press; polling it the
+   *    way `pollActivity` polls the (cheap, incremental) activity JSON
+   *    would stall the tab, and the stall gets worse the longer the
+   *    recording runs.
+   *  - Freshness: while recording, the timeline the last answer described
+   *    is already gone by the time the next tick lands, so a polled answer
+   *    would be stale the instant it rendered. The button is disabled
+   *    below while `recording` is true for exactly this reason — there is
+   *    no "keep it up to date" version of this action mid-recording, only
+   *    "ask once, after the run being asked about has stopped changing."
+   */
+  const findCycles = useCallback(() => {
+    const world = worldRef.current;
+    if (!world?.sim?.timelineCyclesJson) return;
+    try {
+      setCycles(JSON.parse(world.sim.timelineCyclesJson()) as Cycles);
+    } catch {
+      setCycles(null);
+    }
+  }, []);
 
   // Scene, camera, render loop — created once.
   useEffect(() => {
@@ -385,6 +421,8 @@ export default function App(): JSX.Element {
     setRunning(false);
     setRecording(false);
     setActivity(null);
+    setSelection(null);
+    setCycles(null);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const world = await World.load(bytes, mode, chunk);
@@ -464,6 +502,10 @@ export default function App(): JSX.Element {
     } else {
       world.startRecording();
       setActivity(null);
+      // A new recording makes any prior selection/cycle-find answer refer
+      // to a timeline that no longer exists.
+      setSelection(null);
+      setCycles(null);
       setRecording(world.isRecording());
     }
   }, [pollActivity]);
@@ -493,6 +535,17 @@ export default function App(): JSX.Element {
         </button>
         <button onClick={toggleRecording} disabled={status.kind !== "ready"}>
           {recording ? "stop" : "record"}
+        </button>
+        {/* Disabled while recording: see the comment on `findCycles` above
+            for why there is no meaningful "keep this fresh" version of the
+            action mid-recording, only "ask once, after the run has
+            stopped." */}
+        <button
+          onClick={findCycles}
+          disabled={status.kind !== "ready" || recording || !activity}
+          title="replay the recorded timeline once to find a repeating span (O(ticks × blocks) — not polled)"
+        >
+          find cycles
         </button>
         <span className="steps">
           <button onClick={() => stepBy(1)} disabled={status.kind !== "ready" || running}>
@@ -575,7 +628,7 @@ export default function App(): JSX.Element {
         <span className={`status ${status.kind}`}>{status.message ?? "drop a schematic"}</span>
       </header>
 
-      <TimelineStrip activity={activity} />
+      <TimelineStrip activity={activity} selection={selection} onSelect={setSelection} cycles={cycles} />
 
       <footer className="hud">
         <span className="target">{target || "—"}</span>

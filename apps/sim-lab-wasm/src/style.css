@@ -11,6 +11,10 @@
    * must read distinctly from `--accent` (already claimed by inputs) and
    * would be invisible drawn from `--line`/`--dim` alone. */
   --warn: #e8c14a;
+  /* The detected-cycle shade on the timeline strip (Task 4). Needs its own
+   * identity distinct from `--accent` (the selection overlay) and `--warn`
+   * (the piston mark) — a cycle span is neither of those states. */
+  --cycle: #9b7fe8;
 }
 
 * { box-sizing: border-box; }
@@ -106,11 +110,17 @@ button:disabled { opacity: 0.4; cursor: default; }
 }
 /* The measured element: its `clientWidth` is the pixel budget bucketing is
  * computed against, so nothing here may add its own padding — that lives on
- * `.timeline` instead, outside what gets measured. */
+ * `.timeline` instead, outside what gets measured. Positioned, so the
+ * selection/cycle overlays (Task 4) can place themselves against it by
+ * percentage. */
 .timeline-columns {
+  position: relative;
   flex: 1;
   display: flex;
-  align-items: flex-end;
+  /* `stretch`, not `flex-end`: `.timeline-col-hit` must span the full row
+   * height to be a full-height hit target (Decision 1) — the bar inside it
+   * still bottom-aligns on its own. */
+  align-items: stretch;
   gap: 1px;
 }
 .timeline-empty {
@@ -118,20 +128,74 @@ button:disabled { opacity: 0.4; cursor: default; }
   color: var(--dim);
   font-size: 11px;
 }
-.timeline-col {
+/* The click/drag target for one column. Full height on purpose: a
+ * `{changes:0}` tick renders its bar at only the 6% presence floor, and a
+ * hit area limited to that sliver would make those ticks ungrabbable — the
+ * same defect Task 3 fixed for visibility one layer up (Decision 1, Task 4
+ * brief hand-off). `.timeline` itself is `pointer-events: none` (so the
+ * strip never steals clicks meant for the 3D view above/below it); this is
+ * where pointer events are opted back in. */
+.timeline-col-hit {
   flex: 1 1 0;
   min-width: 1px;
   max-width: 6px;
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.timeline-col {
+  width: 100%;
   height: 6%;
   background: var(--dim);
   opacity: 0.55;
   border-radius: 1px 1px 0 0;
+  /* The wrapping `.timeline-col-hit` owns pointer events, not the bar —
+   * otherwise the hit target would shrink back to the painted height. */
+  pointer-events: none;
 }
 /* A mark distinguishing ticks with player input from ticks with none. */
 .timeline-col.has-input { background: var(--accent); opacity: 0.85; }
 /* A mark distinguishing ticks with a piston stroke. Layered on top of (not
  * instead of) the input colour, since a tick can be both. */
 .timeline-col.has-piston { box-shadow: inset 0 0 0 1px var(--warn); }
+
+/* The export-range selection overlay. A readout, not a click target — it
+ * sits over the columns without intercepting the drag/click that placed it
+ * there, or a further drag that would replace it. */
+.timeline-selection {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent);
+  opacity: 0.18;
+  border-left: 1px solid var(--accent);
+  border-right: 1px solid var(--accent);
+  pointer-events: none;
+}
+/* A detected-cycle span (exact or translated). Unlike the selection overlay,
+ * this IS a click target: clicking one selects that cycle's exact ticks. */
+.timeline-cycle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--cycle);
+  opacity: 0.3;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.timeline-cycle:hover { opacity: 0.45; }
+
+/* The selection's tick-range readout, beside the columns. */
+.timeline-readout {
+  flex: 0 0 auto;
+  align-self: center;
+  margin-left: 8px;
+  color: var(--dim);
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+}
 
 /* Fixed so the timeline strip above it can be pinned by pixel offset rather
  * than measured at runtime. */
