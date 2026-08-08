@@ -761,6 +761,9 @@ fn parse_block_data(
 }
 
 fn parse_block_entities(region_tag: &NbtCompound) -> Result<Vec<BlockEntity>> {
+    if !region_tag.contains_key("BlockEntities") {
+        return Ok(Vec::new());
+    }
     let block_entities_list = region_tag.get::<_, &NbtList>("BlockEntities")?;
     let mut block_entities = Vec::new();
 
