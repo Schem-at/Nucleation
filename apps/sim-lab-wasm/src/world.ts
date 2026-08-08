@@ -1074,12 +1074,20 @@ export class World {
    *
    * Clear only what was successfully parsed: never clear anything not yet
    * successfully read, or a malformed read would drop those changes for
-   * good (the engine's copy erased, ours never produced). If `clearChanges`
-   * itself is missing or throws, we deliberately keep going rather than
-   * fail the drain — the next call then re-reads and re-returns everything
-   * already returned this time, since there is no cursor left to skip past
-   * it. That relies on applying a change set being idempotent; it is not
-   * just a perf fallback.
+   * good (the engine's copy erased, ours never produced).
+   *
+   * The cursor only ever moves on a *known* result: `0` on an explicit
+   * `true`, `all.length` on an explicit `false`. Anything else — the call
+   * throwing, or `this.sim.clearChanges` being absent, which optional
+   * chaining resolves to `undefined` *without* throwing, so it does not
+   * reach the `catch` — is not a known result, and the cursor is left
+   * exactly where it was rather than guessed at. Treating an unknown
+   * result as `0` would report a clear that may never have happened;
+   * either way, we deliberately keep going rather than fail the drain —
+   * the next call then re-reads and re-returns from the same cursor,
+   * which for a genuinely missing/failing `clearChanges` means everything
+   * already returned this time comes back too. That relies on applying a
+   * change set being idempotent; it is not just a perf fallback.
    */
   drainChanges(): Change[] {
     if (!this.sim) return [];
@@ -1118,10 +1126,19 @@ export class World {
     // parse) would drop changes we never actually read. Advance the cursor
     // to match whichever actually happened: cleared means the log is gone
     // and position zero is correct again; refused means the log is exactly
-    // as long as `all`, and the next drain must start there.
+    // as long as `all`, and the next drain must start there. Anything else
+    // — `clearChanges` missing (optional chaining yields `undefined`
+    // without throwing) or throwing — is neither of those, known outcomes,
+    // so the cursor is left exactly where it was: the next call re-reads
+    // and re-returns from there, relying on applying a change set being
+    // idempotent. Resetting to `0` here would be reporting a clear that
+    // never happened, and stalling at `all.length` forever would risk
+    // dropping a change that lands between two undefined calls.
     try {
       const cleared = this.sim.clearChanges?.();
-      this.drainCursor = cleared === false ? all.length : 0;
+      if (cleared === true) this.drainCursor = 0;
+      else if (cleared === false) this.drainCursor = all.length;
+      // else: unknown outcome — cursor untouched, see above.
     } catch {
       /* nothing to clear, or engine doesn't support it — leave the cursor
        * where it was; the next call re-reads and re-returns from there. */
