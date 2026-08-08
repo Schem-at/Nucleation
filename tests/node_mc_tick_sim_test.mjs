@@ -327,5 +327,27 @@ expect(
   "recording continues after a clear — it drops what happened, it does not stop recording",
 );
 
+// --- a clear is refused while a run timeline is recording ---
+//
+// A timeline is a seed plus the change log: the recorder keeps only its start
+// tick and an initial frame, and replay applies the log forward from there.
+// Dropping the log mid-recording would leave every later frame reconstructing
+// a world that never existed, so the engine refuses and says so.
+const rec = TickSimulation.fromSnbt(door, TickSettleMode.InWorld, 15, -64, 0, "");
+rec.useBlock(10, 4, 1);
+rec.run(10);
+expect(rec.clearChanges() === true, "a clear succeeds with no timeline recording");
+rec.recordTimeline();
+rec.run(10);
+const changesWhileRecording = Number(rec.changesCount());
+expect(changesWhileRecording > 0, `the recording captured changes (${changesWhileRecording})`);
+expect(rec.clearChanges() === false, "the clear is refused while a timeline is recording");
+expect(
+  Number(rec.changesCount()) === changesWhileRecording,
+  "and the log is untouched — a refusal is not a partial clear",
+);
+rec.stopTimeline();
+expect(rec.clearChanges() === true, "once stopped, a clear succeeds again");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

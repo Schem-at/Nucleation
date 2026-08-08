@@ -269,6 +269,15 @@ export class World {
   /** Mesh-chunk edge for this build; see [`CHUNK`]. Never zero here — a
    * requested 0 is resolved to something that spans the build at load. */
   chunkSize: number = CHUNK;
+  /** Whether a run timeline is currently recording.
+   *
+   * Owned here, not inferred from the engine: `timelineActivityJson()`
+   * replies `{"start":0,"end":0,"ticks":[]}` both when nothing has ever
+   * been recorded and when a recording just started and has not produced
+   * an active tick yet, so there is no way to tell those apart by reading
+   * the engine back. The app has to remember which one is true itself.
+   */
+  private recording = false;
 
   private constructor(eng: Any, pack: Any, cfg: Any) {
     this.eng = eng;
@@ -854,7 +863,12 @@ export class World {
     this.entityMeshes.clear();
   }
 
-  /** Drop every in-flight block — on reload, reset, or a jump in time. */
+  /** Drop every in-flight block — on reload, reset, or a jump in time.
+   *
+   * Also resets recording state: it runs on load and on `startSim`, so a
+   * recording can never outlive the world it describes — a fresh sim has a
+   * fresh (empty, unstarted) timeline, whatever the previous one was doing.
+   */
   clearFlights(): void {
     for (const f of this.flights.values()) {
       this.dispose(f.object);
@@ -867,6 +881,40 @@ export class World {
     }
     this.handover = [];
     this.chunkRevision.clear();
+    this.recording = false;
+    this.drainCursor = 0;
+  }
+
+  /** Start recording a run timeline — a seed frame plus the change log from
+   * here on, which is what makes `frame_at`, `detect_cycles` and export
+   * possible afterwards. See `drainCursor` for why draining still works
+   * while this is on: the engine refuses to clear its log for the whole
+   * time this is true. */
+  startRecording(): void {
+    try {
+      this.sim?.recordTimeline?.();
+      this.recording = true;
+    } catch {
+      /* engine doesn't support it, or refused for its own reasons */
+    }
+  }
+
+  /** Stop recording. The timeline stays readable after this — that's what
+   * makes it exportable — and the next `clearChanges()` can succeed again. */
+  stopRecording(): void {
+    try {
+      this.sim?.stopTimeline?.();
+    } catch {
+      /* nothing recording, or engine doesn't support it */
+    } finally {
+      this.recording = false;
+    }
+  }
+
+  /** Whether a run timeline is currently recording. Owned by the app, not
+   * derived from the engine — see the field comment on `recording`. */
+  isRecording(): boolean {
+    return this.recording;
   }
 
   /** Apply what the last tick changed: patch the schematic, mark chunks.
@@ -990,17 +1038,39 @@ export class World {
     return this.solid.has(key(x, y, z));
   }
 
+  /** How many entries of the log the last drain already returned, while a
+   * clear is being refused.
+   *
+   * Clearing is the bounded path: it costs what happened since the last
+   * drain, nothing more. But `clearChanges()` refuses — and leaves the log
+   * untouched — while a run timeline is recording, because the log *is*
+   * the recording (see `World.startRecording`). A drain must not simply
+   * re-return everything from the start in that case, so this cursor is
+   * the fallback: it remembers how far the last drain got and slices past
+   * that point instead. It is meaningless whenever a clear succeeds — set
+   * back to zero the moment one does, since the log itself is then empty
+   * and position zero in it is correct again.
+   */
+  private drainCursor = 0;
+
   /** Everything the simulation has changed since the last drain.
    *
    * The engine's log is cumulative, so this consumes it: read it once, then
    * call `clearChanges()` so the next drain starts from empty. That's what
    * keeps this bounded — a drain costs what happened since the last drain,
    * not what the whole session has accumulated. Re-reading and slicing off
-   * a cursor (the old approach) re-serialised the whole log every call and
-   * reported 44k changes for 50 ticks of a 1200-block door.
+   * a cursor unconditionally (the old approach) re-serialised the whole log
+   * every call and reported 44k changes for 50 ticks of a 1200-block door.
    *
-   * Because the log is cleared here, nothing else may hold a cursor into
-   * it — there is nothing left to track after this returns.
+   * `clearChanges()` can refuse — while a run timeline is recording, see
+   * `World.startRecording` — and reports that with its return value. A
+   * refusal means the log is *not* cleared, so the next drain would see
+   * everything this one just returned, all over again: `drainCursor`
+   * exists only for that case, tracking how far into the (still-growing)
+   * log the last drain got so the next one can slice past it instead of
+   * re-emitting it. The moment a clear succeeds, the log really is empty
+   * and the cursor resets to zero — carrying it forward past a successful
+   * clear would skip real changes.
    *
    * Clear only what was successfully parsed: never clear anything not yet
    * successfully read, or a malformed read would drop those changes for
@@ -1013,9 +1083,13 @@ export class World {
    */
   drainChanges(): Change[] {
     if (!this.sim) return [];
-    // Cheap gate: nothing new, no parse.
+    // Cheap gate: nothing new since the cursor, no parse. Compares against
+    // the cursor rather than zero, because while a clear is being refused
+    // the log does not shrink back to zero between drains — only the part
+    // past the cursor is "new".
     try {
-      if (Number(this.sim.changesCount?.() ?? -1) === 0) return [];
+      const count = Number(this.sim.changesCount?.() ?? -1);
+      if (count >= 0 && count <= this.drainCursor) return [];
     } catch {
       /* fall through to the parse */
     }
@@ -1036,15 +1110,23 @@ export class World {
     // `parsed?.changes` (not `parsed.changes`) is what keeps that from
     // throwing outside this try/catch, in the frame loop.
     const all: Any[] = Array.isArray(parsed) ? parsed : (parsed?.changes ?? []);
+    // Only take the slice this drain has not already returned — a no-op
+    // when the cursor is zero (the common, clearing path).
+    const batch = all.slice(this.drainCursor);
     // Only clear once the payload above has been fully and successfully
     // interpreted into `all` — clearing any earlier (including on a `null`
-    // parse) would drop changes we never actually read.
+    // parse) would drop changes we never actually read. Advance the cursor
+    // to match whichever actually happened: cleared means the log is gone
+    // and position zero is correct again; refused means the log is exactly
+    // as long as `all`, and the next drain must start there.
     try {
-      this.sim.clearChanges?.();
+      const cleared = this.sim.clearChanges?.();
+      this.drainCursor = cleared === false ? all.length : 0;
     } catch {
-      /* nothing to clear, or engine doesn't support it */
+      /* nothing to clear, or engine doesn't support it — leave the cursor
+       * where it was; the next call re-reads and re-returns from there. */
     }
-    return all
+    return batch
       .map((c: Any) => ({
         pos: [c.x ?? c.pos?.[0], c.y ?? c.pos?.[1], c.z ?? c.pos?.[2]] as [number, number, number],
         to: c.to ?? c.state ?? "minecraft:air",

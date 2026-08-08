@@ -97,6 +97,10 @@ export default function App(): JSX.Element {
   const [target, setTarget] = useState<string>("");
   const [info, setInfo] = useState<string>("");
   const [locked, setLocked] = useState(false);
+  /** Mirrors `World.isRecording()` for the button label — the world is the
+   * source of truth (and resets it on load/`startSim`), this just re-renders
+   * the bar when it changes. */
+  const [recording, setRecording] = useState(false);
 
   useEffect(() => {
     runningRef.current = running;
@@ -346,6 +350,7 @@ export default function App(): JSX.Element {
   const open = useCallback(async (file: File, mode: SettleName = settle, chunk: number = chunkSize) => {
     setStatus({ kind: "loading", message: `meshing ${file.name}…` });
     setRunning(false);
+    setRecording(false);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const world = await World.load(bytes, mode, chunk);
@@ -408,6 +413,21 @@ export default function App(): JSX.Element {
     );
   }, []);
 
+  /** Toggle the run timeline: `record` when idle, `stop` when recording. The
+   * button follows `World`'s own flag rather than driving one of its own, so
+   * a world reload (which resets it in `clearFlights`) cannot leave the
+   * label out of step with what the engine is actually doing. */
+  const toggleRecording = useCallback(() => {
+    const world = worldRef.current;
+    if (!world?.sim) return;
+    if (world.isRecording()) {
+      world.stopRecording();
+    } else {
+      world.startRecording();
+    }
+    setRecording(world.isRecording());
+  }, []);
+
   return (
     <div className="app" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
       <div className="viewport" ref={mount} />
@@ -430,6 +450,9 @@ export default function App(): JSX.Element {
         </label>
         <button onClick={() => setRunning((r) => !r)} disabled={status.kind !== "ready"}>
           {running ? "pause" : "run"}
+        </button>
+        <button onClick={toggleRecording} disabled={status.kind !== "ready"}>
+          {recording ? "stop" : "record"}
         </button>
         <span className="steps">
           <button onClick={() => stepBy(1)} disabled={status.kind !== "ready" || running}>
