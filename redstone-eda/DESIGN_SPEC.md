@@ -112,6 +112,11 @@ A bus is an endpoint list with **roles**: `driver | sink | bidi`.
 split the bus into independently-routed **SEGMENTS**. Form (vertical stack,
 flat lane, …) is inferred from the port geometry at each end of a segment;
 Phase 1 implements the verified vertical 2y-pitch form (`bus8_*.py`).
+Verified form templates ready to port (cell listings in `pivot_tiles.md`):
+vertical↔flat adapters `pivot_v2h`/`pivot_h2v` and the flat 90° corner
+`pivot_flat90` (`pivot_tiles.py`, 96/96 each); an 8-bit word as TWO analog
+wires — the HexAnalog bus form — is verified 256/256 exhaustive end to end
+(`compositor/hexanalog_bus8.py`, comparator-sandwich trunk stations).
 
 **Style** is per-bus: `{bus_block, transparent_block}` (default glass).
 The transparent block is used ONLY where a diagonal must survive — the
@@ -281,7 +286,9 @@ r = d.move_instance("c0", at=(4, 0, 8))   # now overlaps bus_a's fragment
 
 - interference co-reroute + drag APIs (`move_gate`, `move_instance`,
   cancellable, wasm-identical);
-- form-pivot adapter tiles (vertical stack ↔ flat lane at a gate);
+- form-pivot adapter tiles (vertical stack ↔ flat lane at a gate) —
+  hardware DONE and sim-verified (`pivot_tiles.py`/`pivot_tiles.md`,
+  incl. the flat 90° corner); remaining work is the router-side stamping;
 - multi-driver wired-OR (`merge="or"`);
 - loose-layer editing APIs on the design document;
 - design-document serialization: `.nucm` project tier and `.litematic`

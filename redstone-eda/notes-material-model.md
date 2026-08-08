@@ -45,6 +45,18 @@ Mechanism (mc-tick `vanilla.rs`/`wire.rs`, matches the probes exactly):
   the caps at 2y pitch, dust/solid/dust, is isolated in all 4 combos). P2 —
   a repeater FIRES from a slab-top floor (sturdiness is static-legality
   only), so solid repeater floors were never electrically load-bearing.
+- **POINTING LAW (probe_pivot.py, 2026-08-09)**: dust weak-powers only the
+  blocks it POINTS into — the axes of its connections (dust, levers,
+  repeaters count; a single connection extends to the opposite side; a true
+  dot powers all sides). Probed: a lever-axis dead-end fires a station
+  entry block (A), a straight dead-end fires it (C, control), but a run
+  that TURNS A CORNER does not fire an entry block around the corner (B).
+  ⇒ every station entry needs ≥ 1 dust cell on the station's own axis
+  before it. Strong power is exempt (D): a station EXIT block lights dust
+  on ANY side, so a corner directly after an exit block is free. Also
+  probed there (E): a station-exit → 14-step 1y/1x descending staircase on
+  all-solid supports conducts (the diode law downhill, at scale).
+  Law: `materials.dust_drives_block()`; consumers: pivot_tiles.py.
 
 ## PRINCIPLE — materials derive from primitive predicates (materials.py)
 

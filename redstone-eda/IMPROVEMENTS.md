@@ -170,6 +170,37 @@ The material model cashed out as a bus form (`bus8_probe.py`,
   T-junctions/taps off a vertical bus (exit-block strong-power leak makes
   mid-run taps nontrivial).
 
+## Form-pivot adapters + HexAnalog bus form (LANDED, 2026-08-09)
+
+Two template families closing the bus-form gaps (`pivot_tiles.py` +
+`pivot_tiles.md` cell listings for the Rust port; `compositor/
+hexanalog_bus8.py`; four showcase pieces):
+
+- **NEW PROBED PHYSICS — the pointing law** (`probe_pivot.py`, 5/5;
+  `materials.dust_drives_block`): dust weak-powers only the blocks on its
+  connection axes, so a run that turns a corner does NOT fire a station
+  entry block around the corner; strong exit blocks light dust on any
+  side.  Found the honest way: the first v2h/flat90 layouts failed
+  exactly at their corner-entered stations (75/96, 72/96) while the
+  straight-entered h2v scored 96/96 — the law explains all three.
+- **pivot_v2h / pivot_h2v**: vertical(2y) <-> flat(2z) adapters — fan
+  column (separator stack) + per-lane station + uniform-budget 1y/1x
+  staircase; 14-step descent probed; 96/96 each.  Distinct tiles (the
+  repeater direction is the only difference).
+- **pivot_flat90**: concentric flat corner, order preserved in the travel
+  frame; in-leg + out-leg stations per the pointing law; 96/96.
+- **hexanalog_bus8**: 8 bits as TWO analog wires (nibble per wire), with a
+  probed comparator-SANDWICH trunk station (exact ss through dust ->
+  block -> comparator -> block -> dust); 256/256 bytes exhaustive in
+  Gray order.  Cross-section 2 wires vs binary's 16 cells; the cost is
+  codec area (~40x40 per end) and 1 gt per trunk comparator.
+- **Deferred**: router-side stamping of these tiles; a DENSE pivot
+  (interleaved 8-bit staircase at 1y separation via the alternation law)
+  was sketched but is over-constrained at aligned columns — needs the
+  half_slope stagger, left for a follow-up; analog trunk corners (the
+  comparator chain turning 90°) unprobed; nibble bands sit 60 z apart
+  because the encoder decay lanes sprawl — packing codecs is open.
+
 
 What is actually weak, drawn from the session docs, the deferred lists in
 `demos/README.md` / `showcase/README.md`, `CORE_PROPOSALS.md`, and

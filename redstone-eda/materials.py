@@ -116,6 +116,18 @@ def cap_is_harmful(cap, dust_uses_diagonal_here):
     return dust_uses_diagonal_here and cuts_diagonal(cap)
 
 
+def dust_drives_block(entry_on_pointing_axis):
+    """POINTING LAW (probe_pivot.py A/B/C): dust weak-powers only the
+    blocks it POINTS into -- the axes of its connections (dust, levers,
+    repeaters count; a single connection extends to the opposite side; a
+    true dot powers all sides).  A run that turns a corner does NOT fire a
+    station entry block around the corner: every entry block must be
+    preceded by >= 1 dust cell on the station's own axis.  Strong power is
+    exempt (probe D): a station EXIT block lights dust on ANY side, so a
+    corner directly after an exit block is free."""
+    return entry_on_pointing_axis
+
+
 # -- 3. cell choosers -------------------------------------------------------
 
 def pick_support(need_conductor=False, need_insulator=False,
