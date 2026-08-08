@@ -971,6 +971,57 @@ mod tests {
         assert_eq!(back.metadata.description, None);
     }
 
+    /// Sponge v3 marks `BlockEntities` optional, and FAWE omits the key
+    /// outright when a build has none. Our own writer always emits the list,
+    /// so strip it back out to get the file those exports actually produce:
+    /// the importer must read the blocks rather than error on the absent key.
+    #[test]
+    fn schem_v3_reads_a_region_that_omits_block_entities() {
+        let mut schematic = UniversalSchematic::new("no block entities".to_string());
+        schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+
+        let bytes = to_schematic(&schematic).expect("write .schem");
+        let (mut root, root_name) = {
+            let mut gz = GzDecoder::new(BufReader::new(&bytes[..]));
+            read_nbt(&mut gz, Flavor::Uncompressed).expect("decode .schem")
+        };
+
+        {
+            let schem = root
+                .get_mut::<_, &mut NbtCompound>("Schematic")
+                .expect("Schematic compound");
+            let blocks = schem
+                .get::<_, &NbtCompound>("Blocks")
+                .expect("Blocks compound");
+            assert!(
+                blocks.contains_key("BlockEntities"),
+                "writer stopped emitting BlockEntities — this test no longer strips anything"
+            );
+
+            let mut stripped = NbtCompound::new();
+            for (key, value) in blocks.inner().iter() {
+                if key != "BlockEntities" {
+                    stripped.insert(key.clone(), value.clone());
+                }
+            }
+            schem.insert("Blocks", stripped);
+        }
+
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        quartz_nbt::io::write_nbt(&mut encoder, Some(&root_name), &root, Flavor::Uncompressed)
+            .expect("re-encode .schem");
+        let without_block_entities = encoder.finish().expect("finish gzip");
+
+        let back =
+            from_schematic(&without_block_entities).expect("read .schem lacking BlockEntities");
+
+        assert!(back.get_block_entities_as_list().is_empty());
+        assert_eq!(
+            back.get_block(0, 0, 0).map(|b| b.name.as_str()),
+            Some("minecraft:stone")
+        );
+    }
+
     #[test]
     fn test_schematic_file_generation() {
         // Create a test schematic
