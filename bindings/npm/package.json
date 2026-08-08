@@ -8,9 +8,13 @@
     ".": {
       "types": "./index.d.ts",
       "default": "./index.mjs"
+    },
+    "./design": {
+      "types": "./veneer/design.d.ts",
+      "default": "./veneer/design.mjs"
     }
   },
-  "files": ["*.mjs", "*.d.ts", "*.d.mts", "nucleation.wasm", "diplomat.config.mjs"],
+  "files": ["*.mjs", "*.d.ts", "*.d.mts", "veneer/", "nucleation.wasm", "diplomat.config.mjs"],
   "engines": { "node": ">=18" },
   "repository": { "type": "git", "url": "git+https://github.com/Schem-at/Nucleation.git" },
   "homepage": "https://github.com/Schem-at/Nucleation",

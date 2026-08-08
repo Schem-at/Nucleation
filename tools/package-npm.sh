@@ -22,6 +22,12 @@ cp bindings/js/*.mjs bindings/js/*.d.ts bindings/js/*.d.mts "$OUT"/
 cp target/wasm32-unknown-unknown/release/nucleation.wasm "$OUT/"
 cp bindings/npm/package.json "$OUT/"
 cp bindings/npm/README.md "$OUT/"
+# Hand-written veneers overlaying the generated core (mirrors of the Python
+# bindings/python/nucleation/*.py veneers; exported as e.g. `nucleation/design`).
+# They live in veneer/ because the repo's macOS checkouts are case-insensitive:
+# a top-level design.mjs would collide with the generated Design.mjs.
+mkdir -p "$OUT/veneer"
+cp bindings/npm/veneer/*.mjs bindings/npm/veneer/*.d.ts "$OUT/veneer/"
 
 # Package-local wasm path (the committed bindings/diplomat.config.mjs points at
 # target/ for the in-repo smoke tests instead).
