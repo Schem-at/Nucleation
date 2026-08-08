@@ -47,6 +47,8 @@ pub mod bridge;
 pub mod meshing;
 #[cfg(all(feature = "bridge", not(target_arch = "wasm32")))]
 mod python_callback;
+#[cfg(feature = "routing")]
+pub mod routing;
 #[cfg(feature = "rendering")]
 pub mod rendering;
 #[cfg(any(feature = "scripting-lua", feature = "scripting-js"))]

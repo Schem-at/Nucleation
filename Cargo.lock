@@ -3527,6 +3527,7 @@ dependencies = [
  "mchprs_redstone",
  "mchprs_world",
  "mlua",
+ "nucleation-routing",
  "num-complex",
  "palette",
  "phf 0.11.3",
@@ -3566,6 +3567,13 @@ dependencies = [
  "ratatui",
  "ratatui-image",
  "serde_json",
+]
+
+[[package]]
+name = "nucleation-routing"
+version = "0.1.0"
+dependencies = [
+ "pnr-core",
 ]
 
 [[package]]
@@ -4307,6 +4315,10 @@ dependencies = [
  "flate2",
  "miniz_oxide",
 ]
+
+[[package]]
+name = "pnr-core"
+version = "0.1.0"
 
 [[package]]
 name = "polling"
