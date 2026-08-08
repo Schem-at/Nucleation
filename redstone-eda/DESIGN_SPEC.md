@@ -1,7 +1,10 @@
 # Redstone EDA — Composition Model (DESIGN_SPEC)
 
-Status: co-designed model, authoritative. Phase 1 implemented on
-`feat/redstone-eda`; Phase 2 items are listed at the end. Every concept below
+Status: co-designed model, authoritative. Phase 1 is IMPLEMENTED on
+`feat/redstone-eda` (`src/design.rs`, bridge `Design` + `CellExecutor`
+opaques, acceptance in `tests/design_bus_cross.rs` and
+`redstone-eda/compositor/design_demo2.py`); Phase 2 items are listed at
+the end. Every concept below
 is grounded in a type or file that exists on this branch (grounding table,
 section 9).
 
@@ -241,7 +244,7 @@ d.bake(4000)                # settle + bake_to (mc-tick)
 flat = d.flatten()
 
 # typed walking-ones through the EMBEDDED contract — no coordinates
-cell = n.TypedExecutor.for_schematic(flat)      # contract autodetected
+cell = n.CellExecutor.for_schematic(flat)       # contract autodetected
 for i in range(8):
     cell.set_input("a_in", 1 << i); cell.set_input("b_in", 0)
     cell.settle(400)
