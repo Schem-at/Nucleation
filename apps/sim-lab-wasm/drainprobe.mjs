@@ -42,24 +42,30 @@ console.log(await p.evaluate(async () => {
     : "  ✅ a drain costs what the last batch produced, not what the session accumulated");
 
   // -- phase 2: a run timeline is recording, so every clearChanges() is
-  // refused and the log is never emptied — verified separately that
-  // changesCount() is genuinely cumulative and monotonic for as long as a
-  // clear is refused, so `changesJson()` must reserialise the whole
-  // recorded-so-far log on every call; that part is an engine-API
-  // limitation (no "changes since N" read exists) no amount of `world.ts`
-  // logic can avoid, and ms is reported below for visibility, not as a gate.
+  // refused and the log is never emptied. `drainChanges` used to fall back
+  // to `changesJson()` — the whole recorded-so-far log, every call — plus a
+  // slice, which reserialised the entire backlog on every drain and made
+  // cost climb with how long the recording had been running. It now asks
+  // the engine for `changesJsonFrom(drainCursor)`, so a drain only pays for
+  // the tail since the last one, exactly as phase 1's clearing path does.
   //
-  // What `drainCursor` is actually responsible for is bounding what gets
-  // *returned and applied*: without it, the old bug re-returned (and
-  // `applyChanges` re-wrote) the entire accumulated backlog every single
-  // frame for as long as recording ran — actual unbounded, compounding
-  // work, not just an unavoidable parse cost. The precise, falsifiable
-  // version of "still bounded" is conservation: every change the log ever
-  // held during the recording is delivered to a drain exactly once — the
-  // sum of every batch this loop receives must equal the final cumulative
-  // count. If the cursor were broken (stuck at 0, or not advancing on a
-  // refusal), that sum would run far ahead of the final count instead,
-  // because most of it would be the same entries returned again and again.
+  // Two independent checks, because one proves cost and the other proves
+  // correctness and neither implies the other: a drain could stay cheap by
+  // silently dropping changes, or stay correct by paying an unbounded cost
+  // to get there.
+  //
+  // Timing: same shape as phase 1's gate, restored now that reading from a
+  // cursor makes it meaningful again — it did not hold against the old
+  // whole-log reparse, which is why it was replaced with conservation-only
+  // in that version.
+  //
+  // Conservation: every change the log ever held during the recording is
+  // delivered to a drain exactly once — the sum of every batch this loop
+  // receives must equal the final cumulative count. If the cursor were
+  // broken (stuck at 0, or not advancing on a refusal, or advancing by the
+  // wrong amount now that each read is a tail rather than the whole log),
+  // that sum would run ahead of the final count instead, because most of it
+  // would be the same entries returned again and again.
   w.startRecording();
   let sumGot = 0;
   let rFirst = null, rLast = null;
@@ -73,8 +79,12 @@ console.log(await p.evaluate(async () => {
   const finalTotal = Number(w.sim.changesCount());
   w.stopRecording();
   out.push("-- phase 2: recording, clears refused, cursor fallback --");
-  out.push(`drain at tick  10 of recording: ${rFirst.ms.toFixed(3)} ms for ${rFirst.got} changes (engine reparses the whole log each call while recording — informational, not gated)`);
+  out.push(`drain at tick  10 of recording: ${rFirst.ms.toFixed(3)} ms for ${rFirst.got} changes`);
   out.push(`drain at tick 200 of recording: ${rLast.ms.toFixed(3)} ms for ${rLast.got} changes`);
+  const recGrew = rLast.ms > rFirst.ms * 4 && rLast.ms > 0.5;
+  out.push(recGrew
+    ? `  ❌ draining while recording got ${(rLast.ms / Math.max(rFirst.ms, 0.001)).toFixed(1)}x more expensive as the log grew`
+    : "  ✅ a drain costs what the last batch produced, not what the recording has accumulated");
   out.push(`sum of every batch delivered over the recording: ${sumGot}; final cumulative log length: ${finalTotal}`);
   const conserved = sumGot === finalTotal;
   out.push(conserved

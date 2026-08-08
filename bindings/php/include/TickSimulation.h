@@ -96,6 +96,8 @@ bool TickSimulation_clear_changes(TickSimulation* self);
 
 void TickSimulation_changes_json(const TickSimulation* self, DiplomatWrite* write);
 
+void TickSimulation_changes_json_from(const TickSimulation* self, uint32_t start, DiplomatWrite* write);
+
 void TickSimulation_item_entities_json(const TickSimulation* self, DiplomatWrite* write);
 
 void TickSimulation_motion_semantics(const TickSimulation* self, DiplomatWrite* write);

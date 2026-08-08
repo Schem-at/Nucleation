@@ -568,6 +568,7 @@ void TickSimulation_updates_wave_json(TickSimulation* self, uint32_t tick, Diplo
 void TickSimulation_moving_blocks_json(TickSimulation* self, DiplomatWrite* write);
 bool TickSimulation_clear_changes(TickSimulation* self);
 void TickSimulation_changes_json(TickSimulation* self, DiplomatWrite* write);
+void TickSimulation_changes_json_from(TickSimulation* self, uint32_t start, DiplomatWrite* write);
 void TickSimulation_item_entities_json(TickSimulation* self, DiplomatWrite* write);
 void TickSimulation_motion_semantics(TickSimulation* self, DiplomatWrite* write);
 uint32_t TickSimulation_piston_retract_contacts(TickSimulation* self);

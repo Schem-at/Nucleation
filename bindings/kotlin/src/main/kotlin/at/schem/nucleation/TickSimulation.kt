@@ -42,6 +42,7 @@ internal interface TickSimulationLib: Library {
     fun TickSimulation_moving_blocks_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_clear_changes(handle: Pointer): Byte
     fun TickSimulation_changes_json(handle: Pointer, write: Pointer): Unit
+    fun TickSimulation_changes_json_from(handle: Pointer, start: FFIUint32, write: Pointer): Unit
     fun TickSimulation_item_entities_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_motion_semantics(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_piston_retract_contacts(handle: Pointer): FFIUint32
@@ -726,6 +727,29 @@ class TickSimulation internal constructor (
     fun changesJson(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.TickSimulation_changes_json(handle, write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
+    }
+
+    /** The same JSON array [TickSimulation::changes_json] produces,
+    *but only the entries from index `start` onward.
+    *
+    *Exists for a host draining the log every frame while a run
+    *timeline recording refuses [TickSimulation::clear_changes]: the
+    *log only ever grows in that state, so without this,
+    *`changes_json` re-serialises the whole backlog on every single
+    *drain — a cost that climbs for as long as the recording runs,
+    *which is exactly when a session runs longest. Reading from a
+    *cursor keeps a drain's cost to what is actually new.
+    *
+    *`start` at or past the end of the log yields `[]`, not an error —
+    *a host racing a draining cursor against a growing log should not
+    *have to special-case "nothing new yet".
+    */
+    fun changesJsonFrom(start: UInt): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.TickSimulation_changes_json_from(handle, FFIUint32(start), write);
 
         val returnString = DW.writeToString(write)
         return returnString

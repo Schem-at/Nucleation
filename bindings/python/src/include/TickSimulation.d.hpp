@@ -454,6 +454,26 @@ public:
   inline void changes_json_write(W& writeable_output) const;
 
   /**
+   * The same JSON array {@link TickSimulation::changes_json} produces,
+   * but only the entries from index `start` onward.
+   *
+   * Exists for a host draining the log every frame while a run
+   * timeline recording refuses {@link TickSimulation::clear_changes}: the
+   * log only ever grows in that state, so without this,
+   * `changes_json` re-serialises the whole backlog on every single
+   * drain — a cost that climbs for as long as the recording runs,
+   * which is exactly when a session runs longest. Reading from a
+   * cursor keeps a drain's cost to what is actually new.
+   *
+   * `start` at or past the end of the log yields `[]`, not an error —
+   * a host racing a draining cursor against a growing log should not
+   * have to special-case "nothing new yet".
+   */
+  inline std::string changes_json_from(uint32_t start) const;
+  template<typename W>
+  inline void changes_json_from_write(uint32_t start, W& writeable_output) const;
+
+  /**
    * Live item entities and minecarts, as JSON:
    * `{"items":[{"id":N,"item":"...","count":N,"pos":[..],"vel":[..],
    * "on_ground":bool,"contents":[{"id":"...","count":N}]}],

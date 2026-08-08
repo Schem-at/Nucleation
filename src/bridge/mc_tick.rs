@@ -1869,8 +1869,28 @@ pub mod ffi {
         }
 
         pub fn changes_json(&self, out: &mut DiplomatWrite) {
+            self.changes_json_from(0, out);
+        }
+
+        /// The same JSON array [`TickSimulation::changes_json`] produces,
+        /// but only the entries from index `start` onward.
+        ///
+        /// Exists for a host draining the log every frame while a run
+        /// timeline recording refuses [`TickSimulation::clear_changes`]: the
+        /// log only ever grows in that state, so without this,
+        /// `changes_json` re-serialises the whole backlog on every single
+        /// drain — a cost that climbs for as long as the recording runs,
+        /// which is exactly when a session runs longest. Reading from a
+        /// cursor keeps a drain's cost to what is actually new.
+        ///
+        /// `start` at or past the end of the log yields `[]`, not an error —
+        /// a host racing a draining cursor against a growing log should not
+        /// have to special-case "nothing new yet".
+        pub fn changes_json_from(&self, start: u32, out: &mut DiplomatWrite) {
+            let recorded = self.sim.recorded();
+            let start = (start as usize).min(recorded.len());
             let mut json = String::from("[");
-            for (i, change) in self.sim.recorded().iter().enumerate() {
+            for (i, change) in recorded[start..].iter().enumerate() {
                 if i > 0 {
                     json.push(',');
                 }

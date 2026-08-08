@@ -18,6 +18,7 @@ void add_TickSimulation_binding(nb::module_ mod) {
         .def_static("block_entity_audit_json", &nucleation::TickSimulation::block_entity_audit_json, "schematic"_a)
         .def("changes_count", &nucleation::TickSimulation::changes_count)
         .def("changes_json", &nucleation::TickSimulation::changes_json)
+        .def("changes_json_from", &nucleation::TickSimulation::changes_json_from, "start"_a)
         .def("checkpoint", &nucleation::TickSimulation::checkpoint)
         .def("clear_changes", &nucleation::TickSimulation::clear_changes)
         .def("clear_updates", &nucleation::TickSimulation::clear_updates)

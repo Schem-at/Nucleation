@@ -349,5 +349,28 @@ expect(
 rec.stopTimeline();
 expect(rec.clearChanges() === true, "once stopped, a clear succeeds again");
 
+// --- reading only what is new ---
+//
+// While a run timeline is recording the engine refuses to drop the change log,
+// so a host must be able to read the tail without paying for the whole
+// backlog on every frame.
+const inc = TickSimulation.fromSnbt(door, TickSettleMode.InWorld, 15, -64, 0, "");
+inc.useBlock(10, 4, 1);
+inc.run(20);
+const whole = JSON.parse(inc.changesJson());
+expect(whole.length > 10, `the door recorded a backlog (${whole.length})`);
+const tail = JSON.parse(inc.changesJsonFrom(whole.length - 5));
+expect(tail.length === 5, `asking from n returns exactly the tail (${tail.length})`);
+expect(
+  JSON.stringify(tail) === JSON.stringify(whole.slice(-5)),
+  "and it is the same entries changes_json would have given",
+);
+expect(JSON.parse(inc.changesJsonFrom(0)).length === whole.length, "from 0 is the whole log");
+expect(JSON.parse(inc.changesJsonFrom(whole.length)).length === 0, "from the end is empty");
+expect(
+  JSON.parse(inc.changesJsonFrom(whole.length + 1000)).length === 0,
+  "and past the end is empty, not an error",
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

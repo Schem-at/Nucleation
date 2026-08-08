@@ -99,6 +99,8 @@ namespace capi {
 
     void TickSimulation_changes_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
 
+    void TickSimulation_changes_json_from(const diplomat::capi::TickSimulation* self, uint32_t start, diplomat::capi::DiplomatWrite* write);
+
     void TickSimulation_item_entities_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
 
     void TickSimulation_motion_semantics(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
@@ -515,6 +517,22 @@ template<typename W>
 inline void TickSimulation::changes_json_write(W& writeable) const {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     diplomat::capi::TickSimulation_changes_json(this->AsFFI(),
+        &write);
+}
+
+inline std::string TickSimulation::changes_json_from(uint32_t start) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_changes_json_from(this->AsFFI(),
+        start,
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::changes_json_from_write(uint32_t start, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_changes_json_from(this->AsFFI(),
+        start,
         &write);
 }
 

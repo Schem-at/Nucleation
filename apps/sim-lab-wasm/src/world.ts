@@ -1038,72 +1038,86 @@ export class World {
     return this.solid.has(key(x, y, z));
   }
 
-  /** How many entries of the log the last drain already returned, while a
-   * clear is being refused.
+  /** How far into the log the last drain read, while a clear is being
+   * refused.
    *
    * Clearing is the bounded path: it costs what happened since the last
    * drain, nothing more. But `clearChanges()` refuses — and leaves the log
    * untouched — while a run timeline is recording, because the log *is*
    * the recording (see `World.startRecording`). A drain must not simply
    * re-return everything from the start in that case, so this cursor is
-   * the fallback: it remembers how far the last drain got and slices past
-   * that point instead. It is meaningless whenever a clear succeeds — set
-   * back to zero the moment one does, since the log itself is then empty
-   * and position zero in it is correct again.
+   * the fallback: it remembers how far the last drain got, and the next
+   * one reads `changesJsonFrom(drainCursor)` instead of the whole log. It
+   * is meaningless whenever a clear succeeds — set back to zero the moment
+   * one does, since the log itself is then empty and position zero in it
+   * is correct again.
    */
   private drainCursor = 0;
 
   /** Everything the simulation has changed since the last drain.
    *
-   * The engine's log is cumulative, so this consumes it: read it once, then
-   * call `clearChanges()` so the next drain starts from empty. That's what
-   * keeps this bounded — a drain costs what happened since the last drain,
-   * not what the whole session has accumulated. Re-reading and slicing off
-   * a cursor unconditionally (the old approach) re-serialised the whole log
-   * every call and reported 44k changes for 50 ticks of a 1200-block door.
+   * The engine's log is cumulative, so this consumes it: read from the
+   * cursor, then call `clearChanges()` so the next drain starts from empty
+   * and the cursor resets to zero. That's what keeps this bounded — a
+   * drain costs what happened since the last drain, not what the whole
+   * session has accumulated. Slicing off a cursor from a full
+   * `changesJson()` read (the old approach) re-serialised the whole log
+   * every call and reported 44k changes for 50 ticks of a 1200-block door;
+   * asking the engine for `changesJsonFrom(cursor)` instead means a drain's
+   * cost no longer depends on how much backlog sits before the cursor.
    *
    * `clearChanges()` can refuse — while a run timeline is recording, see
    * `World.startRecording` — and reports that with its return value. A
-   * refusal means the log is *not* cleared, so the next drain would see
-   * everything this one just returned, all over again: `drainCursor`
-   * exists only for that case, tracking how far into the (still-growing)
-   * log the last drain got so the next one can slice past it instead of
-   * re-emitting it. The moment a clear succeeds, the log really is empty
-   * and the cursor resets to zero — carrying it forward past a successful
-   * clear would skip real changes.
+   * refusal means the log is *not* cleared, so the next drain must not
+   * ask for everything from the start again: `drainCursor` exists for
+   * that case, tracking how far into the (still-growing) log the last
+   * drain got so the next one reads only the tail past it. The moment a
+   * clear succeeds, the log really is empty and the cursor resets to zero
+   * — carrying it forward past a successful clear would skip real changes.
    *
    * Clear only what was successfully parsed: never clear anything not yet
    * successfully read, or a malformed read would drop those changes for
    * good (the engine's copy erased, ours never produced).
    *
    * The cursor only ever moves on a *known* result: `0` on an explicit
-   * `true`, `all.length` on an explicit `false`. Anything else — the call
-   * throwing, or `this.sim.clearChanges` being absent, which optional
-   * chaining resolves to `undefined` *without* throwing, so it does not
-   * reach the `catch` — is not a known result, and the cursor is left
-   * exactly where it was rather than guessed at. Treating an unknown
-   * result as `0` would report a clear that may never have happened;
-   * either way, we deliberately keep going rather than fail the drain —
-   * the next call then re-reads and re-returns from the same cursor,
-   * which for a genuinely missing/failing `clearChanges` means everything
-   * already returned this time comes back too. That relies on applying a
-   * change set being idempotent; it is not just a perf fallback.
+   * `true`, `from + all.length` on an explicit `false` — `from` is the
+   * position this drain read *from*, and `all` here is only the tail
+   * returned by `changesJsonFrom(from)`, not the whole log, so the next
+   * cursor is where this read started plus how much of the tail it
+   * actually got. Anything else — the call throwing, or
+   * `this.sim.clearChanges` being absent, which optional chaining
+   * resolves to `undefined` *without* throwing, so it does not reach the
+   * `catch` — is not a known result, and the cursor is left exactly where
+   * it was rather than guessed at. Treating an unknown result as `0`
+   * would report a clear that may never have happened; either way, we
+   * deliberately keep going rather than fail the drain — the next call
+   * then re-reads and re-returns from the same cursor, which for a
+   * genuinely missing/failing `clearChanges` means everything already
+   * returned this time comes back too. That relies on applying a change
+   * set being idempotent; it is not just a perf fallback.
    */
   drainChanges(): Change[] {
     if (!this.sim) return [];
     // Cheap gate: nothing new since the cursor, no parse. Compares against
     // the cursor rather than zero, because while a clear is being refused
     // the log does not shrink back to zero between drains — only the part
-    // past the cursor is "new".
+    // past the cursor is "new". `changesCount()` reports the length of the
+    // *whole* log, which is exactly what `drainCursor` is a position into,
+    // so this comparison holds regardless of how the log itself is read.
     try {
       const count = Number(this.sim.changesCount?.() ?? -1);
       if (count >= 0 && count <= this.drainCursor) return [];
     } catch {
       /* fall through to the parse */
     }
+    // Captured before the read: everything below — the query and, on a
+    // refused clear, the cursor update — is relative to where this drain
+    // started reading, not to the length of what comes back (which is only
+    // the tail from here on, not the whole log).
+    const from = this.drainCursor;
     let raw = "";
     try {
-      raw = this.sim.changesJson();
+      raw = this.sim.changesJsonFrom(from);
     } catch {
       return [];
     }
@@ -1117,33 +1131,36 @@ export class World {
     // `JSON.parse` succeeds on `"null"`, so `parsed` can be `null` here —
     // `parsed?.changes` (not `parsed.changes`) is what keeps that from
     // throwing outside this try/catch, in the frame loop.
+    //
+    // No further slicing: `changesJsonFrom(from)` already returned only the
+    // tail this drain has not seen, unlike the old `changesJson()` +
+    // `.slice(drainCursor)`, which re-parsed and then discarded everything
+    // before the cursor on every call.
     const all: Any[] = Array.isArray(parsed) ? parsed : (parsed?.changes ?? []);
-    // Only take the slice this drain has not already returned — a no-op
-    // when the cursor is zero (the common, clearing path).
-    const batch = all.slice(this.drainCursor);
     // Only clear once the payload above has been fully and successfully
     // interpreted into `all` — clearing any earlier (including on a `null`
     // parse) would drop changes we never actually read. Advance the cursor
     // to match whichever actually happened: cleared means the log is gone
     // and position zero is correct again; refused means the log is exactly
-    // as long as `all`, and the next drain must start there. Anything else
-    // — `clearChanges` missing (optional chaining yields `undefined`
-    // without throwing) or throwing — is neither of those, known outcomes,
-    // so the cursor is left exactly where it was: the next call re-reads
-    // and re-returns from there, relying on applying a change set being
+    // `from + all.length` long — where this read started, plus the tail it
+    // actually got — and the next drain must start there. Anything else —
+    // `clearChanges` missing (optional chaining yields `undefined` without
+    // throwing) or throwing — is neither of those known outcomes, so the
+    // cursor is left exactly where it was: the next call re-reads and
+    // re-returns from there, relying on applying a change set being
     // idempotent. Resetting to `0` here would be reporting a clear that
-    // never happened, and stalling at `all.length` forever would risk
-    // dropping a change that lands between two undefined calls.
+    // never happened, and stalling forever would risk dropping a change
+    // that lands between two undefined calls.
     try {
       const cleared = this.sim.clearChanges?.();
       if (cleared === true) this.drainCursor = 0;
-      else if (cleared === false) this.drainCursor = all.length;
+      else if (cleared === false) this.drainCursor = from + all.length;
       // else: unknown outcome — cursor untouched, see above.
     } catch {
       /* nothing to clear, or engine doesn't support it — leave the cursor
        * where it was; the next call re-reads and re-returns from there. */
     }
-    return batch
+    return all
       .map((c: Any) => ({
         pos: [c.x ?? c.pos?.[0], c.y ?? c.pos?.[1], c.z ?? c.pos?.[2]] as [number, number, number],
         to: c.to ?? c.state ?? "minecraft:air",

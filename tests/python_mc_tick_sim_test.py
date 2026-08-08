@@ -355,5 +355,30 @@ expect(
     "recording continues after a clear — it drops what happened, it does not stop recording",
 )
 
+# --- reading only what is new ---
+#
+# While a run timeline is recording the engine refuses to drop the change log,
+# so a host must be able to read the tail without paying for the whole
+# backlog on every frame.
+inc = nucleation.TickSimulation.from_snbt(
+    door, nucleation.TickSettleMode.InWorld, 15, -64, 0, ""
+)
+inc.use_block(10, 4, 1)
+inc.run(20)
+whole = json.loads(inc.changes_json())
+expect(len(whole) > 10, f"the door recorded a backlog ({len(whole)})")
+tail = json.loads(inc.changes_json_from(len(whole) - 5))
+expect(len(tail) == 5, f"asking from n returns exactly the tail ({len(tail)})")
+expect(
+    tail == whole[-5:],
+    "and it is the same entries changes_json would have given",
+)
+expect(len(json.loads(inc.changes_json_from(0))) == len(whole), "from 0 is the whole log")
+expect(len(json.loads(inc.changes_json_from(len(whole)))) == 0, "from the end is empty")
+expect(
+    len(json.loads(inc.changes_json_from(len(whole) + 1000))) == 0,
+    "and past the end is empty, not an error",
+)
+
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(0 if failed == 0 else 1)

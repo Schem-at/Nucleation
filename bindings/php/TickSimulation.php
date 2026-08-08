@@ -308,6 +308,12 @@ final class TickSimulation {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function changesJsonFrom( $start) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->TickSimulation_changes_json_from($this->ptr, $start, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function itemEntitiesJson() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         Lib::ffi()->TickSimulation_item_entities_json($this->ptr, $write);

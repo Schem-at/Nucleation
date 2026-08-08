@@ -99,6 +99,8 @@ namespace capi {
 
     void TickSimulation_changes_json(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    void TickSimulation_changes_json_from(const nucleation::capi::TickSimulation* self, uint32_t start, nucleation::diplomat::capi::DiplomatWrite* write);
+
     void TickSimulation_item_entities_json(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
     void TickSimulation_motion_semantics(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
@@ -515,6 +517,22 @@ template<typename W>
 inline void nucleation::TickSimulation::changes_json_write(W& writeable) const {
     nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
     nucleation::capi::TickSimulation_changes_json(this->AsFFI(),
+        &write);
+}
+
+inline std::string nucleation::TickSimulation::changes_json_from(uint32_t start) const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::TickSimulation_changes_json_from(this->AsFFI(),
+        start,
+        &write);
+    return output;
+}
+template<typename W>
+inline void nucleation::TickSimulation::changes_json_from_write(uint32_t start, W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::TickSimulation_changes_json_from(this->AsFFI(),
+        start,
         &write);
 }
 
