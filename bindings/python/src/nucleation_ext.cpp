@@ -31,6 +31,7 @@ void add_Fingerprint_binding(nb::module_);
 void add_DistanceField_binding(nb::module_);
 void add_Field3_binding(nb::module_);
 void add_Geo_binding(nb::module_);
+void add_Hdl_binding(nb::module_);
 void add_TickSimulation_binding(nb::module_);
 void add_ChunkMeshResult_binding(nb::module_);
 void add_ItemModelConfig_binding(nb::module_);
@@ -184,6 +185,7 @@ NB_MODULE(nucleation, mod)
     add_DistanceField_binding(mod);
     add_Field3_binding(mod);
     add_Geo_binding(mod);
+    add_Hdl_binding(mod);
     add_TickSimulation_binding(mod);
     add_ChunkMeshResult_binding(mod);
     add_ItemModelConfig_binding(mod);

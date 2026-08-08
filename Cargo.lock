@@ -3527,6 +3527,7 @@ dependencies = [
  "mchprs_redstone",
  "mchprs_world",
  "mlua",
+ "nucleation-hdl",
  "nucleation-routing",
  "num-complex",
  "palette",
@@ -3567,6 +3568,13 @@ dependencies = [
  "ratatui",
  "ratatui-image",
  "serde_json",
+]
+
+[[package]]
+name = "nucleation-hdl"
+version = "0.1.0"
+dependencies = [
+ "mc-tick",
 ]
 
 [[package]]

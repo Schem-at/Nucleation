@@ -56,6 +56,8 @@ export { Field3 } from "./Field3.mjs"
 
 export { Geo } from "./Geo.mjs"
 
+export { Hdl } from "./Hdl.mjs"
+
 export { TickSimulation } from "./TickSimulation.mjs"
 
 export { ChunkMeshResult } from "./ChunkMeshResult.mjs"

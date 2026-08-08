@@ -48,6 +48,8 @@ pub mod diff;
 pub mod distance_field;
 pub mod field;
 pub mod geo;
+#[cfg(feature = "hdl")]
+pub mod hdl;
 #[cfg(feature = "mc-tick")]
 pub mod mc_tick;
 #[cfg(feature = "meshing")]

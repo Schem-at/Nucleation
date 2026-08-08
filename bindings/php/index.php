@@ -30,6 +30,7 @@ require_once __DIR__ . '/Fingerprint.php';
 require_once __DIR__ . '/DistanceField.php';
 require_once __DIR__ . '/Field3.php';
 require_once __DIR__ . '/Geo.php';
+require_once __DIR__ . '/Hdl.php';
 require_once __DIR__ . '/TickSimulation.php';
 require_once __DIR__ . '/ChunkMeshResult.php';
 require_once __DIR__ . '/ItemModelConfig.php';
