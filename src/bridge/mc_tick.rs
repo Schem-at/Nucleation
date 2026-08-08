@@ -718,6 +718,7 @@ fn structure_from_blocks(
         inventories: Vec::new(),
         comparator_outputs: Vec::new(),
         block_entities: Vec::new(),
+        commands: Vec::new(),
         entities: Vec::new(),
         item_entities: Vec::new(),
     })
