@@ -1,7 +1,10 @@
 # hdl/ — Verilog to verified redstone
 
-A combinational HDL flow on top of the PLA compiler in `../build_ppa.py`:
-Verilog in, exhaustively sim-verified, baked-at-rest `.schem` out.
+An HDL flow on top of the PLA compiler in `../build_ppa.py`: Verilog in,
+sim-verified, baked-at-rest `.schem` out. Combinational designs verify
+exhaustively; **sequential designs (`always @(posedge clk)`) compile through
+the built-in Rust pipeline** to a DFF bank + clock spine and verify with a
+measured fixed-tick clocked protocol (see "Sequential" below).
 
 ```
 Verilog ──yosys──> BLIF ──hdl2redstone.py──> PLA stages ──bp.PPA──> blocks
@@ -87,15 +90,75 @@ read seg` — 16/16. Wheel builds need
 `NUCLEATION_FEATURES="bridge-full,hdl,routing"` (bridge-full alone omits
 the Hdl surface).
 
-## Examples (all verified exhaustively)
+## Sequential (`.latch` -> DFF bank, `--rust`)
 
-| design    | function                        | inputs | cases | result |
-|-----------|---------------------------------|--------|-------|--------|
-| seg7      | hex digit -> 7-segment decoder  | 4      | 16    | PASS   |
-| cmp4      | 4-bit unsigned eq / lt / gt     | 8      | 256   | PASS   |
-| popcnt4   | population count                | 4      | 16    | PASS   |
+`crates/nucleation-hdl` accepts `.latch <d> <q> re <clk> [<init>]` (what
+yosys emits for `always @(posedge clk)` registers; `dffunmap` in the yosys
+recipe legalises enable-DFFs to plain latches + muxes). The compile:
 
-Intermediate BLIF lands in `hdl/build/` for inspection.
+* **Latch Q nets become stage-0 input rails** without levers ("ext" rails),
+  so the combinational fabric reads state exactly like a primary input
+  (both polarities, inverter torch and all).
+* **D nets are buffer-raised to the top level**, so the **DFF bank — the
+  last stage band** — is fed by ordinary next-stage routes onto bank rails;
+  each DFF taps its rail with a y3 flyover spur whose support blocks double
+  as caps over every rail row crossed.
+* **The bank stamps the verified 13x4x7 master-slave repeater-lock DFF**
+  from `../seq_cells.py` (frozen as template data in
+  `crates/nucleation-hdl/src/seq.rs`; characterization: setup 0 / hold 3 /
+  min pulse 3 / clk->Q 10 / min period 20 gt).
+* **Clock = a dedicated y1 spine** north of the DFF row: one lever (the
+  contract's clock port), dense repeaters (>= every 8 cells, ~2 gt skew
+  each), one dust branch per DFF by adjacency. The clock net never enters
+  the dual-rail fabric (compile error if it feeds logic).
+* **Q wraps around the fabric** — east out of the cell, south, along the
+  west side (x < 0), north past stage 0, and into its input rail's west-end
+  dust from the north. Corridor rows/columns are pitched 2 apart with
+  depths ordered by slice, which makes the whole wrap planar by
+  construction (the counter4 feedback-corridor argument, generalised).
+* **Initial state is baked by construction**: the slave repeater + its lock
+  path are authored at the declared init (BLIF init 1 bakes powered dust
+  levels down the Q path), so the placement settle converges to the
+  declared state before any edge — and since a locked slave cuts every
+  feedback loop, the at-rest build is quiescent. The schematic IS the
+  reset state; there is no reset pin.
+
+Verification (`verify_clocked` in Rust, the same protocol in
+`hdl2redstone.py --rust` against an independent raw-BLIF + latch-state
+model): reset-by-bake, then per step **fixed-tick only** — set input
+levers, *measure* the input-to-edge margin by polling the D-port dust
+against the model (never assume a settle), pulse the clock lever (40 gt
+high), measure the post-edge margin on Q rails + outputs. Measured
+periods: toggle1 72 gt, fsm 130 gt, counter4 140 gt, uart_tx 562 gt.
+
+```sh
+python3 hdl/hdl2redstone.py --verilog ../crates/nucleation-hdl/tests/data/counter4.v \
+    --top counter4 --rust --steps 24
+```
+
+The contract gains the clock as a real Boolean input port (position = the
+spine lever) plus a `sequential` sidecar: `clock_port`, the characterized
+DFF table, `est_min_period_gt`, and `initial_state` per latch (unknown keys
+— the shared `CellContract` parser ignores the sidecar).
+
+## Examples
+
+| design    | function                        | kind         | cases              | result |
+|-----------|---------------------------------|--------------|--------------------|--------|
+| seg7      | hex digit -> 7-segment decoder  | comb         | 16 exhaustive      | PASS   |
+| cmp4      | 4-bit unsigned eq / lt / gt     | comb         | 256 exhaustive     | PASS   |
+| popcnt4   | population count                | comb         | 16 exhaustive      | PASS   |
+| counter4  | 4-bit counter                   | seq, 4 DFF   | 24 steps exact     | PASS   |
+| fsm       | Moore "11" detector             | seq, 2 DFF   | 30 steps           | PASS   |
+| toggle1   | toggler, **baked init Q=1**     | seq, 1 DFF   | boots at 1 + 12    | PASS   |
+| uart_tx   | 8N1 serializer, /2 baud divider | seq, 15 DFF  | full frame of 0xA5 | PASS   |
+
+Sequential sources + BLIFs are checked in at
+`crates/nucleation-hdl/tests/data/` (the Rust crate's own gate drives them:
+`cargo test -p nucleation-hdl --features mc-tick`). uart_tx's frame is
+verified bit-by-bit: the in-sim run matches the model every step, and the
+model's tx tape is asserted to spell start, LSB-first 0xA5, stop, each held
+2 clocks. Intermediate BLIF lands in `hdl/build/` for inspection.
 
 ## How the mapping works
 
@@ -125,8 +188,13 @@ Intermediate BLIF lands in `hdl/build/` for inspection.
 
 ## Limits
 
-* **Combinational only** — `.latch` (and `.subckt`/`.gate`) are rejected.
-  No flip-flops, no clocks.
+* Sequential designs: **single clock domain, rising edge only** (`re`);
+  `.subckt`/`.gate` still rejected. The **pure-Python geometry path stays
+  combinational** — `.latch` routes to `--rust`. BLIF init 2/3
+  (don't-care/unknown) bakes at 0.
+* The clock net may only drive latches — a clock feeding `.names` logic is
+  a compile error (gate it into an enable-mux instead, which is what yosys
+  does anyway).
 * Exhaustive verification up to 12 inputs; sampled (edge + random) above.
 * One primary input per slice in the input stage; nodes cap at 3 product
   terms per slice (wider SOPs pay an extra OR level).
@@ -138,7 +206,9 @@ Intermediate BLIF lands in `hdl/build/` for inspection.
 * ABC genlib mapping onto the verified comparator/adder *cells*
   (`../cells.py`, `../rca_cells.py`) instead of raw PLA columns — smaller
   builds, reuse of the cell library.
-* Sequential support: map `$dff` onto a verified redstone latch cell, add a
-  clock lever/driver and settle-per-phase simulation.
 * Multi-PI packing in the input stage (2 levers/slice) and producer-aware
   slice ordering to cut the eastward drift.
+* Sequential: multiple clock domains / falling edge (second spine +
+  inverted lock phases), a Python-side geometry port of the DFF bank, and
+  driving compiled sequential cells through `BackendCircuitExecutor`
+  (needs a clock-aware step API on the executor).

@@ -324,6 +324,48 @@ Dataclasses `Gate`/`Style` (plain dicts accepted), `Bus`/`CheckReport`/
 1:1** (same names, same shapes, `Object` literals where Python takes
 dataclasses) over the same generated wasm core.
 
+## 12. Sequential cells — `.latch` compiles to a DFF bank (landed)
+
+The HDL compiler (`crates/nucleation-hdl`) accepts rising-edge `.latch`
+lines (single clock domain). Chosen topology, end to end:
+
+* **State = stage-0 rails.** Each latch Q is an extra stage-0 input slice
+  whose rail has no lever ("ext"): the fabric reads state exactly like a
+  primary input, dual-rail included.
+* **Bank = the last stage.** D nets are buffer-raised to the top level, so
+  every D delivery is an ordinary next-stage route onto a rail in the bank
+  band; the DFF taps it with a y3 flyover spur (supports double as caps
+  over crossed rails). One DFF per latch, one slice each, east of every
+  combinational slice.
+* **Cell = the verified master-slave repeater-lock DFF** (13x4x7, from
+  `seq_cells.py`, frozen as data in `nucleation-hdl/src/seq.rs`). Timing
+  (characterized, exact): setup 0 / hold 3 / min pulse 3 / clk->Q 10 /
+  min period 20 gt.
+* **Clock = a dedicated spine**, not a data rail: y1 dust row north of the
+  DFF row, one lever, repeaters at least every 8 cells (2 gt skew each),
+  one branch per DFF by adjacency; the cell's own clk column refreshes
+  once more inside. Clock-into-logic is a compile error.
+* **Feedback = planar wrap corridors.** Q leaves east, runs south, wraps
+  west of x<0, north past stage 0 and enters its rail's west-end dust from
+  the north (the rail is slot 0 = the band's northernmost row). Rows and
+  columns pitch 2 apart, depths ordered by slice — no two corridors ever
+  cross (the counter4 corridor argument, generalised and mechanised).
+* **Init-by-construction.** The slave repeater and its lock path are
+  authored at the declared init (Q=1 bakes the powered dust ladder down
+  the Q path). At rest the slave is locked, which cuts every sequential
+  loop: the deployed build settles to the declared state and is quiescent
+  until the first edge. The schematic IS the reset state.
+* **Contract**: the clock is a real Boolean input port at the spine lever,
+  plus a `sequential` sidecar (clock_port/clock=true, DFF table,
+  `est_min_period_gt`, `initial_state`) that the shared `CellContract`
+  parser ignores by design.
+* **Verification is fixed-tick only** after the placement settle
+  (`verify_clocked`, mirrored in `hdl/hdl2redstone.py --rust`): margins are
+  MEASURED by polling D ports / Q rails against the stepped model, never
+  assumed. Gate results: counter4 24 steps (period 140 gt), fsm 30 steps
+  (130 gt), toggle1 boots at baked Q=1 (72 gt), uart_tx one full 8N1 frame
+  bit-by-bit (562 gt).
+
 ## Phase 2 (in scope of the model; ✅ = landed on this branch)
 
 - ✅ interference co-reroute + drag APIs (`move_gate`, `move_instance`) —
