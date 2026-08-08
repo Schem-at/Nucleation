@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { World, loader, CHUNK, type SettleName } from "./world";
 import { Player } from "./player";
 import { addDefaultLights } from "./mesher";
+import { TimelineStrip, type Activity } from "./timeline";
 
 type Status = { kind: "idle" | "loading" | "ready" | "error"; message?: string };
 
@@ -101,6 +102,14 @@ export default function App(): JSX.Element {
    * source of truth (and resets it on load/`startSim`), this just re-renders
    * the bar when it changes. */
   const [recording, setRecording] = useState(false);
+  /** The activity strip's data. Polled, not derived every render —
+   * `timelineActivityJson()` re-scans the whole accumulated log (see its
+   * doc comment in `src/bridge/mc_tick.rs`), so its cost grows with the
+   * recording. Calling it from the frame loop would put an O(total log)
+   * read on the render path — exactly the unbounded-cost mistake the
+   * timeline-prerequisites work removed elsewhere. A 250 ms timer instead
+   * bounds how often that cost is paid, independent of frame rate. */
+  const [activity, setActivity] = useState<Activity | null>(null);
 
   useEffect(() => {
     runningRef.current = running;
@@ -108,6 +117,30 @@ export default function App(): JSX.Element {
   useEffect(() => {
     rateRef.current = rate;
   }, [rate]);
+
+  /** Read `timelineActivityJson()` once, right now. Shared by the polling
+   * timer below and by the stop button's one extra read, so the strip's
+   * final frame always reflects the tick the recording actually ended on. */
+  const pollActivity = useCallback(() => {
+    const world = worldRef.current;
+    if (!world?.sim?.timelineActivityJson) return;
+    try {
+      setActivity(JSON.parse(world.sim.timelineActivityJson()) as Activity);
+    } catch {
+      /* a malformed read leaves the strip showing its last good frame */
+    }
+  }, []);
+
+  // Poll on a fixed wall-clock timer while recording — deliberately not in
+  // the `requestAnimationFrame` loop above, and deliberately not on every
+  // tick. See the comment on `activity` for why a per-frame poll would be
+  // the wrong place to pay this call's cost.
+  useEffect(() => {
+    if (!recording) return;
+    pollActivity();
+    const id = setInterval(pollActivity, 250);
+    return () => clearInterval(id);
+  }, [recording, pollActivity]);
 
   // Scene, camera, render loop — created once.
   useEffect(() => {
@@ -351,6 +384,7 @@ export default function App(): JSX.Element {
     setStatus({ kind: "loading", message: `meshing ${file.name}…` });
     setRunning(false);
     setRecording(false);
+    setActivity(null);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const world = await World.load(bytes, mode, chunk);
@@ -422,11 +456,17 @@ export default function App(): JSX.Element {
     if (!world?.sim) return;
     if (world.isRecording()) {
       world.stopRecording();
+      setRecording(world.isRecording());
+      // One more read past the polling timer's last tick, so the strip's
+      // final frame reflects everything up to the exact tick recording
+      // stopped on rather than whatever the last 250 ms tick caught.
+      pollActivity();
     } else {
       world.startRecording();
+      setActivity(null);
+      setRecording(world.isRecording());
     }
-    setRecording(world.isRecording());
-  }, []);
+  }, [pollActivity]);
 
   return (
     <div className="app" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
@@ -534,6 +574,8 @@ export default function App(): JSX.Element {
         {entities > 0 && <span className="tick">{entities} entities</span>}
         <span className={`status ${status.kind}`}>{status.message ?? "drop a schematic"}</span>
       </header>
+
+      <TimelineStrip activity={activity} />
 
       <footer className="hud">
         <span className="target">{target || "—"}</span>

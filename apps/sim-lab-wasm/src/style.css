@@ -81,3 +81,53 @@ button:disabled { opacity: 0.4; cursor: default; }
 
 /* The achieved-rate readout, amber when the engine could not keep up. */
 .tick.throttled { color: #ffd166; }
+
+/* The run-timeline activity strip: one column per active tick (never per
+ * tick in the recorded span — a still build draws nothing), bucketed when
+ * there are more active ticks than pixels. Sits directly above the `.hud`
+ * footer, which is a fixed height (see `.hud` below) so this can be pinned
+ * against it without overlapping. */
+.timeline {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 37px;
+  height: 48px;
+  display: flex;
+  padding: 4px 12px;
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--line);
+  pointer-events: none;
+}
+/* The measured element: its `clientWidth` is the pixel budget bucketing is
+ * computed against, so nothing here may add its own padding — that lives on
+ * `.timeline` instead, outside what gets measured. */
+.timeline-columns {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+}
+.timeline-empty {
+  margin: auto;
+  color: var(--dim);
+  font-size: 11px;
+}
+.timeline-col {
+  flex: 1 1 0;
+  min-width: 1px;
+  max-width: 6px;
+  height: 6%;
+  background: var(--dim);
+  opacity: 0.55;
+  border-radius: 1px 1px 0 0;
+}
+/* A mark distinguishing ticks with player input from ticks with none. */
+.timeline-col.has-input { background: var(--accent); opacity: 0.85; }
+/* A mark distinguishing ticks with a piston stroke. Layered on top of (not
+ * instead of) the input colour, since a tick can be both. */
+.timeline-col.has-piston { box-shadow: inset 0 0 0 1px #e8c14a; }
+
+/* Fixed so the timeline strip above it can be pinned by pixel offset rather
+ * than measured at runtime. */
+.hud { height: 37px; }
