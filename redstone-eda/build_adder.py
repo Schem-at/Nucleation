@@ -79,18 +79,27 @@ def facing_toward(frm, to):
     raise ValueError("not a unit horizontal step: %s -> %s" % (frm, to))
 
 
-def run_path(b, cells, repeat_every=5):
+def run_path(b, cells, repeat_every=14):
     """Lay a dust path through `cells`, adding a stone support under each and
-    dropping in a repeater every so often so nothing decays to zero."""
-    since = 0
+    dropping in a repeater every so often so nothing decays to zero.
+
+    Pitch 14 is probe-verified (probe_station I15: a repeater fires from ss1
+    dust, true max 15 between refreshes) minus 2 levels of margin; the first
+    refresh stays within 5 cells because the source may arrive decayed."""
+    since = max(0, repeat_every - 5)
     for i, cell in enumerate(cells):
         x, y, z = cell
         b.stone(x, y - 1, z)
         prev, nxt = (cells[i - 1] if i else None), (cells[i + 1] if i + 1 < len(cells) else None)
         straight = (prev and nxt and prev[1] == y == nxt[1]
                     and (prev[0] == x == nxt[0] or prev[2] == z == nxt[2]))
+        # bank a refresh at the last straight cell before a repeater-free
+        # tail (stairs/landings) so the tail never starts nearly spent
+        nxt2 = cells[i + 2] if i + 2 < len(cells) else None
+        cont = (nxt2 is not None and nxt[1] == y == nxt2[1]
+                and (nxt[0] == x == nxt2[0] or nxt[2] == z == nxt2[2]))
         since += 1
-        if straight and since >= repeat_every:
+        if straight and since >= (repeat_every if cont else repeat_every - 6):
             b.put(x, y, z, repeater(facing_toward(cell, prev)))
             since = 0
         else:

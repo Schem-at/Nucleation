@@ -36,7 +36,14 @@ COL_B = (15,)         # group B column
 EXTRA_COLS = ()       # further gi=0 columns (the ALU's 4-term mux nodes)
 RAIL_E = 15           # every rail must reach the last column
 Y_COLL, Y_GATE, Y_LANE = 4, 5, 7
-RAIL_REPEAT = 12      # a rail loses a level per block; refresh at least this often
+# A rail loses a level per dust cell, so refresh at least this often.  This is
+# NOT over-conservative: a rail is tapped from the side, the tap dust reads
+# rail-1, and a ss0 tap dust never flips its torch (probe_station G: a tap on
+# a ss1 rail cell is dead) -- so a rail needs ss>=2 everywhere, unlike a
+# tap-free route which only needs ss>=1 at its next repeater.  Worst gap is
+# RAIL_REPEAT+1 (bad-column skip), min rail ss = 17-(RAIL_REPEAT+1) = 4:
+# exactly the measured floor of 2 plus 2 levels of margin.
+RAIL_REPEAT = 12
 STAGE_PAD = 1
 
 
@@ -415,8 +422,16 @@ class PPA:
             cells += [(cx, 3, dz - 3), (cx, 2, dz - 2), (cx, 1, dz - 1), (cx, 1, dz)]
             self.run(cells, sig)
 
-    def run(self, cells, label, repeat_every=6):
-        since = 0
+    # Routes are tap-free, so the pitch is bounded only by the repeater's own
+    # input floor: ss1 fires it (probe_station I15), true max 15 dust between
+    # refreshes.  14 leaves the last dust at ss3 -- margin 2.  (Was 6.)
+    ROUTE_REPEAT = 14
+
+    def run(self, cells, label, repeat_every=ROUTE_REPEAT):
+        # The SOURCE is lane dust that has already decayed a few levels, so
+        # the first refresh keeps the old <=6-cell spacing; only
+        # refresh-to-refresh spans run at full pitch.
+        since = max(0, repeat_every - 6)
         for i, (x, y, z) in enumerate(cells):
             # Shared trunk: a second route of the SAME signal may re-walk cells
             # the first already laid (same riser, longer climb).  Existing dust
@@ -434,8 +449,15 @@ class PPA:
             nxt = cells[i + 1] if i + 1 < len(cells) else None
             straight = (prev and nxt and prev[1] == y == nxt[1]
                         and (prev[0] == x == nxt[0] or prev[2] == z == nxt[2]))
+            # The tail after a straight run (stairs, rail landings) cannot
+            # host repeaters, so bank a refresh at the run's LAST straight
+            # cell if the budget is already half spent -- otherwise a full
+            # 13-cell span plus a 5-cell tail would decay to nothing.
+            nxt2 = cells[i + 2] if i + 2 < len(cells) else None
+            cont = (nxt2 is not None and nxt[1] == y == nxt2[1]
+                    and (nxt[0] == x == nxt2[0] or nxt[2] == z == nxt2[2]))
             since += 1
-            if straight and since >= repeat_every:
+            if straight and since >= (repeat_every if cont else repeat_every - 6):
                 self.b.put(x, y, z, repeater(facing_toward((x, y, z), prev)))
                 since = 0
             else:

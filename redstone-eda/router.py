@@ -39,6 +39,9 @@ class Router:
         self.labels = labels
         self.bounds = bounds        # (x0,x1, y0,y1, z0,z1): cells must not
                                     # route outside their own footprint
+        self.strong = {}            # station exit blocks: strongly powered
+                                    # solids that re-emit 15 into ANY adjacent
+                                    # dust -- later routes must keep clear
 
     def in_bounds(self, p):
         if self.bounds is None:
@@ -52,6 +55,13 @@ class Router:
         ok = friendly or {label}
         if p in self.b.cells:
             return self.labels.get(p) in ok         # reuse own net only
+        # a station's exit block strong-powers every adjacent dust cell
+        # (probe_station S_exit_*): the electrical model below cannot see
+        # that, so keep foreign dust out of its whole 6-neighbourhood
+        for nb in ((x + 1, y, z), (x - 1, y, z), (x, y, z + 1), (x, y, z - 1),
+                   (x, y + 1, z), (x, y - 1, z)):
+            if nb in self.strong and self.strong[nb] not in ok:
+                return False
         sup = (x, y - 1, z)
         s = self.b.cells.get(sup)
         if s is not None and not self.b.solid_at(*sup):
@@ -161,12 +171,79 @@ class Router:
         return None
 
     # -- emission -----------------------------------------------------------
-    REFRESH = 5
+    # Max-pitch refresh, probe-verified (probe_station A15/I15): dust arriving
+    # at ss1 still fires a repeater or a station's entry block, so the true
+    # max is 15 dust cells between refreshes (REFRESH=16).  Leave 2 levels of
+    # margin: the last dust before a refresh sits at ss3.  (Was 5, a
+    # debugging-era safety margin.)  Routes are tap-free, so unlike rails
+    # (build_ppa.RAIL_REPEAT) there is no ss>=2 tap floor to respect.
+    REFRESH = 14
+    # A path's SOURCE strength is unknown (a cell port may arrive already
+    # decayed), so the first refresh keeps the old conservative spacing; only
+    # refresh-to-refresh spans are trusted at full pitch.
+    FIRST = 6
 
-    def emit(self, path, label):
+    def station_ok(self, path, i, label, friendly=None):
+        """May a block-sandwich station (block/repeater/block) replace path
+        cells i, i+1, i+2?  Probe-verified constraints (probe_station S*):
+          * the trunk dust, both blocks, the repeater and the next dust must
+            be collinear at one y -- dust only weak-powers blocks it points
+            into, and the exit block must strong-power the following dust;
+          * the exit block re-emits at 15 to EVERY adjacent dust, and any
+            dust atop either block joins the net diagonally -- so no foreign
+            component may touch the station body anywhere but from below.
+        """
+        if i < 1 or i + 3 >= len(path):
+            return False
+        seg = path[i - 1:i + 4]
+        if any(isinstance(mv, tuple) for _p, mv in seg[1:]):
+            return False
+        pts = [p for p, _mv in seg]
+        y = pts[0][1]
+        if any(p[1] != y for p in pts):
+            return False
+        if not (all(p[0] == pts[0][0] for p in pts[:4])
+                or all(p[2] == pts[0][2] for p in pts[:4])):
+            return False
+        # The trunk dust must stay a STRAIGHT LINE pointing into the entry
+        # block -- dust only weak-powers blocks along its line.  Any other
+        # connectable neighbour (dust, repeater, comparator, torch -- own net
+        # included: dust_ok legally allows own-net grazing, and a port stub's
+        # repeater is exactly what broke the FA cell here) bends its shape
+        # off the block face and the station goes dead.  Same physics as the
+        # climb's dead-end entry dust: only solids may flank the trunk.
+        x0, y0, z0 = pts[0]
+        ax = (pts[1][0] - x0, pts[1][2] - z0)
+        for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            if (dx, dz) in (ax, (-ax[0], -ax[1])):
+                continue                        # on-axis keeps the line
+            for dy in (-1, 0, 1):
+                q = (x0 + dx, y0 + dy, z0 + dz)
+                if q in self.b.cells and not self.b.solid_at(*q):
+                    return False
+        ok = (friendly or set()) | {label}
+        body = set(pts[1:4])
+        for (x, _y, z) in body:
+            if (x, y, z) in self.b.cells:
+                return False              # never overwrite (trunk reuse etc.)
+            for nb in ((x + 1, y, z), (x - 1, y, z), (x, y, z + 1),
+                       (x, y, z - 1), (x, y + 1, z)):
+                if nb in body or nb == pts[0] or nb == pts[4]:
+                    continue
+                cell = self.b.cells.get(nb)
+                if cell is None or self.b.solid_at(*nb):
+                    continue
+                if "redstone_wire" in cell and self.labels.get(nb) in ok:
+                    continue              # own net: a 15 re-emit is harmless
+                return False              # foreign dust/repeater/torch/lever
+        return True
+
+    def emit(self, path, label, friendly=None):
         """Lay the routed path into the build."""
-        since = 0
-        for i, (p, mv) in enumerate(path):
+        since, self.stations = self.REFRESH - self.FIRST, 0
+        i = 0
+        while i < len(path):
+            p, mv = path[i]
             x, y, z = p
             if isinstance(mv, tuple) and mv[0] == "climb":
                 px, py, pz = path[i - 1][0]
@@ -185,30 +262,56 @@ class Router:
                 self.labels[(x, y, z)] = label
                 self.b.put(x, y, z, rs.DUST)
                 since = 0
+                i += 1
                 continue
             if "redstone_wire" in self.b.cells.get(p, ""):
                 since = self.REFRESH                    # reused own-net trunk
+                i += 1
                 continue
-            self.b.stone(x, y - 1, z, "route")
             prev = path[i - 1][0] if i else None
             nxt = path[i + 1][0] if i + 1 < len(path) else None
             straight = (prev is not None and nxt is not None
                         and prev[1] == y == nxt[1]
                         and (prev[0] == x == nxt[0] or prev[2] == z == nxt[2])
                         and not isinstance(path[i + 1][1], tuple))
+            # bank a refresh at the last straight cell before a stair/climb
+            # tail: the tail cannot host repeaters and must not start a long
+            # descent on a nearly-spent budget
+            nxt2 = path[i + 2][0] if i + 2 < len(path) else None
+            cont = (nxt2 is not None and nxt[1] == y == nxt2[1]
+                    and (nxt[0] == x == nxt2[0] or nxt[2] == z == nxt2[2])
+                    and not isinstance(path[i + 2][1], tuple))
             since += 1
-            if straight and since >= self.REFRESH:
+            if straight and since >= (self.REFRESH if cont else self.REFRESH - 6):
                 d = {(-1, 0): "west", (1, 0): "east",
                      (0, -1): "north", (0, 1): "south"}[(prev[0] - x, prev[2] - z)]
+                if self.station_ok(path, i, label, friendly):
+                    # block sandwich: the blocks conduct for free, so the
+                    # station spans 3 cells but restarts the budget at 15
+                    # (probe_station B) -- 18 cells of reach per repeater
+                    # instead of 16, and no support needed under the blocks
+                    p2, p3 = path[i + 1][0], path[i + 2][0]
+                    self.b.put(x, y, z, rs.PALETTE["route"])
+                    self.b.stone(p2[0], p2[1] - 1, p2[2], "route")
+                    self.b.put(p2[0], p2[1], p2[2], rs.repeater(d))
+                    self.b.put(p3[0], p3[1], p3[2], rs.PALETTE["route"])
+                    self.strong[p3] = label
+                    self.stations += 1
+                    since = 0
+                    i += 3
+                    continue
+                self.b.stone(x, y - 1, z, "route")
                 self.b.put(x, y, z, rs.repeater(d))
                 since = 0
             else:
+                self.b.stone(x, y - 1, z, "route")
                 self.labels[p] = label
                 self.b.put(x, y, z, rs.DUST)
+            i += 1
 
     def route(self, src, dst, label, friendly=None):
         path = self.find(src, dst, label, friendly)
         if path is None:
             raise RuntimeError("router: no path for %s: %s -> %s" % (label, src, dst))
-        self.emit(path, label)
+        self.emit(path, label, friendly)
         return len(path)

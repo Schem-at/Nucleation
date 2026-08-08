@@ -35,10 +35,27 @@ for i, z in enumerate((1, 5)):
     DST["net%d" % i] = (8, 13, z)
     PROBE["net%d" % i] = (13, 13, z)
 
+# net2: a long flat run that must trigger block-sandwich stations (the
+# max-pitch refresh: block / repeater / block, probe_station-verified)
+b.stone(0, 0, 12); b.force(0, 1, 12, rs.LEVER_OFF)
+b.stone(1, 0, 12)
+b.put(1, 1, 12, rs.DUST)
+labels[(1, 1, 12)] = "net2"
+SRC["net2"] = (1, 1, 12)
+for x in range(46, 51):
+    b.stone(x, 0, 12)
+    b.put(x, 1, 12, rs.DUST)
+    labels[(x, 1, 12)] = "net2"
+DST["net2"] = (46, 1, 12)
+PROBE["net2"] = (50, 1, 12)
+
 r = router.Router(b, labels)
 for name in ("net0", "net1"):
     n = r.route(SRC[name], DST[name], name)
     print("routed %s in %d cells" % (name, n))
+n = r.route(SRC["net2"], DST["net2"], "net2")
+print("routed net2 in %d cells with %d stations" % (n, r.stations))
+assert r.stations >= 1, "long straight run emitted no block-sandwich station"
 
 shorts = nets.check(b.cells, labels)
 print("net check: %d shorts" % len(shorts))
@@ -46,12 +63,13 @@ for s in shorts[:4]:
     print("   ", s)
 
 sim = b.sim()
-lv = rs.Levers(sim, [(0, 1, 0), (0, 1, 4)])
+lv = rs.Levers(sim, [(0, 1, 0), (0, 1, 4), (0, 1, 12)])
 ok = True
-for bits in ((0, 0), (1, 0), (0, 1), (1, 1)):
+for bits in ((0, 0, 0), (1, 0, 1), (0, 1, 0), (1, 1, 1), (0, 0, 1)):
     lv.set(bits)
-    got = tuple(int(sim.on(*PROBE["net%d" % i])) for i in range(2))
+    got = tuple(int(sim.on(*PROBE["net%d" % i])) for i in range(3))
     match = got == bits
     ok = ok and match
     print("levers", bits, "-> probes", got, "OK" if match else "MISMATCH")
 print("ROUTER TEST", "PASS" if (ok and not shorts) else "FAIL")
+raise SystemExit(0 if (ok and not shorts) else 1)
