@@ -484,18 +484,16 @@ fn updates_wave(sim: &mc_tick::Simulation, tick: u64) -> String {
 /// what the heap survives.
 const MAX_VOLUME: usize = 8_000_000;
 
-thread_local! {
-    /// Why the last constructor failed. Set on every failure path, cleared on
-    /// success, read back through `TickSimulation::last_error_detail`.
-    static LAST_ERROR: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
-}
-
+/// Why the last constructor failed. Set on every failure path, cleared on
+/// success, read back through `TickSimulation::last_error_detail` — and,
+/// because the store is bridge-wide, through `NucleationError::detail` on the
+/// caught error itself.
 fn set_last_error(detail: impl Into<String>) {
-    LAST_ERROR.with(|e| *e.borrow_mut() = detail.into());
+    crate::bridge::set_last_error_detail(detail);
 }
 
 fn clear_last_error() {
-    LAST_ERROR.with(|e| e.borrow_mut().clear());
+    crate::bridge::clear_last_error_detail();
 }
 
 /// Refuse a build too large to load before allocating for it.
@@ -1023,9 +1021,7 @@ pub mod ffi {
         /// it is `minecraft:waxed_copper_bulb` at (4,2,1) and says so here.
         /// Empty when the last construction succeeded.
         pub fn last_error_detail(out: &mut DiplomatWrite) {
-            super::LAST_ERROR.with(|e| {
-                let _ = write!(out, "{}", e.borrow());
-            });
+            let _ = write!(out, "{}", crate::bridge::last_error_detail());
         }
 
         /// Largest build this will attempt, in cells.
@@ -1060,10 +1056,15 @@ pub mod ffi {
             origin_z: i32,
             extra_states: &DiplomatStr,
         ) -> Result<Box<TickSimulation>, NucleationError> {
-            let snbt = std::str::from_utf8(snbt).map_err(|_| NucleationError::InvalidArgument)?;
-            let extra =
-                std::str::from_utf8(extra_states).map_err(|_| NucleationError::InvalidArgument)?;
             super::clear_last_error();
+            let snbt = std::str::from_utf8(snbt).map_err(|_| {
+                super::set_last_error("snbt is not valid UTF-8");
+                NucleationError::InvalidArgument
+            })?;
+            let extra = std::str::from_utf8(extra_states).map_err(|_| {
+                super::set_last_error("extra_states is not valid UTF-8");
+                NucleationError::InvalidArgument
+            })?;
             let structure = mc_tick::Structure::parse(snbt).map_err(|e| {
                 super::set_last_error(super::structure_parse_detail(&e, false));
                 // An entity we cannot model is not a malformed file, so it
@@ -1121,8 +1122,10 @@ pub mod ffi {
             extra_states: &DiplomatStr,
         ) -> Result<Box<TickSimulation>, NucleationError> {
             super::clear_last_error();
-            let extra =
-                std::str::from_utf8(extra_states).map_err(|_| NucleationError::InvalidArgument)?;
+            let extra = std::str::from_utf8(extra_states).map_err(|_| {
+                super::set_last_error("extra_states is not valid UTF-8");
+                NucleationError::InvalidArgument
+            })?;
             // Before rendering anything: the SNBT for a world-sized build is
             // what exhausts the heap, and the trap it raises poisons the
             // instance for every door after it.
@@ -1196,8 +1199,11 @@ pub mod ffi {
             origin_y: i32,
             origin_z: i32,
         ) -> Result<Box<TickSimulation>, NucleationError> {
-            let palette =
-                std::str::from_utf8(palette).map_err(|_| NucleationError::InvalidArgument)?;
+            super::clear_last_error();
+            let palette = std::str::from_utf8(palette).map_err(|_| {
+                super::set_last_error("palette is not valid UTF-8");
+                NucleationError::InvalidArgument
+            })?;
             let pal: Vec<String> = palette
                 .split(';')
                 .map(str::trim)
@@ -1206,7 +1212,10 @@ pub mod ffi {
                 .collect();
             let structure =
                 super::structure_from_blocks(bx, by, bz, travel, x_off, &pal, cells, air_index)
-                    .map_err(|_| NucleationError::InvalidArgument)?;
+                    .map_err(|e| {
+                        super::set_last_error(e);
+                        NucleationError::InvalidArgument
+                    })?;
             let extras: Vec<&str> = pal.iter().map(String::as_str).collect();
             let sim = super::wire_simulation(
                 &structure,
@@ -1215,7 +1224,10 @@ pub mod ffi {
                 &extras,
                 None,
             )
-            .map_err(|_| NucleationError::Simulation)?;
+            .map_err(|e| {
+                super::set_last_error(e);
+                NucleationError::Simulation
+            })?;
             Ok(Box::new(TickSimulation {
                 sim,
                 checkpoints: Vec::new(),
@@ -1400,6 +1412,73 @@ pub mod ffi {
                 .descriptor(id)
                 .unwrap_or("minecraft:air");
             let _ = write!(out, "{descriptor}");
+        }
+
+        /// Batched block-state reads: `positions_json` is `[[x,y,z], ...]`,
+        /// the answer a JSON array of descriptors in the same order
+        /// (`"minecraft:air"` for empty).
+        ///
+        /// A verification sweep over a computational build is thousands of
+        /// probe reads per settle; one boundary call per sweep instead of one
+        /// per probe is the difference between the FFI being the throughput
+        /// ceiling and not.
+        pub fn read_probes(
+            &self,
+            positions_json: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let positions: Vec<[i32; 3]> = serde_json::from_slice(positions_json).map_err(|e| {
+                crate::bridge::set_last_error_detail(format!(
+                    "positions_json must be [[x,y,z], ...]: {e}"
+                ));
+                NucleationError::InvalidArgument
+            })?;
+            let states: Vec<&str> = positions
+                .iter()
+                .map(|&[x, y, z]| {
+                    let id = self.sim.world().get(mc_tick::Pos::new(x, y, z));
+                    self.sim.registry().descriptor(id).unwrap_or("minecraft:air")
+                })
+                .collect();
+            let json = serde_json::to_string(&states).map_err(|_| NucleationError::Serialize)?;
+            let _ = write!(out, "{json}");
+            Ok(())
+        }
+
+        /// Who powers this cell and why — a power-source tree from the
+        /// simulation's current state, as JSON.
+        ///
+        /// Each node carries `pos`, `state`, `kind` (`wire` / `conductor` /
+        /// `source` / `block`), the `power` the cell carries or emits, and
+        /// `inputs`: the per-side contributions that explain it, each with a
+        /// `mechanism` (`block_signal`, `wire`, `wire_up`, `wire_down`,
+        /// `strong`, `signal`), the arriving `power`, and a recursive
+        /// `source` node. Cycles stop with `"cycle": true`. Coordinates are
+        /// the same structure-local space `get_block` reads.
+        ///
+        /// This is the static complement of running the sim: an open (a dead
+        /// route that settles quiescent) shows up as an empty `inputs` list
+        /// exactly where the feed should have been.
+        pub fn conduction_trace(&self, x: i32, y: i32, z: i32, out: &mut DiplomatWrite) {
+            let _ = write!(
+                out,
+                "{}",
+                super::conduction_trace_json(&self.sim, mc_tick::Pos::new(x, y, z))
+            );
+        }
+
+        /// Write every settled non-air state back into `schematic` — the bulk
+        /// form of `{simulate=true}`: settle once, keep the world the engine
+        /// ended on. Returns how many blocks changed.
+        ///
+        /// The schematic's bounding-box minimum corresponds to the
+        /// simulation's `(0, 0, 0)`, which is exactly how `from_schematic`
+        /// loaded it. A file baked this way carries real wire connections and
+        /// power in its palette, loads quiescent under `InWorld`, and renders
+        /// correctly in any static consumer. Cells the simulation turned into
+        /// air (a popped-off component) are left as the schematic had them.
+        pub fn bake_to(&self, schematic: &mut Schematic) -> u32 {
+            super::bake_into(&self.sim, &mut schematic.0)
         }
 
         /// Snapshot the entire simulation; returns a checkpoint id.
@@ -2278,10 +2357,54 @@ fn analyse_world(
     world: &mc_tick::World,
     registry: &mc_tick::StateRegistry,
 ) -> mc_tick::machine_graph::MachineGraph {
+    let rules = rebuild_rules(registry);
+    mc_tick::machine_graph::analyse(world, registry, &rules)
+}
+
+/// Rebuild the [`mc_tick::VanillaRules`] a simulation's wiring produced but
+/// did not keep, against a *clone* of its registry: cloning preserves every
+/// existing [`mc_tick::StateId`], so the rules are valid for the caller's
+/// world, and re-registering cannot disturb a live simulation.
+fn rebuild_rules(registry: &mc_tick::StateRegistry) -> mc_tick::VanillaRules {
     let mut scratch = registry.clone();
     let mut table = mc_tick::BehaviourTable::default();
-    let rules = mc_tick::register_all_at(&mut scratch, &mut table, mc_tick::Pos::new(0, 0, 0));
-    mc_tick::machine_graph::analyse(world, registry, &rules)
+    mc_tick::register_all_at(&mut scratch, &mut table, mc_tick::Pos::new(0, 0, 0))
+}
+
+/// A power-source tree for one cell of a live simulation — see
+/// [`mc_tick::VanillaRules::conduction_trace`] for the shape. The rules are
+/// rebuilt per call (they carry only power tables, and the query is a
+/// diagnostic, not a hot path); the comparator strengths come from the
+/// simulation so a comparator-fed line traces truthfully.
+fn conduction_trace_json(sim: &mc_tick::Simulation, pos: mc_tick::Pos) -> String {
+    let rules = rebuild_rules(sim.registry());
+    rules.conduction_trace(sim.registry(), sim.world(), sim.comparator_outputs(), pos)
+}
+
+/// Write every settled non-air state of `sim` back into `schem`, mapping the
+/// simulation's `(0, 0, 0)` onto the schematic's bounding-box minimum — the
+/// inverse of how `from_schematic` loaded it. Returns how many blocks changed.
+fn bake_into(sim: &mc_tick::Simulation, schem: &mut crate::UniversalSchematic) -> u32 {
+    let (mx, my, mz) = schem.get_bounding_box().min;
+    let mut changed = 0u32;
+    for (pos, id) in sim.world().iter_non_air() {
+        let Some(descriptor) = sim.registry().descriptor(id) else {
+            continue;
+        };
+        let (x, y, z) = (pos.x + mx, pos.y + my, pos.z + mz);
+        // Comparing rendered strings, because both sides render sorted
+        // properties; a cell the settle never touched writes nothing.
+        if schem
+            .get_block(x, y, z)
+            .is_some_and(|current| current.to_string() == descriptor)
+        {
+            continue;
+        }
+        if schem.set_block_from_string(x, y, z, descriptor).is_ok() {
+            changed += 1;
+        }
+    }
+    changed
 }
 
 #[cfg(test)]
@@ -2705,6 +2828,68 @@ mod tests {
         )
         .expect("the round-tripped text must load")
         .sim
+    }
+
+    /// A lever driving a dust line: the settled world bakes back into the
+    /// schematic with real wire power, and the far dust's conduction trace
+    /// walks the chain back to the lever.
+    #[test]
+    fn a_settled_line_bakes_back_and_traces_to_its_lever() {
+        let mut schem = UniversalSchematic::new("line".into());
+        for x in 0..3 {
+            schem.set_block(x, 0, 0, &BlockState::new("minecraft:smooth_stone"));
+        }
+        schem
+            .set_block_from_string(0, 1, 0, "minecraft:lever[face=floor,facing=north,powered=true]")
+            .expect("lever");
+        for x in 1..3 {
+            schem
+                .set_block_from_string(
+                    x,
+                    1,
+                    0,
+                    "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]",
+                )
+                .expect("wire");
+        }
+        let mut sim = super::ffi::TickSimulation::from_snbt(
+            to_gametest_snbt(&schem).as_bytes(),
+            super::ffi::TickSettleMode::Placement,
+            0,
+            0,
+            0,
+            b"",
+        )
+        .expect("the line loads")
+        .sim;
+        sim.run_until_quiescent(64);
+
+        let trace = super::conduction_trace_json(&sim, mc_tick::Pos::new(2, 1, 0));
+        assert!(
+            trace.contains("\"kind\":\"wire\",\"power\":14"),
+            "the far dust carries 14: {trace}"
+        );
+        assert!(
+            trace.contains("\"mechanism\":\"wire\""),
+            "it is fed by a one-level wire step: {trace}"
+        );
+        assert!(
+            trace.contains("minecraft:lever"),
+            "the tree reaches the lever: {trace}"
+        );
+
+        let changed = super::bake_into(&sim, &mut schem);
+        assert!(changed >= 2, "both dust cells changed, got {changed}");
+        let near = schem.get_block(1, 1, 0).expect("dust stays").to_string();
+        assert!(
+            near.contains("power=15"),
+            "the baked schematic carries settled power: {near}"
+        );
+        assert_eq!(
+            super::bake_into(&sim, &mut schem),
+            0,
+            "a second bake finds nothing left to write"
+        );
     }
 
     /// A schematic's own DataVersion reaches the engine through the SNBT.
