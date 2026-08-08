@@ -1615,6 +1615,15 @@ final class Schematic {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function compileIoContractsJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Schematic_compile_io_contracts_json($this->ptr, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function allPalettesJson() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         Lib::ffi()->Schematic_all_palettes_json($this->ptr, $write);

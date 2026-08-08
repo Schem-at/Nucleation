@@ -363,6 +363,9 @@ void Schematic_extract_signs_json(const Schematic* self, DiplomatWrite* write);
 typedef struct Schematic_compile_insign_json_result {union { NucleationError err;}; bool is_ok;} Schematic_compile_insign_json_result;
 Schematic_compile_insign_json_result Schematic_compile_insign_json(const Schematic* self, DiplomatWrite* write);
 
+typedef struct Schematic_compile_io_contracts_json_result {union { NucleationError err;}; bool is_ok;} Schematic_compile_io_contracts_json_result;
+Schematic_compile_io_contracts_json_result Schematic_compile_io_contracts_json(const Schematic* self, DiplomatWrite* write);
+
 void Schematic_all_palettes_json(const Schematic* self, DiplomatWrite* write);
 
 void Schematic_default_region_palette_json(const Schematic* self, DiplomatWrite* write);

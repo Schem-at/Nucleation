@@ -856,6 +856,15 @@ public:
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> compile_insign_json_write(W& writeable_output) const;
 
   /**
+   * Parse the schematic's IO-contract insign annotations (`#cell`
+   * header, `bus.*` port annotations, `#route_zone` zones) to JSON:
+   * `{"cell": ..., "buses": [...], "route_zones": {...}}`.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> compile_io_contracts_json() const;
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> compile_io_contracts_json_write(W& writeable_output) const;
+
+  /**
    * Every region's palette, as a JSON object mapping region name → array of
    * block names (the default region under `"default"`).
    */

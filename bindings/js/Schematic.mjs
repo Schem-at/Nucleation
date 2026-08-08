@@ -2996,6 +2996,34 @@ export class Schematic {
     }
 
     /**
+     * Parse the schematic's IO-contract insign annotations (`#cell`
+     * header, `bus.*` port annotations, `#route_zone` zones) to JSON:
+     * `{"cell": ..., "buses": [...], "route_zones": {...}}`.
+     */
+    compileIoContractsJson() {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Schematic_compile_io_contracts_json(diplomatReceive.buffer, this.ffiValue, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
      * Every region's palette, as a JSON object mapping region name → array of
      * block names (the default region under `"default"`).
      */

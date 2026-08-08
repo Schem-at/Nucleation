@@ -136,6 +136,7 @@ internal interface SchematicLib: Library {
     fun Schematic_allocated_dimensions(handle: Pointer): DimensionsNative
     fun Schematic_extract_signs_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_compile_insign_json(handle: Pointer, write: Pointer): ResultUnitInt
+    fun Schematic_compile_io_contracts_json(handle: Pointer, write: Pointer): ResultUnitInt
     fun Schematic_all_palettes_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_default_region_palette_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_region_palette_json(handle: Pointer, regionName: Slice, write: Pointer): ResultUnitInt
@@ -2190,6 +2191,23 @@ class Schematic internal constructor (
     fun compileInsignJson(): Result<String> {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.Schematic_compile_insign_json(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Parse the schematic's IO-contract insign annotations (`#cell`
+    *header, `bus.*` port annotations, `#route_zone` zones) to JSON:
+    *`{"cell": ..., "buses": [...], "route_zones": {...}}`.
+    */
+    fun compileIoContractsJson(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_compile_io_contracts_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
 

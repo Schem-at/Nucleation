@@ -24,6 +24,7 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("bounding_box_json", &nucleation::Schematic::bounding_box_json)
         .def_static("canonical_data_version", &nucleation::Schematic::canonical_data_version)
         .def("compile_insign_json", &nucleation::Schematic::compile_insign_json)
+        .def("compile_io_contracts_json", &nucleation::Schematic::compile_io_contracts_json)
         .def("convert_to_data_version", &nucleation::Schematic::convert_to_data_version, "target_data_version"_a, "source_data_version"_a)
         .def("convert_to_version", &nucleation::Schematic::convert_to_version, "target_data_version"_a)
         .def("copy_region", &nucleation::Schematic::copy_region, "source"_a, "min_x"_a, "min_y"_a, "min_z"_a, "max_x"_a, "max_y"_a, "max_z"_a, "target_x"_a, "target_y"_a, "target_z"_a, "excluded_blocks_json"_a)

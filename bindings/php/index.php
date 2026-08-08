@@ -46,6 +46,7 @@ require_once __DIR__ . '/TextureAtlas.php';
 require_once __DIR__ . '/Nbt.php';
 require_once __DIR__ . '/RenderConfig.php';
 require_once __DIR__ . '/Renderer.php';
+require_once __DIR__ . '/Routing.php';
 require_once __DIR__ . '/BlockState.php';
 require_once __DIR__ . '/Schematic.php';
 require_once __DIR__ . '/SchematicBuilder.php';

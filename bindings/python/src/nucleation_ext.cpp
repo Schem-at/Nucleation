@@ -47,6 +47,7 @@ void add_TextureAtlas_binding(nb::module_);
 void add_Nbt_binding(nb::module_);
 void add_RenderConfig_binding(nb::module_);
 void add_Renderer_binding(nb::module_);
+void add_Routing_binding(nb::module_);
 void add_BlockState_binding(nb::module_);
 void add_Schematic_binding(nb::module_);
 void add_SchematicBuilder_binding(nb::module_);
@@ -199,6 +200,7 @@ NB_MODULE(nucleation, mod)
     add_Nbt_binding(mod);
     add_RenderConfig_binding(mod);
     add_Renderer_binding(mod);
+    add_Routing_binding(mod);
     add_BlockState_binding(mod);
     add_Schematic_binding(mod);
     add_SchematicBuilder_binding(mod);

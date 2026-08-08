@@ -90,6 +90,8 @@ export { RenderConfig } from "./RenderConfig.mjs"
 
 export { Renderer } from "./Renderer.mjs"
 
+export { Routing } from "./Routing.mjs"
+
 export { BlockState } from "./BlockState.mjs"
 
 export { Schematic } from "./Schematic.mjs"

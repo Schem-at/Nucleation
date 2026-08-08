@@ -366,6 +366,9 @@ namespace capi {
     typedef struct Schematic_compile_insign_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_compile_insign_json_result;
     Schematic_compile_insign_json_result Schematic_compile_insign_json(const nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Schematic_compile_io_contracts_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_compile_io_contracts_json_result;
+    Schematic_compile_io_contracts_json_result Schematic_compile_io_contracts_json(const nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
     void Schematic_all_palettes_json(const nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
     void Schematic_default_region_palette_json(const nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatWrite* write);
@@ -1666,6 +1669,21 @@ template<typename W>
 inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Schematic::compile_insign_json_write(W& writeable) const {
     nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
     auto result = nucleation::capi::Schematic_compile_insign_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Schematic::compile_io_contracts_json() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::Schematic_compile_io_contracts_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Schematic::compile_io_contracts_json_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::Schematic_compile_io_contracts_json(this->AsFFI(),
         &write);
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }

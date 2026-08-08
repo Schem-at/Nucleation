@@ -719,6 +719,13 @@ export class Schematic {
     compileInsignJson(): string;
 
     /**
+     * Parse the schematic's IO-contract insign annotations (`#cell`
+     * header, `bus.*` port annotations, `#route_zone` zones) to JSON:
+     * `{"cell": ..., "buses": [...], "route_zones": {...}}`.
+     */
+    compileIoContractsJson(): string;
+
+    /**
      * Every region's palette, as a JSON object mapping region name → array of
      * block names (the default region under `"default"`).
      */
