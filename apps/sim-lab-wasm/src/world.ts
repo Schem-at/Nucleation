@@ -990,21 +990,23 @@ export class World {
     return this.solid.has(key(x, y, z));
   }
 
-  /** How much of the change log has already been applied. */
-  private seen = 0;
-
   /** Everything the simulation has changed since the last drain.
    *
-   * The engine's log is **cumulative** and has no reset, so this keeps a
-   * cursor rather than re-applying history: draining per step without one
-   * re-read the whole log every step and reported 44k changes for 50 ticks
-   * of a 1200-block door. Call it once per batch, not once per step.
+   * The engine's log is cumulative, so this consumes it: read it once, then
+   * call `clearChanges()` so the next drain starts from empty. That's what
+   * keeps this bounded — a drain costs what happened since the last drain,
+   * not what the whole session has accumulated. Re-reading and slicing off
+   * a cursor (the old approach) re-serialised the whole log every call and
+   * reported 44k changes for 50 ticks of a 1200-block door.
+   *
+   * Because the log is cleared here, nothing else may hold a cursor into
+   * it — there is nothing left to track after this returns.
    */
   drainChanges(): Change[] {
     if (!this.sim) return [];
-    // Cheap gate: no new entries, no parse.
+    // Cheap gate: nothing new, no parse.
     try {
-      if (Number(this.sim.changesCount?.() ?? -1) === this.seen) return [];
+      if (Number(this.sim.changesCount?.() ?? -1) === 0) return [];
     } catch {
       /* fall through to the parse */
     }
@@ -1014,6 +1016,11 @@ export class World {
     } catch {
       return [];
     }
+    try {
+      this.sim.clearChanges?.();
+    } catch {
+      /* nothing to clear, or engine doesn't support it */
+    }
     if (!raw) return [];
     let parsed: Any;
     try {
@@ -1022,9 +1029,7 @@ export class World {
       return [];
     }
     const all: Any[] = Array.isArray(parsed) ? parsed : (parsed.changes ?? []);
-    const list = all.slice(this.seen);
-    this.seen = all.length;
-    return list
+    return all
       .map((c: Any) => ({
         pos: [c.x ?? c.pos?.[0], c.y ?? c.pos?.[1], c.z ?? c.pos?.[2]] as [number, number, number],
         to: c.to ?? c.state ?? "minecraft:air",
