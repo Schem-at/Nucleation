@@ -540,6 +540,7 @@ pub fn plan_pivot(
     prefer_away_from: P3,
     flow_out: bool,
     at: &dyn Fn(P3) -> Option<String>,
+    toward: Option<P3>,
 ) -> Result<PivotPlan, String> {
     if wires.is_empty() {
         return Err("form adapter needs at least one connection cell".to_string());
@@ -556,11 +557,23 @@ pub fn plan_pivot(
     } else {
         vec![(-1, 0, 0), (1, 0, 0)]
     };
-    let inward = |d: &P3| {
-        (d.0 * (prefer_away_from.0 - wires[0].0)) + (d.2 * (prefer_away_from.2 - wires[0].2))
+    // COST-DRIVEN, not structural. This used to take the first direction that
+    // merely FIT, ordered by "grows away from the cell body" — which is how the
+    // adapter ended up building its gather bar on the far side of the port and
+    // making the bus double back to reach it. Plan BOTH sides and keep the one
+    // that costs less, breaking ties toward the outside so the old behaviour is
+    // the tie-break rather than the rule.
+    //
+    // Cost is the realized CELL COUNT plus how far the column ends up from the
+    // partner the bus has to reach (`toward`, when the caller knows it): a
+    // cheap adapter that lands the stack head on the wrong side of the
+    // component just moves the cost into the transport leg.
+    let outward = |d: &P3| {
+        -((d.0 * (prefer_away_from.0 - wires[0].0)) + (d.2 * (prefer_away_from.2 - wires[0].2)))
     };
-    cands.sort_by_key(inward);
+    cands.sort_by_key(|d| -outward(d));
     let mut errs = Vec::new();
+    let mut best: Option<(i64, PivotPlan)> = None;
     for out in cands {
         let mut sink = PivotSink {
             at,
@@ -568,20 +581,34 @@ pub fn plan_pivot(
         };
         match lay_pivot(&mut sink, wires, step, along, out, flow_out) {
             Ok(column) => {
-                return Ok(PivotPlan {
+                let cells = sink.cells.len() as i64;
+                // Distance from the column head to whatever the bus must reach.
+                let reach = toward.map_or(0, |t| {
+                    ((column[0].0 - t.0).abs() + (column[0].2 - t.2).abs()) as i64
+                });
+                // Tie-break toward the outside (the old, structural preference).
+                let cost = cells + reach - i64::from(outward(&out) > 0);
+                let plan = PivotPlan {
                     cells: sink.cells,
                     column,
                     note: format!(
                         "form adapter: pivoted the {:?}-pitch row onto a vertical 2y stack via a \
-                         staircase growing {} block(s) toward {:?}",
+                         staircase growing {} block(s) toward {:?} ({cells} cells; the cheaper of \
+                         the two sides)",
                         step,
                         2 * wires.len(),
                         out
                     ),
-                })
+                };
+                if best.as_ref().is_none_or(|(c, _)| cost < *c) {
+                    best = Some((cost, plan));
+                }
             }
             Err(e) => errs.push(format!("toward {out:?}: {e}")),
         }
+    }
+    if let Some((_, plan)) = best {
+        return Ok(plan);
     }
     Err(format!(
         "the row needs a form adapter to reach the vertical 2y-pitch bus stack, but neither side \

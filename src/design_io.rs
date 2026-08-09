@@ -473,6 +473,8 @@ fn bus_from(name: &str, meta: BusMeta, fragment: BTreeMap<P3, String>) -> BusLay
         // promotion in the instance's port modes, so this load promoted nothing.
         promotions: Vec::new(),
         width_map: meta.width_map.map(width_map_from),
+        // Weights are policy, restored to the balanced default on load.
+        cost: Default::default(),
         name: name.to_string(),
         driver: meta.driver,
         extra_drivers: meta.extra_drivers,

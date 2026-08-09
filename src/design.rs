@@ -686,6 +686,93 @@ fn plan_width_map(
     })
 }
 
+/// Per-bus WEIGHTS over the cost vector. A scalar cost is how we ended up
+/// benchmarking cell counts on straight runs and declaring victory while the
+/// actual route gathered into a bar and fanned out eight lanes: identical
+/// length, wildly different quality.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BusCost {
+    /// Realized cells.
+    pub length: f64,
+    /// Worst-bit arrival, in redstone ticks.
+    pub delay: f64,
+    /// max-min arrival across bits. Matched skew is a real requirement, not a
+    /// nicety, so it is its own term rather than folded into delay.
+    pub skew: f64,
+    /// BUNDLE DISPERSION: how far the N bits stray from travelling together in
+    /// their canonical relative arrangement, plus form conversions. This is the
+    /// term that catches "gather bar plus eight lanes" at equal length.
+    pub coherence: f64,
+    /// Occupied volume including clearance — how much of the workspace this
+    /// route denies to everything else.
+    pub footprint: f64,
+}
+
+impl Default for BusCost {
+    /// Balanced: length still dominates, but coherence is heavy enough to
+    /// reject a sprawling route that happens to tie on cells.
+    fn default() -> Self {
+        BusCost {
+            length: 1.0,
+            delay: 4.0,
+            skew: 8.0,
+            coherence: 6.0,
+            footprint: 0.5,
+        }
+    }
+}
+
+impl BusCost {
+    /// Minimise cells and volume; tolerate delay.
+    pub fn compact() -> Self {
+        BusCost { length: 2.0, delay: 1.0, skew: 4.0, coherence: 6.0, footprint: 2.0 }
+    }
+
+    /// Minimise arrival and skew; tolerate sprawl.
+    pub fn fast() -> Self {
+        BusCost { length: 0.5, delay: 16.0, skew: 24.0, coherence: 3.0, footprint: 0.25 }
+    }
+
+    /// Weighted total of a measured vector.
+    pub fn total(&self, v: &BusCostVector) -> f64 {
+        self.length * v.length as f64
+            + self.delay * v.delay_rt as f64
+            + self.skew * v.skew_rt as f64
+            + self.coherence * v.coherence as f64
+            + self.footprint * v.footprint as f64
+    }
+}
+
+/// The MEASURED cost of a realized bus, reported as a vector so a human can see
+/// WHY a route was chosen — and so no single dimension can be optimised in
+/// isolation again.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct BusCostVector {
+    /// Realized cells.
+    pub length: u32,
+    /// Worst-bit arrival in redstone ticks.
+    pub delay_rt: u32,
+    /// max-min arrival across bits.
+    pub skew_rt: u32,
+    /// Bundle dispersion: summed cross-section area ABOVE the canonical form's,
+    /// per slice along the route's principal axis, plus a fixed charge per form
+    /// conversion. Zero means the bits travelled together the whole way in
+    /// their canonical arrangement — a bus that reads as ONE object.
+    pub coherence: u32,
+    /// Occupied volume including a one-cell clearance shell.
+    pub footprint: u32,
+}
+
+impl BusCostVector {
+    /// `{"length":n,"delay_rt":n,"skew_rt":n,"coherence":n,"footprint":n}`
+    pub fn to_json(&self) -> String {
+        format!(
+            "{{\"length\":{},\"delay_rt\":{},\"skew_rt\":{},\"coherence\":{},\"footprint\":{}}}",
+            self.length, self.delay_rt, self.skew_rt, self.coherence, self.footprint
+        )
+    }
+}
+
 /// A bus-shaped waypoint splitting the bus into independently-routed
 /// segments.
 #[derive(Clone, Debug)]
@@ -826,6 +913,8 @@ pub struct BusLayer {
     /// [`WidthMap`]. `None` means the widths matched and every bit pairs with
     /// its own index.
     pub width_map: Option<WidthMap>,
+    /// Cost weights this bus is optimised against (compact / fast / balanced).
+    pub cost: BusCost,
 }
 
 impl BusLayer {
@@ -2237,6 +2326,7 @@ impl Design {
             rule: None,
             promotions,
             width_map,
+            cost: BusCost::default(),
         };
 
         match self.realize(
@@ -3128,6 +3218,52 @@ impl Design {
             .collect();
         let mut occ = self.occupancy_for_plan(&BTreeSet::new(), &self.halo_exempt(&endpoints));
 
+        // CONGRUENT PORTS NEED NO FORM AT ALL.
+        //
+        // The realizer is FORM-FIRST: it converts every port to the canonical
+        // 2y stack, transports one dense bundle, and converts back. When both
+        // ports already share a geometry that is not the canonical stack, that
+        // pipeline builds TWO adapters — a gather bar and 8 climbing lanes at
+        // each end — to reach a form it then immediately leaves. The bus is
+        // really just N PARALLEL WIRES: bit k to bit k, no gather, no stack, no
+        // fan. Detect that and route it that way.
+        //
+        // Deliberately NOT taken for the canonical stack: there the dense form
+        // shares supports and separators between bits, so one 8-bit run beats
+        // eight 1-bit lanes. This path exists to avoid conversions that buy
+        // nothing, not to replace the form that pays for itself.
+        if gates.is_empty() && drivers.len() == 1 && sinks.len() == 1 {
+            if let Some(lanes) = Self::congruent_lanes(&drivers[0], &sinks[0], step) {
+                let mut planner = Planner::new(self, exclude, style, &occ);
+                let mut ok = true;
+                for (k, (a, b)) in lanes.iter().enumerate() {
+                    planner.begin_segment(SegmentKind::Trunk(k), *a, *b);
+                    // Each lane is its own 1-bit run, so it gets its own
+                    // refreshes and the ladder's full retry vocabulary; the
+                    // ports being congruent is what keeps them parallel and
+                    // skew-matched without an explicit bundle constraint.
+                    if let Err(e) = planner.plan_pair(*a, *b, 1, &BTreeSet::new(), 0) {
+                        ok = false;
+                        let _ = e;
+                        break;
+                    }
+                    planner.end_segment();
+                }
+                if ok {
+                    let mut real = planner.finish();
+                    if !real.fragment.is_empty() {
+                        Self::rewire_fragment(&mut real.fragment, &occ);
+                        for (_, _, additions) in real.amendments.iter_mut() {
+                            Self::rewire_fragment(additions, &occ);
+                        }
+                        return Ok(real);
+                    }
+                }
+                // Falling through to the form pipeline is always legal: the
+                // parallel form is an OPTIMISATION, never the only answer.
+            }
+        }
+
         // FORM ADAPTATION IS THE BUS'S JOB. A port whose native geometry is a
         // horizontal row gets a row->stack adapter planned into THIS BUS's
         // fragment, so it is created and ripped with the bus and the component
@@ -3138,7 +3274,13 @@ impl Design {
             if p.step == step {
                 continue;
             }
-            let plan = self.plan_form_adapter(p, &occ)?;
+            // The other end of the bus is what this adapter has to reach.
+            let partner = if std::ptr::eq(p, &drivers[0]) {
+                sinks.first().map(|q| q.anchor)
+            } else {
+                drivers.first().map(|q| q.anchor)
+            };
+            let plan = self.plan_form_adapter(p, &occ, partner)?;
             anchor_of.insert(p.name.clone(), plan.column[0]);
             adapters.push((p.name.clone(), p.anchor, plan));
         }
@@ -3311,6 +3453,45 @@ impl Design {
         crate::routing::engine::wire::rewire(cells, &outside);
     }
 
+    /// Bit-to-bit lane endpoints when the two ports are CONGRUENT — same bit
+    /// count, same pitch, same axis — and their shared form is NOT the
+    /// canonical stack (where the dense form is cheaper than separate lanes).
+    ///
+    /// `None` means the forms differ, so a conversion really is needed.
+    fn congruent_lanes(
+        driver: &DesignPort,
+        sink: &DesignPort,
+        canonical: P3,
+    ) -> Option<Vec<(P3, P3)>> {
+        if driver.width != sink.width || driver.width == 0 {
+            return None;
+        }
+        if driver.step != sink.step || driver.step == canonical {
+            return None;
+        }
+        // Every lane must run the same way, or they are not a bundle: the pair
+        // has to differ on exactly the axes the pitch does NOT use, and by the
+        // same amount for every bit (which congruent steps guarantee).
+        let (a0, b0) = (driver.anchor, sink.anchor);
+        let delta = (b0.0 - a0.0, b0.1 - a0.1, b0.2 - a0.2);
+        if delta == (0, 0, 0) {
+            return None;
+        }
+        // A lane that has to change LEVEL as well is still fine (the level
+        // shift handles it), but a lane running along its own pitch axis would
+        // overlap its neighbours.
+        let pitch_axis = |s: P3| (s.0 != 0, s.1 != 0, s.2 != 0);
+        let (px, _py, pz) = pitch_axis(driver.step);
+        if (px && delta.0 != 0) || (pz && delta.2 != 0) {
+            return None;
+        }
+        Some(
+            (0..driver.width)
+                .map(|k| (driver.wire(k), sink.wire(k)))
+                .collect(),
+        )
+    }
+
     /// Plan the row->stack FORM ADAPTER for a port whose native geometry is a
     /// horizontal row, against the design-wide occupancy.
     ///
@@ -3324,6 +3505,7 @@ impl Design {
         &self,
         port: &DesignPort,
         occ: &OccupancyIndex,
+        toward: Option<P3>,
     ) -> Result<crate::design_promote::PivotPlan, String> {
         let row: Vec<P3> = (0..port.width as i32)
             .map(|i| {
@@ -3361,7 +3543,11 @@ impl Design {
         // A port that DRIVES the fabric flows out of the row into the column;
         // a sink flows the other way.
         let flow_out = port.direction == PortDirection::Input;
-        crate::design_promote::plan_pivot(&row, port.step, away, flow_out, &at)
+        // Where the bus has to GO from here: the adapter's column head should
+        // land on the side facing its partner, or the transport leg pays for
+        // the detour. This is the end-to-end half of the cost — a cheap gather
+        // that forces an expensive run is not cheap.
+        crate::design_promote::plan_pivot(&row, port.step, away, flow_out, &at, toward)
             .map_err(|e| format!("port `{}`: {e}", port.name))
     }
 
@@ -3834,7 +4020,16 @@ impl Design {
                     BusState::Routed => "\"routed\"".to_string(),
                     BusState::Failed(r) => format!("{{\"failed\":{:?}}}", r),
                 };
-                format!("{:?}:{state}", b.name)
+                // Report the VECTOR, not a scalar: five components per bus, so
+                // a human can see why a route was chosen and no single
+                // dimension can be optimised in isolation again.
+                let cost = self.bus_cost(b);
+                format!(
+                    "{:?}:{{\"state\":{state},\"cost\":{},\"weighted\":{:.1}}}",
+                    b.name,
+                    cost.to_json(),
+                    b.cost.total(&cost)
+                )
             })
             .collect();
         let mut rules: Vec<String> = rule_violations.iter().map(|r| format!("{r:?}")).collect();
@@ -3896,6 +4091,91 @@ impl Design {
     /// fragment: a repeater at even offset from the canonical level
     /// belongs to that bit's straight run, at odd offset to the bit's dip
     /// station one level down.
+    /// MEASURE a realized bus against all five terms. See [`BusCostVector`].
+    ///
+    /// Coherence is the term that matters and the one that was missing: for each
+    /// slice along the route's principal axis, take the cross-section bounding
+    /// box of that slice's cells and charge whatever its area exceeds the
+    /// CANONICAL form's (a `1 x (2w-1)` column for the 2y stack). A bundle
+    /// travelling together scores 0; a gather bar with eight lanes hanging off
+    /// it scores enormously, at identical length. Form conversions carry a fixed
+    /// charge on top, because a conversion is a structural decision, not a
+    /// routing detail.
+    pub fn bus_cost(&self, bus: &BusLayer) -> BusCostVector {
+        let f = &bus.fragment;
+        if f.is_empty() {
+            return BusCostVector::default();
+        }
+        let (width, step) = self
+            .resolve_port(&bus.driver)
+            .map(|p| (p.width.max(1) as i32, p.step))
+            .unwrap_or((1, (0, 2, 0)));
+        let delays = self.bus_bit_delays(bus);
+        let (delay_rt, skew_rt) = match (delays.iter().max(), delays.iter().min()) {
+            (Some(hi), Some(lo)) => (*hi as u32, (hi - lo) as u32),
+            _ => (0, 0),
+        };
+
+        // Principal axis: the one the route spans furthest.
+        let (mut lo, mut hi) = ((i32::MAX, i32::MAX, i32::MAX), (i32::MIN, i32::MIN, i32::MIN));
+        for p in f.keys() {
+            lo = (lo.0.min(p.0), lo.1.min(p.1), lo.2.min(p.2));
+            hi = (hi.0.max(p.0), hi.1.max(p.1), hi.2.max(p.2));
+        }
+        let along_x = (hi.0 - lo.0) >= (hi.2 - lo.2);
+        // The canonical bundle's cross-section, derived from the PORT'S OWN
+        // FORM rather than assumed. A 2y stack is one column `2w` tall
+        // (dust + support per bit); a row at pitch `p` is `p*(w-1)+1` wide and 2
+        // tall. Assuming the stack charged every row-form bundle for merely
+        // being a row — the baseline has to be the form the bits are actually
+        // in, or the metric penalises shape instead of DISPERSION.
+        let pitch = step.0.abs().max(step.1.abs()).max(step.2.abs()).max(1);
+        let canonical = if step.1 != 0 {
+            (pitch * width) as u32
+        } else {
+            (2 * (pitch * (width - 1) + 1)) as u32
+        };
+        let mut coherence = 0u32;
+        let mut slices: BTreeMap<i32, ((i32, i32), (i32, i32))> = BTreeMap::new();
+        for p in f.keys() {
+            let (key, a, b) = if along_x { (p.0, p.1, p.2) } else { (p.2, p.1, p.0) };
+            let e = slices.entry(key).or_insert(((a, b), (a, b)));
+            e.0 = (e.0 .0.min(a), e.0 .1.min(b));
+            e.1 = (e.1 .0.max(a), e.1 .1.max(b));
+        }
+        for (_, (slo, shi)) in slices {
+            let area = ((shi.0 - slo.0 + 1) * (shi.1 - slo.1 + 1)) as u32;
+            coherence += area.saturating_sub(canonical);
+        }
+        // A form conversion is a STRUCTURAL decision; charge it as such.
+        let conversions = bus
+            .segments
+            .iter()
+            .filter(|s| matches!(s.kind, SegmentKind::Adapter(_)))
+            .count() as u32;
+        coherence += conversions * 64;
+
+        // Footprint: occupied volume plus a one-cell clearance shell, which is
+        // what the route actually denies to its neighbours.
+        let mut shell: BTreeSet<P3> = BTreeSet::new();
+        for p in f.keys() {
+            for dx in -1..=1 {
+                for dy in -1..=1 {
+                    for dz in -1..=1 {
+                        shell.insert((p.0 + dx, p.1 + dy, p.2 + dz));
+                    }
+                }
+            }
+        }
+        BusCostVector {
+            length: f.len() as u32,
+            delay_rt,
+            skew_rt,
+            coherence,
+            footprint: shell.len() as u32,
+        }
+    }
+
     pub fn bus_bit_delays(&self, bus: &BusLayer) -> Vec<u64> {
         let Ok(driver) = self.resolve_port(&bus.driver) else {
             return Vec::new();

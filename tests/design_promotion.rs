@@ -386,12 +386,26 @@ fn auto_promotion_does_not_mask_an_unrelated_failure() {
     )
     .unwrap();
 
-    let err = d
+    // A 4-bit driver into an 8-bit port is no longer an error — it is a
+    // LAYOUT question the router answers (lsb-aligned, the spare high bits
+    // read 0). What must still not be masked is a genuinely unrelated
+    // failure, so use one: a driver whose width fits but whose TYPE does not.
+    let st = d
         .route_bus("net", "din4", &["u0.bin"], vec![], BusStyle::default())
-        .expect_err("a width mismatch must be an error");
+        .expect("a width mismatch is adapted, not refused");
+    assert_eq!(st, BusState::Routed, "{:?}", d.bus_state("net"));
+    let m = d.bus("net").unwrap().width_map.clone().expect("a mapping");
+    assert_eq!((m.driver_width, m.sink_width), (4, 8));
+    assert_eq!(m.tied_zero, vec![4, 5, 6, 7], "the spare high bits read 0");
+
+    // The unrelated failure: an endpoint that does not exist. Auto-promotion
+    // must not turn that into a promotion story.
+    let err = d
+        .route_bus("nope", "din4", &["u0.not_a_port"], vec![], BusStyle::default())
+        .expect_err("an unknown port must still be an error");
     assert!(
-        err.contains("width"),
-        "the width mismatch must be the reported cause, not a promotion story: {err}"
+        err.contains("no contract port") || err.contains("unknown port"),
+        "the unknown port must be the reported cause, not a promotion story: {err}"
     );
 }
 
