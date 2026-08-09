@@ -108,6 +108,13 @@ export declare class Design {
     rerouted: string[]; failed: Record<string, string>;
   };
 
+  /** Executor hardware (levers/lamps, hand-drivable) vs a routable dust
+   *  input. Reversible: `"executor"` restores the shipped blocks exactly. */
+  setPortMode(instance: string, port: string, mode: "bus" | "executor"): PortModeReport;
+  promotePort(instance: string, port: string): PortModeReport;
+  portModes(): Array<{ name: string; mode: "bus" | "executor"; patch: PortPatch }>;
+  planPortPromotion(instance: string, port: string): PortPatch;
+
   setBlock(x: number, y: number, z: number, block: string): void;
 
   check(opts?: { strict?: boolean }): CheckReport;
@@ -118,6 +125,31 @@ export declare class Design {
   toLitematicB64(): string;
   toBytes(pathOrSuffix: string): Uint8Array;
   save(path: string): Promise<void>; // Node only
+}
+
+/** What Bus mode lays down, and the executor hardware it replaces. */
+export interface PortPatch {
+  wires: Vec3[];
+  hardware: Vec3[];
+  step: Vec3;
+  removed: number;
+  added: number;
+  /** True when the port's hardware was a horizontal ROW and a form adapter
+   *  was grown to reach the vertical 2y-pitch bus stack. */
+  pivoted: boolean;
+  note: string;
+}
+
+/** Outcome of a port-mode switch. `changed` is in WORLD coordinates. */
+export interface PortModeReport {
+  port: string;
+  mode: "bus" | "executor";
+  note: string;
+  changed: Array<{ at: Vec3; from: string | null; to: string | null }>;
+  /** Buses ripped because their endpoint stopped existing. */
+  removed_buses: string[];
+  moves: { rerouted: string[]; failed: Record<string, string> };
+  patch: PortPatch;
 }
 
 export interface VeneerSurface {

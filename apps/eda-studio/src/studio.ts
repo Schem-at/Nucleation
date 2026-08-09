@@ -217,27 +217,91 @@ export class Studio {
   allEndpoints(): {
     name: string; port: string; kind: "input" | "output"; anchor: Vec3; step: Vec3;
     width: number; ty: string; routable: boolean; blocked?: string; instance?: string;
+    /** Port mode, for instance ports only: `"bus"` once promoted. */
+    mode?: "bus" | "executor";
+    /** Whether this port CAN be promoted (and what that would do), so a UI can
+     *  offer the toggle rather than only reporting the refusal. */
+    promotable?: boolean;
   }[] {
     const out = [...this.ports.values()].map((p) => ({
       name: p.name, port: p.name, kind: p.kind, anchor: p.anchor, step: p.step,
       width: p.width, ty: p.ty === "bool" ? "bool" : `${p.ty}${p.width}`,
       routable: true as boolean, blocked: undefined as string | undefined,
       instance: undefined as string | undefined,
+      mode: undefined as "bus" | "executor" | undefined,
+      promotable: false as boolean,
     }));
     for (const ip of this.instancePorts()) {
       // The engine's `role` is CELL-facing; the canvas speaks FABRIC
       // direction, where a cell output is what drives a bus.
       const kind: "input" | "output" = ip.role === "output" ? "input" : "output";
       const anchor = (ip.wires?.[0] ?? ip.hardware[0]) as Vec3;
+      const mode = this.portMode(ip.instance, ip.port);
       out.push({
         name: ip.name, port: ip.port, kind, anchor,
         step: (ip.step ?? [0, 2, 0]) as Vec3,
         width: ip.width, ty: tyName(ip.ty, ip.width),
         routable: ip.routable, blocked: ip.blocked ?? undefined,
         instance: ip.instance,
+        mode,
+        promotable: mode === "bus" || this.canPromote(ip.instance, ip.port),
       });
     }
     return out;
+  }
+
+  // -- port modes (promotion) ----------------------------------------------
+
+  /** Which ports have been switched out of executor mode. Cached per document
+   *  version so the outliner can ask per chip without hitting wasm each time. */
+  private modeCache: { version: number; map: Map<string, "bus" | "executor"> } | null = null;
+
+  portModes(): Map<string, "bus" | "executor"> {
+    if (this.modeCache?.version === this.version) return this.modeCache.map;
+    const map = new Map<string, "bus" | "executor">();
+    for (const e of this.design.portModes() as Array<{ name: string; mode: "bus" | "executor" }>) {
+      map.set(e.name, e.mode);
+    }
+    this.modeCache = { version: this.version, map };
+    return map;
+  }
+
+  portMode(instance: string, port: string): "bus" | "executor" {
+    return this.portModes().get(`${instance}.${port}`) ?? "executor";
+  }
+
+  /** Would promoting this port work? Asks the engine to PLAN the patch, which
+   *  is where every refusal (a ceiling lever, no room for a form adapter) comes
+   *  from — so the UI never offers a toggle that cannot fire. */
+  private promoCache = new Map<string, boolean>();
+  canPromote(instance: string, port: string): boolean {
+    const key = `${this.version}:${instance}.${port}`;
+    const hit = this.promoCache.get(key);
+    if (hit != null) return hit;
+    let ok = false;
+    try {
+      this.design.planPortPromotion(instance, port);
+      ok = true;
+    } catch {
+      ok = false;
+    }
+    this.promoCache.set(key, ok);
+    return ok;
+  }
+
+  /** Toggle a port between executor hardware and a routable dust input. The
+   *  engine rips any bus that terminated on it (its endpoint stops existing)
+   *  and co-reroutes the rest. */
+  setPortMode(instance: string, port: string, mode: "bus" | "executor") {
+    const report = this.design.setPortMode(instance, port, mode);
+    for (const name of report.removed_buses ?? []) this.buses.delete(name);
+    this.bump();
+    return report;
+  }
+
+  togglePortMode(instance: string, port: string) {
+    const next = this.portMode(instance, port) === "bus" ? "executor" : "bus";
+    return this.setPortMode(instance, port, next);
   }
 
   // -- ports ---------------------------------------------------------------

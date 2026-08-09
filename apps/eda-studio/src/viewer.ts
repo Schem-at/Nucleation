@@ -107,6 +107,11 @@ export class Viewer {
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
   controls: OrbitControls;
+  /** Why the camera is locked, or `null`. While locked, orbit/pan/zoom stay
+   *  OFF: a drag belongs to the interaction in progress (drawing a bus,
+   *  moving an instance), and letting OrbitControls also see it means every
+   *  connect gesture spins the scene. */
+  private cameraLock: string | null = null;
   private blockGroup = new THREE.Group();
   private texturedGroup = new THREE.Group();
   private markerGroup = new THREE.Group();
@@ -187,6 +192,7 @@ export class Viewer {
   }
 
   setLayers(layers: LayerBlocks[]) {
+    this.meshBuilds.layers++;
     Viewer.disposeDeep(this.blockGroup);
     const box = new THREE.BoxGeometry(0.94, 0.94, 0.94);
     for (const layer of layers) {
@@ -492,7 +498,9 @@ export class Viewer {
       this.setHovered(name);
       this.cb.onPortHover(name);
     }
-    this.renderer.domElement.style.cursor = hit ? "pointer" : "";
+    if (this.cameraLock == null) {
+      this.renderer.domElement.style.cursor = hit ? "pointer" : "";
+    }
   }
 
   private pointerUp(e: PointerEvent) {
@@ -507,9 +515,58 @@ export class Viewer {
     if (!this.drag) return;
     const drag = this.drag;
     this.drag = null;
-    this.controls.enabled = true;
+    this.controls.enabled = this.cameraLock == null;
     const p = this.groundPoint(e, drag.y);
     if (p) this.cb.onDragEnd(drag.kind, drag.id, p);
+  }
+
+  // ---- mesh-build accounting (dev diagnostic + a verify assertion) -------
+  //
+  // The user's complaint was "it remeshes as I drag things around". It should
+  // not: an instance is a cell REFERENCE plus a transform, so a drag is a
+  // matrix write. These counters make that claim checkable rather than
+  // aspirational — `npm run verify` asserts dragging adds 0 texture builds.
+  meshBuilds = { texture: 0, layers: 0 };
+  /** Cells whose blocks changed since their mesh was built. */
+  private staleCells = new Set<string>();
+
+  /** A cell's blocks changed (a port-mode toggle removed or restored a lever),
+   *  so its mesh is stale. Nothing else in the scene is. */
+  invalidateCell(cell: string) {
+    if (cell) this.staleCells.add(cell);
+  }
+
+  /** Is a pointer drag in progress? */
+  isDragging(): boolean {
+    return this.drag != null;
+  }
+
+  /** Cells awaiting a re-mesh. */
+  stale(): string[] {
+    return [...this.staleCells];
+  }
+
+  clearStale() {
+    this.staleCells.clear();
+  }
+
+  /** Lock (reason) or unlock (`null`) the camera. Idempotent. */
+  setCameraLock(reason: string | null) {
+    this.cameraLock = reason;
+    this.controls.enabled = reason == null && this.drag == null;
+    const el = this.renderer.domElement;
+    el.style.cursor = reason ? "crosshair" : "";
+    el.classList.toggle("camera-locked", reason != null);
+  }
+
+  /** For the headless verify: is the camera free to move? */
+  get cameraFree(): boolean {
+    return this.controls.enabled;
+  }
+
+  /** Why the camera is locked, if it is. */
+  get cameraLockReason(): string | null {
+    return this.cameraLock;
   }
 
   screenshotDataUrl(): string {

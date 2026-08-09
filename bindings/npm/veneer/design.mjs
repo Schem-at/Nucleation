@@ -298,6 +298,36 @@ class DesignBase {
    *  `routable: false` with the reason in `blocked`. */
   instancePorts() { return JSON.parse(this._d.instancePorts()); }
 
+  /** Switch a port between executor hardware and a routable dust input —
+   *  `mode` is `"bus"` or `"executor"`.
+   *
+   *  This is the composability switch. A community cell's inputs are LEVERS,
+   *  and nothing in redstone drives a lever, so `add.sum -> bcd.bin` needs
+   *  `bin` in `"bus"` mode first. The conversion is a reversible per-instance
+   *  patch: `"executor"` restores the shipped blocks byte-exactly.
+   *
+   *  Returns `{port, mode, note, changed: [{at, from, to}], removed_buses,
+   *  moves, patch}`. `note` is a ready-made toast; `changed` is in WORLD
+   *  coordinates. A bus that terminated on the port is RIPPED and named in
+   *  `removed_buses` — its endpoint physically stopped existing. */
+  setPortMode(instance, port, mode) {
+    return JSON.parse(this._d.setPortMode(instance, port, mode));
+  }
+
+  /** `setPortMode(instance, port, "bus")`. */
+  promotePort(instance, port) { return this.setPortMode(instance, port, "bus"); }
+
+  /** Ports whose mode has been switched: `[{name, mode, patch}]`. Anything
+   *  absent is in `"executor"` mode. */
+  portModes() { return JSON.parse(this._d.portModes()); }
+
+  /** What promoting a port WOULD do, without doing it: `{wires, hardware,
+   *  step, removed, added, pivoted, note}`. Throws with the reason when the
+   *  port cannot be promoted (a ceiling lever, say). */
+  planPortPromotion(instance, port) {
+    return JSON.parse(this._d.planPortPromotion(instance, port));
+  }
+
   /** Resolve one endpoint name to the geometry a bus would use:
    *  `{name, anchor, step, width, direction, connectable}`. `direction` is
    *  DESIGN-facing, so `"input"` drives buses. Throws with the reason when

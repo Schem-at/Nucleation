@@ -1,7 +1,7 @@
 {
-  "when": "2026-08-09T02:47:32.934Z",
-  "passed": 26,
-  "total": 26,
+  "when": "2026-08-09T05:02:28.315Z",
+  "passed": 29,
+  "total": 29,
   "results": [
     {
       "ok": true,
@@ -20,7 +20,7 @@
     {
       "ok": true,
       "label": "instance port u0.a is reported non-routable WITH a reason",
-      "detail": "{\"name\":\"u0.a\",\"kind\":\"output\",\"ty\":\"uint8\",\"routable\":false,\"blocked\":\"bit 0: no dust connection cell at or beside (0, 2, 4) (holds `minecraft:lever[face=wall,facing=west,powered=false]`) — this port is executor-only hardware and cannot terminate a bus\"}"
+      "detail": "{\"name\":\"u0.a\",\"kind\":\"output\",\"ty\":\"uint8\",\"routable\":false,\"blocked\":\"bit 0: no dust connection cell at or beside (0, 2, 4) (holds `minecraft:lever[face=wall,facing=west,powered=false]`) — this port is executor-only hardware and cannot terminate a bus. PROMOTE it (switch the port to Bus mode) to swap the hardware for a dust input; the switch is reversible\"}"
     },
     {
       "ok": true,
@@ -55,7 +55,7 @@
     {
       "ok": true,
       "label": "routing into a lever input is refused with a readable reason",
-      "detail": "u1.a is executor-only IO: bit 0: no dust connection cell at or beside (0, 2, 24) (holds `minecraft:lever[face=wall,facing=west,powered=false]`) — this port is executor-only hardware and cannot terminate a bus"
+      "detail": "u1.a is executor-only IO: bit 0: no dust connection cell at or beside (0, 2, 24) (holds `minecraft:lever[face=wall,facing=west,powered=false]`) — this port is executor-only hardware and cannot terminate a bus. PROMOTE it (switch the port to Bus mode) to swap the hardware for a dust input; the switch is reversible"
     },
     {
       "ok": true,
@@ -101,7 +101,7 @@
     },
     {
       "ok": true,
-      "label": ".nucm document exported (2465721 bytes)"
+      "label": ".nucm document exported (2465729 bytes)"
     },
     {
       "ok": true,
@@ -109,7 +109,22 @@
     },
     {
       "ok": true,
-      "label": "textured view: pack loaded ({\"blockstates\":1106,\"models\":3402,\"textures\":3312}) in 268ms, meshed in 317ms"
+      "label": "camera locks while connecting (\"drawing a bus\") and frees on Esc",
+      "detail": "{\"before\":true,\"connecting\":{\"free\":false,\"lock\":\"drawing a bus\",\"mode\":\"connecting\"},\"after\":true}"
+    },
+    {
+      "ok": true,
+      "label": "u1.a: Exec->Bus makes it routable (step [0,2,0]), Bus->Exec restores it, and the outliner shows the toggle",
+      "detail": "{\"port\":\"u1.a\",\"before\":\"executor\",\"promotedRoutable\":true,\"promotedStep\":[0,2,0],\"note\":\"`u1.a` is now a BUS input: 8 bit(s): repeater into the attachment block, connection dust one cell out — bit 0 lands on dust at (-1, 2, 24)\",\"hasToggle\":true,\"toggleLabel\":\"Bus\",\"restoredRoutable\":false,\"restoredNote\":\"`u1.a` is back to EXECUTOR hardware: 32 cell(s) restored exactly as shipped\"}"
+    },
+    {
+      "ok": true,
+      "label": "dragging an instance 8 frames triggers 0 texture re-meshes (0 -> 0)",
+      "detail": "{\"texBefore\":0,\"texAfterDrag\":0}"
+    },
+    {
+      "ok": true,
+      "label": "textured view: pack loaded ({\"blockstates\":1106,\"models\":3402,\"textures\":3312}) in 267ms, meshed in 169ms"
     },
     {
       "ok": true,

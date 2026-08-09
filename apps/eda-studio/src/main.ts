@@ -100,6 +100,14 @@ async function boot() {
   function setMode(next: Mode) {
     mode = next;
     if (next.kind !== "connecting") viewer.setGhost(null);
+    // While an interaction owns the pointer, the camera must not: dragging to
+    // aim a bus (or to place/move a component) was also orbiting the scene.
+    viewer.setCameraLock(
+      next.kind === "connecting" ? "drawing a bus"
+      : next.kind === "grabbing" ? "moving a component"
+      : next.kind === "placing" ? "placing a component"
+      : null
+    );
     // The ghost's far end follows the cursor; the pointermove handler below
     // draws it as soon as the mouse moves.
     setHint();
@@ -127,7 +135,7 @@ async function boot() {
       }
       select({ kind: "port", id: name });
       if (!p.routable) {
-        toast(`${name} is executor-only IO — no bus can land on it. ${p.blocked ?? ""}`, "err");
+        offerPromotion(p, name);
         log(`port ${name}: NOT routable — ${p.blocked ?? "no dust connection cell"}`);
         return;
       }
@@ -236,6 +244,73 @@ async function boot() {
     }
   }
 
+  /** A two-state Executor/Bus switch on every instance port that has one.
+   *
+   *  Community cells name executor hardware — inputs are LEVERS, and nothing in
+   *  redstone drives a lever — so a greyed ✗ port is not a dead end, it is a
+   *  port waiting to be promoted. The switch is the affordance because the
+   *  conversion is REVERSIBLE: Bus mode swaps the lever for a dust input, and
+   *  Executor mode puts the shipped hardware back byte-exactly. */
+  function modeToggle(p: (typeof endpoints)[number]): string {
+    if (!p.instance || !p.promotable) return "";
+    const bus = p.mode === "bus";
+    return `<button class="mode-toggle${bus ? " is-bus" : ""}"
+      data-mode="${esc(p.instance)}|${esc(p.port)}"
+      title="${bus
+        ? "Bus mode: a bus can land here. Switch back to drive it by hand."
+        : "Executor mode: hand-drivable hardware. Switch to Bus so a bus can land here."}"
+      >${bus ? "Bus" : "Exec"}</button>`;
+  }
+
+  /** Refusing a click on an executor-only port used to be the end of the
+   *  conversation. Name the fix instead — and if the port can be promoted,
+   *  offer it right here so the user does not have to find the outliner. */
+  function offerPromotion(p: (typeof endpoints)[number], name: string) {
+    if (p.instance && p.promotable && p.mode !== "bus") {
+      toast(
+        `${name} is executor-only IO (levers) — switching it to Bus mode so a bus can land on it`,
+      );
+      togglePortMode(p.instance, p.port);
+      return;
+    }
+    toast(
+      `${name} is executor-only IO — no bus can land on it. ${p.blocked ?? ""}` +
+      (p.instance ? " (and it cannot be promoted — see the log)" : ""),
+      "err",
+    );
+  }
+
+  function togglePortMode(instance: string, port: string) {
+    try {
+      const before = studio.portMode(instance, port);
+      const report = studio.togglePortMode(instance, port);
+      const moved = (report.changed ?? []).length;
+      const first = report.changed?.[0];
+      if (before === "executor") {
+        const where = report.patch?.wires?.[0];
+        toast(
+          `${instance}.${port} → Bus: removed ${first?.from?.split("[")[0] ?? "hardware"}` +
+          ` at (${first?.at?.join(",")})` +
+          (where ? `; ${port}[0] now lands on dust at (${where.join(",")})` : "") +
+          (report.patch?.pivoted ? " · form adapter added" : "")
+        );
+      } else {
+        toast(`${instance}.${port} → Executor: ${moved} cell(s) restored as shipped`);
+      }
+      log(`port mode: ${report.note}`);
+      if (report.removed_buses?.length) {
+        toast(`ripped with it: ${report.removed_buses.join(", ")}`, "err");
+      }
+      // Its geometry changed, so this cell's mesh is stale — nothing else is.
+      viewer.invalidateCell(studio.instances.get(instance)?.cell ?? "");
+      if (mode.kind === "connecting") setMode({ kind: "idle" });
+      refresh();
+      renderPanels();
+    } catch (err) {
+      toast(String(err), "err");
+    }
+  }
+
   function refresh() {
     endpoints = studio.allEndpoints();
     try {
@@ -243,7 +318,11 @@ async function boot() {
     } catch (err) {
       log(`layer render failed: ${err}`);
     }
-    if (viewer.isTextured()) void remesh();
+    // A drag changes an instance's TRANSFORM, never a cell's blocks, so the
+    // textured mesh is still valid — re-meshing mid-gesture was the stutter.
+    // Blocks change on a port-mode toggle (tracked as a stale cell) or a
+    // reroute, and the drop below re-meshes once.
+    if (viewer.isTextured() && mode.kind !== "grabbing" && !viewer.isDragging()) void remesh();
     const ports: PortMarker[] = endpoints.map((p) => ({
       name: p.name, kind: p.kind, anchor: p.anchor, step: p.step,
       width: p.width, ty: p.ty, routable: p.routable, blocked: p.blocked,
@@ -344,11 +423,12 @@ async function boot() {
         <span class="name">${esc(i.name)}</span>
         <span class="meta">${esc(i.cell)} @ ${i.at.join(",")} · rot ${i.rot}°</span>
         <div class="ports">${mine.map((p) => `
+          <span class="port-row">
           <button class="port-chip ${p.kind === "input" ? "drives" : "receives"}${p.routable ? "" : " blocked"}"
                   data-port="${esc(p.name)}"
                   title="${p.routable ? "click to start/finish a bus" : esc(p.blocked ?? "not routable")}">
             ${p.kind === "input" ? "▲" : "▼"} ${esc(p.port ?? p.name.split(".").pop())} : ${esc(p.ty)}${p.routable ? "" : " ✗"}
-          </button>`).join("")}</div>
+          </button>${modeToggle(p)}</span>`).join("")}</div>
         <div class="row">
           <button data-rot="${esc(i.name)}">R ↻</button>
           <button data-del="${esc(i.name)}">Del ✕</button>
@@ -359,6 +439,13 @@ async function boot() {
       el.addEventListener("click", (ev) => {
         if ((ev.target as HTMLElement).closest("button")) return;
         select({ kind: "instance", id: el.dataset.inst! });
+      });
+    }
+    for (const el of $("#instance-list").querySelectorAll<HTMLElement>("[data-mode]")) {
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const [instance, port] = el.dataset.mode!.split("|");
+        togglePortMode(instance, port);
       });
     }
     for (const el of $("#instance-list").querySelectorAll<HTMLElement>("[data-rot]")) {
@@ -439,7 +526,7 @@ async function boot() {
       return;
     }
     if (!p.routable) {
-      toast(`${name} is executor-only IO — no bus can land on it. ${p.blocked ?? ""}`, "err");
+      offerPromotion(p, name);
       return;
     }
     if (p.kind === "input") {
@@ -543,6 +630,8 @@ async function boot() {
     try {
       const glb = studio.meshGlb();
       if (!glb) return false;
+      viewer.meshBuilds.texture++;
+      viewer.clearStale();
       await viewer.setTexturedGlb(glb);
       viewer.setLayers(studio.layers()); // bus layers stay abstract on top
       log(`meshed ${(glb.byteLength / 1024).toFixed(0)}KB GLB in ${(performance.now() - t0).toFixed(0)}ms`);
@@ -806,6 +895,20 @@ async function boot() {
     key: (key: string, shift = false) =>
       window.dispatchEvent(new KeyboardEvent("keydown", { key, shiftKey: shift })),
     place: (cell: string, at: Vec3) => studio.placeInstance(cell, at),
+    /** Is the camera free to orbit? Must be false while connecting/grabbing. */
+    cameraFree: () => viewer.cameraFree,
+    cameraLock: () => viewer.cameraLockReason,
+    /** Cumulative mesh builds, so a test can assert a drag causes none. */
+    meshBuilds: () => ({ ...viewer.meshBuilds }),
+    staleCells: () => viewer.stale(),
+    portMode: (instance: string, port: string) => studio.portMode(instance, port),
+    togglePortMode,
+    setPortMode: (instance: string, port: string, m: "bus" | "executor") => {
+      const r = studio.setPortMode(instance, port, m);
+      refresh();
+      renderPanels();
+      return r;
+    },
     remesh,
     demo: loadAdderDemo,
     crossing: loadCrossingDemo,

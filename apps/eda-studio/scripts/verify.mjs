@@ -253,6 +253,68 @@ try {
   check(reload.state === "routed" && reload.blocks === exp.layered,
     `.nucm reload keeps the model (${reload.state}, ${reload.blocks} blocks)`);
 
+  // ---- 10b. camera lock, port-mode toggle, mesh accounting --------------
+  //
+  // Three live user reports, checked through the same paths the mouse drives.
+
+  // (a) "when I want to connect two things dragging also affects the camera".
+  const cam = await page.evaluate(() => {
+    const e = window.__eda;
+    const before = e.cameraFree();
+    const out = e.endpoints().find((p) => p.routable && p.kind === "input");
+    e.clickPort(out.name);
+    const connecting = { free: e.cameraFree(), lock: e.cameraLock(), mode: e.mode().kind };
+    e.key("Escape");
+    return { before, connecting, after: e.cameraFree() };
+  });
+  check(cam.before === true && cam.connecting.free === false && cam.after === true,
+    `camera locks while connecting ("${cam.connecting.lock}") and frees on Esc`,
+    JSON.stringify(cam));
+
+  // (b) a greyed executor-only port offers a REVERSIBLE mode toggle.
+  const promo = await page.evaluate(() => {
+    const e = window.__eda;
+    const blocked = e.endpoints().find((p) => p.instance && !p.routable && p.promotable);
+    if (!blocked) return { skipped: true };
+    const before = e.portMode(blocked.instance, blocked.port);
+    const rep = e.setPortMode(blocked.instance, blocked.port, "bus");
+    const now = e.endpoints().find((p) => p.name === blocked.name);
+    const chip = document.querySelector(`.mode-toggle[data-mode="${blocked.instance}|${blocked.port}"]`);
+    const back = e.setPortMode(blocked.instance, blocked.port, "executor");
+    const restored = e.endpoints().find((p) => p.name === blocked.name);
+    return {
+      port: blocked.name, before,
+      promotedRoutable: !!now?.routable, promotedStep: now?.step,
+      note: rep.note, hasToggle: !!chip, toggleLabel: chip?.textContent?.trim(),
+      restoredRoutable: !!restored?.routable, restoredNote: back.note,
+    };
+  });
+  if (promo.skipped) {
+    results.push({ ok: true, label: "port promotion SKIPPED (no promotable blocked port)", skipped: true });
+  } else {
+    check(promo.promotedRoutable === true && promo.restoredRoutable === false && promo.hasToggle,
+      `${promo.port}: Exec->Bus makes it routable (step ${JSON.stringify(promo.promotedStep)}), ` +
+      `Bus->Exec restores it, and the outliner shows the toggle`,
+      JSON.stringify(promo));
+  }
+
+  // (c) "i feel it remeshes as I drag things around" — it must not.
+  const meshes = await page.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const inst = [...s.instances.values()][0];
+    const start = e.meshBuilds();
+    for (let i = 0; i < 8; i++) {
+      window.__edaDrag("instance", inst.name, [inst.at[0] + i, 0, inst.at[2] + i]);
+    }
+    const afterDrag = e.meshBuilds();
+    return { texBefore: start.texture, texAfterDrag: afterDrag.texture };
+  });
+  check(meshes.texAfterDrag === meshes.texBefore,
+    `dragging an instance 8 frames triggers 0 texture re-meshes ` +
+    `(${meshes.texBefore} -> ${meshes.texAfterDrag})`,
+    JSON.stringify(meshes));
+
   // ---- 11. textured renderer (needs a pack; pack.zip is not committed) ---
   const packPath = path.join(root, "..", "..", "pack.zip");
   if (existsSync(packPath)) {

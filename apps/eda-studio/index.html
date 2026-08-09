@@ -68,6 +68,22 @@
       .port-chip.receives { color: var(--accent); border-color: #2b5b70; }
       .port-chip.blocked { color: #8d8d8d; border-color: #3a3f49; opacity: 0.7; }
       .port-chip:hover { border-color: #ffe082; }
+      /* A port's MODE switch. A greyed x port is not a dead end: community
+         cells drive their inputs with levers, and nothing in redstone drives a
+         lever, so the port is waiting to be promoted. Reversible, hence a
+         two-state switch and not a one-shot button. */
+      .port-row { display: inline-flex; align-items: stretch; }
+      .port-row .port-chip { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+      .mode-toggle {
+        font-size: 9px; padding: 1px 4px; cursor: pointer; letter-spacing: .02em;
+        border: 1px solid var(--edge); border-left: none;
+        border-top-right-radius: 3px; border-bottom-right-radius: 3px;
+        background: #171a21; color: #8d8d8d;
+      }
+      .mode-toggle.is-bus { background: #23323d; color: var(--accent); border-color: #2b5b70; }
+      .mode-toggle:hover { border-color: #ffe082; color: #ffe082; }
+      /* While an interaction owns the pointer the camera is locked. */
+      canvas.camera-locked { cursor: crosshair; }
       .item.is-selected { border-color: #ffe082; background: #23242099; }
       .item.is-active { border-color: var(--accent); }
       .item[data-place], .item[data-inst] { cursor: pointer; }
