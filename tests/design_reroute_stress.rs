@@ -508,3 +508,106 @@ fn a_long_walk_of_moves_never_leaves_stale_geometry() {
         assert_all(&d, &rep.changed, &before, &what);
     }
 }
+
+// ----------------------------------------------------------------------
+// Adapter ownership: the bus owns its form adapter, so a rip removes it
+// ----------------------------------------------------------------------
+
+/// A community-shaped cell whose input port is a HORIZONTAL ROW at pitch 2 —
+/// the `BINTOBCD001.bin` shape. Promotion must leave that row alone; the bus
+/// grows the row->stack adapter it needs.
+fn row_port_cell() -> UniversalSchematic {
+    use nucleation::io_contract::{CellContract, IoLayoutBuilder, LayoutFunction};
+    let mut s = UniversalSchematic::new("row".to_string());
+    // Levers marching along x at pitch 2, each on its own support, plus a lamp
+    // column output so the cell has something to read.
+    let d_hw: Vec<P3> = (0..W as i32).map(|i| (2 * i, 5, 0)).collect();
+    let q_hw: Vec<P3> = (0..W as i32).map(|i| (2 * i, 1, 0)).collect();
+    for i in 0..W as i32 {
+        s.set_block_from_string(2 * i, 4, 0, STONE).unwrap();
+        s.set_block_from_string(2 * i, 5, 0, LEVER).unwrap();
+        s.set_block_from_string(2 * i, 1, 0, LAMP).unwrap();
+        s.set_block_from_string(2 * i, 2, 0, DUST).unwrap();
+    }
+    let layout = IoLayoutBuilder::new()
+        .add_input("bin".to_string(), ty(), LayoutFunction::OneToOne, d_hw)
+        .unwrap()
+        .add_output("out".to_string(), ty(), LayoutFunction::OneToOne, q_hw)
+        .unwrap()
+        .build();
+    s.set_cell_contract(&CellContract::new("row".to_string(), layout))
+        .unwrap();
+    s
+}
+
+/// (b) NO ORPHANS ACROSS THE OWNERSHIP BOUNDARY.
+///
+/// The row->stack form adapter used to be emitted by PROMOTION, into a
+/// per-instance patch. Ripping the bus then left the staircase and gather
+/// column behind: geometry that existed only to serve that bus, that the user
+/// could not remove, and that reached far outside the component. The adapter
+/// now belongs to the BUS, so a rip must return the flattened design to
+/// exactly its pre-route block count.
+#[test]
+fn ripping_a_bus_removes_the_form_adapter_it_grew() {
+    let mut s = UniversalSchematic::new("adapt".to_string());
+    let din = lever_bank(&mut s, 0, 2, 20, 1, 0);
+    let mut d = Design::for_schematic("adapt", s);
+    d.add_cell("row", row_port_cell()).unwrap();
+    d.place("u0", "row", (30, 0, 0), 0).unwrap();
+    d.declare_input("din", din, (0, 2, 0), W, ty()).unwrap();
+
+    // The port's NATIVE form survives promotion: a horizontal row at pitch 2.
+    d.promote_input("u0", "bin").unwrap();
+    let port = d
+        .instance_ports()
+        .unwrap()
+        .into_iter()
+        .find(|p| p.name == "u0.bin")
+        .unwrap();
+    assert_eq!(
+        port.step,
+        Some((2, 0, 0)),
+        "promotion converted the component's form — that is the bus's job"
+    );
+
+    let before = d.flatten().unwrap().total_blocks();
+    let st = d
+        .route_bus("a", "din", &["u0.bin"], vec![], BusStyle::default())
+        .unwrap();
+    assert_eq!(st, BusState::Routed, "{:?}", d.bus_state("a"));
+    let routed = d.flatten().unwrap().total_blocks();
+    assert!(
+        routed > before,
+        "the bus laid nothing: {before} -> {routed}"
+    );
+    // The adapter really is the BUS's: its segments name it.
+    let layer = d.bus("a").unwrap();
+    assert!(
+        layer.segments.iter().any(|s| matches!(
+            &s.kind,
+            nucleation::design::SegmentKind::Adapter(n) if n == "u0.bin"
+        )),
+        "no adapter segment on the bus: {:?}",
+        layer.segments.iter().map(|s| &s.kind).collect::<Vec<_>>()
+    );
+    assert_clean(&d, "row-port bus");
+
+    d.rip("a").unwrap();
+    let after = d.flatten().unwrap().total_blocks();
+    assert_eq!(
+        after, before,
+        "ripping the bus left {} orphaned cell(s) behind — geometry that existed only to serve \
+         that bus and that the user cannot remove",
+        after as i64 - before as i64
+    );
+    assert_eq!(total_bus_cells(&d), 0, "the ripped fragment is not empty");
+
+    // And it re-routes to the same thing, adapter included.
+    assert_eq!(d.reroute("a").unwrap(), BusState::Routed);
+    assert_eq!(
+        d.flatten().unwrap().total_blocks(),
+        routed,
+        "re-routing after a rip did not reproduce the same block count"
+    );
+}

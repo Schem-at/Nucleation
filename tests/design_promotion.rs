@@ -134,7 +134,10 @@ fn port_modes_survive_a_nucm_round_trip() {
         .find(|p| p.name == "u0.bin")
         .unwrap();
     assert!(p.routable(), "{:?}", p.blocked);
-    assert_eq!(p.step, Some((0, 2, 0)));
+    // Promotion is minimal and IN-PLACE: the port keeps its native horizontal
+    // row. Adapting that row onto the bus form is the BUS's job (and the
+    // adapter cells live in the bus's fragment, so they rip with it).
+    assert_eq!(p.step, Some((2, 0, 0)));
     // ...and still toggles back to the shipped hardware.
     let mut back = back;
     back.set_port_mode("u0", "bin", PortMode::Executor).unwrap();
@@ -225,8 +228,22 @@ fn promotion_makes_a_lever_port_routable_and_says_what_it_did() {
         "still refused after promotion: {:?}",
         now.blocked
     );
-    assert_eq!(now.step, Some((0, 2, 0)), "promotion must yield the bus form");
+    // Promotion must NOT convert the form: a horizontal row of 8 stays a
+    // horizontal row of 8 at its native pitch, and the patch stays inside the
+    // cell's own footprint. The row->stack adapter belongs to the bus.
+    assert_eq!(now.step, Some((2, 0, 0)), "promotion must keep the native form");
     assert_eq!(now.width, 8);
+    assert!(
+        rep.patch_json.contains("\"pivoted\":false"),
+        "promotion emitted form-conversion geometry: {}",
+        rep.patch_json
+    );
+    // One write per bit: the lever cell becomes dust. Nothing else.
+    assert!(
+        rep.patch_json.contains("\"added\":8"),
+        "promotion is not minimal: {}",
+        rep.patch_json
+    );
 }
 
 /// AUTO-PROMOTION: `route_bus` promotes an executor-only endpoint by itself.
@@ -408,27 +425,27 @@ fn a_promoted_port_computes_the_same_function() {
         .unwrap();
     let mut drive = Vec::new();
     for w in &wires {
-        // A lever two cells away on the design's own layer.
-        for t in 1..=2 {
-            b.set_block((w.0 - t, w.1 - 1, w.2), "minecraft:stone").unwrap();
-            b.set_block(
-                (w.0 - t, w.1, w.2),
-                "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]",
-            )
-            .unwrap();
-        }
-        b.set_block((w.0 - 3, w.1 - 1, w.2), "minecraft:stone").unwrap();
+        // A lever one cell away on the design's own layer, PERPENDICULAR to the
+        // port's native row: the bits are 2 apart along the row itself, so a
+        // stub in the row's own axis would land on the next bit's cell.
+        b.set_block((w.0, w.1 - 1, w.2 - 1), "minecraft:stone").unwrap();
         b.set_block(
-            (w.0 - 3, w.1, w.2),
+            (w.0, w.1, w.2 - 1),
+            "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]",
+        )
+        .unwrap();
+        b.set_block((w.0, w.1 - 1, w.2 - 2), "minecraft:stone").unwrap();
+        b.set_block(
+            (w.0, w.1, w.2 - 2),
             "minecraft:lever[face=floor,facing=north,powered=false]",
         )
         .unwrap();
-        drive.push((w.0 - 3, w.1, w.2));
+        drive.push((w.0, w.1, w.2 - 2));
     }
     b.declare_input(
         "din",
-        (wires[0].0 - 2, wires[0].1, wires[0].2),
-        (0, 2, 0),
+        (wires[0].0, wires[0].1, wires[0].2 - 1),
+        (2, 0, 0),
         8,
         nucleation::io_contract::IoType::UnsignedInt { bits: 8 },
     )

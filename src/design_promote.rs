@@ -389,95 +389,187 @@ fn uniform_step(wires: &[P3]) -> Result<P3, String> {
     }
 }
 
-/// Close a patch: work out the form and pivot a horizontal row into the
-/// canonical vertical stack if needed.
+/// Close a patch. Promotion is MINIMAL and IN-PLACE: the port keeps its NATIVE
+/// geometry (a horizontal row of 8 stays a horizontal row of 8 at its native
+/// pitch) and the patch never reaches outside the cell's own footprint.
+///
+/// FORM ADAPTATION IS THE BUS'S JOB. Promotion used to grow the row->stack
+/// pivot here, which put a staircase and a gather column — geometry that
+/// exists only to serve one bus, and that extends well beyond the cell — into
+/// a PER-INSTANCE patch. Ripping the bus then left it behind as orphaned
+/// geometry the user could not remove. The adapter now belongs to the bus
+/// fragment (see `Design::realize`), so it is created and ripped with the bus,
+/// and the component stays untouched in its native form.
 fn finish(
     mut p: Patcher<'_>,
     hardware: &[P3],
     wires: Vec<P3>,
     how: &str,
-    sch: &UniversalSchematic,
-    flow_out: bool,
+    _sch: &UniversalSchematic,
+    _flow_out: bool,
 ) -> Result<PortPatch, String> {
     let step = uniform_step(&wires)?;
     let n = wires.len();
-    if step == (0, 2, 0) || n == 1 {
-        p.patch.wires = wires;
-        p.patch.step = (0, 2, 0);
-        p.patch.hardware = hardware.to_vec();
-        p.patch.note = format!("{n} bit(s): {how}");
-        return Ok(p.patch);
-    }
-    if step.1 != 0 {
+    if step.1 != 0 && step != (0, 2, 0) {
         return Err(format!(
-            "promoted connection cells step {step:?}: a bus realizes the vertical 2y-pitch stack \
-             and only a HORIZONTAL row can be pivoted onto it. This port's hardware is neither."
+            "promoted connection cells step {step:?}: a bus can adapt a horizontal ROW or the \
+             canonical vertical 2y-pitch stack onto its form. This port's hardware is neither."
         ));
     }
-    let (column, pivot_note) = pivot_row_to_stack(&mut p, &wires, step, sch, flow_out)?;
-    p.patch.wires = column;
-    p.patch.step = (0, 2, 0);
+    p.patch.step = if n == 1 { (0, 2, 0) } else { step };
+    p.patch.wires = wires;
     p.patch.hardware = hardware.to_vec();
-    p.patch.pivoted = true;
-    p.patch.note = format!("{n} bit(s): {how}; {pivot_note}");
+    p.patch.note = if p.patch.step == (0, 2, 0) {
+        format!("{n} bit(s): {how}")
+    } else {
+        format!(
+            "{n} bit(s): {how}; the port keeps its native {:?}-pitch form — the bus grows the \
+             form adapter it needs, and rips it with itself",
+            p.patch.step
+        )
+    };
     Ok(p.patch)
 }
 
-/// Grow a form adapter turning a horizontal ROW of connection cells into a
-/// vertical 2y-pitch COLUMN, and return the column (bit order).
+/// A form-adapter PLAN: the cells to place and the vertical 2y-pitch column
+/// they gather the row into (bit order).
+#[derive(Clone, Debug, Default)]
+pub struct PivotPlan {
+    /// Cells the adapter needs, block per position (caller coordinates).
+    pub cells: std::collections::BTreeMap<P3, String>,
+    /// The resulting 2y-pitch column, bit order — where a bus lands.
+    pub column: Vec<P3>,
+    /// One-sentence human summary.
+    pub note: String,
+}
+
+/// A write target for [`plan_pivot`]: collects cells and answers "what is
+/// there?" through the caller's own view of the world, so the same verified
+/// geometry can be planned against a cell body or against a whole design's
+/// occupancy index.
+struct PivotSink<'f> {
+    at: &'f dyn Fn(P3) -> Option<String>,
+    cells: std::collections::BTreeMap<P3, String>,
+}
+
+impl PivotSink<'_> {
+    fn look(&self, p: P3) -> Option<String> {
+        self.cells.get(&p).cloned().or_else(|| (self.at)(p))
+    }
+
+    fn free(&self, p: P3) -> bool {
+        self.look(p).is_none()
+    }
+
+    fn write(&mut self, p: P3, block: Option<&str>) {
+        match block {
+            Some(b) => {
+                self.cells.insert(p, b.to_string());
+            }
+            None => {
+                self.cells.remove(&p);
+            }
+        }
+    }
+
+    fn place(&mut self, p: P3, block: &str, what: &str) -> Result<(), String> {
+        if let Some(b) = self.look(p) {
+            return Err(format!(
+                "the form adapter needs {p:?} for its {what}, but `{b}` is there"
+            ));
+        }
+        self.write(p, Some(block));
+        Ok(())
+    }
+
+    fn support(&mut self, p: P3) -> Result<(), String> {
+        let below = add(p, (0, -1, 0));
+        match self.look(below) {
+            Some(b) if rblocks::is_sturdy_support(&b) => Ok(()),
+            Some(b) => Err(format!(
+                "the form adapter wants a support under {below:?}; `{b}` is not sturdy"
+            )),
+            None => {
+                self.write(below, Some(SUPPORT));
+                Ok(())
+            }
+        }
+    }
+
+    fn dust(&mut self, p: P3, what: &str) -> Result<(), String> {
+        self.place(p, rblocks::DUST, what)?;
+        self.support(p)
+    }
+}
+
+/// Plan a form adapter turning a horizontal ROW of connection cells into a
+/// vertical 2y-pitch COLUMN. PURE: nothing is written, the caller owns the
+/// cells — for a bus that means they live in the bus's fragment and are ripped
+/// with it.
 ///
-/// See the module docs for the shape. Both perpendicular directions are tried;
-/// the one whose whole volume is free wins, and if both are, the one pointing
-/// out of the cell's block extent is preferred.
-fn pivot_row_to_stack(
-    p: &mut Patcher<'_>,
+/// Shape: bit `i` leaves the row in its own private lane, climbs `2i` blocks on
+/// a dust staircase, runs out to a common depth, then gathers back along the
+/// row axis so all bits land in one vertical 2y-pitch column. Lanes are `pitch`
+/// apart on the row axis, so no two bits are ever plan-adjacent; the gather
+/// column is a textbook bus stack. Refresh repeaters go in every
+/// [`REFRESH_AT`] dust cells with a flat landing around each — dust cannot
+/// climb out of a repeater, so the staircase pauses, repeats and resumes.
+///
+/// Both perpendicular directions are tried; the one whose whole volume is free
+/// wins, and if both are, the one pointing AWAY from `prefer_away_from` (the
+/// cell's centre) is preferred, so the adapter grows out of the component.
+pub fn plan_pivot(
     wires: &[P3],
     step: P3,
-    sch: &UniversalSchematic,
+    prefer_away_from: P3,
     flow_out: bool,
-) -> Result<(Vec<P3>, String), String> {
+    at: &dyn Fn(P3) -> Option<String>,
+) -> Result<PivotPlan, String> {
+    if wires.is_empty() {
+        return Err("form adapter needs at least one connection cell".to_string());
+    }
+    if step.1 != 0 {
+        return Err(format!(
+            "form adapter turns a HORIZONTAL row into the vertical stack; this port's step is \
+             {step:?}"
+        ));
+    }
     let along = if step.0 != 0 { (1, 0, 0) } else { (0, 0, 1) };
     let mut cands: Vec<P3> = if step.0 != 0 {
         vec![(0, 0, -1), (0, 0, 1)]
     } else {
         vec![(-1, 0, 0), (1, 0, 0)]
     };
-    // Prefer the side that leaves the cell body.
-    let mid = {
-        let bb = sch.get_bounding_box();
-        (
-            (bb.min.0 + bb.max.0) / 2,
-            (bb.min.1 + bb.max.1) / 2,
-            (bb.min.2 + bb.max.2) / 2,
-        )
+    let inward = |d: &P3| {
+        (d.0 * (prefer_away_from.0 - wires[0].0)) + (d.2 * (prefer_away_from.2 - wires[0].2))
     };
-    let inward = |d: &P3| (d.0 * (mid.0 - wires[0].0)) + (d.2 * (mid.2 - wires[0].2));
     cands.sort_by_key(inward);
     let mut errs = Vec::new();
     for out in cands {
-        let snap = p.patch.clone();
-        match lay_pivot(p, wires, step, along, out, flow_out) {
-            Ok(col) => {
-                return Ok((
-                    col,
-                    format!(
-                        "pivoted the {:?}-pitch row onto a vertical 2y stack via a staircase \
-                         adapter growing {} block(s) toward {:?}",
+        let mut sink = PivotSink {
+            at,
+            cells: std::collections::BTreeMap::new(),
+        };
+        match lay_pivot(&mut sink, wires, step, along, out, flow_out) {
+            Ok(column) => {
+                return Ok(PivotPlan {
+                    cells: sink.cells,
+                    column,
+                    note: format!(
+                        "form adapter: pivoted the {:?}-pitch row onto a vertical 2y stack via a \
+                         staircase growing {} block(s) toward {:?}",
                         step,
                         2 * wires.len(),
                         out
                     ),
-                ))
+                })
             }
-            Err(e) => {
-                p.patch = snap;
-                errs.push(format!("toward {out:?}: {e}"));
-            }
+            Err(e) => errs.push(format!("toward {out:?}: {e}")),
         }
     }
     Err(format!(
-        "the promoted row needs a form adapter to reach the vertical 2y-pitch bus stack, but \
-         neither side of the port face has room for one ({})",
+        "the row needs a form adapter to reach the vertical 2y-pitch bus stack, but neither side \
+         of the port face has room for one ({})",
         errs.join("; ")
     ))
 }
@@ -485,7 +577,7 @@ fn pivot_row_to_stack(
 /// One attempt at the adapter, in the direction `out`.
 #[allow(clippy::too_many_arguments)]
 fn lay_pivot(
-    p: &mut Patcher<'_>,
+    p: &mut PivotSink<'_>,
     wires: &[P3],
     step: P3,
     along: P3,

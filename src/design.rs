@@ -520,6 +520,15 @@ pub enum SegmentKind {
     /// A branch tying the named extra endpoint (fanout sink, or wired-OR
     /// driver) into the trunk at a dust junction.
     Branch(String),
+    /// A FORM ADAPTER for the named port: the row->stack pivot that lets a bus
+    /// terminate on a port whose native geometry is a horizontal row.
+    ///
+    /// It belongs to the BUS, not to the component: promotion is minimal and
+    /// in-place (the port keeps its native form), and the adapter is created
+    /// and RIPPED with the bus. Owning it in a per-instance promotion patch —
+    /// which is where it used to live — left it behind as orphaned geometry
+    /// when the bus was ripped.
+    Adapter(String),
 }
 
 /// One independently-routed piece of a bus: a trunk waypoint pair
@@ -2544,10 +2553,11 @@ impl Design {
         let step = (0, 2, 0);
         let width = drivers[0].width;
         for p in drivers.iter().chain(sinks.iter()) {
-            if p.step != step {
+            if p.step != step && p.step.1 != 0 {
                 return Err(format!(
                     "unsupported bus form: this design realizes the verified vertical 2y-pitch \
-                     stack (step (0,2,0)); port `{}` has step {:?}",
+                     stack (step (0,2,0)), and can adapt a HORIZONTAL row onto it; port `{}` has \
+                     step {:?}, which is neither",
                     p.name, p.step
                 ));
             }
@@ -2561,6 +2571,58 @@ impl Design {
             }
         }
 
+        // Pin access: this bus may enter the halo of the instances it
+        // terminates on.
+        let endpoints: Vec<String> = drivers
+            .iter()
+            .chain(sinks.iter())
+            .map(|p| p.name.clone())
+            .collect();
+        let mut occ = self.occupancy_for_plan(&BTreeSet::new(), &self.halo_exempt(&endpoints));
+
+        // FORM ADAPTATION IS THE BUS'S JOB. A port whose native geometry is a
+        // horizontal row gets a row->stack adapter planned into THIS BUS's
+        // fragment, so it is created and ripped with the bus and the component
+        // is never edited beyond its own minimal in-place promotion.
+        let mut adapters: Vec<(String, P3, crate::design_promote::PivotPlan)> = Vec::new();
+        let mut anchor_of: BTreeMap<String, P3> = BTreeMap::new();
+        for p in drivers.iter().chain(sinks.iter()) {
+            if p.step == step {
+                continue;
+            }
+            let plan = self.plan_form_adapter(p, &occ)?;
+            anchor_of.insert(p.name.clone(), plan.column[0]);
+            adapters.push((p.name.clone(), p.anchor, plan));
+        }
+        // The adapter's cells are the bus's own: other legs must route AROUND
+        // them (so add them to the occupancy the planner sees) while the
+        // planner is still allowed to write them (so mark them vacated).
+        let mut adapter_cells: BTreeSet<P3> = BTreeSet::new();
+        for (name, _, plan) in &adapters {
+            for (q, blk) in &plan.cells {
+                adapter_cells.insert(*q);
+                occ.cells.insert(
+                    *q,
+                    (blk.clone(), Occupant::Bus(exclude.unwrap_or(name).to_string())),
+                );
+            }
+        }
+        let occ = occ;
+        // Downstream everything — waypoints, branch geometry, the planner —
+        // works from the ADAPTED port: its anchor is the adapter's column head
+        // and its form is the canonical stack. Nothing else needs to know.
+        let adapt = |p: &DesignPort| -> DesignPort {
+            let mut q = p.clone();
+            if let Some(a) = anchor_of.get(&p.name) {
+                q.anchor = *a;
+                q.step = step;
+            }
+            q
+        };
+        let drivers: Vec<DesignPort> = drivers.iter().map(adapt).collect();
+        let sinks: Vec<DesignPort> = sinks.iter().map(adapt).collect();
+        let (drivers, sinks) = (&drivers[..], &sinks[..]);
+
         // Trunk waypoint chain: primary driver, gates, primary sink.
         let mut waypoints = vec![drivers[0].anchor];
         waypoints.extend(gates.iter().map(|g| g.anchor));
@@ -2569,15 +2631,6 @@ impl Design {
         // planner inserts the verified level-shift tile (`shift_plan`) and the
         // bus changes level in form. Only a pair with too little run for the
         // tile fails, and it says so with the numbers.
-
-        // Pin access: this bus may enter the halo of the instances it
-        // terminates on.
-        let endpoints: Vec<String> = drivers
-            .iter()
-            .chain(sinks.iter())
-            .map(|p| p.name.clone())
-            .collect();
-        let occ = self.occupancy_for_plan(&BTreeSet::new(), &self.halo_exempt(&endpoints));
 
         // Branch junctions must sit on the trunk the planner ACTUALLY lays,
         // and a trunk pair may now detour around an obstacle instead of
@@ -2605,6 +2658,19 @@ impl Design {
         }
 
         let mut planner = Planner::new(self, exclude, style, &occ);
+        // Stamp the form adapters FIRST: they are this bus's cells, so the
+        // planner must be allowed to write them even though they are in `occ`
+        // (which is what makes the other legs route around them).
+        planner.vacated.extend(adapter_cells.iter().copied());
+        for (port, row_anchor, plan) in &adapters {
+            planner.begin_segment(SegmentKind::Adapter(port.clone()), *row_anchor, plan.column[0]);
+            for (q, blk) in &plan.cells {
+                planner
+                    .put(*q, blk)
+                    .map_err(|e| format!("form adapter for `{port}`: {e}"))?;
+            }
+            planner.end_segment();
+        }
         let mut since = 0u32;
         for (i, pair) in waypoints.windows(2).enumerate() {
             planner.begin_segment(SegmentKind::Trunk(i), pair[0], pair[1]);
@@ -2645,6 +2711,60 @@ impl Design {
             planner.end_segment();
         }
         Ok(planner.finish())
+    }
+
+    /// Plan the row->stack FORM ADAPTER for a port whose native geometry is a
+    /// horizontal row, against the design-wide occupancy.
+    ///
+    /// The cells come back as a pure plan; the caller stamps them into the
+    /// BUS's fragment. That ownership is the point: promotion is minimal and
+    /// in-place (a horizontal row of 8 stays a horizontal row of 8 at its
+    /// native pitch, inside the cell's own footprint), and the adapter — which
+    /// exists only to serve one bus and reaches well outside the component —
+    /// is created and RIPPED with that bus.
+    fn plan_form_adapter(
+        &self,
+        port: &DesignPort,
+        occ: &OccupancyIndex,
+    ) -> Result<crate::design_promote::PivotPlan, String> {
+        let row: Vec<P3> = (0..port.width as i32)
+            .map(|i| {
+                (
+                    port.anchor.0 + port.step.0 * i,
+                    port.anchor.1 + port.step.1 * i,
+                    port.anchor.2 + port.step.2 * i,
+                )
+            })
+            .collect();
+        // What the adapter must treat as taken: hard cells, and any halo it is
+        // not exempt from (`occ` already has the endpoint instances' halos
+        // suppressed, so pin access still works).
+        let at = |q: P3| -> Option<String> {
+            occ.cells
+                .get(&q)
+                .map(|(b, _)| b.clone())
+                .or_else(|| occ.halos.get(&q).map(|i| format!("the influence halo of `{i}`")))
+        };
+        // Grow AWAY from the owning instance's body, so the adapter leaves the
+        // component instead of burrowing into it.
+        let away = port
+            .name
+            .split_once('.')
+            .and_then(|(inst, _)| self.instances.iter().find(|i| i.name == inst))
+            .map(|inst| {
+                let blocks = self.placed_instance_blocks(inst);
+                let n = blocks.len().max(1) as i64;
+                let (sx, sy, sz) = blocks.keys().fold((0i64, 0i64, 0i64), |a, q| {
+                    (a.0 + q.0 as i64, a.1 + q.1 as i64, a.2 + q.2 as i64)
+                });
+                ((sx / n) as i32, (sy / n) as i32, (sz / n) as i32)
+            })
+            .unwrap_or(port.anchor);
+        // A port that DRIVES the fabric flows out of the row into the column;
+        // a sink flows the other way.
+        let flow_out = port.direction == PortDirection::Input;
+        crate::design_promote::plan_pivot(&row, port.step, away, flow_out, &at)
+            .map_err(|e| format!("port `{}`: {e}", port.name))
     }
 
     /// Plan the trunk as a throwaway probe and report the runs it actually

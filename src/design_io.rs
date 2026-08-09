@@ -108,6 +108,8 @@ struct RunDoc {
 enum SegmentKindDoc {
     Trunk(usize),
     Branch(String),
+    /// The bus-owned row->stack form adapter for the named port.
+    Adapter(String),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -371,6 +373,7 @@ fn segment_doc(s: &Segment) -> SegmentDoc {
         kind: match &s.kind {
             SegmentKind::Trunk(i) => SegmentKindDoc::Trunk(*i),
             SegmentKind::Branch(name) => SegmentKindDoc::Branch(name.clone()),
+            SegmentKind::Adapter(name) => SegmentKindDoc::Adapter(name.clone()),
         },
         a: s.a,
         b: s.b,
@@ -384,6 +387,7 @@ fn segment_from(s: SegmentDoc) -> Segment {
         kind: match s.kind {
             SegmentKindDoc::Trunk(i) => SegmentKind::Trunk(i),
             SegmentKindDoc::Branch(name) => SegmentKind::Branch(name),
+            SegmentKindDoc::Adapter(name) => SegmentKind::Adapter(name),
         },
         a: s.a,
         b: s.b,
