@@ -26,10 +26,13 @@ climbs refresh or preserve level by construction (the climb's output is a
 strongly powered cap block: a fresh 15).
 """
 import heapq
+import re
 
 import rs
 import nets
 import materials as _mt
+
+_FACING = re.compile(r"facing=(north|south|east|west)")
 
 H_MOVES = ((1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1))
 H_MOVES_XZ = ((1, 0), (-1, 0), (0, 1), (0, -1))
@@ -77,6 +80,22 @@ class Router:
                    (x, y + 1, z), (x, y - 1, z)):
             if nb in self.strong and self.strong[nb] not in ok:
                 return False
+        # a repeater/comparator drives the cell it faces and reads the cell
+        # behind it -- neither is in nets.py's dust-only model, so new dust
+        # on either axis cell is an invisible short (an annealed seg7 laid a
+        # ladder entry in a foreign repeater's muzzle: injected 15 AND bent
+        # the entry's line off the base block)
+        for dx, dz in H_MOVES_XZ:
+            nb = (x + dx, y, z + dz)
+            cell = self.b.cells.get(nb)
+            if cell and ("repeater" in cell or "comparator" in cell):
+                m = _FACING.search(cell)
+                if m:
+                    vx, vz = {"north": (0, -1), "south": (0, 1),
+                              "east": (1, 0), "west": (-1, 0)}[m.group(1)]
+                    if p in ((nb[0] + vx, y, nb[2] + vz),
+                             (nb[0] - vx, y, nb[2] - vz)):
+                        return False
         sup = (x, y - 1, z)
         s = self.b.cells.get(sup)
         if s is not None and not self.b.solid_at(*sup) and not _mt.sturdy(s):
@@ -117,6 +136,40 @@ class Router:
 
     def col_free(self, x, z, y0, y1):
         return all((x, y, z) not in self.b.cells for y in range(y0, y1 + 1))
+
+    def climb_entry_ok(self, prev, entry, base):
+        """May `entry` serve as a torch ladder's entry dust?
+
+        The entry's SHAPE is load-bearing: it must be a FRESH dead end whose
+        single connection is the path predecessor, so its line points into
+        the ladder's base block and weak-powers it.
+
+        Two ways this fails, both found in-sim:
+          * reusing an EXISTING own-net dust cell -- `dust_ok` legally allows
+            own-net reuse, but an already-wired cell may carry other
+            connections.  An annealed seg7 lost seg[0] here: the entry
+            landed on a port-corridor dust cell that already had the
+            corridor's repeater on its west face, so the entry rendered as a
+            corner and never fired the ladder.
+          * any connectable neighbour on a PERPENDICULAR face (dust,
+            repeater, comparator, torch, lever -- own net included) bends
+            the line off the base.  Same physics as `station_ok`'s trunk
+            check: only solids and air may flank it.
+        """
+        if entry in self.b.cells:
+            return False
+        ex, ey, ez = entry
+        for dx, dz in H_MOVES_XZ:
+            q = (ex + dx, ey, ez + dz)
+            if q == prev or q == base:
+                continue                    # on-axis: keeps the line
+            cell = self.b.cells.get(q)
+            if cell is not None and not self.b.solid_at(*q):
+                return False
+            for dy in (-1, 1):               # up/down diagonals connect too
+                if "redstone_wire" in self.b.cells.get((q[0], ey + dy, q[2]), ""):
+                    return False
+        return True
 
     def ladder_clear(self, x, z, y0, label, friendly=None):
         """May a torch ladder occupy column (x, *, z) from base y0?
@@ -226,6 +279,7 @@ class Router:
                     entry = (x + dx, y, z + dz)
                     if not (self.dust_ok(entry, label, friendly)
                             and self.move_ok(p, entry, label, friendly)
+                            and self.climb_entry_ok(p, entry, (q[0], y, q[2]))
                             and self.col_free(q[0], q[2], y, y + 4)
                             and self.ladder_clear(q[0], q[2], y, label,
                                                   friendly)):
@@ -259,6 +313,9 @@ class Router:
     # decayed), so the first refresh keeps the old conservative spacing; only
     # refresh-to-refresh spans are trusted at full pitch.
     FIRST = 6
+    # `strong` sentinel that equals no net label: claims a cell against
+    # EVERY net, own included.
+    LADDER_ENTRY = "#ladder_entry"
 
     def station_ok(self, path, i, label, friendly=None):
         """May a block-sandwich station (block/repeater/block) replace path
@@ -332,6 +389,16 @@ class Router:
                 self.labels[(ex, py, ez)] = label
                 self.b.put(ex, py, ez, rs.DUST)
                 self.ss[(ex, py, ez)] = max(1, 15 - since - 1)
+                # The entry's SHAPE is load-bearing: it must stay a dead end
+                # on the climb axis so its line points into the base block.
+                # Anything connectable landing on a perpendicular face bends
+                # it into a corner and the ladder never fires -- own net
+                # INCLUDED (an annealed seg7 lost seg[0] when a later route
+                # of the SAME net put a repeater in the entry's west face).
+                # A never-matching sentinel claims the entry's whole
+                # neighbourhood, so no cell of any net may be placed beside
+                # it after the fact.
+                self.strong[(ex, py, ez)] = self.LADDER_ENTRY
                 # verified template: base, torch, block, torch, cap, exit dust
                 for k in range(3):
                     self.b.stone(x, py + 2 * k, z, "route")

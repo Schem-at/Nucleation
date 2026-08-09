@@ -355,16 +355,26 @@ non-air blocks, tight bbox, structural STA):
 
 | design | fabric | blocks | bbox | volume | crit path | verified |
 |---|---|---|---|---|---|---|
-| seg7 | PLA (hdl/) | 8627 | 254x8x75 | 152400 | 35 rt | 16/16 |
-| seg7 | genlib cells | **6880** (-20%) | 128x7x100 | **89600** (-41%) | 35 rt | 16/16 |
-| cmp4 | PLA (hdl/) | 13873 | 271x8x135 | 292680 | 43 rt | 256/256 |
-| cmp4 | genlib cells | **3560** (**3.9x**) | 149x7x71 | **74053** (**4.0x**) | **28 rt** (-35%) | 256/256 |
+| seg7 | PLA (hdl/) | 8627 | 254x8x75 | 152400 | 35 rt | 16/16 exhaustive |
+| seg7 | genlib cells | **6880** (-20%) | 128x7x100 | **89600** (-41%) | **30 rt** (-14%) | 16/16 exhaustive |
+| cmp4 | PLA (hdl/) | 13873 | 271x8x135 | 292680 | 43 rt | 256/256 exhaustive |
+| cmp4 | genlib cells | **3560** (-74%, **3.9x**) | 149x7x71 | **74053** (**4.0x**) | **28 rt** (-35%) | 256/256 exhaustive |
+
+Every row is exhaustive over the design's full input space (seg7: all 2^4
+digits; cmp4: all 2^8 operand pairs), driven through real levers in mc-tick
+and compared against a pure-Python eval of the same netlist; both genlib
+schems are baked at rest and regenerate byte-identically.  Blocks = non-air
+cells; bbox/volume = tight bounding box; crit path = structural STA over
+cell delays + per-route refresh repeaters (not a measured settle time).
 
 Honest reading: the ~3x-density hypothesis holds on cmp4 (3.9x blocks, 4.0x
 volume, 35% faster) where the PLA's dual-rail overhead dominates; seg7 —
 whose PLA is a single dense truth table, the shape PLAs are best at — gains
-only 20% blocks / 41% volume.  Cell area is a rounding error (814/558
-blocks); ROUTING is the fabric cost, so channel geometry sets density.
+only 20% blocks / 41% volume / 14% delay.  Cell area is a rounding error
+(814/558 blocks); ROUTING is the fabric cost, so channel geometry sets
+density.  Only these two designs were mapped: popcnt4, the adders, ks32 and
+alu8 were NOT re-run on the cell fabric, so the table must not be read as a
+whole-suite result.
 TRICKS.md (community corpus) was reviewed; no new idiom was adopted this
 round — the comparator-subtract AND/XOR and block-sandwich stations that
 make the cells flat were already probed in cells.py/probe_station.py.
@@ -404,3 +414,65 @@ one spacing combination (COL_CHANNEL=16/CLEAR_Z=6) produced a 13/16 build
 while both looser and tighter combos verify 16/16, so at least one hazard
 class is still unmodelled.  The exhaustive verification gate is what makes
 the flow trustworthy; do not ship an unverified layout.
+
+## Annealed placement over a real design (LANDED, 2026-08-09)
+
+pnr-core's seeded annealer now drives a real mapped netlist.  The cheap
+honest path: `crates/nucleation-routing/examples/anneal_place.rs` is a
+deterministic text filter (SplitMix64, no `rand`, wasm-safe) that anneals
+instance BOXES — each cell's claimed obstruction region: fragment +
+5-deep approach corridors + out stubs — under **HPWL + 1000x inflated-box
+overlap + binned congestion** (16x16 bins, quadratic excess over a soft
+per-bin capacity).  `redstone-eda/anneal_genlib.py` exports the boxes/pins/
+nets of the genlib-mapped seg7, runs the filter, rebuilds with the annealed
+placements through the same compositor, and re-verifies exhaustively.
+`genlib_map.compose` grew a `layout=` override so the annealer replaces the
+levelized placer without forking the flow.
+
+Measured, seg7, seed 42 (levelized placer -> annealed):
+
+| metric | baseline | annealed | delta |
+|---|---|---|---|
+| abstract cost | 647620 | 2229 | -99.7% |
+| abstract HPWL | 2620 | 2229 | -14.9% |
+| routed wirelength (path cells) | 2723 | **2678** | -1.7% |
+| blocks | 6880 | **6794** | -1.3% |
+| critical path | 30 rt | **28 rt** | -6.7% |
+| bbox | 128x7x100 | 136x7x122 | **WORSE** (+29% volume) |
+| exhaustive verification | 16/16 | **16/16** | green |
+
+Saved (both verified green + baked): `showcase/genlib_seg7_anneal_baseline
+.schem`, `showcase/genlib_seg7_anneal_annealed.schem`.  Reproduce:
+`~/eda-venv/bin/python anneal_genlib.py --seed 42 --save`; re-running seed
+42 reproduces every number above exactly.
+
+Honest misses, recorded rather than buried:
+
+- **The wins are small and the bbox gets WORSE.** The annealer minimises
+  HPWL, not area, and it starts from a placer that is already good (the
+  levelized columns are a strong initial solution — the 99.7% "cost" drop
+  is mostly the overlap term on the exported boxes, not real improvement).
+  Routed wirelength moved 1.7% while abstract HPWL moved 14.9%: **abstract
+  HPWL is a weak proxy for this fabric**, because a redstone route pays for
+  refresh stations, flyovers and pocket approaches that HPWL cannot see.
+- **A better abstract cost can realise WORSE hardware.** Seed 7 anneals to
+  a lower cost (2216 < 2229) and a smaller bbox, but its realised build
+  verifies only 7/16.  The abstract model does not capture every fabric
+  hazard, so the exhaustive gate — not the cost function — is what makes
+  the flow trustworthy.  Never ship an annealed layout that has not been
+  re-verified; `anneal_genlib.py --save` refuses to write an unverified one.
+- Only seg7 was annealed; cmp4 and the accumulator composition were not.
+
+Two more fabric rules were paid for by this run (both in `router.py`):
+
+- **A climb's entry dust must be a FRESH dead end** (`climb_entry_ok`).
+  `dust_ok` legally allows own-net reuse, so an entry landed on a port
+  corridor's dust cell that already carried the corridor repeater on its
+  west face; the entry rendered as a corner, never weak-powered the ladder
+  base, and seg[0] died.  The entry cell must be empty and flanked only by
+  solids/air on its perpendicular faces, and it is now claimed with a
+  never-matching `strong` sentinel so no later route (own net included) may
+  land beside it.
+- **A repeater/comparator muzzle is not in the dust-only model**: new dust
+  in the cell a diode faces (or the cell behind it) is an invisible short
+  plus a shape bend.  `dust_ok` now rejects both.

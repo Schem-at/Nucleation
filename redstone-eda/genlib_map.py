@@ -559,8 +559,11 @@ class CountingRouter(router_mod.Router):
         return len(path)
 
 
-def compose(name, nl, lib, order):
-    placements, pi_pos = place(nl, lib, order)
+def compose(name, nl, lib, order, layout=None):
+    """Stamp + route the mapped netlist.  `layout` overrides the levelized
+    placer with explicit ((placements, pi_pos)) -- the annealer's entry."""
+    placements, pi_pos = layout if layout is not None \
+        else place(nl, lib, order)
     b = rs.Build("genlib_" + name)
     labels = {}
     lever_at = {}

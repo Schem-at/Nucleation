@@ -3581,6 +3581,7 @@ dependencies = [
 name = "nucleation-routing"
 version = "0.1.0"
 dependencies = [
+ "mc-tick",
  "pnr-core",
 ]
 
