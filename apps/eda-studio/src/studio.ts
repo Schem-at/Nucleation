@@ -110,6 +110,18 @@ export interface LayerBlocks {
   color: number | null; // bus color override, else null (block colors)
   failed: boolean;
   blocks: Block[];
+  /** GEOMETRY REVISION: bumped whenever `blocks` actually changes content.
+   *
+   *  This is what makes the renderer self-correcting rather than dependent on
+   *  a changed-set being perfect. `dirty.buses` is a HINT about what to re-read
+   *  from wasm; `rev` is a FACT about what the blocks are. A renderer that
+   *  caches a mesh per layer keys that cache on `rev`, so a layer whose
+   *  geometry moved can never keep a stale mesh — even if the engine forgot to
+   *  name it, or the app mis-keyed the name it was given. Comparing one
+   *  integer per layer per frame costs nothing, and it does not cause rebuilds
+   *  when nothing changed (that is the whole point of only bumping on a real
+   *  content change). */
+  rev: number;
 }
 
 /** One distinct thing to mesh: a library cell plus whatever per-instance
@@ -127,6 +139,10 @@ export interface CellVariant {
   blocks: Block[];
   /** Rotation footprint `(sx, sy, sz)` from those same bounds. */
   size: Vec3;
+  /** Geometry revision — same contract as `LayerBlocks.rev`. A variant KEY can
+   *  outlive a change to its blocks (re-uploading a library cell under the same
+   *  name), so the renderer keys its mesh cache on this, not on the key. */
+  rev: number;
 }
 
 /** Where one instance puts a variant. Everything a renderer needs to build
@@ -150,6 +166,10 @@ export interface SceneModel {
   buses: LayerBlocks[];
   /** The design's own loose hardware, world coordinates, one unique mesh. */
   loose: LayerBlocks;
+  /** What was re-read since the last call — a PERFORMANCE HINT, not the
+   *  renderer's source of truth. Correctness lives in the per-layer `rev`
+   *  numbers: a renderer that trusts `dirty` alone shows a stale mesh the
+   *  moment a changed-set is incomplete. */
   dirty: {
     /** Variants whose geometry must be (re)built. */
     variants: string[];
@@ -160,6 +180,56 @@ export interface SceneModel {
     loose: boolean;
   };
 }
+
+/** One instance in a clipboard, in coordinates RELATIVE to the copied group's
+ *  origin, so a paste is a translation of the whole set.
+ *
+ *  A copy carries the CELL NAME, never the cell's blocks: an instance is a
+ *  reference plus a transform (that is the whole model, and what makes ten
+ *  placements one mesh), so pasting places another reference to the same
+ *  library cell. `modes` carries the per-port Exec/Bus promotions, which are
+ *  per-INSTANCE patches and therefore genuinely part of what was copied. */
+export interface ClipInstance {
+  /** The name it had when copied — the basis for the pasted name. */
+  src: string;
+  cell: string;
+  rel: Vec3;
+  rot: number;
+  /** Ports promoted to Bus mode on the source instance. */
+  busPorts: string[];
+}
+
+/** A bus whose DRIVER AND EVERY SINK were inside the copied set, so the
+ *  pasted group can carry the same intent. Endpoint names are the SOURCE
+ *  instance names; paste remaps them. A bus with an endpoint outside the set
+ *  is not copied — half a bus is not a bus. */
+export interface ClipBus {
+  driver: string;
+  sinks: string[];
+  gates: { name: string; rel: Vec3; step: Vec3 }[];
+}
+
+export interface Clip {
+  instances: ClipInstance[];
+  buses: ClipBus[];
+  /** Min corner of the copied instances, the origin `rel` is measured from. */
+  origin: Vec3;
+}
+
+/** What a paste did, so the UI can report it in one sentence. */
+export interface PasteReport {
+  instances: { name: string; src: string; cell: string; at: Vec3 }[];
+  buses: string[];
+  /** Buses whose intent was recreated but could not route: name -> reason. */
+  failed: Record<string, string>;
+  /** Blocks the requested offset was nudged by to clear existing keepouts. */
+  nudged: Vec3 | null;
+  /** Why nothing (or less than everything) was pasted. */
+  error?: string;
+}
+
+/** Monotonic across every document in the page — see `bumpRev`. */
+let GEOMETRY_REV = 0;
 
 const BUS_PALETTE = [0x76d275, 0x4fc3f7, 0xffb74d, 0xba68c8, 0x4db6ac, 0xf06292, 0xa2cf6e, 0x7986cb];
 
@@ -208,6 +278,33 @@ export class Studio {
     this.version++;
     this.baked = null; // any edit invalidates the baked artifact
     this.executor = null;
+    // Inside a transaction the notification is deferred to the commit: a paste
+    // is a dozen edits and ONE thing that happened, so it should cost one
+    // refresh. It is not only about speed — refreshing per inner edit makes the
+    // renderer mesh states the user never sees (an instance placed, then
+    // promoted port by port, is N throwaway cell variants).
+    if (this.txns.length || this.deferNotify) { this.pendingNotify = true; return; }
+    this.onChange?.();
+  }
+
+  private pendingNotify = false;
+  private deferNotify = 0;
+
+  /** Run `fn` with the change notification deferred to the end — one refresh
+   *  for a group of edits. Used by transactions and by their inverses. */
+  private batched(fn: () => void) {
+    this.deferNotify++;
+    try {
+      fn();
+    } finally {
+      this.deferNotify--;
+      this.flushNotify();
+    }
+  }
+
+  private flushNotify() {
+    if (this.deferNotify || this.txns.length || !this.pendingNotify) return;
+    this.pendingNotify = false;
     this.onChange?.();
   }
 
@@ -218,8 +315,53 @@ export class Studio {
   /** While replaying an op, mutators must not journal their own inverse. */
   private replaying = 0;
 
+  /** Open transactions, innermost last. While one is open every recorded op is
+   *  collected into it instead of onto the undo stack. */
+  private txns: Op[][] = [];
+
+  /** Run `fn` as ONE undo step.
+   *
+   *  A paste is a dozen document edits (place, promote a port, route a bus) and
+   *  exactly one thing the user did, so it has to be one press of ⌘Z. Rather
+   *  than teach every mutator about grouping, the journal collects the inverses
+   *  they already record and folds them into a single op: undo runs them in
+   *  REVERSE (the buses come out before the instances they land on), redo runs
+   *  them forward. Nested transactions flatten into the outermost one.
+   *
+   *  A throw does not lose the partial work: whatever was recorded so far is
+   *  still committed as an undoable step, so a half-finished paste is
+   *  reversible rather than stuck. */
+  transaction<T>(label: string, fn: () => T): T {
+    const own: Op[] = [];
+    this.txns.push(own);
+    let out: T;
+    try {
+      out = fn();
+    } finally {
+      const i = this.txns.indexOf(own);
+      if (i >= 0) this.txns.splice(i, 1);
+      this.flushNotify();
+      if (own.length) {
+        const ops = [...own];
+        this.record({
+          label,
+          undo: () => this.batched(() => {
+            for (let k = ops.length - 1; k >= 0; k--) ops[k].undo();
+          }),
+          redo: () => this.batched(() => {
+            for (const op of ops) op.redo();
+          }),
+        });
+      }
+    }
+    return out;
+  }
+
   private record(op: Op) {
     if (this.replaying) return;
+    // Inside a transaction the op belongs to the group, not to the stack.
+    const txn = this.txns[this.txns.length - 1];
+    if (txn) { txn.push(op); return; }
     const top = this.undoStack[this.undoStack.length - 1];
     if (op.coalesce && top?.coalesce === op.coalesce) {
       // A drag is one undo step, not sixty: keep the ORIGINAL undo (where the
@@ -323,11 +465,83 @@ export class Studio {
   private dirtyLoose = true;
   /** Instance transforms changed (cheap: matrix writes only). */
   private dirtyPlacements = true;
+  /** Variants whose cell-local geometry may have changed under an unchanged
+   *  KEY — re-uploading a library cell of the same name is the case that
+   *  matters, and it used to leave the old body on screen forever. */
+  private dirtyVariants = new Set<string>();
 
   /** Every bus is suspect — for the rare structural edits where working out
    *  which ones moved costs more than re-reading them. */
   private dirtyAllBuses() {
     for (const n of this.buses.keys()) this.dirtyBuses.add(n);
+  }
+
+  /** Re-read EVERYTHING next scene.
+   *
+   *  The safety net for the one failure mode a changed-set cannot survive: if
+   *  the renderer throws half way through applying a scene, the flags that
+   *  said what to re-read have already been consumed and the stale geometry is
+   *  stale for good. A caller that fails to apply a scene calls this, and the
+   *  next refresh heals the whole document. */
+  invalidateAll() {
+    this.dirtyAllBuses();
+    this.dirtyLoose = true;
+    this.dirtyPlacements = true;
+    for (const k of this.variants.keys()) this.dirtyVariants.add(k);
+  }
+
+  /** A library cell's blocks changed (re-uploaded, re-compiled): drop the
+   *  cached geometry AND flag every variant built from it. */
+  invalidateCell(cell: string) {
+    this.cellLocal.delete(cell);
+    this.cellBounds.delete(cell);
+    for (const [key, v] of this.variants) if (v.cell === cell) this.dirtyVariants.add(key);
+    this.dirtyPlacements = true;
+  }
+
+  /** Content signature of a block list: order-independent enough to be honest
+   *  (the engine emits a stable order) and cheap enough to run per changed
+   *  layer. Used to bump a `rev` ONLY on a real change, so an over-eager
+   *  changed-set costs a wasm read but never a re-mesh. */
+  private static sig(blocks: Block[]): string {
+    let h = 0x811c9dc5;
+    for (const b of blocks) {
+      // FNV-1a over the cell, name included: a block that changed IN PLACE
+      // (dust -> repeater after a reroute) has to register as a change.
+      for (const part of [b.x, b.y, b.z]) {
+        h = ((h ^ (part & 0xffff)) * 0x01000193) >>> 0;
+      }
+      for (let i = 0; i < b.name.length; i++) {
+        h = ((h ^ b.name.charCodeAt(i)) * 0x01000193) >>> 0;
+      }
+    }
+    return `${blocks.length}:${h.toString(36)}`;
+  }
+
+  /** Per-layer geometry revisions and the signatures they are derived from. */
+  private revs = new Map<string, { rev: number; sig: string }>();
+
+  /** Record a layer's new blocks; returns its revision, bumped only if the
+   *  content actually differs from what the layer held before.
+   *
+   *  Revisions come from a PROCESS-WIDE counter, not a per-layer one. Loading a
+   *  new document builds a new `Studio`, and a per-layer counter would hand the
+   *  new document's first `loose` layer revision 1 — the number a renderer that
+   *  outlives the swap is already holding for the OLD document's empty base. It
+   *  then keeps that empty mesh, because 1 === 1. (This is not hypothetical: it
+   *  is what the consistency check caught first.) A monotonic counter cannot
+   *  collide across documents. */
+  private bumpRev(layer: string, blocks: Block[]): number {
+    const sig = Studio.sig(blocks);
+    const have = this.revs.get(layer);
+    if (have && have.sig === sig) return have.rev;
+    const rev = ++GEOMETRY_REV;
+    this.revs.set(layer, { rev, sig });
+    return rev;
+  }
+
+  private revOf(layer: string): number {
+    return this.revs.get(layer)?.rev ?? 0;
   }
 
   /** Wasm round-trips the scene made, by kind. The performance assertions in
@@ -354,6 +568,10 @@ export class Studio {
       ports: cellPortSummary(schematic),
     };
     this.cells.set(name, info);
+    // Re-uploading a cell under a name that is already placed keeps the variant
+    // KEY (it is the cell name) while replacing its blocks — the one case where
+    // "is this variant new?" is the wrong question to ask.
+    this.invalidateCell(name);
     this.bump();
     return info;
   }
@@ -361,6 +579,9 @@ export class Studio {
   // -- instances -----------------------------------------------------------
 
   placeInstance(cell: string, at: Vec3, rot = 0, forceName?: string): InstanceInfo {
+    // A paste can take `u1` before the counter gets there, so the counter has
+    // to skip what is already placed rather than collide with it.
+    while (!forceName && this.instances.has(`u${this.nextInst}`)) this.nextInst++;
     const name = forceName ?? `u${this.nextInst++}`;
     this.design.place(name, cell, at, rot);
     const info: InstanceInfo = { name, cell, at: [...at] as Vec3, rot };
@@ -452,6 +673,199 @@ export class Studio {
     });
     this.bump();
     return report;
+  }
+
+  // -- copy / paste ---------------------------------------------------------
+
+  /** A free instance name derived from `src`: `u0` -> `u1` -> `u2`, and
+   *  `add0` -> `add1`; a name with no trailing number gets `_copy`, `_copy2`.
+   *  Never returns a name the document already uses. */
+  uniqueInstanceName(src: string): string {
+    const m = /^(.*?)(\d+)$/.exec(src);
+    if (m) {
+      let n = Number(m[2]) + 1;
+      while (this.instances.has(`${m[1]}${n}`)) n++;
+      return `${m[1]}${n}`;
+    }
+    if (!this.instances.has(`${src}_copy`)) return `${src}_copy`;
+    let n = 2;
+    while (this.instances.has(`${src}_copy${n}`)) n++;
+    return `${src}_copy${n}`;
+  }
+
+  /** Copy instances (and the buses wholly inside them) to a clipboard value.
+   *
+   *  Buses are NOT copied for a single instance — a bus is a route between two
+   *  endpoints and one of them would be outside the copy. For an AREA copy
+   *  where both ends are inside, the INTENT is copied (driver, sinks, gates)
+   *  and the paste re-routes it: the blocks belong to the router, not to the
+   *  clipboard. */
+  copy(names: string[]): Clip | null {
+    const insts = names.map((n) => this.instances.get(n)).filter((i): i is InstanceInfo => !!i);
+    if (!insts.length) return null;
+    const origin: Vec3 = [
+      Math.min(...insts.map((i) => i.at[0])),
+      Math.min(...insts.map((i) => i.at[1])),
+      Math.min(...insts.map((i) => i.at[2])),
+    ];
+    const inSet = new Set(insts.map((i) => i.name));
+    const modes = this.portModes();
+    const instances: ClipInstance[] = insts.map((i) => {
+      const busPorts: string[] = [];
+      for (const [name, mode] of modes) {
+        if (mode !== "bus") continue;
+        const dot = name.indexOf(".");
+        if (name.slice(0, dot) === i.name) busPorts.push(name.slice(dot + 1));
+      }
+      return {
+        src: i.name, cell: i.cell, rot: i.rot,
+        rel: [i.at[0] - origin[0], i.at[1] - origin[1], i.at[2] - origin[2]] as Vec3,
+        busPorts,
+      };
+    });
+    const owner = (endpoint: string) => endpoint.slice(0, endpoint.indexOf("."));
+    const inside = (endpoint: string) =>
+      endpoint.includes(".") && inSet.has(owner(endpoint));
+    const buses: ClipBus[] = [];
+    for (const b of this.buses.values()) {
+      if (!inside(b.driver) || !b.sinks.length || !b.sinks.every(inside)) continue;
+      buses.push({
+        driver: b.driver,
+        sinks: [...b.sinks],
+        gates: b.gates.map((g) => ({
+          name: g.name,
+          rel: [g.anchor[0] - origin[0], g.anchor[1] - origin[1], g.anchor[2] - origin[2]] as Vec3,
+          step: [...g.step] as Vec3,
+        })),
+      });
+    }
+    return { instances, buses, origin };
+  }
+
+  /** Does an axis-aligned box overlap any placed instance's footprint? The
+   *  engine refuses an overlapping `place` (that is its keepout), so this is
+   *  only a first guess used to pick a landing spot without a throw-and-roll-
+   *  back round trip for the obvious cases. */
+  private footprint(cell: string, at: Vec3, rot: number): { min: Vec3; max: Vec3 } {
+    const dims = this.cells.get(cell)?.dims ?? [1, 1, 1];
+    const [w, h, l] = rot % 180 === 0 ? dims : [dims[2], dims[1], dims[0]];
+    return { min: [...at] as Vec3, max: [at[0] + w - 1, at[1] + h - 1, at[2] + l - 1] as Vec3 };
+  }
+
+  private overlapsAnything(cell: string, at: Vec3, rot: number, ignore: Set<string>): boolean {
+    const a = this.footprint(cell, at, rot);
+    for (const i of this.instances.values()) {
+      if (ignore.has(i.name)) continue;
+      const b = this.footprint(i.cell, i.at, i.rot);
+      if (a.min[0] <= b.max[0] && a.max[0] >= b.min[0] &&
+          a.min[1] <= b.max[1] && a.max[1] >= b.min[1] &&
+          a.min[2] <= b.max[2] && a.max[2] >= b.min[2]) return true;
+    }
+    return false;
+  }
+
+  /** Paste a clipboard so its origin lands at `at`.
+   *
+   *  ONE undo step (a transaction), relative transforms preserved, port modes
+   *  carried over, and any bus whose two ends were both inside the copy
+   *  re-routed for the new group. A bus that cannot route is left FAILED with
+   *  the router's own reason rather than silently dropped — same philosophy as
+   *  every other edit here.
+   *
+   *  Occupancy: the group is nudged along +X (then +Z) until no pasted body
+   *  starts inside an existing one, because the engine refuses that placement
+   *  and a refusal is not a useful answer to Ctrl-V. */
+  paste(clip: Clip, at: Vec3): PasteReport {
+    const report: PasteReport = { instances: [], buses: [], failed: {}, nudged: null };
+    if (!clip.instances.length) return { ...report, error: "clipboard is empty" };
+    // Pick a landing spot: the asked-for one, else step clear of the keepouts.
+    const span = Math.max(
+      1,
+      ...clip.instances.map((c) => {
+        const dims = this.cells.get(c.cell)?.dims ?? [1, 1, 1];
+        return c.rel[0] + Math.max(dims[0], dims[2]);
+      }),
+    );
+    let base: Vec3 | null = null;
+    const tries: Vec3[] = [];
+    for (let k = 0; k < 24; k++) {
+      const step = Math.ceil(k / 2);
+      tries.push(k === 0 ? ([...at] as Vec3)
+        : k % 2 === 1 ? [at[0] + step * (span + 2), at[1], at[2]] as Vec3
+        : [at[0], at[1], at[2] + step * (span + 2)] as Vec3);
+    }
+    const ignore = new Set<string>();
+    for (const cand of tries) {
+      const clash = clip.instances.some((c) => this.overlapsAnything(
+        c.cell,
+        [cand[0] + c.rel[0], cand[1] + c.rel[1], cand[2] + c.rel[2]] as Vec3,
+        c.rot, ignore));
+      if (!clash) { base = cand; break; }
+    }
+    if (!base) return { ...report, error: "no free space within 24 offsets — move the view and try again" };
+    if (base[0] !== at[0] || base[2] !== at[2]) {
+      report.nudged = [base[0] - at[0], base[1] - at[1], base[2] - at[2]] as Vec3;
+    }
+    const landing = base;
+
+    return this.transaction(
+      `paste ${clip.instances.length} instance${clip.instances.length === 1 ? "" : "s"}`,
+      () => {
+        const remap = new Map<string, string>();
+        for (const c of clip.instances) {
+          const name = this.uniqueInstanceName(c.src);
+          const to: Vec3 = [landing[0] + c.rel[0], landing[1] + c.rel[1], landing[2] + c.rel[2]];
+          try {
+            this.placeInstance(c.cell, to, c.rot, name);
+          } catch (err) {
+            report.error = `${c.src}: ${err}`;
+            continue;
+          }
+          remap.set(c.src, name);
+          report.instances.push({ name, src: c.src, cell: c.cell, at: to });
+          // Port modes are per-instance patches, so they are part of the copy.
+          for (const port of c.busPorts) {
+            try { this.setPortMode(name, port, "bus"); } catch { /* cell changed */ }
+          }
+        }
+        const move = (endpoint: string) => {
+          const dot = endpoint.indexOf(".");
+          const to = remap.get(endpoint.slice(0, dot));
+          return to ? `${to}${endpoint.slice(dot)}` : null;
+        };
+        for (const b of clip.buses) {
+          const driver = move(b.driver);
+          const sinks = b.sinks.map(move);
+          if (!driver || sinks.some((s) => !s)) continue; // an end failed to place
+          const gates: GateInfo[] = b.gates.map((g) => ({
+            name: g.name,
+            anchor: [landing[0] + g.rel[0], landing[1] + g.rel[1], landing[2] + g.rel[2]] as Vec3,
+            step: [...g.step] as Vec3,
+          }));
+          try {
+            const bus = this.routeBus(driver, sinks as string[], gates);
+            report.buses.push(bus.name);
+            const st = this.busStateDetail(bus.name);
+            if (st.state === "failed") report.failed[bus.name] = st.reason ?? "unroutable";
+          } catch (err) {
+            // The declaration itself was refused: name it, do not hide it.
+            report.failed[`${driver} → ${sinks.join(", ")}`] = String(err).replace(/^Error:\s*/, "");
+          }
+        }
+        return report;
+      });
+  }
+
+  /** Cut: copy, then delete the originals as ONE undo step. */
+  cut(names: string[]): Clip | null {
+    const clip = this.copy(names);
+    if (!clip) return null;
+    this.transaction(`cut ${names.length} instance${names.length === 1 ? "" : "s"}`, () => {
+      for (const n of names) {
+        try { this.removeInstance(n); } catch { /* already gone */ }
+      }
+    });
+    return clip;
   }
 
   // -- instance ports ------------------------------------------------------
@@ -631,15 +1045,154 @@ export class Studio {
     return this.design.busState(name);
   }
 
+  // -- gates (bus checkpoints) ----------------------------------------------
+  //
+  // A GATE and an ENDPOINT are different things and the difference is the
+  // whole point: an endpoint is netlist ("this bus drives that port"), a gate is
+  // ROUTE ("and it must pass through here"). So removing a gate must leave the
+  // net alone and let the router take a straighter path, while removing an
+  // endpoint changes what the design means. Nothing below ever conflates them.
+  //
+  // Two engine paths, and which one is used matters for speed only:
+  //   * `Design::add_gate` / `remove_gate` keep the untouched segments and
+  //     re-route only the affected span — the fast path;
+  //   * re-declaring the bus with a new gate LIST routes the whole thing.
+  // The fast path is tried first and the fallback is exact, so a core without
+  // `remove_gate` (or `add_gate` on a bus between placed cells, which it
+  // refuses today) still gets working gates rather than a greyed button.
+
+  /** Anchor of an endpoint by name, declared port or instance port. */
+  private anchorOf(endpoint: string): Vec3 | null {
+    const declared = this.ports.get(endpoint);
+    if (declared) return declared.anchor;
+    for (const ip of this.instancePorts()) {
+      if (ip.name === endpoint) return (ip.wires?.[0] ?? ip.hardware[0]) ?? null;
+    }
+    return null;
+  }
+
+  /** Where a new gate belongs in the trunk order: the waypoint pair whose
+   *  midpoint it is nearest, exactly the rule `Design::add_gate` uses, so the
+   *  fast path and the fallback agree on the resulting route. */
+  private gateInsertIndex(bus: BusInfo, anchor: Vec3): number {
+    const first = this.anchorOf(bus.driver);
+    const last = this.anchorOf(bus.sinks[0]);
+    if (!first || !last) return bus.gates.length;
+    const wps: Vec3[] = [first, ...bus.gates.map((g) => g.anchor), last];
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i + 1 < wps.length; i++) {
+      const mid = [
+        Math.trunc((wps[i][0] + wps[i + 1][0]) / 2),
+        Math.trunc((wps[i][1] + wps[i + 1][1]) / 2),
+        Math.trunc((wps[i][2] + wps[i + 1][2]) / 2),
+      ];
+      const d = Math.abs(anchor[0] - mid[0]) + Math.abs(anchor[1] - mid[1]) + Math.abs(anchor[2] - mid[2]);
+      if (d < bestD) { best = i; bestD = d; }
+    }
+    return best;
+  }
+
+  /** Re-declare a bus with a different gate list, keeping its name, colour and
+   *  endpoints. This is what makes a gate removal STRAIGHTEN the route: the
+   *  router plans A→C afresh instead of keeping the detour's segments. */
+  private redeclareBus(name: string, gates: GateInfo[], label: string): string {
+    const bus = this.buses.get(name);
+    if (!bus) throw new Error(`no bus ${name}`);
+    const color = bus.color;
+    const driver = bus.driver;
+    const sinks = [...bus.sinks];
+    const was = bus.gates.map((g) => ({ ...g }));
+    this.transaction(label, () => {
+      this.removeBus(name);
+      try {
+        this.routeBus(driver, sinks, gates.map((g) => ({ ...g })), name);
+      } catch (err) {
+        // Re-declaring must never LOSE the bus. Put the old declaration back
+        // (failed is a state; missing is data loss) and report the refusal.
+        this.routeBus(driver, sinks, was, name);
+        throw err;
+      }
+      const now = this.buses.get(name);
+      if (now) now.color = color; // the palette index moved; the identity did not
+    });
+    this.dirtyAllBuses();
+    return this.busState(name);
+  }
+
+  /** Add a checkpoint the route must pass through. Returns where it landed in
+   *  the trunk order and which engine path was taken. */
   addGate(busName: string, anchor: Vec3, step: Vec3): string {
+    const r = this.addGateAt(busName, anchor, step);
+    return r.state;
+  }
+
+  addGateAt(busName: string, anchor: Vec3, step: Vec3):
+    { state: string; index: number; fast: boolean; name: string } {
     const bus = this.buses.get(busName);
     if (!bus) throw new Error(`no bus ${busName}`);
-    const gname = `g${bus.gates.length}`;
-    const state = this.design.addGate(busName, gname, anchor, step);
-    bus.gates.push({ name: gname, anchor: [...anchor] as Vec3, step: [...step] as Vec3 });
-    this.dirtyBuses.add(busName);
-    this.bump();
-    return state;
+    // Names have to be unique for the lifetime of the bus, not just now: `g0`
+    // freed by a removal must not be reused while the engine still has it.
+    let n = bus.gates.length;
+    while (bus.gates.some((g) => g.name === `g${n}`)) n++;
+    const gname = `g${n}`;
+    const index = this.gateInsertIndex(bus, anchor);
+    const gate: GateInfo = { name: gname, anchor: [...anchor] as Vec3, step: [...step] as Vec3 };
+    try {
+      const state = this.design.addGate(busName, gname, anchor, step);
+      bus.gates.splice(index, 0, gate);
+      this.dirtyBuses.add(busName);
+      this.record({
+        label: `add gate ${busName}/${gname}`,
+        undo: () => { this.removeGate(busName, index); },
+        redo: () => { this.addGateAt(busName, anchor, step); },
+      });
+      this.bump();
+      return { state, index, fast: true, name: gname };
+    } catch (err) {
+      // The core refused the fast path (today: any bus whose endpoints are
+      // instance ports). Re-declare with the full list — same route, more work.
+      const next = [...bus.gates];
+      next.splice(index, 0, gate);
+      const state = this.redeclareBus(busName, next, `add gate ${busName}/${gname}`);
+      if (this.busState(busName).startsWith("failed") && !state.startsWith("failed")) {
+        throw err; // the fallback did not actually work; do not claim it did
+      }
+      return { state, index, fast: false, name: gname };
+    }
+  }
+
+  /** Remove a checkpoint. The bus KEEPS its endpoints and re-routes over the
+   *  merged span, so the path genuinely straightens. */
+  removeGate(busName: string, index: number): { state: string; removed: GateInfo; fast: boolean } {
+    const bus = this.buses.get(busName);
+    if (!bus) throw new Error(`no bus ${busName}`);
+    const removed = bus.gates[index];
+    if (!removed) throw new Error(`bus ${busName} has no gate at ${index}`);
+    const d = this.design as { removeGate?: (b: string, i: number) => string };
+    if (typeof d.removeGate === "function") {
+      try {
+        const state = d.removeGate(busName, index);
+        bus.gates.splice(index, 1);
+        this.dirtyBuses.add(busName);
+        this.record({
+          label: `remove gate ${busName}/${removed.name}`,
+          undo: () => { this.addGateAt(busName, removed.anchor, removed.step); },
+          redo: () => { this.removeGate(busName, index); },
+        });
+        this.bump();
+        return { state, removed, fast: true };
+      } catch { /* fall through to the re-declare */ }
+    }
+    const next = bus.gates.filter((_, i) => i !== index);
+    const state = this.redeclareBus(busName, next, `remove gate ${busName}/${removed.name}`);
+    return { state, removed, fast: false };
+  }
+
+  /** `{gates, segments}` — the model made visible: N gates means N+1 trunk
+   *  spans, which is why removing one can only shorten the route. */
+  gateSummary(busName: string): { gates: GateInfo[]; segments: number } {
+    const bus = this.buses.get(busName);
+    return { gates: bus ? bus.gates.map((g) => ({ ...g })) : [], segments: (bus?.gates.length ?? 0) + 1 };
   }
 
   /** Drag a gate: exactly its two adjacent segments rip and reroute. */
@@ -898,7 +1451,7 @@ export class Studio {
       const world = JSON.parse(flat().getRegionNonAirBlocksJson(`inst:${rep.instance}`)) as Block[];
       blocks = world.map((b) => Studio.toLocal(b, rep.at, rep.rot, size[0], size[2]));
     }
-    return { key, cell: rep.cell, blocks, size };
+    return { key, cell: rep.cell, blocks, size, rev: this.bumpRev(`var:${key}`, blocks) };
   }
 
   /** The renderable document, with only the changed parts re-read.
@@ -919,7 +1472,8 @@ export class Studio {
     const placements = this.placements();
     const wanted = new Map<string, Placement>();
     for (const p of placements) if (!wanted.has(p.variant)) wanted.set(p.variant, p);
-    const newVariants = [...wanted.keys()].filter((k) => !this.variants.has(k));
+    const rebuildVariants = [...wanted.keys()]
+      .filter((k) => !this.variants.has(k) || this.dirtyVariants.has(k));
     const dirtyBusNames = [...this.dirtyBuses].filter((n) => this.buses.has(n));
 
     // ONE flatten, and only if something actually needs it.
@@ -934,7 +1488,7 @@ export class Studio {
       return flatRaw;
     };
 
-    for (const key of newVariants) {
+    for (const key of rebuildVariants) {
       this.variants.set(key, this.buildVariant(key, wanted.get(key)!, flat));
     }
     // Drop variants nothing places any more (a port toggled back, a cell
@@ -953,11 +1507,11 @@ export class Studio {
       } catch {
         this.busBlocks.set(name, []);
       }
+      this.bumpRev(`bus:${name}`, this.busBlocks.get(name) ?? []);
     }
     for (const name of [...this.busBlocks.keys()]) {
       if (!this.buses.has(name)) this.busBlocks.delete(name);
     }
-    this.dirtyBuses.clear();
 
     const looseWas = this.dirtyLoose;
     if (this.dirtyLoose) {
@@ -976,7 +1530,7 @@ export class Studio {
       }
       this.sceneReads.looseDump++;
       this.looseBlocks = out;
-      this.dirtyLoose = false;
+      this.bumpRev("loose", out);
     }
 
     const buses: LayerBlocks[] = [...this.buses.values()].map((b) => ({
@@ -984,24 +1538,82 @@ export class Studio {
       color: b.color,
       failed: this.busState(b.name).startsWith("failed"),
       blocks: this.busBlocks.get(b.name) ?? [],
+      rev: this.revOf(`bus:${b.name}`),
     }));
 
     const dirty = {
-      variants: newVariants,
+      variants: rebuildVariants,
       placements: this.dirtyPlacements,
       buses: dirtyBusNames,
       loose: looseWas,
     };
+    // CLEARED LAST, on purpose. Everything above can throw (a wasm read, a
+    // JSON parse), and a throw after the flags were cleared is permanent
+    // staleness: the work was never done and nothing remembers it was owed.
+    // Clearing here means a failed scene() simply happens again.
+    this.dirtyBuses.clear();
+    this.dirtyVariants.clear();
+    this.dirtyLoose = false;
     this.dirtyPlacements = false;
     return {
       variants: new Map(this.variants),
       placements,
       buses,
-      loose: { layer: "loose", color: null, failed: false, blocks: this.looseBlocks },
+      loose: {
+        layer: "loose", color: null, failed: false,
+        blocks: this.looseBlocks, rev: this.revOf("loose"),
+      },
       dirty,
     };
   }
 
-  /** Set alongside `dirtyLoose` so `scene()` can report it after clearing. */
-  private looseDirtyLast = true;
+  /** The engine's OWN geometry for every layer, read fresh and bypassing every
+   *  cache — the ground truth a full-scene consistency check compares the
+   *  rendered geometry against.
+   *
+   *  Deliberately NOT the incremental path: this exists to catch the case where
+   *  the incremental path is wrong. `bus_blocks_json` / `instance_blocks_json`
+   *  read one fragment directly when the loaded engine has them; otherwise one
+   *  flatten plus the per-region non-air dumps say the same thing more slowly. */
+  engineLayers(): { instances: Map<string, Block[]>; buses: Map<string, Block[]>; loose: Block[] } {
+    const out = { instances: new Map<string, Block[]>(), buses: new Map<string, Block[]>(), loose: [] as Block[] };
+    const d = this.design as {
+      busBlocksJson?: (n: string) => unknown;
+      instanceBlocksJson?: (n: string) => unknown;
+    };
+    /** `[[x,y,z,"block"],..]` (the compact accessors) or `[{x,y,z,name},..]`. */
+    const asBlocks = (raw: unknown): Block[] => {
+      const list = (typeof raw === "string" ? JSON.parse(raw) : raw) as unknown[];
+      return list.map((e) => Array.isArray(e)
+        ? { x: e[0] as number, y: e[1] as number, z: e[2] as number, name: e[3] as string }
+        : e as Block);
+    };
+    let flatRaw: any = null;
+    const flat = () => (flatRaw ??= this.design.flatten().raw);
+    const region = (name: string): Block[] => {
+      try {
+        return JSON.parse(flat().getRegionNonAirBlocksJson(name)) as Block[];
+      } catch {
+        return [];
+      }
+    };
+    for (const name of this.buses.keys()) {
+      if (typeof d.busBlocksJson === "function") {
+        try { out.buses.set(name, asBlocks(d.busBlocksJson(name))); continue; } catch { /* fall through */ }
+      }
+      out.buses.set(name, region(`bus:${name}`));
+    }
+    for (const name of this.instances.keys()) {
+      if (typeof d.instanceBlocksJson === "function") {
+        try { out.instances.set(name, asBlocks(d.instanceBlocksJson(name))); continue; } catch { /* fall through */ }
+      }
+      out.instances.set(name, region(`inst:${name}`));
+    }
+    const names = JSON.parse(flat().regionNamesJson()) as string[];
+    for (const n of names) {
+      if (n.startsWith("bus:") || n.startsWith("inst:")) continue;
+      out.loose.push(...region(n));
+    }
+    return out;
+  }
 }

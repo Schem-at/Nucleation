@@ -6,9 +6,10 @@
  *  out what the next click does, and Esc always cancels back to `idle`.
  */
 import { loadEngine } from "./engine";
-import { Studio, type Vec3, type PortInfo } from "./studio";
+import { Studio, type Vec3, type PortInfo, type Clip, type PasteReport } from "./studio";
 import {
   Viewer, type PortMarker, type GateMarker, type InstanceMarker, type Selection,
+  type BusStyle, type PickTarget,
 } from "./viewer";
 import { verilogToBlif, guessTop } from "./yosys";
 import { humanReason, busFailureLine, fmtAt, type HumanReason } from "./reasons";
@@ -277,11 +278,25 @@ async function boot() {
         ` &nbsp;·&nbsp; <kbd>Esc</kbd> put it back`;
       return;
     }
+    if (selection?.kind === "bus") {
+      const d = studio.busStateDetail(selection.id);
+      const b = studio.buses.get(selection.id);
+      el.innerHTML = `bus <code>${esc(selection.id)}</code> ` +
+        `<b>${esc(d.state)}</b>${d.reason ? ` (${esc(d.reason.slice(0, 48))})` : ""} &nbsp;·&nbsp; ` +
+        `${esc(b?.driver ?? "")} → ${esc(b?.sinks.join(", ") ?? "")} &nbsp;·&nbsp; ` +
+        `<kbd>Del</kbd> delete &nbsp; <kbd>R</kbd> re-route &nbsp; <kbd>F</kbd> frame &nbsp; ` +
+        `<kbd>Esc</kbd> deselect &nbsp;·&nbsp; right-click it to add a gate`;
+      return;
+    }
     if (selection?.kind === "instance") {
-      el.innerHTML = `<code>${esc(selection.id)}</code> selected &nbsp;·&nbsp; ` +
-        `<kbd>R</kbd> rotate 90° &nbsp; <kbd>G</kbd> move &nbsp; <kbd>F</kbd> frame &nbsp; ` +
-        `<kbd>Del</kbd> remove &nbsp; <kbd>Esc</kbd> deselect &nbsp;·&nbsp; ${nav} &nbsp;·&nbsp; ` +
-        `<kbd>?</kbd> keys`;
+      const group = selectedInstances();
+      el.innerHTML = (group.length > 1
+        ? `<code>${group.length} components</code> selected (<code>${esc(selection.id)}</code> primary)`
+        : `<code>${esc(selection.id)}</code> selected`) +
+        ` &nbsp;·&nbsp; <kbd>R</kbd> rotate 90° &nbsp; <kbd>G</kbd> move &nbsp; <kbd>F</kbd> frame &nbsp; ` +
+        `<kbd>⌘/Ctrl-C</kbd> copy &nbsp; <kbd>⌘/Ctrl-D</kbd> duplicate &nbsp; ` +
+        `<kbd>Del</kbd> remove &nbsp; <kbd>Esc</kbd> deselect &nbsp;·&nbsp; ` +
+        `<kbd>⇧</kbd>click adds &nbsp;·&nbsp; ${nav}`;
       return;
     }
     const driver = endpoints.some((e) => e.routable && e.kind === "input");
@@ -308,11 +323,47 @@ async function boot() {
     setHint();
   }
 
-  function select(sel: Selection) {
+  /** The OTHER instances in an area selection, primary-selection excluded.
+   *  `selection` stays the single "focused" thing (the gizmo, R, G, F all act
+   *  on it); `multi` is what a copy, a cut or a group delete acts on. */
+  let multi: string[] = [];
+
+  /** Everything selected, primary first — the set copy/cut/duplicate use. */
+  function selectedInstances(): string[] {
+    const out: string[] = [];
+    if (selection?.kind === "instance") out.push(selection.id);
+    for (const n of multi) if (!out.includes(n) && studio.instances.has(n)) out.push(n);
+    return out;
+  }
+
+  function select(sel: Selection, keepMulti = false) {
     selection = sel;
+    if (!keepMulti) multi = sel?.kind === "instance" ? [sel.id] : [];
     viewer.setSelection(sel);
+    viewer.setMultiSelection(multi);
     renderPanels();
     setHint();
+  }
+
+  /** Shift-click: add to (or remove from) the area selection, and make the
+   *  clicked instance the primary one so the gizmo follows the last click. */
+  function extendSelection(name: string) {
+    if (multi.includes(name) && multi.length > 1 && selection?.kind === "instance"
+        && selection.id === name) {
+      multi = multi.filter((n) => n !== name);
+      select({ kind: "instance", id: multi[0] }, true);
+      toast(`${name} removed from the selection · ${multi.length} selected`);
+      return;
+    }
+    if (!multi.includes(name)) multi.push(name);
+    selection = { kind: "instance", id: name };
+    viewer.setSelection(selection);
+    viewer.setMultiSelection(multi);
+    renderPanels();
+    setHint();
+    if (multi.length > 1) {
+      toast(`${multi.length} selected — ⌘/Ctrl-C copies the group, ⌘/Ctrl-D duplicates it`);
+    }
   }
 
   // ---- rendering --------------------------------------------------------
@@ -348,8 +399,22 @@ async function boot() {
           ` @ ${p.anchor.join(",")}${p.routable ? "" : ` · NOT ROUTABLE: ${p.blocked ?? ""}`}`
         : "";
     },
-    onInstanceClick(name) {
-      select({ kind: "instance", id: name });
+    onInstanceClick(name, additive) {
+      if (additive) extendSelection(name);
+      else select({ kind: "instance", id: name });
+    },
+    onBusClick(name, additive) {
+      if (additive) return; // shift-click builds instance groups, not bus ones
+      selectBus(name);
+    },
+    onGateClick(id) {
+      select({ kind: "gate", id });
+      const [bus, gate] = id.split(" ");
+      const { gates, segments } = studio.gateSummary(bus);
+      const i = gates.findIndex((g) => g.name === gate);
+      toast(`gate ${i + 1} of ${gates.length} on ${bus} — ${segments} trunk span(s)`, {
+        fix: "drag it to steer the route · Del removes it and the route straightens",
+      });
     },
     onDragMove(kind, id, ground) {
       dragMove(kind, id, ground);
@@ -360,7 +425,68 @@ async function boot() {
     onGroundClick(ground) {
       handleGroundClick(ground);
     },
+    onContextMenu(target) {
+      openContextMenu(target);
+    },
   });
+
+  /** Select a bus by clicking its blocks (or its outliner row): the same
+   *  first-class selection an instance gets, so Del works and the panel says
+   *  what it is. */
+  function selectBus(name: string) {
+    if (!studio.buses.has(name)) return;
+    select({ kind: "bus", id: name });
+    const d = studio.busStateDetail(name);
+    const b = studio.buses.get(name)!;
+    const skew = d.state === "routed" ? studio.busSkew(name) : null;
+    toast(`${name}: ${b.driver} → ${b.sinks.join(", ")} · ${d.state}` +
+      (skew ? ` · ${skew.max_rt}t, skew ${skew.skew_rt}t` : ""),
+      { fix: "Del deletes it · R re-routes · Esc deselects" });
+    // Bring its row into view: the canvas selection and the outliner agree.
+    const row = $("#bus-list").querySelector<HTMLElement>(`[data-busrow="${name}"]`);
+    row?.scrollIntoView({ block: "nearest" });
+  }
+
+  /** Remove a checkpoint. NOT the same operation as deleting an endpoint, and
+   *  the message says so: the net is unchanged, the route just gets to be more
+   *  direct. No confirm — it is reversible and it destroys no intent. */
+  function removeGate(bus: string, index: number) {
+    const before = studio.gateSummary(bus);
+    try {
+      const r = studio.removeGate(bus, index);
+      const after = studio.gateSummary(bus);
+      if (selection?.kind === "gate" && selection.id === `${bus} ${r.removed.name}`) select(null);
+      const state = studio.busStateDetail(bus);
+      toast(`removed gate ${index + 1} of ${before.gates.length} from ${bus} — ` +
+        `${after.segments} trunk span(s), ${state.state}`, {
+        kind: state.state === "failed" ? "err" : "ok",
+        fix: state.state === "failed"
+          ? `the shorter route does not fit: ${state.reason}`
+          : "the route is free to take a more direct path now · ⌘/Ctrl-Z puts the gate back",
+      });
+      log(`removeGate ${bus}[${index}] (${r.fast ? "engine remove_gate" : "re-declared"}) -> ${r.state}`);
+      if (state.state === "failed") failToast(bus, state.reason ?? "unroutable");
+    } catch (err) {
+      toast(`could not remove that gate: ${err}`, "err");
+      log(`removeGate ${bus}[${index}] FAILED: ${err}`);
+    }
+  }
+
+  /** Delete the selected bus, asking first when it is carrying a route. */
+  async function deleteBus(name: string) {
+    const d = studio.busStateDetail(name);
+    const ok = await confirmDestructive(
+      `Delete bus ${name}?`,
+      `${name} is ${d.state}. Deleting it drops the declaration as well as the ` +
+      `blocks (Rip keeps the declaration). ⌘/Ctrl-Z puts it back.`,
+      `Delete ${name}`,
+    );
+    if (!ok) { toast(`kept ${name}`); return; }
+    studio.removeBus(name);
+    if (selection?.kind === "bus" && selection.id === name) select(null);
+    log(`deleted bus ${name}`);
+    toast(`deleted ${name} · ⌘/Ctrl-Z to undo`);
+  }
 
   /** A click on empty ground. Placing puts the cell down, grabbing drops it,
    *  connecting cancels — and otherwise it DESELECTS, which is the escape
@@ -417,23 +543,52 @@ async function boot() {
    *  there is no idle wait any more, the engine simply runs as often as it can
    *  finish, and the drag never waits for it.
    */
-  let pendingLive: { kind: "instance" | "gate"; id: string; ground: Vec3 } | null = null;
+  let pendingLive: { kind: "instance" | "gate"; id: string; ground: Vec3; seq: number } | null = null;
   let liveScheduled = false;
+  /** SEQUENCE NUMBERS, and the reason they are here.
+   *
+   *  A live re-route commit is deferred to the next animation frame, so a drop
+   *  can happen while one is still queued: the drop lands the final position,
+   *  then the queued frame lands the position from BEFORE it — and the router
+   *  re-routes every affected bus for a component that is no longer there. That
+   *  is the "sometimes when I move a component the bus doesn't update right"
+   *  race, and it is invisible in a screenshot because the document really does
+   *  say what is drawn; it is just one frame out of date.
+   *
+   *  Every intent takes a number when it is FORMED (pointer position, drop,
+   *  rotate) and a commit is refused if a higher-numbered one has already
+   *  landed. Coalescing can drop work; it can never apply older work over
+   *  newer. */
+  let commitSeq = 0;
+  let committedSeq = 0;
+  /** How many out-of-order commits were refused — a number the verify asserts
+   *  the race by, rather than hoping it does not reproduce. */
+  let staleCommits = 0;
+  const nextSeq = () => ++commitSeq;
   function dragMove(kind: "instance" | "gate", id: string, ground: Vec3) {
     if (kind === "instance") viewer.previewInstance(id, ground);
     if (!($("#live-reroute") as HTMLInputElement).checked) return;
-    pendingLive = { kind, id, ground };
+    pendingLive = { kind, id, ground, seq: nextSeq() };
     if (liveScheduled) return;
     liveScheduled = true;
     requestAnimationFrame(() => {
       liveScheduled = false;
       const p = pendingLive;
       pendingLive = null;
-      if (p) applyMove(p.kind, p.id, p.ground, "live");
+      if (p) applyMove(p.kind, p.id, p.ground, "live", p.seq);
     });
   }
 
-  function applyMove(kind: "instance" | "gate", id: string, ground: Vec3, phase: "live" | "drop") {
+  function applyMove(
+    kind: "instance" | "gate", id: string, ground: Vec3, phase: "live" | "drop",
+    seq = nextSeq(),
+  ) {
+    if (seq < committedSeq) {
+      staleCommits++;
+      log(`dropped a stale ${phase} commit for ${id} (#${seq} < #${committedSeq})`);
+      return;
+    }
+    committedSeq = seq;
     refreshPhase = phase;
     try {
       if (kind === "instance") {
@@ -600,23 +755,31 @@ async function boot() {
   function refresh() {
     timed(refreshPhase === "live" ? "refreshLive" : "refresh", () => refreshInner());
   }
-  function refreshInner() {
-    if (refreshPhase === "live") {
-      try {
-        const model = timed("studio.scene", () => studio.scene());
-        timed("viewer.setScene", () => viewer.setScene(model));
-      } catch (err) {
-        log(`layer render failed: ${err}`);
-      }
-      return;
-    }
-    endpoints = timed("allEndpoints", () => studio.allEndpoints());
+  /** Build the scene and hand it to the viewer.
+   *
+   *  `scene()` CONSUMES the document's changed-set, so a failure between there
+   *  and the last mesh write is the one way this app can go permanently stale:
+   *  the work was never done and nothing remembers it was owed. Failing loudly
+   *  is not enough — the recovery is to re-arm every dirty flag, so the next
+   *  refresh re-reads the whole document instead of trusting a set that was
+   *  already spent. */
+  function renderScene() {
     try {
       const model = timed("studio.scene", () => studio.scene());
       timed("viewer.setScene", () => viewer.setScene(model));
     } catch (err) {
-      log(`layer render failed: ${err}`);
+      studio.invalidateAll();
+      log(`layer render failed (re-reading everything next frame): ${err}`);
     }
+  }
+
+  function refreshInner() {
+    if (refreshPhase === "live") {
+      renderScene();
+      return;
+    }
+    endpoints = timed("allEndpoints", () => studio.allEndpoints());
+    renderScene();
     // A drag changes an instance's TRANSFORM, never a cell's blocks, so the
     // textured mesh is still valid — re-meshing mid-gesture was the stutter.
     // Blocks change on a port-mode toggle (tracked as a stale cell) or a
@@ -636,8 +799,14 @@ async function boot() {
       dims: studio.cells.get(i.cell)?.dims ?? [1, 1, 1],
     }));
     timed("viewer.setMarkers", () => viewer.setMarkers(ports, gates, instances));
+    // Which ports each bus lands on, so selecting a bus lights up its ends.
+    viewer.setBusEndpoints(new Map([...studio.buses.values()].map(
+      (b) => [b.name, [b.driver, ...b.sinks]] as [string, string[]])));
     if (selection?.kind === "instance" && !studio.instances.has(selection.id)) selection = null;
+    if (selection?.kind === "bus" && !studio.buses.has(selection.id)) selection = null;
+    multi = multi.filter((n) => studio.instances.has(n));
     viewer.setSelection(selection);
+    viewer.setMultiSelection(multi);
     timed("renderPanels", () => renderPanels());
     renderHistory();
     renderEmptyState();
@@ -674,6 +843,553 @@ async function boot() {
     }
   }
 
+  // ---- clipboard: copy / cut / paste / duplicate --------------------------
+  //
+  // What a copy IS here is the whole design decision. An instance is a
+  // REFERENCE to a library cell plus a transform — that is why ten placements
+  // cost one mesh — so pasting one places another reference to the same cell,
+  // never a copy of its blocks. The pasted instance carries the transform and
+  // the per-port Exec/Bus promotions (those are per-instance patches, so they
+  // are genuinely part of what was copied) and nothing else.
+  //
+  // Buses follow the same reasoning. A bus is an INTENT (driver, sinks, gates)
+  // that the router realizes; blocks are its output, not its identity. So a
+  // bus with both ends inside the copied group is re-declared for the pasted
+  // group and routed fresh — and if the router cannot do it, the bus is left
+  // FAILED with the router's own reason, exactly as any other failed route is.
+  // A bus with one end outside the group is not copied: half a bus is nothing.
+
+  /** The clipboard, plus how many times it has been pasted — each paste steps
+   *  further from the source so a repeated Ctrl-V does not stack. */
+  let clipboard: Clip | null = null;
+  let pasteCount = 0;
+
+  function copySelection(): number {
+    const names = selectedInstances();
+    if (!names.length) { toast("nothing selected to copy", "err"); return 0; }
+    clipboard = studio.copy(names);
+    pasteCount = 0;
+    if (!clipboard) { toast("could not copy that selection", "err"); return 0; }
+    const buses = clipboard.buses.length;
+    toast(`copied ${names.length} component${names.length === 1 ? "" : "s"}` +
+      (buses ? ` + ${buses} internal bus${buses === 1 ? "" : "es"}` : ""),
+      { fix: buses
+        ? "⌘/Ctrl-V pastes them and re-routes those buses for the new group"
+        : "⌘/Ctrl-V pastes at the cursor · buses that leave the group are not copied" });
+    log(`copy: ${names.join(", ")}${buses ? ` (buses: ${clipboard.buses.length})` : ""}`);
+    return names.length;
+  }
+
+  function cutSelection(): number {
+    const names = selectedInstances();
+    if (!names.length) { toast("nothing selected to cut", "err"); return 0; }
+    const clip = studio.cut(names);
+    if (!clip) { toast("could not cut that selection", "err"); return 0; }
+    clipboard = clip;
+    pasteCount = 0;
+    select(null);
+    toast(`cut ${names.length} component${names.length === 1 ? "" : "s"} · ⌘/Ctrl-V pastes ` +
+      `${names.length === 1 ? "it" : "them"} back · ⌘/Ctrl-Z undoes the cut`);
+    log(`cut: ${names.join(", ")}`);
+    return names.length;
+  }
+
+  /** Paste at an explicit spot, else under the cursor, else stepped off the
+   *  copy's own origin so a paste is always visible somewhere sensible. */
+  function pasteClipboard(at?: Vec3): PasteReport | null {
+    if (!clipboard) { toast("clipboard is empty — select a component and ⌘/Ctrl-C", "err"); return null; }
+    pasteCount++;
+    const span = 4 + pasteCount * 2;
+    const target = at ?? viewer.cursorGround() ?? [
+      clipboard.origin[0] + span, clipboard.origin[1], clipboard.origin[2] + span,
+    ] as Vec3;
+    const report = studio.paste(clipboard, [target[0], clipboard.origin[1], target[2]] as Vec3);
+    if (report.error && !report.instances.length) {
+      toast(`paste failed: ${report.error}`, "err");
+      log(`paste failed: ${report.error}`);
+      return report;
+    }
+    // The pasted group becomes the selection, so a second Ctrl-V/⌘D chains and
+    // R/G/Del act on what was just made.
+    const names = report.instances.map((i) => i.name);
+    multi = names;
+    selection = names.length ? { kind: "instance", id: names[0] } : null;
+    viewer.setSelection(selection);
+    viewer.setMultiSelection(multi);
+    const failed = Object.entries(report.failed);
+    toast(`pasted ${names.join(", ")}` +
+      (report.buses.length ? ` + ${report.buses.length} bus${report.buses.length === 1 ? "" : "es"}` : "") +
+      (report.nudged ? ` (offset by ${report.nudged.filter(Boolean).join(",")} to clear a keepout)` : ""),
+      { fix: "one ⌘/Ctrl-Z removes the whole paste" });
+    for (const [bus, reason] of failed.slice(0, 2)) failToast(bus, reason);
+    log(`paste: ${names.join(", ")} buses=[${report.buses}]` +
+      (failed.length ? ` FAILED: ${failed.map(([b, r]) => `${b}: ${r}`).join("; ")}` : "") +
+      (report.error ? ` partial: ${report.error}` : ""));
+    renderPanels();
+    setHint();
+    return report;
+  }
+
+  /** Duplicate in place with an offset: copy + paste in one keystroke, which is
+   *  the gesture people actually reach for when arraying a cell. */
+  function duplicateSelection(): PasteReport | null {
+    const names = selectedInstances();
+    if (!names.length) { toast("nothing selected to duplicate", "err"); return null; }
+    const clip = studio.copy(names);
+    if (!clip) return null;
+    const keep = clipboard;
+    clipboard = clip;
+    const dims = studio.cells.get(clip.instances[0].cell)?.dims ?? [4, 1, 4];
+    const report = pasteClipboard([
+      clip.origin[0] + Math.max(dims[0], 4) + 2, clip.origin[1], clip.origin[2],
+    ] as Vec3);
+    // ⌘D is not "copy": whatever was on the clipboard stays there.
+    clipboard = keep ?? clip;
+    return report;
+  }
+
+  // ---- right-click context menu -------------------------------------------
+  //
+  // The menu is context-SENSITIVE, and the reason it earns its place is one
+  // entry: "add a gate here". Gate steering is the most powerful thing the
+  // router exposes and it was undiscoverable, because a gate needs a POSITION
+  // and no panel has one. A right-click does: the world point under the cursor
+  // is exactly where the user means.
+
+  interface CtxItem {
+    label: string;
+    hint?: string;
+    danger?: boolean;
+    run?: () => void;
+    /** One level of submenu (per-port modes, the cell library). */
+    sub?: CtxItem[];
+  }
+
+  const ctxEl = () => $("#ctx-menu");
+  function contextMenuOpen(): boolean {
+    return ctxEl().classList.contains("is-open");
+  }
+  function closeContextMenu() {
+    ctxEl().classList.remove("is-open");
+    ctxEl().innerHTML = "";
+    ctxTarget = null;
+  }
+  let ctxTarget: PickTarget | null = null;
+
+  /** What the menu offered last time it opened, so the verify can assert the
+   *  entries are context-sensitive without screen-scraping. */
+  let ctxItems: CtxItem[] = [];
+
+  function ctxFor(target: PickTarget): CtxItem[] {
+    const sep: CtxItem = { label: "-" };
+    if (target.kind === "instance") {
+      const name = target.id;
+      const inst = studio.instances.get(name);
+      const group = selectedInstances();
+      const many = group.length > 1 && group.includes(name);
+      const ports = endpoints.filter((p) => p.instance === name && p.promotable);
+      const carried = studio.busesOn(name);
+      return [
+        { label: `${name} · ${inst?.cell ?? ""}`, hint: `@ ${inst?.at.join(",")} · rot ${inst?.rot}°` },
+        sep,
+        { label: "Rotate CW", hint: "R", run: () => { rotateFromMenu(name, 90); } },
+        { label: "Rotate CCW", hint: "⇧R", run: () => { rotateFromMenu(name, -90); } },
+        { label: "Duplicate", hint: "⌘/Ctrl-D", run: () => { select({ kind: "instance", id: name }); duplicateSelection(); } },
+        { label: many ? `Copy ${group.length} selected` : "Copy", hint: "⌘/Ctrl-C", run: () => { copySelection(); } },
+        { label: many ? `Cut ${group.length} selected` : "Cut", hint: "⌘/Ctrl-X", run: () => { cutSelection(); } },
+        sep,
+        {
+          label: "Port modes",
+          hint: ports.length ? `${ports.length} switchable` : "none switchable",
+          sub: ports.map((p) => ({
+            label: `${p.port} → ${p.mode === "bus" ? "Executor" : "Bus"}`,
+            hint: p.mode === "bus" ? "Bus now" : "Exec now",
+            run: () => togglePortMode(name, p.port),
+          })),
+        },
+        {
+          label: "Promote all inputs to Bus",
+          hint: "so buses can land on them",
+          run: () => {
+            const targets = endpoints.filter((p) =>
+              p.instance === name && p.promotable && p.mode !== "bus" && p.kind === "output");
+            if (!targets.length) { toast(`${name} has no executor-only inputs to promote`); return; }
+            studio.transaction(`promote ${targets.length} port(s) on ${name}`, () => {
+              for (const p of targets) {
+                try { studio.setPortMode(name, p.port, "bus"); } catch { /* refused */ }
+              }
+            });
+            viewer.invalidateCell(inst?.cell ?? "");
+            refresh();
+            toast(`promoted ${targets.length} port(s) on ${name} · one ⌘/Ctrl-Z undoes it`);
+          },
+        },
+        sep,
+        { label: "Frame", hint: "F", run: () => { viewer.focusInstance(name); } },
+        {
+          label: carried.length ? `Rip its ${carried.length} bus(es)` : "Rip its buses",
+          hint: carried.length ? carried.join(", ") : "none",
+          run: () => {
+            if (!carried.length) { toast(`${name} carries no buses`); return; }
+            studio.transaction(`rip ${carried.length} bus(es) on ${name}`, () => {
+              for (const b of carried) studio.ripBus(b);
+            });
+            toast(`ripped ${carried.join(", ")} — declarations kept · ⌘/Ctrl-Z undoes it`);
+          },
+        },
+        sep,
+        {
+          label: many ? `Delete ${group.length} selected` : "Delete",
+          hint: "Del", danger: true,
+          run: () => { if (many) void deleteSelection(group); else void deleteInstance(name); },
+        },
+      ];
+    }
+    if (target.kind === "port") {
+      const p = endpoint(target.id);
+      return [
+        { label: target.id, hint: p ? `${p.kind === "input" ? "drives" : "receives"} · ${p.ty}` : "" },
+        sep,
+        {
+          label: "Start a bus from here",
+          hint: p?.kind === "input" ? "then click an input" : "outputs receive",
+          run: () => { select({ kind: "port", id: target.id }); onPortChip(target.id); },
+        },
+        ...(p?.instance && p.promotable ? [{
+          label: `Switch to ${p.mode === "bus" ? "Executor" : "Bus"} mode`,
+          hint: p.mode === "bus" ? "Bus now" : "Exec now",
+          run: () => togglePortMode(p.instance!, p.port),
+        }] : []),
+        { label: "Frame", run: () => { if (p) viewer.focusOn(p.anchor); } },
+      ];
+    }
+    if (target.kind === "gate") {
+      const [bus, gate] = target.id.split(" ");
+      const { gates, segments } = studio.gateSummary(bus);
+      const i = gates.findIndex((g) => g.name === gate);
+      return [
+        { label: `gate ${i + 1} of ${gates.length} · ${bus}`, hint: `${segments} trunk span(s)` },
+        sep,
+        {
+          label: "Remove gate",
+          hint: "Del · the route straightens",
+          danger: true,
+          run: () => removeGate(bus, i),
+        },
+        { label: "Frame", hint: "F", run: () => { if (gates[i]) viewer.focusOn(gates[i].anchor); } },
+        { label: `Select ${bus}`, run: () => selectBus(bus) },
+      ];
+    }
+    if (target.kind === "bus") {
+      const name = target.id;
+      const d = studio.busStateDetail(name);
+      const b = studio.buses.get(name);
+      const step = (endpoint(b?.driver ?? "")?.step ?? [0, 2, 0]) as Vec3;
+      const style = viewer.busStyleOf(name);
+      const { gates, segments } = studio.gateSummary(name);
+      return [
+        { label: `${name} · ${d.state}`, hint: b ? `${b.driver} → ${b.sinks.join(", ")}` : "" },
+        sep,
+        {
+          label: `Add gate here (${gateAnchorFor(name, target.at).at.join(",")})`,
+          // An engine limitation worth naming in the menu rather than only in
+          // the failure: `Design::add_gate` resolves its bus's endpoints through
+          // the DECLARED port table, so a bus between two placed cells (which is
+          // most of them) cannot take a gate on this build even though
+          // `move_gate` handles one fine. Offering the entry anyway is right —
+          // it works the moment the engine resolves instance ports here — but
+          // the hint should not promise what the core will refuse.
+          hint: "the route must pass through this point",
+          run: () => {
+            const { at, snapped } = gateAnchorFor(name, target.at);
+            try {
+              const r = studio.addGateAt(name, at, step);
+              const summary = studio.gateSummary(name);
+              const i = summary.gates.findIndex((g) => g.name === r.name);
+              toast(`checkpoint ${i + 1} of ${summary.gates.length} on ${name} at ` +
+                `${at.join(",")} — ${r.state.startsWith("failed") ? "FAILED" : r.state}`, {
+                kind: r.state.startsWith("failed") ? "err" : "ok",
+                fix: (snapped
+                  ? `y snapped to the bus's own level (${at[1]}); `
+                  : "") + "drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it",
+                at,
+              });
+              log(`addGate ${name} @ ${at.join(",")} (${r.fast ? "fast path" : "re-declared"}) -> ${r.state}`);
+              if (r.state.startsWith("failed")) failToast(name, r.state.replace(/^failed:?\s*/, ""));
+              select({ kind: "gate", id: `${name} ${r.name}` });
+            } catch (err) {
+              lastGateRefusal = { bus: name, at, error: String(err) };
+              toast(`${name} will not take a checkpoint at ${at.join(",")}`, {
+                kind: "err",
+                fix: `the router refused it and the bus is unchanged: ${err}`,
+                at,
+              });
+              log(`addGate ${name} @ ${at.join(",")} REFUSED: ${err}`);
+            }
+          },
+        },
+        ...(gates.length ? [{
+          label: `Remove a gate (${gates.length})`,
+          hint: `${segments} trunk span(s) now`,
+          sub: gates.map((g, i) => ({
+            label: `Remove gate ${i + 1} @ ${g.anchor.join(",")}`,
+            hint: "the route straightens",
+            danger: true,
+            run: () => removeGate(name, i),
+          })),
+        }] : []),
+        { label: "Re-route", hint: "R", run: () => {
+          const state = studio.rerouteBus(name);
+          if (state.startsWith("failed")) failToast(name, state.replace(/^failed:?\s*/, ""));
+          else toast(`${name} ${state}`);
+        } },
+        { label: "Rip", hint: "keeps the declaration", run: () => {
+          studio.ripBus(name);
+          toast(`ripped ${name} — press Re-route or ⌘/Ctrl-Z`);
+        } },
+        sep,
+        {
+          label: "Draw this bus",
+          hint: style,
+          sub: (["solid", "translucent", "outline"] as BusStyle[]).map((s) => ({
+            label: s === style ? `● ${s}` : `○ ${s}`,
+            hint: s === "outline" ? "shows the redstone" : s === "solid" ? "highest contrast" : "tinted",
+            run: () => { viewer.setBusStyleFor(name, s === viewer.globalBusStyle() ? null : s); },
+          })),
+        },
+        ...(d.state === "failed" ? [{
+          label: "Focus the blockage",
+          hint: humanReason(d.reason).headline.slice(0, 40),
+          run: () => {
+            const at = humanReason(d.reason).at;
+            if (at) viewer.focusOn(at); else toast("the router did not name a coordinate", "err");
+          },
+        }] : []),
+        { label: "Frame", run: () => {
+          const at = endpoint(b?.driver ?? "")?.anchor;
+          if (at) viewer.focusOn(at);
+        } },
+        sep,
+        { label: "Delete", hint: "Del", danger: true, run: () => { void deleteBus(name); } },
+      ];
+    }
+    // Empty space.
+    return [
+      { label: `ground ${target.at.join(",")}`, hint: "nothing under the cursor" },
+      sep,
+      {
+        label: clipboard ? `Paste ${clipboard.instances.length} here` : "Paste",
+        hint: "⌘/Ctrl-V",
+        run: () => {
+          if (!clipboard) { toast("clipboard is empty — select a component and ⌘/Ctrl-C", "err"); return; }
+          pasteClipboard(target.at);
+        },
+      },
+      {
+        label: "Add a component here",
+        hint: `${studio.cells.size} cells`,
+        sub: [...studio.cells.keys()].slice(0, 24).map((cell) => ({
+          label: cell,
+          run: () => {
+            try {
+              const inst = studio.placeInstance(cell, target.at);
+              select({ kind: "instance", id: inst.name });
+              toast(`${inst.name} placed at ${target.at.join(",")}`);
+            } catch (err) {
+              toast(String(err), "err");
+            }
+          },
+        })),
+      },
+      sep,
+      { label: "Frame all", hint: "A", run: () => { viewer.frameAll(); } },
+      {
+        label: viewer.isTextured() ? "Abstract view" : "Textured view",
+        hint: "resource pack",
+        run: () => {
+          const box = $("#textured") as HTMLInputElement;
+          box.checked = !box.checked;
+          box.dispatchEvent(new Event("change"));
+        },
+      },
+      {
+        label: "Toggle IO markers",
+        hint: "the ▲▼ cones",
+        run: () => {
+          const box = $("#show-io") as HTMLInputElement;
+          box.checked = !box.checked;
+          box.dispatchEvent(new Event("change"));
+        },
+      },
+      {
+        label: "Bus drawing",
+        hint: viewer.globalBusStyle(),
+        sub: (["solid", "translucent", "outline"] as BusStyle[]).map((s) => ({
+          label: s === viewer.globalBusStyle() ? `● ${s}` : `○ ${s}`,
+          run: () => setBusStyle(s),
+        })),
+      },
+    ];
+  }
+
+  /** Where a gate CLICKED at `at` should actually go.
+   *
+   *  A bus is a stack of bits at a 2y pitch, so a right-click lands on whichever
+   *  bit's block happened to be under the cursor — bit 5, say, three blocks above
+   *  the trunk's bit-0 level. A gate anchored there is not a waypoint on the run,
+   *  it is a demand for a level change, and this router answers that with
+   *  "vertical level adapters are not implemented yet". What the click MEANS is
+   *  the (x, z) waypoint; the level belongs to the bus. So y snaps to the
+   *  driver's bit-0 anchor and the UI says it did. */
+  function gateAnchorFor(bus: string, at: Vec3): { at: Vec3; snapped: boolean } {
+    const driver = studio.buses.get(bus)?.driver;
+    const level = driver ? endpoint(driver)?.anchor[1] : undefined;
+    if (level == null || level === at[1]) return { at: [...at] as Vec3, snapped: false };
+    return { at: [at[0], level, at[2]] as Vec3, snapped: true };
+  }
+
+  /** Can this bus take a gate on the loaded engine? Its endpoints have to be
+   *  DECLARED ports — see the note on the menu entry. */
+  function gateable(bus: string): boolean {
+    const b = studio.buses.get(bus);
+    if (!b) return false;
+    return studio.ports.has(b.driver) && b.sinks.every((s) => studio.ports.has(s));
+  }
+
+  /** The last gate the engine refused, so the verify can assert the refusal is
+   *  REPORTED rather than swallowed. */
+  let lastGateRefusal: { bus: string; at: Vec3; error: string } | null = null;
+
+  function rotateFromMenu(name: string, delta: number) {
+    try {
+      const report = studio.rotateInstance(name, delta);
+      studio.endGesture();
+      reportBuses(`rotate ${name} -> ${report.rot}°`, report);
+      toast(`${name} rotated to ${report.rot}°`);
+    } catch (err) {
+      toast(String(err), "err");
+    }
+  }
+
+  function openContextMenu(target: PickTarget) {
+    // A menu must never fight a gesture: while placing, connecting or grabbing,
+    // the right button cancels the gesture instead (that is what people expect
+    // from every other editor).
+    if (mode.kind !== "idle") {
+      const was = mode.kind;
+      if (mode.kind === "grabbing") applyMove("instance", mode.instance, mode.origin, "drop");
+      setMode({ kind: "idle" });
+      toast(`cancelled ${was === "placing" ? "placement" : was === "connecting" ? "the bus" : "the move"}`);
+      return;
+    }
+    // Right-clicking a thing also SELECTS it — a menu acting on something the
+    // canvas does not show as selected is how people delete the wrong cell.
+    if (target.kind === "instance" && !selectedInstances().includes(target.id)) {
+      select({ kind: "instance", id: target.id });
+    }
+    if (target.kind === "bus") selectBus(target.id);
+    ctxTarget = target;
+    ctxItems = ctxFor(target);
+    renderContextMenu(target.screen);
+  }
+
+  function renderContextMenu(screen: [number, number]) {
+    const el = ctxEl();
+    const row = (it: CtxItem, i: number, path: string): string => {
+      if (it.label === "-") return `<div class="ctx-sep"></div>`;
+      const isHead = i === 0 && path === "";
+      if (isHead) return `<div class="ctx-head">${esc(it.label)}${it.hint ? `<span>${esc(it.hint)}</span>` : ""}</div>`;
+      const sub = it.sub?.length
+        ? `<div class="ctx-sub">${it.sub.map((s, j) => row(s, j, `${path}${i}.`)).join("")}</div>`
+        : "";
+      const dead = !it.run && !it.sub?.length;
+      return `<div class="ctx-item${it.danger ? " danger" : ""}${it.sub ? " has-sub" : ""}${dead ? " is-dead" : ""}"
+                   ${it.run ? `data-ctx="${esc(`${path}${i}`)}"` : ""} tabindex="0">
+        <span>${esc(it.label)}</span>${it.hint ? `<em>${esc(it.hint)}</em>` : ""}${it.sub ? `<b>›</b>` : ""}
+        ${sub}</div>`;
+    };
+    el.innerHTML = ctxItems.map((it, i) => row(it, i, "")).join("");
+    el.classList.add("is-open");
+    // Keep it on screen: flip against the right/bottom edges.
+    const r = el.getBoundingClientRect();
+    const x = Math.min(screen[0], window.innerWidth - r.width - 8);
+    const y = Math.min(screen[1], window.innerHeight - r.height - 8);
+    el.style.left = `${Math.max(4, x)}px`;
+    el.style.top = `${Math.max(4, y)}px`;
+    for (const node of el.querySelectorAll<HTMLElement>("[data-ctx]")) {
+      const fire = (ev: Event) => {
+        ev.stopPropagation();
+        const item = ctxItemAt(node.dataset.ctx!);
+        closeContextMenu();
+        item?.run?.();
+      };
+      node.addEventListener("click", fire);
+      node.addEventListener("keydown", (ev) => { if ((ev as KeyboardEvent).key === "Enter") fire(ev); });
+    }
+  }
+
+  /** `"3"` or `"7.2"` -> the item, so a click carries no closure state. */
+  function ctxItemAt(path: string): CtxItem | null {
+    let list = ctxItems;
+    let item: CtxItem | null = null;
+    for (const part of path.split(".").filter(Boolean)) {
+      item = list[Number(part)] ?? null;
+      list = item?.sub ?? [];
+    }
+    return item;
+  }
+
+  window.addEventListener("pointerdown", (e) => {
+    if (!contextMenuOpen()) return;
+    if ((e.target as HTMLElement).closest("#ctx-menu")) return;
+    closeContextMenu();
+  }, true);
+
+  // ---- bus presentation dial ----------------------------------------------
+
+  const BUS_STYLE_KEY = "eda.busStyle";
+  function setBusStyle(style: BusStyle, remember = true) {
+    viewer.setBusStyle(style);
+    if (remember) localStorage.setItem(BUS_STYLE_KEY, style);
+    const sel = $("#bus-style") as HTMLSelectElement | null;
+    if (sel) sel.value = style;
+    renderPanels();
+  }
+  {
+    // Remembered across sessions: how someone wants their buses drawn is a
+    // preference, not a per-session accident.
+    const saved = localStorage.getItem(BUS_STYLE_KEY);
+    if (saved === "solid" || saved === "translucent" || saved === "outline") {
+      viewer.setBusStyle(saved);
+    }
+    const sel = $("#bus-style") as HTMLSelectElement | null;
+    if (sel) {
+      sel.value = viewer.globalBusStyle();
+      sel.addEventListener("change", () => setBusStyle(sel.value as BusStyle));
+    }
+  }
+
+  /** Delete an area selection as ONE undo step, with one prompt for the lot. */
+  async function deleteSelection(names: string[]) {
+    const carried = new Set<string>();
+    for (const n of names) for (const b of studio.busesOn(n)) carried.add(b);
+    const ok = await confirmDestructive(
+      `Delete ${names.length} components${carried.size ? ` and rip ${carried.size} bus(es)` : ""}?`,
+      `${names.join(", ")}` +
+      (carried.size ? ` carry ${carried.size} bus(es): ${[...carried].join(", ")}, which go too.` : ".") +
+      ` One ⌘/Ctrl-Z puts everything back.`,
+      `Delete ${names.length}`,
+    );
+    if (!ok) { toast(`kept ${names.length} components`); return; }
+    studio.transaction(`delete ${names.length} components`, () => {
+      for (const n of names) {
+        try { studio.removeInstance(n); } catch { /* already gone */ }
+      }
+    });
+    select(null);
+    toast(`deleted ${names.length} components · one ⌘/Ctrl-Z puts them back`);
+  }
+
   window.addEventListener("keydown", (e) => {
     const t = e.target as HTMLElement;
     if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
@@ -681,6 +1397,7 @@ async function boot() {
     // Esc unwinds ONE layer at a time, outermost first: a modal, then an
     // overlay, then the gesture, then the selection. Never a dead key.
     if (e.key === "Escape") {
+      if (contextMenuOpen()) { closeContextMenu(); return; }
       if (pendingConfirm) { confirmRespond(false); return; }
       if (shortcutsOpen()) { setShortcuts(false); return; }
       if (coachOpen) { coachDismiss(); return; }
@@ -706,11 +1423,60 @@ async function boot() {
       return;
     }
     if (key === "y" && e.ctrlKey) { e.preventDefault(); doRedo(); return; }
+    // Clipboard. These take precedence over the single-key shortcuts below and
+    // work whatever is selected, because a paste needs no selection at all.
+    if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+      if (key === "c") { e.preventDefault(); copySelection(); return; }
+      if (key === "x") { e.preventDefault(); cutSelection(); return; }
+      if (key === "v") { e.preventDefault(); pasteClipboard(); return; }
+      if (key === "d") { e.preventDefault(); duplicateSelection(); return; }
+    }
     // `A` frames the whole design; so does `F` when nothing is selected.
     if (key === "a" && !e.metaKey && !e.ctrlKey) {
       e.preventDefault();
       if (viewer.frameAll()) toast("framed the whole design");
       return;
+    }
+    // A selected GATE: Del removes the checkpoint (the net is untouched).
+    if (selection?.kind === "gate") {
+      const [bus, gate] = selection.id.split(" ");
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        const i = studio.gateSummary(bus).gates.findIndex((g) => g.name === gate);
+        if (i >= 0) removeGate(bus, i);
+        return;
+      }
+      if (key === "f") {
+        e.preventDefault();
+        const g = studio.gateSummary(bus).gates.find((x) => x.name === gate);
+        if (g) { viewer.focusOn(g.anchor); toast(`framed ${selection.id}`); }
+        return;
+      }
+    }
+    // A selected BUS is a first-class object: Del deletes it, R re-routes it.
+    if (selection?.kind === "bus") {
+      const bus = selection.id;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        void deleteBus(bus);
+        return;
+      }
+      if (key === "r") {
+        e.preventDefault();
+        const state = studio.rerouteBus(bus);
+        log(`re-routed ${bus}: ${state}`);
+        if (state.startsWith("failed")) failToast(bus, state.replace(/^failed:?\s*/, ""));
+        else toast(`${bus} ${state}`);
+        return;
+      }
+      if (key === "f") {
+        e.preventDefault();
+        const at = studio.busStateDetail(bus).reason
+          ? humanReason(studio.busStateDetail(bus).reason).at
+          : endpoint(studio.buses.get(bus)!.driver)?.anchor;
+        if (at) { viewer.focusOn(at); toast(`framed ${bus}`); }
+        return;
+      }
     }
     if (!selection || selection.kind !== "instance") {
       if (key === "f") {
@@ -739,7 +1505,9 @@ async function boot() {
     }
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
-      void deleteInstance(name);
+      const group = selectedInstances();
+      if (group.length > 1) void deleteSelection(group);
+      else void deleteInstance(name);
       return;
     }
     if (key === "g") {
@@ -899,8 +1667,11 @@ async function boot() {
       const skew = state === "routed" ? studio.busSkew(b.name) : null;
       // A failed bus focuses the BLOCKAGE; a routed one focuses its driver.
       const focus = h?.at ?? endpoint(b.driver)?.anchor ?? null;
-      return `<div class="item"${focus ? ` data-focus="${esc(focus.join(","))}"` : ""}
-                   title="${focus ? "click to fly to this bus" : ""}">
+      const sel = selection?.kind === "bus" && selection.id === b.name;
+      const style = viewer.busStyleOf(b.name);
+      return `<div class="item${sel ? " is-selected" : ""}" data-busrow="${esc(b.name)}"
+                   ${focus ? ` data-busfocus="${esc(focus.join(","))}"` : ""}
+                   title="click to select it on the canvas · double-click flies there">
         <span class="swatch" style="background:${state === "failed" ? "var(--c-failed)"
           : `#${b.color.toString(16).padStart(6, "0")}`}"
           title="${state === "failed" ? "failed buses draw red" : "this bus's colour on the canvas"}"></span>
@@ -908,6 +1679,15 @@ async function boot() {
         ${skew ? `<span class="badge" title="round-trip ticks: worst bit, and the spread across bits">${skew.max_rt}t · skew ${skew.skew_rt}t</span>` : ""}
         <span class="meta">${esc(b.driver)} → ${esc(b.sinks.join(", "))} · ${
           endpoint(b.driver)?.width ?? "?"} bit${b.gates.length ? ` · gates ${esc(b.gates.map((g) => g.name).join(","))}` : ""}</span>
+        <span class="meta">${b.gates.length + 1} trunk span(s) · ${
+          b.gates.length ? `${b.gates.length} gate(s)` : "no gates"}</span>
+        ${sel && b.gates.length ? `<div class="gates">${b.gates.map((g, i) => `
+          <span class="gate-row">
+            <button class="gate-chip" data-gatefocus="${esc(g.anchor.join(","))}"
+                    title="fly to this checkpoint">◆ gate ${i + 1} @ ${esc(g.anchor.join(","))}</button>
+            <button class="danger" data-gatedel="${esc(`${b.name}|${i}`)}"
+                    title="remove this checkpoint — the route may straighten (the netlist does not change)">✕</button>
+          </span>`).join("")}</div>` : ""}
         ${h ? `<span class="meta reason">${esc(h.headline)}</span>` : ""}
         ${h?.fix ? `<span class="meta fix">↳ ${esc(h.fix)}</span>` : ""}
         ${h ? `<details><summary>the engine's own words${h.at ? ` · ${esc(fmtAt(h.at))}` : ""}</summary><div class="raw">${esc(h.detail)}</div></details>` : ""}
@@ -916,6 +1696,11 @@ async function boot() {
           <button data-reroute="${esc(b.name)}" title="try again from the stored declaration">Re-route</button>
           ${focus ? `<button data-focus-btn="${esc(focus.join(","))}" title="fly to ${esc(fmtAt(focus))}">Focus</button>` : ""}
           <button data-delbus="${esc(b.name)}" class="danger">Delete</button>
+          <select class="bus-style-one" data-busstyle="${esc(b.name)}"
+                  title="how this bus draws over the redstone it is made of">
+            ${(["solid", "translucent", "outline"] as const).map((s) =>
+              `<option value="${s}"${s === style ? " selected" : ""}>${s}</option>`).join("")}
+          </select>
         </div>
       </div>`;
     }).join("") || `<span class="meta">click a green ▲ output port then a blue ▼ input port to route one</span>`;
@@ -927,6 +1712,45 @@ async function boot() {
         const at = raw.split(",").map(Number) as Vec3;
         if (at.length === 3 && at.every((n) => Number.isFinite(n))) viewer.focusOn(at);
       });
+    }
+    // A bus row selects its bus (single click) and flies to it (double), the
+    // same contract the instance rows have.
+    for (const el of $("#bus-list").querySelectorAll<HTMLElement>("[data-busrow]")) {
+      el.addEventListener("click", (ev) => {
+        if ((ev.target as HTMLElement).closest("button, select")) return;
+        selectBus(el.dataset.busrow!);
+      });
+      el.addEventListener("dblclick", (ev) => {
+        if ((ev.target as HTMLElement).closest("button, select")) return;
+        const raw = el.dataset.busfocus;
+        if (!raw) return;
+        const at = raw.split(",").map(Number) as Vec3;
+        if (at.length === 3 && at.every(Number.isFinite)) viewer.focusOn(at);
+      });
+    }
+    for (const el of $("#bus-list").querySelectorAll<HTMLElement>("[data-gatefocus]")) {
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const at = el.dataset.gatefocus!.split(",").map(Number) as Vec3;
+        if (at.length === 3 && at.every(Number.isFinite)) viewer.focusOn(at);
+      });
+    }
+    for (const el of $("#bus-list").querySelectorAll<HTMLElement>("[data-gatedel]")) {
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const [bus, i] = el.dataset.gatedel!.split("|");
+        removeGate(bus, Number(i));
+      });
+    }
+    for (const el of $("#bus-list").querySelectorAll<HTMLSelectElement>("[data-busstyle]")) {
+      el.addEventListener("change", (ev) => {
+        ev.stopPropagation();
+        const bus = el.dataset.busstyle!;
+        const style = el.value as BusStyle;
+        viewer.setBusStyleFor(bus, style === viewer.globalBusStyle() ? null : style);
+        log(`bus ${bus} draws ${style}`);
+      });
+      el.addEventListener("click", (ev) => ev.stopPropagation());
     }
     for (const el of $("#bus-list").querySelectorAll<HTMLElement>("[data-rip]")) {
       el.addEventListener("click", (ev) => {
@@ -1548,7 +2372,7 @@ async function boot() {
     labels: () => ({ ...viewer.labelStats, thresholds: { ...Viewer.LABELS } }),
     /** Where the camera was last sent by a click-to-focus. */
     focus: () => viewer.lastFocus,
-    focusOn: (at: Vec3) => viewer.focusOn(at),
+    focusOn: (at: Vec3, radius?: number) => viewer.focusOn(at, radius),
     /** Orbit distance — what the label thresholds are a function of. */
     frameAll: () => viewer.frameAll(),
     zoom: (radius: number) => { viewer.setOrbitRadius(radius); return viewer.orbitRadius(); },
@@ -1568,6 +2392,111 @@ async function boot() {
     timingsReset: () => { for (const k of Object.keys(timings)) delete timings[k]; },
     /** Rebuild the scene from scratch, as a state change would. */
     refresh,
+
+    // ---- selection, clipboard, buses, context menu ------------------------
+    /** Everything selected, primary first. */
+    selected: () => selectedInstances(),
+    /** Shift-click, through the same path the canvas drives. */
+    extendSelection,
+    selectBus,
+    deleteBus: (name: string) => deleteBus(name),
+    copy: () => copySelection(),
+    cut: () => cutSelection(),
+    paste: (at?: Vec3) => pasteClipboard(at),
+    duplicate: () => duplicateSelection(),
+    clipboard: () => clipboard && {
+      instances: clipboard.instances.map((c) => ({ src: c.src, cell: c.cell, rel: c.rel, rot: c.rot, busPorts: c.busPorts })),
+      buses: clipboard.buses.map((b) => ({ driver: b.driver, sinks: b.sinks })),
+      origin: clipboard.origin,
+    },
+    /** Open the context menu on whatever a right-click there would hit. */
+    contextMenu: (target: Partial<PickTarget> & { kind: PickTarget["kind"]; id?: string }) => {
+      openContextMenu({
+        kind: target.kind, id: target.id ?? "",
+        at: target.at ?? [0, 0, 0], screen: target.screen ?? [400, 300],
+        additive: !!target.additive,
+      });
+      return ctxItems.map((i) => ({
+        label: i.label, hint: i.hint, danger: !!i.danger,
+        sub: i.sub?.map((s) => s.label),
+      }));
+    },
+    /** Fire a menu entry by its label (what a click on it does). */
+    contextFire: (label: string) => {
+      const find = (items: CtxItem[]): CtxItem | null => {
+        for (const it of items) {
+          if (it.label === label) return it;
+          const hit = it.sub ? find(it.sub) : null;
+          if (hit) return hit;
+        }
+        return null;
+      };
+      const item = find(ctxItems);
+      closeContextMenu();
+      if (!item?.run) return false;
+      item.run();
+      return true;
+    },
+    contextOpen: () => contextMenuOpen(),
+    /** `null` unless the engine refused a gate — then what it said. */
+    lastGateRefusal: () => lastGateRefusal,
+    gateable,
+    // ---- gates (bus checkpoints) ------------------------------------------
+    gates: (bus: string) => studio.gateSummary(bus),
+    addGate: (bus: string, at: Vec3) => {
+      const step = (endpoint(studio.buses.get(bus)?.driver ?? "")?.step ?? [0, 2, 0]) as Vec3;
+      return studio.addGateAt(bus, gateAnchorFor(bus, at).at, step);
+    },
+    /** Where a click at `at` would actually put a gate (y snaps to the bus). */
+    gateAnchorFor: (bus: string, at: Vec3) => gateAnchorFor(bus, at),
+    removeGate: (bus: string, index: number) => removeGate(bus, index),
+    /** Drag a gate exactly as the pointer does (kind `"gate"`). */
+    dragGate: (bus: string, gate: string, to: Vec3) =>
+      applyMove("gate", `${bus} ${gate}`, to, "drop"),
+    closeContext: closeContextMenu,
+    busStyle: () => ({
+      global: viewer.globalBusStyle(),
+      stored: localStorage.getItem(BUS_STYLE_KEY),
+      perBus: Object.fromEntries([...studio.buses.keys()].map((n) => [n, viewer.busStyleOf(n)])),
+    }),
+    setBusStyle: (s: BusStyle) => setBusStyle(s),
+    setBusStyleFor: (bus: string, s: BusStyle | null) => viewer.setBusStyleFor(bus, s),
+    /** Commits refused for being out of order — the drag race, counted. */
+    staleCommits: () => staleCommits,
+
+    // ---- the full-scene consistency check ---------------------------------
+    /** Does what is DRAWN match what the engine says the design is?
+     *
+     *  Every rendered layer (each bus, the loose base, every instance body) is
+     *  read back out of the scene graph — vertex buffers and instance matrices,
+     *  not the arrays the renderer was handed — and compared cell-for-cell
+     *  against a fresh read from the engine that bypasses every cache. This is
+     *  the regression guard for the whole incremental-render design: if a
+     *  changed-set is ever incomplete, or a commit lands out of order, this is
+     *  what says so. */
+    consistency: () => {
+      const truth = studio.engineLayers();
+      const drawn = viewer.renderedCells();
+      const key = (b: { x: number; y: number; z: number }) => `${b.x},${b.y},${b.z}`;
+      const layers: { layer: string; engine: number; drawn: number; missing: number; extra: number }[] = [];
+      const mismatches: { layer: string; missing: string[]; extra: string[] }[] = [];
+      const compare = (layer: string, want: Set<string>) => {
+        const have = drawn.get(layer) ?? new Set<string>();
+        const missing = [...want].filter((c) => !have.has(c));
+        const extra = [...have].filter((c) => !want.has(c));
+        layers.push({ layer, engine: want.size, drawn: have.size, missing: missing.length, extra: extra.length });
+        if (missing.length || extra.length) {
+          mismatches.push({ layer, missing: missing.slice(0, 6), extra: extra.slice(0, 6) });
+        }
+      };
+      for (const [name, blocks] of truth.buses) compare(`bus:${name}`, new Set(blocks.map(key)));
+      for (const [name, blocks] of truth.instances) compare(`inst:${name}`, new Set(blocks.map(key)));
+      compare("loose", new Set(truth.loose.map(key)));
+      // A layer the engine no longer has must not still be on screen.
+      const known = new Set(layers.map((l) => l.layer));
+      const orphans = [...drawn.keys()].filter((n) => !known.has(n) && (drawn.get(n)?.size ?? 0) > 0);
+      return { ok: mismatches.length === 0 && orphans.length === 0, layers, mismatches, orphans };
+    },
   };
 }
 

@@ -42,7 +42,17 @@ export interface PortMarker {
 export interface GateMarker { bus: string; name: string; anchor: Vec3; step: Vec3; width: number; }
 export interface InstanceMarker { name: string; cell: string; at: Vec3; dims: Vec3; rot: number; }
 
-export type Selection = { kind: "instance" | "port" | "gate"; id: string } | null;
+export type Selection = { kind: "instance" | "port" | "gate" | "bus"; id: string } | null;
+
+/** How the abstract bus layers draw over the geometry they thread through.
+ *
+ *  A bus fragment IS real redstone — dust, repeaters, the blocks under them —
+ *  so an opaque coloured slab over it hides the thing the user is trying to
+ *  read. `solid` is the high-contrast tracing view, `translucent` lets the
+ *  blocks (or a resource pack's textures) show through the colour, and
+ *  `outline` draws only the fragment's silhouette in the bus colour so the
+ *  redstone is completely unobscured and still identifiable. */
+export type BusStyle = "solid" | "translucent" | "outline";
 
 /** Markers float just past the LAST bit of the column (anchor + step*(w-1))
  *  so they never sit inside the rendered stack. */
@@ -55,14 +65,35 @@ function markerPos(anchor: Vec3, step: Vec3, width: number): Vec3 {
   ];
 }
 
+/** What the pointer is over: the same identity the click handlers use, plus
+ *  the world position under the cursor so a context action can act THERE
+ *  ("add a gate here" is only useful with the here). */
+export interface PickTarget {
+  kind: "instance" | "port" | "gate" | "bus" | "ground";
+  id: string;
+  /** The hit point, or the ground plane point when nothing was hit. */
+  at: Vec3;
+  /** Client coordinates, for placing a menu. */
+  screen: [number, number];
+  /** Additive click (shift/ctrl held): extend the selection. */
+  additive: boolean;
+}
+
 export interface ViewerCallbacks {
   onPortClick(name: string): void;
   onPortHover(name: string | null): void;
-  onInstanceClick(name: string): void;
+  onInstanceClick(name: string, additive: boolean): void;
+  /** A click on a bus's own geometry — buses are selectable objects, not just
+   *  outliner rows. */
+  onBusClick(name: string, additive: boolean): void;
+  /** A click on a gate handle (`"<bus> <gate>"`), before its drag begins. */
+  onGateClick(id: string): void;
   onDragMove(kind: "instance" | "gate", id: string, ground: Vec3): void;
   onDragEnd(kind: "instance" | "gate", id: string, ground: Vec3): void;
   /** A plain click on empty ground (cell-placement mode / deselect). */
   onGroundClick(ground: Vec3): void;
+  /** Right-click, with everything an action needs to be context-sensitive. */
+  onContextMenu(target: PickTarget): void;
 }
 
 const BLOCK_COLORS: [RegExp, number][] = [
@@ -149,6 +180,40 @@ function mergeCubes(blocks: Block[], override: number | null): THREE.BufferGeome
   return geo;
 }
 
+/** The 12 edges of one cube, as vertex pairs. */
+const EDGE_PAIRS: [number, number, number][][] = (() => {
+  const c: [number, number, number][] = [
+    [-1, -1, -1], [1, -1, -1], [1, -1, 1], [-1, -1, 1],
+    [-1, 1, -1], [1, 1, -1], [1, 1, 1], [-1, 1, 1],
+  ];
+  const pairs: [number, number][] = [
+    [0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4],
+    [0, 4], [1, 5], [2, 6], [3, 7],
+  ];
+  return pairs.map(([a, b]) => [c[a], c[b]]);
+})();
+
+/** Outline geometry for a block list: every cube's silhouette, one buffer.
+ *
+ *  Interior edges are not culled — for a 200-cell bus fragment the difference
+ *  is invisible and the cull is a neighbour query per cell. This is built once
+ *  per bus per style change, not per frame. */
+function cubeEdges(blocks: Block[]): THREE.BufferGeometry {
+  const solid = blocks.filter((b) => b.name !== "minecraft:air");
+  const pos = new Float32Array(solid.length * EDGE_PAIRS.length * 2 * 3);
+  let i = 0;
+  for (const b of solid) {
+    for (const [a, c] of EDGE_PAIRS) {
+      pos[i++] = b.x + a[0] * CUBE; pos[i++] = b.y + a[1] * CUBE; pos[i++] = b.z + a[2] * CUBE;
+      pos[i++] = b.x + c[0] * CUBE; pos[i++] = b.y + c[1] * CUBE; pos[i++] = b.z + c[2] * CUBE;
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.computeBoundingSphere();
+  return geo;
+}
+
 /** `Design::transform_pos` is a quarter-turn about the cell's min corner then
  *  a translation, which is exactly one Matrix4:
  *
@@ -166,6 +231,7 @@ function placementMatrix(at: Vec3, rot: number, size: Vec3, out: THREE.Matrix4):
   return out;
 }
 
+const EMPTY_SET: Set<string> = new Set();
 const FAILED_COLOR = 0xff4040;
 /** Drives a bus (fabric input). */
 const DRIVER_COLOR = 0x7bd88f;
@@ -240,9 +306,17 @@ export class Viewer {
     resize();
 
     const el = this.renderer.domElement;
-    el.addEventListener("pointerdown", (e) => this.pointerDown(e));
+    el.addEventListener("pointerdown", (e) => {
+      // The right button is the context menu's, never a drag's.
+      if (e.button === 2) return;
+      this.pointerDown(e);
+    });
     el.addEventListener("pointermove", (e) => this.pointerMove(e));
     el.addEventListener("pointerup", (e) => this.pointerUp(e));
+    el.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      this.cb.onContextMenu(this.pickAt(e as unknown as PointerEvent));
+    });
 
     let last = performance.now();
     const tick = () => {
@@ -326,9 +400,21 @@ export class Viewer {
     capacity: number;
     /** Last matrix written per slot, so an unchanged placement writes nothing. */
     written: Map<string, string>;
+    /** The variant revision this mesh was built from. */
+    rev: number;
+    /** Cell-local blocks it was built from, for the consistency check. */
+    blocks: Block[];
   }>();
   /** Unique (never instanced) layers: one per bus, one for the loose base. */
-  private uniqueMeshes = new Map<string, THREE.Mesh[]>();
+  private uniqueMeshes = new Map<string, {
+    objects: THREE.Object3D[];
+    /** The layer revision, failed flag and style this build reflects — the
+     *  cache key. Any difference means rebuild, whatever `dirty` claimed. */
+    rev: number;
+    failed: boolean;
+    style: string;
+    blocks: Block[];
+  }>();
   private cellGroup = new THREE.Group();
   private looseGroup = new THREE.Group();
   private busGroup = new THREE.Group();
@@ -338,15 +424,35 @@ export class Viewer {
   /** Update the scene from the document model, rebuilding ONLY what
    *  `model.dirty` names. A drag reports `placements` alone, so it writes one
    *  matrix per moved instance and touches no geometry at all. */
+  /** `setScene` is REVISION-DRIVEN, not dirty-list-driven.
+   *
+   *  The perf pass made the document report a changed-set so a drag frame
+   *  re-reads almost nothing, and that is worth keeping — but a renderer that
+   *  believes the changed-set is complete renders a stale mesh the moment it
+   *  is not. So every cached mesh carries the revision it was built from, and
+   *  a mismatch rebuilds regardless of what `dirty` said. `dirty` still
+   *  decides what gets RE-READ out of wasm (the expensive half); `rev` decides
+   *  what gets RE-MESHED (the correct half). The revisions only move on a real
+   *  content change, so this adds an integer compare per layer per frame and
+   *  no rebuilds. */
   setScene(model: SceneModel) {
     this.lastScene = model;
+    let rebuilt = 0;
+    // The two triggers cover each other's failure mode, which is why both are
+    // consulted rather than one replacing the other:
+    //   * `dirty` can be INCOMPLETE (a changed-set that forgot a layer) — the
+    //     revision catches that;
+    //   * a revision can be UNFAMILIAR rather than newer (a fresh document, a
+    //     restored file) — `dirty` catches that.
     const dirtyVariants = new Set(model.dirty.variants);
+    const dirtyBuses = new Set(model.dirty.buses.map((n) => `bus:${n}`));
 
     // (a) cells: mesh each distinct variant once, then place it by matrix.
     for (const [key, variant] of model.variants) {
       const have = this.cellMeshes.get(key);
-      if (have && !dirtyVariants.has(key)) continue;
+      if (have && have.rev === variant.rev && !dirtyVariants.has(key)) continue;
       if (have) this.disposeCell(key);
+      rebuilt++;
       this.meshBuilds.cells++;
       const groups: THREE.InstancedMesh[] = [];
       const n = Math.max(1, model.placements.filter((p) => p.variant === key).length);
@@ -362,6 +468,7 @@ export class Viewer {
       this.cellMeshes.set(key, {
         size: variant.size, groups, capacity,
         slots: new Map(), written: new Map(),
+        rev: variant.rev, blocks: variant.blocks,
       });
     }
     for (const key of [...this.cellMeshes.keys()]) {
@@ -370,25 +477,33 @@ export class Viewer {
 
     // (b) placements: matrices only.
     let t = performance.now();
-    if (model.dirty.placements || dirtyVariants.size) this.writePlacements(model);
+    if (model.dirty.placements || rebuilt) this.writePlacements(model);
     this.sceneMs.placements += performance.now() - t;
     t = performance.now();
 
-    // (c) buses + the loose base: unique geometry, rebuilt only when their
-    // own blocks changed. In the textured view the cells and the base hide
-    // (the pack draws them) but the buses stay abstract on top: the routing is
-    // what the colours encode, and a resource pack cannot show it.
-    for (const name of model.dirty.buses) this.rebuildUnique(model, `bus:${name}`);
+    // (c) buses + the loose base: unique geometry, rebuilt when their revision,
+    // their FAILED flag or the bus style they draw in changed. In the textured
+    // view the cells and the base hide (the pack draws them) but the buses stay
+    // on top: the routing is what the colours encode, and a resource pack
+    // cannot show it — which is exactly why the style has to be dialable.
     for (const layer of model.buses) {
       const built = this.uniqueMeshes.get(layer.layer);
-      // A bus can flip to FAILED (red) without its blocks moving.
-      if (built && built[0]?.userData.failed !== layer.failed) this.rebuildUnique(model, layer.layer);
+      if (!built
+        || built.rev !== layer.rev
+        || built.failed !== layer.failed
+        || built.style !== this.styleKey(layer.layer)
+        || dirtyBuses.has(layer.layer)) {
+        this.rebuildUnique(model, layer.layer);
+      }
     }
     for (const name of [...this.uniqueMeshes.keys()]) {
       if (name === "loose") continue;
       if (!model.buses.some((b) => b.layer === name)) this.disposeUnique(name);
     }
-    if (model.dirty.loose || !this.uniqueMeshes.has("loose")) this.rebuildUnique(model, "loose");
+    const loose = this.uniqueMeshes.get("loose");
+    if (!loose || loose.rev !== model.loose.rev || model.dirty.loose) {
+      this.rebuildUnique(model, "loose");
+    }
     this.sceneMs.unique += performance.now() - t;
 
     this.cellGroup.visible = !this.textured;
@@ -471,13 +586,84 @@ export class Viewer {
     return model.buses.find((b) => b.layer === name) ?? null;
   }
 
+  // ---- bus presentation ----------------------------------------------------
+  //
+  // "The bus lines are too obnoxious — they hide the underlying redstone."
+  // They did, and the reason is worth stating: a bus fragment is not an
+  // annotation drawn NEAR redstone, it IS redstone (dust, repeaters, the blocks
+  // carrying them). Painting it as an opaque slab in the bus colour therefore
+  // deletes information rather than adding it. What the colour is actually for
+  // is IDENTITY — which of the eight buses this cell belongs to — and identity
+  // survives a tint or an outline just as well as a fill.
+
+  private busStyle: BusStyle = "translucent";
+  /** Per-bus overrides, so one bus can be traced solid while the rest recede. */
+  private busStyles = new Map<string, BusStyle>();
+
+  setBusStyle(style: BusStyle) {
+    if (this.busStyle === style) return;
+    this.busStyle = style;
+    this.restyleBuses();
+  }
+
+  busStyleOf(bus: string): BusStyle {
+    return this.busStyles.get(bus) ?? this.busStyle;
+  }
+
+  globalBusStyle(): BusStyle {
+    return this.busStyle;
+  }
+
+  setBusStyleFor(bus: string, style: BusStyle | null) {
+    if (style) this.busStyles.set(bus, style); else this.busStyles.delete(bus);
+    this.restyleBuses();
+  }
+
+  /** Re-mesh the bus layers for a presentation change (nothing else moves). */
+  private restyleBuses() {
+    if (!this.lastScene) return;
+    for (const layer of this.lastScene.buses) this.rebuildUnique(this.lastScene, layer.layer);
+  }
+
+  /** The cache key for a layer's PRESENTATION: any change here is a rebuild,
+   *  exactly like a geometry revision. */
+  private styleKey(name: string): string {
+    if (!name.startsWith("bus:")) return this.textured ? "t" : "a";
+    const bus = name.slice(4);
+    const emph = (this.selection?.kind === "bus" && this.selection.id === bus)
+      || this.hoveredBus === bus;
+    return `${this.busStyleOf(bus)}|${this.textured ? "t" : "a"}|${emph ? "e" : ""}`;
+  }
+
   private rebuildUnique(model: SceneModel, name: string) {
     this.disposeUnique(name);
     const layer = this.layerOf(model, name);
-    if (!layer || layer.blocks.length === 0) return;
+    const style = this.styleKey(name);
+    if (!layer) return;
+    if (layer.blocks.length === 0) {
+      // Still RECORD the build: an empty layer is a legitimate state (a ripped
+      // or failed bus), and forgetting it means re-deciding every frame.
+      this.uniqueMeshes.set(name, { objects: [], rev: layer.rev, failed: layer.failed, style, blocks: [] });
+      return;
+    }
     const isBus = name.startsWith("bus:");
     this.meshBuilds[isBus ? "buses" : "loose"]++;
     const override = layer.failed ? FAILED_COLOR : layer.color;
+    const objects: THREE.Object3D[] = [];
+    const bus = isBus ? name.slice(4) : null;
+    const emph = !!bus && ((this.selection?.kind === "bus" && this.selection.id === bus)
+      || this.hoveredBus === bus);
+    const mode: BusStyle = isBus ? this.busStyleOf(bus!) : "solid";
+
+    // Fill. `outline` keeps a mesh with COLOUR WRITES OFF rather than dropping
+    // it: an invisible-but-present body is what keeps the bus clickable (a
+    // raycast ignores `visible: false`, and a 1-pixel line is not a hit target).
+    const showFill = mode !== "outline" || !this.textured || emph;
+    const opacity = layer.failed ? 0.85
+      : !isBus ? 1
+      : mode === "solid" ? (this.textured ? 0.75 : 1)
+      : mode === "translucent" ? (emph ? 0.7 : this.textured ? 0.34 : 0.62)
+      : emph ? 0.3 : 0.12;
     // Buses are LIT, cells are not. Cell bodies are diffuse-only voxels in
     // muted block colours; a routed bus is the signal, and half the palette
     // (the teal, the mid-green) sat right on top of the stone/quartz greys it
@@ -485,23 +671,44 @@ export class Viewer {
     // "wiring" from "structure" by brightness as well as by hue, and it is the
     // same trick that keeps them readable over a resource-pack mesh.
     const emissive = new THREE.Color(override ?? 0xffffff)
-      .multiplyScalar(layer.failed ? 0.5 : isBus ? 0.42 : 0);
+      .multiplyScalar(layer.failed ? 0.5 : isBus ? (emph ? 0.6 : 0.42) : 0);
     const mat = new THREE.MeshLambertMaterial({
       vertexColors: true,
       emissive: isBus || layer.failed ? emissive : new THREE.Color(0x000000),
-      transparent: layer.failed || (this.textured && isBus),
-      opacity: layer.failed ? 0.85 : this.textured && isBus ? 0.75 : 1,
+      transparent: opacity < 1,
+      opacity,
+      depthWrite: opacity >= 1,
+      colorWrite: showFill,
     });
     const mesh = new THREE.Mesh(mergeCubes(layer.blocks, override), mat);
-    mesh.userData.failed = layer.failed;
+    mesh.userData = { type: isBus ? "bus" : "loose", id: bus ?? "loose", failed: layer.failed };
     (isBus ? this.busGroup : this.looseGroup).add(mesh);
-    this.uniqueMeshes.set(name, [mesh]);
+    objects.push(mesh);
+
+    // Silhouette. One LineSegments over the fragment's cube edges: it names the
+    // bus without covering a single block face, which is the whole point.
+    if (isBus && (mode === "outline" || (mode === "translucent" && emph))) {
+      const line = new THREE.LineSegments(
+        cubeEdges(layer.blocks),
+        new THREE.LineBasicMaterial({
+          color: override ?? 0xffffff,
+          transparent: true,
+          opacity: emph ? 1 : 0.85,
+          depthTest: !emph,
+        }));
+      line.renderOrder = emph ? 9 : 1;
+      this.busGroup.add(line);
+      objects.push(line);
+    }
+    this.uniqueMeshes.set(name, { objects, rev: layer.rev, failed: layer.failed, style, blocks: layer.blocks });
   }
 
   private disposeUnique(name: string) {
-    for (const m of this.uniqueMeshes.get(name) ?? []) {
-      m.geometry.dispose();
-      (m.material as THREE.Material).dispose();
+    for (const m of this.uniqueMeshes.get(name)?.objects ?? []) {
+      const g = m as Partial<THREE.Mesh>;
+      g.geometry?.dispose();
+      const mats = Array.isArray(g.material) ? g.material : g.material ? [g.material] : [];
+      for (const mm of mats) (mm as THREE.Material).dispose();
       m.removeFromParent();
     }
     this.uniqueMeshes.delete(name);
@@ -624,18 +831,68 @@ export class Viewer {
   setSelection(sel: Selection) {
     const wasInst = this.selection?.kind === "instance" ? this.selection.id : null;
     const isInst = sel?.kind === "instance" ? sel.id : null;
+    const wasBus = this.selection?.kind === "bus" ? this.selection.id : null;
+    const isBus = sel?.kind === "bus" ? sel.id : null;
     this.selection = sel;
     this.restyleMarkers();
     // Which box is highlighted moved between the merged batch and its own
     // object, so the two line meshes are re-split (a dozen boxes: microseconds).
     if (wasInst !== isInst) this.rebuildEdges();
+    // A selected bus draws with more emphasis, so its layer is re-meshed —
+    // only the one that gained or lost the selection.
+    if (wasBus !== isBus) {
+      if (this.lastScene) {
+        for (const b of [wasBus, isBus]) {
+          if (b) this.rebuildUnique(this.lastScene, `bus:${b}`);
+        }
+      }
+    }
     this.rebuildGizmo();
+  }
+
+  /** Instances highlighted alongside the primary selection (an area select). */
+  private multi: string[] = [];
+
+  setMultiSelection(names: string[]) {
+    const same = names.length === this.multi.length && names.every((n, i) => this.multi[i] === n);
+    if (same) return;
+    this.multi = [...names];
+    this.rebuildEdges();
   }
 
   setHovered(name: string | null) {
     if (this.hovered === name) return;
     this.hovered = name;
     this.restyleMarkers();
+  }
+
+  /** The bus under the cursor. Raising a hovered bus's emphasis is what keeps
+   *  `outline` mode traceable: the fragment you are pointing at comes forward
+   *  without the other seven coming with it. */
+  private hoveredBus: string | null = null;
+
+  setHoveredBus(bus: string | null) {
+    if (this.hoveredBus === bus) return;
+    const was = this.hoveredBus;
+    this.hoveredBus = bus;
+    if (!this.lastScene) return;
+    for (const b of [was, bus]) if (b) this.rebuildUnique(this.lastScene, `bus:${b}`);
+  }
+
+  /** Which ports each bus terminates on, so selecting a bus can light up its
+   *  two ends — the question "where does this thing go?" answered on the
+   *  canvas instead of in a panel. */
+  private busEnds = new Map<string, string[]>();
+
+  setBusEndpoints(map: Map<string, string[]>) {
+    this.busEnds = map;
+    this.restyleMarkers();
+  }
+
+  /** Endpoints of the selected bus (empty when no bus is selected). */
+  private selectedBusPorts(): Set<string> {
+    if (this.selection?.kind !== "bus") return EMPTY_SET;
+    return new Set(this.busEnds.get(this.selection.id) ?? []);
   }
 
   /** Draw a pending connection from a port's marker to a world point. */
@@ -689,6 +946,8 @@ export class Viewer {
       coneBig: mk(new THREE.ConeGeometry(0.55, 0.9, 4)),
       oct: mk(new THREE.OctahedronGeometry(0.55)),
       octBig: mk(new THREE.OctahedronGeometry(0.7)),
+      /** The ring that tells a gate apart from a port at a glance. */
+      ring: mk(new THREE.TorusGeometry(0.85, 0.07, 6, 20)),
     };
   })();
 
@@ -710,10 +969,15 @@ export class Viewer {
   }[] = [];
   private portMeshes: { solid: THREE.InstancedMesh | null; ghost: THREE.InstancedMesh | null } =
     { solid: null, ghost: null };
-  private gateStyles: { id: string; mesh: THREE.Mesh; mat: THREE.MeshLambertMaterial }[] = [];
+  private gateStyles: {
+    id: string; mesh: THREE.Mesh; mat: THREE.MeshLambertMaterial;
+    ring: THREE.Mesh; lab: { el: HTMLDivElement; world: THREE.Vector3; prio: number };
+  }[] = [];
   private instStyles: { inst: InstanceMarker; pick: THREE.Mesh }[] = [];
   private edgesRest: THREE.LineSegments | null = null;
   private edgesSelected: THREE.LineSegments | null = null;
+  /** Boxes of the OTHER instances in an area selection. */
+  private edgesMulti: THREE.LineSegments | null = null;
   private gizmoOwner: string | null = null;
   private gizmoLabelWorld: THREE.Vector3 | null = null;
   private mScratch = new THREE.Matrix4();
@@ -742,6 +1006,7 @@ export class Viewer {
     this.portMeshes = { solid: null, ghost: null };
     this.edgesRest = null;
     this.edgesSelected = null;
+    this.edgesMulti = null;
 
     if (this.showIo) {
       const sorted = ports_sorted(this.ports);
@@ -770,15 +1035,35 @@ export class Viewer {
       }
     }
 
+    // GATES read as checkpoints, not as ports: an orange diamond wearing a RING,
+    // labelled with its position in the run ("gate 1 of 2"). A port is a place
+    // signal enters or leaves; a gate is a place the route must pass through,
+    // and the two must never be mistaken for each other — deleting one changes
+    // the netlist, deleting the other only straightens the path.
+    const perBus = new Map<string, number>();
+    for (const g of this.gates) perBus.set(g.bus, (perBus.get(g.bus) ?? 0) + 1);
+    const seen = new Map<string, number>();
     for (const g of this.gates) {
       const id = `${g.bus} ${g.name}`;
+      const ord = (seen.get(g.bus) ?? 0) + 1;
+      seen.set(g.bus, ord);
       const mat = new THREE.MeshLambertMaterial({ color: 0xffb74d });
       const m = new THREE.Mesh(Viewer.shared.oct, mat);
-      m.position.set(...markerPos(g.anchor, g.step, g.width));
+      const pos = markerPos(g.anchor, g.step, g.width);
+      m.position.set(...pos);
       m.userData = { type: "gate", id, y: g.anchor[1], shared: true };
+      const ring = new THREE.Mesh(Viewer.shared.ring, new THREE.MeshBasicMaterial({
+        color: 0xffe082, transparent: true, opacity: 0.9, side: THREE.DoubleSide,
+      }));
+      ring.userData.shared = true;
+      ring.rotation.x = Math.PI / 2;
+      m.add(ring);
       this.markerGroup.add(m);
       this.pickables.push(m);
-      this.gateStyles.push({ id, mesh: m, mat });
+      const lab = this.label(
+        `◆ gate ${ord} of ${perBus.get(g.bus)} · ${g.bus}`, "gate-label",
+        new THREE.Vector3(pos[0], pos[1] + 1.0, pos[2]));
+      this.gateStyles.push({ id, mesh: m, mat, ring, lab });
     }
 
     for (const inst of this.instances) {
@@ -808,7 +1093,7 @@ export class Viewer {
   /** Every unselected instance's box in ONE LineSegments; the selected one in
    *  its own object, because it is the only box a drag ever moves alone. */
   private rebuildEdges() {
-    for (const o of [this.edgesRest, this.edgesSelected]) {
+    for (const o of [this.edgesRest, this.edgesSelected, this.edgesMulti]) {
       if (!o) continue;
       // The selected box carries a dark backing child; dispose both.
       o.traverse((c) => {
@@ -820,10 +1105,24 @@ export class Viewer {
     }
     this.edgesRest = null;
     this.edgesSelected = null;
+    this.edgesMulti = null;
     const sel = this.selection?.kind === "instance" ? this.selection.id : null;
+    const alsoSelected = new Set(this.multi.filter((n) => n !== sel));
     const rest: number[] = [];
+    const extra: number[] = [];
     for (const inst of this.instances) {
       const { w, h, l, center } = Viewer.instBox(inst);
+      if (alsoSelected.has(inst.name)) {
+        // Everything else in an area selection: same yellow, batched, because
+        // none of them is the one a drag moves alone.
+        const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, l));
+        const pos = edges.getAttribute("position");
+        for (let i = 0; i < pos.count; i++) {
+          extra.push(pos.getX(i) + center.x, pos.getY(i) + center.y, pos.getZ(i) + center.z);
+        }
+        edges.dispose();
+        continue;
+      }
       if (inst.name === sel) {
         const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, l));
         this.edgesSelected = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
@@ -860,31 +1159,45 @@ export class Viewer {
       }));
       this.markerGroup.add(this.edgesRest);
     }
+    if (extra.length) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(extra, 3));
+      this.edgesMulti = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
+        color: SELECT_COLOR, transparent: true, opacity: 0.9, depthTest: false,
+      }));
+      this.edgesMulti.renderOrder = 11;
+      this.markerGroup.add(this.edgesMulti);
+    }
   }
 
   /** Repaint the marker layer for the current selection/hover: per-instance
    *  colours and one matrix each, no rebuild and no DOM churn. */
   private restyleMarkers() {
     const color = new THREE.Color();
+    const busPorts = this.selectedBusPorts();
     for (const row of this.portRows) {
       const p = row.p;
       const selected = this.selection?.kind === "port" && this.selection.id === p.name;
       const hovered = this.hovered === p.name;
+      // An endpoint of the selected bus is emphasised too: selecting a bus
+      // should say WHERE IT GOES without reading a panel.
+      const onBus = busPorts.has(p.name);
       const base = !p.routable ? BLOCKED_COLOR
         : p.kind === "input" ? DRIVER_COLOR : SINK_COLOR;
       const mesh = this.portMeshes[row.group];
       if (mesh) {
-        mesh.setColorAt(row.row, color.setHex(selected ? SELECT_COLOR : hovered ? HOVER_COLOR : base));
-        mesh.setMatrixAt(row.row, this.portMatrix(row, selected || hovered));
+        mesh.setColorAt(row.row, color.setHex(
+          selected ? SELECT_COLOR : hovered ? HOVER_COLOR : onBus ? SELECT_COLOR : base));
+        mesh.setMatrixAt(row.row, this.portMatrix(row, selected || hovered || onBus));
       }
       row.el.className = `mk-label ${[
         p.kind === "input" ? "io-driver" : "io-sink",
         p.routable ? "" : "io-blocked",
-        selected ? "is-selected" : "",
+        selected || onBus ? "is-selected" : "",
         hovered ? "is-hovered" : "",
       ].join(" ")}`;
       // What you are pointing at is never decluttered away.
-      row.lab.prio = selected || hovered ? 2 : 0;
+      row.lab.prio = selected || hovered || onBus ? 2 : 0;
     }
     for (const mesh of [this.portMeshes.solid, this.portMeshes.ghost]) {
       if (!mesh) continue;
@@ -892,10 +1205,18 @@ export class Viewer {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       mesh.computeBoundingSphere();
     }
-    for (const { id, mesh, mat } of this.gateStyles) {
+    // A gate belonging to the selected BUS lights up too: "what does this bus
+    // have to pass through?" is the question a selected bus should answer.
+    const selBus = this.selection?.kind === "bus" ? this.selection.id : null;
+    for (const { id, mesh, mat, ring, lab } of this.gateStyles) {
       const selected = this.selection?.kind === "gate" && this.selection.id === id;
-      mat.color.setHex(selected ? SELECT_COLOR : 0xffb74d);
+      const onBus = !!selBus && id.startsWith(`${selBus} `);
+      mat.color.setHex(selected || onBus ? SELECT_COLOR : 0xffb74d);
       mesh.geometry = selected ? Viewer.shared.octBig : Viewer.shared.oct;
+      (ring.material as THREE.MeshBasicMaterial).opacity = selected ? 1 : onBus ? 0.95 : 0.55;
+      ring.scale.setScalar(selected ? 1.2 : 1);
+      lab.prio = selected || onBus ? 2 : 0;
+      lab.el.className = `mk-label gate-label${selected ? " is-selected" : ""}`;
     }
   }
 
@@ -1131,9 +1452,18 @@ export class Viewer {
     );
   }
 
+  /** Markers first, then the bus fragments.
+   *
+   *  Two passes rather than one sorted list because a marker must always win:
+   *  a port cone sits ON a bus's first cell, and "click the bus" must not steal
+   *  the click that starts a route. Bus geometry is only consulted when nothing
+   *  in the marker layer was hit. */
   private castPointer(e: PointerEvent): THREE.Intersection | null {
     this.raycaster.setFromCamera(this.ndc(e), this.camera);
-    return this.raycaster.intersectObjects(this.pickables, false)[0] ?? null;
+    const marker = this.raycaster.intersectObjects(this.pickables, false)[0] ?? null;
+    if (marker) return marker;
+    const busMeshes = this.busGroup.children.filter((o) => (o as THREE.Mesh).isMesh);
+    return this.raycaster.intersectObjects(busMeshes, false)[0] ?? null;
   }
 
   /** What a hit means. Ports live in an InstancedMesh, so the port's identity
@@ -1171,6 +1501,76 @@ export class Viewer {
     return p ? markerPos(p.anchor, p.step, p.width) : null;
   }
 
+  /** Everything a context action needs: WHAT is under the cursor and WHERE.
+   *
+   *  The where is the point of it. "Add a gate here" is the entry that makes
+   *  gate steering discoverable at all, and it is meaningless without the world
+   *  position of the click — so the pick carries the hit point (rounded to the
+   *  block grid) and falls back to the ground plane at the hit's height. */
+  pickAt(e: PointerEvent): PickTarget {
+    const hit = this.castPointer(e);
+    const info = Viewer.pickInfo(hit);
+    const screen: [number, number] = [e.clientX, e.clientY];
+    const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+    const point = hit?.point;
+    const at: Vec3 = point
+      ? [Math.round(point.x), Math.round(point.y), Math.round(point.z)]
+      : this.groundPoint(e, 0) ?? [0, 0, 0];
+    if (!info) return { kind: "ground", id: "", at, screen, additive };
+    return {
+      kind: info.type as PickTarget["kind"],
+      id: info.id,
+      at,
+      screen,
+      additive,
+    };
+  }
+
+  // ---- rendered geometry readback (the consistency check) -------------------
+  //
+  // The regression guard for "sometimes the bus doesn't update when I move a
+  // component": read back what is ACTUALLY IN THE SCENE GRAPH and compare it
+  // with what the engine says the design is. Not the arrays the renderer was
+  // handed — the vertex buffers it built and the instance matrices it wrote,
+  // because a stale mesh is precisely the case where those two disagree.
+  //
+  // A cube's 24 vertices start at its `+X -Y -Z` corner (see `mergeCubes`), so
+  // the block position is recoverable from one vertex per cube.
+
+  private static cellsOfGeometry(geo: THREE.BufferGeometry, m?: THREE.Matrix4): Set<string> {
+    const out = new Set<string>();
+    const pos = geo.getAttribute("position") as THREE.BufferAttribute | undefined;
+    if (!pos) return out;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i += 24) {
+      v.set(pos.getX(i) - CUBE, pos.getY(i) + CUBE, pos.getZ(i) + CUBE);
+      if (m) v.applyMatrix4(m);
+      out.add(`${Math.round(v.x)},${Math.round(v.y)},${Math.round(v.z)}`);
+    }
+    return out;
+  }
+
+  /** Every layer the viewer is DRAWING, as sets of `"x,y,z"` world cells:
+   *  `bus:<name>`, `loose`, and one `inst:<name>` per placement. */
+  renderedCells(): Map<string, Set<string>> {
+    const out = new Map<string, Set<string>>();
+    for (const [name, built] of this.uniqueMeshes) {
+      const mesh = built.objects.find((o) => (o as THREE.Mesh).isMesh) as THREE.Mesh | undefined;
+      out.set(name, mesh ? Viewer.cellsOfGeometry(mesh.geometry) : new Set());
+    }
+    const m = new THREE.Matrix4();
+    for (const entry of this.cellMeshes.values()) {
+      const group = entry.groups[0];
+      if (!group) continue;
+      for (const [inst, row] of entry.slots) {
+        if (row >= group.count) continue; // an allocated but unused row
+        group.getMatrixAt(row, m);
+        out.set(`inst:${inst}`, Viewer.cellsOfGeometry(group.geometry, m));
+      }
+    }
+    return out;
+  }
+
   private downAt: [number, number] | null = null;
 
   private pointerDown(e: PointerEvent) {
@@ -1184,21 +1584,40 @@ export class Viewer {
       this.cb.onPortClick(id);
       return;
     }
+    if (type === "bus") {
+      this.cb.onBusClick(id, e.shiftKey || e.metaKey || e.ctrlKey);
+      return;
+    }
     if (type === "instance") {
-      this.cb.onInstanceClick(id);
+      this.cb.onInstanceClick(id, e.shiftKey || e.metaKey || e.ctrlKey);
+      // A shift-click EXTENDS a selection; it must not also start dragging the
+      // instance it just added, or building a group scatters the group.
+      if (e.shiftKey || e.metaKey || e.ctrlKey) return;
       this.drag = { kind: "instance", id, y: y ?? 0 };
       this.controls.enabled = false;
       this.renderer.domElement.setPointerCapture(e.pointerId);
       return;
     }
     if (type === "gate") {
+      // Selecting it is what makes Del work on a gate; the drag starts in the
+      // same gesture, exactly as it does for an instance.
+      this.cb.onGateClick(id);
       this.drag = { kind: "gate", id, y: y ?? 0 };
       this.controls.enabled = false;
       this.renderer.domElement.setPointerCapture(e.pointerId);
     }
   }
 
+  /** Where the cursor last was on the ground plane — where a paste lands, so
+   *  Ctrl-V puts the group where the user is looking rather than at the origin. */
+  private lastGround: Vec3 | null = null;
+
+  cursorGround(): Vec3 | null {
+    return this.lastGround;
+  }
+
   private pointerMove(e: PointerEvent) {
+    this.lastGround = this.groundPoint(e, 0);
     if (this.drag) {
       const p = this.groundPoint(e, this.drag.y);
       if (p) this.cb.onDragMove(this.drag.kind, this.drag.id, p);
@@ -1215,6 +1634,7 @@ export class Viewer {
       this.setHovered(name);
       this.cb.onPortHover(name);
     }
+    this.setHoveredBus(data?.type === "bus" ? data.id : null);
     if (this.cameraLock == null) {
       this.renderer.domElement.style.cursor = hit ? "pointer" : "";
     }

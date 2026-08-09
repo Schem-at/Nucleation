@@ -924,14 +924,705 @@ try {
   if (busMesh.skipped) {
     results.push({ ok: true, label: "bus re-route re-mesh SKIPPED (no bus)", skipped: true });
   } else {
-    check(busMesh.after.mesh.buses - busMesh.before.mesh.buses === 1 &&
-          busMesh.after.reads.busDump - busMesh.before.reads.busDump === 1 &&
-          busMesh.after.mesh.cells === busMesh.before.mesh.cells,
-      `re-routing ${busMesh.bus} re-meshes exactly 1 bus and 0 cells, in ` +
-      `${busMesh.ms.toFixed(0)} ms`,
+    // Re-reading the bus is the CONTRACT (it may have moved); re-meshing it is
+    // an OPTIMISATION DECISION, and the right one is "only if the blocks
+    // actually changed". A reroute that lands the same fragment re-meshes
+    // nothing — the mesh on screen is already correct, which is exactly what
+    // the revision numbers are for.
+    const remeshes = busMesh.after.mesh.buses - busMesh.before.mesh.buses;
+    check(busMesh.after.reads.busDump - busMesh.before.reads.busDump === 1 &&
+          busMesh.after.mesh.cells === busMesh.before.mesh.cells &&
+          remeshes <= 1,
+      `re-routing ${busMesh.bus} re-reads exactly 1 bus layer and 0 cells, and ` +
+      `re-meshes it ${remeshes} time(s) — ${remeshes === 0
+        ? "the route came back identical, so the mesh was already right"
+        : "the route moved"} (${busMesh.ms.toFixed(0)} ms)`,
       JSON.stringify(busMesh));
   }
 
+  // ---- 10b. the RENDER is consistent with the ENGINE, after everything -----
+  //
+  // The regression guard for "sometimes when I move a component the bus doesn't
+  // update right". The perf pass made the renderer re-read only what the
+  // document reports as changed, which is fast and is one incomplete
+  // changed-set away from drawing a lie. So: run the whole battery of edits
+  // (drag with live re-route, rotate, rip, re-route, promote a port, delete,
+  // undo) and after EACH one compare every rendered layer — read back out of
+  // the scene graph's own vertex buffers and instance matrices — against a
+  // fresh read from the engine that bypasses every cache.
+  const consistency = await page.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const steps = [];
+    const after = async (what) => {
+      await frame();
+      const c = e.consistency();
+      steps.push({ what, ok: c.ok, layers: c.layers.length, mismatches: c.mismatches, orphans: c.orphans });
+      return c;
+    };
+    await after("baseline");
+    const inst = [...s.instances.keys()][0];
+    const home = [...s.instances.get(inst).at];
+    // A DRAG that re-routes buses, frame by frame, exactly as the pointer does.
+    for (let i = 1; i <= 12; i++) window.__edaDragMove("instance", inst, [home[0] + i, home[1], home[2]]);
+    window.__edaDrag("instance", inst, [home[0] + 12, home[1], home[2]]);
+    await after("drag 12 frames + drop");
+    // The RACE: queue a live frame and drop somewhere else in the same tick, so
+    // the deferred commit is older than the drop when it fires.
+    const staleBefore = e.staleCommits();
+    window.__edaDragMove("instance", inst, [home[0] + 3, home[1], home[2]]);
+    window.__edaDrag("instance", inst, [home[0] + 12, home[1], home[2]]);
+    await after("stale live frame after a drop");
+    const staleAfter = e.staleCommits();
+    const racePos = [...s.instances.get(inst).at];
+    e.select(inst);
+    e.key("r");
+    await after("rotate");
+    const bus = [...s.buses.keys()][0];
+    if (bus) { s.ripBus(bus); await after("rip a bus"); s.rerouteBus(bus); await after("re-route it"); }
+    const promo = e.endpoints().find((p) => p.instance && p.promotable && p.mode !== "bus");
+    if (promo) { e.setPortMode(promo.instance, promo.port, "bus"); await after("promote a port"); }
+    s.removeInstance([...s.instances.keys()].pop());
+    await after("delete an instance");
+    e.undo();
+    await after("undo it");
+    return {
+      steps, staleDropped: staleAfter - staleBefore,
+      racePos, wanted: [home[0] + 12, home[1], home[2]],
+    };
+  });
+  const badSteps = consistency.steps.filter((s) => !s.ok);
+  check(badSteps.length === 0,
+    `every rendered layer matches the engine's blocks after all ${consistency.steps.length} ` +
+    `operations (drag, rotate, rip, re-route, promote, delete, undo) — ` +
+    `${consistency.steps[0].layers} layers compared cell-for-cell against a fresh, ` +
+    `cache-bypassing read`,
+    JSON.stringify(badSteps.slice(0, 2)));
+  check(consistency.staleDropped >= 1 &&
+        consistency.racePos.join() === consistency.wanted.join(),
+    `the drag race is closed: a live re-route frame queued BEFORE a drop is refused ` +
+    `when it fires (${consistency.staleDropped} stale commit dropped), and the instance ` +
+    `stays where the drop put it (${consistency.racePos.join(",")})`,
+    JSON.stringify(consistency));
+
+  // ---- 10c. copy / paste / cut / duplicate --------------------------------
+  //
+  // The model: an instance is a REFERENCE to a library cell plus a transform,
+  // so a paste places another reference — never a copy of the blocks. What has
+  // to survive the round trip is the transform, the port modes, and (for an
+  // area copy) any bus whose two ends were both inside the group.
+  const clip = await page.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    // Promote a port first, so "port modes carry over" is a real assertion.
+    const src = [...s.instances.keys()][0];
+    const port = e.endpoints().find((p) => p.instance === src && p.promotable && p.mode !== "bus");
+    if (port) e.setPortMode(src, port.port, "bus");
+    await frame();
+    const before = { instances: s.instances.size, mesh: e.meshBuilds() };
+    const keysBefore = [...s.instances.keys()];
+    e.select(src);
+    e.copy();
+    const copied = e.clipboard();
+    const report = e.paste([120, s.instances.get(src).at[1], 120]);
+    await frame();
+    const pasted = report.instances[0];
+    const modes = pasted
+      ? e.endpoints().filter((p) => p.instance === pasted.name).map((p) => `${p.port}:${p.mode}`)
+      : [];
+    const srcModes = e.endpoints().filter((p) => p.instance === src).map((p) => `${p.port}:${p.mode}`);
+    const consistent = e.consistency().ok;
+    const undoLabel = e.history().undo;
+    // Captured BEFORE the undo — measuring "after the paste" after undoing it
+    // is how a test lies to itself.
+    const after = { instances: s.instances.size, mesh: e.meshBuilds() };
+    e.undo();
+    await frame();
+    return {
+      copied, port: port?.port ?? null, report, before, after,
+      afterUndo: s.instances.size, pasted, modes, srcModes, consistent, undoLabel,
+      keysBefore, keysAfter: [...s.instances.keys()],
+      sameCell: pasted?.cell === s.cells.get(pasted?.cell)?.name,
+      variants: e.scene().variants.size,
+      consistentAfterUndo: e.consistency().ok,
+    };
+  });
+  check(clip.report.instances.length === 1 &&
+        clip.after.instances === clip.before.instances + 1 &&
+        clip.pasted.name !== clip.copied.instances[0].src,
+    `⌘C then ⌘V places ONE new instance of the SAME cell, uniquely named ` +
+    `(${clip.copied.instances[0].src} → ${clip.pasted.name}) at the paste point ` +
+    `(${clip.pasted.at.join(",")})`,
+    JSON.stringify({ before: clip.before.instances, after: clip.after.instances,
+                     keysBefore: clip.keysBefore, keysAfter: clip.keysAfter,
+                     report: clip.report, toast: clip.toast }));
+  check(clip.after.mesh.cells === clip.before.mesh.cells,
+    `...and it costs ZERO new cell meshes: the paste is a reference to the cell ` +
+    `already meshed, placed by matrix (cells ${clip.before.mesh.cells} → ${clip.after.mesh.cells})`,
+    JSON.stringify({ before: clip.before.mesh, after: clip.after.mesh }));
+  if (clip.port) {
+    check(clip.modes.join() === clip.srcModes.join() && clip.modes.some((m) => m.endsWith(":bus")),
+      `...with the port modes carried over: ${clip.pasted.name} has the same ` +
+      `Exec/Bus state as ${clip.copied.instances[0].src} (${clip.modes.filter((m) => m.endsWith(":bus")).join(", ")})`,
+      JSON.stringify({ pasted: clip.modes, src: clip.srcModes }));
+  } else {
+    results.push({ ok: true, label: "port modes carried over SKIPPED (no promotable port)", skipped: true });
+  }
+  check(/^paste /.test(clip.undoLabel ?? "") && clip.afterUndo === clip.before.instances,
+    `...and the whole paste is ONE undo step ("${clip.undoLabel}"): one ⌘Z removes ` +
+    `every pasted instance (${clip.after.instances} → ${clip.afterUndo})`,
+    JSON.stringify(clip));
+  check(clip.consistent === true && clip.consistentAfterUndo === true,
+    `...with the render consistent with the engine both after the paste and after the undo`,
+    JSON.stringify({ paste: clip.consistent, undo: clip.consistentAfterUndo }));
+
+  // ---- a page whose buses run CELL TO CELL ------------------------------
+  //
+  // The two-adder demo only routes instance -> declared port, so "both endpoints
+  // inside the copied set" never happens there and the area-paste check was
+  // skipping itself. The chain demo (ADD007 -> BINTOBCD001 -> NUMDISPLAY001) is
+  // exactly the shape these two features are about, so they run there.
+  const pageC = await browser.newPage({ viewport: { width: 1680, height: 980 } });
+  pageC.on("console", (m) => { if (m.type() === "error") { errors.push(m.text()); console.log("console:", m.text()); } });
+  await pageC.goto(`http://localhost:${PORT}/?chain=1`, { waitUntil: "load" });
+  await pageC.waitForFunction(() => window.__edaReady === true, null, { timeout: 120_000 });
+  await pageC.waitForFunction(() => window.__edaStudio().buses.size > 0, null, { timeout: 120_000 });
+  await pageC.waitForTimeout(1500);
+
+  // AREA copy: two instances plus the bus between them.
+  const area = await pageC.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    // Find a bus whose driver and sink are both instance ports, and copy BOTH.
+    const bus = [...s.buses.values()].find((b) =>
+      b.driver.includes(".") && b.sinks.length && b.sinks.every((x) => x.includes(".")));
+    if (!bus) return { skipped: true };
+    const ends = [bus.driver, ...bus.sinks].map((n) => n.split(".")[0]);
+    const group = [...new Set(ends)];
+    e.select(group[0]);
+    for (const g of group.slice(1)) e.extendSelection(g);
+    const selected = e.selected();
+    e.copy();
+    const copied = e.clipboard();
+    const before = { instances: s.instances.size, buses: s.buses.size };
+    const report = e.paste([260, s.instances.get(group[0]).at[1], 260]);
+    await frame();
+    const undoLabel = e.history().undo;
+    const consistent = e.consistency().ok;
+    const newBus = report.buses[0] ? s.buses.get(report.buses[0]) : null;
+    const state = report.buses[0] ? s.busStateDetail(report.buses[0]) : null;
+    // Relative transforms preserved?
+    const rel = report.instances.map((i) => {
+      const src = s.instances.get(i.src) ?? copied.instances.find((c) => c.src === i.src);
+      return { src: i.src, name: i.name, rot: s.instances.get(i.name).rot, srcRot: src?.rot ?? null };
+    });
+    // Compare offsets between the SAME pair of sources: the pasted list is in
+    // selection order (primary first), which is not the group's order.
+    const bySrc = new Map(report.instances.map((i) => [i.src, i]));
+    const pair = group.length > 1 ? [group[0], group[1]] : null;
+    const spans = pair && bySrc.has(pair[0]) && bySrc.has(pair[1]) ? [
+      bySrc.get(pair[1]).at[0] - bySrc.get(pair[0]).at[0],
+      bySrc.get(pair[1]).at[2] - bySrc.get(pair[0]).at[2],
+    ] : null;
+    const srcSpans = pair ? [
+      s.instances.get(pair[1]).at[0] - s.instances.get(pair[0]).at[0],
+      s.instances.get(pair[1]).at[2] - s.instances.get(pair[0]).at[2],
+    ] : null;
+    const driverSrc = bus.driver.split(".")[0];
+    e.undo();
+    await frame();
+    return {
+      bus: bus.name, group, selected, copied, report, before, undoLabel, consistent, driverSrc,
+      newBus: newBus && { driver: newBus.driver, sinks: newBus.sinks },
+      state, rel, spans, srcSpans,
+      afterUndo: { instances: s.instances.size, buses: s.buses.size },
+      consistentAfterUndo: e.consistency().ok,
+    };
+  });
+  if (area.skipped) {
+    results.push({ ok: true, label: "area paste SKIPPED (no instance-to-instance bus)", skipped: true });
+  } else {
+    check(area.selected.length === area.group.length && area.copied.buses.length === 1,
+      `⇧-click builds an area selection (${area.selected.join(", ")}) and the copy takes the ` +
+      `bus BETWEEN them (${area.bus}: both ends inside) — buses with one end outside are not copied`,
+      JSON.stringify({ selected: area.selected, buses: area.copied.buses }));
+    check(area.report.instances.length === area.group.length &&
+          area.spans?.join() === area.srcSpans?.join() &&
+          area.rel.every((r) => r.rot === r.srcRot),
+      `...pasting replicates the whole group with its relative transforms intact ` +
+      `(offsets ${area.spans?.join(",")} = ${area.srcSpans?.join(",")}, rotations preserved)`,
+      JSON.stringify(area.rel));
+    const pastedDriver = area.report.instances.find((i) => i.src === area.driverSrc)?.name;
+    check(area.report.buses.length === 1 &&
+          area.newBus.driver === `${pastedDriver}.${area.bus0Port ?? area.newBus.driver.split(".")[1]}` &&
+          (area.state.state === "routed" || area.state.state === "failed"),
+      `...and the internal bus is RECREATED for the pasted group — every endpoint remapped ` +
+      `to the COPIES (${area.newBus.driver} → ${area.newBus.sinks.join(", ")}, ${area.state.state}` +
+      `${area.state.reason ? `: ${area.state.reason.slice(0, 40)}` : ""}) — routed if it can be, ` +
+      `left FAILED with the router's reason if not`,
+      JSON.stringify({ bus: area.newBus, state: area.state, failed: area.report.failed }));
+    check(/^paste /.test(area.undoLabel ?? "") &&
+          area.afterUndo.instances === area.before.instances &&
+          area.afterUndo.buses === area.before.buses &&
+          area.consistent === true && area.consistentAfterUndo === true,
+      `...and ONE ⌘Z removes the pasted instances AND the recreated bus ` +
+      `(${area.before.instances}+${area.before.buses} → paste → back to ` +
+      `${area.afterUndo.instances}+${area.afterUndo.buses}), render still consistent`,
+      JSON.stringify(area));
+  }
+
+  // Duplicate + cut, and the screenshot of a pasted group.
+  const dup = await page.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const src = [...s.instances.keys()][0];
+    e.select(src);
+    const before = s.instances.size;
+    const report = e.duplicate();
+    await frame();
+    const overlaps = report.instances.some((i) => {
+      const a = s.instances.get(i.name);
+      return [...s.instances.values()].some((b) =>
+        b.name !== i.name && b.at.join() === a.at.join());
+    });
+    const selectedAfter = e.selected();
+    const cutName = report.instances[0]?.name;
+    e.select(cutName);
+    const n = e.cut();
+    await frame();
+    const afterCut = s.instances.size;
+    const pastedBack = e.paste([300, 0, 300]);
+    await frame();
+    return {
+      before, report, overlaps, selectedAfter, cut: n, afterCut,
+      afterPaste: s.instances.size, pastedBack, consistent: e.consistency().ok,
+      nudged: report.nudged,
+    };
+  });
+  check(dup.report.instances.length === 1 && dup.overlaps === false,
+    `⌘D duplicates in place with an offset — the copy lands clear of the original ` +
+    `(no two instances share an origin${dup.nudged ? `; nudged by ${dup.nudged.filter(Boolean).join(",")} to clear a keepout` : ""})`,
+    JSON.stringify(dup.report));
+  check(dup.selectedAfter.includes(dup.report.instances[0].name),
+    `...and the PASTED group becomes the selection, so a second ⌘D chains off it ` +
+    `(selected: ${dup.selectedAfter.join(", ")})`);
+  check(dup.cut === 1 && dup.afterCut === dup.before &&
+        dup.afterPaste === dup.afterCut + 1 && dup.consistent === true,
+    `⌘X cuts to the clipboard (${dup.afterCut} instances) and ⌘V puts it back ` +
+    `(${dup.afterPaste}), render consistent`,
+    JSON.stringify(dup));
+  await page.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const src = [...s.instances.keys()][0];
+    const home = s.instances.get(src).at;
+    e.select(src);
+    e.copy();
+    const r = e.paste([home[0] + 26, home[1], home[2] + 4]);
+    await new Promise((x) => requestAnimationFrame(() => requestAnimationFrame(x)));
+    // Frame the ORIGINAL and its copy together: "same cell, second placement".
+    const at = r?.instances?.[0]?.at ?? home;
+    e.focusOn([(home[0] + at[0]) / 2, home[1] + 6, (home[2] + at[2]) / 2], 46);
+  });
+  await page.waitForTimeout(700);
+  await snap(page, "copy-paste-group");
+
+  // ---- 10d. a bus is a first-class selectable object ----------------------
+  const busSel = await page.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const bus = [...s.buses.keys()][0];
+    if (!bus) return { skipped: true };
+    e.selectBus(bus);
+    await frame();
+    const sel = e.selection();
+    const hint = e.hint();
+    const row = document.querySelector(`#bus-list [data-busrow="${bus}"]`)?.className ?? "";
+    // Del deletes it, through the same confirm policy an instance delete uses.
+    const before = s.buses.size;
+    e.key("Delete");
+    await new Promise((r) => setTimeout(r, 200));
+    const prompt = e.pendingConfirm();
+    e.confirmRespond(true);
+    await new Promise((r) => setTimeout(r, 400));
+    const after = s.buses.size;
+    const consistent = e.consistency().ok;
+    e.undo();
+    await frame();
+    return {
+      bus, sel, hint, row, before, after, prompt, consistent,
+      afterUndo: s.buses.size, selectionCleared: e.selection(),
+      consistentAfterUndo: e.consistency().ok,
+    };
+  });
+  if (busSel.skipped) {
+    results.push({ ok: true, label: "bus selection SKIPPED (no bus)", skipped: true });
+  } else {
+    check(busSel.sel?.kind === "bus" && busSel.sel.id === busSel.bus &&
+          /Del/.test(busSel.hint) && /is-selected/.test(busSel.row),
+      `clicking a bus SELECTS it (${busSel.bus}): the hint bar names Del/R/F, and its ` +
+      `outliner row highlights — the canvas and the panel agree on what is selected`,
+      JSON.stringify(busSel));
+    check(busSel.prompt != null && busSel.after === busSel.before - 1 &&
+          busSel.afterUndo === busSel.before && busSel.consistent === true &&
+          busSel.consistentAfterUndo === true,
+      `...and Del deletes it after the same destructive confirm ("${busSel.prompt?.title}"), ` +
+      `${busSel.before} → ${busSel.after} buses, ⌘Z restores it, render consistent throughout`,
+      JSON.stringify(busSel));
+  }
+
+  // ---- 10e. bus drawing: show the redstone --------------------------------
+  const busDraw = await page.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const bus = [...s.buses.keys()][0];
+    const before = e.busStyle();
+    e.setBusStyle("outline");
+    await frame();
+    const outline = { style: e.busStyle(), prof: e.profile(), consistent: e.consistency().ok };
+    if (bus) e.setBusStyleFor(bus, "solid");
+    await frame();
+    const perBus = e.busStyle();
+    if (bus) e.setBusStyleFor(bus, null);
+    e.setBusStyle("translucent");
+    await frame();
+    return { before, outline, perBus, after: e.busStyle(), stored: localStorage.getItem("eda.busStyle") };
+  });
+  check(busDraw.outline.style.global === "outline" && busDraw.outline.consistent === true,
+    `bus drawing has three presets and outline mode keeps the fragment's own blocks ` +
+    `visible (silhouette only) without changing what is rendered as bus geometry`,
+    JSON.stringify(busDraw.outline.style));
+  check(Object.values(busDraw.perBus.perBus).includes("solid") &&
+        busDraw.perBus.global === "outline",
+    `...and one bus can be overridden solid while the rest stay outlined ` +
+    `(per-bus: ${JSON.stringify(busDraw.perBus.perBus)})`,
+    JSON.stringify(busDraw.perBus));
+  check(busDraw.stored === "translucent" && busDraw.after.global === "translucent",
+    `...with the choice remembered in localStorage ("${busDraw.stored}"), so it survives a reload`,
+    JSON.stringify(busDraw));
+
+  // ---- 10f. the right-click context menu ---------------------------------
+  const ctx = await page.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const inst = [...s.instances.keys()][0];
+    const onInstance = e.contextMenu({ kind: "instance", id: inst, at: s.instances.get(inst).at });
+    const rotBefore = s.instances.get(inst).rot;
+    e.contextFire("Rotate CW");
+    await frame();
+    const rotAfter = s.instances.get(inst).rot;
+    const bus = [...s.buses.keys()][0];
+    // A cell the bus actually occupies — the point a right-click on its
+    // geometry would report.
+    const frag = bus ? (s.engineLayers().buses.get(bus) ?? []) : [];
+    const mid = frag[Math.floor(frag.length / 2)];
+    const gateAt = mid ? [mid.x, mid.y, mid.z] : [4, 0, 4];
+    let onBus = null, gates = null, gateState = null;
+    if (bus) {
+      onBus = e.contextMenu({ kind: "bus", id: bus, at: gateAt });
+      const label = onBus.find((i) => /^Add gate here/.test(i.label))?.label;
+      const gatesBefore = s.buses.get(bus).gates.length;
+      e.contextFire(label);
+      await new Promise((r) => setTimeout(r, 500));
+      gates = { before: gatesBefore, after: s.buses.get(bus).gates.length,
+                anchor: s.buses.get(bus).gates.at(-1)?.anchor ?? null,
+                at: gateAt, label, gateable: e.gateable(bus),
+                snapped: e.gateAnchorFor(bus, gateAt).at,
+                refusal: e.lastGateRefusal(),
+                toast: document.querySelector("#toast")?.textContent ?? "" };
+      gateState = s.busStateDetail(bus);
+      // Leave the document as we found it: a gate that FAILED the bus (this
+      // router refuses a level change, and says so) must not be left behind for
+      // the checks that follow.
+      if (gateState.state === "failed" && gates.after > gates.before) {
+        e.undo();
+        await new Promise((r) => setTimeout(r, 400));
+      }
+    }
+    const onGround = e.contextMenu({ kind: "ground", at: [10, 0, 10] });
+    const openNow = e.contextOpen();
+    e.key("Escape");
+    const openAfterEsc = e.contextOpen();
+    const onPort = e.contextMenu({ kind: "port", id: e.endpoints()[0]?.name ?? "" });
+    e.closeContext();
+    const delBefore = s.instances.size;
+    e.contextMenu({ kind: "instance", id: inst });
+    e.contextFire("Delete");
+    await new Promise((r) => setTimeout(r, 250));
+    const prompt = e.pendingConfirm();
+    e.confirmRespond(true);
+    await new Promise((r) => setTimeout(r, 500));
+    const consistent = e.consistency().ok;
+    const delAfter = s.instances.size;
+    e.undo();
+    await frame();
+    return {
+      inst, onInstance, rotBefore, rotAfter, onBus, gates, gateState, onGround, onPort,
+      openNow, openAfterEsc, delBefore, delAfter, prompt, consistent,
+      restored: s.instances.size,
+      keys: [...s.instances.keys()],
+      toast: document.querySelector("#toast")?.textContent?.slice(-300),
+      logtail: document.querySelector("#log")?.textContent?.slice(0, 300),
+    };
+  });
+  check(ctx.onInstance.some((i) => i.label === "Rotate CW") &&
+        ctx.onInstance.some((i) => i.label === "Delete") &&
+        ctx.onInstance.some((i) => i.sub) &&
+        ctx.rotAfter === (ctx.rotBefore + 90) % 360,
+    `right-clicking an instance offers its own verbs (${ctx.onInstance.filter((i) => i.label !== "-").length} entries: ` +
+    `rotate, duplicate, copy/cut, a per-port Exec/Bus submenu, rip its buses, delete) and ` +
+    `Rotate CW really rotates it (${ctx.rotBefore}° → ${ctx.rotAfter}°)`,
+    JSON.stringify(ctx.onInstance.map((i) => i.label)));
+  check(ctx.onGround.some((i) => /^Paste/.test(i.label)) &&
+        ctx.onGround.some((i) => i.label === "Frame all") &&
+        ctx.onGround.some((i) => i.sub?.length) &&
+        ctx.onPort.some((i) => /Start a bus/.test(i.label)),
+    `...and the menu is CONTEXT-SENSITIVE: empty space offers paste/frame-all/add-a-component ` +
+    `and a port offers "start a bus from here"`,
+    JSON.stringify({ ground: ctx.onGround.map((i) => i.label), port: ctx.onPort.map((i) => i.label) }));
+  if (ctx.gates) {
+    // The entry always carries the CLICKED position — that is the whole reason
+    // it exists. Whether the engine accepts it is a separate question:
+    // `Design::add_gate` resolves a bus's endpoints through the DECLARED port
+    // table, so a bus between two placed cells is refused today (an engine gap
+    // reported upstream, `move_gate` has no such limit). Either outcome is
+    // acceptable here; SILENCE is not.
+    const placed = ctx.gates.after === ctx.gates.before + 1;
+    const want = ctx.gates.snapped;   // where a click there actually puts a gate
+    check(ctx.gates.label === `Add gate here (${want.join(",")})` &&
+          want[0] === ctx.gates.at[0] && want[2] === ctx.gates.at[2] &&
+          (placed
+            ? ctx.gates.anchor?.join() === want.join()
+            : !!ctx.gates.refusal && ctx.gates.refusal.at.join() === want.join()
+              && /will not take a checkpoint/.test(ctx.gates.toast)),
+      `..."Add gate here" carries the clicked (x, z) into the call and snaps only the LEVEL to the ` +
+      `bus's own (clicked ${ctx.gates.at.join(",")} → ${want.join(",")}: a bus is a 2y-pitch stack, ` +
+      `so the block under the cursor can be any bit, and a gate off the trunk level is a level ` +
+      `change this router refuses) — and ${placed
+        ? `the checkpoint landed at ${ctx.gates.anchor?.join(",")} (bus is ${ctx.gateState.state})`
+        : `the refusal is REPORTED, not swallowed: ${ctx.gates.refusal?.error}`}`,
+      JSON.stringify(ctx.gates));
+  } else {
+    results.push({ ok: true, label: "context add-gate SKIPPED (no bus)", skipped: true });
+  }
+  check(ctx.openAfterEsc === false && ctx.openNow === true,
+    `...Esc closes it (open ${ctx.openNow} → ${ctx.openAfterEsc}), so it is never a trap`);
+  check(ctx.prompt != null && ctx.delAfter === ctx.delBefore - 1 &&
+        ctx.restored === ctx.delBefore && ctx.consistent === true,
+    `...and its Delete goes through the same confirm as every other delete ` +
+    `("${ctx.prompt?.title}"), removes it (${ctx.delBefore} → ${ctx.delAfter}), leaves the ` +
+    `render consistent, and ⌘Z brings it back (${ctx.restored})`,
+    JSON.stringify(ctx));
+  await page.evaluate(() => {
+    const s = window.__edaStudio();
+    window.__eda.contextMenu({
+      kind: "instance", id: [...s.instances.keys()][0], screen: [560, 300],
+    });
+  });
+  await snap(page, "context-menu-instance");
+  await page.evaluate(() => window.__eda.closeContext());
+
+  // ---- 10g. gates are CHECKPOINTS with a full lifecycle -------------------
+  //
+  // A gate and an endpoint are deliberately different things: an endpoint is
+  // netlist, a gate is route. So adding one makes the run pass through a point,
+  // and removing one lets the router take a straighter path — WITHOUT touching
+  // what the bus connects. This walks add (via the context menu's clicked
+  // position), drag (the 2-adjacent-segment fast path), remove, and undo.
+  const gate = await pageC.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const settle = async (ms = 500) => {
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) => setTimeout(r, ms));
+    };
+    const bus = [...s.buses.keys()].find((b) => s.busStateDetail(b).state === "routed");
+    if (!bus) return { skipped: true };
+    const cells = () => (s.engineLayers().buses.get(bus) ?? []);
+    const has = (at) => cells().some((c) => c.x === at[0] && c.y === at[1] && c.z === at[2]);
+    const frag = cells();
+    const direct = frag.length;
+    // A detour point: on the trunk's own level (a gate at another level is
+    // refused by this router, and it says so), pushed sideways off the run.
+    // A bus is a stack of bits at a 2y pitch: the cell under a click can be any
+    // bit. The waypoint is the (x, z); the LEVEL belongs to the bus, and the app
+    // snaps it (a gate off the trunk level is a level change, which this router
+    // refuses and says so). Pick a real trunk column and let the app snap y.
+    const cols = new Map();
+    for (const c of frag) {
+      const k = `${c.x},${c.z}`;
+      cols.set(k, Math.min(cols.get(k) ?? Infinity, c.y));
+    }
+    const trunk = [...cols.keys()].map((k) => k.split(",").map(Number));
+    const spanX = Math.max(...trunk.map((c) => c[0])) - Math.min(...trunk.map((c) => c[0]));
+    const spanZ = Math.max(...trunk.map((c) => c[1])) - Math.min(...trunk.map((c) => c[1]));
+    const pick = trunk[Math.floor(trunk.length / 2)];
+    const away = spanX >= spanZ ? [0, 0, 6] : [6, 0, 0];
+    const snap = (x, z) => e.gateAnchorFor(bus, [x, cols.get(`${x},${z}`) ?? 0, z]).at;
+    const detour = (() => {
+      const a = snap(pick[0], pick[1]);
+      return [a[0] + away[0], a[1], a[2] + away[2]];
+    })();
+    const onPath = snap(pick[0], pick[1]);
+
+    // ADD, through the context menu entry, with the clicked position.
+    const items = e.contextMenu({ kind: "bus", id: bus, at: detour });
+    const label = items.find((i) => /^Add gate here/.test(i.label))?.label;
+    e.contextFire(label);
+    await settle(700);
+    let used = detour;
+    let addState = s.busStateDetail(bus);
+    let addedVia = "detour";
+    if (addState.state !== "routed") {
+      // The detour did not fit. A gate ON the existing path is still a real
+      // checkpoint and keeps the assertion honest; the refusal was reported.
+      e.undo();
+      await settle(600);
+      const items2 = e.contextMenu({ kind: "bus", id: bus, at: onPath });
+      e.contextFire(items2.find((i) => /^Add gate here/.test(i.label))?.label);
+      await settle(700);
+      used = onPath;
+      addState = s.busStateDetail(bus);
+      addedVia = "on-path";
+    }
+    const afterAdd = {
+      state: addState, gates: e.gates(bus), cells: cells().length,
+      through: has(used), consistent: e.consistency().ok, undoLabel: e.history().undo,
+    };
+    // DRAG the handle, exactly as the pointer does.
+    const gname = e.gates(bus).gates[0]?.name;
+    const meshBefore = e.meshBuilds();
+    const to = [used[0] + (away[2] ? 2 : 0), used[1], used[2] + (away[0] ? 2 : 0)];
+    e.dragGate(bus, gname, to);
+    await settle(700);
+    const afterDrag = {
+      anchor: e.gates(bus).gates[0]?.anchor, state: s.busStateDetail(bus),
+      cells: cells().length, consistent: e.consistency().ok,
+      busRemeshes: e.meshBuilds().buses - meshBefore.buses,
+      cellRemeshes: e.meshBuilds().cells - meshBefore.cells,
+      buses: s.buses.size,
+      undoLabel: e.history().undo,
+    };
+    // REMOVE it: same endpoints, straighter route.
+    e.removeGate(bus, 0);
+    await settle(800);
+    const afterRemove = {
+      state: s.busStateDetail(bus), gates: e.gates(bus), cells: cells().length,
+      consistent: e.consistency().ok, undoLabel: e.history().undo,
+      driver: s.buses.get(bus).driver, sinks: s.buses.get(bus).sinks,
+    };
+    e.undo();
+    await settle(800);
+    const afterUndo = { gates: e.gates(bus), consistent: e.consistency().ok };
+    // Leave the design with the gate REMOVED, so later checks see a clean bus.
+    e.removeGate(bus, 0);
+    await settle(700);
+    return {
+      bus, direct, used, addedVia, afterAdd, afterDrag, afterRemove, afterUndo,
+      endpointsUnchanged: afterRemove.driver === s.buses.get(bus).driver,
+      selection: e.selection(),
+    };
+  });
+  if (gate.skipped) {
+    results.push({ ok: true, label: "gate lifecycle SKIPPED (no routed bus)", skipped: true });
+  } else {
+    check(gate.afterAdd.gates.gates.length === 1 &&
+          gate.afterAdd.gates.segments === 2 &&
+          gate.afterAdd.state.state === "routed" &&
+          gate.afterAdd.through === true,
+      `right-click → "Add gate here" puts a CHECKPOINT at the clicked cell ` +
+      `(${gate.used.join(",")}, ${gate.addedVia}): the bus stays routed, now in ` +
+      `${gate.afterAdd.gates.segments} trunk spans, and its geometry passes THROUGH that cell`,
+      JSON.stringify(gate.afterAdd));
+    check(gate.afterDrag.anchor?.join() !== gate.used.join() &&
+          gate.afterDrag.cellRemeshes === 0 &&
+          gate.afterDrag.busRemeshes >= 1 &&
+          gate.afterDrag.busRemeshes <= gate.afterDrag.buses &&
+          gate.afterDrag.consistent === true,
+      `...dragging the handle moves the checkpoint (${gate.used.join(",")} → ` +
+      `${gate.afterDrag.anchor?.join(",")}) and costs ZERO cell re-meshes and at most one ` +
+      `re-mesh per bus whose geometry moved (${gate.afterDrag.busRemeshes} of ` +
+      `${gate.afterDrag.buses} bus layers; the router may amend the buses a re-routed span crosses)`,
+      JSON.stringify(gate.afterDrag));
+    check(gate.afterRemove.gates.gates.length === 0 &&
+          gate.afterRemove.gates.segments === 1 &&
+          gate.afterRemove.state.state === "routed" &&
+          gate.afterRemove.cells <= gate.afterDrag.cells &&
+          gate.endpointsUnchanged === true,
+      `...and removing it STRAIGHTENS the route — ${gate.afterDrag.cells} cells with the ` +
+      `checkpoint, ${gate.afterRemove.cells} without (direct route: ${gate.direct}) — while the ` +
+      `endpoints stay exactly as they were (${gate.afterRemove.driver} → ` +
+      `${gate.afterRemove.sinks.join(", ")}): a gate is ROUTE, an endpoint is NETLIST`,
+      JSON.stringify({ add: gate.afterAdd.cells, drag: gate.afterDrag.cells, remove: gate.afterRemove.cells }));
+    check(/^add gate /.test(gate.afterAdd.undoLabel ?? "") &&
+          /gate/.test(gate.afterDrag.undoLabel ?? "") &&
+          /^remove gate /.test(gate.afterRemove.undoLabel ?? "") &&
+          gate.afterUndo.gates.gates.length === 1 &&
+          gate.afterUndo.consistent === true,
+      `...each step is its own undo entry ("${gate.afterAdd.undoLabel}", ` +
+      `"${gate.afterDrag.undoLabel}", "${gate.afterRemove.undoLabel}") and ⌘Z after the ` +
+      `removal puts the checkpoint back`,
+      JSON.stringify(gate.afterUndo));
+  }
+
+  // Two gates on one bus, with the menu open on it: the screenshot the model
+  // needs (checkpoints are visibly different objects from ports).
+  const twoGates = await pageC.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const settle = async (ms = 600) => {
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) => setTimeout(r, ms));
+    };
+    const bus = [...s.buses.keys()].find((b) => s.busStateDetail(b).state === "routed");
+    if (!bus) return { skipped: true };
+    const frag = () => s.engineLayers().buses.get(bus) ?? [];
+    const lane = frag();
+    const ys = new Map();
+    for (const c of lane) ys.set(c.y, (ys.get(c.y) ?? 0) + 1);
+    const y = [...ys.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    const row = lane.filter((c) => c.y === y).sort((a, b) => (a.x - b.x) || (a.z - b.z));
+    for (const q of [0.33, 0.66]) {
+      const c = row[Math.floor(row.length * q)];
+      if (c) { try { e.addGate(bus, [c.x, c.y, c.z]); } catch { /* refused */ } await settle(500); }
+    }
+    e.selectBus(bus);
+    await settle(400);
+    return {
+      bus, gates: e.gates(bus), state: s.busStateDetail(bus),
+      rows: document.querySelectorAll("#bus-list .gate-chip").length,
+      consistent: e.consistency().ok,
+    };
+  });
+  if (!twoGates.skipped) {
+    check(twoGates.gates.gates.length >= 1 &&
+          twoGates.rows === twoGates.gates.gates.length &&
+          twoGates.consistent === true,
+      `a selected bus LISTS its checkpoints in the outliner (${twoGates.rows} rows, ordered, ` +
+      `click-to-focus, each with its own ✕) alongside "${twoGates.gates.segments} trunk span(s)" — ` +
+      `the model is on screen, not implied`,
+      JSON.stringify(twoGates));
+    await pageC.evaluate(() => {
+      const s = window.__edaStudio();
+      const bus = [...s.buses.keys()].find((b) => s.buses.get(b).gates.length) ?? [...s.buses.keys()][0];
+      const g = s.buses.get(bus).gates[0];
+      if (g) window.__eda.focusOn([g.anchor[0], g.anchor[1] + 2, g.anchor[2]], 34);
+      window.__eda.contextMenu({ kind: "bus", id: bus, at: g?.anchor ?? [0, 0, 0], screen: [700, 340] });
+    });
+    await snap(pageC, "bus-gates-and-context-menu");
+    await pageC.evaluate(() => window.__eda.closeContext());
+  }
+  if (twoGates.skipped) {
+    results.push({ ok: true, label: "gate outliner listing SKIPPED (no routed bus)", skipped: true });
+  }
+  await pageC.close();
 
   // ---- 11. textured renderer (needs a pack; pack.zip is not committed) ---
   const packPath = path.join(root, "..", "..", "pack.zip");
@@ -954,6 +1645,42 @@ try {
       `textured view: pack loaded (${JSON.stringify(tex.info)}) in ${tex.loadMs}ms, meshed in ${tex.meshMs}ms`);
     await page.waitForTimeout(1200);
     await snap(page, "textured-resource-pack");
+    // The bus-drawing point, made with pictures: the same textured scene with
+    // the bus layers solid (they hide the redstone they are made of) and then
+    // outlined (the redstone reads, the identity survives).
+    // Frame the BUS: by now the clipboard checks have scattered instances
+    // hundreds of blocks away, and a whole-design frame makes the point
+    // invisible. These two shots are the argument, so they have to be readable.
+    await page.evaluate(() => {
+      const e = window.__eda;
+      const s = window.__edaStudio();
+      const bus = [...s.buses.keys()].find((b) => s.busStateDetail(b).state === "routed");
+      const frag = bus ? (s.engineLayers().buses.get(bus) ?? []) : [];
+      const mid = frag[Math.floor(frag.length / 2)];
+      if (mid) e.focusOn([mid.x, mid.y, mid.z], 26);
+      e.setBusStyle("solid");
+    });
+    await page.waitForTimeout(900);
+    await snap(page, "textured-bus-solid");
+    await page.evaluate(() => window.__eda.setBusStyle("outline"));
+    await page.waitForTimeout(900);
+    await snap(page, "textured-bus-outline-shows-redstone");
+    const busOverTexture = await page.evaluate(() => ({
+      style: window.__eda.busStyle(),
+      consistent: window.__eda.consistency().ok,
+      prof: window.__eda.profile(),
+    }));
+    check(busOverTexture.style.global === "outline" && busOverTexture.consistent === true,
+      `...and over a resource pack the bus layers can be reduced to outlines, so the ` +
+      `dust and repeaters a bus is MADE OF are visible through it ` +
+      `(${busOverTexture.prof.busMeshes} bus objects, render still consistent)`,
+      JSON.stringify(busOverTexture.style));
+    await page.evaluate(() => {
+      window.__eda.setBusStyle("translucent");
+      document.querySelector("#textured").checked = false;
+      document.querySelector("#textured").dispatchEvent(new Event("change"));
+    });
+    await page.waitForTimeout(400);
   } else {
     console.log("SKIP textured view (no pack.zip at repo root; it is not committed)");
     results.push({ ok: true, label: "textured view SKIPPED (no pack.zip)", skipped: true });

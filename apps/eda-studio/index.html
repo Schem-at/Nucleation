@@ -257,6 +257,49 @@
         margin: 8px 0 4px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
         color: var(--dim);
       }
+      /* ---- right-click context menu ------------------------------------- */
+      #ctx-menu {
+        position: fixed; z-index: 20; display: none; min-width: 216px;
+        background: #1b2028f2; border: 1px solid var(--edge); border-radius: 6px;
+        padding: 4px; box-shadow: 0 12px 32px rgba(0,0,0,.55);
+        backdrop-filter: blur(3px); font-size: 11.5px;
+      }
+      #ctx-menu.is-open { display: block; }
+      #ctx-menu .ctx-head {
+        padding: 5px 8px 6px; color: var(--accent); font-weight: 600;
+        display: flex; justify-content: space-between; gap: 10px;
+      }
+      #ctx-menu .ctx-head span { color: var(--dim); font-weight: 400; }
+      #ctx-menu .ctx-sep { height: 1px; background: var(--edge); margin: 4px 2px; }
+      #ctx-menu .ctx-item {
+        position: relative; display: flex; align-items: baseline; gap: 10px;
+        padding: 5px 8px; border-radius: 4px; cursor: pointer; outline: none;
+      }
+      #ctx-menu .ctx-item > span { flex: 1; white-space: nowrap; }
+      #ctx-menu .ctx-item > em { color: var(--dim); font-style: normal; font-size: 10.5px; }
+      #ctx-menu .ctx-item > b { color: var(--dim); }
+      #ctx-menu .ctx-item:hover, #ctx-menu .ctx-item:focus { background: #2b3341; }
+      #ctx-menu .ctx-item.danger { color: #ff8a80; }
+      #ctx-menu .ctx-item.is-dead { color: var(--dim); cursor: default; }
+      #ctx-menu .ctx-item.is-dead:hover { background: transparent; }
+      #ctx-menu .ctx-sub {
+        display: none; position: absolute; left: 100%; top: -5px; margin-left: 2px;
+        background: #1b2028f8; border: 1px solid var(--edge); border-radius: 6px;
+        padding: 4px; min-width: 190px; max-height: 320px; overflow-y: auto;
+        box-shadow: 0 12px 32px rgba(0,0,0,.55);
+      }
+      #ctx-menu .ctx-item.has-sub:hover > .ctx-sub,
+      #ctx-menu .ctx-item.has-sub:focus-within > .ctx-sub { display: block; }
+      /* ---- gates (bus checkpoints) --------------------------------------- */
+      .mk-label.gate-label { color: #ffcc80; border-color: #ffb74d55; }
+      .gates { display: flex; flex-direction: column; gap: 3px; margin: 4px 0 2px; }
+      .gate-row { display: flex; gap: 4px; align-items: center; }
+      .gate-chip {
+        flex: 1; text-align: left; font-size: 10.5px; padding: 2px 6px;
+        color: #ffcc80; border-color: #ffb74d55;
+      }
+      #bus-style { font-size: 10.5px; }
+      select.bus-style-one { font-size: 10px; padding: 1px 2px; }
     </style>
   </head>
   <body>
@@ -269,6 +312,13 @@
       <label class="row" style="margin:0"><input type="checkbox" id="show-io" checked />show IO</label>
       <label class="row" style="margin:0"><input type="checkbox" id="textured" />textured</label>
       <label class="row" style="margin:0"><input type="checkbox" id="live-reroute" checked />live reroute</label>
+      <label class="row" style="margin:0" title="Bus fragments ARE redstone. Solid hides it; translucent tints it; outline shows the blocks and only draws the bus's silhouette.">buses
+        <select id="bus-style">
+          <option value="solid">solid</option>
+          <option value="translucent">translucent</option>
+          <option value="outline">outline</option>
+        </select>
+      </label>
       <button id="btn-help" title="Keyboard + colour legend (?)">?</button>
       <button id="btn-demo-chain" class="primary" title="ADD007 → BINTOBCD001 → NUMDISPLAY001">Chain demo</button>
       <button id="btn-demo">Adder demo</button>
@@ -373,6 +423,10 @@
           </div>
         </div>
       </div>
+      <!-- Right-click menu. Populated per click: what it offers is a function
+           of what is under the cursor (instance / port / bus / empty space). -->
+      <div id="ctx-menu"></div>
+
       <div id="shortcuts">
         <div class="card">
           <h3>Keyboard &amp; colour legend</h3>
@@ -388,10 +442,19 @@
                 <tr><td class="k"><kbd>F</kbd></td><td>frame the selection (or the whole design)</td></tr>
                 <tr><td class="k"><kbd>A</kbd></td><td>frame the whole design</td></tr>
                 <tr><td class="k"><kbd>Esc</kbd></td><td>cancel anything · close overlays · deselect</td></tr>
+                <tr><td class="k"><kbd>⇧</kbd>+<kbd>click</kbd></td><td>add/remove an instance from the selection (area select)</td></tr>
+                <tr><td class="k"><kbd>right-click</kbd></td><td>context menu — instance, port, bus or empty space</td></tr>
+              </table>
+              <h4>Clipboard</h4>
+              <table>
+                <tr><td class="k"><kbd>⌘/Ctrl C</kbd></td><td>copy the selection (a reference to the same cell, not a copy of its blocks)</td></tr>
+                <tr><td class="k"><kbd>⌘/Ctrl V</kbd></td><td>paste at the cursor · buses inside the group are re-routed</td></tr>
+                <tr><td class="k"><kbd>⌘/Ctrl X</kbd></td><td>cut</td></tr>
+                <tr><td class="k"><kbd>⌘/Ctrl D</kbd></td><td>duplicate with an offset</td></tr>
               </table>
               <h4>Document</h4>
               <table>
-                <tr><td class="k"><kbd>⌘/Ctrl Z</kbd></td><td>undo</td></tr>
+                <tr><td class="k"><kbd>⌘/Ctrl Z</kbd></td><td>undo (a paste is ONE step)</td></tr>
                 <tr><td class="k"><kbd>⇧⌘/Ctrl Z</kbd></td><td>redo</td></tr>
                 <tr><td class="k"><kbd>?</kbd></td><td>this panel</td></tr>
               </table>
@@ -403,7 +466,22 @@
                 <tr><td class="k">blue ▼</td><td>receives a bus — click second</td></tr>
                 <tr><td class="k">grey ✗</td><td>executor-only: clicking it as a target promotes it</td></tr>
                 <tr><td class="k">Exec/Bus</td><td>the reversible port-mode switch on each chip</td></tr>
-                <tr><td class="k">orange ◆</td><td>a gate — drag it to re-route two legs</td></tr>
+                <tr><td class="k">click a bus</td><td>select it (its two ports light up) · <kbd>Del</kbd> deletes it</td></tr>
+              </table>
+              <h4>Checkpoints (gates)</h4>
+              <table>
+                <tr><td class="k">orange ◆⃝</td><td>a CHECKPOINT the route must pass through — a ring, so it is never
+                  mistaken for a port. Deleting one only straightens the path; deleting a PORT changes the netlist</td></tr>
+                <tr><td class="k">right-click a bus</td><td><b>Add gate here</b> — at the clicked point (its level snaps to the bus's)</td></tr>
+                <tr><td class="k">drag ◆</td><td>steer the route — only the two adjacent spans re-route</td></tr>
+                <tr><td class="k">click ◆ then <kbd>Del</kbd></td><td>remove it; the router is free to take a shorter path</td></tr>
+                <tr><td class="k">Buses panel</td><td>a selected bus lists its checkpoints, in order, each with a ✕</td></tr>
+              </table>
+              <h4>Bus drawing</h4>
+              <table>
+                <tr><td class="k">solid</td><td>highest contrast, for tracing a route</td></tr>
+                <tr><td class="k">translucent</td><td>tinted — the redstone reads through it</td></tr>
+                <tr><td class="k">outline</td><td>silhouette only: the real blocks, nothing over them</td></tr>
               </table>
               <h4>States</h4>
               <table>
