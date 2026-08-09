@@ -4195,24 +4195,45 @@ impl Design {
         }
     }
 
+    /// Repeater delay charged to each bit, in bit order.
+    ///
+    /// A bit is identified by PROJECTING the repeater onto the driving port's
+    /// own bit axis — [`DesignPort::step`] — not by its height. Keying off `y`
+    /// is only correct for the canonical 2y stack; a bundle laid out as a flat
+    /// row steps in `z`, so every one of its repeaters has `y == y0`, all the
+    /// delay lands on bit 0, and the bus reports a large phantom skew for a
+    /// bundle whose true skew is zero.
+    ///
+    /// The projection reproduces the old arithmetic exactly on a 2y stack
+    /// (a repeater on a support level rounds up to the bit above it, which is
+    /// the bit it refreshes) and is correct for every other bundle geometry.
     pub fn bus_bit_delays(&self, bus: &BusLayer) -> Vec<u64> {
         let Ok(driver) = self.resolve_port(&bus.driver) else {
             return Vec::new();
         };
-        let width = driver.width as i32;
-        let y0 = driver.anchor.1;
-        let mut per = vec![0u64; width as usize];
+        let width = driver.width as usize;
+        let mut per = vec![0u64; width];
+        let s = driver.step;
+        let norm = (s.0 * s.0 + s.1 * s.1 + s.2 * s.2) as i64;
+        if norm == 0 {
+            // A degenerate or single-bit port: every repeater serves bit 0.
+            for (_, b) in bus.fragment.iter().filter(|(_, b)| rblocks::is_repeater(b)) {
+                if let Some(slot) = per.first_mut() {
+                    *slot += rblocks::repeater_delay(b) as u64;
+                }
+            }
+            return per;
+        }
+        let a = driver.anchor;
         for (p, b) in &bus.fragment {
             if !rblocks::is_repeater(b) {
                 continue;
             }
-            let off = p.1 - y0;
-            let bit = if off.rem_euclid(2) == 0 {
-                off / 2
-            } else {
-                (off + 1) / 2
-            };
-            if (0..width).contains(&bit) {
+            let d = (p.0 - a.0, p.1 - a.1, p.2 - a.2);
+            let dot = (d.0 * s.0 + d.1 * s.1 + d.2 * s.2) as i64;
+            // Nearest bit, halves rounding up, in integer arithmetic.
+            let bit = (2 * dot + norm).div_euclid(2 * norm);
+            if bit >= 0 && (bit as usize) < width {
                 per[bit as usize] += rblocks::repeater_delay(b) as u64;
             }
         }

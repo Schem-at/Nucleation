@@ -281,13 +281,19 @@ fn a_congruent_bundle_has_no_coherence_penalty() {
     let v = d.bus_cost(d.bus("b").unwrap());
     println!("[cost] congruent bundle {v:?}");
     assert_eq!(v.coherence, 0, "a bundle travelling together must score 0 coherence");
-    // NOT asserted as 0: `bus_bit_delays` walks the canonical 2y stack (it keys
-    // per-bit arrival off y), so for a ROW-form bundle it mis-attributes which
-    // cell belongs to which bit and reports a skew the lanes do not have. The
-    // lanes are congruent and equal-length, so the true skew is 0. Making the
-    // delay model form-agnostic is scoped, not done — recorded here so the
-    // number in the report is not mistaken for a real skew.
-    println!("[cost] reported skew {} (delay model is stack-specific)", v.skew_rt);
+    // The lanes are congruent and equal-length, so the true skew is 0.
+    //
+    // This used to report a phantom skew: `bus_bit_delays` keyed per-bit
+    // arrival off `y`, which is only the bit axis of the canonical 2y stack.
+    // A ROW-form bundle steps in `z`, so every repeater sat at `y == y0`, all
+    // the delay was charged to bit 0, and the difference between bit 0 and the
+    // rest was reported as skew. The delay model now projects onto the
+    // driving port's own `step`, so it is form-agnostic.
+    assert_eq!(
+        v.skew_rt, 0,
+        "a congruent equal-length ROW bundle has no skew; a non-zero number here \
+         means the delay model is keying bits off the wrong axis again"
+    );
     // And the vector reaches the report.
     let json = d.check().unwrap().json;
     assert!(json.contains("\"coherence\""), "the cost vector is not in check(): {json}");
