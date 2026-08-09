@@ -979,6 +979,73 @@ pub struct OccupancyIndex {
     pub port_lanes: Vec<(P3, P3, u8)>,
 }
 
+/// A [`crate::routing::transport::BlockView`] over placed geometry PLUS a bus
+/// fragment, so the clearance predicates see the route being judged.
+///
+/// The fragment shadows the index: a route's own cells are what the mechanism
+/// rules must reason about (its supports are the cut cells that sever a foreign
+/// diagonal), and the occupancy index does not contain them until the bus is
+/// committed.
+struct FragmentView<'a> {
+    occ: &'a OccupancyIndex,
+    frag: &'a BTreeMap<P3, String>,
+}
+
+impl crate::routing::transport::BlockView for FragmentView<'_> {
+    fn block_at(&self, p: crate::routing::Pos) -> Option<&str> {
+        let k = (p.x, p.y, p.z);
+        self.frag
+            .get(&k)
+            .map(|s| s.as_str())
+            .or_else(|| self.occ.cells.get(&k).map(|(b, _)| b.as_str()))
+    }
+}
+
+/// Can this mechanism carry or read a signal? An inert flank couples to
+/// nothing, which is exactly why a bus may lay dust flush against a cell body.
+fn is_live_mech(m: crate::routing::transport::Mechanism) -> bool {
+    use crate::routing::transport::Mechanism as M;
+    !matches!(m, M::SolidSupport | M::TransparentSupport | M::Inert)
+}
+
+/// Chebyshev distance in cells — the natural metric for "n cells of clearance".
+fn chebyshev(a: P3, b: P3) -> i32 {
+    (a.0 - b.0).abs().max((a.1 - b.1).abs()).max((a.2 - b.2).abs())
+}
+
+/// The cells whose contents could couple to `p`, out to `extra` cells of
+/// additional declared separation.
+///
+/// At `extra = 0` this is the mechanism reach: the six faces, plus the eight
+/// horizontal-with-1y-step offsets that dust's wire connection adds — the
+/// DIAGONAL cases, which is where `X02`'s defect lived. Beyond that it is a
+/// plain cube, because declared spacing is a distance demand rather than a
+/// mechanism relation.
+fn clearance_scan(p: P3, extra: i32) -> Vec<P3> {
+    let mut out = Vec::new();
+    if extra <= 0 {
+        out.push((p.0, p.1 + 1, p.2));
+        out.push((p.0, p.1 - 1, p.2));
+        for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            for dy in [-1, 0, 1] {
+                out.push((p.0 + dx, p.1 + dy, p.2 + dz));
+            }
+        }
+        return out;
+    }
+    let r = extra + 1;
+    for dx in -r..=r {
+        for dy in -r..=r {
+            for dz in -r..=r {
+                if (dx, dy, dz) != (0, 0, 0) {
+                    out.push((p.0 + dx, p.1 + dy, p.2 + dz));
+                }
+            }
+        }
+    }
+    out
+}
+
 /// One cell a port-mode switch rewrote, with both sides of the change so a UI
 /// can say exactly what happened ("removed lever at (19,5,5)").
 #[derive(Clone, Debug)]
@@ -4298,6 +4365,154 @@ impl Design {
         ))
     }
 
+    /// Why this bus's geometry must not be accepted on CLEARANCE grounds.
+    ///
+    /// The router avoided every OCCUPIED cell correctly and then ran its own
+    /// wire alongside a live foreign one. `X02_hex_cross_vertical`: bit 0 was
+    /// laid at (7,2,-1)..(9,2,-1), DIAGONALLY adjacent to a hex trunk's live
+    /// readout dust at (8,1,0) — one down, one over, which is a conducting dust
+    /// diagonal — and bit 0 came out stuck high whenever the trunk carried a
+    /// value. The control with the trunk idle passes 12/12, so the geometry was
+    /// never the problem; the missing clearance was.
+    ///
+    /// WHY THIS IS CHECKED HERE AND NOT IN THE SEARCH. Until now
+    /// `nucleation_routing::transport::interferes` had exactly ONE caller, the
+    /// corridor search in [`crate::design_corridor`]. Straight runs, L corners,
+    /// form adapters and level-shift tiles emit geometry without ever asking —
+    /// which is why a defect this basic survived: most routes never touch the
+    /// one code path that knew the rule. Asking over the finished fragment
+    /// covers every emitter at once, including the three that have no search.
+    ///
+    /// LVS cannot substitute for this. LVS compares INTENT NETS, and the hex
+    /// trunk is a fixture with no intent net at all, so a bit merging with it is
+    /// not a short between two intents — there is no pair to report. Coupling to
+    /// something that was never declared as a net is invisible to it by
+    /// construction.
+    ///
+    /// [`NetClassRule::spacing`] is finally read on the routing path here: it is
+    /// EXTRA clearance beyond the mechanism rules, so `spacing = n` additionally
+    /// demands `n` cells of empty separation from foreign live redstone (a clock
+    /// line asking not to be coupled at all).
+    fn clearance_reason(&self, name: &str) -> Option<String> {
+        let layer = self.buses.get(name)?;
+        if layer.fragment.is_empty() {
+            return None;
+        }
+        let extra = layer.rule.as_ref().map_or(0i32, |r| i32::from(r.spacing));
+        // Foreign geometry: everything placed EXCEPT this bus's own cells.
+        // Instances that own an endpoint are exempt wholesale, matching
+        // `halo_exempt`: routing INTO the cell you are wiring to is what a pin
+        // is for, and its port dust is supposed to touch ours.
+        let endpoints: Vec<String> = layer
+            .driver_names()
+            .into_iter()
+            .chain(layer.sinks.iter().cloned())
+            .collect();
+        let pin_access = self.halo_exempt(&endpoints);
+        let occ = self.occupancy_index();
+        let mut ours_cells: BTreeSet<P3> = layer.fragment.keys().copied().collect();
+        // THE BUS'S OWN TERMINALS ARE NOT A CLEARANCE VIOLATION. A declared
+        // design port sits on hardware in the BASE schematic, so it is owned by
+        // the loose layer rather than an instance and `halo_exempt` does not
+        // reach it — and the route is supposed to land on that dust and drive
+        // that lever. Without this the check rejected essentially every bus in
+        // the suite for touching its own port.
+        for ep in &endpoints {
+            if let Ok(p) = self.resolve_port(ep) {
+                ours_cells.extend(p.wires());
+                for b in &p.bits {
+                    ours_cells.extend(b.lever);
+                    ours_cells.extend(b.lamp);
+                }
+            }
+        }
+        let view = FragmentView {
+            occ: &occ,
+            frag: &layer.fragment,
+        };
+        const OURS: &str = "\0bus-under-test";
+
+        let mut why: Vec<String> = Vec::new();
+        for (p, block) in &layer.fragment {
+            let ours = crate::routing::transport::Placement {
+                mech: crate::routing::transport::mech_of(block),
+                cell: crate::routing::Pos::new(p.0, p.1, p.2),
+                fwd: crate::routing::transport::fwd_of(block),
+                net: OURS,
+            };
+            for q in clearance_scan(*p, extra) {
+                if ours_cells.contains(&q) {
+                    continue; // our own geometry is one net by construction
+                }
+                let Some((fblock, owner)) = occ.cells.get(&q) else {
+                    continue;
+                };
+                let fowner = match owner {
+                    Occupant::Loose => "loose block".to_string(),
+                    Occupant::Instance(n) => {
+                        if pin_access.contains(n) {
+                            continue; // the cell this bus terminates on
+                        }
+                        format!("instance `{n}`")
+                    }
+                    Occupant::Bus(n) => {
+                        if n == name {
+                            continue;
+                        }
+                        format!("bus `{n}`")
+                    }
+                };
+                let theirs = crate::routing::transport::Placement {
+                    mech: crate::routing::transport::mech_of(fblock),
+                    cell: crate::routing::Pos::new(q.0, q.1, q.2),
+                    fwd: crate::routing::transport::fwd_of(fblock),
+                    net: &fowner,
+                };
+                // Only LIVE foreign hardware couples. An inert flank emits
+                // nothing and reads nothing; that exemption is the whole point
+                // of the mechanism model and must survive.
+                if !is_live_mech(theirs.mech) {
+                    continue;
+                }
+                if let Some(rel) =
+                    crate::routing::transport::interferes(&theirs, &ours, &view)
+                {
+                    why.push(format!(
+                        "{fowner} at {q:?} couples to this bus at {p:?}: {rel}"
+                    ));
+                    continue;
+                }
+                // EXTRA spacing is a separation demand, not a mechanism
+                // relation: at `spacing = n` no foreign live cell may sit
+                // within n cells at all, coupling or not.
+                if extra > 0 && chebyshev(*p, q) <= extra {
+                    why.push(format!(
+                        "{fowner} at {q:?} is within the declared spacing of {extra} \
+                         cell(s) of this bus at {p:?}"
+                    ));
+                }
+            }
+        }
+        if why.is_empty() {
+            return None;
+        }
+        why.sort();
+        why.dedup();
+        let shown = why.len().min(3);
+        let more = why.len() - shown;
+        Some(format!(
+            "routed geometry has insufficient clearance from live redstone: {}{}. \
+             Move one of them, or give the bus a lane 2 cells clear (dust one cell \
+             apart shorts, and a 1-y diagonal conducts unless the cut cell is solid)",
+            why[..shown].join("; "),
+            if more > 0 {
+                format!(" (and {more} more)")
+            } else {
+                String::new()
+            }
+        ))
+    }
+
     /// Drop a bus's realized geometry and record why it failed.
     fn set_failed(&mut self, name: &str, reason: String) -> BusState {
         self.touch_bus(name);
@@ -4310,9 +4525,18 @@ impl Design {
         BusState::Failed(reason)
     }
 
-    /// Gate a freshly realized route on conduction: `Routed` only if the signal
-    /// actually arrives, otherwise `Failed` with the electrical reason.
+    /// Gate a freshly realized route: `Routed` only if the signal actually
+    /// arrives AND nothing live is close enough to corrupt it. Otherwise
+    /// `Failed` with the electrical reason.
+    ///
+    /// Clearance is asked FIRST: a bus coupled to a foreign live net is the more
+    /// specific diagnosis, and reporting "does not conduct" for geometry whose
+    /// real problem is a neighbour would send the user looking in the wrong
+    /// place.
     fn accept_if_conducting(&mut self, name: &str) -> BusState {
+        if let Some(why) = self.clearance_reason(name) {
+            return self.set_failed(name, why);
+        }
         match self.conduction_reason(name) {
             None => BusState::Routed,
             Some(why) => self.set_failed(name, why),
