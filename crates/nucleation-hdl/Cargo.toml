@@ -23,3 +23,10 @@ missing_docs = "warn"
 [[test]]
 name = "verify"
 required-features = ["mc-tick"]
+
+# Drives a compiled build in the tick engine, so it only builds with the
+# simulator available; without this a featureless `cargo test -p nucleation-hdl`
+# fails compiling the example rather than skipping it.
+[[example]]
+name = "lever_probe"
+required-features = ["mc-tick"]

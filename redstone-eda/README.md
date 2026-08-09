@@ -315,8 +315,8 @@ non-zero unless its verification is perfect.
 | [`kogge_stone_32bit`](docs/img/kogge_stone_32bit.png) | 154,152 | Flagship: 32-bit prefix adder from the PLA compiler | 54/54 (47 random + 7 corners) |
 | [`alu8`](docs/img/alu8.png) | 30,052 | 8-bit 4-op ALU (ADD/SUB/AND/XOR) | 144/144 |
 | [`mult4x4_stacked`](docs/img/mult_4x4.png) | 27,222 | 4 stacked planes, 3D maze-routed inter-plane nets | exhaustive 256/256 |
-| [`genlib_seg7`](docs/img/genlib_seg7.png) | 6,880 | Cell-mapped seg7: −20% blocks, −41% volume vs PLA | 16/16 exhaustive |
-| [`genlib_cmp4`](docs/img/genlib_cmp4.png) | 3,560 | Cell-mapped cmp4: **3.9× denser**, 35% faster than PLA | 256/256 exhaustive |
+| [`genlib_seg7`](docs/img/genlib_seg7.png) | 6,880 | Cell-mapped seg7: −20% blocks vs the PLA fabric | 16/16 exhaustive |
+| [`genlib_cmp4`](docs/img/genlib_cmp4.png) | 3,560 | Cell-mapped cmp4: **3.9× smaller**, 43 → 28 rt | 256/256 exhaustive |
 | [`ripple_carry_adder_4bit`](docs/img/ripple_carry_adder_4bit.png) | 3,362 | The routed 4-bit RCA | exhaustive |
 | [`accumulator4`](docs/img/accumulator4.png) | 2,059 | Compositor MVP composition, clocked feedback | 24/24 clocked, DRC clean, LVS opens=0 |
 | [`counter4`](docs/img/counter4.png) | 1,973 | The sequential loop closed: register + FA increment | 24 steps mod 16, min period 100 gt |
@@ -324,7 +324,7 @@ non-zero unless its verification is perfect.
 | [`bus8_run`](docs/img/bus8_run.png) | 656 | Dense vertical bus: 8 bits, one block wide, zero glass | 96/96, zero crosstalk |
 | [`hexanalog_trunk`](docs/img/hexanalog_trunk.png) | 556 | 4 bits on one wire's signal strength + decoder | encode/decode 16/16 exhaustive |
 | [`bus_cross8_design`](docs/img/bus_cross8_design.png) | 512 | Two 8-bit buses, crossing implicit, via the Design API | 432/432 output checks |
-| [`pivot_v2h`](docs/img/pivot_v2h.png) | 432 | Form-pivot adapter: vertical bus form → flat form | 96/96, zero crosstalk |
+| [`pivot_v2h`](docs/img/pivot_v2h.png) | 432 | Form-pivot adapter: vertical bus form → flat form, stamped by the router implicitly on a form mismatch | 96/96, zero crosstalk |
 | [`register4`](docs/img/register4.png) | 280 | 4-bit register, clock chained by abutment | 16 write + 16 hold rounds |
 | [`router_gallery`](docs/img/router_gallery.png) | 239 | Obstacle dive, vertical via, 3-net braid, shared-trunk fork | 7/7 conduct, braid isolation, DRC 0 |
 | [`dff`](docs/img/dff.png) | 70 | MS rising-edge DFF from repeater locks | 11-pt protocol + 24 random steps, characterized |
@@ -332,20 +332,29 @@ non-zero unless its verification is perfect.
 
 ### Density: cells vs PLA
 
-`abc -genlib` mapping onto the verified flat cell library, measured the same way
-(non-air blocks, tight bbox, structural STA):
+`abc -genlib` mapping onto the verified flat cell library — seven cells (torch
+INV, comparator-subtract AND2/XOR2, repeater-join OR2, inverted tails), with
+areas and delays taken from the measured fragments:
 
-| design | fabric | blocks | volume | crit path | verified |
+| design | fabric | blocks | bbox | crit path | verified |
 |---|---|---|---|---|---|
-| seg7 | PLA | 8,627 | 152,400 | 35 rt | 16/16 |
-| seg7 | genlib cells | **6,880** (−20%) | **89,600** (−41%) | 35 rt | 16/16 |
-| cmp4 | PLA | 13,873 | 292,680 | 43 rt | 256/256 |
-| cmp4 | genlib cells | **3,560** (**3.9×**) | **74,053** (**4.0×**) | **28 rt** (−35%) | 256/256 |
+| seg7 | PLA | 8,627 | 254×8×75 | 35 rt | 16/16 exhaustive |
+| seg7 | genlib cells | **6,880** (−20%) | 128×7×100 | 30 rt | 16/16 exhaustive |
+| cmp4 | PLA | 13,873 | 271×8×135 | 43 rt | 256/256 exhaustive |
+| cmp4 | genlib cells | **3,560** (**3.9× smaller**) | 149×7×71 | **28 rt** | 256/256 exhaustive |
 
-Honest reading: the ~3× hypothesis holds on cmp4, where the PLA's dual-rail
-overhead dominates; seg7 — a single dense truth table, the shape PLAs are best
-at — gains only 20%. Cell area is a rounding error (≈800 blocks); **routing is
-the fabric cost**, so channel geometry sets density.
+Read this honestly, because the scope is narrow:
+
+- **Only seg7 and cmp4 were cell-mapped.** Two designs is not a trend.
+- The 3.9× holds on cmp4, where the PLA's **dual-rail overhead dominates**.
+  seg7 is a single dense truth table — the shape PLAs are *best* at — and gains
+  only 20%.
+- **Cell area is negligible** (≈800 and ≈560 blocks of actual cells). Routing is
+  the fabric cost, so **channel geometry sets density**, not cell choice.
+- `crit path` is **structural STA**, not a measured settle.
+
+Running `pnr-core`'s annealer over the mapped seg7 placement bought a further
+−1.7% wirelength, −1.3% blocks and 30 → 28 rt (16/16 green, seed 42).
 
 ---
 
@@ -411,6 +420,14 @@ worth knowing before you build on this:
 - A stale venv wheel once silently lacked `Routing.lvs`, surfacing as an
   `AttributeError` 40 minutes into a run. Scripts should assert the bridge
   surface they need at import time.
+
+**The cost model is not the verifier**
+
+The annealer optimizes a cost model, and the cost model can be wrong: on mapped
+seg7, seed 42 improved every metric and stayed 16/16, while a **lower-cost**
+seed 7 realised only **7/16**. A better score is a hypothesis; the exhaustive
+in-sim gate is the only trustworthy signal, which is exactly why every generator
+refuses to save an artifact it has not proven.
 
 **Limits on scale and quality (P2)**
 
