@@ -4036,6 +4036,14 @@ mod tests {
                 assert!(reason.contains("no corridor"), "{reason}");
                 assert!(reason.contains("(12,"), "names the blocker location: {reason}");
                 assert!(reason.contains("loose block"), "names the owner: {reason}");
+                // And it must say whether the LEVEL is the problem or the
+                // workspace is genuinely full — the two need opposite fixes, and
+                // "no path" told the user neither. Here the wall spans y 0..=20,
+                // so no level is clear.
+                assert!(
+                    reason.contains("No level within 8 blocks"),
+                    "must report the cross-level verdict: {reason}"
+                );
             }
             other => panic!("expected Failed, got {other:?}"),
         }
