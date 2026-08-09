@@ -8,8 +8,13 @@ Verified by `probe_vertical_forms.py` and `probe_spiral_tiling.py`.
 Four forms:
 
   torch_ladder()   1x1 column, 2 y per torch, inverts per torch, refreshes to
-                   15.  UP ONLY.  The densest legal riser: towers may stand at
-                   x-pitch 1 provided their PORTS alternate sides.
+                   15.  UP ONLY.  Densest and fastest *on paper*, and towers
+                   may stand at x-pitch 1 provided their PORTS alternate sides
+                   -- but **NOT USABLE FOR SWITCHING BUS DATA**: it costs 1 gt
+                   per y of rise on the critical path, and its torches BURN OUT
+                   when the input is toggled faster than one change per 4 gt
+                   (`probe_torch_burnout.py`).  Static or low-toggle control
+                   signals only; call `assert_data_safe()` first.
   glass_tower()    2x1 column of dust on all-glass supports, 1 y per cell,
                    0 gt, non-inverting, -1 ss per y.  UP ONLY (transparent
                    diode).  z-pitch 2.
@@ -31,6 +36,100 @@ from rs import DUST, STONE
 
 GLASS = "minecraft:glass"
 SLAB_TOP = "minecraft:smooth_stone_slab[type=top,waterlogged=false]"
+
+
+# --------------------------------------------------------------------------
+# 0. the form contract -- latency and TOGGLE-RATE limits are first-class
+# --------------------------------------------------------------------------
+# mc-tick's constants (crates/mc-tick/src/components.rs).  Only turn-offs count
+# toward the budget, so a full toggle cycle spends one.
+TORCH_BURNOUT_WINDOW = 60      # game ticks the engine looks back over
+TORCH_MAX_TURNOFFS = 8         # turn-offs in that window before it goes dead
+# Measured, not derived: probe_torch_burnout.py B1/B2.  Hold-time per input
+# state, in game ticks, below which a torch starts dropping transitions.
+TORCH_MIN_HOLD_GT = 4
+
+#: One row per form.  A router must read `max_toggle_gt` and `burnout_risk`
+#: BEFORE it reads the density: a carrier that cannot survive the traffic is
+#: not a cheap carrier, it is a broken one.
+#:
+#:   gt_per_y            latency added per y of level change
+#:   blocks_per_y_per_bit marginal block cost of one more y (measured, section M
+#:                       of probe_vertical_forms.py)
+#:   xz_claim_per_bit    footprint a router must reserve, incl. neighbour pitch
+#:   max_toggle_gt       minimum hold time per input state.  None = unlimited
+#:   burnout_risk        "none" | "disqualifying"
+#:   data_safe           may this carry continuously switching bus data?
+FORMS = {
+    "torch_ladder": dict(
+        direction="up", rate="2 y per torch", gt_per_y=1.0,
+        blocks_per_y_per_bit=1.0, xz_claim_per_bit=3.0,
+        inverting=True, ss_per_y=0, reach_y=None,
+        max_toggle_gt=TORCH_MIN_HOLD_GT, burnout_risk="disqualifying",
+        data_safe=False,
+        note="fastest and densest on paper; burns out under switching data"),
+    "glass_tower": dict(
+        direction="up", rate="1 y per cell", gt_per_y=0.0,
+        blocks_per_y_per_bit=2.0, xz_claim_per_bit=4.0,
+        inverting=False, ss_per_y=1, reach_y=14,
+        max_toggle_gt=None, burnout_risk="none", data_safe=True,
+        note="pure dust; also a free one-way diode"),
+    "ring_riser": dict(
+        direction="both", rate="1 y per cell", gt_per_y=0.0,
+        blocks_per_y_per_bit=2.0, xz_claim_per_bit=3.75,
+        inverting=False, ss_per_y=1, reach_y=14,
+        max_toggle_gt=None, burnout_risk="none", data_safe=True,
+        note="5x3 / 4 bits; the only form that descends"),
+    "half_slope": dict(
+        direction="both", rate="1 y per 2 x cells", gt_per_y=0.0,
+        blocks_per_y_per_bit=2.0, xz_claim_per_bit=None,
+        inverting=False, ss_per_y=2, reach_y=7,
+        max_toggle_gt=None, burnout_risk="none", data_safe=True,
+        note="a SLOPE, not a shaft: footprint grows with rise but is shared "
+             "by every bit in the stack"),
+    "stair_1to1": dict(
+        direction="both", rate="1 y per x cell", gt_per_y=0.0,
+        blocks_per_y_per_bit=2.0, xz_claim_per_bit=None,
+        inverting=False, ss_per_y=1, reach_y=14,
+        max_toggle_gt=None, burnout_risk="none", data_safe=True,
+        note="cannot stack a second line at any pitch"),
+    "repeater_drop": dict(
+        direction="down", rate="1 y per station", gt_per_y=2.0,
+        blocks_per_y_per_bit=3.0, xz_claim_per_bit=2.0,
+        inverting=False, ss_per_y=0, reach_y=None,
+        max_toggle_gt=None, burnout_risk="none", data_safe=True,
+        note="repeaters do not burn out; only the single stage is probed"),
+}
+
+
+def data_safe(form, toggle_period_gt=None):
+    """HARD precondition, not a cost: may `form` carry switching data?
+
+    `toggle_period_gt` is how long the caller guarantees each input state is
+    held.  Omit it to ask the unconditional question ("is this safe for a bus
+    whose traffic I cannot bound?"), which is the question a router asks.
+    """
+    f = FORMS[form]
+    lim = f["max_toggle_gt"]
+    if lim is None:
+        return True
+    if toggle_period_gt is None:
+        return False
+    return toggle_period_gt >= lim
+
+
+def assert_data_safe(form, toggle_period_gt=None):
+    if not data_safe(form, toggle_period_gt):
+        f = FORMS[form]
+        raise AssertionError(
+            "%s is not safe for this traffic: it needs each input state held "
+            ">= %d gt (torch burnout: %d turn-offs per %d gt), and the caller "
+            "%s. Use a torch-free form -- ring_riser descends and climbs at "
+            "0 gt with no toggle limit."
+            % (form, f["max_toggle_gt"], TORCH_MAX_TURNOFFS,
+               TORCH_BURNOUT_WINDOW,
+               "did not bound its toggle rate" if toggle_period_gt is None
+               else "holds only %d gt" % toggle_period_gt))
 
 
 # --------------------------------------------------------------------------
