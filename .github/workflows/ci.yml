@@ -15,6 +15,13 @@ env:
   # diplomat-tool from our fork (adds the PHP backend); pinned by branch.
   DIPLOMAT_TOOL_GIT: https://github.com/Nano112/diplomat
   DIPLOMAT_TOOL_BRANCH: nanobind-public-api
+  # `.cargo/config.toml` sets build.rustc-wrapper = "sccache" for the local dev
+  # loop, and cargo hard-fails if that binary is absent. This is the RELEASE
+  # pipeline: it cross-compiles on three OSes and builds wheels inside
+  # manylinux containers where sccache is not installed. An empty RUSTC_WRAPPER
+  # overrides the config file and restores plain rustc. Caching for the
+  # everyday tiers lives in dev-tiers.yml, which does install sccache.
+  RUSTC_WRAPPER: ""
 
 jobs:
   check-version:

@@ -1,8 +1,41 @@
 #[target.aarch64-unknown-linux-gnu]
 #linker = "aarch64-linux-gnu-gcc"
 
+# `-undefined dynamic_lookup` is load-bearing for the Python (nanobind)
+# extension: it links against the interpreter's symbols, which only exist at
+# import time. Do not remove — the wheel build fails to link without it.
 [target.x86_64-apple-darwin]
 rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
 
 [target.aarch64-apple-darwin]
 rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
+
+[build]
+# sccache caches dependency compilations *keyed by the exact rustc invocation*,
+# which is precisely this repo's problem: seven feature combinations
+# (default / simulation / bridge / bridge-full / +routing / +hdl / +meshing)
+# each recompile the same 159 dependencies. With sccache the second and later
+# feature sets pull those out of the cache instead of rebuilding them, and a
+# `cargo clean` stops being a punishment.
+#
+# REQUIRED TOOL: `brew install sccache`. Cargo hard-fails if the wrapper is
+# missing, so this is a prerequisite for building the repo — `tools/doctor.sh`
+# checks for it and CI installs it. Workspace crates compile *incrementally*
+# and so bypass the cache by design; the win is entirely on dependencies.
+rustc-wrapper = "sccache"
+
+# One canonical loop feature set, one warm artifact set. See docs/DEV.md.
+#   cargo ck        — canonical check (what tools/dev.sh fast runs)
+#   cargo ct        — canonical test
+[alias]
+ck = "check --features bridge-full,routing,hdl,meshing --all-targets"
+ct = "test --features bridge-full,routing,hdl,meshing"
+
+# NOTE ON LINKERS (measured, 2026-08-09): no alternative linker is configured
+# on purpose. Xcode's default on this machine is ld-prime (ld-1167.4.1), which
+# is already Apple's fast parallel linker on arm64; `lld` is not installed and
+# Homebrew's `lld` formula pulls the full ~2 GB `llvm`. More to the point, the
+# two dominant costs measured here — a no-op `cargo check` (31.8s) and a
+# one-file-touch `cargo check` (180s) — are metadata-only and never invoke a
+# linker at all, so a linker swap cannot move them. Revisit only if link time
+# shows up in `cargo build --timings`.
