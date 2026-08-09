@@ -2377,10 +2377,19 @@ impl Design {
         let state = layer.state.clone();
         self.touch_bus(&name);
         self.buses.insert(name.clone(), layer);
+        // A ROUTE IS NOT A SUCCESS UNTIL IT CONDUCTS. Placement succeeding says
+        // only that the cells fit; it says nothing about the signal arriving.
+        let state = if matches!(state, BusState::Routed) {
+            self.accept_if_conducting(&name)
+        } else {
+            state
+        };
         // FIRST-COME-FIRST-SERVED IS THE BUG. A bus declared later competes for
         // space that earlier buses already took, and the loser is whoever asked
         // last — not whoever had the worse alternative. Before accepting the
         // failure, rip the buses that are in the way and let this one go first.
+        // This runs for an electrical failure too: a lane shorted against a
+        // neighbour is exactly the kind of thing reordering can cure.
         let state = if matches!(state, BusState::Failed(_)) {
             self.rip_up_and_retry(&name)
         } else {
@@ -2785,7 +2794,9 @@ impl Design {
                 let layer = self.buses.get_mut(name).unwrap();
                 Self::fill_layer(layer, real.fragment, real.segments, real.gate_cells);
                 self.apply_amendments(real.amendments);
-                BusState::Routed
+                // Same gate as the fresh-declaration path: a reroute that lays
+                // non-conducting geometry has not rerouted anything.
+                self.accept_if_conducting(name)
             }
             Err(reason) => {
                 self.touch_bus(name);
@@ -4118,14 +4129,21 @@ impl Design {
                 let sink_bit = bit as i32 + shift;
                 // ONE net per bit: every driver (wired-OR merges stay one
                 // intent net) plus every sink.
+                // `resolve_port`, NOT `self.ports`: an INSTANCE port (`u0.q`) is
+                // derived from the cell contract and is not in the declared-port
+                // map, so looking there produced NO terminals, hence no intent
+                // net, hence no LVS coverage whatsoever for any bus wired
+                // between placed cells. Every such bus was silently exempt from
+                // the open/short check — which is most of
+                // `tests/design_routability.rs` and the whole studio use case.
                 let mut terminals = Vec::new();
                 for dn in bus.driver_names() {
-                    if let Some(dp) = self.ports.get(&dn) {
+                    if let Ok(dp) = self.resolve_port(&dn) {
                         terminals.push(dp.wire(bit));
                     }
                 }
                 for s in &bus.sinks {
-                    if let Some(sp) = self.ports.get(s) {
+                    if let Ok(sp) = self.resolve_port(s) {
                         terminals.push(sp.wire(sink_bit.max(0) as u8));
                     }
                 }
@@ -4139,6 +4157,166 @@ impl Design {
             }
         }
         nets
+    }
+
+    /// Why this bus's realized geometry must NOT be reported as a success, if
+    /// there is a reason.
+    ///
+    /// A ROUTE THAT REPORTS SUCCESS AND DOES NOT CONDUCT IS WORSE THAN ONE THAT
+    /// HONESTLY FAILS. Until this existed, realization asked only "did every
+    /// cell get placed without colliding" — a STRUCTURAL question. It never
+    /// asked the electrical one: does the signal ARRIVE? The corpus found the
+    /// gap with a one-wall fixture (`O03_flat_obstacle`): a flat bundle detoured
+    /// around an obstacle, came back `routed`, and in simulation carried 1 of 12
+    /// words, some lanes dead and some shorted together.
+    ///
+    /// The question is asked over the SAME extractor `check` uses, so the two
+    /// can never disagree: conduction components are extracted from the emitted
+    /// cells and compared against this bus's per-bit intent
+    /// ([`Design::intent_nets`]). An intent net split across components is a
+    /// DEAD LANE; two intent nets sharing a component are LANES SHORTED
+    /// TOGETHER; both are reported as the failure they are, with the bit named.
+    ///
+    /// Structural DRC on the bus's own cells is folded in too, because a bus
+    /// that lays an accidental repeater ring is not routed either — that is the
+    /// other half of what O03 emitted.
+    ///
+    /// Deliberately NOT a simulation: this is symbolic reachability over placed
+    /// blocks, the same cost as `check`, so it can run on every accepted route.
+    fn conduction_reason(&self, name: &str) -> Option<String> {
+        let flat = match self.flatten() {
+            Ok(f) => f,
+            Err(e) => return Some(format!("the realized geometry could not be flattened: {e}")),
+        };
+        let ws = crate::routing::workspace_from_schematic(&flat);
+        let lvs = crate::routing::lvs(ws.cells(), &self.intent_nets());
+        let prefix = format!("{name}[");
+        let mine = |n: &String| n.starts_with(&prefix);
+        let mut why: Vec<String> = Vec::new();
+
+        // THE CELL BOUNDARY APPLIES HERE TOO, and forgetting it produced a
+        // spectacular false positive: the ADD007 -> BINTOBCD001 chain, verified
+        // 8/8 in simulation, was rejected as "all eight bits shorted". Its
+        // terminals are the adder's own stacked output LAMPS, and lamps are
+        // solid conductors, so the extractor merges the whole column — inside a
+        // placed cell, which is a verified black box behind its keepout. A
+        // finding whose every witness lies inside one instance is that cell's
+        // internal business, exactly as `Design::check` already treats it.
+        let bodies = self.instance_bodies();
+        let interior = |cells: &[crate::routing::Pos]| -> bool {
+            !cells.is_empty()
+                && cells.iter().all(|q| {
+                    let p = (q.x, q.y, q.z);
+                    bodies.iter().any(|b| b.contains(&p))
+                })
+        };
+
+        for o in &lvs.opens {
+            if !mine(&o.net) || interior(&o.fragments.concat()) {
+                continue;
+            }
+            let ends: Vec<String> = o
+                .fragments
+                .iter()
+                .map(|f| {
+                    let ps: Vec<String> = f.iter().map(|p| format!("({},{},{})", p.x, p.y, p.z)).collect();
+                    format!("[{}]", ps.join(" "))
+                })
+                .collect();
+            why.push(format!(
+                "net `{}` does NOT conduct end to end: its terminals fall in {} separate \
+                 conduction groups {} — the route was laid but the signal cannot cross",
+                o.net,
+                o.fragments.len(),
+                ends.join(" vs ")
+            ));
+        }
+        for s in &lvs.shorts {
+            if !mine(&s.net_a) && !mine(&s.net_b) {
+                continue;
+            }
+            if interior(&[s.at_a, s.at_b]) {
+                continue;
+            }
+            why.push(format!(
+                "nets `{}` and `{}` are SHORTED: they share one conduction component, \
+                 witnessed at ({},{},{}) and ({},{},{}) — the lanes would carry each \
+                 other's value",
+                s.net_a, s.net_b, s.at_a.x, s.at_a.y, s.at_a.z, s.at_b.x, s.at_b.y, s.at_b.z
+            ));
+        }
+
+        // Structural findings on cells THIS bus laid. Scoped to our own
+        // fragment so a pre-existing defect elsewhere (a community cell's
+        // interior, another layer's mess) is never blamed on this route.
+        let fragment: BTreeSet<P3> = self
+            .buses
+            .get(name)
+            .map(|b| b.fragment.keys().copied().collect())
+            .unwrap_or_default();
+        let ours = |cells: &[P3]| cells.iter().any(|c| fragment.contains(c));
+        for ring in &lvs.cycles {
+            if interior(ring) {
+                continue; // a register's latch IS a repeater ring, by design
+            }
+            let cells: Vec<P3> = ring.iter().map(|p| (p.x, p.y, p.z)).collect();
+            if ours(&cells) {
+                why.push(format!(
+                    "the route closes a REPEATER RING through {cells:?} — an accidental latch, \
+                     so the bus would hold a value of its own instead of passing one through"
+                ));
+            }
+        }
+        let opts = crate::routing::DrcOptions {
+            aliases: vec![],
+            skip_decay: true,
+        };
+        for v in crate::routing::drc_schematic(&flat, &opts) {
+            if self.is_inside_an_instance(&v) {
+                continue; // a placed cell's interior is its own business
+            }
+            if ours(&Self::violation_cells(&v)) {
+                why.push(format!("the route violates a design rule: {v:?}"));
+            }
+        }
+
+        if why.is_empty() {
+            return None;
+        }
+        // Bounded: a bundle that fails wholesale would otherwise produce one
+        // line per bit and bury the cause.
+        let shown = why.len().min(4);
+        let more = why.len() - shown;
+        Some(format!(
+            "routed geometry does not conduct: {}{}",
+            why[..shown].join("; "),
+            if more > 0 {
+                format!(" (and {more} more)")
+            } else {
+                String::new()
+            }
+        ))
+    }
+
+    /// Drop a bus's realized geometry and record why it failed.
+    fn set_failed(&mut self, name: &str, reason: String) -> BusState {
+        self.touch_bus(name);
+        let layer = self.buses.get_mut(name).expect("caller holds the bus");
+        layer.fragment.clear();
+        layer.runs.clear();
+        layer.segments.clear();
+        layer.gate_cells.clear();
+        layer.state = BusState::Failed(reason.clone());
+        BusState::Failed(reason)
+    }
+
+    /// Gate a freshly realized route on conduction: `Routed` only if the signal
+    /// actually arrives, otherwise `Failed` with the electrical reason.
+    fn accept_if_conducting(&mut self, name: &str) -> BusState {
+        match self.conduction_reason(name) {
+            None => BusState::Routed,
+            Some(why) => self.set_failed(name, why),
+        }
     }
 
     /// DRC + LVS + STA/skew over the flattened artifact, plus the per-bus
