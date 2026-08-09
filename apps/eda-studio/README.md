@@ -74,6 +74,96 @@ full legend, in the app.
 | `⌘/Ctrl-Z` / `⇧⌘/Ctrl-Z` | undo / redo |
 | `?` | keyboard + colour legend |
 | `Esc` | cancel placing/connecting/grabbing, close an overlay, or deselect |
+| `⇧`+click | add/remove an instance from an area selection (the last click is primary) |
+| `⌘/Ctrl-C` `V` `X` `D` | copy / paste at the cursor / cut / duplicate with an offset |
+| right-click | context menu on whatever is under the cursor |
+
+Four kinds of thing are selectable, and each answers `Del` differently, because
+they are different things: an **instance** (deleting it takes its buses, so it
+asks), a **bus** (deleting it drops the declaration; `Rip` keeps it), a **gate**
+(deleting it only lets the route straighten), and a **port** (not deletable at
+all — it belongs to a cell).
+
+### Copy / paste
+
+An instance is a *reference to a library cell plus a transform* — that is why
+ten placements cost one mesh — so a paste places **another reference**, never a
+copy of the blocks. `⌘V` costs zero new cell meshes, which the verify asserts.
+
+What travels with a copy: the transform, and the per-port Exec/Bus promotions
+(those are per-instance patches, so they genuinely are part of the instance).
+What does not: geometry, and buses with an endpoint outside the copied set —
+half a bus is nothing.
+
+For an **area** copy (`⇧`-click a group), a bus whose driver *and* every sink are
+inside the set has its **intent** copied — driver, sinks, gates — and the paste
+re-declares it for the new group, with every endpoint remapped to the copies. A
+bus is an intent the router realizes; blocks are its output, not its identity.
+If the new copy cannot route, it is left FAILED with the router's own reason,
+like every other failed route here.
+
+A paste is **one undo step** (`Studio.transaction`) covering the placements, the
+promotions and the recreated buses — and one refresh, so the renderer never
+meshes the half-promoted intermediate states nobody sees. Names are derived from
+the source (`u1` → `u2`, `add0` → `add1`, otherwise `_copy`), and the group is
+nudged clear of existing keepouts rather than being refused.
+
+### Gates are checkpoints, not endpoints
+
+A gate says *the route must pass through here*; an endpoint says *this bus
+drives that port*. Conflating them is the mistake that makes routing feel
+arbitrary, so nothing in the UI does: removing a gate leaves the netlist alone
+and lets the router take a **straighter** path (the verify asserts the cell
+count does not grow), while removing an endpoint changes what the design means.
+
+Full lifecycle on canvas: right-click a bus → **Add gate here** at the clicked
+point; drag the ◆ handle to steer (only the two adjacent spans re-route); select
+it and `Del`, or use its ✕ in the Buses panel, to remove it. Each is its own
+undo step. A selected bus lists its checkpoints in order with their coordinates,
+and prints `N trunk span(s)` so the model is on screen rather than implied.
+
+Two engine notes the UI works around rather than hides:
+
+- a click lands on whatever *bit* of the bus's 2y-pitch stack is under the
+  cursor, so the gate's **level snaps to the bus's own** (a gate off the trunk
+  level is a level change, which this router refuses — and says so);
+- `Design::add_gate` resolves a bus's endpoints through the *declared* port
+  table, so it refuses any bus running between placed cells. Those buses fall
+  back to re-declaring the bus with the new gate list, which routes the whole run
+  instead of two spans — same result, more work. `remove_gate` is used when the
+  loaded engine has it and falls back the same way.
+
+### Bus drawing: a bus IS redstone
+
+A bus fragment is not an annotation near redstone, it is dust, repeaters and the
+blocks carrying them. Painting it as an opaque coloured slab therefore *deletes*
+information — and what the colour is for is identity, which survives a tint or an
+outline just as well. Three presets (header dial, remembered in `localStorage`,
+overridable per bus in the Buses panel):
+
+| preset | what it draws | for |
+| --- | --- | --- |
+| `solid` | the fragment in the bus colour | tracing a route at maximum contrast |
+| `translucent` | tinted, the blocks reading through | the default |
+| `outline` | silhouette only, in the bus colour | seeing the actual redstone |
+
+Hovering or selecting a bus raises its emphasis temporarily, so `outline` stays
+traceable: the fragment under the cursor comes forward without the other seven.
+Compare `docs/15-textured-bus-solid.png` with
+`docs/16-textured-bus-outline-shows-redstone.png`.
+
+### Right-click
+
+Context-sensitive on what is under the cursor: an **instance** offers rotate,
+duplicate, copy/cut, a per-port Exec/Bus submenu, promote-all-inputs, frame, rip
+its buses, delete; a **port** offers start-a-bus and its mode switch; a **bus**
+offers add-gate-here, remove-a-gate submenu, re-route, rip, its drawing style,
+focus-the-blockage when FAILED, delete; **empty space** offers paste, add a
+component from the library, frame all, and the view toggles. `Esc` closes it, and
+right-clicking mid-gesture cancels the gesture instead of opening a menu.
+
+The highest-value entry is **Add gate here**, because it is the only affordance
+that can exist: gate steering needs a world position, and no panel has one.
 
 ### Undo/redo
 
@@ -84,9 +174,11 @@ port-mode toggles are all reversible, and a **drag is one undo step** — the
 sixty committed live-reroute frames coalesce into "where the gesture started"
 → "where it ended". Undoing the delete of a bus-carrying instance re-places
 the body, re-applies its promotions and **re-routes its buses**; the verify
-script asserts exactly that. `declarePort` and `addGate` have no engine inverse
-and are deliberately *not* journalled rather than faked. Loading a demo clears
-the history — a starting point is not an edit.
+script asserts exactly that. Gate add/move/remove and pastes are journalled too,
+a paste as **one** step via `Studio.transaction` (which also defers the change
+notification to the commit, so a dozen edits cost one refresh). `declarePort` has
+no engine inverse and is deliberately *not* journalled rather than faked. Loading
+a demo clears the history — a starting point is not an edit.
 
 ### Colour semantics, documented in the UI
 
@@ -329,6 +421,41 @@ The loose layer is read from flatten's own non-`inst:`/`bus:` regions rather
 than by subtracting instance blocks from a full-document dump — that dump was
 36 ms at 2.5k blocks and grew with every placed cell.
 
+### ...but the renderer does not TRUST the changed set
+
+"Sometimes when I move a component the bus doesn't update right" is what an
+incremental renderer costs you if the changed set is the only thing deciding
+what to redraw. A changed set is a performance hint; it can be incomplete, it
+can be spent by a failed frame, and it can be stale by a frame. So three
+mechanisms sit under it, each aimed at one of those:
+
+1. **Geometry revisions.** Every layer (each bus, the loose base, each cell
+   variant) carries a `rev` that moves only when its blocks actually change
+   content — a signature comparison, not a re-read. The renderer keys its mesh
+   cache on `rev`, so a layer whose geometry moved can never keep a stale mesh
+   even if nobody named it. Revisions come from a process-wide counter, because
+   a per-layer one hands a NEW document's first `loose` layer revision 1 — the
+   number a renderer that outlives the document swap is already holding. (That
+   is not hypothetical: the consistency check below caught exactly that, and the
+   symptom was the design's loose hardware silently not drawn.)
+2. **The dirty set is consumed last.** `scene()` clears the flags only after
+   every read has succeeded, and a caller that fails to apply a scene calls
+   `Studio.invalidateAll()`. A throw mid-scene used to mean permanent staleness:
+   the work was never done and nothing remembered it was owed.
+3. **Commit sequence numbers.** A live re-route commit is deferred to the next
+   animation frame, so a drop could land the final position and then have the
+   queued frame land the position from *before* it — re-routing every affected
+   bus for a component that had already moved. Every intent takes a number when
+   it is formed and a commit is refused if a higher-numbered one has landed.
+   Coalescing may drop work; it can never apply older work over newer.
+
+And one assertion, which is the actual regression guard:
+`window.__eda.consistency()` reads back **what is in the scene graph** — the
+vertex buffers and the instance matrices, not the arrays the renderer was handed
+— and compares it cell-for-cell with a fresh, cache-bypassing read of the
+engine. `npm run verify` runs it after a 12-frame drag, a rotate, a rip, a
+re-route, a promotion, a delete, an undo, every paste and every gate edit.
+
 ### Numbers
 
 `npm run profile` writes `docs/profile-<tag>.json`; `docs/profile-before.json`
@@ -395,7 +522,7 @@ npm run profile                 # -> docs/profile-current.json
 EDA_PROFILE_TAG=before npm run profile   # tag a baseline to diff against
 ```
 
-**71 checks**, all through the same code paths the mouse and keyboard drive
+**101 checks**, all through the same code paths the mouse and keyboard drive
 (`window.__eda`), so green means the UI works and not just the engine: library
 auto-load, instance ports (routable + refused-with-reason), selection and the
 hint bar, `R` rotate, `Del` delete ripping its bus, click-to-connect, a bus
@@ -421,6 +548,27 @@ reverse), plus the **UX contract**:
 | `Esc` cancels placing **and** grabbing (put back where it started), camera freed | one key, no dead ends |
 | clicking empty ground deselects | the escape hatch people try before they find `Esc` |
 
+...the **editing model** added in this pass:
+
+| assertion | why it is the right thing to assert |
+| --- | --- |
+| every rendered layer matches the engine's blocks after a drag, rotate, rip, re-route, promotion, delete and undo | the regression guard for "sometimes the bus doesn't update": it reads the scene graph's own buffers, not the arrays the renderer was handed |
+| a live frame queued before a drop is refused when it fires, and the instance stays where the drop put it | the drag race, asserted by the count of commits actually dropped |
+| ⌘C/⌘V places one new instance of the same cell, uniquely named, for **0** new cell meshes | a paste is a reference, which is the whole model |
+| ...with its Exec/Bus port modes carried over | the per-instance patches are part of the instance |
+| ...as **one** undo step, and consistent both after the paste and after the undo | one action, one ⌘Z |
+| an area copy takes the bus with both ends inside, and the paste RECREATES it with endpoints remapped to the copies | a bus is an intent, not blocks |
+| ...and one ⌘Z removes the pasted instances *and* the recreated bus | the transaction, end to end |
+| ⌘D lands the copy clear of the original; ⌘X then ⌘V round-trips | the two shortcuts people actually use to array a cell |
+| clicking a bus selects it, the hint bar names Del/R/F, its outliner row highlights, `Del` deletes it behind the same confirm | a bus is a first-class object, not an outliner row |
+| bus drawing has three presets, one bus can override the global, and the choice survives a reload | "the bus lines hide the redstone" is a preference, so it is stored |
+| the right-click menu is context-sensitive per instance / port / bus / ground, `Esc` closes it, its Delete uses the same confirm | a menu that acts on something the canvas does not show as selected is how you delete the wrong cell |
+| "Add gate here" carries the clicked (x, z) and snaps only the LEVEL to the bus's | the entry only means anything with a position |
+| a gate lands, the bus stays routed, and the geometry passes THROUGH that cell | otherwise it is a decoration |
+| dragging the handle moves it for **0** cell re-meshes | the 2-adjacent-span fast path |
+| removing it leaves the endpoints untouched and the route no longer | gate = route, endpoint = netlist, asserted rather than described |
+| add / drag / remove are each their own undo entry | each is a thing a user did |
+
 ...and the **performance contract**, re-run unchanged:
 
 | assertion | why it is the right thing to assert |
@@ -430,7 +578,7 @@ reverse), plus the **UX contract**:
 | K placements of one cell ⇒ 1 mesh build, 1 instanced group | the instancing claim itself |
 | ...read out of wasm once, from the CELL | no per-instance region dumps |
 | port-mode toggle ⇒ exactly 1 cell variant re-meshed | the only edit that changes a placed cell's blocks |
-| one bus re-route ⇒ exactly 1 bus re-meshed, 0 cells | bus dirtiness is per bus, from the engine's own report |
+| one bus re-route ⇒ exactly 1 bus layer RE-READ, 0 cells, and re-meshed only if its blocks moved | re-reading is the contract; re-meshing is a decision, and an identical route already has a correct mesh |
 | live re-route commits ≤ 1 engine move per animation frame | there is no fixed throttle left to drift out of date |
 | 10 placements / 3 cells ⇒ the draw-call count | the number a reader can check |
 
@@ -438,7 +586,9 @@ The counters behind these are `viewer.meshBuilds` (`cells`, `instancedGroups`,
 `matrixWrites`, `buses`, `loose`, `texture`) and `studio.sceneReads`
 (`flatten`, `cellDump`, `instDump`, `busDump`, `looseDump`); the UX ones are
 `__eda.labels()`, `__eda.history()`, `__eda.coach()`, `__eda.toasts()`,
-`__eda.pendingConfirm()`, `__eda.lastFailure()` and `__eda.focus()`. All are on
+`__eda.pendingConfirm()`, `__eda.lastFailure()`, `__eda.focus()`,
+`__eda.consistency()`, `__eda.staleCommits()`, `__eda.clipboard()`,
+`__eda.gates()` and `__eda.contextMenu()`. All are on
 `window.__eda`. Results land in `docs/verify-out.json`; screenshots in `docs/`.
 
 The textured check needs a resource pack at the repo root (`pack.zip`, **not**
@@ -460,8 +610,13 @@ Regenerated by `npm run verify` into `docs/`:
 | `08-bus-failed-reason.png` | a FAILED bus as a **sentence** — headline, fix, `→ (15, 6, 25)`, engine words behind a disclosure |
 | `09-baked-typed-poke.png` | the poke panel after `Bake` |
 | `10-auto-promoted-cell-to-cell.png` | auto-promotion on connect, cell to cell |
-| `11-textured-resource-pack.png` | the textured view (needs `pack.zip`) |
-| `12-instanced-10-placements.png` | 10 placements over 3 cells, 7 draw calls |
+| `11-copy-paste-group.png` | ⌘C/⌘V — a second placement of the same cell, framed with its original |
+| `12-context-menu-instance.png` | the right-click menu on an instance (rotate, duplicate, port-mode submenu, rip its buses) |
+| `13-bus-gates-and-context-menu.png` | a bus with two checkpoints, its menu open, its gate list in the panel |
+| `14-textured-resource-pack.png` | the textured view (needs `pack.zip`) |
+| `15-textured-bus-solid.png` | the same scene with `solid` buses — the coloured slab hides the redstone it is made of |
+| `16-textured-bus-outline-shows-redstone.png` | ...and with `outline` buses: dust, repeaters and blocks visible, identity kept |
+| `17-instanced-10-placements.png` | 10 placements over 3 cells, 7 draw calls |
 
 ## Known rough edges
 
@@ -484,6 +639,14 @@ Regenerated by `npm run verify` into `docs/`:
 - The engine runs on the main thread. That no longer costs the drag gesture
   anything (see *Renderer → Numbers*), but a live-re-route drag and the
   200 ms textured re-mesh are still main-thread stalls a Web Worker would hide.
+- **`Design::add_gate` cannot resolve instance ports.** It looks its bus's
+  driver and first sink up in the *declared* port table, so any bus between two
+  placed cells — which is most of them — is refused with
+  `NucleationError.InvalidArgument`, even though `move_gate` handles a gate on
+  the same bus fine. The app falls back to re-declaring the bus with the new gate
+  list (whole run re-routed instead of two spans), so gates work everywhere; the
+  fast path returns as soon as the engine resolves endpoints there. Same for
+  `remove_gate`, used when present.
 - Buses realize a single-level 2y-pitch stack: both endpoints must share a y.
   Moving an instance off that level reports FAILED with that explanation
   (which is what the verify script's failure case uses).
