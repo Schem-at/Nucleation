@@ -611,3 +611,131 @@ fn ripping_a_bus_removes_the_form_adapter_it_grew() {
         "re-routing after a rip did not reproduce the same block count"
     );
 }
+
+// ----------------------------------------------------------------------
+// Gates vs endpoints: deleting them means different things
+// ----------------------------------------------------------------------
+
+/// Removing a GATE relaxes a constraint: the bus survives, the two spans it
+/// separated MERGE, and the result is genuinely straighter — not the two old
+/// legs stitched together.
+#[test]
+fn removing_a_gate_merges_its_spans_into_a_more_direct_route() {
+    let mut s = UniversalSchematic::new("rmg".to_string());
+    let din = lever_bank(&mut s, 0, 2, 8, 1, 0);
+    let dout = lamp_bank(&mut s, 48, 2, 8);
+    let mut d = Design::for_schematic("rmg", s);
+    let step = (0, 2, 0);
+    d.declare_input("din", din, step, W, ty()).unwrap();
+    d.declare_output("dout", dout, step, W, ty()).unwrap();
+    // A gate dragged well off the straight line forces a dogleg.
+    let gates = vec![Gate { name: "g0".into(), anchor: (24, 2, 24), step }];
+    assert_eq!(
+        d.route_bus("g", "din", &["dout"], gates, BusStyle::default()).unwrap(),
+        BusState::Routed
+    );
+    let with_gate = d.bus("g").unwrap().fragment.len();
+    let segments_with = d.bus("g").unwrap().segments.len();
+    assert_clean(&d, "with the gate");
+
+    let before = geometry(&d);
+    let rev = d.layer_revision();
+    let rep = d.remove_gate("g", 0).unwrap();
+    assert_eq!(rep.state, BusState::Routed, "{:?}", d.bus_state("g"));
+    assert_eq!(rep.changed, d.changed_layers_since(rev));
+    assert!(rep.changed.iter().any(|n| n == "g"), "{:?}", rep.changed);
+    assert_all(&d, &rep.changed, &before, "remove gate g0");
+
+    // The bus SURVIVED (a gate is a constraint, not a terminal)...
+    assert!(d.bus("g").is_some());
+    assert!(d.bus("g").unwrap().gates.is_empty());
+    // ...and the merged span is genuinely more direct, not spliced.
+    let without = d.bus("g").unwrap().fragment.len();
+    assert!(
+        without < with_gate,
+        "removing the gate did not shorten the route: {with_gate} -> {without}"
+    );
+    assert!(
+        d.bus("g").unwrap().segments.len() < segments_with,
+        "the spans were not merged: still {} segment(s)",
+        d.bus("g").unwrap().segments.len()
+    );
+
+    // Out-of-range says what there is.
+    let err = d.remove_gate("g", 0).unwrap_err();
+    assert!(err.contains("no gate at index 0") && err.contains("none"), "{err}");
+}
+
+/// Removing an ENDPOINT changes the netlist: the bus loses a terminal, so it is
+/// deleted — and never silently.
+#[test]
+fn removing_a_port_is_refused_before_it_deletes_a_bus() {
+    let mut s = UniversalSchematic::new("rmp".to_string());
+    let din = lever_bank(&mut s, 0, 2, 8, 1, 0);
+    let dout = lamp_bank(&mut s, 32, 2, 8);
+    let mut d = Design::for_schematic("rmp", s);
+    let step = (0, 2, 0);
+    d.declare_input("din", din, step, W, ty()).unwrap();
+    d.declare_output("dout", dout, step, W, ty()).unwrap();
+    routed(&mut d, "a", "din", "dout");
+
+    // Unconfirmed: refused, and it names what would go.
+    let err = d.remove_port("dout", false).unwrap_err();
+    assert!(
+        err.contains("ENDPOINT") && err.contains("\"a\"") || err.contains("a)") || err.contains(" a"),
+        "{err}"
+    );
+    assert!(d.bus("a").is_some(), "the bus was deleted despite the refusal");
+
+    // Confirmed: the bus goes, and it is reported.
+    let rev = d.layer_revision();
+    let (removed, moves) = d.remove_port("dout", true).unwrap();
+    assert_eq!(removed, vec!["a".to_string()]);
+    assert!(d.bus("a").is_none(), "the bus outlived its endpoint");
+    assert!(d.port("dout").is_none(), "the port declaration survived");
+    let mut reported: Vec<String> = removed.iter().chain(moves.changed.iter()).cloned().collect();
+    reported.sort();
+    reported.dedup();
+    assert_eq!(reported, d.changed_layers_since(rev), "removal under-reported");
+
+    // An instance port is derived, not declared: say so instead of no-op.
+    let mut d2 = layout_instances();
+    let err = d2.remove_port("u0.d", true).unwrap_err();
+    assert!(err.contains("INSTANCE port") && err.contains("set_port_mode"), "{err}");
+}
+
+/// BUG: `add_gate` resolved its endpoints through the DECLARED port table, so
+/// every bus between two placed cells (`u0.q` -> `u1.d` — instance ports,
+/// derived from the contract, never in that table) refused a gate outright,
+/// while `move_gate` worked on the very same bus. Gates were therefore unusable
+/// on real cell-to-cell buses.
+#[test]
+fn a_gate_can_be_added_to_a_bus_between_two_instance_ports() {
+    let mut d = layout_instances();
+    routed(&mut d, "b", "u0.q", "u1.d");
+    assert!(d.bus("b").unwrap().gates.is_empty());
+
+    let before = geometry(&d);
+    let rev = d.layer_revision();
+    let st = d
+        .add_gate("b", "g0", (28, 2, 8), (0, 2, 0))
+        .expect("a gate on an instance-port bus must be accepted");
+    assert_eq!(st, BusState::Routed, "{:?}", d.bus_state("b"));
+    assert_eq!(d.bus("b").unwrap().gates.len(), 1);
+    assert!(
+        d.bus("b").unwrap().segments.len() >= 2,
+        "the gate did not split the bus: {} segment(s)",
+        d.bus("b").unwrap().segments.len()
+    );
+    let changed = d.changed_layers_since(rev);
+    assert_changed_set_complete(&changed, &before, &geometry(&d), "add_gate");
+    assert_all(&d, &changed, &before, "add gate to an instance-port bus");
+
+    // ...and it moves and comes back off again, on the same bus.
+    let rep = d.move_gate("b", "g0", (28, 2, 12)).unwrap();
+    assert_eq!(rep.state, BusState::Routed, "{:?}", rep.state);
+    let rep = d.remove_gate_named("b", "g0").unwrap();
+    assert_eq!(rep.state, BusState::Routed, "{:?}", rep.state);
+    assert!(d.bus("b").unwrap().gates.is_empty());
+    assert_clean(&d, "after the gate round trip");
+}

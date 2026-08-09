@@ -141,6 +141,93 @@ owned fragment or the bus enters `FAILED(reason)` with the workspace
 untouched. Never half-routed; **unroutability is a state, not an
 exception**.
 
+### 4a. Gates vs endpoints — never merged into one concept
+
+A **gate** and an **endpoint** are both waypoints a bus passes through, and
+they are the same shape on screen. They must stay separate concepts, because
+deleting them means opposite things:
+
+| | what it is | deleting it |
+|---|---|---|
+| **gate** | a routing CONSTRAINT: a checkpoint the bus must thread, splitting it into independently-routed segments (the rip granularity of the drag APIs) | RELAXES the constraint. The bus survives; the two spans it separated MERGE and are re-planned as ONE pair, so the result is shorter and straighter — not the two old legs stitched together. `Design::remove_gate(bus, index)` |
+| **endpoint** | a NETLIST terminal: a driver or a sink, with a type, a width and a direction | changes the netlist. The bus loses a terminal, so it cannot exist: every bus naming that port is DELETED. `Design::remove_port(name, force)` refuses without `force` and names the buses that would go, so it never happens silently |
+
+Implicit blurring is forbidden in both directions — a gate must never quietly
+become a tap, and removing an endpoint must never quietly degrade into
+"re-route without it". An EXPLICIT conversion (promote a gate to a sink where a
+tap is genuinely wanted, or demote a sink to a gate) is a legitimate future
+operation; it just has to be asked for by name.
+
+Instance ports are a third thing: they are DERIVED from the cell's contract,
+not declared, so there is nothing to remove. `remove_port("u0.d", ..)` says so
+and points at `set_port_mode` (undo the promotion) or removing the instance.
+
+### 4b. Form adaptation belongs to the BUS
+
+A port has a native geometry, and PROMOTION MUST NOT CHANGE IT. Turning a
+cell's executor IO into routable dust is a minimal, in-place, reversible patch
+inside the cell's own footprint: a horizontal row of 8 levers becomes a
+horizontal row of 8 dust cells at the same pitch. Nothing else.
+
+If the bus's internal form differs from a port's form, the adapter — today the
+row→stack pivot (private lanes, `2i`-block staircases, a gather column) — is
+part of **that bus's fragment layer**, under `SegmentKind::Adapter(port)`, and
+is placed outside the cell. It is created with the bus and RIPPED with the bus.
+
+This is ownership, not style. While the adapter lived in a per-instance
+promotion patch, `rip` left the staircase and gather column behind: geometry
+that existed only to serve one bus, that reached far outside the component, and
+that the user could not remove. `tests/design_reroute_stress.rs` pins the rule
+— after a rip the flattened design returns to exactly its pre-route block
+count.
+
+(The adapter is still a workaround for having only one realizer. A second,
+HORIZONTAL realizer would let a horizontal-port-to-horizontal-port bus need no
+adapter at all; the corridor fabric's column test, the refresh stations, the
+crossing rules and the DRC are all keyed to the 2y stack, so that is its own
+piece of work.)
+
+### 4c. The CHANGED-LAYER CONTRACT
+
+A viewer redraws only what the engine reports as changed — that is what makes a
+drag cost 0.05 ms/frame instead of 431 ms. So the report, not the viewer, is
+the source of truth, and it must never UNDER-report.
+
+`Design::layer_revision()` returns a monotonic counter. Every single write to a
+bus layer's fragment stamps it. `Design::changed_layers_since(rev)` returns the
+layers stamped since `rev`: bracket any mutation with those two calls, or read
+the `changed` field the reports carry (`MoveReport`, `GateMoveReport`, and the
+JSON of `move_instance` / `remove_instance` / `move_gate` / `remove_gate` /
+`remove_port` / `set_port_mode`).
+
+It is complete **by construction**, and that matters because the interesting
+cases are not the obvious ones:
+
+- the bus an operation was aimed at, `Routed` **or** `FAILED` — both directions
+  of the transition are stamped;
+- every bus RIPPED and co-rerouted because a moved instance's footprint, halo,
+  **or ports** touched it. A bus WIRED to an instance moves with it whatever
+  the halo geometry says: a cell declaring explicit `keepouts` can have a halo
+  that excludes the very cell its port's bus leaves along, and inferring the
+  set from fragment intersection missed exactly those buses;
+- every bus amended INDIRECTLY. A crossing stamps a through-bus station into a
+  bus that was never ripped and appears in no other report — the classic
+  "I moved a component and the bus didn't update" stale mesh;
+- every bus DELETED. A layer named here that `bus()` no longer knows is a
+  removal: drop the mesh.
+
+It may OVER-report (a bus ripped and re-routed to byte-identical geometry is
+still named). Redrawing an unchanged layer is wasted work, never a wrong
+picture. `tests/design_reroute_stress.rs` computes the set both ways — revision
+stamps against a block-by-block diff — and fails on any under-report.
+
+One thing the contract deliberately does NOT promise: that an undisturbed bus
+matches a fresh from-scratch route. Routing is INCREMENTAL. A bus nobody
+touched keeps its geometry, including dip-unders it grew around buses that have
+since been deleted, and `move_gate` re-plans exactly two segments on purpose.
+"Stale" means a fragment that no longer MEETS ITS PORTS, and that is what the
+harness asserts.
+
 ## 5. INTERFERENCE (Phase 2)
 
 Spatial occupancy = instance footprints + influence halos
@@ -148,8 +235,10 @@ Spatial occupancy = instance footprints + influence halos
 `src/io_contract/physical.rs`) + route fragments + electrical clearance
 (the router's `electrical_conflicts` — adjacency one step up/down shorts
 without sharing a cell). Moving anything computes the **affected bus set**:
-buses whose fragments intersect the old or new footprint, plus buses whose
-DRC would newly fail. The affected set is co-rerouted under negotiated
+buses WIRED to the thing that moved (their endpoint anchors move with it,
+whatever the halo says), buses whose fragments intersect the old or new
+footprint, plus every already-`FAILED` bus (the drag that blocked one can be
+the drag that unblocks it). The affected set is co-rerouted under negotiated
 congestion (pnr-core PathFinder), deterministic, seeded and bounded;
 failures become `FAILED` states on the buses, never exceptions.
 

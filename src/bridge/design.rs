@@ -481,6 +481,60 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Remove a gate by index and re-realize the bus, so the two spans it
+        /// separated MERGE and route as one — removing a checkpoint relaxes a
+        /// constraint, so the result is shorter and straighter, not the two old
+        /// legs stitched together. Writes the same JSON as `move_gate`:
+        /// `{"state", "rerouted_segments", "changed"}`.
+        pub fn remove_gate(
+            &mut self,
+            bus: &DiplomatStr,
+            index: usize,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let report = self.0.remove_gate(utf8(bus)?, index).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::InvalidArgument
+            })?;
+            let changed: Vec<String> =
+                report.changed.iter().map(|n| format!("{n:?}")).collect();
+            let _ = write!(
+                out,
+                "{{\"state\":{:?},\"rerouted_segments\":{},\"changed\":[{}]}}",
+                state_str(&report.state),
+                report.rerouted_segments,
+                changed.join(",")
+            );
+            Ok(())
+        }
+
+        /// Undo a design port declaration. Removing an ENDPOINT changes the
+        /// netlist, so every bus that named it is deleted — pass `force=false`
+        /// first to be refused with the list and confirm. An instance port is
+        /// derived from its cell's contract; use `set_port_mode` there.
+        ///
+        /// Writes `{"removed_buses":[...],"rerouted":[...],"failed":{...},
+        /// "changed":[...]}`.
+        pub fn remove_port(
+            &mut self,
+            name: &DiplomatStr,
+            force: bool,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let (removed, moves) = self.0.remove_port(utf8(name)?, force).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::InvalidArgument
+            })?;
+            let r: Vec<String> = removed.iter().map(|b| format!("{b:?}")).collect();
+            let _ = write!(
+                out,
+                "{{\"removed_buses\":[{}],{}",
+                r.join(","),
+                &moves.to_json()[1..]
+            );
+            Ok(())
+        }
+
         /// The current bus-layer GEOMETRY REVISION. Read it before a mutating
         /// call, pass it to `changed_layers_since` after, and redraw exactly
         /// the layers named.

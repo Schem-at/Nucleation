@@ -753,7 +753,7 @@ mod tests {
     }
 
     #[test]
-    fn a_horizontal_row_is_pivoted_onto_the_vertical_stack() {
+    fn a_horizontal_row_keeps_its_form_and_the_bus_adapts_it() {
         // Four floor levers marching along x at pitch 2 on top of a slab.
         let mut s = slab(8, 4, 4);
         for i in 0..4 {
@@ -767,28 +767,55 @@ mod tests {
         }
         let hw: Vec<P3> = (0..4).map(|i| (2 * i, 4, 0)).collect();
         let patch = plan_input(&s, &hw).unwrap();
-        assert!(patch.pivoted, "{}", patch.note);
-        assert_eq!(patch.step, (0, 2, 0));
-        // A vertical 2y-pitch column, bit order preserved.
-        for (k, w) in patch.wires.iter().enumerate() {
-            assert_eq!(w.0, patch.wires[0].0, "bit {k} left the column");
-            assert_eq!(w.2, patch.wires[0].2, "bit {k} left the column");
-            assert_eq!(w.1, patch.wires[0].1 + 2 * k as i32, "bit {k} off pitch");
+
+        // PROMOTION IS MINIMAL AND IN-PLACE: the row stays a row at its native
+        // pitch, one write per bit, no form-conversion geometry anywhere.
+        assert!(!patch.pivoted, "{}", patch.note);
+        assert_eq!(patch.step, (2, 0, 0), "{}", patch.note);
+        assert_eq!(patch.wires, hw, "the connection cells left the lever row");
+        assert_eq!(
+            patch.writes.len(),
+            4,
+            "promotion wrote {} cells for 4 bits: {:?}",
+            patch.writes.len(),
+            patch.writes
+        );
+        for w in &hw {
+            assert!(
+                patch.writes.get(w).and_then(|o| o.as_deref()).is_some_and(rblocks::is_dust),
+                "bit at {w:?} is not dust in place"
+            );
         }
-        // Every dust cell has a support beneath it.
-        for (p, b) in &patch.writes {
-            if b.as_deref().is_some_and(rblocks::is_dust) {
-                let below = add(*p, (0, -1, 0));
-                let has = patch
-                    .writes
+
+        // FORM ADAPTATION IS THE BUS'S: the same verified pivot, planned as a
+        // pure set of cells the caller (a bus) owns and rips with itself.
+        let at = |q: P3| -> Option<String> {
+            s.get_block(q.0, q.1, q.2)
+                .map(|b| b.to_string())
+                .filter(|b| !b.contains("minecraft:air"))
+                .filter(|_| !hw.contains(&q))
+        };
+        let plan = plan_pivot(&patch.wires, patch.step, (4, 4, 0), false, &at)
+            .expect("the row must be adaptable onto the stack");
+        // A vertical 2y-pitch column, bit order preserved.
+        for (k, w) in plan.column.iter().enumerate() {
+            assert_eq!(w.0, plan.column[0].0, "bit {k} left the column");
+            assert_eq!(w.2, plan.column[0].2, "bit {k} left the column");
+            assert_eq!(w.1, plan.column[0].1 + 2 * k as i32, "bit {k} off pitch");
+        }
+        // Every dust cell the adapter plans has a support beneath it.
+        for (q, b) in &plan.cells {
+            if rblocks::is_dust(b) {
+                let below = add(*q, (0, -1, 0));
+                let has = plan
+                    .cells
                     .get(&below)
-                    .and_then(|o| o.as_deref())
-                    .map(rblocks::is_sturdy_support)
+                    .map(|b| rblocks::is_sturdy_support(b))
                     .unwrap_or(false)
                     || s.get_block(below.0, below.1, below.2)
                         .map(|b| rblocks::is_sturdy_support(&b.to_string()))
                         .unwrap_or(false);
-                assert!(has, "dust at {p:?} floats");
+                assert!(has, "adapter dust at {q:?} floats");
             }
         }
     }

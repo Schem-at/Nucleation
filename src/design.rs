@@ -2210,16 +2210,23 @@ impl Design {
         }
         // Insert position: the trunk waypoint pair the anchor is nearest
         // to (Manhattan distance to the pair midpoint) — deterministic.
+        //
+        // Resolve through `resolve_port`, NOT the declared-port table: an
+        // endpoint may be an INSTANCE port (`add0.sum` -> `bcd0.bin`), which is
+        // derived from the cell's contract and never appears in `self.ports`.
+        // Looking only there made `add_gate` refuse every bus between two
+        // placed cells — exactly the buses a user most wants a checkpoint on —
+        // while `move_gate` worked fine on the same bus.
+        let (driver_name, sink0_name) = (layer.driver.clone(), layer.sinks[0].clone());
+        let gate_anchors: Vec<P3> = layer.gates.iter().map(|g| g.anchor).collect();
         let driver = self
-            .ports
-            .get(&layer.driver)
-            .ok_or_else(|| format!("driver port `{}` no longer exists", layer.driver))?;
+            .resolve_port(&driver_name)
+            .map_err(|e| format!("bus `{bus}`: driver {e}"))?;
         let sink0 = self
-            .ports
-            .get(&layer.sinks[0])
-            .ok_or_else(|| format!("sink port `{}` no longer exists", layer.sinks[0]))?;
+            .resolve_port(&sink0_name)
+            .map_err(|e| format!("bus `{bus}`: sink {e}"))?;
         let mut wps = vec![driver.anchor];
-        wps.extend(layer.gates.iter().map(|g| g.anchor));
+        wps.extend(gate_anchors);
         wps.push(sink0.anchor);
         let mut best = (0usize, i32::MAX);
         for (i, pair) in wps.windows(2).enumerate() {
@@ -2245,6 +2252,155 @@ impl Design {
         );
         let _ = self.rip(bus);
         Ok(self.reroute_one(bus))
+    }
+
+    /// Undo a port declaration.
+    ///
+    /// A DESIGN port (`declare_input` / `declare_output`) is a document entry
+    /// and this removes it. An INSTANCE port (`inst.port`) is derived from the
+    /// cell's contract and cannot be removed — what a UI means there is
+    /// "return it to Executor mode", which is
+    /// [`Design::set_port_mode`]; this says so rather than silently doing
+    /// nothing.
+    ///
+    /// GATES AND ENDPOINTS ARE NOT THE SAME THING. Removing a gate relaxes a
+    /// constraint: the bus survives and re-routes straighter
+    /// ([`Design::remove_gate`]). Removing an ENDPOINT changes the netlist: the
+    /// bus loses a terminal, so every bus that named this port is DELETED, and
+    /// they are returned so a UI can say which. Nothing is blurred, and nothing
+    /// is deleted silently: pass `force = false` to be refused with the list
+    /// instead, and confirm first.
+    ///
+    /// Returns `(removed buses, reroute outcome for the buses that merely used
+    /// the space)`.
+    pub fn remove_port(
+        &mut self,
+        name: &str,
+        force: bool,
+    ) -> Result<(Vec<String>, MoveReport), String> {
+        let rev0 = self.layer_revision();
+        if !self.ports.contains_key(name) {
+            if name.contains('.') {
+                return Err(format!(
+                    "`{name}` is an INSTANCE port derived from its cell's contract, not a \
+                     declaration, so there is nothing to remove. To undo its promotion, set it \
+                     back to Executor mode (`set_port_mode`); to remove the port itself, remove \
+                     the instance"
+                ));
+            }
+            return Err(format!(
+                "unknown port `{name}` (declared: {})",
+                if self.ports.is_empty() {
+                    "none".to_string()
+                } else {
+                    self.ports.keys().cloned().collect::<Vec<_>>().join(", ")
+                }
+            ));
+        }
+        let doomed: Vec<String> = self
+            .buses
+            .values()
+            .filter(|b| {
+                b.driver_names().iter().chain(b.sinks.iter()).any(|p| p == name)
+            })
+            .map(|b| b.name.clone())
+            .collect();
+        if !force && !doomed.is_empty() {
+            return Err(format!(
+                "port `{name}` is an ENDPOINT of {} bus(es) ({}); removing it changes the netlist, \
+                 so those buses would be deleted. Re-run with force to confirm, or re-point them \
+                 first",
+                doomed.len(),
+                doomed.join(", ")
+            ));
+        }
+        for b in &doomed {
+            self.touch_bus(b);
+            self.buses.remove(b);
+        }
+        self.ports.remove(name);
+        // Freeing the port's space may unblock a bus that failed near it.
+        let affected: BTreeSet<String> = self
+            .buses
+            .values()
+            .filter(|b| matches!(b.state, BusState::Failed(_)))
+            .map(|b| b.name.clone())
+            .collect();
+        Ok((doomed, self.co_reroute(affected, rev0)))
+    }
+
+    /// Remove a gate by INDEX (its position in the bus's gate list) and
+    /// re-realize the bus, so the two spans it separated MERGE and are routed
+    /// as one.
+    ///
+    /// Removing a gate RELAXES a constraint, so the result should be shorter
+    /// and straighter — not the two old legs stitched together. That is why
+    /// this re-plans the merged span from scratch instead of splicing: with the
+    /// waypoint gone, `A -> gate -> C` becomes the single pair `A -> C`, which
+    /// the templates take as one straight run or one L.
+    ///
+    /// The bus survives either way: an unroutable result leaves it
+    /// `FAILED(reason)`, visible, never half-routed. The change is in the
+    /// changed-layer report ([`Design::changed_layers_since`]) like every other
+    /// mutation.
+    ///
+    /// See also [`Design::remove_port`]: a gate and an endpoint are NOT the
+    /// same thing, and deleting them means different things.
+    pub fn remove_gate(&mut self, bus: &str, index: usize) -> Result<GateMoveReport, String> {
+        let rev0 = self.layer_revision();
+        let layer = self
+            .buses
+            .get(bus)
+            .ok_or_else(|| format!("unknown bus `{bus}`"))?;
+        let n = layer.gates.len();
+        if index >= n {
+            return Err(format!(
+                "bus `{bus}` has {n} gate(s) ({}), so there is no gate at index {index}",
+                if n == 0 {
+                    "none".to_string()
+                } else {
+                    layer
+                        .gates
+                        .iter()
+                        .map(|g| format!("`{}`", g.name))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                }
+            ));
+        }
+        self.buses.get_mut(bus).unwrap().gates.remove(index);
+        let _ = self.rip(bus);
+        let state = self.reroute_one(bus);
+        Ok(GateMoveReport {
+            state,
+            rerouted_segments: self.buses[bus].segments.len(),
+            changed: self.changed_layers_since(rev0),
+        })
+    }
+
+    /// Remove a gate by NAME — the same as [`Design::remove_gate`], for a UI
+    /// that tracks gates by their label rather than their order.
+    pub fn remove_gate_named(&mut self, bus: &str, gate: &str) -> Result<GateMoveReport, String> {
+        let layer = self
+            .buses
+            .get(bus)
+            .ok_or_else(|| format!("unknown bus `{bus}`"))?;
+        let index = layer
+            .gates
+            .iter()
+            .position(|g| g.name == gate)
+            .ok_or_else(|| {
+                format!(
+                    "bus `{bus}` has no gate `{gate}` (has: {})",
+                    layer
+                        .gates
+                        .iter()
+                        .map(|g| g.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            })?;
+        self.remove_gate(bus, index)
     }
 
     /// Drag a gate: the anchor moves unconditionally (the document's
