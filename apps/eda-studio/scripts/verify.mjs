@@ -124,24 +124,16 @@ try {
   const backTo0 = await page.evaluate(() => window.__edaStudio().instances.get("u0")?.rot);
   check(backTo0 === 0, `three more R return u0 to 0° (got ${backTo0})`);
 
-  // ---- 5. refusal: you cannot bus INTO a lever input ---------------------
-  const refusal = await page.evaluate(async () => {
-    window.__eda.clickPort("u0.sum");
-    const midHint = window.__eda.hint();
-    window.__eda.clickPort("u1.a");           // lever bank: must be refused
-    await new Promise((r) => setTimeout(r, 400));
-    const s = window.__edaStudio();
-    return {
-      midHint,
-      toast: document.querySelector("#toast")?.textContent ?? "",
-      busCount: s.buses.size,
-    };
+  // ---- 5. the connect gesture arms and says what happens next -------------
+  const armed = await page.evaluate(async () => {
+    const e = window.__eda;
+    e.clickPort("u0.sum");
+    const midHint = e.hint();
+    e.key("Escape");
+    return { midHint };
   });
-  check(/click a blue/i.test(refusal.midHint),
-    `starting a bus updates the hint to the next action`, refusal.midHint);
-  check(/executor-only|lever|dust/i.test(refusal.toast),
-    `routing into a lever input is refused with a readable reason`, refusal.toast);
-  await snap(page, "refusal-lever-input");
+  check(/click a blue/i.test(armed.midHint),
+    `starting a bus updates the hint to the next action`, armed.midHint);
 
   // ---- 6. delete by keyboard rips its bus -------------------------------
   const del = await page.evaluate(async () => {
@@ -298,22 +290,223 @@ try {
       JSON.stringify(promo));
   }
 
+  // (b2) AUTO-PROMOTION: connecting to a lever input just connects.
+  //
+  // The live report was "it still makes me click Promote first". An
+  // executor-only port is not a dead end, it is a port nobody has converted
+  // yet — so the connect gesture converts it, names what it changed, and stays
+  // reversible. This is also the cell-to-cell chain the README said needed a
+  // Bus-mode click first: sum of one adder into `a` of the next.
+  //
+  // Runs AFTER the export checks on purpose: promoting a port currently breaks
+  // `Design::to_litematic` for the rest of the document's life (engine bug,
+  // reproduced standalone — nothing this app does).
+  const auto = await page.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const cell = [...s.instances.values()][0].cell;
+    e.key("Escape");
+    const u = e.place(cell, [0, -1, 44]);        // a second adder to chain into
+    await new Promise((r) => setTimeout(r, 400));
+    const busesBefore = s.buses.size;
+    const meshBefore = e.meshBuilds();
+    const target = `${u.name}.a`;
+    const modeBefore = e.portMode(u.name, "a");
+    const blockedBefore = !e.endpoints().find((p) => p.name === target)?.routable;
+    e.clickPort("u1.sum");                        // green driver
+    e.clickPort(target);                          // a LEVER bank: must auto-promote
+    await new Promise((r) => setTimeout(r, 1500));
+    return {
+      inst: u.name, target, modeBefore, blockedBefore, busesBefore,
+      toast: document.querySelector("#toast")?.textContent ?? "",
+      lastConnect: e.lastConnect(),
+      modeAfter: e.portMode(u.name, "a"),
+      routableAfter: !!e.endpoints().find((p) => p.name === target)?.routable,
+      buses: s.buses.size,
+      cellRemeshes: e.meshBuilds().cells - meshBefore.cells,
+    };
+  });
+  check(auto.modeBefore === "executor" && auto.blockedBefore === true &&
+        auto.modeAfter === "bus" && auto.routableAfter === true,
+    `clicking executor-only ${auto.target} as a bus target AUTO-PROMOTES it ` +
+    `(executor -> bus, now routable) with no separate Promote click`, JSON.stringify(auto));
+  check(auto.buses === auto.busesBefore + 1 && auto.lastConnect?.state === "routed",
+    `and the cell-to-cell bus lands: ${auto.lastConnect?.state} ` +
+    `(${auto.busesBefore} -> ${auto.buses} buses)`, JSON.stringify(auto.lastConnect));
+  check((auto.lastConnect?.promoted ?? []).some((p) => p.includes(auto.target) && p.includes("→")) &&
+        /promoted/i.test(auto.toast),
+    `the gesture REPORTS what it promoted: ` +
+    `"${(auto.lastConnect?.promoted ?? []).join(" | ")}"`,
+    `toast: ${auto.toast}`);
+  check(auto.cellRemeshes === 1,
+    `auto-promotion re-meshes exactly ONE cell variant, not the scene ` +
+    `(${auto.cellRemeshes})`);
+  await snap(page, "auto-promoted-cell-to-cell");
+
+  // ...and back: Executor mode restores the shipped hardware.
+  const restore = await page.evaluate(async (inst) => {
+    const e = window.__eda;
+    e.setPortMode(inst, "a", "executor");
+    await new Promise((r) => setTimeout(r, 600));
+    const out = {
+      mode: e.portMode(inst, "a"),
+      routable: !!e.endpoints().find((p) => p.name === `${inst}.a`)?.routable,
+    };
+    window.__edaStudio().removeInstance(inst);   // tidy up after ourselves
+    return out;
+  }, auto.inst);
+  check(restore.mode === "executor" && restore.routable === false,
+    `toggling ${auto.target} back to Executor restores the original hardware ` +
+    `(${restore.mode}, routable=${restore.routable})`, JSON.stringify(restore));
+
+  // A port that genuinely CANNOT be promoted still refuses, with the reason.
+  const hard = await page.evaluate(async () => {
+    const e = window.__eda;
+    const p = e.endpoints().find((q) => q.instance && !q.routable && !q.promotable);
+    if (!p) return { skipped: true };
+    e.key("Escape");
+    e.clickPort("u1.sum");
+    e.clickPort(p.name);
+    await new Promise((r) => setTimeout(r, 400));
+    return { port: p.name, blocked: p.blocked, toast: document.querySelector("#toast")?.textContent ?? "" };
+  });
+  if (hard.skipped) {
+    results.push({ ok: true, label: "un-promotable refusal SKIPPED (every port is promotable)", skipped: true });
+    console.log("SKIP un-promotable refusal (every blocked port is promotable)");
+  } else {
+    check(/cannot be promoted|executor-only/i.test(hard.toast),
+      `${hard.port} cannot be promoted and says why`, `${hard.toast} | ${hard.blocked}`);
+  }
+  await page.evaluate(() => window.__eda.key("Escape"));
+
   // (c) "i feel it remeshes as I drag things around" — it must not.
-  const meshes = await page.evaluate(async () => {
+  //
+  // GPU INSTANCING, asserted rather than asserted-to. A cell is meshed ONCE
+  // and every placement of it is a row in that mesh's instance set, so:
+  //   * K placements of one cell  -> 1 mesh build, 1 group per colour
+  //   * dragging N frames         -> 0 mesh builds, 0 block dumps out of wasm
+  //   * a port-mode toggle        -> exactly 1 (that cell's variant)
+  //   * one bus re-route          -> exactly 1 (that bus)
+  const N = 20;
+  const meshes = await page.evaluate(async (N) => {
     const e = window.__eda;
     const s = window.__edaStudio();
     const inst = [...s.instances.values()][0];
-    const start = e.meshBuilds();
-    for (let i = 0; i < 8; i++) {
-      window.__edaDrag("instance", inst.name, [inst.at[0] + i, 0, inst.at[2] + i]);
+    const at = [...inst.at];
+    document.querySelector("#live-reroute").checked = false; // preview-only path
+    const start = { mesh: e.meshBuilds(), reads: e.sceneReads() };
+    e.profileReset();
+    // The SYNCHRONOUS cost of a drag frame — the number that decides whether
+    // the gesture can keep up with the pointer. (Wall-clock fps in headless
+    // chromium is bounded by software GL, not by this.)
+    let sync = 0;
+    for (let i = 0; i < N; i++) {
+      const t = performance.now();
+      window.__edaDragMove("instance", inst.name, [at[0] + (i % 7), at[1], at[2] + (i % 5)]);
+      sync += performance.now() - t;
+      await new Promise((r) => requestAnimationFrame(r));
     }
-    const afterDrag = e.meshBuilds();
-    return { texBefore: start.texture, texAfterDrag: afterDrag.texture };
+    const after = { mesh: e.meshBuilds(), reads: e.sceneReads() };
+    document.querySelector("#live-reroute").checked = true;
+    window.__edaDrag("instance", inst.name, at);
+    return {
+      start, after, syncMs: sync / N, prof: e.profile(),
+      budgetFps: 1000 / Math.max(sync / N, 0.0001),
+    };
+  }, N);
+  check(meshes.after.mesh.cells === meshes.start.mesh.cells &&
+        meshes.after.mesh.texture === meshes.start.mesh.texture,
+    `dragging an instance ${N} frames triggers 0 cell re-meshes and 0 texture re-meshes ` +
+    `(cells ${meshes.start.mesh.cells} -> ${meshes.after.mesh.cells})`,
+    JSON.stringify(meshes.after.mesh));
+  check(meshes.after.reads.cellDump === meshes.start.reads.cellDump &&
+        meshes.after.reads.instDump === meshes.start.reads.instDump &&
+        meshes.after.reads.flatten === meshes.start.reads.flatten,
+    `...and reads NOTHING back out of wasm: it is ` +
+    `${meshes.after.mesh.matrixWrites - meshes.start.mesh.matrixWrites} matrix writes`,
+    JSON.stringify({ before: meshes.start.reads, after: meshes.after.reads }));
+  check(meshes.syncMs <= 33,
+    `...costing ${meshes.syncMs.toFixed(2)} ms of main-thread work per frame — ` +
+    `a ${meshes.budgetFps > 999 ? ">999" : meshes.budgetFps.toFixed(0)} fps budget, target >= 30 fps ` +
+    `(<= 33 ms)`);
+
+  // The same gesture with LIVE RE-ROUTE on: every frame also commits the move
+  // to the document and re-routes the affected buses. This is the router's
+  // floor, not the renderer's, and it is why the fixed 250 ms throttle is gone
+  // — the drag previews at frame rate and the engine runs as often as it can.
+  const live = await page.evaluate(async (N) => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const inst = [...s.instances.values()][0];
+    const at = [...inst.at];
+    document.querySelector("#live-reroute").checked = true;
+    e.timingsReset();
+    const t0 = performance.now();
+    for (let i = 0; i < N; i++) {
+      window.__edaDragMove("instance", inst.name, [at[0] + (i % 7), at[1], at[2] + (i % 5)]);
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    const wall = performance.now() - t0;
+    window.__edaDrag("instance", inst.name, at);
+    const t = e.timings();
+    return {
+      wallPerFrame: wall / N,
+      commits: t.dragFrame?.n ?? 0,
+      commitMs: t.dragFrame ? t.dragFrame.ms / t.dragFrame.n : 0,
+      scene: t["studio.scene"] ? t["studio.scene"].ms / t["studio.scene"].n : 0,
+    };
+  }, N);
+  check(live.commits > 0 && live.commits <= N + 1, // +1: the drop that follows
+    `live re-route commits at most one engine move per animation frame ` +
+    `(${live.commits} commits over ${N} frames, ${live.commitMs.toFixed(0)} ms each, ` +
+    `scene update ${live.scene.toFixed(1)} ms) — no fixed throttle`,
+    JSON.stringify(live));
+
+  const toggleMesh = await page.evaluate(async () => {
+    const e = window.__eda;
+    const p = e.endpoints().find((q) => q.instance && !q.routable && q.promotable);
+    if (!p) return { skipped: true };
+    const before = { mesh: e.meshBuilds(), reads: e.sceneReads() };
+    e.setPortMode(p.instance, p.port, "bus");
+    await new Promise((r) => requestAnimationFrame(r));
+    const mid = { mesh: e.meshBuilds(), reads: e.sceneReads() };
+    e.setPortMode(p.instance, p.port, "executor");
+    return { port: p.name, before, mid };
   });
-  check(meshes.texAfterDrag === meshes.texBefore,
-    `dragging an instance 8 frames triggers 0 texture re-meshes ` +
-    `(${meshes.texBefore} -> ${meshes.texAfterDrag})`,
-    JSON.stringify(meshes));
+  if (toggleMesh.skipped) {
+    results.push({ ok: true, label: "port-mode re-mesh SKIPPED (no promotable port)", skipped: true });
+  } else {
+    check(toggleMesh.mid.mesh.cells - toggleMesh.before.mesh.cells === 1 &&
+          toggleMesh.mid.reads.instDump - toggleMesh.before.reads.instDump === 1,
+      `a port-mode toggle on ${toggleMesh.port} re-meshes exactly 1 cell variant ` +
+      `(+${toggleMesh.mid.mesh.cells - toggleMesh.before.mesh.cells} cell, ` +
+      `+${toggleMesh.mid.reads.instDump - toggleMesh.before.reads.instDump} instance region read)`,
+      JSON.stringify(toggleMesh));
+  }
+
+  const busMesh = await page.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const bus = [...s.buses.keys()][0];
+    if (!bus) return { skipped: true };
+    const before = { mesh: e.meshBuilds(), reads: e.sceneReads() };
+    const t0 = performance.now();
+    s.rerouteBus(bus);
+    const ms = performance.now() - t0;
+    await new Promise((r) => requestAnimationFrame(r));
+    return { bus, before, after: { mesh: e.meshBuilds(), reads: e.sceneReads() }, ms };
+  });
+  if (busMesh.skipped) {
+    results.push({ ok: true, label: "bus re-route re-mesh SKIPPED (no bus)", skipped: true });
+  } else {
+    check(busMesh.after.mesh.buses - busMesh.before.mesh.buses === 1 &&
+          busMesh.after.reads.busDump - busMesh.before.reads.busDump === 1 &&
+          busMesh.after.mesh.cells === busMesh.before.mesh.cells,
+      `re-routing ${busMesh.bus} re-meshes exactly 1 bus and 0 cells, in ` +
+      `${busMesh.ms.toFixed(0)} ms`,
+      JSON.stringify(busMesh));
+  }
+
 
   // ---- 11. textured renderer (needs a pack; pack.zip is not committed) ---
   const packPath = path.join(root, "..", "..", "pack.zip");
@@ -340,6 +533,67 @@ try {
     console.log("SKIP textured view (no pack.zip at repo root; it is not committed)");
     results.push({ ok: true, label: "textured view SKIPPED (no pack.zip)", skipped: true });
   }
+
+  // ---- 12. instancing at scale (last: it adds instances) ------------------
+  //
+  // K placements of ONE cell, then ~10 placements over THREE distinct cells.
+  // The draw-call number is the proof: it tracks distinct CELLS, not
+  // placements, because the cell is meshed once and placed by matrix.
+  const K = 5;
+  const many = await page.evaluate(async (K) => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const cell = [...s.cells.keys()].find((c) => ![...s.instances.values()].some((i) => i.cell === c))
+      ?? [...s.cells.keys()][0];
+    const before = { mesh: e.meshBuilds(), reads: e.sceneReads(), prof: e.profile() };
+    for (let i = 0; i < K; i++) e.place(cell, [200 + 30 * i, -1, 200]);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return { cell, before, after: { mesh: e.meshBuilds(), reads: e.sceneReads(), prof: e.profile() } };
+  }, K);
+  check(many.after.mesh.cells - many.before.mesh.cells === 1 &&
+        many.after.prof.cellMeshes - many.before.prof.cellMeshes === 1,
+    `${K} placements of ${many.cell} cost exactly 1 cell mesh build and ` +
+    `${many.after.mesh.instancedGroups - many.before.mesh.instancedGroups} instanced group ` +
+    `(one InstancedMesh, vertex-coloured, ${K} rows)`,
+    JSON.stringify({ before: many.before.mesh, after: many.after.mesh }));
+  check(many.after.reads.cellDump - many.before.reads.cellDump === 1 &&
+        many.after.reads.instDump === many.before.reads.instDump,
+    `...read out of wasm ONCE, from the cell itself — no per-instance region dumps ` +
+    `(instDump ${many.before.reads.instDump} -> ${many.after.reads.instDump})`,
+    JSON.stringify({ before: many.before.reads, after: many.after.reads }));
+
+  // The headline number, measured on a CLEAN page so nothing else is in the
+  // scene: 10 placements over 3 distinct cells.
+  const page2 = await browser.newPage({ viewport: { width: 1680, height: 980 } });
+  await page2.goto(`http://localhost:${PORT}/`, { waitUntil: "load" });
+  await page2.waitForFunction(() => window.__edaReady === true, null, { timeout: 120_000 });
+  await page2.waitForFunction(() => window.__edaStudio().cells.size >= 3, null, { timeout: 120_000 });
+  const draws = await page2.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const cells = [...s.cells.keys()].slice(0, 3);
+    cells.forEach((c, i) => {
+      // Tight enough that all ten are inside the default camera frustum, so
+      // the draw-call count is measured with nothing culled away.
+      for (let k = 0; k < (i === 0 ? 4 : 3); k++) e.place(c, [14 * k, -1, 14 * i]);
+    });
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    e.profileReset();
+    await new Promise((r) => setTimeout(r, 400));
+    return { cells, instances: s.instances.size, prof: e.profile(), mesh: e.meshBuilds() };
+  });
+  check(draws.instances === 10 && draws.prof.cellMeshes === 3 && draws.mesh.cells === 3,
+    `10 placements over 3 distinct cells: 3 meshed cells, ` +
+    `${draws.prof.cellGroups} instanced groups, ` +
+    `**${draws.prof.drawCalls} draw calls** for the whole scene ` +
+    `(${draws.prof.triangles} triangles, ${draws.prof.geometries} geometries)`,
+    JSON.stringify({ instances: draws.instances, mesh: draws.mesh, prof: draws.prof }));
+  check(draws.prof.drawCalls < 10 * 3,
+    `...and the draw calls track distinct CELLS (3), not the 10 placements: ` +
+    `${draws.prof.drawCalls} calls, ${(draws.prof.drawCalls / draws.instances).toFixed(1)} per instance`,
+    JSON.stringify(draws.prof));
+  await page2.screenshot({ path: path.join(docs, "09-instanced-10-placements.png") });
+  await page2.close();
 
   check(errors.length === 0, `no console errors (${errors.length})`,
     errors.slice(0, 3).join(" | "));
