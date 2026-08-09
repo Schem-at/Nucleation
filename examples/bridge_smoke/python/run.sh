@@ -15,7 +15,7 @@ fi
 "$VENV/bin/pip" install -q --upgrade pip "$NANOBIND_SPEC"
 PY="$VENV/bin/python3"
 
-cargo build --release --lib --features bridge-full --manifest-path "$ROOT/Cargo.toml"
+cargo build --release --lib --features bridge-full,routing,hdl --manifest-path "$ROOT/Cargo.toml"
 
 PY_INCLUDE=$("$PY" -c "import sysconfig; print(sysconfig.get_paths()['include'])")
 NB_DIR=$("$PY" -c "import nanobind, os; print(os.path.dirname(nanobind.__file__))")
