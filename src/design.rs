@@ -130,6 +130,78 @@ fn axis_run(a: P3, b: P3, width: u8) -> Option<RunInfo> {
 /// gap (tail + joint column + head = 15) inside dust's 15-cell reach.
 const REFRESH_AT: u32 = 7;
 
+/// Dust cells tolerated between refresh stations INSIDE a level shift. A
+/// staircase cell cannot host a repeater (a repeater does not power
+/// diagonally), so a slope spends the signal 2 cells per level; 12 leaves the
+/// exit cell plus a joint column inside dust's 15-cell reach.
+const SHIFT_DUST_CAP: u32 = 12;
+
+/// One column of the verified BUS LEVEL-SHIFT tile ([`shift_plan`]).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum ShiftCell {
+    /// The dust the stack steps OFF toward the next level.
+    Step,
+    /// The dust the stack LANDS on, one level away.
+    Land,
+    /// Flat dust resuming the bus form at the shifted level.
+    Flat,
+    /// Refresh station entry block (weak-powered by the dust pointing in).
+    Entry,
+    /// Refresh station repeater, on a conducting floor.
+    Rep,
+    /// Refresh station exit block (strongly powered: a fresh 15 out).
+    Exit,
+}
+
+/// The column plan of a `k`-level shift of a dense 2y-pitch stack:
+/// `(offset along the axis, level RELATIVE to the entry level, cell)`, plus
+/// the dust-since-refresh count on the way out.
+///
+/// A level costs TWO columns — step off, land — so the slope is 1 y per 2
+/// cells. A continuous 1y-per-1x staircase is IMPOSSIBLE for a dense stack:
+/// every cell would be both the step-UPPER of the next diagonal (its support
+/// must CONDUCT, the diode law) and the cap over bit n-1's in-use lower
+/// diagonal (its support must INSULATE, the cut law) — an over-constrained
+/// cell, i.e. the geometry itself is wrong. Landing flat for one cell splits
+/// those two roles across two columns: THE ALTERNATION.
+///
+/// Because stairs cannot host repeaters, a station is inserted before any
+/// level whose two dust cells would blow [`SHIFT_DUST_CAP`] — which also
+/// refreshes a stale arrival on entry. `k` is therefore unbounded.
+///
+/// Verified in mc-tick by `redstone-eda/bus_levelshift.py`: 8-bit stack,
+/// k in {1,2,3,5,8} x {down,up} x {fresh,stale} arrival, walking-ones /
+/// all-on / alternating / 8 random patterns, 3040 output checks, zero
+/// crosstalk. All-solid, all-glass and swapped-parity variants all FAIL,
+/// so the alternation below is load-bearing in both directions.
+fn shift_plan(k: u32, down: bool, since0: u32) -> (Vec<(i32, i32, ShiftCell)>, u32) {
+    let sgn = if down { -1 } else { 1 };
+    let mut cols = Vec::new();
+    let (mut o, mut dy, mut since) = (0i32, 0i32, since0);
+    for _ in 0..k {
+        if since + 2 > SHIFT_DUST_CAP {
+            for kind in [ShiftCell::Entry, ShiftCell::Rep, ShiftCell::Exit] {
+                cols.push((o, dy, kind));
+                o += 1;
+            }
+            since = 0;
+        }
+        cols.push((o, dy, ShiftCell::Step));
+        o += 1;
+        dy += sgn;
+        cols.push((o, dy, ShiftCell::Land));
+        o += 1;
+        since += 2;
+    }
+    cols.push((o, dy, ShiftCell::Flat));
+    (cols, since + 1)
+}
+
+/// Cells of straight run a `k`-level shift consumes (entry cell included).
+fn shift_len(k: u32, down: bool, since0: u32) -> i32 {
+    shift_plan(k, down, since0).0.last().map_or(0, |c| c.0 + 1)
+}
+
 /// A library cell: schematic + resolved contract, stored once and shared by
 /// every instance that references it.
 #[derive(Clone, Debug)]
@@ -2341,24 +2413,10 @@ impl Design {
         let mut waypoints = vec![drivers[0].anchor];
         waypoints.extend(gates.iter().map(|g| g.anchor));
         waypoints.push(sinks[0].anchor);
-        for pair in waypoints.windows(2) {
-            if pair[0].1 != pair[1].1 {
-                let (lo, hi) = (pair[0], pair[1]);
-                return Err(format!(
-                    "segment {:?} -> {:?}: this bus form is a SINGLE-LEVEL 2y-pitch stack, but \
-                     the two anchors' bit-0 dust sits at y={} and y={} (a {}-block level change). \
-                     Move one endpoint's instance by {} in y so both ports share a level, or \
-                     split the run with a gate placed at the target level — vertical level \
-                     adapters are not implemented yet",
-                    lo,
-                    hi,
-                    lo.1,
-                    hi.1,
-                    (hi.1 - lo.1).abs(),
-                    hi.1 - lo.1
-                ));
-            }
-        }
+        // A pair whose anchors sit on different levels is NOT a failure: the
+        // planner inserts the verified level-shift tile (`shift_plan`) and the
+        // bus changes level in form. Only a pair with too little run for the
+        // tile fails, and it says so with the numbers.
 
         // Pin access: this bus may enter the halo of the instances it
         // terminates on.
@@ -3286,6 +3344,11 @@ impl<'a> Planner<'a> {
         if a == b {
             return Err("zero-length segment".to_string());
         }
+        // Anchors on different levels are not a failure: the bus changes
+        // level BY CONSTRUCTION with the verified level-shift tile.
+        if a.1 != b.1 {
+            return self.plan_pair_across_levels(a, b, width, keep, since0);
+        }
         let snap = self.snapshot();
         let mut tried: Vec<String> = Vec::new();
 
@@ -3345,6 +3408,284 @@ impl<'a> Planner<'a> {
             }
         }
         Err(crate::design_corridor::diagnose(self.occ, a, b, width, &tried))
+    }
+
+    /// Plan a waypoint pair whose anchors sit on DIFFERENT levels: two FLAT
+    /// legs (planned by the ordinary machinery — templates, corners,
+    /// corridors, crossings) joined by the verified level-shift tile.
+    ///
+    /// The tile needs `shift_len` cells of straight run on one horizontal
+    /// axis, so every placement is a `(axis, position)` pair; they are tried
+    /// cheapest-clearance first (the end with more room), and each failure is
+    /// collected so an unroutable pair names every placement it tried.
+    fn plan_pair_across_levels(
+        &mut self,
+        a: P3,
+        b: P3,
+        width: u8,
+        keep: &BTreeSet<P3>,
+        since0: u32,
+    ) -> Result<u32, String> {
+        let k = (b.1 - a.1).unsigned_abs();
+        let down = b.1 < a.1;
+        let len = shift_len(k, down, since0);
+        let places = Self::shift_placements(self.occ, a, b, len, width, keep);
+        if places.is_empty() {
+            return Err(format!(
+                "the anchors are {k} level(s) apart, so the bus must change level: the verified \
+                 level-shift tile needs {len} cells of straight run (plus 1 to clear the port) on \
+                 one horizontal axis, but the pair only spans {} in x and {} in z between {:?} and \
+                 {:?}. Lengthen the run, or split it with a gate so one leg has room",
+                (b.0 - a.0).abs(),
+                (b.2 - a.2).abs(),
+                a,
+                b
+            ));
+        }
+        let snap = self.snapshot();
+        let mut tried: Vec<String> = Vec::new();
+        for (entry, exit, along_x, sign, what) in places {
+            match self.plan_shift_route(a, b, entry, exit, along_x, sign, k, down, width, keep, since0)
+            {
+                Ok(out) => return Ok(out),
+                Err(e) => {
+                    self.restore(snap.clone());
+                    tried.push(format!("level shift {what} ({entry:?} -> {exit:?}): {e}"));
+                }
+            }
+        }
+        Err(format!(
+            "the anchors are {k} level(s) apart and every placement of the {len}-cell level-shift \
+             tile was blocked: {}",
+            tried.join("; ")
+        ))
+    }
+
+    /// One placement attempt: flat leg into the tile, the tile, flat leg out.
+    #[allow(clippy::too_many_arguments)]
+    fn plan_shift_route(
+        &mut self,
+        a: P3,
+        b: P3,
+        entry: P3,
+        exit: P3,
+        along_x: bool,
+        sign: i32,
+        k: u32,
+        down: bool,
+        width: u8,
+        keep: &BTreeSet<P3>,
+        since0: u32,
+    ) -> Result<u32, String> {
+        let mut since = since0;
+        if a != entry {
+            since = self
+                .plan_pair(a, entry, width, keep, since)
+                .map_err(|e| format!("leg into the shift: {e}"))?;
+        }
+        since = self.plan_level_shift(entry, along_x, sign, k, down, width, since)?;
+        if exit != b {
+            // The tile's exit cell is one more dust cell between refreshes.
+            since = self
+                .plan_pair(exit, b, width, keep, since)
+                .map_err(|e| format!("leg out of the shift: {e}"))?;
+        }
+        Ok(since)
+    }
+
+    /// Candidate placements of a `len`-cell level-shift tile between `a` and
+    /// `b`, ordered by clearance (emptiest footprint first). On each axis with
+    /// room: hard against the driver end, mid-run, and hard against the sink
+    /// end — so a congested endpoint falls through to the open one.
+    fn shift_placements(
+        occ: &OccupancyIndex,
+        a: P3,
+        b: P3,
+        len: i32,
+        width: u8,
+        keep: &BTreeSet<P3>,
+    ) -> Vec<(P3, P3, bool, i32, &'static str)> {
+        let mut out: Vec<(usize, P3, P3, bool, i32, &'static str)> = Vec::new();
+        // Longer axis first, so the tie-break after scoring is the roomier one.
+        let mut axes = [(true, (b.0 - a.0).abs()), (false, (b.2 - a.2).abs())];
+        axes.sort_by_key(|(_, span)| std::cmp::Reverse(*span));
+        for (along_x, span) in axes {
+            // One cell must stay clear at each end so the tile never lands on
+            // a port's own anchor cell.
+            if span < len + 1 {
+                continue;
+            }
+            let sign = if along_x {
+                (b.0 - a.0).signum()
+            } else {
+                (b.2 - a.2).signum()
+            };
+            let a_c = if along_x { a.0 } else { a.2 };
+            let slack = span - len - 1;
+            for (offset, what) in [
+                (1, "at the driver end"),
+                (1 + slack / 2, "mid-run"),
+                (1 + slack, "at the sink end"),
+            ] {
+                let start = a_c + sign * offset;
+                // Driver-end and mid placements ride the driver's cross-axis
+                // row; the sink-end one rides the sink's, so the flat leg out
+                // is a straight shot.
+                let cross = if offset == 1 + slack {
+                    if along_x {
+                        b.2
+                    } else {
+                        b.0
+                    }
+                } else if along_x {
+                    a.2
+                } else {
+                    a.0
+                };
+                let (entry, exit) = if along_x {
+                    ((start, a.1, cross), (start + sign * (len - 1), b.1, cross))
+                } else {
+                    ((cross, a.1, start), (cross, b.1, start + sign * (len - 1)))
+                };
+                let Some(score) = Self::shift_clearance(occ, entry, exit, along_x, width, keep)
+                else {
+                    continue; // a branch junction falls inside the footprint
+                };
+                if out.iter().any(|c| c.1 == entry && c.3 == along_x) {
+                    continue; // slack 0/1 collapses the three positions
+                }
+                out.push((score, entry, exit, along_x, sign, what));
+            }
+        }
+        out.sort_by_key(|c| c.0);
+        out.into_iter()
+            .map(|(_, e, x, ax, s, w)| (e, x, ax, s, w))
+            .collect()
+    }
+
+    /// How congested a candidate tile footprint is (occupied + halo cells), or
+    /// `None` when a branch junction we must keep as plain dust falls inside
+    /// it — the tile would eat the junction, so the placement is void.
+    fn shift_clearance(
+        occ: &OccupancyIndex,
+        entry: P3,
+        exit: P3,
+        along_x: bool,
+        width: u8,
+        keep: &BTreeSet<P3>,
+    ) -> Option<usize> {
+        let (lo_a, hi_a) = if along_x {
+            (entry.0.min(exit.0), entry.0.max(exit.0))
+        } else {
+            (entry.2.min(exit.2), entry.2.max(exit.2))
+        };
+        // The stack sweeps from the lower level's support to the top bit.
+        let lo_y = entry.1.min(exit.1) - 1;
+        let hi_y = entry.1.max(exit.1) + 2 * (width as i32 - 1);
+        let mut score = 0usize;
+        for c in lo_a..=hi_a {
+            for y in lo_y..=hi_y {
+                let p = if along_x {
+                    (c, y, entry.2)
+                } else {
+                    (entry.0, y, c)
+                };
+                if keep.contains(&p) {
+                    return None;
+                }
+                if occ.cells.contains_key(&p) {
+                    score += 4; // a hard cell is worse than a soft halo
+                } else if occ.halos.contains_key(&p) {
+                    score += 1;
+                }
+            }
+        }
+        Some(score)
+    }
+
+    /// Stamp the verified BUS LEVEL-SHIFT tile: the whole `width`-bit
+    /// 2y-pitch stack changes level by `k`, in form, over
+    /// [`shift_len`] cells of straight run from `entry` (bit 0) along the
+    /// axis. See [`shift_plan`] for the column plan and its verification.
+    ///
+    /// Every bit moves in LOCKSTEP, so the 2 y pitch — and with it the
+    /// interleave that isolates the bits — is invariant through the shift; an
+    /// odd `k` changes the stack's absolute y PARITY, which matters only to
+    /// crossings, and those are evaluated per run at the level it actually
+    /// runs on.
+    #[allow(clippy::too_many_arguments)]
+    fn plan_level_shift(
+        &mut self,
+        entry: P3,
+        along_x: bool,
+        sign: i32,
+        k: u32,
+        down: bool,
+        width: u8,
+        since0: u32,
+    ) -> Result<u32, String> {
+        let bus_block = self.style.bus_block.clone();
+        let transparent = self.style.transparent_block.clone();
+        // Repeater INPUT side faces the driver.
+        let toward_driver = if along_x {
+            rblocks::facing_name(-sign, 0)
+        } else {
+            rblocks::facing_name(0, -sign)
+        }
+        .expect("axis-aligned unit step");
+        let (cols, since_out) = shift_plan(k, down, since0);
+        let pos_at = |o: i32, y: i32| -> P3 {
+            if along_x {
+                (entry.0 + o * sign, y, entry.2)
+            } else {
+                (entry.0, y, entry.2 + o * sign)
+            }
+        };
+        for bit in 0..width {
+            let base = entry.1 + 2 * bit as i32;
+            for &(o, dy, kind) in &cols {
+                let y = base + dy;
+                match kind {
+                    // The station blocks float, exactly as in the dip tile.
+                    ShiftCell::Entry | ShiftCell::Exit => self.put(pos_at(o, y), &bus_block)?,
+                    ShiftCell::Rep => {
+                        self.put(pos_at(o, y - 1), &bus_block)?;
+                        self.put(pos_at(o, y), &rblocks::repeater(toward_driver, 1))?;
+                    }
+                    ShiftCell::Flat => {
+                        self.put(pos_at(o, y - 1), &bus_block)?;
+                        self.put(pos_at(o, y), rblocks::DUST)?;
+                    }
+                    ShiftCell::Step | ShiftCell::Land => {
+                        // THE ALTERNATION, and it FLIPS WITH DIRECTION.
+                        //
+                        // Descending, the step-off dust is the diagonal's
+                        // UPPER end, so its support must CONDUCT (a 1y step
+                        // passes down only over a conducting upper support —
+                        // the diode law), while the landed dust's support is
+                        // the cap sitting directly above bit n-1's in-use
+                        // diagonal and must NOT cut it.
+                        //
+                        // Ascending, up-steps conduct over anything, so the
+                        // two roles SWAP: the step-off support becomes the
+                        // cap that must insulate, and the landed support is
+                        // the conductor that severs the cross-bit diagonal
+                        // (bit n's step-off dust and bit n-1's landed dust
+                        // are 1 y apart in adjacent columns — an unintended
+                        // connection, cut by the conductor above the lower).
+                        //
+                        // Bit 0 has nothing below to protect, so it is
+                        // unconstrained: solid, per "transparency only where
+                        // a diagonal must survive".
+                        let insulate = bit > 0 && (kind == ShiftCell::Land) == down;
+                        let support = if insulate { &transparent } else { &bus_block };
+                        self.put(pos_at(o, y - 1), support)?;
+                        self.put(pos_at(o, y), rblocks::DUST)?;
+                    }
+                }
+            }
+        }
+        Ok(since_out)
     }
 
     /// Plan a multi-leg corridor: a straight run per leg with a joint column

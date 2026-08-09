@@ -217,7 +217,12 @@ fn category(r: &str) -> &'static str {
         ("no corridor", "no corridor (blocked after search)"),
         ("collision", "collision: obstacle in the corridor"),
         ("influence halo", "halo/keepout rejection"),
-        ("SINGLE-LEVEL", "endpoints on different levels"),
+        // Endpoints on different levels are no longer a failure category: the
+        // planner inserts the verified level-shift tile. What CAN still fail
+        // is a pair with too little run to host the tile, and that reason
+        // names the tile's cost and the span available.
+        ("level-shift tile needs", "level shift: not enough run for the tile"),
+        ("level-shift tile was blocked", "level shift: every placement blocked"),
         ("levels/widths differ", "crossing level/width mismatch"),
         ("crossing windows", "crossing windows too close"),
         ("no trunk run aligns", "branch: no perpendicular shot"),
@@ -724,5 +729,7 @@ fn routability_rate_holds_the_line() {
 }
 
 /// Measured 2026-08-09. Baseline before the corridor router and the instance
-/// transform fix was 52.1%; see `redstone-eda/IMPROVEMENTS.md`.
-const ROUTABILITY_FLOOR: f64 = 84.0;
+/// transform fix was 52.1%; the automatic level shift took 84.4% -> 91.1% by
+/// clearing the whole "endpoints on different levels" category. See
+/// `redstone-eda/IMPROVEMENTS.md`.
+const ROUTABILITY_FLOOR: f64 = 91.0;
