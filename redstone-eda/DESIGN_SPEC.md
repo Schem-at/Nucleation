@@ -390,3 +390,85 @@ lines (single clock domain). Chosen topology, end to end:
   `skew_rt` from fragment repeaters, design-level arrival + critical path
   over the existing sta machinery, and `NetClassRule` enforcement
   (`max_len_rt`, `y_band`) folded into `clean`.
+
+## Port modes: executor hardware ⇄ routable dust (promotion)
+
+A community cell's contract names **executor hardware** — inputs are levers or
+buttons, outputs lamps. Nothing in redstone drives a lever, so
+`ADD007.sum -> BINTOBCD001.bin` was impossible however good the router became.
+That is not a routing gap; it is the composability blocker, and it is why the
+studio could only ever bus `ADD007.sum` (the one port in the whole enhanced
+library with dust beside its lamps) into a loose lamp readout.
+
+Every instance port therefore has a **mode**, and the design remembers both
+forms:
+
+| mode | hardware | drivable by `CellExecutor` | routable |
+| --- | --- | --- | --- |
+| `Executor` (default) | as shipped | ✅ | ❌ |
+| `Bus` (promoted) | driver stub ending in dust | ❌ | ✅ |
+
+```rust
+d.set_port_mode("u1", "bin", PortMode::Bus)?;   // or d.promote_input("u1","bin")
+d.set_port_mode("u1", "bin", PortMode::Executor)?;  // byte-exact undo
+```
+
+- The switch is a **reversible per-instance patch** (`design_promote::PortPatch`:
+  `writes` + `saved` + the new connection cells), *not* an edit to the shared
+  cell body. Toggling back restores the original block states exactly, which
+  `tests/design_promotion.rs` asserts by byte-comparing the flattened layers.
+- Modes are persisted in `.nucm` (`InstanceCore::port_modes`, format v2). The
+  payload is bincode, so the field is unconditional and the version gate rejects
+  v1 documents rather than misreading them.
+- Toggling a port that carries a bus **rips** that bus (its endpoint physically
+  stops existing) and names it in `PortModeReport::removed_buses`; buses that
+  merely crossed the changed space are co-rerouted, exactly as for a drag. This
+  follows the FAILED-state philosophy: the document's truth wins, buses fail or
+  heal visibly.
+- `PortModeReport::to_json` carries a per-cell before/after list in WORLD
+  coordinates, so a UI can say *"removed lever at (19,5,5); bin[0] now lands on
+  dust at (0,5,-20)"*.
+
+### Why the strategy depends on the lever's face
+
+A lever **strongly** powers its attachment block; everything downstream reads
+that block. Dust only ever powers a block **weakly**, and weak power does not
+reach dust. So:
+
+- `face=floor` — the attachment block is directly below, and dust in the
+  lever's own cell sits on it and powers it from above. Verified:
+  `BINTOBCD001.bin`, 8/8 vectors identical to lever drive.
+- `face=wall` — a **repeater** in the lever's cell pointing into the attachment
+  block reproduces the lever's strong power exactly; the connection dust goes
+  one cell further out. Verified: `ADD007.a` 8/8 and `NUMDISPLAY001.bcd` 10/10.
+  Plain dust here is *not* enough — `ADD007.a` feeds bare dust and reads 0
+  forever, which is precisely the weak-power rule.
+- `face=ceiling` — refused with that reason: nothing can sit above a block to
+  power it.
+
+Outputs are easier: a lamp driven by a repeater is already strongly powered, so
+dust **on top of the lamp** taps the value without touching the lamp — the port
+stays executor-READABLE *and* becomes routable.
+
+### The form pivot
+
+Promotion is only half the job. A bus realizes the verified vertical 2y-pitch
+stack, and community IO is often a horizontal ROW (`BINTOBCD001`'s `bin` levers
+march along x at pitch 2). Such a port is dust, routable in principle, and still
+unusable: its step is `(2,0,0)`.
+
+`design_promote::pivot_row_to_stack` grows a **form adapter**. Bit `i` leaves the
+row in its own private lane (lanes are 2 apart on the row axis, so no two bits
+are ever plan-adjacent), climbs `2i` blocks on a dust staircase, runs out to a
+depth every lane shares, then gathers back along the row axis so all bits land
+in one vertical 2y-pitch column — a textbook bus stack. Refresh repeaters go in
+every 6 dust cells; dust cannot climb out of a repeater, so the staircase pauses
+on a flat landing, repeats, and resumes. The shared depth must equal the deepest
+lane's actual end (`refresh_pauses`), and `lay_pivot` asserts it: off by one and
+only the TOP bit of the port goes dead.
+
+**Acceptance (`tests/design_promotion.rs`)** — the canonical demo, end to end in
+the tick engine: `ADD007.sum -> BINTOBCD001.bin -> NUMDISPLAY001.bcd`, both
+buses `Routed`, driven through the adder's own levers. 8/8 BCD values exact
+(0, 2, 42, 127, 16, 137, 255, 255) and 8/8 seven-segment patterns exact against
+the verified `REPORT.md` reference.

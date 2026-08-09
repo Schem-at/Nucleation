@@ -1231,9 +1231,13 @@ impl Design {
             match self.dust_tap(*hp, overlay) {
                 Some(w) => wires.push(w),
                 None => {
+                    // Actionable, because there IS an action: this is exactly
+                    // what `set_port_mode(.., PortMode::Bus)` exists for.
                     blocked = Some(format!(
                         "bit {k}: no dust connection cell at or beside {:?} (holds `{}`) — this \
-                         port is executor-only hardware and cannot terminate a bus",
+                         port is executor-only hardware and cannot terminate a bus. PROMOTE it \
+                         (switch the port to Bus mode) to swap the hardware for a dust input; the \
+                         switch is reversible",
                         hp,
                         self.block_at(*hp, overlay)
                             .unwrap_or_else(|| "air".to_string())
