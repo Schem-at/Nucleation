@@ -960,6 +960,23 @@ pub struct OccupancyIndex {
     /// it — which the blanket shell forbade, and which was the single largest
     /// exclusion bucket in `tests/design_routability.rs`.
     pub soft_halos: BTreeSet<P3>,
+    /// PORT ESCAPE LANES: every vertical-stack port anchor in the design, as
+    /// `(bit-0 cell, step, width)`.
+    ///
+    /// A port on the flank of a solid cell body has exactly ONE column it can
+    /// leave along — the other three neighbours are the body itself. Routing
+    /// one bus at a time, an early bus that runs down that column strands the
+    /// port, and the bus that terminates there later fails with "every
+    /// neighbouring column is occupied". That is not an occupancy problem (the
+    /// cells really are taken) and no clearance predicate can recover it; it is
+    /// an ORDERING problem, and the fix is to make the early bus pay for the
+    /// lane so it prefers a detour while one exists. See
+    /// [`crate::design_corridor::BusFabric::column_reserved`].
+    ///
+    /// Only vertical-stack ports (`step` along y) are listed: the corridor
+    /// search models a bus as one column per bit-0 cell, so a horizontal ROW
+    /// port's escape geometry is a different question this does not answer.
+    pub port_lanes: Vec<(P3, P3, u8)>,
 }
 
 /// One cell a port-mode switch rewrote, with both sides of the change so a UI
@@ -3163,7 +3180,52 @@ impl Design {
                 }
             }
         }
+        idx.port_lanes = self.vertical_port_lanes();
         idx
+    }
+
+    /// Every VERTICAL-STACK port in the design — declared design ports and
+    /// derived instance ports alike — as `(bit-0 cell, step, width)`, for
+    /// [`OccupancyIndex::port_lanes`].
+    ///
+    /// Ports whose bits advance horizontally are omitted on purpose: the
+    /// corridor search's unit is a column of the 2y-pitch stack, so it can
+    /// reason about "the lane this port leaves along" only when the port IS
+    /// such a stack. A row port's bits each need their own escape and that is a
+    /// different geometry.
+    ///
+    /// A port whose bus is already routed needs no protection — its lane is
+    /// occupied by that bus, so the freeness test in
+    /// [`crate::design_corridor::BusFabric::column_reserved`] finds nothing to
+    /// reserve. The list is therefore safe to compute unconditionally.
+    fn vertical_port_lanes(&self) -> Vec<(P3, P3, u8)> {
+        let vertical = |step: P3| step.0 == 0 && step.2 == 0 && step.1 != 0;
+        let mut out: Vec<(P3, P3, u8)> = self
+            .ports
+            .values()
+            .filter(|p| vertical(p.step))
+            .map(|p| (p.anchor, p.step, p.width))
+            .collect();
+        // Instance ports are DERIVED from the contract, so a contract error
+        // must not take the occupancy index down with it: an escape lane is an
+        // optimisation, and the caller that really needs the port will report
+        // the error itself through `resolve_port`.
+        if let Ok(ports) = self.instance_ports() {
+            for p in ports {
+                if !p.routable() {
+                    continue;
+                }
+                let (Some(wires), Some(step)) = (p.wires.as_ref(), p.step) else {
+                    continue;
+                };
+                if let (Some(anchor), true) = (wires.first(), vertical(step)) {
+                    out.push((*anchor, step, p.width));
+                }
+            }
+        }
+        out.sort();
+        out.dedup();
+        out
     }
 
     /// Realize a bus (pure planning: no mutation). `Err` is the

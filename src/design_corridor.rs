@@ -142,6 +142,9 @@ pub struct BusFabric<'a> {
     memo: RefCell<HashMap<(i32, i32), bool>>,
     /// Memo for [`BusFabric::column_hugs`], on the same hot path.
     hug_memo: RefCell<HashMap<(i32, i32), bool>>,
+    /// Columns that are some FOREIGN port's last remaining escape lane.
+    /// Precomputed once per query — see [`BusFabric::column_reserved`].
+    reserved: BTreeSet<(i32, i32)>,
 }
 
 /// Extra cost per column that runs inside a cell's soft halo. Charged per
@@ -149,13 +152,47 @@ pub struct BusFabric<'a> {
 /// a hug still beats no route at all.
 const HUG_COST: u32 = 4;
 
+/// Cost of consuming a foreign port's LAST escape lane.
+///
+/// Deliberately a price and not a prohibition. Two reasons:
+///
+/// - a port that will never carry a bus (an unused output in a netlist) would
+///   otherwise reserve its lane forever, and a hard rule would fail buses that
+///   have no other way past;
+/// - it makes the change MONOTONE. Nothing that routed before can fail now; it
+///   can only get more expensive, so an early bus detours while a detour
+///   exists and still takes the lane when the alternative is failing.
+///
+/// Sized to beat any detour the search would otherwise reject: a corridor
+/// around a library cell body is tens of cells at cost 1 (plus [`HUG_COST`] in
+/// the shell), so 200 dominates the detour without overflowing the u32 sums.
+const ESCAPE_COST: u32 = 200;
+
 impl<'a> BusFabric<'a> {
     /// Every cell a bus column at `(x, z)` would occupy: a support and a dust
     /// per bit, contiguous from `y0 - 1` to `y0 + 2*(width-1)`.
     fn column_cells(&self, x: i32, z: i32) -> impl Iterator<Item = P3> + '_ {
-        let lo = self.y0 - 1;
-        let hi = self.y0 + 2 * (self.width as i32 - 1);
-        (lo..=hi).map(move |y| (x, y, z))
+        stack_cells(x, z, self.y0, self.width)
+    }
+
+    /// Is a `width`-bit stack based at `y0` placeable in this column, for a bus
+    /// terminating on the port at column `port_col`?
+    ///
+    /// The generalisation of [`BusFabric::column_free`] to a stack that is not
+    /// the one being routed — used to ask whether a FOREIGN port still has a
+    /// lane to leave along, which is a question about that port's stack, not
+    /// about ours.
+    ///
+    /// `port_col` is not decoration, and leaving it out is what made the first
+    /// version of the reservation measure zero gain: a port's lane is ALWAYS
+    /// electrically adjacent to the port's own dust, so asked as a plain
+    /// `column_free` every lane in the design reads as blocked, every port
+    /// looks stranded already, and nothing ever gets reserved. The question is
+    /// whether the port's OWN bus could stand there, and that bus is exempt
+    /// from its own hardware.
+    fn stack_free(&self, x: i32, z: i32, y0: i32, width: u8, port_col: (i32, i32)) -> bool {
+        stack_cells(x, z, y0, width)
+            .all(|p| self.cell_placeable_exempting(p, mech_at_level(p.1, y0), Some(port_col)))
     }
 
     /// Can the bus stand a column here?
@@ -226,15 +263,109 @@ impl<'a> BusFabric<'a> {
     /// on a 2y pitch from `y0 - 1`, so the parity off the support level says
     /// which mechanism a cell carries — and the two answer to different rules.
     fn mech_at(&self, p: P3) -> Mechanism {
-        if (p.1 - self.y0).rem_euclid(2) == 0 {
-            Mechanism::Dust
-        } else {
-            Mechanism::SolidSupport
-        }
+        mech_at_level(p.1, self.y0)
     }
 
-    /// Condition 1-3 for a single cell.
+    /// Is this column some FOREIGN port's last remaining escape lane?
+    ///
+    /// A port on the flank of a solid library cell has three of its four
+    /// neighbouring columns inside the cell body; the fourth is the only way
+    /// its bus can ever leave. Routing one bus at a time, whichever bus reaches
+    /// that column first takes it, and the bus that actually terminates on the
+    /// port fails later with "every neighbouring column is occupied" — the
+    /// residual `skip4` and `g4` failures in `tests/design_routability.rs`,
+    /// which a prior audit proved are NOT search-budget-bound (1.5M nodes
+    /// recovered zero of them).
+    ///
+    /// Reserved columns are charged [`ESCAPE_COST`] rather than forbidden, so
+    /// the rule is monotone: an early bus detours while a detour exists, and
+    /// still takes the lane when the alternative is failing.
+    pub fn column_reserved(&self, x: i32, z: i32) -> bool {
+        self.reserved.contains(&(x, z))
+    }
+
+    /// Every column that is the LAST free neighbour of a foreign port.
+    ///
+    /// Computed once per query. A port whose bus is already routed contributes
+    /// nothing: that bus occupies the lane, so the lane is not free and there is
+    /// nothing left to protect — which is exactly right, and is why this can run
+    /// unconditionally over every port in the design.
+    fn compute_reserved(&self) -> BTreeSet<(i32, i32)> {
+        let mut out = BTreeSet::new();
+        for (anchor, step, width) in &self.occ.port_lanes {
+            let (px, py, pz) = *anchor;
+            // Our own endpoints are not foreign ports; landing on them is the
+            // point of the route.
+            if self.exempt.contains(&(px, pz)) {
+                continue;
+            }
+            // The column model is the verified 2y-pitch stack. A port on some
+            // other pitch is not a stack this search can reason about.
+            if step.1.abs() != 2 {
+                continue;
+            }
+            // Bits may be listed top-down; the stack is based at the LOWEST bit.
+            let y0 = if step.1 < 0 {
+                py + step.1 * (*width as i32 - 1)
+            } else {
+                py
+            };
+            let mut free = Vec::with_capacity(4);
+            for h in Heading::ALL {
+                let (dx, dz) = h.delta();
+                if self.stack_free(px + dx, pz + dz, y0, *width, (px, pz)) {
+                    free.push((px + dx, pz + dz));
+                }
+            }
+            // Zero free lanes: already stranded, nothing to reserve. Two or
+            // more: taking one leaves the port a way out, so it is nobody's
+            // last lane.
+            if free.len() != 1 {
+                continue;
+            }
+            let (lx, lz) = free[0];
+            out.insert((lx, lz));
+            // ...AND THE LANE'S CLEARANCE. Reserving only the lane column is
+            // not enough, and measuring proved it: with the column alone
+            // reserved, `skip4` still failed while (23,*,1) sat empty, because
+            // `skip0` had run down (22,*,1) — one cell to the side. Dust one
+            // cell apart shorts, so a foreign run BESIDE the lane makes the
+            // lane unplaceable without ever entering it. A lane nobody may
+            // stand in is not a lane.
+            //
+            // Orthogonal neighbours only: the interference scan reaches one
+            // cell horizontally (with a 1-y step), never a pure diagonal, so
+            // this plus-shape is exactly the set that can kill the lane.
+            for h in Heading::ALL {
+                let (dx, dz) = h.delta();
+                let c = (lx + dx, lz + dz);
+                // Never the port's own column: that is the hardware the lane
+                // exists to reach, and charging for it would price every route
+                // out of its own destination.
+                if c == (px, pz) {
+                    continue;
+                }
+                out.insert(c);
+            }
+        }
+        out
+    }
+
+    /// Condition 1-3 for a single cell, for the bus being routed.
     fn cell_placeable(&self, p: P3, mech: Mechanism) -> bool {
+        self.cell_placeable_exempting(p, mech, None)
+    }
+
+    /// Condition 1-3 with ONE extra column treated as own hardware.
+    ///
+    /// `extra_exempt` exists for [`BusFabric::stack_free`], which asks the
+    /// question on behalf of a foreign port rather than of the route in hand.
+    fn cell_placeable_exempting(
+        &self,
+        p: P3,
+        mech: Mechanism,
+        extra_exempt: Option<(i32, i32)>,
+    ) -> bool {
         if self.occ.cells.contains_key(&p) {
             return false;
         }
@@ -251,7 +382,7 @@ impl<'a> BusFabric<'a> {
             net: OUR_NET,
         };
         for q in interference_scan(p) {
-            if self.exempt.contains(&(q.0, q.2)) {
+            if self.exempt.contains(&(q.0, q.2)) || extra_exempt == Some((q.0, q.2)) {
                 continue; // our own port column
             }
             let Some((block, owner)) = self.occ.cells.get(&q) else {
@@ -294,6 +425,26 @@ impl<'a> BusFabric<'a> {
                 transport::mech_of(ub) == Mechanism::Dust && owner_name(uo) == lower_owner
             })
         })
+    }
+}
+
+/// Every cell a `width`-bit bus stack based at `y0` occupies in one column: a
+/// support and a dust per bit, contiguous from `y0 - 1` to `y0 + 2*(width-1)`.
+fn stack_cells(x: i32, z: i32, y0: i32, width: u8) -> impl Iterator<Item = P3> {
+    let lo = y0 - 1;
+    let hi = y0 + 2 * (width as i32 - 1);
+    (lo..=hi).map(move |y| (x, y, z))
+}
+
+/// What a bus stack based at `y0` puts at height `y`. The stack alternates
+/// support / dust on a 2y pitch from `y0 - 1`, so the parity off the support
+/// level says which mechanism a cell carries — and the two answer to different
+/// rules.
+fn mech_at_level(y: i32, y0: i32) -> Mechanism {
+    if (y - y0).rem_euclid(2) == 0 {
+        Mechanism::Dust
+    } else {
+        Mechanism::SolidSupport
     }
 }
 
@@ -414,7 +565,12 @@ impl Fabric for BusFabric<'_> {
                 },
                 base_cost: 1
                     + if turning { self.turn_cost } else { 0 }
-                    + if self.column_hugs(to.x, to.z) { HUG_COST } else { 0 },
+                    + if self.column_hugs(to.x, to.z) { HUG_COST } else { 0 }
+                    + if self.column_reserved(to.x, to.z) {
+                        ESCAPE_COST
+                    } else {
+                        0
+                    },
                 tag: h,
                 footprint: vec![to],
             });
@@ -448,7 +604,7 @@ fn fabric<'a>(
         Pos::new(a.0.min(b.0) - m, a.1, a.2.min(b.2) - m),
         Pos::new(a.0.max(b.0) + m, a.1, a.2.max(b.2) + m),
     );
-    BusFabric {
+    let mut f = BusFabric {
         occ,
         y0: a.1,
         width,
@@ -457,7 +613,14 @@ fn fabric<'a>(
         turn_cost: effort.turn_cost,
         memo: RefCell::new(HashMap::new()),
         hug_memo: RefCell::new(HashMap::new()),
-    }
+        reserved: BTreeSet::new(),
+    };
+    // Two-phase: the reservation set is computed BY the fabric (it needs
+    // `stack_free`), so the fabric exists first with an empty set. Nothing reads
+    // `reserved` during the computation, so the intermediate state is not
+    // observable.
+    f.reserved = f.compute_reserved();
+    f
 }
 
 /// Search for a corridor from `a` to `b` for a `width`-bit bus. Both anchors
@@ -810,6 +973,47 @@ mod tests {
         assert!(!f.column_free(20, 8), "z=8 hugs the foreign lane at z=9");
         assert!(!f.column_free(20, 10), "z=10 hugs it from the other side");
         assert!(f.column_free(20, 7), "z=7 has a clear cell of separation");
+    }
+
+    /// The escape-lane reservation, on the exact geometry that motivated it:
+    /// a library cell body with a port on its -X flank, whose only way out is
+    /// the single column beside it.
+    #[test]
+    fn a_ports_last_lane_and_its_clearance_are_reserved() {
+        let mut occ = OccupancyIndex::default();
+        // A solid body at x 24..33, z 0..3, tall enough for an 8-bit stack.
+        for x in 24..=33 {
+            for z in 0..=3 {
+                for y in 0..=17 {
+                    occ.cells
+                        .insert((x, y, z), ("minecraft:stone".to_string(), Occupant::Loose));
+                }
+            }
+        }
+        // Its input port: bit-0 dust at (24,2,1), 8 bits on a 2y pitch.
+        occ.port_lanes.push(((24, 2, 1), (0, 2, 0), 8));
+        // A route that has nothing to do with that port.
+        let f = fabric(&occ, (1, 2, 8), (60, 2, 8), 8, LADDER[0]);
+        // Three neighbours are the body; (23,1) is the only lane.
+        assert!(f.column_reserved(23, 1), "the lane itself must be reserved");
+        // ...and its CLEARANCE: a bus running one cell to the side shorts the
+        // lane without ever entering it. This is the half that was missing when
+        // the first version of this rule measured zero gain.
+        assert!(f.column_reserved(22, 1), "the lane's -X clearance");
+        assert!(f.column_reserved(23, 0), "the lane's -Z clearance");
+        assert!(f.column_reserved(23, 2), "the lane's +Z clearance");
+        // The port's own column is never charged for: it is the destination.
+        assert!(!f.column_reserved(24, 1), "the port column must stay free");
+        // Nothing far away is reserved.
+        assert!(!f.column_reserved(10, 8));
+
+        // A port with TWO ways out is nobody's last lane, so nothing is
+        // reserved: taking one still leaves it a way out.
+        let mut open = OccupancyIndex::default();
+        open.port_lanes.push(((24, 2, 1), (0, 2, 0), 8));
+        let g = fabric(&open, (1, 2, 8), (60, 2, 8), 8, LADDER[0]);
+        assert!(!g.column_reserved(23, 1), "open field reserves nothing");
+        assert!(!g.column_reserved(25, 1));
     }
 
     #[test]
