@@ -14,6 +14,50 @@ OUT="${1:-dist/npm}"
 # Naming the wrong one produces an engine that loads, meshes, and silently has
 # no TickSimulation at all — which is how a whole app came up dead.
 FEATURES="${NUCLEATION_WASM_FEATURES:-bridge,mc-tick,meshing}"
+
+# ---------------------------------------------------------------- input guard
+# A release wasm build is minutes, and this script gets called from `npm run
+# dev` (via sync-engine) and from the dev-loop tiers, where the inputs usually
+# have not changed at all. Stamp the inputs and skip the whole assembly when
+# they match.
+#
+# The stamp covers everything that can change the emitted package: the Rust
+# sources, the manifests, the generated JS glue, the npm veneers, and the
+# feature set (which selects a different wasm binary entirely). Paths+sizes
+# +mtimes rather than content hashes, so the guard itself stays milliseconds.
+#
+# Force a rebuild with NUCLEATION_FORCE_REBUILD=1.
+# BSD stat (macOS) and GNU stat (CI) take different flags, and a silently empty
+# stamp would make the guard skip rebuilds it should perform — so pick the right
+# one up front and fail loudly if neither works.
+if stat -f '%N %z %m' Cargo.toml >/dev/null 2>&1; then
+  STAT_FLAG=-f; STAT_FMT='%N %z %m'          # BSD / macOS
+elif stat -c '%n %s %Y' Cargo.toml >/dev/null 2>&1; then
+  STAT_FLAG=-c; STAT_FMT='%n %s %Y'          # GNU / Linux
+else
+  echo "package-npm.sh: cannot determine stat(1) flavour; refusing to guess" >&2
+  exit 1
+fi
+
+stamp_inputs() {
+  printf 'features=%s\n' "$FEATURES"
+  find src crates bindings/js bindings/npm build.rs Cargo.toml Cargo.lock \
+    -type f \( -name '*.rs' -o -name '*.toml' -o -name '*.lock' -o -name '*.mjs' \
+               -o -name '*.ts' -o -name '*.mts' -o -name '*.json' -o -name '*.md' \) \
+    -exec stat "$STAT_FLAG" "$STAT_FMT" {} + 2>/dev/null | sort
+}
+
+STAMP_FILE="$OUT/.build-stamp"
+STAMP="$(stamp_inputs | shasum -a 256 | cut -d' ' -f1)"
+
+if [[ -z "${NUCLEATION_FORCE_REBUILD:-}" \
+      && -f "$STAMP_FILE" && -f "$OUT/nucleation.wasm" \
+      && "$(cat "$STAMP_FILE" 2>/dev/null)" == "$STAMP" ]]; then
+  echo "npm package in $OUT is up to date (inputs unchanged) — skipping."
+  echo "  force with NUCLEATION_FORCE_REBUILD=1"
+  exit 0
+fi
+
 cargo build --release --target wasm32-unknown-unknown --lib --features "$FEATURES"
 
 rm -rf "$OUT"
@@ -42,5 +86,7 @@ EOF
 # The generated glue imports ../diplomat.config.mjs (it expects to sit one level below
 # the config); rewrite to package-local.
 sed -i.bak "s#'../diplomat.config.mjs'#'./diplomat.config.mjs'#" "$OUT/diplomat-wasm.mjs" && rm "$OUT/diplomat-wasm.mjs.bak"
+
+printf '%s' "$STAMP" > "$STAMP_FILE"
 
 echo "npm package assembled in $OUT (set version + npm publish from there)"
