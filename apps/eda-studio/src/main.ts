@@ -258,9 +258,21 @@ async function boot() {
 
   // ---- hint bar: always says what the next click does --------------------
 
+  /** The port the pointer is over, so the hint bar can say what a click DOES
+   *  before it is made. Hovering a port is the moment the routing model has to
+   *  be legible: the user's report was that starting a bus felt like a gamble. */
+  let hoverPort: string | null = null;
+
   function setHint() {
     const el = $("#hint");
     const nav = "drag: orbit · wheel: zoom";
+    if (viewer.connectMode() && mode.kind === "idle") {
+      const p = hoverPort ? endpoint(hoverPort) : null;
+      el.innerHTML = `<b>connect mode</b> — components are not clickable, only ports` +
+        (p ? ` &nbsp;·&nbsp; <b>click to start a bus from</b> <code>${esc(p.name)}</code>` : "") +
+        ` &nbsp;·&nbsp; <kbd>C</kbd> or release <kbd>Alt</kbd> to leave`;
+      return;
+    }
     if (mode.kind === "placing") {
       el.innerHTML = `<b>click the ground</b> to place <code>${esc(mode.cell)}</code>` +
         ` &nbsp;·&nbsp; <kbd>Esc</kbd> cancel`;
@@ -268,8 +280,15 @@ async function boot() {
     }
     if (mode.kind === "connecting") {
       const from = endpoint(mode.from);
+      const over = hoverPort && hoverPort !== mode.from ? endpoint(hoverPort) : null;
       el.innerHTML = `bus from <code>${esc(mode.from)}</code> ` +
-        `(${esc(from?.ty ?? "")}) &nbsp;→&nbsp; <b>click a blue ▼ input port</b> to finish` +
+        `(${esc(from?.ty ?? "")}) &nbsp;→&nbsp; ` +
+        (over
+          ? over.routable && over.kind !== "input"
+            ? `<b>click to finish the bus at</b> <code>${esc(over.name)}</code> (${esc(over.ty)}[${over.width}])`
+            : `<code>${esc(over.name)}</code> <b>cannot receive this bus</b> — ` +
+              (over.routable ? "it is a driver, not a sink" : "it is not routable")
+          : `<b>click a blue ▼ input port</b> to finish`) +
         ` &nbsp;·&nbsp; <kbd>Esc</kbd> cancel`;
       return;
     }
@@ -277,6 +296,24 @@ async function boot() {
       el.innerHTML = `moving <code>${esc(mode.instance)}</code> — <b>move the mouse, click to drop</b>` +
         ` &nbsp;·&nbsp; <kbd>Esc</kbd> put it back`;
       return;
+    }
+    // Hovering a port outranks the selection: it is about the NEXT click, and
+    // that is the whole job of this bar.
+    if (hoverPort) {
+      const p = endpoint(hoverPort);
+      if (p) {
+        el.innerHTML = !p.routable
+          ? `<code>${esc(p.name)}</code> is <b>NOT routable</b> — ` +
+            `${esc((p.blocked ?? "no dust connection cell").slice(0, 44))} &nbsp;·&nbsp; ` +
+            `click it anyway and the studio offers to promote it`
+          : p.kind === "input"
+            ? `<b>click to start a bus from</b> <code>${esc(p.name)}</code> ` +
+              `(${esc(p.ty)}[${p.width}]) &nbsp;·&nbsp; the component will NOT move` +
+              ` &nbsp;·&nbsp; <kbd>Alt</kbd> hold for connect mode`
+            : `<code>${esc(p.name)}</code> <b>receives</b> a bus (${esc(p.ty)}[${p.width}]) — ` +
+              `start from a green ▲ output instead`;
+        return;
+      }
     }
     if (selection?.kind === "bus") {
       const d = studio.busStateDetail(selection.id);
@@ -394,6 +431,8 @@ async function boot() {
     },
     onPortHover(name) {
       const p = name ? endpoint(name) : null;
+      hoverPort = p ? name : null;
+      setHint();
       $("#hover-info").textContent = p
         ? `${p.name} · ${p.kind === "input" ? "drives" : "receives"} · ${p.ty}[${p.width}]` +
           ` @ ${p.anchor.join(",")}${p.routable ? "" : ` · NOT ROUTABLE: ${p.blocked ?? ""}`}`
@@ -1390,9 +1429,37 @@ async function boot() {
     toast(`deleted ${names.length} components · one ⌘/Ctrl-Z puts them back`);
   }
 
+  // ---- connect mode: bodies unpickable ------------------------------------
+  //
+  // The escape hatch for a dense scene. Port priority already means a press on
+  // a marker is never a move, but a marker you MISS by six pixels still lands
+  // on a body — so there is a mode in which the bodies are simply not there.
+  // Held with Alt (momentary, for one gesture) or latched with C.
+  let connectLatched = false;
+  function setConnectMode(on: boolean, why: "latched" | "alt") {
+    const was = viewer.connectMode();
+    if (why === "latched") connectLatched = on;
+    viewer.setConnectMode(on || connectLatched);
+    if (viewer.connectMode() === was) { setHint(); return; }
+    setHint();
+    if (why !== "latched") return;
+    toast(on
+      ? "connect mode ON — components are not clickable, only ports"
+      : "connect mode off — components are clickable again",
+      { fix: "C toggles it · holding Alt does the same for one gesture" });
+  }
+  window.addEventListener("keyup", (e) => {
+    if (e.key === "Alt" && !connectLatched) setConnectMode(false, "alt");
+  });
+  // Losing focus mid-hold must not leave the mode stuck on.
+  window.addEventListener("blur", () => {
+    if (!connectLatched) setConnectMode(false, "alt");
+  });
+
   window.addEventListener("keydown", (e) => {
     const t = e.target as HTMLElement;
     if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+    if (e.key === "Alt") setConnectMode(true, "alt");
     const key = e.key.toLowerCase();
     // Esc unwinds ONE layer at a time, outermost first: a modal, then an
     // overlay, then the gesture, then the selection. Never a dead key.
@@ -1435,6 +1502,14 @@ async function boot() {
     if (key === "a" && !e.metaKey && !e.ctrlKey) {
       e.preventDefault();
       if (viewer.frameAll()) toast("framed the whole design");
+      return;
+    }
+    // `C` LATCHES connect mode: in a dense scene, bodies stop being pickable
+    // altogether, so no press can be mistaken for a component move. Alt below
+    // is the same thing, held.
+    if (key === "c" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      setConnectMode(!viewer.connectMode(), "latched");
       return;
     }
     // A selected GATE: Del removes the checkpoint (the net is untouched).
@@ -2322,6 +2397,36 @@ async function boot() {
     cameraLock: () => viewer.cameraLockReason,
     /** Cumulative mesh builds, so a test can assert a drag causes none. */
     meshBuilds: () => ({ ...viewer.meshBuilds }),
+
+    // ---- port-vs-body picking ---------------------------------------------
+    /** Where a port marker is ON SCREEN, so a test can put a REAL pointer on
+     *  it and drive the actual handlers rather than a hook. */
+    portScreen: (name: string) => viewer.portScreenPos(name),
+    /** What a press at these client coordinates would resolve to. */
+    probeAt: (x: number, y: number) => viewer.probeAt(x, y),
+    /** Is this client point somewhere a pointer can actually press? A marker
+     *  can project over the header, and a check on a coordinate the mouse can
+     *  never reach proves nothing. */
+    onCanvas: (x: number, y: number, inset = 0) => {
+      const r = viewer.canvasRect();
+      return x >= r.left + inset && x <= r.right - inset
+        && y >= r.top + inset && y <= r.bottom - inset;
+    },
+    canvasRect: () => viewer.canvasRect(),
+    /** How presses resolved: port vs body, drags started, clicks below the
+     *  4 px threshold, ports that beat a body in front of them. */
+    pickStats: () => ({ ...viewer.pickStats }),
+    /** The two numbers the interaction contract is stated in. */
+    pickThresholds: () => ({ portPickPx: Viewer.PORT_PICK_PX, dragPx: Viewer.DRAG_PX }),
+    /** The port the pointer is over, as the hint bar sees it. */
+    hoverPort: () => hoverPort,
+    connectMode: () => viewer.connectMode(),
+    setConnectMode: (on: boolean) => setConnectMode(on, "latched"),
+    /** An instance's placement, for "did anything move?". */
+    instanceAt: (name: string) => {
+      const i = studio.instances.get(name);
+      return i ? { at: [...i.at] as Vec3, rot: i.rot } : null;
+    },
     staleCells: () => viewer.stale(),
     portMode: (instance: string, port: string) => studio.portMode(instance, port),
     togglePortMode,

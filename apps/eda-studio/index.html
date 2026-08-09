@@ -104,6 +104,17 @@
       .mode-toggle:hover { border-color: var(--sel); color: var(--sel); }
       /* While an interaction owns the pointer the camera is locked. */
       canvas.camera-locked { cursor: crosshair; }
+      /* Connect mode: component bodies are not pickable, so every press is a
+         routing press. The tint says the scene is behaving differently. */
+      canvas.connect-mode { cursor: crosshair; }
+      /* Under #hover-info, not centred: the toast column owns the top middle. */
+      #canvas-wrap:has(canvas.connect-mode)::after {
+        content: "connect mode — bodies not clickable";
+        position: absolute; top: 32px; left: 10px;
+        background: #23323dee; color: var(--accent); border: 1px solid #2b5b70;
+        border-radius: 4px; padding: 2px 8px; font-size: 10px; pointer-events: none;
+        letter-spacing: .03em; z-index: 3;
+      }
       .item.is-selected { border-color: var(--sel); background: #23242099; }
       .item.is-active { border-color: var(--accent); }
       .item[data-place], .item[data-inst], .item[data-focus] { cursor: pointer; }
@@ -441,6 +452,7 @@
                 <tr><td class="k"><kbd>Del</kbd> <kbd>⌫</kbd></td><td>delete (confirms if it carries buses)</td></tr>
                 <tr><td class="k"><kbd>F</kbd></td><td>frame the selection (or the whole design)</td></tr>
                 <tr><td class="k"><kbd>A</kbd></td><td>frame the whole design</td></tr>
+                <tr><td class="k"><kbd>C</kbd> / hold <kbd>Alt</kbd></td><td>connect mode — component bodies stop being clickable, so a press can only be a port</td></tr>
                 <tr><td class="k"><kbd>Esc</kbd></td><td>cancel anything · close overlays · deselect</td></tr>
                 <tr><td class="k"><kbd>⇧</kbd>+<kbd>click</kbd></td><td>add/remove an instance from the selection (area select)</td></tr>
                 <tr><td class="k"><kbd>right-click</kbd></td><td>context menu — instance, port, bus or empty space</td></tr>

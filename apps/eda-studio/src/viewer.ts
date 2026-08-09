@@ -79,6 +79,16 @@ export interface PickTarget {
   additive: boolean;
 }
 
+/** One resolved pick, before it is turned into a gesture. */
+interface Probe {
+  type: "instance" | "port" | "gate" | "bus";
+  id: string;
+  /** The drag plane's height, for instances and gates. */
+  y?: number;
+  /** Where on the thing the pointer landed. */
+  point: THREE.Vector3 | null;
+}
+
 export interface ViewerCallbacks {
   onPortClick(name: string): void;
   onPortHover(name: string | null): void;
@@ -259,6 +269,15 @@ export class Viewer {
   private raycaster = new THREE.Raycaster();
   private ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private drag: { kind: "instance" | "gate"; id: string; y: number } | null = null;
+  /** A body press that has NOT yet moved far enough to be a move.
+   *
+   *  The user's report was "I always accidentally move the component": a press
+   *  used to become a drag on the first pointermove, so a 1-pixel jitter during
+   *  a click nudged the instance and cost an undo. A press now parks HERE, and
+   *  only crossing `DRAG_PX` promotes it to `drag`. Below the threshold the
+   *  gesture stays what it looks like: a selection. */
+  private pending:
+    { kind: "instance" | "gate"; id: string; y: number; x: number; py: number } | null = null;
   private cb: ViewerCallbacks;
   private pickables: THREE.Object3D[] = [];
   private labelLayer: HTMLDivElement;
@@ -272,6 +291,40 @@ export class Viewer {
   private showIo = true;
   private textured = false;
   private ghost: { from: Vec3; to: THREE.Vector3 } | null = null;
+  /** Connect mode: component BODIES are not pickable at all, so in a dense
+   *  scene every press is a routing press. Held (Alt) or latched (C). */
+  private connect = false;
+
+  // ---- how a press is resolved -------------------------------------------
+  //
+  // Two numbers, both of them the answer to a bug report.
+
+  /** A port's pick radius in CSS PIXELS. Ports are picked in SCREEN SPACE, not
+   *  by ray-vs-cone: a 0.45-block cone is a 4-pixel target when the labels
+   *  start to declutter, and "click the little arrow" cannot be the gesture the
+   *  whole routing model rests on. 15 px is ~2.5x the cone's own radius at a
+   *  comfortable working zoom and stays clickable when it is far smaller. */
+  static PORT_PICK_PX = 15;
+  /** How far a press on a BODY has to travel before it is a move rather than a
+   *  click. Below this the instance does not move at all. */
+  static DRAG_PX = 4;
+
+  /** How presses were resolved, so the interaction contract is checkable and
+   *  not just claimed (`npm run verify` asserts every one of these). */
+  pickStats = {
+    /** Presses that resolved to a port. */
+    portPicks: 0,
+    /** Presses that resolved to an instance body. */
+    bodyPicks: 0,
+    /** Ports that won a press the body geometry was in front of. */
+    portOverBody: 0,
+    /** Body presses promoted to a real move. */
+    dragsStarted: 0,
+    /** Body presses that stayed a selection (< DRAG_PX). */
+    clicksBelowThreshold: 0,
+    /** Bodies not offered to the raycast because connect mode was on. */
+    bodiesSkippedInConnectMode: 0,
+  };
 
   constructor(container: HTMLElement, cb: ViewerCallbacks) {
     this.cb = cb;
@@ -313,6 +366,14 @@ export class Viewer {
     });
     el.addEventListener("pointermove", (e) => this.pointerMove(e));
     el.addEventListener("pointerup", (e) => this.pointerUp(e));
+    // A cancelled pointer (a gesture the browser took over) must not leave a
+    // press parked: the camera would stay locked and the next move would
+    // "resume" a drag the user never made.
+    el.addEventListener("pointercancel", () => {
+      this.pending = null;
+      this.drag = null;
+      this.controls.enabled = this.cameraLock == null;
+    });
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       this.cb.onContextMenu(this.pickAt(e as unknown as PointerEvent));
@@ -983,6 +1044,7 @@ export class Viewer {
   private mScratch = new THREE.Matrix4();
   private qScratch = new THREE.Quaternion();
   private vScratch = new THREE.Vector3();
+  private vScratch2 = new THREE.Vector3();
   private sScratch = new THREE.Vector3();
 
   /** Emphasis is the CONE RADIUS, so it is an x/z scale on the shared cone —
@@ -1020,7 +1082,10 @@ export class Viewer {
         const mesh = new THREE.InstancedMesh(Viewer.shared.cone, mat, list.length);
         mesh.userData = { type: "ports", ids: list.map((p) => p.name), shared: true };
         this.markerGroup.add(mesh);
-        this.pickables.push(mesh);
+        // NOT in `pickables`: ports are picked in screen space (`pickPort`), so
+        // the cone geometry is for the eye only. Leaving it in the ray pass
+        // would put ports back under the depth test the priority rule exists to
+        // escape.
         this.portMeshes[key] = mesh;
         list.forEach((p, row) => {
           // A driver points OUT of its column, a sink points IN: the arrow
@@ -1444,43 +1509,106 @@ export class Viewer {
 
   // -- picking / drag -------------------------------------------------------
 
-  private ndc(e: PointerEvent): THREE.Vector2 {
+  private ndc(cx: number, cy: number): THREE.Vector2 {
     const rect = this.renderer.domElement.getBoundingClientRect();
     return new THREE.Vector2(
-      ((e.clientX - rect.left) / rect.width) * 2 - 1,
-      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      ((cx - rect.left) / rect.width) * 2 - 1,
+      -((cy - rect.top) / rect.height) * 2 + 1,
     );
   }
 
-  /** Markers first, then the bus fragments.
+  /** THE PORT IS THE TARGET, and screen space is how it wins.
    *
-   *  Two passes rather than one sorted list because a marker must always win:
-   *  a port cone sits ON a bus's first cell, and "click the bus" must not steal
-   *  the click that starts a route. Bus geometry is only consulted when nothing
-   *  in the marker layer was hit. */
-  private castPointer(e: PointerEvent): THREE.Intersection | null {
-    this.raycaster.setFromCamera(this.ndc(e), this.camera);
-    const marker = this.raycaster.intersectObjects(this.pickables, false)[0] ?? null;
-    if (marker) return marker;
-    const busMeshes = this.busGroup.children.filter((o) => (o as THREE.Mesh).isMesh);
-    return this.raycaster.intersectObjects(busMeshes, false)[0] ?? null;
-  }
-
-  /** What a hit means. Ports live in an InstancedMesh, so the port's identity
-   *  is the `instanceId`, not the object. */
-  private static pickInfo(hit: THREE.Intersection | null):
-    { type: string; id: string; y?: number } | null {
-    if (!hit) return null;
-    const ud = hit.object.userData as { type?: string; id?: string; y?: number; ids?: string[] };
-    if (ud.type === "ports") {
-      const id = ud.ids?.[hit.instanceId ?? -1];
-      return id ? { type: "port", id } : null;
+   *  Ray-vs-geometry cannot express "the port always wins". A port marker sits
+   *  one block outside its column, which means it is often INSIDE or BEHIND the
+   *  neighbouring cell's body box — and the body box is an invisible solid, so
+   *  the ray hits its near face first and the press becomes a component drag.
+   *  That is the reported bug, exactly: "it's awkward to select an IO and route
+   *  it, I always accidentally move the component".
+   *
+   *  So ports are picked by projecting every marker to the screen and taking
+   *  the nearest one within a pixel radius. Depth cannot steal the press, no
+   *  occluder can hide it, and the target is a constant size on screen at every
+   *  zoom instead of shrinking to nothing — which is what makes a port still
+   *  clickable at the zoom where its label has been decluttered away.
+   *
+   *  Ties (dense columns) go to the port nearest the CAMERA: the one in front is
+   *  the one you meant. */
+  private pickPort(cx: number, cy: number): { p: PortMarker; pos: Vec3; px: number } | null {
+    if (!this.showIo || this.portRows.length === 0) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+    // Pixels per world unit at depth d: rect.height / (2 tan(fov/2) d).
+    const k = rect.height / (2 * Math.tan(((this.camera.fov / 2) * Math.PI) / 180));
+    const v = this.vScratch;
+    let best: { p: PortMarker; pos: Vec3; px: number } | null = null;
+    let bestScore = Infinity;
+    let bestDepth = Infinity;
+    for (const row of this.portRows) {
+      v.set(...row.pos).project(this.camera);
+      if (v.z > 1) continue; // behind the camera
+      const x = ((v.x + 1) / 2) * rect.width + rect.left;
+      const y = ((-v.y + 1) / 2) * rect.height + rect.top;
+      const d = this.camera.position.distanceTo(this.vScratch2.set(...row.pos));
+      // The generous radius: 2.5x the cone's own on-screen radius, floored at
+      // PORT_PICK_PX so a far port is still a real target.
+      const radius = Math.max(Viewer.PORT_PICK_PX, (2.5 * 0.45 * k) / Math.max(d, 0.001));
+      const dist = Math.hypot(x - cx, y - cy);
+      if (dist > radius) continue;
+      const score = dist / radius;
+      if (score < bestScore - 1e-6 || (Math.abs(score - bestScore) <= 1e-6 && d < bestDepth)) {
+        bestScore = score;
+        bestDepth = d;
+        best = { p: row.p, pos: row.pos, px: dist };
+      }
     }
-    return ud.type ? { type: ud.type, id: ud.id ?? "", y: ud.y } : null;
+    return best;
   }
 
-  private groundPoint(e: PointerEvent, y: number): Vec3 | null {
-    this.raycaster.setFromCamera(this.ndc(e), this.camera);
+  /** What is under the cursor, in PRIORITY order: ports, then the solid marker
+   *  layer (gates and instance bodies, nearest first), then the bus fragments.
+   *
+   *  Buses come last for the same reason ports come first: a port cone sits ON a
+   *  bus's first cell, and "click the bus" must not steal the click that starts
+   *  a route. */
+  private probe(cx: number, cy: number): Probe | null {
+    const port = this.pickPort(cx, cy);
+    this.raycaster.setFromCamera(this.ndc(cx, cy), this.camera);
+    if (port) {
+      // Did the port beat a body that was in front of it? Worth counting: it is
+      // the case the whole priority rule exists for.
+      const blocker = this.raycaster.intersectObjects(this.solidPickables(), false)[0];
+      if (blocker && (blocker.object.userData as { type?: string }).type === "instance") {
+        this.pickStats.portOverBody++;
+      }
+      return { type: "port", id: port.p.name, point: new THREE.Vector3(...port.pos) };
+    }
+    const solid = this.raycaster.intersectObjects(this.solidPickables(), false)[0];
+    if (solid) {
+      const ud = solid.object.userData as { type?: string; id?: string; y?: number };
+      if (ud.type) return { type: ud.type as Probe["type"], id: ud.id ?? "", y: ud.y, point: solid.point };
+    }
+    const busMeshes = this.busGroup.children.filter((o) => (o as THREE.Mesh).isMesh);
+    const bus = this.raycaster.intersectObjects(busMeshes, false)[0];
+    if (!bus) return null;
+    const ud = bus.object.userData as { type?: string; id?: string; y?: number };
+    return ud.type ? { type: ud.type as Probe["type"], id: ud.id ?? "", y: ud.y, point: bus.point } : null;
+  }
+
+  /** The ray-picked part of the marker layer. In connect mode the bodies are
+   *  simply not in it: nothing to hit, nothing to nudge. */
+  private solidPickables(): THREE.Object3D[] {
+    if (!this.connect) return this.pickables;
+    const out: THREE.Object3D[] = [];
+    for (const o of this.pickables) {
+      if ((o.userData as { type?: string }).type === "instance") continue;
+      out.push(o);
+    }
+    return out;
+  }
+
+  private groundPoint(cx: number, cy: number, y: number): Vec3 | null {
+    this.raycaster.setFromCamera(this.ndc(cx, cy), this.camera);
     this.ground.constant = -y;
     const hit = new THREE.Vector3();
     if (!this.raycaster.ray.intersectPlane(this.ground, hit)) return null;
@@ -1489,10 +1617,52 @@ export class Viewer {
 
   /** World point on the y-plane under the cursor (for the ghost line). */
   worldPoint(e: PointerEvent, y: number): THREE.Vector3 | null {
-    this.raycaster.setFromCamera(this.ndc(e), this.camera);
+    this.raycaster.setFromCamera(this.ndc(e.clientX, e.clientY), this.camera);
     this.ground.constant = -y;
     const hit = new THREE.Vector3();
     return this.raycaster.ray.intersectPlane(this.ground, hit) ? hit : null;
+  }
+
+  // ---- connect mode -------------------------------------------------------
+
+  /** Bodies unpickable. Idempotent; `Alt` holds it, `C` latches it. */
+  setConnectMode(on: boolean) {
+    if (this.connect === on) return;
+    this.connect = on;
+    const el = this.renderer.domElement;
+    el.classList.toggle("connect-mode", on);
+    if (on && this.cameraLock == null) el.style.cursor = "crosshair";
+  }
+
+  connectMode(): boolean {
+    return this.connect;
+  }
+
+  /** Where a port's marker is ON SCREEN, in client coordinates — what a test
+   *  (or a tutorial arrow) needs to put a real pointer on it. */
+  portScreenPos(name: string): [number, number] | null {
+    const row = this.portRows.find((r) => r.p.name === name);
+    if (!row) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.vScratch.set(...row.pos).project(this.camera);
+    if (this.vScratch.z > 1) return null;
+    return [
+      ((this.vScratch.x + 1) / 2) * rect.width + rect.left,
+      ((-this.vScratch.y + 1) / 2) * rect.height + rect.top,
+    ];
+  }
+
+  /** The canvas in client coordinates — where a pointer can actually go. */
+  canvasRect(): { left: number; top: number; right: number; bottom: number } {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+  }
+
+  /** What a press at these client coordinates would resolve to. The pick
+   *  priority, readable without synthesising an event. */
+  probeAt(cx: number, cy: number): { kind: string; id: string } | null {
+    const p = this.probe(cx, cy);
+    return p ? { kind: p.type, id: p.id } : null;
   }
 
   /** The marker position of a port, for anchoring a ghost line. */
@@ -1508,22 +1678,15 @@ export class Viewer {
    *  position of the click — so the pick carries the hit point (rounded to the
    *  block grid) and falls back to the ground plane at the hit's height. */
   pickAt(e: PointerEvent): PickTarget {
-    const hit = this.castPointer(e);
-    const info = Viewer.pickInfo(hit);
+    const info = this.probe(e.clientX, e.clientY);
     const screen: [number, number] = [e.clientX, e.clientY];
     const additive = e.shiftKey || e.metaKey || e.ctrlKey;
-    const point = hit?.point;
+    const point = info?.point;
     const at: Vec3 = point
       ? [Math.round(point.x), Math.round(point.y), Math.round(point.z)]
-      : this.groundPoint(e, 0) ?? [0, 0, 0];
+      : this.groundPoint(e.clientX, e.clientY, 0) ?? [0, 0, 0];
     if (!info) return { kind: "ground", id: "", at, screen, additive };
-    return {
-      kind: info.type as PickTarget["kind"],
-      id: info.id,
-      at,
-      screen,
-      additive,
-    };
+    return { kind: info.type, id: info.id, at, screen, additive };
   }
 
   // ---- rendered geometry readback (the consistency check) -------------------
@@ -1574,13 +1737,18 @@ export class Viewer {
   private downAt: [number, number] | null = null;
 
   private pointerDown(e: PointerEvent) {
-    const info = Viewer.pickInfo(this.castPointer(e));
+    if (this.connect) this.pickStats.bodiesSkippedInConnectMode++;
+    const info = this.probe(e.clientX, e.clientY);
     if (!info) {
       this.downAt = [e.clientX, e.clientY];
       return;
     }
     const { type, id, y } = info;
     if (type === "port") {
+      // A PORT PRESS IS NEVER A DRAG. It does not park in `pending` and it does
+      // not touch `drag`, so no amount of subsequent pointer movement can turn
+      // it into a component move — whatever the body geometry underneath it is.
+      this.pickStats.portPicks++;
       this.cb.onPortClick(id);
       return;
     }
@@ -1589,23 +1757,29 @@ export class Viewer {
       return;
     }
     if (type === "instance") {
+      this.pickStats.bodyPicks++;
       this.cb.onInstanceClick(id, e.shiftKey || e.metaKey || e.ctrlKey);
       // A shift-click EXTENDS a selection; it must not also start dragging the
       // instance it just added, or building a group scatters the group.
       if (e.shiftKey || e.metaKey || e.ctrlKey) return;
-      this.drag = { kind: "instance", id, y: y ?? 0 };
-      this.controls.enabled = false;
-      this.renderer.domElement.setPointerCapture(e.pointerId);
+      this.armPending("instance", id, y ?? 0, e);
       return;
     }
     if (type === "gate") {
       // Selecting it is what makes Del work on a gate; the drag starts in the
       // same gesture, exactly as it does for an instance.
       this.cb.onGateClick(id);
-      this.drag = { kind: "gate", id, y: y ?? 0 };
-      this.controls.enabled = false;
-      this.renderer.domElement.setPointerCapture(e.pointerId);
+      this.armPending("gate", id, y ?? 0, e);
     }
+  }
+
+  /** A body press: selected, camera parked, but NOTHING MOVED yet. */
+  private armPending(kind: "instance" | "gate", id: string, y: number, e: PointerEvent) {
+    this.pending = { kind, id, y, x: e.clientX, py: e.clientY };
+    // The camera is parked from the press, not from the promotion: a press on a
+    // body is never an orbit, whether or not it becomes a move.
+    this.controls.enabled = false;
+    this.renderer.domElement.setPointerCapture(e.pointerId);
   }
 
   /** Where the cursor last was on the ground plane — where a paste lands, so
@@ -1617,9 +1791,19 @@ export class Viewer {
   }
 
   private pointerMove(e: PointerEvent) {
-    this.lastGround = this.groundPoint(e, 0);
+    this.lastGround = this.groundPoint(e.clientX, e.clientY, 0);
+    // A parked press becomes a move only once it has travelled far enough to be
+    // one. Until then the instance is untouched — the click is a selection.
+    if (this.pending) {
+      const moved = Math.hypot(e.clientX - this.pending.x, e.clientY - this.pending.py);
+      if (moved < Viewer.DRAG_PX) return;
+      const { kind, id, y } = this.pending;
+      this.pending = null;
+      this.drag = { kind, id, y };
+      this.pickStats.dragsStarted++;
+    }
     if (this.drag) {
-      const p = this.groundPoint(e, this.drag.y);
+      const p = this.groundPoint(e.clientX, e.clientY, this.drag.y);
       if (p) this.cb.onDragMove(this.drag.kind, this.drag.id, p);
       return;
     }
@@ -1627,8 +1811,7 @@ export class Viewer {
       const w = this.worldPoint(e, this.ghost.from[1]);
       if (w) { this.ghost.to = w; this.refreshGhost(); }
     }
-    const hit = this.castPointer(e);
-    const data = Viewer.pickInfo(hit);
+    const data = this.probe(e.clientX, e.clientY);
     const name = data?.type === "port" ? data.id : null;
     if (name !== this.hovered) {
       this.setHovered(name);
@@ -1636,7 +1819,13 @@ export class Viewer {
     }
     this.setHoveredBus(data?.type === "bus" ? data.id : null);
     if (this.cameraLock == null) {
-      this.renderer.domElement.style.cursor = hit ? "pointer" : "";
+      // The cursor says which gesture the press will be, before it is made:
+      // crosshair = start a bus here, move = this will move, pointer = select.
+      this.renderer.domElement.style.cursor =
+        name ? "crosshair"
+        : data?.type === "instance" ? "move"
+        : data ? "pointer"
+        : this.connect ? "crosshair" : "";
     }
   }
 
@@ -1644,16 +1833,25 @@ export class Viewer {
     if (this.downAt) {
       const [dx, dy] = [e.clientX - this.downAt[0], e.clientY - this.downAt[1]];
       this.downAt = null;
-      if (Math.hypot(dx, dy) < 4) {
-        const p = this.groundPoint(e, 0);
+      if (Math.hypot(dx, dy) < Viewer.DRAG_PX) {
+        const p = this.groundPoint(e.clientX, e.clientY, 0);
         if (p) this.cb.onGroundClick(p);
       }
+    }
+    if (this.pending) {
+      // Released without ever crossing the threshold: the selection that
+      // happened on the press IS the whole gesture. No drag end, so no move to
+      // commit and no undo entry for a click.
+      this.pending = null;
+      this.pickStats.clicksBelowThreshold++;
+      this.controls.enabled = this.cameraLock == null;
+      return;
     }
     if (!this.drag) return;
     const drag = this.drag;
     this.drag = null;
     this.controls.enabled = this.cameraLock == null;
-    const p = this.groundPoint(e, drag.y);
+    const p = this.groundPoint(e.clientX, e.clientY, drag.y);
     if (p) this.cb.onDragEnd(drag.kind, drag.id, p);
   }
 
@@ -1697,9 +1895,9 @@ export class Viewer {
   /** Lock (reason) or unlock (`null`) the camera. Idempotent. */
   setCameraLock(reason: string | null) {
     this.cameraLock = reason;
-    this.controls.enabled = reason == null && this.drag == null;
+    this.controls.enabled = reason == null && this.drag == null && this.pending == null;
     const el = this.renderer.domElement;
-    el.style.cursor = reason ? "crosshair" : "";
+    el.style.cursor = reason || this.connect ? "crosshair" : "";
     el.classList.toggle("camera-locked", reason != null);
   }
 
