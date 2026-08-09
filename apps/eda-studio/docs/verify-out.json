@@ -1,7 +1,7 @@
 {
-  "when": "2026-08-09T09:35:13.832Z",
-  "passed": 101,
-  "total": 101,
+  "when": "2026-08-09T11:12:12.425Z",
+  "passed": 117,
+  "total": 120,
   "results": [
     {
       "ok": true,
@@ -34,8 +34,8 @@
     },
     {
       "ok": true,
-      "label": "? opens the keyboard + colour legend (33 rows) and Esc closes it",
-      "detail": "{\"open\":true,\"rows\":33,\"closed\":true}"
+      "label": "? opens the keyboard + colour legend (34 rows) and Esc closes it",
+      "detail": "{\"open\":true,\"rows\":34,\"closed\":true}"
     },
     {
       "ok": true,
@@ -45,17 +45,17 @@
     {
       "ok": true,
       "label": "...section headers carry counts (\"3 in 3 type(s)\", \"2 · 2 routed\"), chips read \"name : type\" (17 typed) and each carries a mode badge (11)",
-      "detail": "{\"groups\":[{\"name\":\"ADD007_8bit_cca_matt\",\"count\":\"× 1\"},{\"name\":\"BINTOBCD001_8bit_comb_binary_to_bcd\",\"count\":\"× 1\"},{\"name\":\"NUMDISPLAY001_fast_bcd_to_7seg\",\"count\":\"× 1\"}],\"counts\":{\"cells\":\"8\",\"instances\":\"3 in 3 type(s)\",\"buses\":\"2 · 2 routed\"},\"chips\":[\"▼ a : uint8 ✗\",\"▼ b : uint8 ✗\",\"▼ cin : boolean ✗\",\"▲ cout : boolean ✗\"],\"typed\":17,\"modeBadges\":11,\"busRowText\":\"bus0 routed 7t · skew 0t u0.sum → u1.bin · 8 bit 1 trunk span(s) · no gates Rip Re-route Focus Delete solidtranslucentoutline\",\"skew\":{\"per_bit_rt\":[7,7,7,7,7,7,7,7],\"skew_rt\":0,\"max_rt\":7},\"focusables\":2}"
+      "detail": "{\"groups\":[{\"name\":\"ADD007_8bit_cca_matt\",\"count\":\"× 1\"},{\"name\":\"BINTOBCD001_8bit_comb_binary_to_bcd\",\"count\":\"× 1\"},{\"name\":\"NUMDISPLAY001_fast_bcd_to_7seg\",\"count\":\"× 1\"}],\"counts\":{\"cells\":\"8\",\"instances\":\"3 in 3 type(s)\",\"buses\":\"2 · 2 routed\"},\"chips\":[\"▼ a : uint8 ✗\",\"▼ b : uint8 ✗\",\"▼ cin : boolean ✗\",\"▲ cout : boolean ✗\"],\"typed\":17,\"modeBadges\":11,\"busRowText\":\"bus0 routed 17t · skew 8t u0.sum → u1.bin · 8 bit 1 trunk span(s) · no gates Rip Re-route Focus Delete solidtranslucentoutline\",\"skew\":{\"per_bit_rt\":[17,10,10,14,9,12,9,9],\"skew_rt\":8,\"max_rt\":17},\"focusables\":2}"
     },
     {
       "ok": true,
-      "label": "...bus rows show endpoints + state + timing (7t, skew 0t) and 2 rows are click-to-focus",
-      "detail": "bus0 routed 7t · skew 0t u0.sum → u1.bin · 8 bit 1 trunk span(s) · no gates Rip Re-route Focus Delete solidtranslucentoutline"
+      "label": "...bus rows show endpoints + state + timing (17t, skew 8t) and 2 rows are click-to-focus",
+      "detail": "bus0 routed 17t · skew 8t u0.sum → u1.bin · 8 bit 1 trunk span(s) · no gates Rip Re-route Focus Delete solidtranslucentoutline"
     },
     {
       "ok": true,
-      "label": "labels declutter by projected size: 16/17 shown with the design framed (8.3 px per block), 0 zoomed out — all 17 below the 3.2 px-per-block legibility threshold",
-      "detail": "{\"framed\":{\"total\":17,\"shown\":16,\"hiddenSmall\":0,\"hiddenOverlap\":1,\"hiddenBehind\":0,\"pxPerBlock\":8.333461338252564,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}},\"wide\":{\"total\":17,\"shown\":0,\"hiddenSmall\":17,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":0,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}}}"
+      "label": "labels declutter by projected size: 16/17 shown with the design framed (8.4 px per block), 0 zoomed out — all 17 below the 3.2 px-per-block legibility threshold",
+      "detail": "{\"framed\":{\"total\":17,\"shown\":16,\"hiddenSmall\":0,\"hiddenOverlap\":1,\"hiddenBehind\":0,\"pxPerBlock\":8.383095565411514,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}},\"wide\":{\"total\":17,\"shown\":0,\"hiddenSmall\":17,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":0,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}}}"
     },
     {
       "ok": true,
@@ -69,7 +69,7 @@
     {
       "ok": true,
       "label": "...and colliding labels lose to the one nearest the camera, with every label accounted for (16 shown, 1 overlapping, 0 too small, 0 behind the camera)",
-      "detail": "{\"total\":17,\"shown\":16,\"hiddenSmall\":0,\"hiddenOverlap\":1,\"hiddenBehind\":0,\"pxPerBlock\":8.333461338252564,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}}"
+      "detail": "{\"total\":17,\"shown\":16,\"hiddenSmall\":0,\"hiddenOverlap\":1,\"hiddenBehind\":0,\"pxPerBlock\":8.383095565411514,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}}"
     },
     {
       "ok": true,
@@ -93,8 +93,8 @@
     },
     {
       "ok": true,
-      "label": "toasts STACK (3 at once), each × dismisses one (2 left), and the column never overlaps the hint bar",
-      "detail": "{\"n\":3,\"after\":2,\"overlapsHint\":false}"
+      "label": "toasts STACK (4 at once), each × dismisses one (3 left), and the column never overlaps the hint bar",
+      "detail": "{\"n\":4,\"after\":3,\"overlapsHint\":false}"
     },
     {
       "ok": true,
@@ -173,28 +173,28 @@
     },
     {
       "ok": true,
-      "label": "moving the driver away leaves the bus FAILED with a reason",
-      "detail": "{\"state\":\"failed\",\"reason\":\"segment (15, 6, 25) -> (40, 2, 4): this bus form is a SINGLE-LEVEL 2y-pitch stack, but the two anchors' bit-0 dust sits at y=6 and y=2 (a 4-block level change). Move one endpoint's instance by -4 in y so both ports share a level, or split the run with a gate placed at the target level — vertical level adapters are not implemented yet\"}"
+      "label": "a driver dropped on top of its own sink leaves the bus FAILED with a reason (2 placement(s) tried)",
+      "detail": "[{\"why\":\"lifted off the bus level\",\"at\":[0,3,24],\"state\":\"routed\"},{\"why\":\"dropped on top of its own sink\",\"at\":[40,2,4],\"state\":\"failed\"}]"
     },
     {
       "ok": true,
-      "label": "the 335-char engine reason becomes a sentence (level): \"the two ends are on different levels — driver bit 0 at y=6, sink bit 0 at y=2 between (15, 6, 25) and (40, 2, 4)\" → \"move one endpoint's instance by -4 in y so both ports share a level, or split the run with a gate at the target level\" @ [15,6,25]",
-      "detail": "{\"at\":[15,6,25],\"blame\":[],\"detail\":\"segment (15, 6, 25) -> (40, 2, 4): this bus form is a SINGLE-LEVEL 2y-pitch stack, but the two anchors' bit-0 dust sits at y=6 and y=2 (a 4-block level change). Move one endpoint's instance by -4 in y so both ports share a level, or split the run with a gate placed at the target level — vertical level adapters are not implemented yet\",\"kind\":\"level\",\"headline\":\"the two ends are on different levels — driver bit 0 at y=6, sink bit 0 at y=2 between (15, 6, 25) and (40, 2, 4)\",\"fix\":\"move one endpoint's instance by -4 in y so both ports share a level, or split the run with a gate at the target level\"}"
+      "label": "the 1464-char engine reason becomes a sentence (corridor): \"no corridor at (54, 4, 5) for the 8-bit bus — instance u1 minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side] is in the way\" → \"move u1, or give the bus a gate so it routes in two legs\" @ [54,4,5]",
+      "detail": "{\"at\":[54,4,5],\"blame\":[\"u1\"],\"detail\":\"segment (55, 5, 5) -> (40, 2, 4): the anchors are 3 level(s) apart and every placement of the 7-cell level-shift tile was blocked: level shift mid-run ((51, 5, 5) -> (45, 2, 5)): leg into the shift: no corridor from (55, 5, 5) to (51, 5, 5) for a 8-bit bus on level y=5: the direct line is blocked at (54, 4, 5) by instance `u1` `minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side]`. A bounded detour search (margin 96 cells, 400000 nodes) found no clear rectilinear corridor either — the layers hemming the endpoints in are: instance `u1`. No level within 8 blocks up or down is clear either, so this is real congestion rather than a level-change limitation. Move one of them, give the bus a gate to route through in two legs, or free a lane at least 1 cell clear of other redstone (dust one cell apart shorts, so the corridor needs 2 cells of pitch). Template attempts: straight run: collision at (54, 4, 5): `minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side]` (instance `u1`) already there, wanted `minecraft:gray_concrete`; level shift at the driver end ((54, 5, 5) -> (48, 2, 5)): collision at (54, 4, 5): `minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side]` (instance `u1`) already there, wanted `minecraft:gray_concrete`; level shift at the sink end ((47, 5, 4) -> (41, 2, 4)): collision at (47, 4, 4): `minecraft:magenta_wool` (instance `u1`) already there, wanted `minecraft:gray_concrete`\",\"kind\":\"corridor\",\"headline\":\"no corridor at (54, 4, 5) for the 8-bit bus — instance u1 minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side] is in the way\",\"fix\":\"move u1, or give the bus a gate so it routes in two legs\"}"
     },
     {
       "ok": true,
       "label": "...the Buses panel shows headline + fix, and keeps the engine's own words behind a disclosure",
-      "detail": "{\"headline\":\"the two ends are on different levels — driver bit 0 at y=6, sink bit 0 at y=2 between (15, 6, 25) and (40, 2, 4)\",\"fix\":\"↳ move one endpoint's instance by -4 in y so both ports share a level, or split the run with a gate at the target level\"}"
+      "detail": "{\"headline\":\"no corridor at (54, 4, 5) for the 8-bit bus — instance u1 minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side] is in the way\",\"fix\":\"↳ move u1, or give the bus a gate so it routes in two legs\"}"
     },
     {
       "ok": true,
       "label": "...a toast says \"Bus <name> failed: <what> — <fix>\"",
-      "detail": "[\"Bus bus1 failed: the two ends are on different levels — driver bit 0 at y=6, sink bit 0 at y=2 between (15, 6, 25) and (40, 2, 4)move one endpoint's instance by -4 in y so both ports share a level, or split the run with a gate at the target level\"]"
+      "detail": "[\"Bus bus1 failed: no corridor at (54, 4, 5) for the 8-bit bus — instance u1 minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side] is in the waymove u1, or give the bus a gate so it routes in two legs\"]"
     },
     {
       "ok": true,
-      "label": "...and the FAILED row is click-to-focus: the camera flew to [15,6,25], the coordinate the router named",
-      "detail": "{\"before\":{\"target\":[19.75,8,15.5],\"radius\":75.07753966353312},\"after\":{\"target\":[15,6,25],\"radius\":26}}"
+      "label": "...and the FAILED row is click-to-focus: the camera flew to [54,4,5], the coordinate the router named",
+      "detail": "{\"before\":{\"target\":[19.75,8,15.5],\"radius\":75.07753966353312},\"after\":{\"target\":[54,4,5],\"radius\":26}}"
     },
     {
       "ok": true,
@@ -214,7 +214,7 @@
     },
     {
       "ok": true,
-      "label": ".litematic keeps blocks AND inst:/bus: regions (1427, [\"bus:bus1\",\"Main\",\"inst:u1\"])"
+      "label": ".litematic keeps blocks AND inst:/bus: regions (1427, [\"inst:u1\",\"Main\",\"bus:bus1\"])"
     },
     {
       "ok": true,
@@ -276,31 +276,31 @@
     {
       "ok": true,
       "label": "dragging an instance 20 frames triggers 0 cell re-meshes and 0 texture re-meshes (cells 4 -> 4)",
-      "detail": "{\"texture\":0,\"cells\":4,\"instancedGroups\":4,\"instanceAllocs\":0,\"matrixWrites\":35,\"buses\":17,\"loose\":1}"
+      "detail": "{\"texture\":0,\"cells\":4,\"instancedGroups\":4,\"instanceAllocs\":0,\"matrixWrites\":36,\"buses\":18,\"loose\":1}"
     },
     {
       "ok": true,
       "label": "...and reads NOTHING back out of wasm: it is 19 matrix writes",
-      "detail": "{\"before\":{\"flatten\":18,\"cellDump\":1,\"instDump\":2,\"busDump\":17,\"looseDump\":1},\"after\":{\"flatten\":18,\"cellDump\":1,\"instDump\":2,\"busDump\":17,\"looseDump\":1}}"
+      "detail": "{\"before\":{\"flatten\":19,\"cellDump\":1,\"instDump\":2,\"busDump\":18,\"looseDump\":1},\"after\":{\"flatten\":19,\"cellDump\":1,\"instDump\":2,\"busDump\":18,\"looseDump\":1}}"
     },
     {
       "ok": true,
-      "label": "...costing 0.06 ms of main-thread work per frame — a >999 fps budget, target >= 30 fps (<= 33 ms)"
+      "label": "...costing 0.02 ms of main-thread work per frame — a >999 fps budget, target >= 30 fps (<= 33 ms)"
     },
     {
       "ok": true,
-      "label": "live re-route commits at most one engine move per animation frame (21 commits over 20 frames, 7 ms each, scene update 3.1 ms) — no fixed throttle",
-      "detail": "{\"wallPerFrame\":102.84500000476837,\"commits\":21,\"commitMs\":6.857142845789592,\"scene\":3.1047619183858237}"
+      "label": "live re-route commits at most one engine move per animation frame (21 commits over 20 frames, 7 ms each, scene update 3.5 ms) — no fixed throttle",
+      "detail": "{\"wallPerFrame\":104.91499999761581,\"commits\":21,\"commitMs\":7.461904798235212,\"scene\":3.533333346957252}"
     },
     {
       "ok": true,
       "label": "a port-mode toggle on u1.a re-meshes exactly 1 cell variant (+1 cell, +1 instance region read)",
-      "detail": "{\"port\":\"u1.a\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":4,\"instancedGroups\":4,\"instanceAllocs\":0,\"matrixWrites\":56,\"buses\":39,\"loose\":1},\"reads\":{\"flatten\":40,\"cellDump\":1,\"instDump\":2,\"busDump\":39,\"looseDump\":1}},\"mid\":{\"mesh\":{\"texture\":0,\"cells\":5,\"instancedGroups\":5,\"instanceAllocs\":0,\"matrixWrites\":57,\"buses\":40,\"loose\":1},\"reads\":{\"flatten\":41,\"cellDump\":1,\"instDump\":3,\"busDump\":40,\"looseDump\":1}}}"
+      "detail": "{\"port\":\"u1.a\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":4,\"instancedGroups\":4,\"instanceAllocs\":0,\"matrixWrites\":57,\"buses\":40,\"loose\":1},\"reads\":{\"flatten\":41,\"cellDump\":1,\"instDump\":2,\"busDump\":40,\"looseDump\":1}},\"mid\":{\"mesh\":{\"texture\":0,\"cells\":5,\"instancedGroups\":5,\"instanceAllocs\":0,\"matrixWrites\":58,\"buses\":41,\"loose\":1},\"reads\":{\"flatten\":42,\"cellDump\":1,\"instDump\":3,\"busDump\":41,\"looseDump\":1}}}"
     },
     {
       "ok": true,
       "label": "re-routing bus1 re-reads exactly 1 bus layer and 0 cells, and re-meshes it 1 time(s) — the route moved (8 ms)",
-      "detail": "{\"bus\":\"bus1\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":58,\"buses\":41,\"loose\":1},\"reads\":{\"flatten\":42,\"cellDump\":1,\"instDump\":3,\"busDump\":41,\"looseDump\":1}},\"after\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":58,\"buses\":42,\"loose\":1},\"reads\":{\"flatten\":43,\"cellDump\":1,\"instDump\":3,\"busDump\":42,\"looseDump\":1}},\"ms\":7.799999952316284}"
+      "detail": "{\"bus\":\"bus1\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":59,\"buses\":42,\"loose\":1},\"reads\":{\"flatten\":43,\"cellDump\":1,\"instDump\":3,\"busDump\":42,\"looseDump\":1}},\"after\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":59,\"buses\":43,\"loose\":1},\"reads\":{\"flatten\":44,\"cellDump\":1,\"instDump\":3,\"busDump\":43,\"looseDump\":1}},\"ms\":8.099999904632568}"
     },
     {
       "ok": true,
@@ -320,7 +320,7 @@
     {
       "ok": true,
       "label": "...and it costs ZERO new cell meshes: the paste is a reference to the cell already meshed, placed by matrix (cells 9 → 9)",
-      "detail": "{\"before\":{\"texture\":0,\"cells\":9,\"instancedGroups\":9,\"instanceAllocs\":0,\"matrixWrites\":76,\"buses\":49,\"loose\":1},\"after\":{\"texture\":0,\"cells\":9,\"instancedGroups\":9,\"instanceAllocs\":0,\"matrixWrites\":77,\"buses\":50,\"loose\":1}}"
+      "detail": "{\"before\":{\"texture\":0,\"cells\":9,\"instancedGroups\":9,\"instanceAllocs\":0,\"matrixWrites\":77,\"buses\":50,\"loose\":1},\"after\":{\"texture\":0,\"cells\":9,\"instancedGroups\":9,\"instanceAllocs\":0,\"matrixWrites\":78,\"buses\":51,\"loose\":1}}"
     },
     {
       "ok": true,
@@ -330,7 +330,7 @@
     {
       "ok": true,
       "label": "...and the whole paste is ONE undo step (\"paste 1 instance\"): one ⌘Z removes every pasted instance (2 → 1)",
-      "detail": "{\"copied\":{\"instances\":[{\"src\":\"u1\",\"cell\":\"ADD007_8bit_cca_matt\",\"rel\":[0,0,0],\"rot\":90,\"busPorts\":[\"a\",\"b\"]}],\"buses\":[],\"origin\":[12,-1,24]},\"port\":\"b\",\"report\":{\"instances\":[{\"name\":\"u2\",\"src\":\"u1\",\"cell\":\"ADD007_8bit_cca_matt\",\"at\":[120,-1,120]}],\"buses\":[],\"failed\":{},\"nudged\":null},\"before\":{\"instances\":1,\"mesh\":{\"texture\":0,\"cells\":9,\"instancedGroups\":9,\"instanceAllocs\":0,\"matrixWrites\":76,\"buses\":49,\"loose\":1}},\"after\":{\"instances\":2,\"mesh\":{\"texture\":0,\"cells\":9,\"instancedGroups\":9,\"instanceAllocs\":0,\"matrixWrites\":77,\"buses\":50,\"loose\":1}},\"afterUndo\":1,\"pasted\":{\"name\":\"u2\",\"src\":\"u1\",\"cell\":\"ADD007_8bit_cca_matt\",\"at\":[120,-1,120]},\"modes\":[\"a:bus\",\"b:bus\",\"cin:executor\",\"cout:executor\",\"sum:executor\"],\"srcModes\":[\"a:bus\",\"b:bus\",\"cin:executor\",\"cout:executor\",\"sum:executor\"],\"consistent\":true,\"undoLabel\":\"paste 1 instance\",\"keysBefore\":[\"u1\"],\"keysAfter\":[\"u1\"],\"sameCell\":true,\"variants\":1,\"consistentAfterUndo\":true}"
+      "detail": "{\"copied\":{\"instances\":[{\"src\":\"u1\",\"cell\":\"ADD007_8bit_cca_matt\",\"rel\":[0,0,0],\"rot\":90,\"busPorts\":[\"a\",\"b\"]}],\"buses\":[],\"origin\":[12,-1,24]},\"port\":\"b\",\"report\":{\"instances\":[{\"name\":\"u2\",\"src\":\"u1\",\"cell\":\"ADD007_8bit_cca_matt\",\"at\":[120,-1,120]}],\"buses\":[],\"failed\":{},\"nudged\":null},\"before\":{\"instances\":1,\"mesh\":{\"texture\":0,\"cells\":9,\"instancedGroups\":9,\"instanceAllocs\":0,\"matrixWrites\":77,\"buses\":50,\"loose\":1}},\"after\":{\"instances\":2,\"mesh\":{\"texture\":0,\"cells\":9,\"instancedGroups\":9,\"instanceAllocs\":0,\"matrixWrites\":78,\"buses\":51,\"loose\":1}},\"afterUndo\":1,\"pasted\":{\"name\":\"u2\",\"src\":\"u1\",\"cell\":\"ADD007_8bit_cca_matt\",\"at\":[120,-1,120]},\"modes\":[\"a:bus\",\"b:bus\",\"cin:executor\",\"cout:executor\",\"sum:executor\"],\"srcModes\":[\"a:bus\",\"b:bus\",\"cin:executor\",\"cout:executor\",\"sum:executor\"],\"consistent\":true,\"undoLabel\":\"paste 1 instance\",\"keysBefore\":[\"u1\"],\"keysAfter\":[\"u1\"],\"sameCell\":true,\"variants\":1,\"consistentAfterUndo\":true}"
     },
     {
       "ok": true,
@@ -394,7 +394,7 @@
     {
       "ok": true,
       "label": "...with the choice remembered in localStorage (\"translucent\"), so it survives a reload",
-      "detail": "{\"before\":{\"global\":\"translucent\",\"stored\":null,\"perBus\":{\"bus1\":\"translucent\"}},\"outline\":{\"style\":{\"global\":\"outline\",\"stored\":\"outline\",\"perBus\":{\"bus1\":\"outline\"}},\"prof\":{\"frames\":246,\"avgFrameMs\":8.716666670349555,\"avgGapMs\":81.41138211401497,\"fps\":12.283294719152666,\"drawCalls\":8,\"triangles\":38444,\"geometries\":9,\"textures\":0,\"programs\":7,\"cellGroups\":1,\"cellMeshes\":1,\"busMeshes\":2,\"looseMeshes\":1,\"sceneObjects\":4,\"markerObjects\":6,\"labels\":16,\"labelStats\":{\"total\":16,\"shown\":11,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":5,\"pxPerBlock\":28.514772354720364},\"sceneMs\":{\"placements\":0.3000001907348633,\"unique\":27.700000286102295}},\"consistent\":true},\"perBus\":{\"global\":\"outline\",\"stored\":\"outline\",\"perBus\":{\"bus1\":\"solid\"}},\"after\":{\"global\":\"translucent\",\"stored\":\"translucent\",\"perBus\":{\"bus1\":\"translucent\"}},\"stored\":\"translucent\"}"
+      "detail": "{\"before\":{\"global\":\"translucent\",\"stored\":null,\"perBus\":{\"bus1\":\"translucent\"}},\"outline\":{\"style\":{\"global\":\"outline\",\"stored\":\"outline\",\"perBus\":{\"bus1\":\"outline\"}},\"prof\":{\"frames\":284,\"avgFrameMs\":6.203521123234655,\"avgGapMs\":63.61478873289807,\"fps\":15.719615201407642,\"drawCalls\":8,\"triangles\":38444,\"geometries\":9,\"textures\":0,\"programs\":7,\"cellGroups\":1,\"cellMeshes\":1,\"busMeshes\":2,\"looseMeshes\":1,\"sceneObjects\":4,\"markerObjects\":6,\"labels\":16,\"labelStats\":{\"total\":16,\"shown\":11,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":5,\"pxPerBlock\":28.514772354720368},\"sceneMs\":{\"placements\":0.3000001907348633,\"unique\":28.699999809265137}},\"consistent\":true},\"perBus\":{\"global\":\"outline\",\"stored\":\"outline\",\"perBus\":{\"bus1\":\"solid\"}},\"after\":{\"global\":\"translucent\",\"stored\":\"translucent\",\"perBus\":{\"bus1\":\"translucent\"}},\"stored\":\"translucent\"}"
     },
     {
       "ok": true,
@@ -418,36 +418,36 @@
     {
       "ok": true,
       "label": "...and its Delete goes through the same confirm as every other delete (\"Delete u1 and rip 1 bus?\"), removes it (3 → 2), leaves the render consistent, and ⌘Z brings it back (3)",
-      "detail": "{\"inst\":\"u1\",\"onInstance\":[{\"label\":\"u1 · ADD007_8bit_cca_matt\",\"hint\":\"@ 12,-1,24 · rot 90°\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Rotate CW\",\"hint\":\"R\",\"danger\":false},{\"label\":\"Rotate CCW\",\"hint\":\"⇧R\",\"danger\":false},{\"label\":\"Duplicate\",\"hint\":\"⌘/Ctrl-D\",\"danger\":false},{\"label\":\"Copy\",\"hint\":\"⌘/Ctrl-C\",\"danger\":false},{\"label\":\"Cut\",\"hint\":\"⌘/Ctrl-X\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Port modes\",\"hint\":\"5 switchable\",\"danger\":false,\"sub\":[\"a → Executor\",\"b → Executor\",\"cin → Bus\",\"cout → Bus\",\"sum → Bus\"]},{\"label\":\"Promote all inputs to Bus\",\"hint\":\"so buses can land on them\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Frame\",\"hint\":\"F\",\"danger\":false},{\"label\":\"Rip its 1 bus(es)\",\"hint\":\"bus1\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Delete\",\"hint\":\"Del\",\"danger\":true}],\"rotBefore\":90,\"rotAfter\":180,\"onBus\":[{\"label\":\"bus1 · routed\",\"hint\":\"u1.sum → sum_out\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Add gate here (13,2,4)\",\"hint\":\"the route must pass through this point\",\"danger\":false},{\"label\":\"Re-route\",\"hint\":\"R\",\"danger\":false},{\"label\":\"Rip\",\"hint\":\"keeps the declaration\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Draw this bus\",\"hint\":\"translucent\",\"danger\":false,\"sub\":[\"○ solid\",\"● translucent\",\"○ outline\"]},{\"label\":\"Frame\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Delete\",\"hint\":\"Del\",\"danger\":true}],\"gates\":{\"before\":0,\"after\":1,\"anchor\":[13,2,4],\"at\":[13,9,4],\"label\":\"Add gate here (13,2,4)\",\"gateable\":false,\"snapped\":[13,2,4],\"refusal\":null,\"toast\":\"undid delete bus1×u1 rotated to 180°×bus1: u1.sum → sum_out · routed · 5t, skew 0tDel deletes it · R re-routes · Esc deselects×checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×\"},\"gateState\":{\"state\":\"routed\"},\"onGround\":[{\"label\":\"ground 10,0,10\",\"hint\":\"nothing under the cursor\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Paste 1 here\",\"hint\":\"⌘/Ctrl-V\",\"danger\":false},{\"label\":\"Add a component here\",\"hint\":\"8 cells\",\"danger\":false,\"sub\":[\"REGISTER001_8bit_register\",\"ADD007_8bit_cca_matt\",\"ADD005_8bit_cle\",\"NUMDISPLAY001_fast_bcd_to_7seg\",\"BINTOBCD001_8bit_comb_binary_to_bcd\",\"DIVIDE009_3_33hz_5tpb_8b_divider_zPippo\",\"REGISTERFILE001_register_file\",\"MULTIPY003_8bit_comb_multiplier\"]},{\"label\":\"-\",\"danger\":false},{\"label\":\"Frame all\",\"hint\":\"A\",\"danger\":false},{\"label\":\"Textured view\",\"hint\":\"resource pack\",\"danger\":false},{\"label\":\"Toggle IO markers\",\"hint\":\"the ▲▼ cones\",\"danger\":false},{\"label\":\"Bus drawing\",\"hint\":\"translucent\",\"danger\":false,\"sub\":[\"○ solid\",\"● translucent\",\"○ outline\"]}],\"onPort\":[{\"label\":\"sum_out\",\"hint\":\"receives · uint8\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Start a bus from here\",\"hint\":\"outputs receive\",\"danger\":false},{\"label\":\"Frame\",\"danger\":false}],\"openNow\":true,\"openAfterEsc\":false,\"delBefore\":3,\"delAfter\":2,\"prompt\":{\"title\":\"Delete u1 and rip 1 bus?\",\"body\":\"u1 carries 1 routed bus: bus1. Deleting it removes that bus too. Undo (⌘/Ctrl-Z) puts everything back.\"},\"consistent\":true,\"restored\":3,\"keys\":[\"u3\",\"u2\",\"u1\"],\"toast\":\"checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×removed with it: bus1×u1 deleted — ripped bus1 · ⌘/Ctrl-Z to undo×undid delete u1×\",\"logtail\":\"undo: delete u1\\ndeleted u1  removed=[bus1]  rerouted=[]\\naddGate bus1 @ 13,2,4 (re-declared) -> routed\\nrotate u1 -> 180°  rerouted=[bus1]\\nundo: delete bus1\\ndeleted bus bus1\\npaste: u2 buses=[]\\ncopy: u1\\npaste: u3 buses=[]\\ncut: u2\\npaste: u2 buses=[]\\nundo: paste 1 instance\\npaste: u2 buses=[]\\ncopy: u1\\nund\"}"
+      "detail": "{\"inst\":\"u1\",\"onInstance\":[{\"label\":\"u1 · ADD007_8bit_cca_matt\",\"hint\":\"@ 12,-1,24 · rot 90°\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Rotate CW\",\"hint\":\"R\",\"danger\":false},{\"label\":\"Rotate CCW\",\"hint\":\"⇧R\",\"danger\":false},{\"label\":\"Duplicate\",\"hint\":\"⌘/Ctrl-D\",\"danger\":false},{\"label\":\"Copy\",\"hint\":\"⌘/Ctrl-C\",\"danger\":false},{\"label\":\"Cut\",\"hint\":\"⌘/Ctrl-X\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Port modes\",\"hint\":\"5 switchable\",\"danger\":false,\"sub\":[\"a → Executor\",\"b → Executor\",\"cin → Bus\",\"cout → Bus\",\"sum → Bus\"]},{\"label\":\"Promote all inputs to Bus\",\"hint\":\"so buses can land on them\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Frame\",\"hint\":\"F\",\"danger\":false},{\"label\":\"Rip its 1 bus(es)\",\"hint\":\"bus1\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Delete\",\"hint\":\"Del\",\"danger\":true}],\"rotBefore\":90,\"rotAfter\":180,\"onBus\":[{\"label\":\"bus1 · routed\",\"hint\":\"u1.sum → sum_out\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Add gate here (13,2,4)\",\"hint\":\"the route must pass through this point\",\"danger\":false},{\"label\":\"Re-route\",\"hint\":\"R\",\"danger\":false},{\"label\":\"Rip\",\"hint\":\"keeps the declaration\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Draw this bus\",\"hint\":\"translucent\",\"danger\":false,\"sub\":[\"○ solid\",\"● translucent\",\"○ outline\"]},{\"label\":\"Frame\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Delete\",\"hint\":\"Del\",\"danger\":true}],\"gates\":{\"before\":0,\"after\":1,\"anchor\":[13,2,4],\"at\":[13,9,4],\"label\":\"Add gate here (13,2,4)\",\"gateable\":false,\"snapped\":[13,2,4],\"refusal\":null,\"toast\":\"undid delete bus1×u1 rotated to 180°×bus1: u1.sum → sum_out · routed · 5t, skew 0tDel deletes it · R re-routes · Esc deselects×checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×\"},\"gateState\":{\"state\":\"routed\"},\"onGround\":[{\"label\":\"ground 10,0,10\",\"hint\":\"nothing under the cursor\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Paste 1 here\",\"hint\":\"⌘/Ctrl-V\",\"danger\":false},{\"label\":\"Add a component here\",\"hint\":\"8 cells\",\"danger\":false,\"sub\":[\"REGISTER001_8bit_register\",\"ADD007_8bit_cca_matt\",\"ADD005_8bit_cle\",\"NUMDISPLAY001_fast_bcd_to_7seg\",\"BINTOBCD001_8bit_comb_binary_to_bcd\",\"DIVIDE009_3_33hz_5tpb_8b_divider_zPippo\",\"REGISTERFILE001_register_file\",\"MULTIPY003_8bit_comb_multiplier\"]},{\"label\":\"-\",\"danger\":false},{\"label\":\"Frame all\",\"hint\":\"A\",\"danger\":false},{\"label\":\"Textured view\",\"hint\":\"resource pack\",\"danger\":false},{\"label\":\"Toggle IO markers\",\"hint\":\"the ▲▼ cones\",\"danger\":false},{\"label\":\"Bus drawing\",\"hint\":\"translucent\",\"danger\":false,\"sub\":[\"○ solid\",\"● translucent\",\"○ outline\"]}],\"onPort\":[{\"label\":\"sum_out\",\"hint\":\"receives · uint8\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Start a bus from here\",\"hint\":\"outputs receive\",\"danger\":false},{\"label\":\"Frame\",\"danger\":false}],\"openNow\":true,\"openAfterEsc\":false,\"delBefore\":3,\"delAfter\":2,\"prompt\":{\"title\":\"Delete u1 and rip 1 bus?\",\"body\":\"u1 carries 1 routed bus: bus1. Deleting it removes that bus too. Undo (⌘/Ctrl-Z) puts everything back.\"},\"consistent\":true,\"restored\":3,\"keys\":[\"u3\",\"u2\",\"u1\"],\"toast\":\"checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×removed with it: bus1×u1 deleted — ripped bus1 · ⌘/Ctrl-Z to undo×undid delete u1×\",\"logtail\":\"undo: delete u1\\ndeleted u1  removed=[bus1]  rerouted=[]\\naddGate bus1 @ 13,2,4 (fast path) -> routed\\nrotate u1 -> 180°  rerouted=[bus1]\\nundo: delete bus1\\ndeleted bus bus1\\npaste: u2 buses=[]\\ncopy: u1\\npaste: u3 buses=[]\\ncut: u2\\npaste: u2 buses=[]\\nundo: paste 1 instance\\npaste: u2 buses=[]\\ncopy: u1\\nundo:\"}"
     },
     {
-      "ok": true,
-      "label": "right-click → \"Add gate here\" puts a CHECKPOINT at the clicked cell (28,3,26, detour): the bus stays routed, now in 2 trunk spans, and its geometry passes THROUGH that cell",
-      "detail": "{\"state\":{\"state\":\"routed\"},\"gates\":{\"gates\":[{\"name\":\"g0\",\"anchor\":[28,3,26],\"step\":[0,2,0]}],\"segments\":2},\"cells\":1200,\"through\":true,\"consistent\":true,\"undoLabel\":\"add gate bus0/g0\"}"
+      "ok": false,
+      "label": "right-click → \"Add gate here\" puts a CHECKPOINT at the clicked cell (62,3,30, on-path): the bus stays routed, now in 2 trunk spans, and its geometry passes THROUGH that cell",
+      "detail": "{\"state\":{\"state\":\"failed\",\"reason\":\"segment (15, 3, 1) -> (62, 3, 30): no corridor from (15, 3, 1) to (62, 3, 30) for a 8-bit bus on level y=3: the direct line is blocked at (16, 3, 1) by instance `u0` `minecraft:redstone_lamp[lit=false]`. A bounded detour search (margin 96 cells, 400000 nodes) found no clear rectilinear corridor either — the layers hemming the endpoints in are: bus `bus0`, instance `u0`. A clear corridor DOES exist at y=5 or y=7 or y=9 or y=11 — this bus's level is the problem, not the workspace. The bus form is a single-level 2y-pitch stack and cannot ramp between levels, so shift an endpoint's instance in y instead of clearing space. Move one of them, give the bus a gate to route through in two legs, or free a lane at least 1 cell clear of other redstone (dust one cell apart shorts, so the corridor needs 2 cells of pitch). Template attempts: L corner x-first: collision at (16, 3, 1): `minecraft:redstone_lamp[lit=false]` (instance `u0`) already there, wanted `minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]` | L corner z-first: internal plan conflict at (60, 2, 30): `minecraft:stone` vs `minecraft:gray_concrete`\"},\"gates\":{\"gates\":[{\"name\":\"g0\",\"anchor\":[62,3,30],\"step\":[0,2,0]}],\"segments\":2},\"cells\":0,\"through\":false,\"consistent\":true,\"undoLabel\":\"add gate bus0/g0\"}"
     },
     {
-      "ok": true,
-      "label": "...dragging the handle moves the checkpoint (28,3,26 → 30,3,26) and costs ZERO cell re-meshes and at most one re-mesh per bus whose geometry moved (2 of 2 bus layers; the router may amend the buses a re-routed span crosses)",
-      "detail": "{\"anchor\":[30,3,26],\"state\":{\"state\":\"routed\"},\"cells\":1200,\"consistent\":true,\"busRemeshes\":2,\"cellRemeshes\":0,\"buses\":2,\"undoLabel\":\"move gate bus0/g0\"}"
+      "ok": false,
+      "label": "...dragging the handle moves the checkpoint (62,3,30 → 64,3,30) and costs ZERO cell re-meshes and at most one re-mesh per bus whose geometry moved (0 of 2 bus layers; the router may amend the buses a re-routed span crosses)",
+      "detail": "{\"anchor\":[64,3,30],\"state\":{\"state\":\"failed\",\"reason\":\"segment (15, 3, 1) -> (64, 3, 30): no corridor from (15, 3, 1) to (64, 3, 30) for a 8-bit bus on level y=3: the direct line is blocked at (16, 3, 1) by instance `u0` `minecraft:redstone_lamp[lit=false]`. A bounded detour search (margin 96 cells, 400000 nodes) found no clear rectilinear corridor either — the layers hemming the endpoints in are: bus `bus0`, instance `u0`. A clear corridor DOES exist at y=7 or y=9 or y=11 — this bus's level is the problem, not the workspace. The bus form is a single-level 2y-pitch stack and cannot ramp between levels, so shift an endpoint's instance in y instead of clearing space. Move one of them, give the bus a gate to route through in two legs, or free a lane at least 1 cell clear of other redstone (dust one cell apart shorts, so the corridor needs 2 cells of pitch). Template attempts: L corner x-first: collision at (16, 3, 1): `minecraft:redstone_lamp[lit=false]` (instance `u0`) already there, wanted `minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]` | L corner z-first: internal plan conflict at (60, 2, 30): `minecraft:stone` vs `minecraft:gray_concrete`\"},\"cells\":0,\"consistent\":true,\"busRemeshes\":0,\"cellRemeshes\":0,\"buses\":2,\"undoLabel\":\"move gate bus0/g0\"}"
     },
     {
-      "ok": true,
-      "label": "...and removing it STRAIGHTENS the route — 1200 cells with the checkpoint, 1008 without (direct route: 1008) — while the endpoints stay exactly as they were (u0.sum → u1.bin): a gate is ROUTE, an endpoint is NETLIST",
-      "detail": "{\"add\":1200,\"drag\":1200,\"remove\":1008}"
+      "ok": false,
+      "label": "...and removing it STRAIGHTENS the route — 0 cells with the checkpoint, 1440 without (direct route: 1440) — while the endpoints stay exactly as they were (u0.sum → u1.bin): a gate is ROUTE, an endpoint is NETLIST",
+      "detail": "{\"add\":0,\"drag\":0,\"remove\":1440}"
     },
     {
       "ok": true,
       "label": "...each step is its own undo entry (\"add gate bus0/g0\", \"move gate bus0/g0\", \"remove gate bus0/g0\") and ⌘Z after the removal puts the checkpoint back",
-      "detail": "{\"gates\":{\"gates\":[{\"name\":\"g0\",\"anchor\":[30,3,26],\"step\":[0,2,0]}],\"segments\":2},\"consistent\":true}"
+      "detail": "{\"gates\":{\"gates\":[{\"name\":\"g0\",\"anchor\":[64,3,30],\"step\":[0,2,0]}],\"segments\":2},\"consistent\":true}"
     },
     {
       "ok": true,
       "label": "a selected bus LISTS its checkpoints in the outliner (2 rows, ordered, click-to-focus, each with its own ✕) alongside \"3 trunk span(s)\" — the model is on screen, not implied",
-      "detail": "{\"bus\":\"bus1\",\"gates\":{\"gates\":[{\"name\":\"g0\",\"anchor\":[103,3,100],\"step\":[0,2,0]},{\"name\":\"g1\",\"anchor\":[140,3,54],\"step\":[0,2,0]}],\"segments\":3},\"state\":{\"state\":\"routed\"},\"rows\":2,\"consistent\":true}"
+      "detail": "{\"bus\":\"bus1\",\"gates\":{\"gates\":[{\"name\":\"g0\",\"anchor\":[90,3,100],\"step\":[2,0,0]},{\"name\":\"g1\",\"anchor\":[140,3,47],\"step\":[2,0,0]}],\"segments\":3},\"state\":{\"state\":\"failed\",\"reason\":\"gate `g0`: step (2, 0, 0) does not match the bus form (0,2,0)\"},\"rows\":2,\"consistent\":true}"
     },
     {
       "ok": true,
-      "label": "textured view: pack loaded ({\"blockstates\":1106,\"models\":3402,\"textures\":3312}) in 258ms, meshed in 453ms"
+      "label": "textured view: pack loaded ({\"blockstates\":1106,\"models\":3402,\"textures\":3312}) in 271ms, meshed in 393ms"
     },
     {
       "ok": true,
@@ -457,12 +457,12 @@
     {
       "ok": true,
       "label": "5 placements of REGISTER001_8bit_register cost exactly 1 cell mesh build and 1 instanced group (one InstancedMesh, vertex-coloured, 5 rows)",
-      "detail": "{\"before\":{\"texture\":1,\"cells\":9,\"instancedGroups\":9,\"instanceAllocs\":0,\"matrixWrites\":84,\"buses\":71,\"loose\":1},\"after\":{\"texture\":1,\"cells\":10,\"instancedGroups\":10,\"instanceAllocs\":1,\"matrixWrites\":93,\"buses\":76,\"loose\":1}}"
+      "detail": "{\"before\":{\"texture\":1,\"cells\":9,\"instancedGroups\":9,\"instanceAllocs\":0,\"matrixWrites\":85,\"buses\":72,\"loose\":1},\"after\":{\"texture\":1,\"cells\":10,\"instancedGroups\":10,\"instanceAllocs\":1,\"matrixWrites\":94,\"buses\":77,\"loose\":1}}"
     },
     {
       "ok": true,
       "label": "...read out of wasm ONCE, from the cell itself — no per-instance region dumps (instDump 6 -> 6)",
-      "detail": "{\"before\":{\"flatten\":61,\"cellDump\":1,\"instDump\":6,\"busDump\":59,\"looseDump\":1},\"after\":{\"flatten\":66,\"cellDump\":2,\"instDump\":6,\"busDump\":64,\"looseDump\":1}}"
+      "detail": "{\"before\":{\"flatten\":62,\"cellDump\":1,\"instDump\":6,\"busDump\":60,\"looseDump\":1},\"after\":{\"flatten\":67,\"cellDump\":2,\"instDump\":6,\"busDump\":65,\"looseDump\":1}}"
     },
     {
       "ok": true,
@@ -472,16 +472,108 @@
     {
       "ok": true,
       "label": "10 placements over 3 distinct cells: 3 meshed cells, 3 instanced groups, **7 draw calls** for the whole scene (78752 triangles, 15 geometries)",
-      "detail": "{\"instances\":10,\"mesh\":{\"texture\":0,\"cells\":3,\"instancedGroups\":3,\"instanceAllocs\":0,\"matrixWrites\":10,\"buses\":0,\"loose\":0},\"prof\":{\"frames\":5,\"avgFrameMs\":0.759999942779541,\"avgGapMs\":89.15999999046326,\"fps\":11.21579183610321,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}}"
+      "detail": "{\"instances\":10,\"mesh\":{\"texture\":0,\"cells\":3,\"instancedGroups\":3,\"instanceAllocs\":0,\"matrixWrites\":10,\"buses\":0,\"loose\":0},\"prof\":{\"frames\":5,\"avgFrameMs\":0.8599999904632568,\"avgGapMs\":91.07999997138977,\"fps\":10.97935880889462,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}}"
     },
     {
       "ok": true,
       "label": "...and the draw calls track distinct CELLS (3), not the 10 placements: 7 calls, 0.7 per instance",
-      "detail": "{\"frames\":5,\"avgFrameMs\":0.759999942779541,\"avgGapMs\":89.15999999046326,\"fps\":11.21579183610321,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}"
+      "detail": "{\"frames\":5,\"avgFrameMs\":0.8599999904632568,\"avgGapMs\":91.07999997138977,\"fps\":10.97935880889462,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}"
     },
     {
       "ok": true,
       "label": "no console errors (0)"
+    },
+    {
+      "ok": true,
+      "label": "a port marker is pickable at EVERY zoom — 9/9@r40 11/11@r70 11/11@r130 11/11@r320 (15 px screen-space radius, not ray-vs-cone)",
+      "detail": "[{\"radius\":40,\"onScreen\":9,\"hit\":9,\"misses\":[]},{\"radius\":70,\"onScreen\":11,\"hit\":11,\"misses\":[]},{\"radius\":130,\"onScreen\":11,\"hit\":11,\"misses\":[]},{\"radius\":320,\"onScreen\":11,\"hit\":11,\"misses\":[]}]"
+    },
+    {
+      "ok": true,
+      "label": "...including at the 4 zoom level(s) where labels DECLUTTER (up to 8 labels hidden, every port still hit)",
+      "detail": "[{\"radius\":40,\"labels\":{\"total\":11,\"shown\":10,\"hiddenSmall\":0,\"hiddenOverlap\":1,\"hiddenBehind\":0,\"pxPerBlock\":22.857151650111586,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}},\"hit\":9,\"onScreen\":9},{\"radius\":70,\"labels\":{\"total\":11,\"shown\":10,\"hiddenSmall\":0,\"hiddenOverlap\":1,\"hiddenBehind\":0,\"pxPerBlock\":13.843069723186659,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}},\"hit\":11,\"onScreen\":11},{\"radius\":130,\"labels\":{\"total\":11,\"shown\":10,\"hiddenSmall\":0,\"hiddenOverlap\":1,\"hiddenBehind\":0,\"pxPerBlock\":7.570411678935004,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}},\"hit\":11,\"onScreen\":11},{\"radius\":320,\"labels\":{\"total\":11,\"shown\":3,\"hiddenSmall\":8,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":3.235640564746356,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}},\"hit\":11,\"onScreen\":11}]"
+    },
+    {
+      "ok": true,
+      "label": "6 of 11 ports sit behind or inside a component's pick box and STILL win the press — the priority rule, measured (ray order would have given those to the body)",
+      "detail": "{\"before\":{\"portPicks\":0,\"bodyPicks\":0,\"portOverBody\":23,\"dragsStarted\":0,\"clicksBelowThreshold\":0,\"bodiesSkippedInConnectMode\":0},\"after\":{\"portPicks\":0,\"bodyPicks\":0,\"portOverBody\":29,\"dragsStarted\":0,\"clicksBelowThreshold\":0,\"bodiesSkippedInConnectMode\":0}}"
+    },
+    {
+      "ok": true,
+      "label": "a routable driver port is reachable by the pointer (u0.sum)"
+    },
+    {
+      "ok": true,
+      "label": "a mousedown on u0.sum + 40 px of pointer movement starts a BUS (mode connecting from u0.sum)",
+      "detail": "{\"mode\":{\"kind\":\"connecting\",\"from\":\"u0.sum\"},\"hint\":\"bus from u0.sum (uint8)  →  click a blue ▼ input port to finish  ·  Esc cancel\"}"
+    },
+    {
+      "ok": true,
+      "label": "...and ZERO instance transform change: 2 placements identical, 0 drags started, no new undo entry — a port press never touches the drag state",
+      "detail": "{\"before\":[{\"name\":\"u0\",\"at\":[0,-1,4],\"rot\":0},{\"name\":\"u1\",\"at\":[0,-1,24],\"rot\":0}],\"after\":[{\"name\":\"u0\",\"at\":[0,-1,4],\"rot\":0},{\"name\":\"u1\",\"at\":[0,-1,24],\"rot\":0}],\"stats\":{\"portPicks\":1,\"bodyPicks\":0,\"portOverBody\":34,\"dragsStarted\":0,\"clicksBelowThreshold\":0,\"bodiesSkippedInConnectMode\":0}}"
+    },
+    {
+      "ok": true,
+      "label": "...and Esc cancels the bus the port press started (mode idle)",
+      "detail": "{\"kind\":\"idle\"}"
+    },
+    {
+      "ok": true,
+      "label": "a component body is pickable on the canvas ({\"x\":781.5,\"y\":350.7,\"id\":\"u0\"})"
+    },
+    {
+      "ok": true,
+      "label": "a 3 px press on u0 SELECTS it and moves it not one block ([0,-1,4] -> [0,-1,4], 0 drags started, no undo entry) — the 4 px threshold",
+      "detail": "{\"before\":{\"stats\":{\"portPicks\":1,\"bodyPicks\":0,\"portOverBody\":53,\"dragsStarted\":0,\"clicksBelowThreshold\":0,\"bodiesSkippedInConnectMode\":0},\"at\":{\"at\":[0,-1,4],\"rot\":0},\"history\":{\"canUndo\":false,\"canRedo\":false,\"undo\":null,\"redo\":null}},\"after\":{\"stats\":{\"portPicks\":1,\"bodyPicks\":1,\"portOverBody\":53,\"dragsStarted\":0,\"clicksBelowThreshold\":1,\"bodiesSkippedInConnectMode\":0},\"at\":{\"at\":[0,-1,4],\"rot\":0},\"history\":{\"canUndo\":false,\"canRedo\":false,\"undo\":null,\"redo\":null},\"selection\":{\"kind\":\"instance\",\"id\":\"u0\"},\"cursor\":\"move\"}}"
+    },
+    {
+      "ok": true,
+      "label": "past the threshold the same press DOES move u0 ([0,-1,4] -> [4,-1,-14], 1 drag started)",
+      "detail": "{\"before\":{\"at\":[0,-1,4],\"rot\":0},\"after\":{\"at\":[4,-1,-14],\"rot\":0},\"stats\":{\"portPicks\":1,\"bodyPicks\":2,\"portOverBody\":53,\"dragsStarted\":1,\"clicksBelowThreshold\":1,\"bodiesSkippedInConnectMode\":0}}"
+    },
+    {
+      "ok": true,
+      "label": "...as ONE undo step: a single undo puts it back at [0,-1,4]",
+      "detail": "{\"at\":{\"at\":[0,-1,4],\"rot\":0},\"history\":{\"canUndo\":false,\"canRedo\":true,\"undo\":null,\"redo\":\"move u0\"}}"
+    },
+    {
+      "ok": true,
+      "label": "...and 20 drag frames cost 0 cell re-meshes, 0 texture builds and leave the draw calls at 16 (20 matrix writes instead)",
+      "detail": "{\"before\":{\"texture\":0,\"cells\":1,\"instancedGroups\":1,\"instanceAllocs\":0,\"matrixWrites\":2,\"buses\":3,\"loose\":1},\"mid\":{\"texture\":0,\"cells\":1,\"instancedGroups\":1,\"instanceAllocs\":0,\"matrixWrites\":22,\"buses\":3,\"loose\":1},\"draws\":[16,16]}"
+    },
+    {
+      "ok": true,
+      "label": "the cursor says which gesture the press will be: CROSSHAIR over a port, MOVE over a body (crosshair / move)",
+      "detail": "{\"port\":\"crosshair\",\"body\":\"move\"}"
+    },
+    {
+      "ok": true,
+      "label": "hovering u0.sum brings back its label at orbit radius 320, where 8 labels are decluttered away, and emphasises the marker",
+      "detail": "{\"cursor\":\"crosshair\",\"hoverPort\":\"u0.sum\",\"hint\":\"click to start a bus from u0.sum (uint8[8])  ·  the component will NOT move  ·  Alt hold for connect mode\",\"labelShown\":true,\"labelHovered\":true,\"labels\":{\"total\":12,\"shown\":5,\"hiddenSmall\":7,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":3.178332136724188,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}}}"
+    },
+    {
+      "ok": true,
+      "label": "...and the hint bar says what the click DOES: \"click to start a bus from u0.sum (uint8[8]) · the component will NOT move · Alt hold for con…\"",
+      "detail": "click to start a bus from u0.sum (uint8[8])  ·  the component will NOT move  ·  Alt hold for connect mode"
+    },
+    {
+      "ok": true,
+      "label": "connect mode (C, or hold Alt): 1744 body pixels become 0 and all 11 ports stay pickable — in a dense scene no press can be a move",
+      "detail": "{\"off\":{\"bodies\":1744,\"ports\":11},\"on\":{\"bodies\":0,\"ports\":11,\"mode\":true,\"hint\":\"connect mode — components are not clickable, only ports  ·  C or release Alt to leave\"},\"placements\":[[0,-1,4],[0,-1,24]],\"back\":false}"
+    },
+    {
+      "ok": true,
+      "label": "...and the hint bar says so (\"connect mode — components are not clickable, only ports · C or release A…\")",
+      "detail": "connect mode — components are not clickable, only ports  ·  C or release Alt to leave"
+    },
+    {
+      "ok": true,
+      "label": "after the whole picking suite the render still matches the engine (4 layers)",
+      "detail": "[]"
+    },
+    {
+      "ok": true,
+      "label": "no console errors on the picking page (0)"
     }
   ]
 }

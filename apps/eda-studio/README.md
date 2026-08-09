@@ -64,8 +64,9 @@ full legend, in the app.
 
 | key | action |
 | --- | --- |
-| click | select an instance (raycast); click empty ground to deselect |
-| drag | move the selected instance; buses reroute live |
+| click a port | start (or finish) a bus — a port press **never** moves anything |
+| click a body | select an instance; click empty ground to deselect |
+| drag a body | move it once the pointer has travelled 4 px; buses reroute live |
 | `R` / `⇧R` | rotate 90° / −90° in place; buses reroute, the gizmo shows the new axes |
 | `G` | grab-move; click to drop, `Esc` puts it back |
 | `F` | frame the selection (or the whole design when nothing is selected) |
@@ -76,6 +77,7 @@ full legend, in the app.
 | `Esc` | cancel placing/connecting/grabbing, close an overlay, or deselect |
 | `⇧`+click | add/remove an instance from an area selection (the last click is primary) |
 | `⌘/Ctrl-C` `V` `X` `D` | copy / paste at the cursor / cut / duplicate with an offset |
+| `C` / hold `Alt` | connect mode — component bodies stop being pickable entirely |
 | right-click | context menu on whatever is under the cursor |
 
 Four kinds of thing are selectable, and each answers `Del` differently, because
@@ -83,6 +85,54 @@ they are different things: an **instance** (deleting it takes its buses, so it
 asks), a **bus** (deleting it drops the declaration; `Rip` keeps it), a **gate**
 (deleting it only lets the route straighten), and a **port** (not deletable at
 all — it belongs to a cell).
+
+### Picking: the port always wins, and a click is not a drag
+
+> *"it's awkward to select an IO and route it, I always accidentally move the
+> component"*
+
+Two separate bugs wearing one symptom, and both of them were in how a press was
+resolved.
+
+**1. Ports are picked in screen space, and they outrank everything.** A port
+marker sits one block *outside* its column, which puts it inside or behind the
+neighbouring instance's invisible pick box more often than not. Ray order then
+handed the press to the box — the port was drawn on top and was not what you
+hit. So ports are no longer ray-picked at all: every marker is projected to the
+screen and the nearest one within **15 CSS pixels** (or 2.5× the cone's own
+on-screen radius, whichever is larger) takes the press. Three consequences, all
+of them the point:
+
+* depth cannot steal a press — a port buried inside a cell mesh is still the
+  target, which is what `portOverBody` in `__eda.pickStats()` counts;
+* the target is a **constant size on screen**, so a port stays clickable at the
+  zoom where its label has already been decluttered away (the verify sweeps four
+  orbit radii and asserts every on-canvas port resolves to itself);
+* it costs nothing to draw: the port cones left the ray-pick list, so this adds
+  zero geometry and zero draw calls.
+
+Ties go to the port nearest the camera. Buses are still consulted last, for the
+original reason: a port cone sits *on* a bus's first cell.
+
+**2. A press on a body is a selection until it travels 4 pixels.** A press used
+to become a drag on the first `pointermove`, so a jittery click nudged the
+component and cost an undo — the "I always accidentally move it" half of the
+report. A press now parks in a `pending` slot: under 4 px it stays a selection
+and the instance does not move one block; past 4 px it promotes to a drag, which
+is still **one undo step**. A press on a *port* never parks there at all, so no
+amount of subsequent movement can turn it into a move.
+
+**Affordances**, so none of this has to be discovered by experiment: the cursor
+is a **crosshair** over a port and **move** over a body; a hovered port scales
+up and gets its label back even when labels are decluttered; and the hint bar
+says what the click will do — *"click to start a bus from u0.sum (uint8[8]) · the
+component will NOT move"*. See `docs/18-hover-port-affordance.png`.
+
+**Connect mode** (`C`, or hold `Alt`) is the escape hatch for a dense scene:
+bodies are not in the pick list at all, so a press can only ever be a port. The
+canvas says so with a badge, and the verify asserts that every body pixel on the
+canvas stops resolving to an instance while every port keeps resolving to itself
+(`docs/19-connect-mode-bodies-unpickable.png`).
 
 ### Copy / paste
 
@@ -522,8 +572,11 @@ npm run profile                 # -> docs/profile-current.json
 EDA_PROFILE_TAG=before npm run profile   # tag a baseline to diff against
 ```
 
-**101 checks**, all through the same code paths the mouse and keyboard drive
-(`window.__eda`), so green means the UI works and not just the engine: library
+**120 checks**, all through the same code paths the mouse and keyboard drive
+(`window.__eda`) — and the picking suite goes further and drives the **real
+pointer** (`page.mouse`), because the whole claim there is that the browser's own
+events resolve the way we say they do. Green means the UI works and not just the
+engine: library
 auto-load, instance ports (routable + refused-with-reason), selection and the
 hint bar, `R` rotate, `Del` delete ripping its bus, click-to-connect, a bus
 FAILED then healed, a typed poke through the routed chain (`u1.a=99 + u1.b=28
@@ -569,6 +622,22 @@ reverse), plus the **UX contract**:
 | removing it leaves the endpoints untouched and the route no longer | gate = route, endpoint = netlist, asserted rather than described |
 | add / drag / remove are each their own undo entry | each is a thing a user did |
 
+...the **picking model** (driven with real pointer input, on its own page):
+
+| assertion | why it is the right thing to assert |
+| --- | --- |
+| every on-canvas port resolves to itself at four orbit radii | a hit target that shrinks with zoom is the bug, so the zoom is swept, not assumed |
+| ...including at the radii where labels have decluttered away | that is exactly where the old ray-vs-cone pick had already stopped working |
+| N of the ports sit behind or inside a body's pick box and still win | ray order would have given those presses to the body — the priority rule, measured rather than described |
+| a real mousedown on a port + 40 px of movement starts a **bus**, with **0** instance transform change and no new undo entry | the reported bug, as a gesture: a port press never touches the drag state |
+| a real 3 px press on a body **selects** it and moves it not one block | the other half of the report: a click is not a drag |
+| a 140 px press does move it, in **one** undo step | the threshold must not cost the gesture it is protecting |
+| ...for 0 cell re-meshes, 0 texture builds and an unchanged draw-call count over 20 frames | the new pick path is screen-space arithmetic; it may not cost geometry |
+| the cursor is crosshair over a port and move over a body | the affordance, read off the DOM |
+| a hovered port's label comes back at a zoom where others are hidden | hovering is how you know *which* port you are about to route |
+| the hint bar says "click to start a bus from `<port>`" | the bar's whole job is the next click |
+| connect mode: every body pixel stops resolving to an instance, every port still resolves | the dense-scene escape hatch, as a measurement over the canvas |
+
 ...and the **performance contract**, re-run unchanged:
 
 | assertion | why it is the right thing to assert |
@@ -588,7 +657,11 @@ The counters behind these are `viewer.meshBuilds` (`cells`, `instancedGroups`,
 `__eda.labels()`, `__eda.history()`, `__eda.coach()`, `__eda.toasts()`,
 `__eda.pendingConfirm()`, `__eda.lastFailure()`, `__eda.focus()`,
 `__eda.consistency()`, `__eda.staleCommits()`, `__eda.clipboard()`,
-`__eda.gates()` and `__eda.contextMenu()`. All are on
+`__eda.gates()` and `__eda.contextMenu()`; the picking ones are
+`__eda.pickStats()` (`portPicks`, `bodyPicks`, `portOverBody`, `dragsStarted`,
+`clicksBelowThreshold`), `__eda.pickThresholds()`, `__eda.probeAt(x, y)`,
+`__eda.portScreen(name)`, `__eda.onCanvas(x, y, inset)`, `__eda.hoverPort()` and
+`__eda.connectMode()`. All are on
 `window.__eda`. Results land in `docs/verify-out.json`; screenshots in `docs/`.
 
 The textured check needs a resource pack at the repo root (`pack.zip`, **not**
@@ -617,9 +690,19 @@ Regenerated by `npm run verify` into `docs/`:
 | `15-textured-bus-solid.png` | the same scene with `solid` buses — the coloured slab hides the redstone it is made of |
 | `16-textured-bus-outline-shows-redstone.png` | ...and with `outline` buses: dust, repeaters and blocks visible, identity kept |
 | `17-instanced-10-placements.png` | 10 placements over 3 cells, 7 draw calls |
+| `18-hover-port-affordance.png` | hovering a port: crosshair cursor, the label back, and the hint bar saying *"click to start a bus from u0.sum · the component will NOT move"* |
+| `19-connect-mode-bodies-unpickable.png` | connect mode (`C` / hold `Alt`) — the badge, and bodies that no longer take a press |
 
 ## Known rough edges
 
+- **Three gate checks are RED against the current engine build, and it is not
+  this app.** `addGate` now yields a bus whose realized geometry is empty
+  (`0 cells with the checkpoint, 1440 without`), so "the route passes THROUGH the
+  gate cell", the gate-drag re-mesh count and the straightening assertion all
+  fail. Reproduced with this app's sources stashed, i.e. against the engine
+  alone. Needs a look in `crates/nucleation-routing` (gate/span realization);
+  the same build also routes a bus the router used to refuse, which is why the
+  FAILED-bus scenario is now *searched for* rather than hard-coded.
 - **`Check` is never clean with community cells placed.** An ADD007 alone,
   with zero buses, produces 253 DRC violations (`floating`,
   `unattached_wall_torch`, `repeater_cycle`) inside its own body. That is a
