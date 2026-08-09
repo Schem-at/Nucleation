@@ -172,6 +172,41 @@ public:
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> instance_ports_write(W& writeable_output) const;
 
   /**
+   * Switch a port between executor hardware and a routable dust input.
+   *
+   * `mode` is `"bus"` or `"executor"`. Community cells name LEVERS for
+   * their inputs and nothing in redstone drives a lever, so a port must
+   * be in `"bus"` mode before a bus can land on it. The switch is a
+   * reversible per-instance patch — `"executor"` restores the shipped
+   * blocks byte-exactly.
+   *
+   * Returns the report as JSON: `{port, mode, note, changed:[{at,from,
+   * to}], removed_buses, moves, patch}` — `note` is a ready-made toast
+   * and `changed` is in WORLD coordinates.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> set_port_mode(std::string_view instance, std::string_view port, std::string_view mode);
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> set_port_mode_write(std::string_view instance, std::string_view port, std::string_view mode, W& writeable_output);
+
+  /**
+   * Every port whose mode has been switched, as JSON:
+   * `[{"name":"u0.bin","mode":"bus","patch":{..}}]`. Ports absent from
+   * the array are in `"executor"` mode.
+   */
+  inline std::string port_modes() const;
+  template<typename W>
+  inline void port_modes_write(W& writeable_output) const;
+
+  /**
+   * Describe (without applying) what switching a port to `"bus"` mode
+   * would do: `{"wires","hardware","step","removed","added","pivoted",
+   * "note"}`. Errors when the port cannot be promoted, with the reason.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> plan_port_promotion(std::string_view instance, std::string_view port) const;
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> plan_port_promotion_write(std::string_view instance, std::string_view port, W& writeable_output) const;
+
+  /**
    * Resolve one routing endpoint name — a declared design port or an
    * instance port `{instance}.{port}` — to the geometry a bus would
    * use: `{"name","anchor","step","width","direction","connectable"}`.

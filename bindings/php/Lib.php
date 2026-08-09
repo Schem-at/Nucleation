@@ -512,6 +512,11 @@ typedef struct Design_flatten_composite_result { union { Schematic* ok; Nucleati
 Design_flatten_composite_result Design_flatten_composite(Design* self);
 typedef struct Design_instance_ports_result { union { NucleationError err; }; bool is_ok; } Design_instance_ports_result;
 Design_instance_ports_result Design_instance_ports(Design* self, DiplomatWrite* write);
+typedef struct Design_set_port_mode_result { union { NucleationError err; }; bool is_ok; } Design_set_port_mode_result;
+Design_set_port_mode_result Design_set_port_mode(Design* self, DiplomatStringView instance, DiplomatStringView port, DiplomatStringView mode, DiplomatWrite* write);
+void Design_port_modes(Design* self, DiplomatWrite* write);
+typedef struct Design_plan_port_promotion_result { union { NucleationError err; }; bool is_ok; } Design_plan_port_promotion_result;
+Design_plan_port_promotion_result Design_plan_port_promotion(Design* self, DiplomatStringView instance, DiplomatStringView port, DiplomatWrite* write);
 typedef struct Design_resolve_port_result { union { NucleationError err; }; bool is_ok; } Design_resolve_port_result;
 Design_resolve_port_result Design_resolve_port(Design* self, DiplomatStringView name, DiplomatWrite* write);
 typedef struct Design_add_gate_result { union { NucleationError err; }; bool is_ok; } Design_add_gate_result;

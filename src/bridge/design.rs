@@ -324,6 +324,69 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Switch a port between executor hardware and a routable dust input.
+        ///
+        /// `mode` is `"bus"` or `"executor"`. Community cells name LEVERS for
+        /// their inputs and nothing in redstone drives a lever, so a port must
+        /// be in `"bus"` mode before a bus can land on it. The switch is a
+        /// reversible per-instance patch — `"executor"` restores the shipped
+        /// blocks byte-exactly.
+        ///
+        /// Returns the report as JSON: `{port, mode, note, changed:[{at,from,
+        /// to}], removed_buses, moves, patch}` — `note` is a ready-made toast
+        /// and `changed` is in WORLD coordinates.
+        pub fn set_port_mode(
+            &mut self,
+            instance: &DiplomatStr,
+            port: &DiplomatStr,
+            mode: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let m = crate::design::PortMode::parse(utf8(mode)?).ok_or_else(|| {
+                crate::bridge::set_last_error_detail(format!(
+                    "port mode must be \"executor\" or \"bus\", got {:?}",
+                    utf8(mode).unwrap_or("")
+                ));
+                NucleationError::InvalidArgument
+            })?;
+            let rep = self
+                .0
+                .set_port_mode(utf8(instance)?, utf8(port)?, m)
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::InvalidArgument
+                })?;
+            let _ = write!(out, "{}", rep.to_json());
+            Ok(())
+        }
+
+        /// Every port whose mode has been switched, as JSON:
+        /// `[{"name":"u0.bin","mode":"bus","patch":{..}}]`. Ports absent from
+        /// the array are in `"executor"` mode.
+        pub fn port_modes(&self, out: &mut DiplomatWrite) {
+            let _ = write!(out, "{}", self.0.port_modes_json());
+        }
+
+        /// Describe (without applying) what switching a port to `"bus"` mode
+        /// would do: `{"wires","hardware","step","removed","added","pivoted",
+        /// "note"}`. Errors when the port cannot be promoted, with the reason.
+        pub fn plan_port_promotion(
+            &self,
+            instance: &DiplomatStr,
+            port: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let patch = self
+                .0
+                .plan_port_patch(utf8(instance)?, utf8(port)?)
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::InvalidArgument
+                })?;
+            let _ = write!(out, "{}", patch.to_json());
+            Ok(())
+        }
+
         /// Resolve one routing endpoint name — a declared design port or an
         /// instance port `{instance}.{port}` — to the geometry a bus would
         /// use: `{"name","anchor","step","width","direction","connectable"}`.

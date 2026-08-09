@@ -68,6 +68,14 @@ namespace capi {
     typedef struct Design_instance_ports_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_instance_ports_result;
     Design_instance_ports_result Design_instance_ports(const diplomat::capi::Design* self, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Design_set_port_mode_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_set_port_mode_result;
+    Design_set_port_mode_result Design_set_port_mode(diplomat::capi::Design* self, diplomat::capi::DiplomatStringView instance, diplomat::capi::DiplomatStringView port, diplomat::capi::DiplomatStringView mode, diplomat::capi::DiplomatWrite* write);
+
+    void Design_port_modes(const diplomat::capi::Design* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_plan_port_promotion_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_plan_port_promotion_result;
+    Design_plan_port_promotion_result Design_plan_port_promotion(const diplomat::capi::Design* self, diplomat::capi::DiplomatStringView instance, diplomat::capi::DiplomatStringView port, diplomat::capi::DiplomatWrite* write);
+
     typedef struct Design_resolve_port_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_resolve_port_result;
     Design_resolve_port_result Design_resolve_port(const diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name, diplomat::capi::DiplomatWrite* write);
 
@@ -352,6 +360,60 @@ template<typename W>
 inline diplomat::result<std::monostate, NucleationError> Design::instance_ports_write(W& writeable) const {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     auto result = diplomat::capi::Design_instance_ports(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Design::set_port_mode(std::string_view instance, std::string_view port, std::string_view mode) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_set_port_mode(this->AsFFI(),
+        {instance.data(), instance.size()},
+        {port.data(), port.size()},
+        {mode.data(), mode.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::set_port_mode_write(std::string_view instance, std::string_view port, std::string_view mode, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_set_port_mode(this->AsFFI(),
+        {instance.data(), instance.size()},
+        {port.data(), port.size()},
+        {mode.data(), mode.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline std::string Design::port_modes() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::Design_port_modes(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void Design::port_modes_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::Design_port_modes(this->AsFFI(),
+        &write);
+}
+
+inline diplomat::result<std::string, NucleationError> Design::plan_port_promotion(std::string_view instance, std::string_view port) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_plan_port_promotion(this->AsFFI(),
+        {instance.data(), instance.size()},
+        {port.data(), port.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::plan_port_promotion_write(std::string_view instance, std::string_view port, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_plan_port_promotion(this->AsFFI(),
+        {instance.data(), instance.size()},
+        {port.data(), port.size()},
         &write);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }

@@ -23,6 +23,9 @@ internal interface DesignLib: Library {
     fun Design_to_schem_b64(handle: Pointer, write: Pointer): ResultUnitInt
     fun Design_flatten_composite(handle: Pointer): ResultPointerInt
     fun Design_instance_ports(handle: Pointer, write: Pointer): ResultUnitInt
+    fun Design_set_port_mode(handle: Pointer, instance: Slice, port: Slice, mode: Slice, write: Pointer): ResultUnitInt
+    fun Design_port_modes(handle: Pointer, write: Pointer): Unit
+    fun Design_plan_port_promotion(handle: Pointer, instance: Slice, port: Slice, write: Pointer): ResultUnitInt
     fun Design_resolve_port(handle: Pointer, name: Slice, write: Pointer): ResultUnitInt
     fun Design_add_gate(handle: Pointer, bus: Slice, gate: Slice, x: Int, y: Int, z: Int, sx: Int, sy: Int, sz: Int, write: Pointer): ResultUnitInt
     fun Design_move_gate(handle: Pointer, bus: Slice, gate: Slice, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
@@ -526,6 +529,76 @@ class Design internal constructor (
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Switch a port between executor hardware and a routable dust input.
+    *
+    *`mode` is `"bus"` or `"executor"`. Community cells name LEVERS for
+    *their inputs and nothing in redstone drives a lever, so a port must
+    *be in `"bus"` mode before a bus can land on it. The switch is a
+    *reversible per-instance patch — `"executor"` restores the shipped
+    *blocks byte-exactly.
+    *
+    *Returns the report as JSON: `{port, mode, note, changed:[{at,from,
+    *to}], removed_buses, moves, patch}` — `note` is a ready-made toast
+    *and `changed` is in WORLD coordinates.
+    */
+    fun setPortMode(instance: String, port: String, mode: String): Result<String> {
+        val instanceSliceMemory = PrimitiveArrayTools.borrowUtf8(instance)
+        val portSliceMemory = PrimitiveArrayTools.borrowUtf8(port)
+        val modeSliceMemory = PrimitiveArrayTools.borrowUtf8(mode)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_set_port_mode(handle, instanceSliceMemory.slice, portSliceMemory.slice, modeSliceMemory.slice, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            instanceSliceMemory.close()
+            portSliceMemory.close()
+            modeSliceMemory.close()
+        }
+    }
+
+    /** Every port whose mode has been switched, as JSON:
+    *`[{"name":"u0.bin","mode":"bus","patch":{..}}]`. Ports absent from
+    *the array are in `"executor"` mode.
+    */
+    fun portModes(): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_port_modes(handle, write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
+    }
+
+    /** Describe (without applying) what switching a port to `"bus"` mode
+    *would do: `{"wires","hardware","step","removed","added","pivoted",
+    *"note"}`. Errors when the port cannot be promoted, with the reason.
+    */
+    fun planPortPromotion(instance: String, port: String): Result<String> {
+        val instanceSliceMemory = PrimitiveArrayTools.borrowUtf8(instance)
+        val portSliceMemory = PrimitiveArrayTools.borrowUtf8(port)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_plan_port_promotion(handle, instanceSliceMemory.slice, portSliceMemory.slice, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            instanceSliceMemory.close()
+            portSliceMemory.close()
         }
     }
 

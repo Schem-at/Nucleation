@@ -34,6 +34,8 @@ void add_Design_binding(nb::module_ mod) {
         .def("move_gate", &nucleation::Design::move_gate, "bus"_a, "gate"_a, "x"_a, "y"_a, "z"_a)
         .def("move_instance", &nucleation::Design::move_instance, "name"_a, "x"_a, "y"_a, "z"_a, "rot_y"_a)
         .def("place", &nucleation::Design::place, "name"_a, "cell"_a, "x"_a, "y"_a, "z"_a, "rot_y"_a)
+        .def("plan_port_promotion", &nucleation::Design::plan_port_promotion, "instance"_a, "port"_a)
+        .def("port_modes", &nucleation::Design::port_modes)
         .def("remove_bus", &nucleation::Design::remove_bus, "name"_a)
         .def("remove_instance", &nucleation::Design::remove_instance, "name"_a)
         .def("reroute", &nucleation::Design::reroute, "name"_a)
@@ -44,6 +46,7 @@ void add_Design_binding(nb::module_ mod) {
         .def("save_nucm", &nucleation::Design::save_nucm, "path"_a)
         .def("set_block", &nucleation::Design::set_block, "x"_a, "y"_a, "z"_a, "block"_a)
         .def("set_bus_rule", &nucleation::Design::set_bus_rule, "bus"_a, "rule_json"_a)
+        .def("set_port_mode", &nucleation::Design::set_port_mode, "instance"_a, "port"_a, "mode"_a)
         .def("to_litematic_b64", &nucleation::Design::to_litematic_b64)
         .def("to_nucm_b64", &nucleation::Design::to_nucm_b64)
         .def("to_schem_b64", &nucleation::Design::to_schem_b64);

@@ -546,6 +546,103 @@ export class Design {
     }
 
     /**
+     * Switch a port between executor hardware and a routable dust input.
+     *
+     * `mode` is `"bus"` or `"executor"`. Community cells name LEVERS for
+     * their inputs and nothing in redstone drives a lever, so a port must
+     * be in `"bus"` mode before a bus can land on it. The switch is a
+     * reversible per-instance patch — `"executor"` restores the shipped
+     * blocks byte-exactly.
+     *
+     * Returns the report as JSON: `{port, mode, note, changed:[{at,from,
+     * to}], removed_buses, moves, patch}` — `note` is a ready-made toast
+     * and `changed` is in WORLD coordinates.
+     */
+    setPortMode(instance, port, mode) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const instanceSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, instance)));
+        const portSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, port)));
+        const modeSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, mode)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Design_set_port_mode(diplomatReceive.buffer, this.ffiValue, instanceSlice.ptr, portSlice.ptr, modeSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Every port whose mode has been switched, as JSON:
+     * `[{"name":"u0.bin","mode":"bus","patch":{..}}]`. Ports absent from
+     * the array are in `"executor"` mode.
+     */
+    portModes() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Design_port_modes(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * Describe (without applying) what switching a port to `"bus"` mode
+     * would do: `{"wires","hardware","step","removed","added","pivoted",
+     * "note"}`. Errors when the port cannot be promoted, with the reason.
+     */
+    planPortPromotion(instance, port) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const instanceSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, instance)));
+        const portSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, port)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Design_plan_port_promotion(diplomatReceive.buffer, this.ffiValue, instanceSlice.ptr, portSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
      * Resolve one routing endpoint name — a declared design port or an
      * instance port `{instance}.{port}` — to the geometry a bus would
      * use: `{"name","anchor","step","width","direction","connectable"}`.

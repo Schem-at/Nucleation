@@ -385,6 +385,80 @@ final class Design {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function setPortMode(string $instance, string $port, string $mode) {
+        $__n0 = strlen($instance);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $instance, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $__n1 = strlen($port);
+        $__view1 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n1 > 0) {
+            $__buf1 = Lib::ffi()->new("uint8_t[" . $__n1 . "]", false);
+            \FFI::memcpy($__buf1, $port, $__n1);
+            $__view1->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf1[0]));
+        } else {
+            $__view1->data = null;
+        }
+        $__view1->len = $__n1;
+        $__n2 = strlen($mode);
+        $__view2 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n2 > 0) {
+            $__buf2 = Lib::ffi()->new("uint8_t[" . $__n2 . "]", false);
+            \FFI::memcpy($__buf2, $mode, $__n2);
+            $__view2->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf2[0]));
+        } else {
+            $__view2->data = null;
+        }
+        $__view2->len = $__n2;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Design_set_port_mode($this->ptr, $__view0, $__view1, $__view2, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function portModes() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->Design_port_modes($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function planPortPromotion(string $instance, string $port) {
+        $__n0 = strlen($instance);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $instance, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $__n1 = strlen($port);
+        $__view1 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n1 > 0) {
+            $__buf1 = Lib::ffi()->new("uint8_t[" . $__n1 . "]", false);
+            \FFI::memcpy($__buf1, $port, $__n1);
+            $__view1->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf1[0]));
+        } else {
+            $__view1->data = null;
+        }
+        $__view1->len = $__n1;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Design_plan_port_promotion($this->ptr, $__view0, $__view1, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function resolvePort(string $name) {
         $__n0 = strlen($name);
         $__view0 = Lib::ffi()->new('DiplomatStringView');
