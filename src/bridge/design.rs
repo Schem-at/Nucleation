@@ -521,6 +521,39 @@ pub mod ffi {
             Ok(())
         }
 
+        /// ONE bus layer's cells as `[[x,y,z,"block"],..]`.
+        ///
+        /// The live-re-route fast path: `flatten()` rebuilds every layer in the
+        /// document to answer "what changed about this one bus". An unrouted bus
+        /// yields `[]`.
+        pub fn bus_blocks_json(
+            &self,
+            name: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let json = self.0.bus_blocks_json(utf8(name)?).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::NotFound
+            })?;
+            let _ = write!(out, "{json}");
+            Ok(())
+        }
+
+        /// ONE instance's placed cells as `[[x,y,z,"block"],..]`, transform
+        /// applied. Same fast path as `bus_blocks_json`.
+        pub fn instance_blocks_json(
+            &self,
+            name: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let json = self.0.instance_blocks_json(utf8(name)?).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::NotFound
+            })?;
+            let _ = write!(out, "{json}");
+            Ok(())
+        }
+
         /// Rip a bus: clear its fragment, back to `intended`.
         pub fn rip(&mut self, name: &DiplomatStr) -> Result<(), NucleationError> {
             self.0.rip(utf8(name)?).map_err(|e| {
