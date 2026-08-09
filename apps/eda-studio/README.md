@@ -5,10 +5,22 @@ Photoshop-style layer stack of **cell instances**, **loose hardware** and
 **routed buses**, edited on a 3-D canvas, checked (DRC/LVS/STA), baked, poked
 through its typed contract, and exported.
 
-Everything runs in the browser: the engine is the nucleation wasm build
-(`bridge,simulation,mc-tick,routing,hdl,meshing`) plus the hand-written
-`Design` veneer; Verilog synthesis is YoWASP yosys; textured rendering is
-nucleation's own meshing pipeline.
+Everything runs in the browser. The engine is the nucleation wasm build plus
+the hand-written `Design` veneer; Verilog synthesis is YoWASP yosys; textured
+rendering is nucleation's own meshing pipeline.
+
+**Feature set** — `bridge,simulation,mc-tick,routing,hdl,meshing`:
+
+| feature | what the app needs it for |
+| --- | --- |
+| `bridge` | the generated `src/bridge/` → `bindings/` surface (everything) |
+| `routing` | `Design`, `route_bus`, the corridor router and its diagnostics |
+| `simulation` + `mc-tick` | `bake()` → the typed executor behind the poke panel |
+| `hdl` | `Hdl.compileBlif` for the Verilog → cell path |
+| `meshing` | the textured view's GLB, against a resource-pack ZIP |
+
+`rendering` (wgpu) stays **out**: `meshing` is enough, and it is the package
+default.
 
 ## Run
 
@@ -22,12 +34,33 @@ npm install
 npm run dev          # syncs public/engine + public/cells, serves :8455
 ```
 
-Open <http://localhost:8455/> and press **Load demo** (or `/?demo=1`).
+Open <http://localhost:8455/>.
+
+### What you land on
+
+The default page is **not an empty grid**: it loads the chain
+`tests/design_promotion.rs` verifies end to end — **ADD007 → BINTOBCD001 →
+NUMDISPLAY001**, both buses routed — frames it, and runs a dismissible 4-step
+coach over it (*this is a routed design* → *click a port to start a bus* →
+*R rotates, Del deletes* → *Exec/Bus, then Bake and Export*). Dismissal is
+remembered in `localStorage`. With no design at all, the canvas prints the four
+things to do first, in order.
+
+| URL | state |
+| --- | --- |
+| `/` | the verified chain, framed, coach on first visit |
+| `/?chain=1` | the same, explicitly |
+| `/?demo=1` | two ADD007 adders + an 8-bit lamp readout |
+| `/?crossing=1` | the DESIGN_SPEC sketch: two crossing 8-bit buses |
+| `/?empty=1` | nothing placed — the empty state, and what the benchmarks use |
+| `/?coach=1` | force the coach open again |
 
 ## The interaction model
 
 One selection, one mode, and a hint bar that always says what the next click
-does. `Esc` always cancels back to idle.
+does. `Esc` always cancels back to idle — unwinding one layer at a time (modal
+→ overlay → gesture → selection), never a dead key. Press <kbd>?</kbd> for the
+full legend, in the app.
 
 | key | action |
 | --- | --- |
@@ -35,13 +68,123 @@ does. `Esc` always cancels back to idle.
 | drag | move the selected instance; buses reroute live |
 | `R` / `⇧R` | rotate 90° / −90° in place; buses reroute, the gizmo shows the new axes |
 | `G` | grab-move; click to drop, `Esc` puts it back |
-| `Del` / `⌫` | delete the instance — buses that terminated on it are ripped and named |
-| `Esc` | cancel placing/connecting/grabbing, or deselect |
+| `F` | frame the selection (or the whole design when nothing is selected) |
+| `A` | frame the whole design |
+| `Del` / `⌫` | delete the instance — **confirms first** if buses die with it, with the count |
+| `⌘/Ctrl-Z` / `⇧⌘/Ctrl-Z` | undo / redo |
+| `?` | keyboard + colour legend |
+| `Esc` | cancel placing/connecting/grabbing, close an overlay, or deselect |
 
-The selected instance gets a highlighted bounding box, a translucent shell and
-an **axis indicator** (red = local +X, blue = local +Z after `rot`).
+### Undo/redo
+
+The design layer offers `rip` / `reroute` / `remove_*` / `set_port_mode` but no
+document history, so the studio keeps an **operation journal**: every mutator
+records its inverse. Place, move, rotate, delete, route, rip, delete-bus and
+port-mode toggles are all reversible, and a **drag is one undo step** — the
+sixty committed live-reroute frames coalesce into "where the gesture started"
+→ "where it ended". Undoing the delete of a bus-carrying instance re-places
+the body, re-applies its promotions and **re-routes its buses**; the verify
+script asserts exactly that. `declarePort` and `addGate` have no engine inverse
+and are deliberately *not* journalled rather than faked. Loading a demo clears
+the history — a starting point is not an edit.
+
+### Colour semantics, documented in the UI
+
+One colour, one meaning, defined once as CSS variables and printed as a
+swatch legend in the left panel *and* in the `?` overlay, so the canvas and the
+panels cannot drift apart:
+
+| colour | meaning |
+| --- | --- |
+| green ▲ | drives a bus — start one here |
+| blue ▼ | receives a bus — finish one here |
+| grey ✗ | executor-only — promotes itself when you click it as a target |
+| yellow | selected (shell + axis arrows + outline) |
+| white | hovered |
+| red | a FAILED bus, and the reason next to it |
+| orange ◆ | a gate — drag it to re-route two legs |
+
+Bus layers carry a dim **emissive** term that cell bodies do not: half the
+palette (the teal, the mid-green) otherwise sat right on the stone/quartz greys
+it threads through, and brightness separates *wiring* from *structure* in the
+abstract view and over a resource-pack mesh alike. Selection gizmos draw
+depth-test-free with a dark backing outline for the same reason — a gizmo that
+vanishes inside a bright block is not a gizmo.
+
+### Labels declutter themselves
+
+A 12-instance design carries ~50 port labels; zoomed out they are a grey mat
+over the geometry they name. Three rules, all keyed off one measurement — how
+many screen pixels a block spans **at that label's own depth**:
+
+- below **3.2 px per block** the label is dropped and its 3-D cone marker stays:
+  you lose the name, never the affordance;
+- between there and 9 px it fades, so distance reads as distance;
+- labels landing in the same 86×15 px screen cell collide, and the one nearest
+  the camera wins.
+
+Whatever is **selected or hovered** is exempt and never dropped. The counts
+(`shown`, `hiddenSmall`, `hiddenOverlap`, `hiddenBehind`) are on
+`window.__eda.labels()` and asserted by `npm run verify`.
+
+### Errors you can act on
+
+`design_corridor::diagnose` already produces excellent diagnostics — the
+blocking layer, the coordinate, the bounded search, a cross-level probe — but
+one of them is 300–500 characters of prose, and a panel that prints it verbatim
+reads as noise. `src/reasons.ts` splits each into **headline** (what failed,
+where), **fix** (what to move) and **at** (where to look), keeping the engine's
+own words behind a disclosure triangle. Nothing is invented: every clause is
+lifted from the string.
+
+```
+engine   segment (15, 6, 25) -> (40, 2, 4): this bus form is a SINGLE-LEVEL 2y-pitch
+         stack, but the two anchors' bit-0 dust sits at y=6 and y=2 (a 4-block level
+         change). Move one endpoint's instance by -4 in y so both ports share a level,
+         or split the run with a gate placed at the target level — vertical level
+         adapters are not implemented yet
+studio   Bus bus1 failed: the two ends are on different levels — driver bit 0 at y=6,
+         sink bit 0 at y=2 between (15, 6, 25) and (40, 2, 4)
+         ↳ move one endpoint's instance by -4 in y so both ports share a level, or
+           split the run with a gate at the target level          [→ (15, 6, 25)]
+```
+
+Recognised shapes: level mismatch, a walled-in endpoint, no corridor (including
+"a clear corridor DOES exist at y=…", which is a completely different fix),
+executor-only ports, width mismatches, and `driver port \`x\`: …` /
+`sink port \`x\`: …` wrappers, which recurse. Anything unrecognised degrades to
+its own first sentence — never to "failed".
+
+Toasts **stack** (four at a time, newest last), each has an ×, an optional
+second line naming the fix, and an optional `→ (x,y,z)` button that flies the
+camera there. The column is anchored top-centre so it can never cover the hint
+bar. A **FAILED bus row in the outliner is click-to-focus**: it flies to the
+coordinate the router named.
+
+### The outliner
+
+Instances are **grouped by cell type with counts** — the same model the
+renderer uses (one mesh per cell, N placements), so the panel and the machine
+agree. Section headers carry counts (`3 in 3 type(s)`, `2 · 2 routed`,
+`1 · 0 routed · 1 failed`). Port chips read `▲ sum : uint8` with the
+reversible **Exec/Bus** badge attached. Bus rows show driver → sinks, width,
+gates, state, and **latency + skew** from the engine's STA machinery
+(`bus_skew_json`, e.g. `7t · skew 0t`). Click a bus row (or its **Focus**
+button) to fly there; double-click an instance card, or press its **Frame**
+button, to frame it — a single click selects and deliberately does *not* move
+the camera.
+
+Destructive actions confirm **in-app** (not `window.confirm`, which blocks the
+engine, cannot carry a count and is auto-dismissed by every headless driver)
+with the count in the prompt: *"Delete u1 and rip 2 buses?"*, listing them, and
+saying that undo puts everything back.
 
 ### IO and wiring
+
+The selected instance gets a highlighted bounding box (over a dark backing
+outline, drawn depth-test-free), a translucent shell and an **axis indicator**
+(red = local +X, blue = local +Z after `rot`).
+
 
 Ports render as cones at their bit column, coloured by what they do:
 
@@ -252,13 +395,33 @@ npm run profile                 # -> docs/profile-current.json
 EDA_PROFILE_TAG=before npm run profile   # tag a baseline to diff against
 ```
 
-`npm run verify` exercises the same code paths the mouse and keyboard drive
-(`window.__eda`), so green means the UI works, not just the engine: library
+**71 checks**, all through the same code paths the mouse and keyboard drive
+(`window.__eda`), so green means the UI works and not just the engine: library
 auto-load, instance ports (routable + refused-with-reason), selection and the
 hint bar, `R` rotate, `Del` delete ripping its bus, click-to-connect, a bus
 FAILED then healed, a typed poke through the routed chain (`u1.a=99 + u1.b=28
 → sum_out=127`), all three export tiers, **auto-promotion** on connect (and the
-reverse), and the **performance contract**:
+reverse), plus the **UX contract**:
+
+| assertion | why it is the right thing to assert |
+| --- | --- |
+| the default page lands on the chain, buses already routed | onboarding is a property of the *default*, not of a button someone has to find |
+| a 4-step coach opens on first visit, walks, and stays dismissed on reload | teaching once is the feature; nagging is the bug |
+| `?` opens the legend (18 rows) and `Esc` closes it | discoverability, asserted rather than hoped for |
+| with no design, the canvas prints the first four steps in order | the empty state is a screen users *will* see |
+| labels: 16/17 shown framed, **0** past the 3.2 px-per-block threshold, markers stay | declutter is a measured rule, not a taste |
+| ...and the selected label is exempt at any zoom | the exemption is the part that would silently rot |
+| undo/redo a placement; a 20-frame drag is **one** undo step | the journal's coalescing is the only reason undo is usable during a drag |
+| undoing a bus-carrying delete restores the instance **and** re-routes its bus | the one undo that rebuilds more than a transform |
+| `Del` on a bus-carrying instance confirms first, with the count, and Cancel keeps it | destructive-by-accident is the failure mode |
+| a 335-char engine reason becomes headline + fix + coordinate | the whole point of `reasons.ts`, checked against a real router string |
+| ...the panel shows both and keeps the raw text behind a disclosure | the summary must never be the *only* copy |
+| the FAILED row is click-to-focus: the camera flies to the named coordinate | "somewhere at (15,6,25)" is only useful if you can get there |
+| toasts stack, each × dismisses one, the column never overlaps the hint bar | the old single toast erased its own story |
+| `Esc` cancels placing **and** grabbing (put back where it started), camera freed | one key, no dead ends |
+| clicking empty ground deselects | the escape hatch people try before they find `Esc` |
+
+...and the **performance contract**, re-run unchanged:
 
 | assertion | why it is the right thing to assert |
 | --- | --- |
@@ -273,7 +436,9 @@ reverse), and the **performance contract**:
 
 The counters behind these are `viewer.meshBuilds` (`cells`, `instancedGroups`,
 `matrixWrites`, `buses`, `loose`, `texture`) and `studio.sceneReads`
-(`flatten`, `cellDump`, `instDump`, `busDump`, `looseDump`), both exposed on
+(`flatten`, `cellDump`, `instDump`, `busDump`, `looseDump`); the UX ones are
+`__eda.labels()`, `__eda.history()`, `__eda.coach()`, `__eda.toasts()`,
+`__eda.pendingConfirm()`, `__eda.lastFailure()` and `__eda.focus()`. All are on
 `window.__eda`. Results land in `docs/verify-out.json`; screenshots in `docs/`.
 
 The textured check needs a resource pack at the repo root (`pack.zip`, **not**
@@ -281,8 +446,22 @@ committed); it is skipped, not failed, when absent.
 
 ## Screenshots
 
-`docs/01-demo-adder-instance-ports.png` … `09-instanced-10-placements.png`,
-regenerated by `npm run verify`.
+Regenerated by `npm run verify` into `docs/`:
+
+| file | what it shows |
+| --- | --- |
+| `01-onboarding-coach.png` | the default landing state: the chain framed, coach step 1/4 |
+| `02-chain-routed.png` | the same design after the coach is dismissed — two routed buses, timing in the panel |
+| `03-outliner-grouped.png` | instances grouped by type with counts, port chips + Exec/Bus badges, a selection |
+| `04-demo-adder-instance-ports.png` | the two-adder demo and its instance ports |
+| `05-selection-gizmo-io-labels.png` | selection shell, axis arrows, IO labels |
+| `06-rotated-90.png` | `R` — the gizmo's axes follow the rotation |
+| `07-connected-instance-port-to-readout.png` | a bus routed by clicking two ports |
+| `08-bus-failed-reason.png` | a FAILED bus as a **sentence** — headline, fix, `→ (15, 6, 25)`, engine words behind a disclosure |
+| `09-baked-typed-poke.png` | the poke panel after `Bake` |
+| `10-auto-promoted-cell-to-cell.png` | auto-promotion on connect, cell to cell |
+| `11-textured-resource-pack.png` | the textured view (needs `pack.zip`) |
+| `12-instanced-10-placements.png` | 10 placements over 3 cells, 7 draw calls |
 
 ## Known rough edges
 
