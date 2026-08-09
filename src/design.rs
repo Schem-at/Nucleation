@@ -2376,8 +2376,123 @@ impl Design {
         }
         let state = layer.state.clone();
         self.touch_bus(&name);
-        self.buses.insert(name, layer);
+        self.buses.insert(name.clone(), layer);
+        // FIRST-COME-FIRST-SERVED IS THE BUG. A bus declared later competes for
+        // space that earlier buses already took, and the loser is whoever asked
+        // last — not whoever had the worse alternative. Before accepting the
+        // failure, rip the buses that are in the way and let this one go first.
+        let state = if matches!(state, BusState::Failed(_)) {
+            self.rip_up_and_retry(&name)
+        } else {
+            state
+        };
         Ok(state)
+    }
+
+    /// Buses currently Routed whose geometry sits in the workspace `name` needs.
+    ///
+    /// The region is the bounding box of `name`'s own endpoints and gates, grown
+    /// by the corridor search's first-rung margin — the area a detour for this
+    /// bus could plausibly want. Deliberately geometric rather than parsed out
+    /// of the failure reason: the reason is a user-facing sentence and must stay
+    /// free to change wording.
+    fn contesting_buses(&self, name: &str) -> BTreeSet<String> {
+        let Some(layer) = self.buses.get(name) else {
+            return BTreeSet::new();
+        };
+        let mut pts: Vec<P3> = Vec::new();
+        for ep in layer.driver_names().iter().chain(layer.sinks.iter()) {
+            if let Ok(p) = self.resolve_port(ep) {
+                // Both ends of the stack: an 8-bit port spans 16 levels, and a
+                // box around bit 0 alone would miss what blocks bit 7.
+                pts.push(p.anchor);
+                pts.push(p.wire(p.width.saturating_sub(1)));
+            }
+        }
+        for g in &layer.gates {
+            pts.push(g.anchor);
+        }
+        if pts.is_empty() {
+            return BTreeSet::new();
+        }
+        let m = crate::design_corridor::LADDER[0].margin;
+        let lo = (
+            pts.iter().map(|p| p.0).min().unwrap() - m,
+            pts.iter().map(|p| p.1).min().unwrap() - m,
+            pts.iter().map(|p| p.2).min().unwrap() - m,
+        );
+        let hi = (
+            pts.iter().map(|p| p.0).max().unwrap() + m,
+            pts.iter().map(|p| p.1).max().unwrap() + m,
+            pts.iter().map(|p| p.2).max().unwrap() + m,
+        );
+        let inside = |p: &P3| {
+            (lo.0..=hi.0).contains(&p.0) && (lo.1..=hi.1).contains(&p.1) && (lo.2..=hi.2).contains(&p.2)
+        };
+        self.buses
+            .values()
+            .filter(|b| b.name != name && matches!(b.state, BusState::Routed))
+            .filter(|b| b.fragment.keys().any(inside))
+            .map(|b| b.name.clone())
+            .collect()
+    }
+
+    /// How many buses are Routed right now — the quantity rip-up-and-retry is
+    /// allowed to improve and forbidden to trade away.
+    fn routed_count(&self) -> usize {
+        self.buses
+            .values()
+            .filter(|b| matches!(b.state, BusState::Routed))
+            .count()
+    }
+
+    /// RIP-UP-AND-RETRY for a bus that could not be routed: rip the buses in its
+    /// way, route IT first, then put them back.
+    ///
+    /// Measured on `tests/design_routability.rs`: the residual failures are not
+    /// occupancy and not search budget (a 1.5M-node rung recovered zero of
+    /// them). They are ORDERING — `skip4` fails because `skip0`, routed four
+    /// declarations earlier, took the one lane crossing the span `skip4` needs.
+    /// Nothing a single-net search can see will fix that; only reconsidering the
+    /// earlier bus will.
+    ///
+    /// STRICTLY IMPROVING, and that is the whole safety argument. The retry is
+    /// attempted on a snapshot and kept only if it raises the routed count. A
+    /// swap that routes this bus by failing another is a lateral move that
+    /// churns geometry for nothing, so it is discarded and the original failure
+    /// stands. Nothing that routed before can end up unrouted.
+    ///
+    /// DETERMINISTIC: the rip set is a `BTreeSet`, so the retry order is name
+    /// order; [`Design::co_reroute`] then runs its own bounded rounds in the
+    /// same order. No randomness, seeded or otherwise, anywhere in the loop.
+    ///
+    /// Cost: one `Design` clone on the failure path only. A bus that routes
+    /// never pays it.
+    fn rip_up_and_retry(&mut self, name: &str) -> BusState {
+        let failed_state = self
+            .bus_state(name)
+            .cloned()
+            .unwrap_or(BusState::Intended);
+        let contesting = self.contesting_buses(name);
+        if contesting.is_empty() {
+            return failed_state;
+        }
+        let before = self.routed_count();
+        let snapshot = self.clone();
+        for b in &contesting {
+            let _ = self.rip(b);
+        }
+        // The failing bus goes FIRST. Reversing the order is the entire
+        // mechanism; everything else here is bookkeeping and safety.
+        let state = self.reroute_one(name);
+        let rev0 = self.layer_revision();
+        let _ = self.co_reroute(contesting, rev0);
+        if self.routed_count() > before {
+            state
+        } else {
+            *self = snapshot;
+            failed_state
+        }
     }
 
     /// Attach a net-class discipline to a bus; [`Design::check`] enforces
