@@ -128,10 +128,23 @@ sets, or recovering from a `cargo clean`, now pulls the 159 dependencies out of
 the cache instead of rebuilding them. Workspace crates compile *incrementally*
 and bypass the cache by design — the win is entirely on dependencies.
 
+**Be clear about when this helps, so it is not credited for the wrong thing.**
+Inside one warm target directory, cargo's own fingerprinting already avoids
+recompiling anything, and sccache contributes ~nothing — it is not what made the
+numbers in the table above move (that was the debug-info change). sccache pays
+off precisely when cargo *must* invoke rustc for work it has done before:
+
+- recovering from `cargo clean` / `rm -rf target/debug`,
+- a second target directory (CI, or an IDE configured with its own),
+- returning to a feature set you built earlier and have since cleaned.
+
+Measured proof of the mechanism: building the canonical set into a *fresh*
+target dir served **101 dependency compilations from cache** (20.6% Rust hit
+rate) instead of running rustc.
+
 `brew install sccache` is therefore a **prerequisite**: cargo hard-fails with
 "could not execute process sccache" if the wrapper binary is missing. Inspect it
-with `sccache -s` (verified working here: 39 hits / 444 misses filling a cold
-cache during the first rebuild).
+with `sccache -s`.
 
 Because the wrapper is committed, any environment *without* sccache must opt
 out with an empty override — `RUSTC_WRAPPER=""`. `.github/workflows/ci.yml` (the
