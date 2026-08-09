@@ -163,6 +163,24 @@ export interface SceneModel {
 
 const BUS_PALETTE = [0x76d275, 0x4fc3f7, 0xffb74d, 0xba68c8, 0x4db6ac, 0xf06292, 0xa2cf6e, 0x7986cb];
 
+/** One reversible document edit.
+ *
+ *  The design layer offers `rip` / `reroute` / `remove_*` / `set_port_mode`
+ *  but no document-level history, so the studio keeps an OPERATION JOURNAL:
+ *  every mutator records the inverse call alongside the forward one. That is
+ *  enough for the edits a user makes with the mouse (place, move, rotate,
+ *  delete, route, rip, delete-bus, port-mode) and it is honest about the ones
+ *  it cannot invert — `declarePort` and `addGate` have no engine inverse, so
+ *  they are not journalled rather than pretending. */
+interface Op {
+  /** What the user did, in the past tense, for the button's tooltip. */
+  label: string;
+  undo: () => void;
+  redo: () => void;
+  /** Identity of a coalescing group: consecutive ops that share one (a drag) collapse. */
+  coalesce?: string;
+}
+
 export class Studio {
   core: Core;
   d: VeneerSurface;
@@ -191,6 +209,105 @@ export class Studio {
     this.baked = null; // any edit invalidates the baked artifact
     this.executor = null;
     this.onChange?.();
+  }
+
+  // -- undo / redo ----------------------------------------------------------
+
+  private undoStack: Op[] = [];
+  private redoStack: Op[] = [];
+  /** While replaying an op, mutators must not journal their own inverse. */
+  private replaying = 0;
+
+  private record(op: Op) {
+    if (this.replaying) return;
+    const top = this.undoStack[this.undoStack.length - 1];
+    if (op.coalesce && top?.coalesce === op.coalesce) {
+      // A drag is one undo step, not sixty: keep the ORIGINAL undo (where the
+      // gesture started) and take the newest redo (where it ended).
+      top.redo = op.redo;
+      top.label = op.label;
+    } else {
+      this.undoStack.push(op);
+      if (this.undoStack.length > 200) this.undoStack.shift();
+    }
+    this.redoStack.length = 0;
+  }
+
+  /** Run an inverse without journalling it. */
+  private replay(fn: () => void) {
+    this.replaying++;
+    try {
+      fn();
+    } finally {
+      this.replaying--;
+    }
+  }
+
+  /** End the current coalescing group, so the next edit starts a new undo
+   *  step even if it touches the same instance (pointer up, key released). */
+  endGesture() {
+    const top = this.undoStack[this.undoStack.length - 1];
+    if (top) top.coalesce = undefined;
+  }
+
+  canUndo(): boolean { return this.undoStack.length > 0; }
+  canRedo(): boolean { return this.redoStack.length > 0; }
+  undoLabel(): string | null { return this.undoStack[this.undoStack.length - 1]?.label ?? null; }
+  redoLabel(): string | null { return this.redoStack[this.redoStack.length - 1]?.label ?? null; }
+
+  /** Undo one edit; returns its label, or `null` when there is nothing to undo. */
+  undo(): string | null {
+    const op = this.undoStack.pop();
+    if (!op) return null;
+    op.coalesce = undefined;
+    this.replay(op.undo);
+    this.redoStack.push(op);
+    return op.label;
+  }
+
+  redo(): string | null {
+    const op = this.redoStack.pop();
+    if (!op) return null;
+    this.replay(op.redo);
+    this.undoStack.push(op);
+    return op.label;
+  }
+
+  /** A fresh document has no history to walk back into. */
+  clearHistory() {
+    this.undoStack.length = 0;
+    this.redoStack.length = 0;
+  }
+
+  /** Buses that terminate on one of this instance's ports — what a delete
+   *  takes with it, and therefore what the confirm prompt has to count. */
+  busesOn(instance: string): string[] {
+    const p = `${instance}.`;
+    return [...this.buses.values()]
+      .filter((b) => b.driver.startsWith(p) || b.sinks.some((s) => s.startsWith(p)))
+      .map((b) => b.name);
+  }
+
+  /** Re-declare a bus from its stored intent (the inverse of a rip/remove). */
+  private restoreBuses(list: BusInfo[]) {
+    for (const b of list) {
+      try {
+        this.design.routeBus(b.name, { driver: b.driver, sinks: b.sinks, gates: b.gates });
+        this.buses.set(b.name, b);
+        this.dirtyBuses.add(b.name);
+      } catch { /* the geometry it needed is gone; leave it out */ }
+    }
+  }
+
+  /** Which of this instance's ports are in Bus mode, so an undo can put the
+   *  promotions back before the buses that depend on them. */
+  private promotedPortsOf(instance: string): string[] {
+    const out: string[] = [];
+    for (const [name, mode] of this.portModes()) {
+      if (mode !== "bus") continue;
+      if (name.startsWith(`${instance}.`)) out.push(name.slice(instance.length + 1));
+    }
+    return out;
   }
 
   // -- what changed, and therefore what must be re-read from wasm ----------
@@ -243,23 +360,44 @@ export class Studio {
 
   // -- instances -----------------------------------------------------------
 
-  placeInstance(cell: string, at: Vec3, rot = 0): InstanceInfo {
-    const name = `u${this.nextInst++}`;
+  placeInstance(cell: string, at: Vec3, rot = 0, forceName?: string): InstanceInfo {
+    const name = forceName ?? `u${this.nextInst++}`;
     this.design.place(name, cell, at, rot);
     const info: InstanceInfo = { name, cell, at: [...at] as Vec3, rot };
     this.instances.set(name, info);
     this.dirtyPlacements = true;
     this.dirtyAllBuses(); // a new body is a new obstacle
+    this.record({
+      label: `place ${name}`,
+      undo: () => this.removeInstance(name),
+      redo: () => this.placeInstance(cell, at, rot, name),
+    });
     this.bump();
     return info;
   }
 
   /** Drag an instance: the move always lands (the document's truth); the
    *  affected buses reroute, failures stay visibly failed. */
-  moveInstance(name: string, at: Vec3, rot?: number): { rerouted: string[]; failed: Record<string, string> } {
+  moveInstance(
+    name: string, at: Vec3, rot?: number,
+    /** `true` during a drag: fold this frame into the gesture's one undo step. */
+    coalesce = false,
+  ): { rerouted: string[]; failed: Record<string, string> } {
     const inst = this.instances.get(name);
     if (!inst) throw new Error(`no instance ${name}`);
+    const was: Vec3 = [...inst.at] as Vec3;
+    const wasRot = inst.rot;
+    const to: Vec3 = [...at] as Vec3;
+    const toRot = rot ?? inst.rot;
     const report = this.design.moveInstance(name, at, rot ?? inst.rot);
+    if (was[0] !== to[0] || was[1] !== to[1] || was[2] !== to[2] || wasRot !== toRot) {
+      this.record({
+        label: wasRot !== toRot ? `rotate ${name} to ${toRot}°` : `move ${name}`,
+        coalesce: coalesce ? `move:${name}` : undefined,
+        undo: () => this.moveInstance(name, was, wasRot),
+        redo: () => this.moveInstance(name, to, toRot),
+      });
+    }
     inst.at = [...at] as Vec3;
     if (rot != null) inst.rot = rot;
     // A move changes this instance's MATRIX and nothing else about its blocks.
@@ -283,12 +421,35 @@ export class Studio {
   /** Delete an instance. Buses that terminated on one of its ports are
    *  deleted with it (they lost an endpoint) and reported by name. */
   removeInstance(name: string): { removed_buses: string[]; rerouted: string[]; failed: Record<string, string> } {
-    if (!this.instances.has(name)) throw new Error(`no instance ${name}`);
+    const info = this.instances.get(name);
+    if (!info) throw new Error(`no instance ${name}`);
+    // Everything the delete destroys, captured BEFORE it happens: the body,
+    // which of its ports were promoted, and the buses that end on it.
+    const snapshot = { ...info, at: [...info.at] as Vec3 };
+    const promoted = this.promotedPortsOf(name);
+    const carried = this.busesOn(name).map((n) => this.buses.get(n)!).filter(Boolean)
+      .map((b) => ({ ...b, sinks: [...b.sinks], gates: b.gates.map((g) => ({ ...g })) }));
     const report = this.design.removeInstance(name);
     this.instances.delete(name);
     this.dirtyAllBuses();
     for (const b of report.removed_buses ?? []) this.buses.delete(b);
     this.dirtyPlacements = true;
+    this.record({
+      label: `delete ${name}`,
+      undo: () => {
+        this.design.place(name, snapshot.cell, snapshot.at, snapshot.rot);
+        this.instances.set(name, { ...snapshot, at: [...snapshot.at] as Vec3 });
+        this.dirtyPlacements = true;
+        this.dirtyAllBuses();
+        for (const p of promoted) {
+          try { this.design.setPortMode(name, p, "bus"); } catch { /* cell changed */ }
+        }
+        this.modeCache = null;
+        this.restoreBuses(carried);
+        this.bump();
+      },
+      redo: () => this.removeInstance(name),
+    });
     this.bump();
     return report;
   }
@@ -391,9 +552,24 @@ export class Studio {
    *  engine rips any bus that terminated on it (its endpoint stops existing)
    *  and co-reroutes the rest. */
   setPortMode(instance: string, port: string, mode: "bus" | "executor") {
+    const before = this.portMode(instance, port);
     const report = this.design.setPortMode(instance, port, mode);
+    const ripped = ((report.removed_buses ?? []) as string[])
+      .map((n) => this.buses.get(n)!).filter(Boolean)
+      .map((b) => ({ ...b, sinks: [...b.sinks], gates: b.gates.map((g) => ({ ...g })) }));
     this.dirtyAllBuses();
     for (const name of report.removed_buses ?? []) this.buses.delete(name);
+    if (before !== mode) {
+      this.record({
+        label: `${instance}.${port} → ${mode === "bus" ? "Bus" : "Executor"}`,
+        undo: () => {
+          this.setPortMode(instance, port, before);
+          this.restoreBuses(ripped);
+          this.bump();
+        },
+        redo: () => this.setPortMode(instance, port, mode),
+      });
+    }
     // This is the ONE edit that changes a placed cell's blocks, so it is the
     // one edit that costs a cell re-mesh — of the affected instance's variant
     // only. Every other instance keeps the mesh it already has.
@@ -418,8 +594,8 @@ export class Studio {
 
   // -- buses ---------------------------------------------------------------
 
-  routeBus(driver: string, sinks: string[], gates: GateInfo[] = []): BusInfo {
-    const name = `bus${this.nextBus++}`;
+  routeBus(driver: string, sinks: string[], gates: GateInfo[] = [], forceName?: string): BusInfo {
+    const name = forceName ?? `bus${this.nextBus++}`;
     const color = BUS_PALETTE[this.buses.size % BUS_PALETTE.length];
     const bus = this.design.routeBus(name, { driver, sinks, gates });
     const info: BusInfo = {
@@ -431,8 +607,24 @@ export class Studio {
     this.buses.set(name, info);
     // Realizing a bus can amend the buses it crosses, so they are suspect too.
     this.dirtyAllBuses();
+    this.record({
+      label: `route ${name}`,
+      undo: () => this.removeBus(name),
+      redo: () => this.routeBus(driver, sinks, gates, name),
+    });
     this.bump();
     return info;
+  }
+
+  /** Per-bus timing from the engine's STA machinery: `{per_bit_rt, skew_rt,
+   *  max_rt}` in redstone ticks, or `null` for a bus that has not realized. */
+  busSkew(name: string): { per_bit_rt: number[]; skew_rt: number; max_rt: number } | null {
+    try {
+      const s = this.design.busSkew(name);
+      return s && typeof s.max_rt === "number" ? s : null;
+    } catch {
+      return null;
+    }
   }
 
   busState(name: string): string {
@@ -455,9 +647,16 @@ export class Studio {
     const bus = this.buses.get(busName);
     const gate = bus?.gates.find((g) => g.name === gateName);
     if (!bus || !gate) throw new Error(`no gate ${busName}/${gateName}`);
+    const was = [...gate.anchor] as Vec3;
     const report = this.design.moveGate(busName, gateName, anchor);
     gate.anchor = [...anchor] as Vec3;
     this.dirtyBuses.add(busName);
+    this.record({
+      label: `move gate ${busName}/${gateName}`,
+      coalesce: `gate:${busName}/${gateName}`,
+      undo: () => this.moveGate(busName, gateName, was),
+      redo: () => this.moveGate(busName, gateName, [...anchor] as Vec3),
+    });
     this.bump();
     return report;
   }
@@ -465,6 +664,11 @@ export class Studio {
   ripBus(name: string): void {
     this.design.rip(name);
     this.dirtyBuses.add(name);
+    this.record({
+      label: `rip ${name}`,
+      undo: () => { this.rerouteBus(name); },
+      redo: () => this.ripBus(name),
+    });
     this.bump();
   }
 
@@ -479,9 +683,20 @@ export class Studio {
 
   /** Delete a bus outright, freeing its name. */
   removeBus(name: string): void {
+    const info = this.buses.get(name);
+    const snapshot = info
+      ? { ...info, sinks: [...info.sinks], gates: info.gates.map((g) => ({ ...g })) }
+      : null;
     this.design.removeBus(name);
     this.buses.delete(name);
     this.dirtyBuses.add(name);
+    if (snapshot) {
+      this.record({
+        label: `delete ${name}`,
+        undo: () => { this.restoreBuses([snapshot]); this.bump(); },
+        redo: () => this.removeBus(name),
+      });
+    }
     this.bump();
   }
 
