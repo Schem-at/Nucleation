@@ -476,3 +476,139 @@ Two more fabric rules were paid for by this run (both in `router.py`):
 - **A repeater/comparator muzzle is not in the dust-only model**: new dust
   in the cell a diode faces (or the cell behind it) is an invisible short
   plus a shape bend.  `dust_ok` now rejects both.
+
+## Bus routability: 52% -> 84% (LANDED, 2026-08-09)
+
+The EDA Studio was reporting "a lot of invalid busses". Measured first, with a
+harness that mimics realistic studio usage — `tests/design_routability.rs`,
+45 buses over 10 scenarios (open field, walls with gaps, 3x3 orthogonal
+crossings, fanout, level changes, congested channels, rows and grids of placed
+cells at assorted rotations, and a field populated with real cells from
+`computational_schematics/enhanced/`). It prints PASS/FAIL per bus with the
+reason and a reason histogram, and gates on the rate:
+
+```
+cargo test --features routing --test design_routability -- --nocapture
+```
+
+| | routed | collision | halo | endpoint escape | levels | other |
+|---|---|---|---|---|---|---|
+| before | **25/45 = 52.1%** | 11 | 7 | 5 | 3 | 3 |
+| after | **38/45 = 84.4%** | 0 | 0 | 0 | 3 | 0 |
+
+DRC + LVS come back clean on every routed scenario (the harness asserts it —
+routing more buses by laying illegal geometry is not progress). All 7 remaining
+failures name a cause AND a location; none is a generic "no path".
+
+### Root cause 1: there was no pathfinder
+
+`Planner::plan_pair` knew exactly two shapes: a straight run, or an L through
+one corner (x-first, else z-first). An axis-aligned pair had **one** candidate
+and no fallback at all, so a single blocking column killed the bus. In a real
+design that is the common case, not the corner case: as soon as two cells are
+on the canvas, the third bus's corridor crosses somebody's body or influence
+halo.
+
+`src/design_corridor.rs` adds the missing shape — *any* rectilinear corridor —
+via `pnr_core`'s weighted A* over a new `BusFabric`:
+
+- one node per COLUMN on the bit-0 dust plane; a column is legal only when the
+  whole stack it would occupy (`y0-1 ..= y0+2*(width-1)`: a support and a dust
+  per bit) is clear of hard occupancy and of every foreign halo. An 8-bit bus
+  therefore cannot squeeze through a 3-high hole that a 1-bit bus fits.
+- **electrical clearance**: no column cell may be orthogonally adjacent to
+  foreign dust or a foreign repeater. Two dust runs one cell apart short
+  without ever sharing a cell — the template planner never hit this because
+  parallel runs collide outright, but a corridor free to bend will hug a
+  neighbour. This one was found by the harness's DRC gate, not by reasoning.
+- turns cost real money and are illegal until the current leg is `MIN_LEG = 3`
+  long, so the search cannot emit a zigzag whose legs read into each other.
+- a corridor that comes back within one cell of ITSELF is rejected: the search
+  state is `(column, leg)`, so A* may legally revisit a column with a different
+  heading, and a self-touching corridor closes a ring oscillator through its
+  own refresh repeaters. Also found by the DRC gate (`repeater_cycle`).
+- a column-legality memo, because the search visits each column ~20x and
+  `route_bus` is an interactive call.
+
+`plan_pair` is now a ladder: straight/L templates FIRST (so an unobstructed
+design realizes byte-for-byte as before, and crossing-heavy designs keep using
+the verified dip-under tile), then two corridor efforts. `plan_chain` realizes
+a multi-leg corridor with the existing run + joint-column vocabulary — **no new
+redstone geometry was invented, only a new order to lay the known tiles in.**
+
+Branch junctions are now derived from a throwaway PROBE of the real trunk
+(`probe_trunk_runs`) instead of the x-first template guess, since a trunk that
+detoured is nowhere near its guess.
+
+### Root cause 2: rotated instances were placed tens of blocks away
+
+`Design` derived a cell's rotation footprint from
+`UniversalSchematic::get_bounding_box()`, which reports a region's ALLOCATED
+envelope rather than its contents: a 10x18x6 cell built with
+`set_block_from_string` reports `(0,0,0)..(10,65,65)`. `transform_pos` takes
+the rotation's X/Z size from that box, so **every instance at rot_y 90/180/270
+had its blocks, ports and halo mapped tens of blocks off**, while rot_y=0 (where
+only `min` matters) looked perfectly fine. Rotate a cell in the studio and its
+ports moved somewhere else entirely; buses then failed citing coordinates
+nowhere near the design.
+
+`design.rs::cell_bounds` computes the true non-air extent instead. This is what
+cleared the whole "endpoint escape" and "port not connectable" categories —
+those were symptoms, not causes. Regression:
+`tests/design_instance_transform.rs` asserts a placed instance's derived ports
+lie inside its own footprint at all four rotations, and that the footprint is
+the cell's real size anchored at `at`.
+
+### Also fixed
+
+- **A crossing between vertically DISJOINT buses is not a crossing.** The
+  level/width check fired on any two lines that crossed in plan view, even when
+  their stacks shared no y at all, failing the bus over a tile that did not
+  apply. Now gated on actual vertical overlap, and the mismatch message says
+  what to do (give the buses non-overlapping `y_band`s, or match widths).
+- **`check()` no longer blames the design for a library cell's interior.**
+  Hand-built community redstone breaks the route-oriented DRC conventions by
+  design — three enhanced-corpus cells report 787 `floating` findings standing
+  alone with zero buses routed — and a register's latch IS a repeater ring, so
+  `lvs.cycles` flagged every memory cell as an accidental latch. `clean` could
+  therefore never be true once a real cell was on the canvas. A placed cell is
+  a verified black box behind its keepout: findings entirely inside one are
+  reported under a new `cells` key, informationally, and only what the design
+  owns (loose layer + bus fragments) gates `clean`. A finding STRADDLING the
+  boundary — a cell's dust shorting against a bus — still gates, which is
+  exactly where an integration error belongs.
+- **Failure reasons are actionable end to end.** `no corridor ...` names the
+  blocker's position and owner, lists the layers hemming the endpoints in
+  ("bus `x` is in the way" is directly fixable), and states the clearance rule.
+  `endpoint approach blocked ...` says which anchor is walled in and by what.
+  The level-change refusal states both levels, the delta, and the two remedies.
+
+### Still open
+
+- **P1 Vertical level adapters.** 3 of the 7 remaining harness failures are
+  endpoints on different bit-0 levels; the bus form is single-level and there is
+  no verified tile for shifting a 2y-pitch stack in y. A uniform +/-2 shift is a
+  lockstep shear (every bit's dust follows a staircase, adjacent bits stay 2
+  apart), which looks tractable but needs sim verification of the diagonal
+  reads before it ships. This is the single biggest remaining unlock.
+- **P1 `Region::get_bounding_box` reports the allocated envelope.** The root
+  cause behind root-cause-2, and it also makes the default region's air mask
+  named `inst:*` / `bus:*` layers across a phantom volume, so a composite's
+  layers are invisible to `get_block` even though `iter_blocks` and the export
+  path see them. Making air transparent in `get_block` fixes composites but
+  breaks the deliberate `main_air_masks` contract in
+  `overlapping_named_regions_have_stable_lexicographic_precedence`; both can
+  only hold once the region reports its true extent. That is a core change with
+  a wide blast radius (export formats, meshing, stamping) and wants its own
+  review — `tests/design_layer_precedence.rs` carries two `#[ignore]`d
+  executable specifications of it. `Design` sidesteps it via `cell_bounds`.
+- **P2 Only 11% of the enhanced corpus can terminate a bus** (4 of 37 ports).
+  The rest are executor-only lever/lamp hardware with no dust tap, so a user
+  cannot wire two library cells together at all. That is a CELL-AUTHORING gap,
+  not a router one: driving a lever electrically is not a thing. Those cells
+  need dust bus ports (an interface shim, or a re-cut contract).
+- **P2 The remaining 4 "no corridor" failures are genuine congestion**, in a
+  6-cell grid where earlier buses have taken the lanes. Negotiated congestion
+  (`pnr_core::congestion::route_all`, now a dependency) would let contested
+  corridors negotiate instead of first-come-first-served; the natural place is
+  `co_reroute`, which already rips and re-routes a whole set together.
