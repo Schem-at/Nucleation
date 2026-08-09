@@ -135,6 +135,45 @@ templates don't cover falls back to the generic per-net router
 (`route_all`, negotiated congestion via pnr-core,
 `crates/nucleation-routing/src/router.rs`).
 
+### 4d. Crossing tile choice — three verified families
+
+The dip-under above is the *within-one-bus-form* crossing. Three further
+crossing families are verified and ready to port; cell listings, ports, delays
+and footprints in **`crosswire_tiles.md`**, mechanism model in
+**`TRANSPORT_MODEL.md`** (`crosswire/verify_crosswire.py`: 881 checks, zero
+crosstalk; `crosswire/test_crosswire_templates.py` guards the formulas against
+the ground-truth schematics).
+
+| tile | delay / line | ss cost / line | plan footprint | port levels |
+|---|---|---|---|---|
+| `xw_buffered` | 2 gt | **0** — refreshed to 15 | 5 × 5 | X and Z on opposite parities |
+| `xw_hop` | **0 gt** | +1 (straight axis), +2 (jogged axis) | 7 × 9 | X and Z on opposite parities |
+| `xw_updown` | **0 gt** | +2 | 7 × 7 | **both axes on the SAME levels** |
+
+When each is preferable:
+
+- **`xw_updown` is the default for two buses that must cross.** Zero delay and,
+  uniquely, both axes keep their own levels — so it removes the "give the buses
+  non-overlapping `y_band`s or match widths" refusal without a level-shift
+  adapter. It gets there by leaving the intersection cell EMPTY: one line dips
+  1, the other bumps 1, and each bump's support doubles as the lid and the CUT
+  cell over the other line's dust.
+- **`xw_hop` when the two buses are already interleaved on opposite y-parities**
+  (which the vertical 2y-pitch form naturally produces): 1 y-level per line,
+  0 ticks, and the straight axis pays only +1 ss. Its crossing primitive — dust
+  hops 1 up over a foreign line, on a *conducting* support — is the one worth
+  promoting from a stamped tile to a router MOVE.
+- **`xw_buffered` when reach matters more than latency.** It is the only family
+  that refreshes: both signals leave at 15, so a long run on the far side needs
+  no station. Also the smallest in plan view. Pay 1 redstone tick per line.
+- Latency-critical buses: never `xw_buffered`; 2 gt per crossing compounds.
+
+The rule that makes all three legal is the same one, now split three ways in
+`materials.py`: **the CUT cell (above the lower dust of a step) is not the DIODE
+cell (the upper dust's support)**, and a conductor in the first severs a foreign
+diagonal while carrying our own line. A *transparent* block there carries the
+line but does not sever — which is why these families contain no glass.
+
 **Segment realization is ATOMIC**: each segment is built in a transaction
 seeded with the design's full occupancy; it either commits into the bus's
 owned fragment or the bus enters `FAILED(reason)` with the workspace

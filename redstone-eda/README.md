@@ -464,6 +464,8 @@ refuses to save an artifact it has not proven.
 | `cells.py`, `seq_cells.py` | The verified cell library: comparator cells, latches, DFF |
 | `router.py`, `nets.py`, `audit.py`, `timing.py` | Place-and-route and the static checkers (ported to `nucleation-routing`) |
 | `materials.py`, `notes-material-model.md` | The predicate material model and its probe results |
+| `TRANSPORT_MODEL.md`, `probe_transport.py`, `test_transport.py` | The signal-TRANSPORT model: 11 mechanism rows (dust / strong-powered block / weak-powered block / repeater / comparator / torch / redstone block / lever / solid + transparent support), the split CUT/DIODE/WEAK-CARRY rules, and the router-unlock spec |
+| `crosswire_tiles.md`, `crosswire/` | Three verified 90-degree crossing families (`xw_buffered` / `xw_hop` / `xw_updown`) from user-supplied ground truth; 881 checks, zero crosstalk |
 | `pivot_tiles.py`, `pivot_tiles.md`, `crossing_tiles.py` | Bus-form adapters and crossing tiles |
 | `genlib_map.py`, `anneal_genlib.py` | `abc -genlib` mapping onto the cell library |
 | `compositor/` | The Design API acceptance demos (`design_demo2/3/4`) and compositions |

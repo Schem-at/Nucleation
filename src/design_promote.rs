@@ -838,7 +838,7 @@ mod tests {
                 .filter(|b| !b.contains("minecraft:air"))
                 .filter(|_| !hw.contains(&q))
         };
-        let plan = plan_pivot(&patch.wires, patch.step, (4, 4, 0), false, &at)
+        let plan = plan_pivot(&patch.wires, patch.step, (4, 4, 0), false, &at, None)
             .expect("the row must be adaptable onto the stack");
         // A vertical 2y-pitch column, bit order preserved.
         for (k, w) in plan.column.iter().enumerate() {
