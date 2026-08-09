@@ -503,18 +503,34 @@ try {
 
   // ---- 8. bus FAILED, then healed --------------------------------------
   const failed = await page.evaluate(async () => {
+    const e = window.__eda;
     const s = window.__edaStudio();
     const bus = [...s.buses.keys()][0];
-    // Lift the adder off the bus level: the trunk realizes one flat 2y-pitch
-    // stack, so a driver whose bit 0 sits at a different y is unroutable —
-    // a real, reported failure rather than a thrown error.
-    window.__edaDrag("instance", "u1", [0, 3, 24]);
-    await new Promise((r) => setTimeout(r, 1500));
-    return { bus, state: s.busState(bus), detail: s.busStateDetail(bus) };
+    // A REAL, REPORTED failure — and the placement that produces one is a
+    // moving target, so it is SEARCHED FOR rather than hard-coded. The router
+    // keeps getting better at awkward geometry (lifting the driver off the bus
+    // level used to be unroutable and now is not), and these checks are about
+    // the REASON PIPELINE, not about any one placement staying impossible.
+    const sink = e.endpoints().find((x) => x.name === (s.buses.get(bus)?.sinks?.[0] ?? ""));
+    const cands = [
+      ["lifted off the bus level", [0, 3, 24]],
+      ["dropped on top of its own sink", sink ? [...sink.anchor] : null],
+      ["lifted far above it", [0, 45, 24]],
+    ].filter(([, at]) => at);
+    const tried = [];
+    for (const [why, at] of cands) {
+      window.__edaDrag("instance", "u1", at);
+      await new Promise((r) => setTimeout(r, 1500));
+      const detail = s.busStateDetail(bus);
+      tried.push({ why, at, state: detail.state });
+      if (detail.state.startsWith("failed")) return { bus, why, at, state: detail.state, detail, tried };
+    }
+    return { bus, why: null, state: s.busState(bus), detail: s.busStateDetail(bus), tried };
   });
   check(failed.state.startsWith("failed"),
-    `moving the driver away leaves the bus FAILED with a reason`,
-    JSON.stringify(failed.detail));
+    `a driver ${failed.why ?? "(no placement found!)"} leaves the bus FAILED with a reason ` +
+    `(${failed.tried.length} placement(s) tried)`,
+    JSON.stringify(failed.tried));
 
   // The reason is 300+ characters of engine prose. What the UI must show is a
   // SENTENCE: what failed, where, and what to move — with the raw text still
@@ -560,7 +576,7 @@ try {
     e.frameAll();                       // put the camera back for later shots
     return { before, after };
   });
-  check(flew.after && flew.after.target.join() === said.h.at.join(),
+  check(!!flew.after && !!said.h.at && flew.after.target.join() === said.h.at.join(),
     `...and the FAILED row is click-to-focus: the camera flew to ` +
     `${JSON.stringify(flew.after?.target)}, the coordinate the router named`,
     JSON.stringify(flew));
@@ -1760,6 +1776,441 @@ try {
 
   check(errors.length === 0, `no console errors (${errors.length})`,
     errors.slice(0, 3).join(" | "));
+
+  // ======================================================================
+  // PART 3 — PORT vs BODY PICKING.
+  //
+  // The reported bug, in the user's words: "it's awkward to select an IO and
+  // route it, I always accidentally move the component". Two causes, both of
+  // them checked here with REAL pointer input (page.mouse, not a hook — the
+  // whole point is that the browser's own events resolve the way we claim):
+  //
+  //   1. a port marker sits one block outside its column, so it is often inside
+  //      or behind a neighbouring body's invisible pick box. Ray order gave the
+  //      press to the box. Ports are now picked in SCREEN SPACE and always win.
+  //   2. a press on a body became a drag on the first pointermove, so a jittery
+  //      click nudged the component. A press under 4 px is now a selection.
+  //
+  // On its own page, with the two-adder demo: the checks drive the pointer, and
+  // a scene that has been scattered by the clipboard section would make "find a
+  // pixel that is a body" meaningless.
+  // ======================================================================
+  const p3 = await browser.newPage({ viewport: { width: 1680, height: 980 } });
+  const p3errors = [];
+  p3.on("console", (m) => { if (m.type() === "error") p3errors.push(m.text()); });
+  await p3.goto(`http://localhost:${PORT}/?demo=1`, { waitUntil: "load" });
+  await p3.waitForFunction(() => window.__edaReady === true, null, { timeout: 120_000 });
+  await p3.waitForFunction(() => window.__edaStudio().instances.size >= 2, null, { timeout: 120_000 });
+  await p3.waitForTimeout(1500);
+  // The coach owns the first Escape. Dismiss it up front so every Esc in this
+  // section unwinds the GESTURE, which is what these checks are about.
+  await p3.evaluate(() => window.__eda.coachDismiss());
+  await p3.waitForTimeout(200);
+
+  // ---- 13. a port is a target at every zoom -------------------------------
+  //
+  // The zoom sweep is the point. A cone of radius 0.45 blocks is a 4-pixel
+  // target once the labels start decluttering, and "click the little arrow" is
+  // the gesture the entire routing model rests on.
+  const zooms = await p3.evaluate(async () => {
+    const e = window.__eda;
+    const out = [];
+    e.frameAll();
+    for (const radius of [40, 70, 130, 320]) {
+      e.zoom(radius);
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) => setTimeout(r, 120));
+      let onScreen = 0, hit = 0;
+      const misses = [];
+      for (const { name } of e.endpoints()) {
+        const at = e.portScreen(name);
+        // ON THE CANVAS, not merely in the viewport: a marker that projects over
+        // the header is not something a pointer can press, and counting it would
+        // make this check pass on a coordinate the mouse can never reach.
+        if (!at || !e.onCanvas(at[0], at[1])) continue;
+        onScreen++;
+        const got = e.probeAt(at[0], at[1]);
+        if (got?.kind === "port" && got.id === name) hit++;
+        else misses.push({ name, got });
+      }
+      out.push({ radius, onScreen, hit, misses: misses.slice(0, 4), labels: e.labels() });
+    }
+    return { out, thresholds: e.pickThresholds() };
+  });
+  const allZoom = zooms.out.every((z) => z.onScreen > 0 && z.hit === z.onScreen);
+  check(allZoom,
+    `a port marker is pickable at EVERY zoom — ${zooms.out.map((z) => `${z.hit}/${z.onScreen}@r${z.radius}`).join(" ")} ` +
+    `(${zooms.thresholds.portPickPx} px screen-space radius, not ray-vs-cone)`,
+    JSON.stringify(zooms.out.map((z) => ({ radius: z.radius, onScreen: z.onScreen, hit: z.hit, misses: z.misses }))));
+  // ...including at the zoom where the labels have decluttered away, which is
+  // exactly where a shrinking hit target would have stopped working.
+  const decluttered = zooms.out.filter((z) => z.labels.hiddenSmall + z.labels.hiddenOverlap > 0);
+  check(decluttered.length > 0 && decluttered.every((z) => z.hit === z.onScreen),
+    `...including at the ${decluttered.length} zoom level(s) where labels DECLUTTER ` +
+    `(up to ${Math.max(0, ...decluttered.map((z) => z.labels.hiddenSmall + z.labels.hiddenOverlap))} labels hidden, ` +
+    `every port still hit)`,
+    JSON.stringify(decluttered.map((z) => ({ radius: z.radius, labels: z.labels, hit: z.hit, onScreen: z.onScreen }))));
+
+  // ---- 14. a port beats the body geometry in front of it ------------------
+  const overlap = await p3.evaluate(async () => {
+    const e = window.__eda;
+    e.frameAll();
+    e.zoom(70);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const before = e.pickStats();
+    const ports = e.endpoints().map((p) => p.name);
+    let probed = 0;
+    for (const name of ports) {
+      const at = e.portScreen(name);
+      if (!at) continue;
+      probed++;
+      e.probeAt(at[0], at[1]);
+    }
+    return { probed, before, after: e.pickStats() };
+  });
+  check(overlap.after.portOverBody - overlap.before.portOverBody > 0,
+    `${overlap.after.portOverBody - overlap.before.portOverBody} of ${overlap.probed} ports ` +
+    `sit behind or inside a component's pick box and STILL win the press — the ` +
+    `priority rule, measured (ray order would have given those to the body)`,
+    JSON.stringify({ before: overlap.before, after: overlap.after }));
+
+  /** A canvas pixel that is unambiguously a component body: `id`'s body, and
+   *  far enough from every port marker that no reasonable pick radius reaches
+   *  it. Scanned rather than computed, so it is a pixel the pointer can use. */
+  //
+  //  Kept well inside the canvas: at the edges the ground plane is at a grazing
+  //  angle, so a press there maps to a wild world coordinate and the drag being
+  //  measured stops being the drag a user makes.
+  const bodyPixel = async (id) => p3.evaluate((id) => {
+    const e = window.__eda;
+    const r = e.canvasRect();
+    const inx = (r.right - r.left) * 0.15, iny = (r.bottom - r.top) * 0.15;
+    const ports = e.endpoints().map((p) => e.portScreen(p.name)).filter(Boolean);
+    for (let y = r.top + iny; y < r.bottom - iny; y += 6) {
+      for (let x = r.left + inx; x < r.right - inx; x += 6) {
+        const got = e.probeAt(x, y);
+        if (got?.kind !== "instance" || (id && got.id !== id)) continue;
+        if (ports.some(([px, py]) => Math.hypot(px - x, py - y) < 40)) continue;
+        return { x, y, id: got.id };
+      }
+    }
+    return null;
+  }, id);
+
+  // ---- 15. a press on a PORT can never become a component move ------------
+  //
+  // A zoom where the design is fully on the canvas, so the port the pointer is
+  // sent to is a port the pointer can reach.
+  const portName = await p3.evaluate(async () => {
+    const e = window.__eda;
+    e.frameAll();
+    e.zoom(90);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await new Promise((r) => setTimeout(r, 150));
+    const reachable = (p) => {
+      const at = e.portScreen(p.name);
+      return at && e.onCanvas(at[0], at[1], 60) && e.probeAt(at[0], at[1])?.id === p.name;
+    };
+    const eps = e.endpoints();
+    return (eps.find((p) => p.routable && p.kind === "input" && p.instance && reachable(p))
+      ?? eps.find((p) => p.routable && p.kind === "input" && reachable(p)))?.name ?? null;
+  });
+  check(portName != null, `a routable driver port is reachable by the pointer (${portName})`);
+  const portAt = await p3.evaluate((n) => window.__eda.portScreen(n), portName);
+  const beforePress = await p3.evaluate(() => {
+    const s = window.__edaStudio();
+    return {
+      stats: window.__eda.pickStats(),
+      placements: [...s.instances.values()].map((i) => ({ name: i.name, at: [...i.at], rot: i.rot })),
+      history: window.__eda.history(),
+    };
+  });
+  // The gesture: press ON the port, then MOVE 40 px. Under the old code this
+  // was a component drag; it must now be a connection and nothing else.
+  await p3.mouse.move(portAt[0], portAt[1]);
+  await p3.waitForTimeout(120);
+  await p3.mouse.down();
+  for (let i = 1; i <= 8; i++) {
+    await p3.mouse.move(portAt[0] + i * 5, portAt[1] + i * 3);
+    await p3.waitForTimeout(16);
+  }
+  await p3.mouse.up();
+  await p3.waitForTimeout(400);
+  const afterPress = await p3.evaluate(() => {
+    const s = window.__edaStudio();
+    return {
+      stats: window.__eda.pickStats(),
+      mode: window.__eda.mode(),
+      selection: window.__eda.selection(),
+      placements: [...s.instances.values()].map((i) => ({ name: i.name, at: [...i.at], rot: i.rot })),
+      history: window.__eda.history(),
+      hint: window.__eda.hint(),
+    };
+  });
+  const moved = JSON.stringify(beforePress.placements) !== JSON.stringify(afterPress.placements);
+  check(afterPress.mode?.kind === "connecting" && afterPress.mode.from === portName,
+    `a mousedown on ${portName} + 40 px of pointer movement starts a BUS ` +
+    `(mode ${afterPress.mode?.kind} from ${afterPress.mode?.from})`,
+    JSON.stringify({ mode: afterPress.mode, hint: afterPress.hint }));
+  check(!moved &&
+        afterPress.stats.dragsStarted === beforePress.stats.dragsStarted &&
+        afterPress.history.canUndo === beforePress.history.canUndo,
+    `...and ZERO instance transform change: ${afterPress.placements.length} placements identical, ` +
+    `0 drags started, no new undo entry — a port press never touches the drag state`,
+    JSON.stringify({ before: beforePress.placements, after: afterPress.placements, stats: afterPress.stats }));
+  const cancelled = await p3.evaluate(() => {
+    window.__eda.key("Escape");
+    return window.__eda.mode();
+  });
+  check(cancelled?.kind === "idle",
+    `...and Esc cancels the bus the port press started (mode ${cancelled?.kind})`,
+    JSON.stringify(cancelled));
+
+  // ---- 16. a <4 px press on a BODY selects, and does NOT move it ----------
+  const bodyA = await bodyPixel(null);
+  check(bodyA != null, `a component body is pickable on the canvas (${JSON.stringify(bodyA)})`);
+  const jitter = await (async () => {
+    const before = await p3.evaluate((id) => ({
+      stats: window.__eda.pickStats(),
+      at: window.__eda.instanceAt(id),
+      history: window.__eda.history(),
+    }), bodyA.id);
+    await p3.mouse.move(bodyA.x, bodyA.y);
+    await p3.waitForTimeout(80);
+    await p3.mouse.down();
+    // Three one-pixel twitches: a hand, not a gesture. Total travel 3 px.
+    for (const [dx, dy] of [[1, 0], [1, 1], [2, 1]]) {
+      await p3.mouse.move(bodyA.x + dx, bodyA.y + dy);
+      await p3.waitForTimeout(20);
+    }
+    await p3.mouse.up();
+    await p3.waitForTimeout(300);
+    const after = await p3.evaluate((id) => ({
+      stats: window.__eda.pickStats(),
+      at: window.__eda.instanceAt(id),
+      history: window.__eda.history(),
+      selection: window.__eda.selection(),
+      cursor: document.querySelector("#canvas-wrap canvas").style.cursor,
+    }), bodyA.id);
+    return { before, after };
+  })();
+  check(jitter.after.selection?.kind === "instance" && jitter.after.selection.id === bodyA.id &&
+        JSON.stringify(jitter.after.at) === JSON.stringify(jitter.before.at) &&
+        jitter.after.stats.dragsStarted === jitter.before.stats.dragsStarted &&
+        jitter.after.stats.clicksBelowThreshold === jitter.before.stats.clicksBelowThreshold + 1 &&
+        jitter.after.history.canUndo === jitter.before.history.canUndo,
+    `a 3 px press on ${bodyA.id} SELECTS it and moves it not one block ` +
+    `(${JSON.stringify(jitter.before.at?.at)} -> ${JSON.stringify(jitter.after.at?.at)}, ` +
+    `0 drags started, no undo entry) — the ${zooms.thresholds.dragPx} px threshold`,
+    JSON.stringify(jitter));
+
+  // ---- 17. past the threshold it moves, in ONE undo step, with no re-mesh --
+  //
+  // Also the perf contract for the new picking: 20 drag frames must cost zero
+  // cell re-meshes and leave the draw-call count alone. Measured with the live
+  // re-route off, so what is being measured is the DRAG, not the router.
+  const dragged = await (async () => {
+    const before = await p3.evaluate((id) => {
+      document.querySelector("#live-reroute").checked = false;
+      return {
+        stats: window.__eda.pickStats(), at: window.__eda.instanceAt(id),
+        mesh: window.__eda.meshBuilds(), prof: window.__eda.profile(),
+        history: window.__eda.history(),
+      };
+    }, bodyA.id);
+    await p3.mouse.move(bodyA.x, bodyA.y);
+    await p3.mouse.down();
+    for (let i = 1; i <= 20; i++) {
+      await p3.mouse.move(bodyA.x + i * 7, bodyA.y + i * 4);
+      await p3.waitForTimeout(16);
+    }
+    const mid = await p3.evaluate(() => ({
+      mesh: window.__eda.meshBuilds(), prof: window.__eda.profile(),
+      stats: window.__eda.pickStats(),
+    }));
+    await p3.mouse.up();
+    await p3.waitForTimeout(700);
+    const after = await p3.evaluate((id) => {
+      document.querySelector("#live-reroute").checked = true;
+      return {
+        stats: window.__eda.pickStats(), at: window.__eda.instanceAt(id),
+        history: window.__eda.history(),
+      };
+    }, bodyA.id);
+    const undone = await p3.evaluate((id) => {
+      window.__eda.undo();
+      return { at: window.__eda.instanceAt(id), history: window.__eda.history() };
+    }, bodyA.id);
+    return { before, mid, after, undone };
+  })();
+  check(dragged.after.stats.dragsStarted === dragged.before.stats.dragsStarted + 1 &&
+        JSON.stringify(dragged.after.at) !== JSON.stringify(dragged.before.at),
+    `past the threshold the same press DOES move ${bodyA.id} ` +
+    `(${JSON.stringify(dragged.before.at?.at)} -> ${JSON.stringify(dragged.after.at?.at)}, 1 drag started)`,
+    JSON.stringify({ before: dragged.before.at, after: dragged.after.at, stats: dragged.after.stats }));
+  check(JSON.stringify(dragged.undone.at) === JSON.stringify(dragged.before.at),
+    `...as ONE undo step: a single undo puts it back at ` +
+    `${JSON.stringify(dragged.undone.at?.at)}`,
+    JSON.stringify(dragged.undone));
+  check(dragged.mid.mesh.cells === dragged.before.mesh.cells &&
+        dragged.mid.mesh.texture === dragged.before.mesh.texture &&
+        dragged.mid.prof.drawCalls === dragged.before.prof.drawCalls,
+    `...and 20 drag frames cost 0 cell re-meshes, 0 texture builds and leave the ` +
+    `draw calls at ${dragged.mid.prof.drawCalls} (${dragged.mid.mesh.matrixWrites - dragged.before.mesh.matrixWrites} matrix writes instead)`,
+    JSON.stringify({ before: dragged.before.mesh, mid: dragged.mid.mesh,
+      draws: [dragged.before.prof.drawCalls, dragged.mid.prof.drawCalls] }));
+
+  // ---- 18. hover affordances ----------------------------------------------
+  const hover = await (async () => {
+    // The zoom is SEARCHED for, not assumed: the one that matters is the
+    // furthest one at which a port is still an unambiguous target, because that
+    // is where the old ray-vs-cone pick had already become unusable. The
+    // hovered port's label has to come back there — hovering is how you know
+    // WHICH port you are about to route.
+    const name = await p3.evaluate(async () => {
+      const e = window.__eda;
+      e.frameAll();
+      let best = null;
+      for (const radius of [90, 130, 200, 320]) {
+        e.zoom(radius);
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        await new Promise((r) => setTimeout(r, 200));
+        const hidden = [...document.querySelectorAll(".mk-label")]
+          .filter((el) => el.style.display === "none")
+          .map((el) => el.textContent.split(" :")[0]);
+        const p = e.endpoints().find((q) => {
+          if (!q.routable || !hidden.includes(q.name)) return false;
+          const at = e.portScreen(q.name);
+          return at && e.onCanvas(at[0], at[1], 60) && e.probeAt(at[0], at[1])?.id === q.name;
+        });
+        if (p) best = { port: p.name, radius, hiddenCount: hidden.length, labels: e.labels() };
+      }
+      // Leave the camera where the winning measurement was made.
+      if (best) {
+        e.zoom(best.radius);
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      return best ?? { port: null, hiddenCount: 0, labels: e.labels() };
+    });
+    if (!name.port) return { skipped: true, name };
+    const at = await p3.evaluate((n) => window.__eda.portScreen(n), name.port);
+    await p3.mouse.move(at[0], at[1]);
+    await p3.waitForTimeout(400);
+    const onPort = await p3.evaluate((n) => {
+      const el = [...document.querySelectorAll(".mk-label")]
+        .find((q) => q.textContent.startsWith(`${n} :`));
+      return {
+        cursor: document.querySelector("#canvas-wrap canvas").style.cursor,
+        hoverPort: window.__eda.hoverPort(),
+        hint: window.__eda.hint(),
+        labelShown: !!el && el.style.display !== "none",
+        labelHovered: !!el?.classList.contains("is-hovered"),
+        labels: window.__eda.labels(),
+      };
+    }, name.port);
+    // The SCREENSHOT is taken close in, where it is readable: same hover, a
+    // zoom a person would actually be at.
+    const closeAt = await p3.evaluate(async (n) => {
+      const e = window.__eda;
+      for (const radius of [34, 48, 70, 90]) {
+        e.zoom(radius);
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        await new Promise((r) => setTimeout(r, 150));
+        const at = e.portScreen(n);
+        if (at && e.onCanvas(at[0], at[1], 80) && e.probeAt(at[0], at[1])?.id === n) return at;
+      }
+      return null;
+    }, name.port);
+    if (closeAt) {
+      await p3.mouse.move(closeAt[0] + 40, closeAt[1] + 30);
+      await p3.waitForTimeout(120);
+      await p3.mouse.move(closeAt[0], closeAt[1]);
+      await p3.waitForTimeout(500);
+    }
+    const shot = await snap(p3, "hover-port-affordance");
+    const bodyB = await bodyPixel(null);
+    let onBody = null;
+    if (bodyB) {
+      await p3.mouse.move(bodyB.x, bodyB.y);
+      await p3.waitForTimeout(300);
+      onBody = await p3.evaluate(() => ({
+        cursor: document.querySelector("#canvas-wrap canvas").style.cursor,
+        hoverPort: window.__eda.hoverPort(),
+        hint: window.__eda.hint(),
+      }));
+    }
+    return { name, onPort, onBody, shot };
+  })();
+  if (hover.skipped) {
+    results.push({ ok: true, label: "hover affordance SKIPPED (no decluttered port on screen)", skipped: true });
+  } else {
+    check(hover.onPort.cursor === "crosshair" && hover.onBody?.cursor === "move",
+      `the cursor says which gesture the press will be: CROSSHAIR over a port, ` +
+      `MOVE over a body (${hover.onPort.cursor} / ${hover.onBody?.cursor})`,
+      JSON.stringify({ port: hover.onPort.cursor, body: hover.onBody?.cursor }));
+    check(hover.onPort.labelShown && hover.onPort.labelHovered && hover.onPort.hoverPort === hover.name.port,
+      `hovering ${hover.name.port} brings back its label at orbit radius ` +
+      `${hover.name.radius}, where ${hover.name.hiddenCount} labels are decluttered ` +
+      `away, and emphasises the marker`,
+      JSON.stringify(hover.onPort));
+    check(/click to start a bus from/i.test(hover.onPort.hint) &&
+          hover.onPort.hint.includes(hover.name.port) &&
+          /will NOT move/i.test(hover.onPort.hint),
+      `...and the hint bar says what the click DOES: "${hover.onPort.hint.replace(/\s+/g, " ").slice(0, 92)}…"`,
+      hover.onPort.hint);
+  }
+
+  // ---- 19. connect mode: bodies are not there ------------------------------
+  const connectMode = await p3.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const rect = document.querySelector("#canvas-wrap canvas").getBoundingClientRect();
+    const bodyHits = () => {
+      let n = 0;
+      for (let y = rect.top + 8; y < rect.bottom - 8; y += 12) {
+        for (let x = rect.left + 8; x < rect.right - 8; x += 12) {
+          if (e.probeAt(x, y)?.kind === "instance") n++;
+        }
+      }
+      return n;
+    };
+    const portHits = () => e.endpoints().filter((p) => {
+      const at = e.portScreen(p.name);
+      return at && e.probeAt(at[0], at[1])?.kind === "port";
+    }).length;
+    const off = { bodies: bodyHits(), ports: portHits() };
+    e.key("c");
+    await new Promise((r) => requestAnimationFrame(r));
+    const on = { bodies: bodyHits(), ports: portHits(), mode: e.connectMode(), hint: e.hint() };
+    const placements = [...s.instances.values()].map((i) => [...i.at]);
+    e.key("c");
+    return { off, on, placements, back: e.connectMode() };
+  });
+  check(connectMode.on.mode === true && connectMode.on.bodies === 0 &&
+        connectMode.off.bodies > 0 && connectMode.on.ports === connectMode.off.ports &&
+        connectMode.back === false,
+    `connect mode (C, or hold Alt): ${connectMode.off.bodies} body pixels become 0 and all ` +
+    `${connectMode.on.ports} ports stay pickable — in a dense scene no press can be a move`,
+    JSON.stringify(connectMode));
+  check(/connect mode/i.test(connectMode.on.hint),
+    `...and the hint bar says so ("${connectMode.on.hint.replace(/\s+/g, " ").slice(0, 72)}…")`,
+    connectMode.on.hint);
+  await p3.evaluate(() => window.__eda.setConnectMode(true));
+  await p3.waitForTimeout(500);
+  await snap(p3, "connect-mode-bodies-unpickable");
+  await p3.evaluate(() => window.__eda.setConnectMode(false));
+
+  // The scene still draws what the engine says it is, after all of that
+  // pointer traffic.
+  const p3consistent = await p3.evaluate(() => window.__eda.consistency());
+  check(p3consistent.ok === true,
+    `after the whole picking suite the render still matches the engine ` +
+    `(${p3consistent.layers.length} layers)`,
+    JSON.stringify(p3consistent.mismatches ?? []));
+  check(p3errors.length === 0, `no console errors on the picking page (${p3errors.length})`,
+    p3errors.slice(0, 3).join(" | "));
+  await p3.close();
 
   await browser.close();
 } finally {
