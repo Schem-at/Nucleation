@@ -1,7 +1,7 @@
 {
-  "when": "2026-08-09T05:02:28.315Z",
-  "passed": 29,
-  "total": 29,
+  "when": "2026-08-09T06:00:32.568Z",
+  "passed": 43,
+  "total": 43,
   "results": [
     {
       "ok": true,
@@ -54,11 +54,6 @@
     },
     {
       "ok": true,
-      "label": "routing into a lever input is refused with a readable reason",
-      "detail": "u1.a is executor-only IO: bit 0: no dust connection cell at or beside (0, 2, 24) (holds `minecraft:lever[face=wall,facing=west,powered=false]`) — this port is executor-only hardware and cannot terminate a bus. PROMOTE it (switch the port to Bus mode) to swap the hardware for a dust input; the switch is reversible"
-    },
-    {
-      "ok": true,
       "label": "Delete removes u0 ([\"u1\"])"
     },
     {
@@ -97,7 +92,7 @@
     },
     {
       "ok": true,
-      "label": ".litematic keeps blocks AND inst:/bus: regions (1427, [\"Main\",\"bus:bus1\",\"inst:u1\"])"
+      "label": ".litematic keeps blocks AND inst:/bus: regions (1427, [\"bus:bus1\",\"Main\",\"inst:u1\"])"
     },
     {
       "ok": true,
@@ -119,12 +114,85 @@
     },
     {
       "ok": true,
-      "label": "dragging an instance 8 frames triggers 0 texture re-meshes (0 -> 0)",
-      "detail": "{\"texBefore\":0,\"texAfterDrag\":0}"
+      "label": "clicking executor-only u2.a as a bus target AUTO-PROMOTES it (executor -> bus, now routable) with no separate Promote click",
+      "detail": "{\"inst\":\"u2\",\"target\":\"u2.a\",\"modeBefore\":\"executor\",\"blockedBefore\":true,\"busesBefore\":1,\"toast\":\"promoted u2.a: 8 lever → 16 stone + 8 redstone_wire + 8 repeater; bus2 routed: u1.sum → u2.a\",\"lastConnect\":{\"bus\":\"bus2\",\"state\":\"routed\",\"promoted\":[\"u2.a: 8 lever → 16 stone + 8 redstone_wire + 8 repeater\"]},\"modeAfter\":\"bus\",\"routableAfter\":true,\"buses\":2,\"cellRemeshes\":1}"
     },
     {
       "ok": true,
-      "label": "textured view: pack loaded ({\"blockstates\":1106,\"models\":3402,\"textures\":3312}) in 267ms, meshed in 169ms"
+      "label": "and the cell-to-cell bus lands: routed (1 -> 2 buses)",
+      "detail": "{\"bus\":\"bus2\",\"state\":\"routed\",\"promoted\":[\"u2.a: 8 lever → 16 stone + 8 redstone_wire + 8 repeater\"]}"
+    },
+    {
+      "ok": true,
+      "label": "the gesture REPORTS what it promoted: \"u2.a: 8 lever → 16 stone + 8 redstone_wire + 8 repeater\"",
+      "detail": "toast: promoted u2.a: 8 lever → 16 stone + 8 redstone_wire + 8 repeater; bus2 routed: u1.sum → u2.a"
+    },
+    {
+      "ok": true,
+      "label": "auto-promotion re-meshes exactly ONE cell variant, not the scene (1)"
+    },
+    {
+      "ok": true,
+      "label": "toggling u2.a back to Executor restores the original hardware (executor, routable=false)",
+      "detail": "{\"mode\":\"executor\",\"routable\":false}"
+    },
+    {
+      "ok": true,
+      "label": "un-promotable refusal SKIPPED (every port is promotable)",
+      "skipped": true
+    },
+    {
+      "ok": true,
+      "label": "dragging an instance 20 frames triggers 0 cell re-meshes and 0 texture re-meshes (cells 4 -> 4)",
+      "detail": "{\"texture\":0,\"cells\":4,\"instancedGroups\":4,\"instanceAllocs\":0,\"matrixWrites\":33,\"buses\":15,\"loose\":1}"
+    },
+    {
+      "ok": true,
+      "label": "...and reads NOTHING back out of wasm: it is 19 matrix writes",
+      "detail": "{\"before\":{\"flatten\":16,\"cellDump\":1,\"instDump\":2,\"busDump\":15,\"looseDump\":1},\"after\":{\"flatten\":16,\"cellDump\":1,\"instDump\":2,\"busDump\":15,\"looseDump\":1}}"
+    },
+    {
+      "ok": true,
+      "label": "...costing 0.03 ms of main-thread work per frame — a >999 fps budget, target >= 30 fps (<= 33 ms)"
+    },
+    {
+      "ok": true,
+      "label": "live re-route commits at most one engine move per animation frame (21 commits over 20 frames, 7 ms each, scene update 3.1 ms) — no fixed throttle",
+      "detail": "{\"wallPerFrame\":103.575,\"commits\":21,\"commitMs\":6.7428571950821645,\"scene\":3.0523809591929116}"
+    },
+    {
+      "ok": true,
+      "label": "a port-mode toggle on u1.a re-meshes exactly 1 cell variant (+1 cell, +1 instance region read)",
+      "detail": "{\"port\":\"u1.a\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":4,\"instancedGroups\":4,\"instanceAllocs\":0,\"matrixWrites\":54,\"buses\":37,\"loose\":1},\"reads\":{\"flatten\":38,\"cellDump\":1,\"instDump\":2,\"busDump\":37,\"looseDump\":1}},\"mid\":{\"mesh\":{\"texture\":0,\"cells\":5,\"instancedGroups\":5,\"instanceAllocs\":0,\"matrixWrites\":55,\"buses\":38,\"loose\":1},\"reads\":{\"flatten\":39,\"cellDump\":1,\"instDump\":3,\"busDump\":38,\"looseDump\":1}}}"
+    },
+    {
+      "ok": true,
+      "label": "re-routing bus1 re-meshes exactly 1 bus and 0 cells, in 7 ms",
+      "detail": "{\"bus\":\"bus1\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":56,\"buses\":39,\"loose\":1},\"reads\":{\"flatten\":40,\"cellDump\":1,\"instDump\":3,\"busDump\":39,\"looseDump\":1}},\"after\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":56,\"buses\":40,\"loose\":1},\"reads\":{\"flatten\":41,\"cellDump\":1,\"instDump\":3,\"busDump\":40,\"looseDump\":1}},\"ms\":6.6000001430511475}"
+    },
+    {
+      "ok": true,
+      "label": "textured view: pack loaded ({\"blockstates\":1106,\"models\":3402,\"textures\":3312}) in 274ms, meshed in 296ms"
+    },
+    {
+      "ok": true,
+      "label": "5 placements of REGISTER001_8bit_register cost exactly 1 cell mesh build and 1 instanced group (one InstancedMesh, vertex-coloured, 5 rows)",
+      "detail": "{\"before\":{\"texture\":1,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":56,\"buses\":41,\"loose\":1},\"after\":{\"texture\":6,\"cells\":7,\"instancedGroups\":7,\"instanceAllocs\":1,\"matrixWrites\":65,\"buses\":46,\"loose\":1}}"
+    },
+    {
+      "ok": true,
+      "label": "...read out of wasm ONCE, from the cell itself — no per-instance region dumps (instDump 3 -> 3)",
+      "detail": "{\"before\":{\"flatten\":41,\"cellDump\":1,\"instDump\":3,\"busDump\":40,\"looseDump\":1},\"after\":{\"flatten\":46,\"cellDump\":2,\"instDump\":3,\"busDump\":45,\"looseDump\":1}}"
+    },
+    {
+      "ok": true,
+      "label": "10 placements over 3 distinct cells: 3 meshed cells, 3 instanced groups, **7 draw calls** for the whole scene (78752 triangles, 15 geometries)",
+      "detail": "{\"instances\":10,\"mesh\":{\"texture\":0,\"cells\":3,\"instancedGroups\":3,\"instanceAllocs\":0,\"matrixWrites\":10,\"buses\":0,\"loose\":0},\"prof\":{\"frames\":0,\"avgFrameMs\":0,\"avgGapMs\":0,\"fps\":0,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"sceneMs\":{\"placements\":0,\"unique\":0}}}"
+    },
+    {
+      "ok": true,
+      "label": "...and the draw calls track distinct CELLS (3), not the 10 placements: 7 calls, 0.7 per instance",
+      "detail": "{\"frames\":0,\"avgFrameMs\":0,\"avgGapMs\":0,\"fps\":0,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"sceneMs\":{\"placements\":0,\"unique\":0}}"
     },
     {
       "ok": true,

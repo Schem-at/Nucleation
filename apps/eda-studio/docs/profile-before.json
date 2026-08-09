@@ -1,0 +1,156 @@
+{
+  "tag": "before",
+  "when": "2026-08-09T05:16:33.440Z",
+  "load": {
+    "engineReadyMs": 1621,
+    "firstRenderMs": 2107
+  },
+  "loadPhases": {
+    "allEndpoints": {
+      "n": 22,
+      "ms": 10.299999952316284
+    },
+    "studio.layers": {
+      "n": 22,
+      "ms": 241.59999990463257
+    },
+    "viewer.setLayers": {
+      "n": 22,
+      "ms": 5.099999904632568
+    },
+    "viewer.setMarkers": {
+      "n": 22,
+      "ms": 3.299999475479126
+    },
+    "renderPanels": {
+      "n": 22,
+      "ms": 3.700000286102295
+    },
+    "refresh": {
+      "n": 22,
+      "ms": 265.99999952316284
+    }
+  },
+  "scene10": {
+    "distinctCells": [
+      "REGISTER001_8bit_register",
+      "ADD007_8bit_cca_matt",
+      "BINTOBCD001_8bit_comb_binary_to_bcd"
+    ],
+    "placements": 10,
+    "instances": 12,
+    "drawCalls": 26,
+    "triangles": 21464,
+    "geometries": 16,
+    "sceneObjects": 91,
+    "markerObjects": 78,
+    "meshBuilds": {
+      "before": {
+        "texture": 0,
+        "layers": 22
+      },
+      "after": {
+        "texture": 0,
+        "layers": 32
+      }
+    },
+    "buildMs": {
+      "allEndpoints": 121.3,
+      "studio.layers": 2124.9,
+      "viewer.setLayers": 21.4,
+      "viewer.setMarkers": 10.9,
+      "renderPanels": 3.5,
+      "refresh": 2288.7
+    }
+  },
+  "drag": {
+    "frames": 30,
+    "dragFrameMsAvg": 431.1,
+    "wallMsPerFrame": 938.9,
+    "impliedFps": 1.1,
+    "renderFps": 1.1,
+    "renderFrameMsAvg": 15.91,
+    "drawCalls": 26,
+    "meshBuilds": {
+      "before": {
+        "texture": 0,
+        "layers": 32
+      },
+      "after": {
+        "texture": 0,
+        "layers": 63
+      }
+    },
+    "phases": {
+      "allEndpoints": {
+        "n": 31,
+        "msAvg": 21.2
+      },
+      "studio.layers": {
+        "n": 31,
+        "msAvg": 339.06
+      },
+      "viewer.setLayers": {
+        "n": 31,
+        "msAvg": 3.09
+      },
+      "viewer.setMarkers": {
+        "n": 31,
+        "msAvg": 1.01
+      },
+      "renderPanels": {
+        "n": 31,
+        "msAvg": 0.55
+      },
+      "refresh": {
+        "n": 31,
+        "msAvg": 365.94
+      },
+      "dragFrame": {
+        "n": 31,
+        "msAvg": 431.07
+      }
+    }
+  },
+  "reroute": {
+    "bus": "bus0",
+    "state": "routed",
+    "msAvg": 435.7,
+    "msMin": 419.5,
+    "msMax": 456.9
+  },
+  "portModeToggle": {
+    "port": "u0.a",
+    "meshBuilds": {
+      "before": {
+        "texture": 0,
+        "layers": 68
+      },
+      "mid": {
+        "texture": 0,
+        "layers": 70
+      },
+      "after": {
+        "texture": 0,
+        "layers": 72
+      }
+    },
+    "ms": {
+      "allEndpoints": 82.7,
+      "studio.layers": 1359.5,
+      "viewer.setLayers": 12.4,
+      "viewer.setMarkers": 3.2,
+      "renderPanels": 1.8,
+      "refresh": 1462.2
+    }
+  },
+  "memory": {
+    "jsHeapMB": 87.5,
+    "geometries": 1,
+    "textures": 0,
+    "programs": 1,
+    "sceneObjects": 91,
+    "markerObjects": 78,
+    "labels": 54
+  }
+}
