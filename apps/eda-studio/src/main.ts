@@ -56,11 +56,25 @@ async function boot() {
   let studio = new Studio(core, d, "studio");
   let mode: Mode = { kind: "idle" };
   let selection: Selection = null;
-  let lastLive = 0;
   /** Endpoints as of the last refresh, for the connect flow and panels. */
   let endpoints: ReturnType<Studio["allEndpoints"]> = [];
 
   const endpoint = (name: string) => endpoints.find((e) => e.name === name);
+
+  /** Wall-clock accounting per named phase, `{n, ms}` — the numbers
+   *  `scripts/profile.mjs` reports, and the only way to tell "the scene got
+   *  faster" from "the scene got smaller". */
+  const timings: Record<string, { n: number; ms: number }> = {};
+  function timed<T>(label: string, fn: () => T): T {
+    const t0 = performance.now();
+    try {
+      return fn();
+    } finally {
+      const e = (timings[label] ??= { n: 0, ms: 0 });
+      e.n++;
+      e.ms += performance.now() - t0;
+    }
+  }
 
   // ---- hint bar: always says what the next click does --------------------
 
@@ -157,11 +171,7 @@ async function boot() {
       select({ kind: "instance", id: name });
     },
     onDragMove(kind, id, ground) {
-      if (!($("#live-reroute") as HTMLInputElement).checked) return;
-      const now = performance.now();
-      if (now - lastLive < 250) return; // bounded live-reroute rate
-      lastLive = now;
-      applyMove(kind, id, ground, "live");
+      dragMove(kind, id, ground);
     },
     onDragEnd(kind, id, ground) {
       applyMove(kind, id, ground, "drop");
@@ -202,14 +212,42 @@ async function boot() {
       const inst = studio.instances.get(mode.instance);
       if (!inst) return;
       const p = viewer.worldPoint(e as PointerEvent, inst.at[1]);
-      if (p) applyMove("instance", mode.instance, [Math.round(p.x), inst.at[1], Math.round(p.z)], "live");
+      if (p) dragMove("instance", mode.instance, [Math.round(p.x), inst.at[1], Math.round(p.z)]);
     }
   });
 
+  /** One drag frame.
+   *
+   *  The instance moves on the GPU FIRST — one matrix per (cell, colour) group,
+   *  no engine call — so the gesture tracks the cursor at frame rate whatever
+   *  the router is doing. The document is then committed at most once per
+   *  animation frame. That replaces the old fixed 250 ms live-reroute throttle:
+   *  there is no idle wait any more, the engine simply runs as often as it can
+   *  finish, and the drag never waits for it.
+   */
+  let pendingLive: { kind: "instance" | "gate"; id: string; ground: Vec3 } | null = null;
+  let liveScheduled = false;
+  function dragMove(kind: "instance" | "gate", id: string, ground: Vec3) {
+    if (kind === "instance") viewer.previewInstance(id, ground);
+    if (!($("#live-reroute") as HTMLInputElement).checked) return;
+    pendingLive = { kind, id, ground };
+    if (liveScheduled) return;
+    liveScheduled = true;
+    requestAnimationFrame(() => {
+      liveScheduled = false;
+      const p = pendingLive;
+      pendingLive = null;
+      if (p) applyMove(p.kind, p.id, p.ground, "live");
+    });
+  }
+
   function applyMove(kind: "instance" | "gate", id: string, ground: Vec3, phase: "live" | "drop") {
+    refreshPhase = phase;
     try {
       if (kind === "instance") {
-        const report = studio.moveInstance(id, ground);
+        // Includes the refresh() the document's onChange fires: this IS the
+        // whole cost of one drag frame.
+        const report = timed("dragFrame", () => studio.moveInstance(id, ground));
         if (phase === "drop") reportBuses(`move ${id} -> ${ground.join(",")}`, report);
       } else {
         const [busName, gateName] = id.split(" ");
@@ -227,6 +265,8 @@ async function boot() {
         toast(String(err), "err");
         log(`move failed: ${err}`);
       }
+    } finally {
+      refreshPhase = "drop";
     }
   }
 
@@ -242,6 +282,24 @@ async function boot() {
     } else if (removed.length) {
       toast(`removed with it: ${removed.join(", ")}`);
     }
+  }
+
+  /** "8 lever + 8 stone → 8 repeater + 8 stone": what a promotion actually did
+   *  to the cell, from the engine's own per-cell change list. `from`-only
+   *  entries were removed, `to`-only entries were added, both means replaced. */
+  function promotionSummary(port: string, report: any): string {
+    const tally = (xs: string[]) => {
+      const m = new Map<string, number>();
+      for (const s of xs) {
+        const k = String(s).split("[")[0].replace("minecraft:", "");
+        m.set(k, (m.get(k) ?? 0) + 1);
+      }
+      return [...m].map(([k, n]) => `${n} ${k}`).join(" + ");
+    };
+    const changed = (report?.changed ?? []) as { from?: string | null; to?: string | null }[];
+    const before = tally(changed.filter((c) => c.from).map((c) => c.from as string));
+    const after = tally(changed.filter((c) => c.to).map((c) => c.to as string));
+    return `${port}: ${before || "nothing"} → ${after || "nothing"}`;
   }
 
   /** A two-state Executor/Bus switch on every instance port that has one.
@@ -271,6 +329,13 @@ async function boot() {
         `${name} is executor-only IO (levers) — switching it to Bus mode so a bus can land on it`,
       );
       togglePortMode(p.instance, p.port);
+      // Promotion moved the port; if it is now a driver, carry straight on
+      // into the connect gesture rather than making the user click again.
+      const now = endpoint(name);
+      if (now?.routable && now.kind === "input") {
+        setMode({ kind: "connecting", from: name });
+        toast(`${name} promoted and armed — now click an input port`);
+      }
       return;
     }
     toast(
@@ -311,10 +376,29 @@ async function boot() {
     }
   }
 
+  /** `"live"` during a drag gesture: the blocks and the buses still update (the
+   *  engine has already re-routed them), but the endpoint list, the marker
+   *  layer and the outliner do not — nothing mid-gesture reads them, and
+   *  together they were ~20 ms a frame. The drop refresh reconciles all three. */
+  let refreshPhase: "live" | "drop" = "drop";
+
   function refresh() {
-    endpoints = studio.allEndpoints();
+    timed(refreshPhase === "live" ? "refreshLive" : "refresh", () => refreshInner());
+  }
+  function refreshInner() {
+    if (refreshPhase === "live") {
+      try {
+        const model = timed("studio.scene", () => studio.scene());
+        timed("viewer.setScene", () => viewer.setScene(model));
+      } catch (err) {
+        log(`layer render failed: ${err}`);
+      }
+      return;
+    }
+    endpoints = timed("allEndpoints", () => studio.allEndpoints());
     try {
-      viewer.setLayers(studio.layers());
+      const model = timed("studio.scene", () => studio.scene());
+      timed("viewer.setScene", () => viewer.setScene(model));
     } catch (err) {
       log(`layer render failed: ${err}`);
     }
@@ -336,10 +420,10 @@ async function boot() {
       name: i.name, cell: i.cell, at: i.at, rot: i.rot,
       dims: studio.cells.get(i.cell)?.dims ?? [1, 1, 1],
     }));
-    viewer.setMarkers(ports, gates, instances);
+    timed("viewer.setMarkers", () => viewer.setMarkers(ports, gates, instances));
     if (selection?.kind === "instance" && !studio.instances.has(selection.id)) selection = null;
     viewer.setSelection(selection);
-    renderPanels();
+    timed("renderPanels", () => renderPanels());
     setHint();
   }
   studio.onChange = refresh;
@@ -572,19 +656,58 @@ async function boot() {
 
   // ---- actions ----------------------------------------------------------
 
+  /** Connect two endpoints, PROMOTING whatever has to be promoted.
+   *
+   *  The old flow refused the click and told you to press a toggle first, which
+   *  is the thing everyone tripped over: an executor-only port is not a dead
+   *  end, it is a port that has not been converted yet. So a connect gesture
+   *  converts it — reporting exactly what it changed — and only refuses the
+   *  ports that genuinely cannot be converted (a ceiling lever, a button),
+   *  with the engine's own reason. The explicit Exec/Bus toggle stays for
+   *  manual control and for converting back. */
   function connectPorts(a: string, b: string) {
-    const pa = endpoint(a), pb = endpoint(b);
+    let pa = endpoint(a), pb = endpoint(b);
     if (!pa || !pb) return;
-    const driver = pa.kind === "input" ? pa : pb;
-    const sink = pa.kind === "input" ? pb : pa;
-    if (driver.kind !== "input" || sink.kind !== "output") {
+    const driverName = pa.kind === "input" ? a : b;
+    const sinkName = pa.kind === "input" ? b : a;
+    if (endpoint(driverName)!.kind !== "input" || endpoint(sinkName)!.kind !== "output") {
       toast("a bus needs one driver (green ▲) and one sink (blue ▼)", "err");
       return;
     }
+
+    // (1) auto-promote either end that needs it, before any geometry is read:
+    //     promotion MOVES the port (lever -> a routable cell in the port's own
+    //     orientation), so width and type must be re-read afterwards.
+    const promoted: string[] = [];
+    for (const name of [driverName, sinkName]) {
+      const p = endpoint(name);
+      if (!p || p.routable) continue;
+      if (!p.instance || !p.promotable) {
+        toast(`${p.name} is executor-only IO and cannot be promoted: ` +
+          `${p.blocked ?? "no dust connection cell"}`, "err");
+        log(`route refused: ${p.name} — ${p.blocked}`);
+        return;
+      }
+      try {
+        const rep = studio.setPortMode(p.instance, p.port, "bus");
+        // The cell's blocks changed, so exactly this cell's mesh is stale.
+        viewer.invalidateCell(studio.instances.get(p.instance)?.cell ?? "");
+        promoted.push(promotionSummary(p.name, rep));
+        log(`auto-promoted ${p.name}: ${rep.note}`);
+        if (rep.removed_buses?.length) log(`  ripped with it: ${rep.removed_buses.join(", ")}`);
+      } catch (err) {
+        toast(`${p.name} could not be promoted: ${String(err).replace(/^Error:\s*/, "")}`, "err");
+        return;
+      }
+      refresh();
+    }
+
+    pa = endpoint(driverName); pb = endpoint(sinkName);
+    if (!pa || !pb) return;
+    const driver = pa, sink = pb;
     if (!driver.routable || !sink.routable) {
       const bad = !driver.routable ? driver : sink;
       toast(`${bad.name} is executor-only IO: ${bad.blocked ?? "no dust connection cell"}`, "err");
-      log(`route refused: ${bad.name} — ${bad.blocked}`);
       return;
     }
     if (driver.width !== sink.width) {
@@ -597,15 +720,26 @@ async function boot() {
     }
     try {
       const bus = studio.routeBus(driver.name, [sink.name]);
+      // A core that promotes inside route_bus reports it here; either way the
+      // summary names every conversion the one click caused.
+      for (const p of (bus.promotions ?? []) as any[]) {
+        promoted.push(typeof p === "string" ? p : (p?.note ?? JSON.stringify(p)));
+      }
       const { state, reason } = studio.busStateDetail(bus.name);
-      log(`routed ${bus.name}: ${driver.name} -> ${sink.name} (${state}${reason ? `: ${reason}` : ""})`);
-      if (state === "failed") toast(`${bus.name} FAILED: ${reason}`, "err");
-      else toast(`${bus.name} routed: ${driver.name} → ${sink.name}`);
+      const promo = promoted.length ? `promoted ${promoted.join("; ")}; ` : "";
+      log(`routed ${bus.name}: ${driver.name} -> ${sink.name} (${state}${reason ? `: ${reason}` : ""})` +
+        (promoted.length ? `  [${promoted.join(" | ")}]` : ""));
+      lastConnect = { bus: bus.name, state, promoted: [...promoted] };
+      if (state === "failed") toast(`${promo}${bus.name} FAILED: ${reason}`, "err");
+      else toast(`${promo}${bus.name} routed: ${driver.name} → ${sink.name}`);
     } catch (err) {
       toast(String(err).replace(/^Error:\s*/, ""), "err");
       log(`route failed: ${err}`);
     }
   }
+
+  /** The last connect gesture's outcome, for the headless verify. */
+  let lastConnect: { bus: string; state: string; promoted: string[] } | null = null;
 
   $("#cell-file").addEventListener("change", async (e) => {
     const files = (e.target as HTMLInputElement).files ?? [];
@@ -632,8 +766,7 @@ async function boot() {
       if (!glb) return false;
       viewer.meshBuilds.texture++;
       viewer.clearStale();
-      await viewer.setTexturedGlb(glb);
-      viewer.setLayers(studio.layers()); // bus layers stay abstract on top
+      await viewer.setTexturedGlb(glb); // bus layers stay abstract on top
       log(`meshed ${(glb.byteLength / 1024).toFixed(0)}KB GLB in ${(performance.now() - t0).toFixed(0)}ms`);
       return true;
     } catch (err) {
@@ -670,7 +803,6 @@ async function boot() {
     }
     if (on) await remesh();
     viewer.setTexturedVisible(on);
-    viewer.setLayers(studio.layers());
   });
 
   $("#show-io").addEventListener("change", (e) => {
@@ -883,6 +1015,9 @@ async function boot() {
   (window as any).__edaShot = () => viewer.screenshotDataUrl();
   (window as any).__edaDrag = (kind: "instance" | "gate", id: string, ground: Vec3) =>
     applyMove(kind, id, ground, "drop");
+  /** One drag FRAME, exactly as the pointer handler drives it. */
+  (window as any).__edaDragMove = (kind: "instance" | "gate", id: string, ground: Vec3) =>
+    dragMove(kind, id, ground);
   // Headless hooks for the verification script: the same paths the mouse and
   // keyboard drive, so a passing check means the UI itself works.
   (window as any).__eda = {
@@ -912,6 +1047,20 @@ async function boot() {
     remesh,
     demo: loadAdderDemo,
     crossing: loadCrossingDemo,
+    /** `{bus, state, promoted}` from the last connect gesture — how the verify
+     *  script checks that a connect AUTO-PROMOTED and said so. */
+    lastConnect: () => lastConnect,
+    /** Draw calls, mesh builds and the wasm round-trips the scene made. */
+    sceneReads: () => ({ ...studio.sceneReads }),
+    sceneMs: () => ({ ...studio.sceneMs }),
+    scene: () => studio.scene(),
+    // ---- profiling hooks (scripts/profile.mjs) ----------------------------
+    profile: () => viewer.profile(),
+    profileReset: () => viewer.profileReset(),
+    timings: () => ({ ...timings }),
+    timingsReset: () => { for (const k of Object.keys(timings)) delete timings[k]; },
+    /** Rebuild the scene from scratch, as a state change would. */
+    refresh,
   };
 }
 
