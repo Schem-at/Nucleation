@@ -714,7 +714,8 @@ export class Design {
      * two adjacent segments are ripped and rerouted atomically. An
      * unroutable move leaves the bus `failed: reason` — visible,
      * never half-routed. Writes `{"state": "...",
-     * "rerouted_segments": n}`.
+     * "rerouted_segments": n, "changed": [layer, ...]}`, where `changed`
+     * is the COMPLETE redraw set (see `changed_layers_since`).
      */
     moveGate(bus, gate, x, y, z) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
@@ -741,6 +742,123 @@ export class Design {
             functionCleanupArena.free();
 
             diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Remove a gate by index and re-realize the bus, so the two spans it
+     * separated MERGE and route as one — removing a checkpoint relaxes a
+     * constraint, so the result is shorter and straighter, not the two old
+     * legs stitched together. Writes the same JSON as `move_gate`:
+     * `{"state", "rerouted_segments", "changed"}`.
+     */
+    removeGate(bus, index) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const busSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, bus)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Design_remove_gate(diplomatReceive.buffer, this.ffiValue, busSlice.ptr, index, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Undo a design port declaration. Removing an ENDPOINT changes the
+     * netlist, so every bus that named it is deleted — pass `force=false`
+     * first to be refused with the list and confirm. An instance port is
+     * derived from its cell's contract; use `set_port_mode` there.
+     *
+     * Writes `{"removed_buses":[...],"rerouted":[...],"failed":{...},
+     * "changed":[...]}`.
+     */
+    removePort(name, force) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const nameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, name)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Design_remove_port(diplomatReceive.buffer, this.ffiValue, nameSlice.ptr, force, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * The current bus-layer GEOMETRY REVISION. Read it before a mutating
+     * call, pass it to `changed_layers_since` after, and redraw exactly
+     * the layers named.
+     */
+    layerRevision() {
+
+        const result = wasm.Design_layer_revision(this.ffiValue);
+
+        try {
+            return result;
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * The COMPLETE set of bus layers whose geometry was rewritten since
+     * `rev`, as a JSON array of names.
+     *
+     * This is the contract a viewer must trust: it is stamped at every
+     * write to a layer's fragment, so it also names layers changed
+     * INDIRECTLY — a crossing stamps a through-bus station into a bus
+     * that was never ripped and appears in no other report. It also names
+     * DELETED layers (a name here that `bus_state` no longer knows means
+     * drop the mesh). `route_bus`, which returns only a state, is covered
+     * by this too: bracket it with `layer_revision`.
+     */
+    changedLayersSince(rev) {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Design_changed_layers_since(this.ffiValue, rev, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
             write.free();
         }
     }
@@ -821,6 +939,73 @@ export class Design {
 
 
         const result = wasm.Design_bus_state(diplomatReceive.buffer, this.ffiValue, nameSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * ONE bus layer's cells as `[[x,y,z,"block"],..]`.
+     *
+     * The live-re-route fast path: `flatten()` rebuilds every layer in the
+     * document to answer "what changed about this one bus". An unrouted bus
+     * yields `[]`.
+     */
+    busBlocksJson(name) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const nameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, name)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Design_bus_blocks_json(diplomatReceive.buffer, this.ffiValue, nameSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * ONE instance's placed cells as `[[x,y,z,"block"],..]`, transform
+     * applied. Same fast path as `bus_blocks_json`.
+     */
+    instanceBlocksJson(name) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const nameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, name)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Design_instance_blocks_json(diplomatReceive.buffer, this.ffiValue, nameSlice.ptr, write.buffer);
 
         try {
             if (!diplomatReceive.resultFlag) {

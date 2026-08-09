@@ -85,6 +85,16 @@ namespace capi {
     typedef struct Design_move_gate_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_move_gate_result;
     Design_move_gate_result Design_move_gate(diplomat::capi::Design* self, diplomat::capi::DiplomatStringView bus, diplomat::capi::DiplomatStringView gate, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Design_remove_gate_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_remove_gate_result;
+    Design_remove_gate_result Design_remove_gate(diplomat::capi::Design* self, diplomat::capi::DiplomatStringView bus, size_t index, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_remove_port_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_remove_port_result;
+    Design_remove_port_result Design_remove_port(diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name, bool force, diplomat::capi::DiplomatWrite* write);
+
+    uint64_t Design_layer_revision(const diplomat::capi::Design* self);
+
+    void Design_changed_layers_since(const diplomat::capi::Design* self, uint64_t rev, diplomat::capi::DiplomatWrite* write);
+
     typedef struct Design_set_bus_rule_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_set_bus_rule_result;
     Design_set_bus_rule_result Design_set_bus_rule(diplomat::capi::Design* self, diplomat::capi::DiplomatStringView bus, diplomat::capi::DiplomatStringView rule_json);
 
@@ -93,6 +103,12 @@ namespace capi {
 
     typedef struct Design_bus_state_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_bus_state_result;
     Design_bus_state_result Design_bus_state(const diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_bus_blocks_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_bus_blocks_json_result;
+    Design_bus_blocks_json_result Design_bus_blocks_json(const diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_instance_blocks_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_instance_blocks_json_result;
+    Design_instance_blocks_json_result Design_instance_blocks_json(const diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name, diplomat::capi::DiplomatWrite* write);
 
     typedef struct Design_rip_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_rip_result;
     Design_rip_result Design_rip(diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name);
@@ -491,6 +507,65 @@ inline diplomat::result<std::monostate, NucleationError> Design::move_gate_write
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
+inline diplomat::result<std::string, NucleationError> Design::remove_gate(std::string_view bus, size_t index) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_remove_gate(this->AsFFI(),
+        {bus.data(), bus.size()},
+        index,
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::remove_gate_write(std::string_view bus, size_t index, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_remove_gate(this->AsFFI(),
+        {bus.data(), bus.size()},
+        index,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Design::remove_port(std::string_view name, bool force) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_remove_port(this->AsFFI(),
+        {name.data(), name.size()},
+        force,
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::remove_port_write(std::string_view name, bool force, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_remove_port(this->AsFFI(),
+        {name.data(), name.size()},
+        force,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline uint64_t Design::layer_revision() const {
+    auto result = diplomat::capi::Design_layer_revision(this->AsFFI());
+    return result;
+}
+
+inline std::string Design::changed_layers_since(uint64_t rev) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::Design_changed_layers_since(this->AsFFI(),
+        rev,
+        &write);
+    return output;
+}
+template<typename W>
+inline void Design::changed_layers_since_write(uint64_t rev, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::Design_changed_layers_since(this->AsFFI(),
+        rev,
+        &write);
+}
+
 inline diplomat::result<std::monostate, NucleationError> Design::set_bus_rule(std::string_view bus, std::string_view rule_json) {
     auto result = diplomat::capi::Design_set_bus_rule(this->AsFFI(),
         {bus.data(), bus.size()},
@@ -527,6 +602,40 @@ template<typename W>
 inline diplomat::result<std::monostate, NucleationError> Design::bus_state_write(std::string_view name, W& writeable) const {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     auto result = diplomat::capi::Design_bus_state(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Design::bus_blocks_json(std::string_view name) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_bus_blocks_json(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::bus_blocks_json_write(std::string_view name, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_bus_blocks_json(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Design::instance_blocks_json(std::string_view name) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_instance_blocks_json(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::instance_blocks_json_write(std::string_view name, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_instance_blocks_json(this->AsFFI(),
         {name.data(), name.size()},
         &write);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));

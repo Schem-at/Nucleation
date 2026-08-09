@@ -226,11 +226,59 @@ public:
    * two adjacent segments are ripped and rerouted atomically. An
    * unroutable move leaves the bus `failed: reason` — visible,
    * never half-routed. Writes `{"state": "...",
-   * "rerouted_segments": n}`.
+   * "rerouted_segments": n, "changed": [layer, ...]}`, where `changed`
+   * is the COMPLETE redraw set (see `changed_layers_since`).
    */
   inline diplomat::result<std::string, NucleationError> move_gate(std::string_view bus, std::string_view gate, int32_t x, int32_t y, int32_t z);
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> move_gate_write(std::string_view bus, std::string_view gate, int32_t x, int32_t y, int32_t z, W& writeable_output);
+
+  /**
+   * Remove a gate by index and re-realize the bus, so the two spans it
+   * separated MERGE and route as one — removing a checkpoint relaxes a
+   * constraint, so the result is shorter and straighter, not the two old
+   * legs stitched together. Writes the same JSON as `move_gate`:
+   * `{"state", "rerouted_segments", "changed"}`.
+   */
+  inline diplomat::result<std::string, NucleationError> remove_gate(std::string_view bus, size_t index);
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> remove_gate_write(std::string_view bus, size_t index, W& writeable_output);
+
+  /**
+   * Undo a design port declaration. Removing an ENDPOINT changes the
+   * netlist, so every bus that named it is deleted — pass `force=false`
+   * first to be refused with the list and confirm. An instance port is
+   * derived from its cell's contract; use `set_port_mode` there.
+   *
+   * Writes `{"removed_buses":[...],"rerouted":[...],"failed":{...},
+   * "changed":[...]}`.
+   */
+  inline diplomat::result<std::string, NucleationError> remove_port(std::string_view name, bool force);
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> remove_port_write(std::string_view name, bool force, W& writeable_output);
+
+  /**
+   * The current bus-layer GEOMETRY REVISION. Read it before a mutating
+   * call, pass it to `changed_layers_since` after, and redraw exactly
+   * the layers named.
+   */
+  inline uint64_t layer_revision() const;
+
+  /**
+   * The COMPLETE set of bus layers whose geometry was rewritten since
+   * `rev`, as a JSON array of names.
+   *
+   * This is the contract a viewer must trust: it is stamped at every
+   * write to a layer's fragment, so it also names layers changed
+   * INDIRECTLY — a crossing stamps a through-bus station into a bus
+   * that was never ripped and appears in no other report. It also names
+   * DELETED layers (a name here that `bus_state` no longer knows means
+   * drop the mesh). `route_bus`, which returns only a state, is covered
+   * by this too: bracket it with `layer_revision`.
+   */
+  inline std::string changed_layers_since(uint64_t rev) const;
+  template<typename W>
+  inline void changed_layers_since_write(uint64_t rev, W& writeable_output) const;
 
   /**
    * Attach a net-class discipline to a bus (JSON `NetClassRule`:
@@ -254,6 +302,25 @@ public:
   inline diplomat::result<std::string, NucleationError> bus_state(std::string_view name) const;
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> bus_state_write(std::string_view name, W& writeable_output) const;
+
+  /**
+   * ONE bus layer's cells as `[[x,y,z,"block"],..]`.
+   *
+   * The live-re-route fast path: `flatten()` rebuilds every layer in the
+   * document to answer "what changed about this one bus". An unrouted bus
+   * yields `[]`.
+   */
+  inline diplomat::result<std::string, NucleationError> bus_blocks_json(std::string_view name) const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> bus_blocks_json_write(std::string_view name, W& writeable_output) const;
+
+  /**
+   * ONE instance's placed cells as `[[x,y,z,"block"],..]`, transform
+   * applied. Same fast path as `bus_blocks_json`.
+   */
+  inline diplomat::result<std::string, NucleationError> instance_blocks_json(std::string_view name) const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> instance_blocks_json_write(std::string_view name, W& writeable_output) const;
 
   /**
    * Rip a bus: clear its fragment, back to `intended`.
