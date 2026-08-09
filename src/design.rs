@@ -1958,6 +1958,7 @@ impl Design {
     /// redraws only what the engine reports, leaves the crossed bus showing
     /// its pre-station geometry.
     fn apply_amendments(&mut self, amendments: Vec<(String, Vec<P3>, BTreeMap<P3, String>)>) {
+        let mut touched: Vec<String> = Vec::new();
         for (bus, removals, additions) in amendments {
             self.touch_bus(&bus);
             let target = self.buses.get_mut(&bus).expect("amended bus exists");
@@ -1975,6 +1976,20 @@ impl Design {
                 target.segments[i].cells.extend(additions.keys().copied());
             }
             target.fragment.extend(additions);
+            touched.push(bus);
+        }
+        // An amendment REMOVES dust from the bus it stations, and a removal
+        // changes the connection state of every wire that pointed at it. Draw
+        // the amended bus again rather than leaving dots around the station.
+        if !touched.is_empty() {
+            let occ = self.occupancy_index();
+            for bus in touched {
+                if let Some(target) = self.buses.get_mut(&bus) {
+                    let mut frag = std::mem::take(&mut target.fragment);
+                    Self::rewire_fragment(&mut frag, &occ);
+                    self.buses.get_mut(&bus).unwrap().fragment = frag;
+                }
+            }
         }
     }
 
@@ -2866,7 +2881,57 @@ impl Design {
                 .map_err(|e| format!("branch for `{port}`: {e}"))?;
             planner.end_segment();
         }
-        Ok(planner.finish())
+        let mut real = planner.finish();
+
+        // TWO STRUCTURAL INVARIANTS, checked here because this is the ONLY
+        // place a bus's geometry comes from. A "routed" bus with nothing built
+        // is the worst possible outcome — green status, empty layer, and a
+        // viewer that trusts the status shows nothing and says everything is
+        // fine. Make it unrepresentable rather than merely unlikely.
+        if real.fragment.is_empty() {
+            return Err(format!(
+                "internal: the plan for {:?} -> {:?} produced NO cells. A routed bus always \
+                 builds something; refusing rather than reporting an empty layer as routed",
+                waypoints[0],
+                waypoints[waypoints.len() - 1]
+            ));
+        }
+        // A gate is a CHECKPOINT: the realized path must actually pass through
+        // it. `plan_column` lays the joint, so a missing gate cell means the
+        // column was never planned — the waypoint was silently skipped.
+        for g in gates {
+            for k in 0..width {
+                let p = add(g.anchor, (0, 2 * k as i32, 0));
+                if !real.fragment.contains_key(&p) {
+                    return Err(format!(
+                        "internal: gate `{}` was not realized — bit {k} of its checkpoint column \
+                         at {:?} is absent from the route, so the bus does not pass through the \
+                         gate it was given",
+                        g.name, p
+                    ));
+                }
+            }
+        }
+
+        // DRAW THE WIRE, not a trail of dots. Every dust cell above was
+        // authored in the fully-spelled-out DEFAULT state — which is right for
+        // interning (a bare `redstone_wire` interns a property-less state that
+        // tick engines never normalise, and those cells sit INERT) but is
+        // geometrically a DOT. Minecraft derives the connection state from the
+        // neighbours at placement time; so do we, here, once the whole fragment
+        // is known. No simulation, no bake: cheap and deterministic.
+        Self::rewire_fragment(&mut real.fragment, &occ);
+        for (_, _, additions) in real.amendments.iter_mut() {
+            Self::rewire_fragment(additions, &occ);
+        }
+        Ok(real)
+    }
+
+    /// Give every dust cell in `cells` its geometrically derived connection
+    /// state, reading the rest of the world out of `occ`.
+    fn rewire_fragment(cells: &mut BTreeMap<P3, String>, occ: &OccupancyIndex) {
+        let outside = |q: P3| -> Option<String> { occ.cells.get(&q).map(|(b, _)| b.clone()) };
+        crate::routing::engine::wire::rewire(cells, &outside);
     }
 
     /// Plan the row->stack FORM ADAPTER for a port whose native geometry is a
@@ -3069,7 +3134,59 @@ impl Design {
             let p = transform_pos(bp, bbox.min, bbox.max, inst.rot_y, inst.at);
             out.insert(p, transform_state(&bs, inst.rot_y));
         }
+        // A PROMOTED port's dust is authored before any bus exists, so in
+        // isolation it is correctly a dot; once a bus lands on it, it must be
+        // drawn connected. This is the single definition of where an instance's
+        // blocks are — shared by `flatten` and `instance_blocks_json` — so
+        // deriving here is what keeps a viewer and an export agreeing about it.
+        //
+        // ONLY the promotion patch's OWN cells. A placed cell is a verified
+        // black box: its interior wire states were authored by whoever built
+        // it, over blocks the wire model does not classify, and rewriting them
+        // breaks working redstone — measured, when this pass covered every dust
+        // in the body it turned the ADD007 -> BINTOBCD001 chain's arithmetic
+        // wrong (1+1 read 0).
+        let ours: BTreeSet<P3> = inst
+            .port_modes
+            .values()
+            .filter(|o| o.mode == PortMode::Bus)
+            .flat_map(|o| o.patch.writes.keys())
+            .map(|bp| transform_pos(*bp, bbox.min, bbox.max, inst.rot_y, inst.at))
+            .collect();
+        let dust: Vec<P3> = out
+            .iter()
+            .filter(|(p, b)| ours.contains(p) && rblocks::is_dust(&b.to_string()))
+            .map(|(p, _)| *p)
+            .collect();
+        if !dust.is_empty() {
+            let mine: BTreeMap<P3, String> =
+                out.iter().map(|(p, b)| (*p, b.to_string())).collect();
+            let at = |q: P3| -> Option<String> { mine.get(&q).cloned().or_else(|| self.neighbour_block(q)) };
+            for p in dust {
+                let power = crate::routing::engine::wire::power_of(&mine[&p]);
+                let derived = crate::routing::engine::wire::derive(p, power, &at);
+                if let Ok(bs) = crate::BlockState::from_block_string(&derived) {
+                    out.insert(p, bs);
+                }
+            }
+        }
         out
+    }
+
+    /// The block at `p` from the layers that can sit beside an instance: the
+    /// routed bus fragments and the loose layer. Other INSTANCES are skipped on
+    /// purpose — influence halos keep two of them from ever touching, so paying
+    /// to scan them all on every neighbour lookup would buy nothing.
+    fn neighbour_block(&self, p: P3) -> Option<String> {
+        for bus in self.buses.values() {
+            if let Some(b) = bus.fragment.get(&p) {
+                return Some(b.clone());
+            }
+        }
+        self.base
+            .get_block(p.0, p.1, p.2)
+            .map(|b| b.to_string())
+            .filter(|b| !b.contains("minecraft:air"))
     }
 
     /// `[[x,y,z,"block"],..]` for ONE bus layer's cells.
@@ -3303,11 +3420,23 @@ impl Design {
             .iter()
             .filter(|o| !interior(&o.fragments.concat()))
             .count();
+        // A bus reported ROUTED must have built something. Nothing upstream can
+        // produce this any more (`realize` refuses an empty plan outright), but
+        // it is asserted here too because it is the single worst state to ship:
+        // green status, empty layer, and a viewer that trusts the status draws
+        // nothing and reports success.
+        let empty_routed: Vec<String> = self
+            .buses
+            .values()
+            .filter(|b| b.state == BusState::Routed && b.fragment.is_empty())
+            .map(|b| b.name.clone())
+            .collect();
         let clean = violations.is_empty()
             && design_opens == 0
             && design_shorts == 0
             && design_cycles == 0
-            && rule_violations.is_empty();
+            && rule_violations.is_empty()
+            && empty_routed.is_empty();
         let bus_states: Vec<String> = self
             .buses
             .values()
@@ -3320,7 +3449,13 @@ impl Design {
                 format!("{:?}:{state}", b.name)
             })
             .collect();
-        let rules: Vec<String> = rule_violations.iter().map(|r| format!("{r:?}")).collect();
+        let mut rules: Vec<String> = rule_violations.iter().map(|r| format!("{r:?}")).collect();
+        for name in &empty_routed {
+            rules.push(format!(
+                "{:?}",
+                format!("bus `{name}` reports ROUTED but built no cells")
+            ));
+        }
         let json = format!(
             "{{\"clean\":{clean},\"drc\":{},\"cells\":{},\"lvs\":{},\"buses\":{{{}}},\
              \"sta\":{sta_json},\"rules\":[{}]}}",

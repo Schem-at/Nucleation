@@ -416,6 +416,22 @@ fn finish(
              canonical vertical 2y-pitch stack onto its form. This port's hardware is neither."
         ));
     }
+    // DRAW THE WIRE. The dust above was authored in the default state, which
+    // interns correctly (a bare `redstone_wire` sits inert) but is
+    // geometrically a DOT. Derive the connection states from the neighbours the
+    // way Minecraft does on placement, reading the cell body for anything the
+    // patch does not itself write.
+    let body_at = |q: P3| -> Option<String> { p.body.at(q) };
+    let mut writes: std::collections::BTreeMap<P3, String> = p
+        .patch
+        .writes
+        .iter()
+        .filter_map(|(q, v)| v.clone().map(|b| (*q, b)))
+        .collect();
+    crate::routing::engine::wire::rewire(&mut writes, &body_at);
+    for (q, b) in writes {
+        p.patch.writes.insert(q, Some(b));
+    }
     p.patch.step = if n == 1 { (0, 2, 0) } else { step };
     p.patch.wires = wires;
     p.patch.hardware = hardware.to_vec();

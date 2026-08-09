@@ -14,6 +14,8 @@
 //! - [`audit`]: structural support audit (port of `audit.py`).
 //! - [`budget`]: the signal budget (decay, refresh interval, stair caps).
 //! - [`via`]: vertical via templates, seeded with the verified torch ladder.
+//! - [`wire`]: GEOMETRIC dust connection states, so authored routes draw as
+//!   wires rather than dots without needing a bake.
 //! - [`fabric`]: the `pnr_core::Fabric` implementation — every rule from the
 //!   design table.
 //! - [`router`]: route / route_all + path emission (dust, supports,
@@ -43,6 +45,7 @@ pub mod region;
 pub mod router;
 pub mod sta;
 pub mod via;
+pub mod wire;
 pub mod workspace;
 
 pub use budget::SignalBudget;

@@ -115,6 +115,7 @@ fn violations(json: &str) -> usize {
 
 /// (a) DRC + LVS clean.
 fn assert_clean(d: &Design, what: &str) {
+    assert_every_routed_bus_built_something(d, what);
     let c = d.check().unwrap_or_else(|e| panic!("{what}: check() failed: {e}"));
     assert!(
         c.clean,
@@ -151,6 +152,27 @@ fn assert_changed_set_complete(
         missed.is_empty(),
         "{what}: changed set UNDER-REPORTS {missed:?} — the studio would keep drawing \
          stale geometry for those layers. reported={reported:?} actually_changed={actually:?}"
+    );
+}
+
+/// A bus reported ROUTED must have BUILT something.
+///
+/// Green status over an empty layer is the worst possible outcome: a viewer that
+/// trusts the status draws nothing and reports success, and nobody finds out
+/// until the build does not work. Asserted GLOBALLY, after every operation, not
+/// just around the API that happened to expose it once.
+fn assert_every_routed_bus_built_something(d: &Design, what: &str) {
+    let geo = geometry(d);
+    let empty: Vec<String> = geo
+        .iter()
+        .filter(|(n, frag)| {
+            frag.is_empty() && d.bus(n).is_some_and(|b| b.state == BusState::Routed)
+        })
+        .map(|(n, _)| n.clone())
+        .collect();
+    assert!(
+        empty.is_empty(),
+        "{what}: bus(es) {empty:?} report ROUTED with ZERO cells — green status, nothing built"
     );
 }
 
@@ -738,4 +760,137 @@ fn a_gate_can_be_added_to_a_bus_between_two_instance_ports() {
     assert_eq!(rep.state, BusState::Routed, "{:?}", rep.state);
     assert!(d.bus("b").unwrap().gates.is_empty());
     assert_clean(&d, "after the gate round trip");
+}
+
+// ----------------------------------------------------------------------
+// Gate realization: a checkpoint the bus does not pass through is a bug
+// ----------------------------------------------------------------------
+
+/// Every bit of every gate's checkpoint column must be IN the realized route.
+fn assert_route_passes_through_gates(d: &Design, bus: &str, what: &str) {
+    let layer = d.bus(bus).expect("bus");
+    if layer.state != BusState::Routed {
+        return;
+    }
+    for g in &layer.gates {
+        for k in 0..W as i32 {
+            let p = (g.anchor.0, g.anchor.1 + 2 * k, g.anchor.2);
+            assert!(
+                layer.fragment.contains_key(&p),
+                "{what}: bus `{bus}` reports routed but bit {k} of gate `{}`'s checkpoint column \
+                 at {p:?} is not in the route — the bus does not pass through its own gate",
+                g.name
+            );
+        }
+    }
+}
+
+/// REGRESSION GUARD for the reported shape: "0 cells with the checkpoint, 1440
+/// without". Adding a gate can only ever ADD constraint, so the gated route
+/// must be non-empty, must pass through the checkpoint, and must cost at least
+/// as much as the free route. Removing it must give the cells back.
+#[test]
+fn adding_a_gate_never_yields_an_empty_or_shorter_route() {
+    for at in [(24, 2, 8), (24, 2, 20), (30, 2, 8), (24, 4, 8)] {
+        let mut d = layout_instances();
+        routed(&mut d, "b", "u0.q", "u1.d");
+        let ungated = d.bus("b").unwrap().fragment.len();
+        assert!(ungated > 0, "the ungated route is empty to begin with");
+
+        let before = geometry(&d);
+        let rev = d.layer_revision();
+        let st = d
+            .add_gate("b", "g0", at, (0, 2, 0))
+            .unwrap_or_else(|e| panic!("add_gate {at:?} refused: {e}"));
+        let what = format!("gate at {at:?}");
+        // A refusal is fine; a green-but-empty bus is not.
+        if st != BusState::Routed {
+            assert!(
+                d.bus("b").unwrap().fragment.is_empty(),
+                "{what}: FAILED but left geometry behind"
+            );
+            continue;
+        }
+        let gated = d.bus("b").unwrap().fragment.len();
+        assert!(gated > 0, "{what}: routed with ZERO cells (was {ungated})");
+        assert_route_passes_through_gates(&d, "b", &what);
+        assert!(
+            gated >= ungated,
+            "{what}: adding a constraint SHORTENED the route ({ungated} -> {gated}) — the \
+             checkpoint cannot have been honoured"
+        );
+        assert_all(&d, &d.changed_layers_since(rev), &before, &what);
+
+        // ...and taking it off gives the cells back without going empty.
+        let rep = d.remove_gate("b", 0).unwrap();
+        assert_eq!(rep.state, BusState::Routed, "{what}: ungating failed");
+        let merged = d.bus("b").unwrap().fragment.len();
+        assert!(merged > 0, "{what}: the MERGED span is empty");
+        assert!(
+            merged <= gated,
+            "{what}: removing the constraint made the route longer ({gated} -> {merged})"
+        );
+        assert_clean(&d, &format!("{what}, ungated again"));
+    }
+}
+
+/// The same on the REAL corpus chain the report was measured against
+/// (`ADD007.sum -> BINTOBCD001.bin`, 1440 cells ungated), including the
+/// off-trunk-level gates the studio's right-click now produces.
+#[test]
+fn gates_on_the_real_corpus_chain_realize() {
+    fn load(file: &str) -> Option<UniversalSchematic> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("computational_schematics/enhanced")
+            .join(file);
+        nucleation::formats::schematic::from_schematic(&std::fs::read(path).ok()?).ok()
+    }
+    let (Some(add), Some(bcd)) = (
+        load("ADD007_8bit_cca_matt_enhanced.schem"),
+        load("BINTOBCD001_8bit_comb_binary_to_bcd_enhanced.schem"),
+    ) else {
+        eprintln!("enhanced corpus unavailable; skipping");
+        return;
+    };
+    let mut base = Design::new("chain");
+    base.add_cell("add", add).unwrap();
+    base.add_cell("bcd", bcd).unwrap();
+    base.place("u0", "add", (0, 0, 0), 0).unwrap();
+    base.place("u1", "bcd", (60, -2, 40), 0).unwrap();
+    base.promote_input("u1", "bin").unwrap();
+    let st = base
+        .route_bus("sum_to_bin", "u0.sum", &["u1.bin"], vec![], BusStyle::default())
+        .unwrap();
+    assert_eq!(st, BusState::Routed, "{:?}", base.bus_state("sum_to_bin"));
+    let ungated = base.bus("sum_to_bin").unwrap().fragment.len();
+    assert!(ungated > 0);
+
+    for at in [(30, 3, 1), (40, 3, 20), (28, 3, 26), (45, 3, 40)] {
+        let mut d = base.clone();
+        let st = d.add_gate("sum_to_bin", "g0", at, (0, 2, 0)).unwrap();
+        let what = format!("corpus gate {at:?}");
+        if st != BusState::Routed {
+            continue; // a refusal is a legitimate answer; emptiness is not
+        }
+        let gated = d.bus("sum_to_bin").unwrap().fragment.len();
+        assert!(gated > 0, "{what}: routed with ZERO cells (ungated was {ungated})");
+        // The 8-bit chain's gate column is 8 bits, not W.
+        let layer = d.bus("sum_to_bin").unwrap();
+        for g in &layer.gates {
+            for k in 0..8i32 {
+                let p = (g.anchor.0, g.anchor.1 + 2 * k, g.anchor.2);
+                assert!(
+                    layer.fragment.contains_key(&p),
+                    "{what}: bit {k} of the checkpoint at {p:?} is not in the route"
+                );
+            }
+        }
+        assert!(gated >= ungated, "{what}: {ungated} -> {gated}");
+        assert_every_routed_bus_built_something(&d, &what);
+
+        let rep = d.remove_gate("sum_to_bin", 0).unwrap();
+        assert_eq!(rep.state, BusState::Routed, "{what}: ungating failed");
+        let merged = d.bus("sum_to_bin").unwrap().fragment.len();
+        assert!(merged > 0 && merged <= gated, "{what}: merged {merged}, gated {gated}");
+    }
 }
