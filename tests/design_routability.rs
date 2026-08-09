@@ -157,6 +157,24 @@ impl Report {
             "  {ok}/{total} routed = {:.1}%",
             100.0 * ok as f64 / total.max(1) as f64
         );
+        // MACHINE-READABLE lines for `tools/routing_report.sh`, which turns
+        // this suite plus the corpus cost vector plus the BCD chain into one
+        // before/after table. Grep-stable on purpose: every routing change is
+        // supposed to be measured against the same three numbers, and a step
+        // with no measured gain has to be visible as such rather than kept
+        // quietly. Format: `RR|key|value`.
+        println!("RR|routability|{ok}/{total}");
+        for a in &self.attempts {
+            if let Some(r) = &a.reason {
+                println!(
+                    "RR|fail|{}::{}|{}",
+                    a.scenario,
+                    a.bus,
+                    category(r)
+                );
+            }
+        }
+        println!("RR|dirty|{}", self.dirty.len());
         if self.dirty.is_empty() {
             println!("  DRC + LVS clean on every scenario");
         } else {

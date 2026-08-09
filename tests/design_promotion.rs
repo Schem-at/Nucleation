@@ -644,6 +644,10 @@ fn the_adder_feeds_the_bcd_converter() {
             ok += 1;
         }
     }
+    // Machine-readable for `tools/routing_report.sh`: the BCD chain is a GUARD
+    // on every routing change, not a routability metric. A routability gain
+    // that breaks this chain is not a gain.
+    println!("RR|bcd_arith|{ok}/{}", cases.len());
     assert_eq!(ok, cases.len(), "the chained adder->BCD arithmetic is wrong");
 }
 
@@ -690,5 +694,6 @@ fn the_full_add_bcd_sevenseg_pipeline() {
             ok += 1;
         }
     }
+    println!("RR|bcd_sevenseg|{ok}/{}", cases.len());
     assert_eq!(ok, cases.len(), "7-segment patterns wrong");
 }
