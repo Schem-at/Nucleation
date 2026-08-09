@@ -587,6 +587,14 @@ fn the_adder_feeds_the_bcd_converter() {
         d.bus_state("sum_to_bin")
     );
 
+    // The cost VECTOR of the real chain, not just "it routed": this is the
+    // number that has to move when the fabric gets smarter.
+    let v = d.bus_cost(d.bus("sum_to_bin").unwrap());
+    println!(
+        "[cost] sum_to_bin length={} delay_rt={} skew_rt={} coherence={} footprint={}",
+        v.length, v.delay_rt, v.skew_rt, v.coherence, v.footprint
+    );
+
     // The artifact bakes.
     let baked = d.bake(20_000).expect("bake");
     println!(

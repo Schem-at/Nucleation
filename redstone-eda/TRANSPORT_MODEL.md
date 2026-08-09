@@ -322,6 +322,10 @@ with `MECHANISM` ∈ the 11 rows, because:
 
 ### Ranked unlocks
 
+> **Ranking item 1 was MEASURED and it is not a pure win. See
+> "MEASURED AGAINST THE ROUTER" at the end of this file before planning work
+> off this list.**
+
 1. **`interferes()`-based clearance instead of the scalar halo.** Pure win, no
    new geometry: it *permits* the four legal adjacencies above and keeps
    forbidding the illegal ones. Every other item below is blocked on it, and it
@@ -362,3 +366,51 @@ with `MECHANISM` ∈ the 11 rows, because:
 * **Bottom slabs / air as supports.** mc-tick never pops pre-placed dust, so
   support legality is a *static* check (`audit.py`) that the sim will not catch;
   `can_occupy` is where it belongs.
+
+## MEASURED AGAINST THE ROUTER (2026-08-10)
+
+Ranked unlock 1 was implemented in Rust
+(`crates/nucleation-routing/src/transport.rs`, 25 tests) and wired into the bus
+fabric, replacing both the blanket instance halo and the "no cell orthogonally
+adjacent to foreign redstone" rule with the real emission ∩ sensitivity test.
+Measured on `tests/design_routability.rs` (45 buses) and on the real
+`ADD007.sum -> BINTOBCD001.bin` chain:
+
+| | before | after |
+|---|---|---|
+| routability | 41/45 = **91.1 %** | 41/45 = **91.1 %** |
+| exclusion histogram | 4 × "no corridor" | 2 × "no corridor", 2 × "endpoint escape" |
+| real chain cost vector | `{1440, 17, 8, 2784, 5621}` | `{1440, 17, 8, 2784, 5621}` |
+| DRC + LVS | clean | clean |
+
+**The model's own #1 unlock buys nothing measurable.** Two things were wrong
+with the prediction, and both are worth more than the prediction was:
+
+1. **The scalar halo was doing DOUBLE duty.** It was never only electrical
+   conservatism; it was also the router's *only* channel-reservation
+   discipline. Replacing it with the exact predicate and nothing else is a
+   measured **11-point regression, 91.1 % → 80.0 %**, because the buses are
+   routed greedily one at a time and the first bus to reach a gap now hugs a
+   cell flank and eats the lane a later bus needed to escape its own port.
+   Charging a `HUG_COST` per column inside a former halo — passable, but
+   impolite — restores the reservation behaviour and holds 91.1 %. The
+   permissiveness is real and available; nothing in the corpus needs it yet.
+2. **The residual failures are not occupancy failures at all.** All four are
+   *congestion and ordering*: a port whose single escape lane was consumed by
+   an earlier bus (`skip4`, `g4`), or a cell body that genuinely walls off the
+   direct line with no in-bound detour (`g2`, `g5`). An earlier audit had
+   already shown they are not search-budget-bound
+   (`design_corridor.rs`, `LADDER`). No clearance predicate can recover them.
+
+So the honest re-ranking, for anyone picking this up: **the next real unlock is
+not on the list above.** It is *negotiated / ordered routing* — rip-up and
+retry, or reserving each port's escape lane before any bus is routed — because
+that is what the measured failures are made of. The mechanism work in items
+2–7 buys density once the router can no longer paint itself into a corner; on
+today's greedy one-bus-at-a-time router it buys freedom the router immediately
+misuses.
+
+One genuine bug did fall out of the port: the Rust material classifier did not
+know that **wool, planks and terracotta are solid**, so it read the verified
+crossing tiles' own wool cut cells as air and "found" shorts in them.
+`transport::classify` is now a faithful port of `materials.py::classify`.
