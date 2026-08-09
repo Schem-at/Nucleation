@@ -527,6 +527,10 @@ typedef struct Design_remove_gate_result { union { NucleationError err; }; bool 
 Design_remove_gate_result Design_remove_gate(Design* self, DiplomatStringView bus, size_t index, DiplomatWrite* write);
 typedef struct Design_remove_port_result { union { NucleationError err; }; bool is_ok; } Design_remove_port_result;
 Design_remove_port_result Design_remove_port(Design* self, DiplomatStringView name, bool force, DiplomatWrite* write);
+typedef struct Design_route_bus_adapted_result { union { NucleationError err; }; bool is_ok; } Design_route_bus_adapted_result;
+Design_route_bus_adapted_result Design_route_bus_adapted(Design* self, DiplomatStringView name, DiplomatStringView driver, DiplomatStringView sinks_csv, DiplomatStringView gates_json, DiplomatStringView style_json, uint8_t align, int32_t shift, bool truncate, DiplomatWrite* write);
+typedef struct Design_bus_width_map_result { union { NucleationError err; }; bool is_ok; } Design_bus_width_map_result;
+Design_bus_width_map_result Design_bus_width_map(Design* self, DiplomatStringView name, DiplomatWrite* write);
 uint64_t Design_layer_revision(Design* self);
 void Design_changed_layers_since(Design* self, uint64_t rev, DiplomatWrite* write);
 typedef struct Design_set_bus_rule_result { union { NucleationError err; }; bool is_ok; } Design_set_bus_rule_result;

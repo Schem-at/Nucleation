@@ -202,6 +202,17 @@ fn shift_len(k: u32, down: bool, since0: u32) -> i32 {
     shift_plan(k, down, since0).0.last().map_or(0, |c| c.0 + 1)
 }
 
+/// The MOST cells a `k`-level shift can ever consume.
+///
+/// The tile's real length depends on how much of the dust budget the leg into
+/// it already spent — a stale arrival buys a leading refresh station, three
+/// cells the caller cannot know about before planning that leg. Placement is
+/// therefore checked against the worst case, so a tile can never grow past the
+/// room reserved for it and leave a gap at its exit.
+fn shift_len_max(k: u32, down: bool) -> i32 {
+    shift_len(k, down, SHIFT_DUST_CAP)
+}
+
 /// A library cell: schematic + resolved contract, stored once and shared by
 /// every instance that references it.
 #[derive(Clone, Debug)]
@@ -4166,6 +4177,10 @@ struct Planner<'a> {
     real: Realization,
     cur_seg: Option<Segment>,
     cur_gate: Option<(String, BTreeSet<P3>)>,
+    /// Level hops taken on the current pair. The hop rung plans cross-level
+    /// legs, which recurse into `plan_pair`; without this a pair that cannot be
+    /// routed at ANY level would hop forever.
+    hops: u32,
 }
 
 impl<'a> Planner<'a> {
@@ -4184,6 +4199,7 @@ impl<'a> Planner<'a> {
             real: Realization::default(),
             cur_seg: None,
             cur_gate: None,
+            hops: 0,
         }
     }
 
@@ -4207,6 +4223,7 @@ impl<'a> Planner<'a> {
         self.real
     }
 
+    #[allow(clippy::type_complexity)]
     fn snapshot(&self) -> (Realization, Option<Segment>, BTreeSet<P3>) {
         (self.real.clone(), self.cur_seg.clone(), self.vacated.clone())
     }
@@ -4352,6 +4369,64 @@ impl<'a> Planner<'a> {
                 }
             }
         }
+        // LAST RUNG: HOP TO A CLEAR LEVEL.
+        //
+        // The pair's own level is congested, but the diagnostic's cross-level
+        // probe often proves a clear corridor exists a few blocks up or down.
+        // That used to be the end of the road — the reason literally said "the
+        // bus form cannot ramp between levels, so shift an endpoint's instance
+        // in y". It CAN ramp now, so use the level shift to go get that lane
+        // instead of asking the user to move a component: hop up, cross at the
+        // clear level, hop back down onto the sink.
+        //
+        // Each leg is cross-level, so it recurses through
+        // `plan_pair_across_levels`; `hops` bounds that.
+        if self.hops == 0 {
+            for dy in [2i32, -2, 4, -4, 6, -6, 8, -8] {
+                let y2 = a.1 + dy;
+                if y2 < 1 {
+                    continue; // the stack's supports would go under the world
+                }
+                let k = dy.unsigned_abs();
+                // Each end needs a shift, plus a cell so neither lands on a port.
+                let leg = shift_len_max(k, dy < 0) + 1;
+                let along_x = (b.0 - a.0).abs() >= (b.2 - a.2).abs();
+                let (span, sign) = if along_x {
+                    ((b.0 - a.0).abs(), (b.0 - a.0).signum())
+                } else {
+                    ((b.2 - a.2).abs(), (b.2 - a.2).signum())
+                };
+                if span < 2 * leg + 1 {
+                    continue;
+                }
+                let (m1, m2) = if along_x {
+                    (
+                        (a.0 + sign * leg, y2, a.2),
+                        (b.0 - sign * leg, y2, b.2),
+                    )
+                } else {
+                    (
+                        (a.0, y2, a.2 + sign * leg),
+                        (b.0, y2, b.2 - sign * leg),
+                    )
+                };
+                self.hops += 1;
+                let hop = (|| -> Result<u32, String> {
+                    let s1 = self.plan_pair(a, m1, width, keep, since0)?;
+                    let s2 = self.plan_pair(m1, m2, width, keep, s1.saturating_add(1))?;
+                    self.plan_pair(m2, b, width, keep, s2.saturating_add(1))
+                })();
+                self.hops -= 1;
+                match hop {
+                    Ok(out) => return Ok(out),
+                    Err(e) => {
+                        self.restore(snap.clone());
+                        tried.push(format!("level hop to y={y2}: {e}"));
+                    }
+                }
+            }
+        }
+
         Err(crate::design_corridor::diagnose(self.occ, a, b, width, &tried))
     }
 
@@ -4373,7 +4448,7 @@ impl<'a> Planner<'a> {
     ) -> Result<u32, String> {
         let k = (b.1 - a.1).unsigned_abs();
         let down = b.1 < a.1;
-        let len = shift_len(k, down, since0);
+        let len = shift_len_max(k, down);
         let places = Self::shift_placements(self.occ, a, b, len, width, keep);
         if places.is_empty() {
             return Err(format!(
@@ -4390,8 +4465,7 @@ impl<'a> Planner<'a> {
         let snap = self.snapshot();
         let mut tried: Vec<String> = Vec::new();
         for (entry, exit, along_x, sign, what) in places {
-            match self.plan_shift_route(a, b, entry, exit, along_x, sign, k, down, width, keep, since0)
-            {
+            match self.plan_shift_route(a, b, entry, along_x, sign, k, down, width, keep, since0) {
                 Ok(out) => return Ok(out),
                 Err(e) => {
                     self.restore(snap.clone());
@@ -4413,7 +4487,6 @@ impl<'a> Planner<'a> {
         a: P3,
         b: P3,
         entry: P3,
-        exit: P3,
         along_x: bool,
         sign: i32,
         k: u32,
@@ -4428,7 +4501,8 @@ impl<'a> Planner<'a> {
                 .plan_pair(a, entry, width, keep, since)
                 .map_err(|e| format!("leg into the shift: {e}"))?;
         }
-        since = self.plan_level_shift(entry, along_x, sign, k, down, width, since)?;
+        let (out, exit) = self.plan_level_shift(entry, along_x, sign, k, down, width, since)?;
+        since = out;
         if exit != b {
             // The tile's exit cell is one more dust cell between refreshes.
             since = self
@@ -4568,7 +4642,7 @@ impl<'a> Planner<'a> {
         down: bool,
         width: u8,
         since0: u32,
-    ) -> Result<u32, String> {
+    ) -> Result<(u32, P3), String> {
         let bus_block = self.style.bus_block.clone();
         let transparent = self.style.transparent_block.clone();
         // Repeater INPUT side faces the driver.
@@ -4630,7 +4704,10 @@ impl<'a> Planner<'a> {
                 }
             }
         }
-        Ok(since_out)
+        // The EXIT is wherever the plan actually ended, not where a
+        // pre-computed length said it would: the caller continues from here.
+        let last = cols.last().expect("a shift plan is never empty");
+        Ok((since_out, pos_at(last.0, entry.1 + last.1)))
     }
 
     /// Plan a multi-leg corridor: a straight run per leg with a joint column

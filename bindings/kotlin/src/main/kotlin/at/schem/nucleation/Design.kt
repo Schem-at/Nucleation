@@ -31,6 +31,8 @@ internal interface DesignLib: Library {
     fun Design_move_gate(handle: Pointer, bus: Slice, gate: Slice, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
     fun Design_remove_gate(handle: Pointer, bus: Slice, index: FFISizet, write: Pointer): ResultUnitInt
     fun Design_remove_port(handle: Pointer, name: Slice, force: Boolean, write: Pointer): ResultUnitInt
+    fun Design_route_bus_adapted(handle: Pointer, name: Slice, driver: Slice, sinksCsv: Slice, gatesJson: Slice, styleJson: Slice, align: FFIUint8, shift: Int, truncate: Boolean, write: Pointer): ResultUnitInt
+    fun Design_bus_width_map(handle: Pointer, name: Slice, write: Pointer): ResultUnitInt
     fun Design_layer_revision(handle: Pointer): FFIUint64
     fun Design_changed_layers_since(handle: Pointer, rev: FFIUint64, write: Pointer): Unit
     fun Design_set_bus_rule(handle: Pointer, bus: Slice, ruleJson: Slice): ResultUnitInt
@@ -717,6 +719,66 @@ class Design internal constructor (
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.Design_remove_port(handle, nameSliceMemory.slice, force, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            nameSliceMemory.close()
+        }
+    }
+
+    /** Declare and route a bus with an explicit WIDTH-ADAPTATION policy, so
+    *a narrower word can drive a wider port.
+    *
+    *`align`: 0 = lsb (bit 0 to bit 0, magnitude preserved), 1 = msb (top
+    *bit to top bit — a shift up by the width difference), 2 = use
+    *`shift` verbatim (positive moves toward the MSB). `truncate` permits
+    *DROPPING source bits that fall outside the destination; without it a
+    *lossy connection is refused, because losing a word's high bits is not
+    *the router's call. Destination bits nothing drives read 0 with no
+    *hardware at all.
+    *
+    *Writes the resulting bus state; `bus_width_map` reports the mapping.
+    */
+    fun routeBusAdapted(name: String, driver: String, sinksCsv: String, gatesJson: String, styleJson: String, align: UByte, shift: Int, truncate: Boolean): Result<String> {
+        val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
+        val driverSliceMemory = PrimitiveArrayTools.borrowUtf8(driver)
+        val sinksCsvSliceMemory = PrimitiveArrayTools.borrowUtf8(sinksCsv)
+        val gatesJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(gatesJson)
+        val styleJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(styleJson)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_route_bus_adapted(handle, nameSliceMemory.slice, driverSliceMemory.slice, sinksCsvSliceMemory.slice, gatesJsonSliceMemory.slice, styleJsonSliceMemory.slice, FFIUint8(align), shift, truncate, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            nameSliceMemory.close()
+            driverSliceMemory.close()
+            sinksCsvSliceMemory.close()
+            gatesJsonSliceMemory.close()
+            styleJsonSliceMemory.close()
+        }
+    }
+
+    /** The resolved bit mapping of a width-adapted bus (`null` when the
+    *widths matched): `{"map":{...,"pairs":[[dbit,sbit],..]},"note":".."}`.
+    */
+    fun busWidthMap(name: String): Result<String> {
+        val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_bus_width_map(handle, nameSliceMemory.slice, write);
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {

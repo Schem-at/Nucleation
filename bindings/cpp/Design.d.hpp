@@ -258,6 +258,32 @@ public:
   inline diplomat::result<std::monostate, NucleationError> remove_port_write(std::string_view name, bool force, W& writeable_output);
 
   /**
+   * Declare and route a bus with an explicit WIDTH-ADAPTATION policy, so
+   * a narrower word can drive a wider port.
+   *
+   * `align`: 0 = lsb (bit 0 to bit 0, magnitude preserved), 1 = msb (top
+   * bit to top bit — a shift up by the width difference), 2 = use
+   * `shift` verbatim (positive moves toward the MSB). `truncate` permits
+   * DROPPING source bits that fall outside the destination; without it a
+   * lossy connection is refused, because losing a word's high bits is not
+   * the router's call. Destination bits nothing drives read 0 with no
+   * hardware at all.
+   *
+   * Writes the resulting bus state; `bus_width_map` reports the mapping.
+   */
+  inline diplomat::result<std::string, NucleationError> route_bus_adapted(std::string_view name, std::string_view driver, std::string_view sinks_csv, std::string_view gates_json, std::string_view style_json, uint8_t align, int32_t shift, bool truncate);
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> route_bus_adapted_write(std::string_view name, std::string_view driver, std::string_view sinks_csv, std::string_view gates_json, std::string_view style_json, uint8_t align, int32_t shift, bool truncate, W& writeable_output);
+
+  /**
+   * The resolved bit mapping of a width-adapted bus (`null` when the
+   * widths matched): `{"map":{...,"pairs":[[dbit,sbit],..]},"note":".."}`.
+   */
+  inline diplomat::result<std::string, NucleationError> bus_width_map(std::string_view name) const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> bus_width_map_write(std::string_view name, W& writeable_output) const;
+
+  /**
    * The current bus-layer GEOMETRY REVISION. Read it before a mutating
    * call, pass it to `changed_layers_since` after, and redraw exactly
    * the layers named.

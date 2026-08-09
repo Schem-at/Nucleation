@@ -819,6 +819,84 @@ export class Design {
     }
 
     /**
+     * Declare and route a bus with an explicit WIDTH-ADAPTATION policy, so
+     * a narrower word can drive a wider port.
+     *
+     * `align`: 0 = lsb (bit 0 to bit 0, magnitude preserved), 1 = msb (top
+     * bit to top bit — a shift up by the width difference), 2 = use
+     * `shift` verbatim (positive moves toward the MSB). `truncate` permits
+     * DROPPING source bits that fall outside the destination; without it a
+     * lossy connection is refused, because losing a word's high bits is not
+     * the router's call. Destination bits nothing drives read 0 with no
+     * hardware at all.
+     *
+     * Writes the resulting bus state; `bus_width_map` reports the mapping.
+     */
+    routeBusAdapted(name, driver, sinksCsv, gatesJson, styleJson, align, shift, truncate) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const nameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, name)));
+        const driverSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, driver)));
+        const sinksCsvSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, sinksCsv)));
+        const gatesJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, gatesJson)));
+        const styleJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, styleJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Design_route_bus_adapted(diplomatReceive.buffer, this.ffiValue, nameSlice.ptr, driverSlice.ptr, sinksCsvSlice.ptr, gatesJsonSlice.ptr, styleJsonSlice.ptr, align, shift, truncate, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * The resolved bit mapping of a width-adapted bus (`null` when the
+     * widths matched): `{"map":{...,"pairs":[[dbit,sbit],..]},"note":".."}`.
+     */
+    busWidthMap(name) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const nameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, name)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Design_bus_width_map(diplomatReceive.buffer, this.ffiValue, nameSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
      * The current bus-layer GEOMETRY REVISION. Read it before a mutating
      * call, pass it to `changed_layers_since` after, and redraw exactly
      * the layers named.

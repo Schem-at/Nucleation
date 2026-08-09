@@ -91,6 +91,12 @@ namespace capi {
     typedef struct Design_remove_port_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_remove_port_result;
     Design_remove_port_result Design_remove_port(diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name, bool force, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Design_route_bus_adapted_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_route_bus_adapted_result;
+    Design_route_bus_adapted_result Design_route_bus_adapted(diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name, diplomat::capi::DiplomatStringView driver, diplomat::capi::DiplomatStringView sinks_csv, diplomat::capi::DiplomatStringView gates_json, diplomat::capi::DiplomatStringView style_json, uint8_t align, int32_t shift, bool truncate, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_bus_width_map_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_bus_width_map_result;
+    Design_bus_width_map_result Design_bus_width_map(const diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name, diplomat::capi::DiplomatWrite* write);
+
     uint64_t Design_layer_revision(const diplomat::capi::Design* self);
 
     void Design_changed_layers_since(const diplomat::capi::Design* self, uint64_t rev, diplomat::capi::DiplomatWrite* write);
@@ -541,6 +547,54 @@ inline diplomat::result<std::monostate, NucleationError> Design::remove_port_wri
     auto result = diplomat::capi::Design_remove_port(this->AsFFI(),
         {name.data(), name.size()},
         force,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Design::route_bus_adapted(std::string_view name, std::string_view driver, std::string_view sinks_csv, std::string_view gates_json, std::string_view style_json, uint8_t align, int32_t shift, bool truncate) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_route_bus_adapted(this->AsFFI(),
+        {name.data(), name.size()},
+        {driver.data(), driver.size()},
+        {sinks_csv.data(), sinks_csv.size()},
+        {gates_json.data(), gates_json.size()},
+        {style_json.data(), style_json.size()},
+        align,
+        shift,
+        truncate,
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::route_bus_adapted_write(std::string_view name, std::string_view driver, std::string_view sinks_csv, std::string_view gates_json, std::string_view style_json, uint8_t align, int32_t shift, bool truncate, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_route_bus_adapted(this->AsFFI(),
+        {name.data(), name.size()},
+        {driver.data(), driver.size()},
+        {sinks_csv.data(), sinks_csv.size()},
+        {gates_json.data(), gates_json.size()},
+        {style_json.data(), style_json.size()},
+        align,
+        shift,
+        truncate,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Design::bus_width_map(std::string_view name) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_bus_width_map(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::bus_width_map_write(std::string_view name, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_bus_width_map(this->AsFFI(),
+        {name.data(), name.size()},
         &write);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }

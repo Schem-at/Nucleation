@@ -422,9 +422,10 @@ fn cross_level_probe(occ: &OccupancyIndex, a: P3, b: P3, width: u8) -> String {
             .to_string();
     }
     format!(
-        " A clear corridor DOES exist at y={} — this bus's level is the problem, not the \
-         workspace. The bus form is a single-level 2y-pitch stack and cannot ramp between levels, \
-         so shift an endpoint's instance in y instead of clearing space.",
+        " A clear corridor DOES exist at y={}, and the router TRIED to hop there with a level \
+         shift and could not fit one — a shift needs a straight run at each end, so the pair is \
+         too short for the detour rather than blocked outright. Lengthen the run, or split it with \
+         a gate at the clear level.",
         clear
             .iter()
             .map(|y| y.to_string())
