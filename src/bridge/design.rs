@@ -451,7 +451,8 @@ pub mod ffi {
         /// two adjacent segments are ripped and rerouted atomically. An
         /// unroutable move leaves the bus `failed: reason` — visible,
         /// never half-routed. Writes `{"state": "...",
-        /// "rerouted_segments": n}`.
+        /// "rerouted_segments": n, "changed": [layer, ...]}`, where `changed`
+        /// is the COMPLETE redraw set (see `changed_layers_since`).
         pub fn move_gate(
             &mut self,
             bus: &DiplomatStr,
@@ -468,13 +469,43 @@ pub mod ffi {
                     crate::bridge::set_last_error_detail(e);
                     NucleationError::InvalidArgument
                 })?;
+            let changed: Vec<String> =
+                report.changed.iter().map(|n| format!("{n:?}")).collect();
             let _ = write!(
                 out,
-                "{{\"state\":{:?},\"rerouted_segments\":{}}}",
+                "{{\"state\":{:?},\"rerouted_segments\":{},\"changed\":[{}]}}",
                 state_str(&report.state),
-                report.rerouted_segments
+                report.rerouted_segments,
+                changed.join(",")
             );
             Ok(())
+        }
+
+        /// The current bus-layer GEOMETRY REVISION. Read it before a mutating
+        /// call, pass it to `changed_layers_since` after, and redraw exactly
+        /// the layers named.
+        pub fn layer_revision(&self) -> u64 {
+            self.0.layer_revision()
+        }
+
+        /// The COMPLETE set of bus layers whose geometry was rewritten since
+        /// `rev`, as a JSON array of names.
+        ///
+        /// This is the contract a viewer must trust: it is stamped at every
+        /// write to a layer's fragment, so it also names layers changed
+        /// INDIRECTLY — a crossing stamps a through-bus station into a bus
+        /// that was never ripped and appears in no other report. It also names
+        /// DELETED layers (a name here that `bus_state` no longer knows means
+        /// drop the mesh). `route_bus`, which returns only a state, is covered
+        /// by this too: bracket it with `layer_revision`.
+        pub fn changed_layers_since(&self, rev: u64, out: &mut DiplomatWrite) {
+            let names: Vec<String> = self
+                .0
+                .changed_layers_since(rev)
+                .iter()
+                .map(|n| format!("{n:?}"))
+                .collect();
+            let _ = write!(out, "[{}]", names.join(","));
         }
 
         /// Attach a net-class discipline to a bus (JSON `NetClassRule`:

@@ -681,6 +681,12 @@ pub struct MoveReport {
     pub rerouted: Vec<String>,
     /// Buses left in `FAILED(reason)` after the bounded negotiation.
     pub failed: Vec<(String, String)>,
+    /// EVERY bus layer whose realized geometry was rewritten, in name order —
+    /// the studio's redraw set. See [`Design::changed_layers_since`] for the
+    /// guarantee: it is a superset of `rerouted` + `failed`, because it also
+    /// names buses amended INDIRECTLY (a crossing station stamped into a bus
+    /// that was never ripped) and buses that were deleted.
+    pub changed: Vec<String>,
 }
 
 impl MoveReport {
@@ -692,10 +698,12 @@ impl MoveReport {
             .iter()
             .map(|(n, why)| format!("{n:?}:{why:?}"))
             .collect();
+        let c: Vec<String> = self.changed.iter().map(|n| format!("{n:?}")).collect();
         format!(
-            "{{\"rerouted\":[{}],\"failed\":{{{}}}}}",
+            "{{\"rerouted\":[{}],\"failed\":{{{}}},\"changed\":[{}]}}",
             r.join(","),
-            f.join(",")
+            f.join(","),
+            c.join(",")
         )
     }
 }
@@ -734,6 +742,10 @@ pub struct GateMoveReport {
     /// Segments ripped and rerouted (2 for a partial gate drag; the full
     /// segment count when the bus needed a whole-bus reroute).
     pub rerouted_segments: usize,
+    /// Every bus layer whose geometry was rewritten — the dragged bus, plus
+    /// any bus a crossing amendment touched. See
+    /// [`Design::changed_layers_since`].
+    pub changed: Vec<String>,
 }
 
 /// Outcome of [`Design::check`].
@@ -755,6 +767,13 @@ pub struct Design {
     ports: BTreeMap<String, DesignPort>,
     buses: BTreeMap<String, BusLayer>,
     auto_promote: bool,
+    /// GEOMETRY REVISION per bus layer — see [`Design::changed_layers_since`].
+    /// Runtime-only (never serialized): a reloaded document starts every layer
+    /// at revision 1, which is correct, because a fresh reader has drawn
+    /// nothing yet.
+    bus_revs: BTreeMap<String, u64>,
+    /// Monotonic clock stamped into `bus_revs`.
+    rev_clock: u64,
 }
 
 impl Design {
@@ -769,7 +788,88 @@ impl Design {
             ports: BTreeMap::new(),
             buses: BTreeMap::new(),
             auto_promote: true,
+            bus_revs: BTreeMap::new(),
+            rev_clock: 0,
         }
+    }
+
+    // ------------------------------------------------------------------
+    // The CHANGED-LAYER CONTRACT
+    // ------------------------------------------------------------------
+
+    /// The current geometry revision. Read it BEFORE a mutating call, pass it
+    /// to [`Design::changed_layers_since`] after, and redraw exactly the
+    /// layers it names.
+    pub fn layer_revision(&self) -> u64 {
+        self.rev_clock
+    }
+
+    /// Bus layers whose realized geometry may have been REWRITTEN since
+    /// revision `rev`, in name order. This is the studio's redraw set, and it
+    /// is **complete by construction**: the revision is stamped at every
+    /// single write to a layer's fragment, so no operation can change a layer
+    /// without naming it. Specifically it includes
+    ///
+    /// - the bus an operation was aimed at, whether it ended `Routed` or
+    ///   `FAILED` (both directions of the transition are stamped);
+    /// - every bus RIPPED and co-rerouted because a moved instance's
+    ///   footprint, influence halo, or PORTS touched it;
+    /// - every bus amended INDIRECTLY — a crossing stamps a through-bus
+    ///   station into a bus that was never ripped and is not otherwise named
+    ///   in any report. Missing these is the classic "I moved a component and
+    ///   the bus didn't update" stale-mesh bug;
+    /// - every bus DELETED (a layer named here that [`Design::bus`] no longer
+    ///   knows is a removal: drop the mesh).
+    ///
+    /// It may over-report: a bus ripped and re-routed to byte-identical
+    /// geometry is still named. Redrawing it is wasted work, never a wrong
+    /// picture, and `tests/design_reroute_stress.rs` pins the guarantee by
+    /// comparing this set against a block-by-block diff.
+    pub fn changed_layers_since(&self, rev: u64) -> Vec<String> {
+        self.bus_revs
+            .iter()
+            .filter(|(_, r)| **r > rev)
+            .map(|(n, _)| n.clone())
+            .collect()
+    }
+
+    /// Stamp a layer as rewritten. Called from EVERY write to a bus
+    /// fragment — including the indirect ones (crossing amendments) — so
+    /// [`Design::changed_layers_since`] cannot under-report.
+    fn touch_bus(&mut self, name: &str) {
+        self.rev_clock += 1;
+        self.bus_revs.insert(name.to_string(), self.rev_clock);
+    }
+
+    /// Every bus layer's realized geometry — the independent oracle the
+    /// changed-layer contract is tested against (and a cheap way for a caller
+    /// that would rather diff than track revisions).
+    pub fn bus_geometry(&self) -> BTreeMap<String, BTreeMap<P3, String>> {
+        self.buses
+            .iter()
+            .map(|(n, b)| (n.clone(), b.fragment.clone()))
+            .collect()
+    }
+
+    /// Bus layers whose blocks actually differ from a [`Design::bus_geometry`]
+    /// snapshot, in name order — appearances and removals included.
+    pub fn layers_differing_from(
+        &self,
+        before: &BTreeMap<String, BTreeMap<P3, String>>,
+    ) -> Vec<String> {
+        let now = self.bus_geometry();
+        let mut out: BTreeSet<String> = BTreeSet::new();
+        for (n, frag) in &now {
+            if before.get(n) != Some(frag) {
+                out.insert(n.clone());
+            }
+        }
+        for n in before.keys() {
+            if !now.contains_key(n) {
+                out.insert(n.clone());
+            }
+        }
+        out.into_iter().collect()
     }
 
     /// A design whose loose block layer is `base` (endpoint hardware placed
@@ -950,6 +1050,7 @@ impl Design {
                 note: format!("`{instance}.{port}` is already in {} mode", mode.as_str()),
             });
         }
+        let rev0 = self.layer_revision();
         // Plan the patch once and remember it, so toggling is symmetric.
         if !self.instances[idx].port_modes.contains_key(port) {
             let patch = self.plan_port_patch(instance, port)?;
@@ -975,6 +1076,7 @@ impl Design {
             .map(|b| b.name.clone())
             .collect();
         for b in &doomed {
+            self.touch_bus(b);
             self.buses.remove(b);
         }
         // Everything that touched the instance's space is re-attempted.
@@ -1002,7 +1104,7 @@ impl Design {
                 _ => {}
             }
         }
-        let moves = self.co_reroute(affected);
+        let moves = self.co_reroute(affected, rev0);
         let over = self.instances[idx].port_modes[port].clone();
         let inst = &self.instances[idx];
         let cell = &self.cells[&inst.cell];
@@ -1257,6 +1359,7 @@ impl Design {
             .iter()
             .position(|i| i.name == name)
             .ok_or_else(|| format!("unknown instance `{name}`"))?;
+        let rev0 = self.layer_revision();
         let region = self.instance_region(idx);
         let prefix = format!("{name}.");
 
@@ -1291,10 +1394,11 @@ impl Design {
             }
         }
         for b in &doomed {
+            self.touch_bus(b);
             self.buses.remove(b);
         }
         self.instances.remove(idx);
-        let moves = self.co_reroute(affected);
+        let moves = self.co_reroute(affected, rev0);
         Ok(RemoveReport {
             removed_buses: doomed,
             moves,
@@ -1800,6 +1904,7 @@ impl Design {
             }
         }
         let state = layer.state.clone();
+        self.touch_bus(&name);
         self.buses.insert(name, layer);
         Ok(state)
     }
@@ -1839,8 +1944,13 @@ impl Design {
 
     /// Apply crossing amendments to the buses they target, keeping their
     /// fragments AND per-segment cell sets consistent.
+    /// An amendment rewrites a bus that was never ripped and is named in NO
+    /// report, so it is stamped as changed here — otherwise the studio, which
+    /// redraws only what the engine reports, leaves the crossed bus showing
+    /// its pre-station geometry.
     fn apply_amendments(&mut self, amendments: Vec<(String, Vec<P3>, BTreeMap<P3, String>)>) {
         for (bus, removals, additions) in amendments {
+            self.touch_bus(&bus);
             let target = self.buses.get_mut(&bus).expect("amended bus exists");
             // The segment losing cells also receives the station cells.
             let seg_idx = removals
@@ -1879,13 +1989,22 @@ impl Design {
             .iter()
             .position(|i| i.name == name)
             .ok_or_else(|| format!("unknown instance `{name}`"))?;
+        let rev0 = self.layer_revision();
         let old_region = self.instance_region(idx);
         // The move itself always succeeds.
         self.instances[idx].at = at;
         self.instances[idx].rot_y = rot_y.rem_euclid(360);
         let new_region = self.instance_region(idx);
 
-        let mut affected: BTreeSet<String> = BTreeSet::new();
+        // Buses WIRED to this instance move with it: their endpoint anchors
+        // are derived from the instance transform, so a bus that keeps its old
+        // fragment is now wired to where the ports USED to be. This must not
+        // depend on the fragment intersecting the region — a cell that
+        // declares explicit `keepouts` can have a halo that excludes the very
+        // cell its port's bus leaves along, and then the fragment test misses
+        // it. That was the "I moved a component and the bus didn't update"
+        // bug: the geometry silently kept pointing at the old position.
+        let mut affected: BTreeSet<String> = self.buses_wired_to(name);
         for bus in self.buses.values() {
             match &bus.state {
                 BusState::Routed => {
@@ -1905,7 +2024,24 @@ impl Design {
                 BusState::Intended => {}
             }
         }
-        Ok(self.co_reroute(affected))
+        Ok(self.co_reroute(affected, rev0))
+    }
+
+    /// Buses whose declaration names a port OF this instance (`inst.port`) —
+    /// the buses an instance carries with it when it moves, and the ones that
+    /// cannot survive its removal.
+    fn buses_wired_to(&self, instance: &str) -> BTreeSet<String> {
+        let prefix = format!("{instance}.");
+        self.buses
+            .values()
+            .filter(|b| {
+                b.driver_names()
+                    .iter()
+                    .chain(b.sinks.iter())
+                    .any(|p| p.starts_with(&prefix))
+            })
+            .map(|b| b.name.clone())
+            .collect()
     }
 
     /// Footprint + influence halo of an instance, as a cell set.
@@ -1964,7 +2100,7 @@ impl Design {
     /// because a peer's fresh fragment contested its cells is retried
     /// after the peers commit. No exceptions: survivors are `Routed`,
     /// the rest `FAILED(reason)`.
-    fn co_reroute(&mut self, affected: BTreeSet<String>) -> MoveReport {
+    fn co_reroute(&mut self, affected: BTreeSet<String>, rev0: u64) -> MoveReport {
         const ROUNDS: usize = 3;
         for name in &affected {
             let _ = self.rip(name);
@@ -1991,6 +2127,10 @@ impl Design {
                 report.failed.push((name.clone(), reason.clone()));
             }
         }
+        // The redraw set is MEASURED from the revision stamps, not inferred
+        // from `affected`: it also picks up buses that were never ripped but
+        // had a crossing station amended into them by a peer's fresh route.
+        report.changed = self.changed_layers_since(rev0);
         report
     }
 
@@ -2010,6 +2150,7 @@ impl Design {
                 Ok(p) => driver_ports.push(p),
                 Err(why) => {
                     let state = BusState::Failed(format!("driver port `{dn}`: {why}"));
+                    self.touch_bus(name);
                     self.buses.get_mut(name).unwrap().state = state.clone();
                     return state;
                 }
@@ -2021,6 +2162,7 @@ impl Design {
                 Ok(p) => sink_ports.push(p),
                 Err(why) => {
                     let state = BusState::Failed(format!("sink port `{sn}`: {why}"));
+                    self.touch_bus(name);
                     self.buses.get_mut(name).unwrap().state = state.clone();
                     return state;
                 }
@@ -2028,12 +2170,14 @@ impl Design {
         }
         match self.realize(Some(name), &driver_ports, &sink_ports, &gates, &style) {
             Ok(real) => {
+                self.touch_bus(name);
                 let layer = self.buses.get_mut(name).unwrap();
                 Self::fill_layer(layer, real.fragment, real.segments, real.gate_cells);
                 self.apply_amendments(real.amendments);
                 BusState::Routed
             }
             Err(reason) => {
+                self.touch_bus(name);
                 let layer = self.buses.get_mut(name).unwrap();
                 layer.fragment.clear();
                 layer.runs.clear();
@@ -2100,6 +2244,7 @@ impl Design {
     /// An unroutable move leaves the bus `FAILED(reason)` with the
     /// fragment cleared — visible, never half-routed.
     pub fn move_gate(&mut self, bus: &str, gate: &str, anchor: P3) -> Result<GateMoveReport, String> {
+        let rev0 = self.layer_revision();
         let layer = self
             .buses
             .get(bus)
@@ -2135,6 +2280,7 @@ impl Design {
             return Ok(GateMoveReport {
                 state,
                 rerouted_segments: n,
+                changed: self.changed_layers_since(rev0),
             });
         };
 
@@ -2169,6 +2315,7 @@ impl Design {
             return Ok(GateMoveReport {
                 state,
                 rerouted_segments: n,
+                changed: self.changed_layers_since(rev0),
             });
         }
 
@@ -2209,6 +2356,7 @@ impl Design {
 
         match plan {
             Ok(()) => {
+                self.touch_bus(bus);
                 let layer = self.buses.get_mut(bus).unwrap();
                 for p in &ripped {
                     layer.fragment.remove(p);
@@ -2225,6 +2373,7 @@ impl Design {
                 Ok(GateMoveReport {
                     state: BusState::Routed,
                     rerouted_segments: 2,
+                    changed: self.changed_layers_since(rev0),
                 })
             }
             Err(reason) => {
@@ -2232,6 +2381,7 @@ impl Design {
                     "segment {:?} -> {:?} -> {:?} (gate `{gate}`): {reason}",
                     wp_before, anchor, wp_after
                 );
+                self.touch_bus(bus);
                 let layer = self.buses.get_mut(bus).unwrap();
                 layer.fragment.clear();
                 layer.runs.clear();
@@ -2241,6 +2391,7 @@ impl Design {
                 Ok(GateMoveReport {
                     state: BusState::Failed(reason),
                     rerouted_segments: 2,
+                    changed: self.changed_layers_since(rev0),
                 })
             }
         }
@@ -2250,10 +2401,11 @@ impl Design {
     /// amendments stamped into OTHER buses by crossings stay (they remain
     /// electrically sound straight-line refreshes).
     pub fn rip(&mut self, name: &str) -> Result<(), String> {
-        let bus = self
-            .buses
-            .get_mut(name)
-            .ok_or_else(|| format!("unknown bus `{name}`"))?;
+        if !self.buses.contains_key(name) {
+            return Err(format!("unknown bus `{name}`"));
+        }
+        self.touch_bus(name);
+        let bus = self.buses.get_mut(name).expect("checked above");
         bus.fragment.clear();
         bus.runs.clear();
         bus.segments.clear();
@@ -2277,7 +2429,7 @@ impl Design {
     /// [`Design::rip`] (which keeps the declaration so it can be rerouted),
     /// the name becomes free again.
     pub fn remove_bus(&mut self, name: &str) -> Result<(), String> {
-        self.rip(name)?;
+        self.rip(name)?; // stamps the layer as changed
         self.buses.remove(name);
         Ok(())
     }
@@ -3190,6 +3342,11 @@ impl Design {
             // Policy, not document state: a reloaded design routes the same way
             // a fresh one does.
             auto_promote: true,
+            // A reloaded document starts every layer at revision 0: a fresh
+            // reader has drawn nothing yet, so nothing needs reporting until
+            // the first edit.
+            bus_revs: BTreeMap::new(),
+            rev_clock: 0,
         }
     }
 }
