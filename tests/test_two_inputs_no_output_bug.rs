@@ -79,6 +79,8 @@ fn test_two_inputs_no_output_power_propagation() {
     inputs.insert(
         "b".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(3, 1, 2)],
@@ -87,6 +89,8 @@ fn test_two_inputs_no_output_power_propagation() {
     inputs.insert(
         "region_2".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 2)],
@@ -143,6 +147,8 @@ fn test_two_inputs_no_output_power_propagation() {
     outputs.insert(
         "region_3".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 0)], // Output at the problematic position
@@ -230,6 +236,8 @@ fn test_single_input_no_output_works() {
     inputs.insert(
         "b".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(3, 1, 2)],

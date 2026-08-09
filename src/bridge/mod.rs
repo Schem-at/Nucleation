@@ -10,15 +10,48 @@
 
 pub mod shared;
 
+thread_local! {
+    /// Why the last failing bridge call on this thread failed, in words.
+    ///
+    /// [`shared::ffi::NucleationError`] is a bare enum — the FFI cannot carry
+    /// a message in the error itself — so modules that know the real story
+    /// (mc_tick's constructors, principally) park it here on every failure
+    /// path and clear it on success. Read back through
+    /// `NucleationError::detail` or `TickSimulation::last_error_detail`.
+    static LAST_ERROR_DETAIL: std::cell::RefCell<String> =
+        const { std::cell::RefCell::new(String::new()) };
+}
+
+/// Record why the bridge call that is about to fail failed.
+pub(crate) fn set_last_error_detail(detail: impl Into<String>) {
+    LAST_ERROR_DETAIL.with(|e| *e.borrow_mut() = detail.into());
+}
+
+/// Forget the previous failure's story, so a stale detail is never read as
+/// this call's.
+pub(crate) fn clear_last_error_detail() {
+    LAST_ERROR_DETAIL.with(|e| e.borrow_mut().clear());
+}
+
+/// The last recorded failure detail on this thread; empty when the last
+/// detail-carrying call succeeded.
+pub(crate) fn last_error_detail() -> String {
+    LAST_ERROR_DETAIL.with(|e| e.borrow().clone())
+}
+
 pub mod animation;
 pub mod autostack;
 pub mod blocks;
 pub mod building;
 pub mod definition_region;
+#[cfg(feature = "routing")]
+pub mod design;
 pub mod diff;
 pub mod distance_field;
 pub mod field;
 pub mod geo;
+#[cfg(feature = "hdl")]
+pub mod hdl;
 #[cfg(feature = "mc-tick")]
 pub mod mc_tick;
 #[cfg(feature = "meshing")]
@@ -26,6 +59,8 @@ pub mod meshing;
 pub mod nbt;
 #[cfg(feature = "rendering")]
 pub mod rendering;
+#[cfg(feature = "routing")]
+pub mod routing;
 pub mod schematic;
 pub mod schematic_builder;
 #[cfg(any(feature = "scripting-lua", feature = "scripting-js"))]

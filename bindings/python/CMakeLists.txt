@@ -84,4 +84,8 @@ target_include_directories(nucleation PRIVATE "${NB_PKG_DIR}/ext/robin_map/inclu
 target_compile_features(nucleation PUBLIC cxx_std_20)
 target_link_libraries(nucleation PUBLIC nucleation_rust ${Python3_SABI_LIBRARY})
 
-install(TARGETS nucleation LIBRARY DESTINATION .)
+# The extension lands INSIDE the veneer package (nucleation/) so that
+# `import nucleation` resolves to the hand-written Python layer, which
+# re-exports the compiled core as its `nucleation.nucleation` submodule
+# (the PyInit_nucleation symbol matches the last dotted component).
+install(TARGETS nucleation LIBRARY DESTINATION nucleation)

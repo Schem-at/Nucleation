@@ -1,0 +1,15 @@
+[package]
+name = "pnr-core"
+version = "0.1.0"
+edition = "2021"
+description = "Fabric-agnostic place-and-route algorithms: grid A*, negotiated congestion, interval colouring, union-find net checking, simulated annealing, generic STA"
+license = "MIT"
+
+# Zero dependencies on purpose: this crate is pure algorithms behind the
+# `Fabric` trait seam, must compile for wasm32-unknown-unknown, and must be
+# deterministic (seeded RNG implemented in-crate, no `rand`, no fs, no
+# threads, no clocks).
+[dependencies]
+
+[lints.rust]
+missing_docs = "warn"

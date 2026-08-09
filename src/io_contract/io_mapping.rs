@@ -2,10 +2,12 @@
 //!
 //! Maps a semantic type to physical redstone positions through a layout function.
 
+use super::physical::{Face, PortDirection};
 use super::{IoType, LayoutFunction, Value};
+use serde::{Deserialize, Serialize};
 
 /// Maps a semantic IO type to physical positions
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IoMapping {
     /// The semantic type (what the user sees)
     pub io_type: IoType,
@@ -15,6 +17,15 @@ pub struct IoMapping {
 
     /// Physical redstone positions (x, y, z)
     pub positions: Vec<(i32, i32, i32)>,
+
+    /// Which cell face this port presents on (physical contract; optional)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub face: Option<Face>,
+
+    /// Signal direction as seen from the cell (in/out; optional — implied by
+    /// the input/output map the port lives in when absent)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direction: Option<PortDirection>,
 }
 
 impl IoMapping {
@@ -28,9 +39,23 @@ impl IoMapping {
             io_type,
             layout,
             positions,
+            face: None,
+            direction: None,
         };
         mapping.validate()?;
         Ok(mapping)
+    }
+
+    /// Set the cell face this port presents on
+    pub fn with_face(mut self, face: Face) -> Self {
+        self.face = Some(face);
+        self
+    }
+
+    /// Set the port direction (in/out)
+    pub fn with_direction(mut self, direction: PortDirection) -> Self {
+        self.direction = Some(direction);
+        self
     }
 
     /// Validate that the mapping is consistent

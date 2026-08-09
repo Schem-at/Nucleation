@@ -68,6 +68,8 @@ fn test_exact_failing_topology() {
     inputs.insert(
         "region_2".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 2)],
@@ -76,6 +78,8 @@ fn test_exact_failing_topology() {
     inputs.insert(
         "b".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(3, 1, 2)],

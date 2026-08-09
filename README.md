@@ -75,6 +75,31 @@ interference, and type set in blocks.
 Every one is a few dozen lines. Open the [gallery](docs/gallery.md) for all ten
 with their code.
 
+## Redstone EDA
+
+Electronic design automation for redstone lives in
+[`redstone-eda/`](redstone-eda/README.md): **Verilog in, exhaustively
+sim-verified `.schem` out.**
+
+<div align="center">
+<a href="redstone-eda/README.md"><img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/redstone-eda/docs/img/kogge_stone_32bit.png" width="900" alt="A 32-bit Kogge-Stone prefix adder in redstone, 154,152 blocks, emitted by the HDL compiler"></a>
+</div>
+
+An HDL compiler (combinational *and* sequential — `always @(posedge clk)`
+becomes a characterized DFF bank plus a clock spine), a verified
+comparator-cell library, place-and-route (`crates/pnr-core` +
+`crates/nucleation-routing`, with DRC/LVS/STA on a generated `Routing`
+bridge), an interactive compositor with a
+[browser app](apps/eda-studio/README.md), and 18 baked-at-rest artifacts
+totalling 221,785 blocks and 2,660 verification checks — up to the 32-bit
+Kogge-Stone adder above.
+
+Nothing is trusted because it looks right: every artifact is proven in
+[mc-tick](crates/mc-tick), the vanilla-accurate tick simulator, before it is
+saved, and is saved settled so what you paste is what was proven.
+
+
+
 ## Documentation & development
 
 - [Documentation index](docs/README.md): per-language references and all

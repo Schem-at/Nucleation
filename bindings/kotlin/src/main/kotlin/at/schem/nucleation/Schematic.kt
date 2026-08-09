@@ -69,6 +69,8 @@ internal interface SchematicLib: Library {
     fun Schematic_get_entities_snbt_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_add_entity_from_snbt(handle: Pointer, snbt: Slice): ResultUnitInt
     fun Schematic_get_all_blocks_json(handle: Pointer, write: Pointer): Unit
+    fun Schematic_get_region_non_air_blocks_json(handle: Pointer, regionName: Slice, write: Pointer): ResultUnitInt
+    fun Schematic_get_non_air_blocks_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_get_chunk_blocks_json(handle: Pointer, offsetX: Int, offsetY: Int, offsetZ: Int, width: Int, height: Int, length: Int, write: Pointer): Unit
     fun Schematic_get_chunks_json(handle: Pointer, chunkWidth: Int, chunkHeight: Int, chunkLength: Int, write: Pointer): Unit
     fun Schematic_get_chunks_with_strategy_json(handle: Pointer, chunkWidth: Int, chunkHeight: Int, chunkLength: Int, strategy: Slice, cameraX: Float, cameraY: Float, cameraZ: Float, write: Pointer): Unit
@@ -136,6 +138,10 @@ internal interface SchematicLib: Library {
     fun Schematic_allocated_dimensions(handle: Pointer): DimensionsNative
     fun Schematic_extract_signs_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_compile_insign_json(handle: Pointer, write: Pointer): ResultUnitInt
+    fun Schematic_set_cell_contract_json(handle: Pointer, json: Slice): ResultUnitInt
+    fun Schematic_cell_contract_json(handle: Pointer, write: Pointer): ResultUnitInt
+    fun Schematic_resolve_cell_contract_json(handle: Pointer, write: Pointer): ResultUnitInt
+    fun Schematic_compile_io_contracts_json(handle: Pointer, write: Pointer): ResultUnitInt
     fun Schematic_all_palettes_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_default_region_palette_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_region_palette_json(handle: Pointer, regionName: Slice, write: Pointer): ResultUnitInt
@@ -1267,12 +1273,48 @@ class Schematic internal constructor (
         }
     }
 
-    /** Every non-air block as a JSON array of
+    /** Every IN-BOUNDS cell as a JSON array of
     *`{"x", "y", "z", "name", "properties"}` (the old `CBlockArray`).
+    *Air cells are materialized too — on a large sparse build this
+    *dump is `volume()`-sized and can exhaust wasm memory; renderers
+    *and analyzers want `get_non_air_blocks_json`.
     */
     fun getAllBlocksJson(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.Schematic_get_all_blocks_json(handle, write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
+    }
+
+    /** Every non-air block of ONE named region (a flattened design names
+    *one per layer: `inst:{name}`, `bus:{name}`), same JSON shape as
+    *`get_all_blocks_json`. Unknown region names error.
+    */
+    fun getRegionNonAirBlocksJson(regionName: String): Result<String> {
+        val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_get_region_non_air_blocks_json(handle, regionNameSliceMemory.slice, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionNameSliceMemory.close()
+        }
+    }
+
+    /** Every non-air block, same JSON shape as `get_all_blocks_json`.
+    *`block_count()`-sized regardless of the bounding volume.
+    */
+    fun getNonAirBlocksJson(): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_get_non_air_blocks_json(handle, write);
 
         val returnString = DW.writeToString(write)
         return returnString
@@ -2190,6 +2232,79 @@ class Schematic internal constructor (
     fun compileInsignJson(): Result<String> {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.Schematic_compile_insign_json(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Embed a `CellContract` (JSON) in the schematic's metadata,
+    *validating it parses first. The contract is carried through
+    *`.schem` save/open and autodetected on open — schematic +
+    *contract = one self-describing typed cell.
+    */
+    fun setCellContractJson(json: String): Result<Unit> {
+        val jsonSliceMemory = PrimitiveArrayTools.borrowUtf8(json)
+
+        val returnVal = lib.Schematic_set_cell_contract_json(handle, jsonSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            jsonSliceMemory.close()
+        }
+    }
+
+    /** The contract embedded in the schematic's metadata, as JSON.
+    *Errors with `NotFound` when none is embedded, `Parse` when an
+    *embedded string exists but is corrupt (loud, never silent).
+    */
+    fun cellContractJson(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_cell_contract_json(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Resolve the schematic's cell contract from its sources in
+    *strict precedence — embedded metadata over Insign signs — with
+    *loud conflict warnings. Writes `{"contract": ..., "warnings":
+    *[...]}`; errors with `NotFound` when no source defines one.
+    */
+    fun resolveCellContractJson(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_resolve_cell_contract_json(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Parse the schematic's IO-contract insign annotations (`#cell`
+    *header, `bus.*` port annotations, `#route_zone` zones) to JSON:
+    *`{"cell": ..., "buses": [...], "route_zones": {...}}`.
+    */
+    fun compileIoContractsJson(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_compile_io_contracts_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
 

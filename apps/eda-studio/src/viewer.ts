@@ -1,0 +1,275 @@
+/** The design canvas: a purpose-built three.js voxel renderer.
+ *
+ * RENDERER DECISION (task option (a), documented in README.md): the design
+ * document's flatten() already splits the build into named layers
+ * (`bus:x`, `inst:y`, loose base), and an EDA canvas wants per-bus colors
+ * and red failed layers more than it wants textured terrain. So blocks
+ * render as flat-shaded instanced cubes colored by layer/block kind —
+ * a few hundred lines, no resource pack, rebuilds in milliseconds on every
+ * document edit. The schemati WebGPU renderer was evaluated and skipped
+ * (47k LOC app pinned to nucleation 0.3.3, not packaged as a library);
+ * nucleation's textured meshing remains available for an export-quality
+ * view later.
+ */
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import type { LayerBlocks, Vec3 } from "./studio";
+
+export interface PortMarker { name: string; kind: "input" | "output"; anchor: Vec3; width: number; step: Vec3; }
+export interface GateMarker { bus: string; name: string; anchor: Vec3; step: Vec3; width: number; }
+
+/** Markers float just past the LAST bit of the column (anchor + step*(w-1))
+ *  so they never sit inside the rendered stack. */
+function markerPos(anchor: Vec3, step: Vec3, width: number): Vec3 {
+  const w = Math.max(width - 1, 0);
+  return [
+    anchor[0] + step[0] * w + (step[0] ? Math.sign(step[0]) : 0),
+    anchor[1] + step[1] * w + (step[1] ? Math.sign(step[1]) * 2 : 2),
+    anchor[2] + step[2] * w + (step[2] ? Math.sign(step[2]) : 0),
+  ];
+}
+export interface InstanceMarker { name: string; at: Vec3; dims: Vec3; rot: number; }
+
+export interface ViewerCallbacks {
+  onPortClick(name: string): void;
+  onDragMove(kind: "instance" | "gate", id: string, ground: Vec3): void;
+  onDragEnd(kind: "instance" | "gate", id: string, ground: Vec3): void;
+  /** A plain click on empty ground (used by cell-placement mode). */
+  onGroundClick(ground: Vec3): void;
+}
+
+const BLOCK_COLORS: [RegExp, number][] = [
+  [/redstone_wire/, 0xb71c1c],
+  [/redstone_torch/, 0xff5252],
+  [/repeater|comparator/, 0xb0a8b9],
+  [/lever/, 0x8d6e63],
+  [/redstone_lamp/, 0xffd54f],
+  [/redstone_block/, 0xd32f2f],
+  [/piston/, 0xcabf9b],
+  [/glass/, 0xb3e5fc],
+  [/slab|stone|deepslate|quartz/, 0x78909c],
+];
+const DYE_COLORS: Record<string, number> = {
+  white: 0xe8e8e8, orange: 0xf9801d, magenta: 0xc74ebd, light_blue: 0x3ab3da,
+  yellow: 0xfed83d, lime: 0x80c71f, pink: 0xf38baa, gray: 0x474f52,
+  light_gray: 0x9d9d97, cyan: 0x169c9c, purple: 0x8932b8, blue: 0x3c44aa,
+  brown: 0x835432, green: 0x5e7c16, red: 0xb02e26, black: 0x1d1d21,
+};
+
+function blockColor(name: string): number {
+  const short = name.replace("minecraft:", "");
+  const dye = /^([a-z_]+?)_(concrete|wool|stained_glass|terracotta)/.exec(short);
+  if (dye && DYE_COLORS[dye[1]] != null) return DYE_COLORS[dye[1]];
+  for (const [re, c] of BLOCK_COLORS) if (re.test(short)) return c;
+  return 0x90a4ae;
+}
+
+const FAILED_COLOR = 0xff4040;
+
+export class Viewer {
+  scene = new THREE.Scene();
+  camera: THREE.PerspectiveCamera;
+  renderer: THREE.WebGLRenderer;
+  controls: OrbitControls;
+  private blockGroup = new THREE.Group();
+  private markerGroup = new THREE.Group();
+  private raycaster = new THREE.Raycaster();
+  private ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  private drag: { kind: "instance" | "gate"; id: string; y: number } | null = null;
+  private cb: ViewerCallbacks;
+  private pickables: THREE.Object3D[] = [];
+
+  constructor(container: HTMLElement, cb: ViewerCallbacks) {
+    this.cb = cb;
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    this.renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(this.renderer.domElement);
+    this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 4000);
+    this.camera.position.set(28, 34, 42);
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.target.set(9, 4, 9);
+    this.scene.background = new THREE.Color(0x14161a);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+    sun.position.set(40, 80, 20);
+    this.scene.add(sun);
+    const grid = new THREE.GridHelper(200, 200, 0x2c313c, 0x20242c);
+    grid.position.set(0, -0.51, 0);
+    this.scene.add(grid, this.blockGroup, this.markerGroup);
+
+    const resize = () => {
+      const w = container.clientWidth, h = container.clientHeight;
+      this.renderer.setSize(w, h);
+      this.camera.aspect = w / h;
+      this.camera.updateProjectionMatrix();
+    };
+    new ResizeObserver(resize).observe(container);
+    resize();
+
+    const el = this.renderer.domElement;
+    el.addEventListener("pointerdown", (e) => this.pointerDown(e));
+    el.addEventListener("pointermove", (e) => this.pointerMove(e));
+    el.addEventListener("pointerup", (e) => this.pointerUp(e));
+
+    const tick = () => {
+      requestAnimationFrame(tick);
+      this.controls.update();
+      this.renderer.render(this.scene, this.camera);
+    };
+    tick();
+  }
+
+  // -- scene rebuild --------------------------------------------------------
+
+  private static disposeDeep(group: THREE.Group) {
+    group.traverse((obj) => {
+      const m = obj as Partial<THREE.Mesh>;
+      (m.geometry as THREE.BufferGeometry | undefined)?.dispose();
+      const mats = Array.isArray(m.material) ? m.material : m.material ? [m.material] : [];
+      for (const mat of mats) (mat as THREE.Material).dispose();
+    });
+    group.clear();
+  }
+
+  setLayers(layers: LayerBlocks[]) {
+    Viewer.disposeDeep(this.blockGroup);
+    const box = new THREE.BoxGeometry(0.94, 0.94, 0.94);
+    for (const layer of layers) {
+      // group blocks by final color so each color is ONE InstancedMesh
+      const byColor = new Map<number, { x: number; y: number; z: number }[]>();
+      for (const b of layer.blocks) {
+        if (b.name === "minecraft:air") continue;
+        const color = layer.failed ? FAILED_COLOR : layer.color ?? blockColor(b.name);
+        let list = byColor.get(color);
+        if (!list) byColor.set(color, (list = []));
+        list.push(b);
+      }
+      for (const [color, blocks] of byColor) {
+        const mat = new THREE.MeshLambertMaterial({
+          color,
+          transparent: layer.failed,
+          opacity: layer.failed ? 0.85 : 1,
+        });
+        const mesh = new THREE.InstancedMesh(box, mat, blocks.length);
+        const m = new THREE.Matrix4();
+        blocks.forEach((b, i) => mesh.setMatrixAt(i, m.makeTranslation(b.x, b.y, b.z)));
+        mesh.instanceMatrix.needsUpdate = true;
+        this.blockGroup.add(mesh);
+      }
+    }
+  }
+
+  setMarkers(ports: PortMarker[], gates: GateMarker[], instances: InstanceMarker[]) {
+    Viewer.disposeDeep(this.markerGroup);
+    this.pickables = [];
+    for (const p of ports) {
+      const geo = new THREE.ConeGeometry(0.45, 0.9, 4);
+      const mat = new THREE.MeshLambertMaterial({
+        color: p.kind === "input" ? 0x7bd88f : 0x4fc3f7,
+      });
+      const cone = new THREE.Mesh(geo, mat);
+      cone.position.set(...markerPos(p.anchor, p.step, p.width));
+      cone.rotation.x = Math.PI; // point down at the bit column
+      cone.userData = { type: "port", id: p.name };
+      this.markerGroup.add(cone);
+      this.pickables.push(cone);
+    }
+    for (const g of gates) {
+      const geo = new THREE.OctahedronGeometry(0.55);
+      const mat = new THREE.MeshLambertMaterial({ color: 0xffb74d });
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(...markerPos(g.anchor, g.step, g.width));
+      m.userData = { type: "gate", id: `${g.bus} ${g.name}`, y: g.anchor[1] };
+      this.markerGroup.add(m);
+      this.pickables.push(m);
+    }
+    for (const inst of instances) {
+      const [w, h, l] = inst.rot % 180 === 0 ? inst.dims : [inst.dims[2], inst.dims[1], inst.dims[0]];
+      const geo = new THREE.BoxGeometry(w, h, l);
+      const edges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geo),
+        new THREE.LineBasicMaterial({ color: 0x4fc3f7 }),
+      );
+      const pick = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ visible: false }));
+      for (const obj of [edges, pick] as THREE.Object3D[]) {
+        obj.position.set(inst.at[0] + w / 2 - 0.5, inst.at[1] + h / 2 - 0.5, inst.at[2] + l / 2 - 0.5);
+      }
+      pick.userData = { type: "instance", id: inst.name, y: inst.at[1] };
+      this.markerGroup.add(edges, pick);
+      this.pickables.push(pick);
+    }
+  }
+
+  // -- picking / drag -------------------------------------------------------
+
+  private castPointer(e: PointerEvent): THREE.Intersection | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(ndc, this.camera);
+    return this.raycaster.intersectObjects(this.pickables, false)[0] ?? null;
+  }
+
+  private groundPoint(e: PointerEvent, y: number): Vec3 | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(ndc, this.camera);
+    this.ground.constant = -y;
+    const hit = new THREE.Vector3();
+    if (!this.raycaster.ray.intersectPlane(this.ground, hit)) return null;
+    return [Math.round(hit.x), y, Math.round(hit.z)];
+  }
+
+  private downAt: [number, number] | null = null;
+
+  private pointerDown(e: PointerEvent) {
+    const hit = this.castPointer(e);
+    if (!hit) {
+      this.downAt = [e.clientX, e.clientY];
+      return;
+    }
+    const { type, id, y } = hit.object.userData as { type: string; id: string; y?: number };
+    if (type === "port") {
+      this.cb.onPortClick(id);
+      return;
+    }
+    if (type === "gate" || type === "instance") {
+      this.drag = { kind: type as "gate" | "instance", id, y: y ?? 0 };
+      this.controls.enabled = false;
+      this.renderer.domElement.setPointerCapture(e.pointerId);
+    }
+  }
+
+  private pointerMove(e: PointerEvent) {
+    if (!this.drag) return;
+    const p = this.groundPoint(e, this.drag.y);
+    if (p) this.cb.onDragMove(this.drag.kind, this.drag.id, p);
+  }
+
+  private pointerUp(e: PointerEvent) {
+    if (this.downAt) {
+      const [dx, dy] = [e.clientX - this.downAt[0], e.clientY - this.downAt[1]];
+      this.downAt = null;
+      if (Math.hypot(dx, dy) < 4) {
+        const p = this.groundPoint(e, 0);
+        if (p) this.cb.onGroundClick(p);
+      }
+    }
+    if (!this.drag) return;
+    const drag = this.drag;
+    this.drag = null;
+    this.controls.enabled = true;
+    const p = this.groundPoint(e, drag.y);
+    if (p) this.cb.onDragEnd(drag.kind, drag.id, p);
+  }
+
+  screenshotDataUrl(): string {
+    this.renderer.render(this.scene, this.camera);
+    return this.renderer.domElement.toDataURL("image/png");
+  }
+}

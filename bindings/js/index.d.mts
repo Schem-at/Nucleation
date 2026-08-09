@@ -48,6 +48,8 @@ export { DefinitionRegion } from "./DefinitionRegion.mjs"
 
 export { SchematicRegions } from "./SchematicRegions.mjs"
 
+export { Design } from "./Design.mjs"
+
 export { Diff } from "./Diff.mjs"
 
 export { Fingerprint } from "./Fingerprint.mjs"
@@ -57,6 +59,8 @@ export { DistanceField } from "./DistanceField.mjs"
 export { Field3 } from "./Field3.mjs"
 
 export { Geo } from "./Geo.mjs"
+
+export { Hdl } from "./Hdl.mjs"
 
 export { TickSimulation } from "./TickSimulation.mjs"
 
@@ -90,6 +94,8 @@ export { RenderConfig } from "./RenderConfig.mjs"
 
 export { Renderer } from "./Renderer.mjs"
 
+export { Routing } from "./Routing.mjs"
+
 export { BlockState } from "./BlockState.mjs"
 
 export { Schematic } from "./Schematic.mjs"
@@ -103,6 +109,8 @@ export { FieldProgram } from "./FieldProgram.mjs"
 export { FieldProgramBuilder } from "./FieldProgramBuilder.mjs"
 
 export { Sdf } from "./Sdf.mjs"
+
+export { CellExecutor } from "./CellExecutor.mjs"
 
 export { CircuitBuilder } from "./CircuitBuilder.mjs"
 

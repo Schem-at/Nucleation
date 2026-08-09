@@ -56,6 +56,13 @@ namespace capi {
 
     void TickSimulation_get_block(const diplomat::capi::TickSimulation* self, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct TickSimulation_read_probes_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} TickSimulation_read_probes_result;
+    TickSimulation_read_probes_result TickSimulation_read_probes(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatStringView positions_json, diplomat::capi::DiplomatWrite* write);
+
+    void TickSimulation_conduction_trace(const diplomat::capi::TickSimulation* self, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatWrite* write);
+
+    uint32_t TickSimulation_bake_to(const diplomat::capi::TickSimulation* self, diplomat::capi::Schematic* schematic);
+
     uint32_t TickSimulation_checkpoint(diplomat::capi::TickSimulation* self);
 
     typedef struct TickSimulation_restore_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} TickSimulation_restore_result;
@@ -290,6 +297,49 @@ inline void TickSimulation::get_block_write(int32_t x, int32_t y, int32_t z, W& 
         y,
         z,
         &write);
+}
+
+inline diplomat::result<std::string, NucleationError> TickSimulation::read_probes(std::string_view positions_json) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::TickSimulation_read_probes(this->AsFFI(),
+        {positions_json.data(), positions_json.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> TickSimulation::read_probes_write(std::string_view positions_json, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::TickSimulation_read_probes(this->AsFFI(),
+        {positions_json.data(), positions_json.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline std::string TickSimulation::conduction_trace(int32_t x, int32_t y, int32_t z) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_conduction_trace(this->AsFFI(),
+        x,
+        y,
+        z,
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::conduction_trace_write(int32_t x, int32_t y, int32_t z, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_conduction_trace(this->AsFFI(),
+        x,
+        y,
+        z,
+        &write);
+}
+
+inline uint32_t TickSimulation::bake_to(Schematic& schematic) const {
+    auto result = diplomat::capi::TickSimulation_bake_to(this->AsFFI(),
+        schematic.AsFFI());
+    return result;
 }
 
 inline uint32_t TickSimulation::checkpoint() {

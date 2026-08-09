@@ -206,6 +206,31 @@ pub(crate) fn serialize_custom_io_changes(changes: &[CustomIoChange]) -> String 
     serde_json::to_string(&arr).unwrap_or_else(|_| "[]".to_string())
 }
 
+/// Bind a self-describing cell (schematic + resolved contract) to the
+/// mc-tick engine for the `CellExecutor` opaque.
+#[cfg(feature = "mc-tick")]
+fn cell_executor_for(
+    schem: &crate::UniversalSchematic,
+) -> Result<crate::simulation::typed_executor::BackendCircuitExecutor, String> {
+    let (contract, _warnings) = schem
+        .resolve_cell_contract()?
+        .ok_or("no cell contract: embed one (set_cell_contract) or author Insign io.* signs")?;
+    let extra = crate::simulation::typed_executor::standard_io_extra_states();
+    let extra_refs: Vec<&str> = extra.iter().map(String::as_str).collect();
+    crate::simulation::typed_executor::BackendCircuitExecutor::for_cell(
+        schem.clone(),
+        &contract,
+        &extra_refs,
+    )
+}
+
+#[cfg(not(feature = "mc-tick"))]
+fn cell_executor_for(
+    _schem: &crate::UniversalSchematic,
+) -> Result<crate::simulation::typed_executor::BackendCircuitExecutor, String> {
+    Err("CellExecutor needs the vanilla tick engine: rebuild with the `mc-tick` feature".to_string())
+}
+
 #[diplomat::bridge]
 pub mod ffi {
     use super::super::schematic::ffi::Schematic;
@@ -1447,6 +1472,71 @@ pub mod ffi {
         /// Sync the simulation state and return the schematic (cloned).
         pub fn sync_to_schematic(&mut self) -> Box<Schematic> {
             Box::new(Schematic(self.0.sync_and_get_schematic().clone()))
+        }
+    }
+
+    // ─── CellExecutor ────────────────────────────────────────────────────────
+
+    /// A typed executor bound to a self-describing cell: the schematic's
+    /// EMBEDDED contract (autodetected, Insign fallback) supplies the port
+    /// names, types and positions; the vanilla-accurate mc-tick engine
+    /// supplies the physics. Wraps
+    /// [`crate::simulation::typed_executor::BackendCircuitExecutor`].
+    #[diplomat::opaque_mut]
+    pub struct CellExecutor(
+        pub(crate) crate::simulation::typed_executor::BackendCircuitExecutor,
+    );
+
+    impl CellExecutor {
+        /// Bind the schematic's embedded cell contract to the mc-tick
+        /// engine (needs the `mc-tick` feature, else errors). Cells deploy
+        /// BAKED: the backend trusts saved block states; an unbaked build
+        /// sits inert until the first input flip.
+        pub fn for_schematic(
+            schematic: &Schematic,
+        ) -> Result<Box<CellExecutor>, NucleationError> {
+            super::cell_executor_for(&schematic.0)
+                .map(|e| Box::new(CellExecutor(e)))
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::Simulation
+                })
+        }
+
+        /// Set an input port by name and typed value.
+        pub fn set_input(
+            &mut self,
+            name: &DiplomatStr,
+            value: &Value,
+        ) -> Result<(), NucleationError> {
+            let name = std::str::from_utf8(name).map_err(|_| NucleationError::InvalidArgument)?;
+            self.0.set_input(name, &value.0).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::Simulation
+            })
+        }
+
+        /// Run until quiescent within `budget` ticks; true when settled.
+        pub fn settle(&mut self, budget: u32) -> bool {
+            self.0.settle(budget)
+        }
+
+        /// Read an output port by name.
+        pub fn read_output(&mut self, name: &DiplomatStr) -> Result<Box<Value>, NucleationError> {
+            let name = std::str::from_utf8(name).map_err(|_| NucleationError::InvalidArgument)?;
+            self.0.read_output(name).map(|v| Box::new(Value(v))).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::Simulation
+            })
+        }
+
+        /// Rebuild the engine from the original schematic (all inputs back
+        /// to their saved states).
+        pub fn reset(&mut self) -> Result<(), NucleationError> {
+            self.0.reset().map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::Simulation
+            })
         }
     }
 

@@ -51,6 +51,8 @@ fn test_comparator_subtract_executor() {
     inputs.insert(
         "back".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 2)], // Browser test: io.back at [0,1,2]
@@ -59,6 +61,8 @@ fn test_comparator_subtract_executor() {
     inputs.insert(
         "side".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(1, 1, 1)], // Browser test: io.side at [1,1,1]
@@ -69,6 +73,8 @@ fn test_comparator_subtract_executor() {
     outputs.insert(
         "out".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 0)], // Browser test: io.out at [0,1,0]
@@ -170,6 +176,8 @@ fn test_comparator_all_cases() {
     inputs.insert(
         "back".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 2)], // io.back at [0,1,2]
@@ -178,6 +186,8 @@ fn test_comparator_all_cases() {
     inputs.insert(
         "side".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(1, 1, 1)], // io.side at [1,1,1]
@@ -188,6 +198,8 @@ fn test_comparator_all_cases() {
     outputs.insert(
         "out".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 0)], // io.out at [0,1,0]

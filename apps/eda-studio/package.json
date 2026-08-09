@@ -1,0 +1,25 @@
+{
+  "name": "eda-studio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run sync-engine && vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "smoke": "node scripts/smoke.mjs",
+    "screenshot": "node scripts/screenshot.mjs",
+    "sync-engine": "rm -rf public/engine && mkdir -p public/engine && cp -R ../../dist/npm-eda/. public/engine/ && node -e \"const fs=require('fs');if(!fs.existsSync('public/engine/Design.mjs')||!fs.existsSync('public/engine/veneer/design.mjs')){console.error('\\n  engine lacks the Design bridge or veneer — rebuild:\\n  NUCLEATION_WASM_FEATURES=bridge,simulation,mc-tick,routing,hdl ./tools/package-npm.sh dist/npm-eda\\n');process.exit(1)}\""
+  },
+  "dependencies": {
+    "@yowasp/yosys": "^0.44.407",
+    "three": "^0.185.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/three": "^0.185.0",
+    "playwright": "^1.54.0",
+    "typescript": "~5.6.3",
+    "vite": "^6.0.7"
+  }
+}

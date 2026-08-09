@@ -23,6 +23,7 @@ pub mod fingerprint;
 pub mod formats;
 pub mod geo;
 pub mod insign;
+pub mod io_contract;
 mod item;
 mod metadata;
 pub mod nbt;
@@ -47,6 +48,12 @@ pub mod bridge;
 pub mod meshing;
 #[cfg(all(feature = "bridge", not(target_arch = "wasm32")))]
 mod python_callback;
+#[cfg(feature = "routing")]
+pub mod design;
+#[cfg(feature = "routing")]
+pub mod design_io;
+#[cfg(feature = "routing")]
+pub mod routing;
 #[cfg(feature = "rendering")]
 pub mod rendering;
 #[cfg(any(feature = "scripting-lua", feature = "scripting-js"))]

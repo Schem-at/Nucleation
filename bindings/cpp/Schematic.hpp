@@ -194,6 +194,11 @@ namespace capi {
 
     void Schematic_get_all_blocks_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Schematic_get_region_non_air_blocks_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_get_region_non_air_blocks_json_result;
+    Schematic_get_region_non_air_blocks_json_result Schematic_get_region_non_air_blocks_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView region_name, diplomat::capi::DiplomatWrite* write);
+
+    void Schematic_get_non_air_blocks_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
+
     void Schematic_get_chunk_blocks_json(const diplomat::capi::Schematic* self, int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, diplomat::capi::DiplomatWrite* write);
 
     void Schematic_get_chunks_json(const diplomat::capi::Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, diplomat::capi::DiplomatWrite* write);
@@ -365,6 +370,18 @@ namespace capi {
 
     typedef struct Schematic_compile_insign_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_compile_insign_json_result;
     Schematic_compile_insign_json_result Schematic_compile_insign_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Schematic_set_cell_contract_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_set_cell_contract_json_result;
+    Schematic_set_cell_contract_json_result Schematic_set_cell_contract_json(diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView json);
+
+    typedef struct Schematic_cell_contract_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_cell_contract_json_result;
+    Schematic_cell_contract_json_result Schematic_cell_contract_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Schematic_resolve_cell_contract_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_resolve_cell_contract_json_result;
+    Schematic_resolve_cell_contract_json_result Schematic_resolve_cell_contract_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Schematic_compile_io_contracts_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_compile_io_contracts_json_result;
+    Schematic_compile_io_contracts_json_result Schematic_compile_io_contracts_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
 
     void Schematic_all_palettes_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
 
@@ -1052,6 +1069,43 @@ inline void Schematic::get_all_blocks_json_write(W& writeable) const {
         &write);
 }
 
+inline diplomat::result<diplomat::result<std::string, NucleationError>, diplomat::Utf8Error> Schematic::get_region_non_air_blocks_json(std::string_view region_name) const {
+    if (!diplomat::capi::diplomat_is_str(region_name.data(), region_name.size())) {
+    return diplomat::Err<diplomat::Utf8Error>();
+  }
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Schematic_get_region_non_air_blocks_json(this->AsFFI(),
+        {region_name.data(), region_name.size()},
+        &write);
+    return diplomat::Ok<diplomat::result<std::string, NucleationError>>(result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err))));
+}
+template<typename W>
+inline diplomat::result<diplomat::result<std::monostate, NucleationError>, diplomat::Utf8Error> Schematic::get_region_non_air_blocks_json_write(std::string_view region_name, W& writeable) const {
+    if (!diplomat::capi::diplomat_is_str(region_name.data(), region_name.size())) {
+    return diplomat::Err<diplomat::Utf8Error>();
+  }
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Schematic_get_region_non_air_blocks_json(this->AsFFI(),
+        {region_name.data(), region_name.size()},
+        &write);
+    return diplomat::Ok<diplomat::result<std::monostate, NucleationError>>(result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err))));
+}
+
+inline std::string Schematic::get_non_air_blocks_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::Schematic_get_non_air_blocks_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void Schematic::get_non_air_blocks_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::Schematic_get_non_air_blocks_json(this->AsFFI(),
+        &write);
+}
+
 inline std::string Schematic::get_chunk_blocks_json(int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length) const {
     std::string output;
     diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
@@ -1666,6 +1720,57 @@ template<typename W>
 inline diplomat::result<std::monostate, NucleationError> Schematic::compile_insign_json_write(W& writeable) const {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     auto result = diplomat::capi::Schematic_compile_insign_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::set_cell_contract_json(std::string_view json) {
+    auto result = diplomat::capi::Schematic_set_cell_contract_json(this->AsFFI(),
+        {json.data(), json.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Schematic::cell_contract_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Schematic_cell_contract_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Schematic::cell_contract_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Schematic_cell_contract_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Schematic::resolve_cell_contract_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Schematic_resolve_cell_contract_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Schematic::resolve_cell_contract_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Schematic_resolve_cell_contract_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Schematic::compile_io_contracts_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Schematic_compile_io_contracts_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Schematic::compile_io_contracts_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Schematic_compile_io_contracts_json(this->AsFFI(),
         &write);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }

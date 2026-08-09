@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redstone EDA Studio</title>
+    <style>
+      :root {
+        --bg: #14161a; --panel: #1c1f26; --edge: #2c313c; --text: #d7dae0;
+        --dim: #8b93a1; --accent: #4fc3f7; --ok: #7bd88f; --bad: #ff6d6d;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; height: 100vh; display: grid;
+        grid-template-rows: 42px 1fr; grid-template-columns: 300px 1fr 320px;
+        grid-template-areas: "top top top" "left canvas right";
+        background: var(--bg); color: var(--text);
+        font: 13px/1.45 "SF Mono", ui-monospace, Menlo, monospace;
+      }
+      header {
+        grid-area: top; display: flex; align-items: center; gap: 12px;
+        padding: 0 12px; border-bottom: 1px solid var(--edge); background: var(--panel);
+      }
+      header h1 { font-size: 14px; margin: 0; color: var(--accent); font-weight: 600; }
+      header .spacer { flex: 1; }
+      aside { overflow-y: auto; background: var(--panel); padding: 10px; }
+      #left { grid-area: left; border-right: 1px solid var(--edge); }
+      #right { grid-area: right; border-left: 1px solid var(--edge); }
+      #canvas-wrap { grid-area: canvas; position: relative; min-width: 0; }
+      #canvas-wrap canvas { display: block; }
+      #hint {
+        position: absolute; left: 10px; bottom: 8px; color: var(--dim);
+        font-size: 11px; pointer-events: none; white-space: pre;
+      }
+      section { margin-bottom: 14px; }
+      section > h2 {
+        font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+        color: var(--dim); margin: 0 0 6px; border-bottom: 1px solid var(--edge);
+        padding-bottom: 3px;
+      }
+      button {
+        background: #262b35; color: var(--text); border: 1px solid var(--edge);
+        border-radius: 4px; padding: 3px 9px; font: inherit; cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); }
+      button.primary { background: #103246; border-color: var(--accent); }
+      button:disabled { opacity: 0.4; cursor: default; }
+      textarea, input[type="text"], input[type="number"] {
+        width: 100%; background: #10131a; color: var(--text);
+        border: 1px solid var(--edge); border-radius: 4px; padding: 4px 6px;
+        font: inherit;
+      }
+      textarea { resize: vertical; }
+      .row { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+      .row label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+      .item {
+        border: 1px solid var(--edge); border-radius: 4px; padding: 5px 7px;
+        margin: 4px 0; background: #191d24;
+      }
+      .item .name { font-weight: 600; }
+      .item .meta { color: var(--dim); font-size: 11px; }
+      .state-routed { color: var(--ok); }
+      .state-failed { color: var(--bad); }
+      .state-intended { color: var(--dim); }
+      .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; }
+      #log {
+        font-size: 11px; color: var(--dim); white-space: pre-wrap;
+        max-height: 180px; overflow-y: auto; background: #10131a;
+        border: 1px solid var(--edge); border-radius: 4px; padding: 6px;
+      }
+      #toast {
+        position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+        background: #262b35; border: 1px solid var(--edge); border-radius: 6px;
+        padding: 6px 14px; display: none; z-index: 5;
+      }
+      .badge { font-size: 10px; border: 1px solid var(--edge); border-radius: 3px; padding: 0 4px; color: var(--dim); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Redstone EDA Studio</h1>
+      <span id="status" class="badge">loading engine…</span>
+      <span class="spacer"></span>
+      <label class="row" style="margin:0"><input type="checkbox" id="live-reroute" checked />live reroute</label>
+      <button id="btn-demo">Load demo</button>
+      <button id="btn-check">Check</button>
+      <button id="btn-bake" class="primary">Bake</button>
+    </header>
+
+    <aside id="left">
+      <section>
+        <h2>Library</h2>
+        <input type="file" id="cell-file" multiple accept=".schem,.litematic,.nbt,.mcstructure,.snapshot" />
+        <div id="cell-list"></div>
+      </section>
+      <section>
+        <h2>Verilog &rarr; cell</h2>
+        <textarea id="verilog" rows="8" spellcheck="false"></textarea>
+        <div class="row">
+          <input type="text" id="verilog-name" placeholder="cell name" value="my_cell" />
+          <button id="btn-compile">Compile</button>
+        </div>
+        <div class="meta" id="verilog-status"></div>
+      </section>
+      <section>
+        <h2>Instances</h2>
+        <div id="instance-list"></div>
+      </section>
+    </aside>
+
+    <div id="canvas-wrap">
+      <div id="toast"></div>
+      <div id="hint">drag: orbit &nbsp; shift-drag: pan &nbsp; wheel: zoom
+click instance/gate then drag on ground to move &nbsp; click two ports to route a bus</div>
+    </div>
+
+    <aside id="right">
+      <section>
+        <h2>Ports</h2>
+        <div id="port-list"></div>
+      </section>
+      <section>
+        <h2>Buses</h2>
+        <div id="bus-list"></div>
+      </section>
+      <section>
+        <h2>Poke (after bake)</h2>
+        <div id="poke-panel"><span class="meta">bake first</span></div>
+      </section>
+      <section>
+        <h2>Export</h2>
+        <div class="row">
+          <button id="btn-export-schem">.schem</button>
+          <button id="btn-export-litematic">.litematic</button>
+          <button id="btn-export-nucm">.nucm</button>
+        </div>
+      </section>
+      <section>
+        <h2>Log</h2>
+        <div id="log"></div>
+      </section>
+    </aside>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

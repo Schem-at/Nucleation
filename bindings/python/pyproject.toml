@@ -17,6 +17,9 @@ Homepage = "https://github.com/Schem-at/Nucleation"
 [tool.scikit-build]
 minimum-version = "0.10"
 build-dir = "build/{wheel_tag}"
+# The hand-written veneer package; the compiled core is installed into it
+# by CMake as the `nucleation.nucleation` submodule.
+wheel.packages = ["nucleation"]
 # Stable ABI wheels for CPython 3.12+
 wheel.py-api = "cp312"
 # Populated only for source-distribution builds. Local wheels continue to use

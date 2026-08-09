@@ -16,7 +16,11 @@
 
 namespace nucleation {
 namespace capi {
+    extern "C" {
 
+    void NucleationError_detail(nucleation::capi::NucleationError self, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    } // extern "C"
 } // namespace capi
 } // namespace
 
@@ -43,5 +47,19 @@ inline nucleation::NucleationError nucleation::NucleationError::FromFFI(nucleati
         default:
             std::abort();
     }
+}
+
+inline std::string nucleation::NucleationError::detail() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::NucleationError_detail(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void nucleation::NucleationError::detail_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::NucleationError_detail(this->AsFFI(),
+        &write);
 }
 #endif // NUCLEATION_NucleationError_HPP

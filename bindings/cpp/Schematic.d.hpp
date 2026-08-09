@@ -429,12 +429,32 @@ public:
   inline diplomat::result<std::monostate, NucleationError> add_entity_from_snbt(std::string_view snbt);
 
   /**
-   * Every non-air block as a JSON array of
+   * Every IN-BOUNDS cell as a JSON array of
    * `{"x", "y", "z", "name", "properties"}` (the old `CBlockArray`).
+   * Air cells are materialized too — on a large sparse build this
+   * dump is `volume()`-sized and can exhaust wasm memory; renderers
+   * and analyzers want `get_non_air_blocks_json`.
    */
   inline std::string get_all_blocks_json() const;
   template<typename W>
   inline void get_all_blocks_json_write(W& writeable_output) const;
+
+  /**
+   * Every non-air block of ONE named region (a flattened design names
+   * one per layer: `inst:{name}`, `bus:{name}`), same JSON shape as
+   * `get_all_blocks_json`. Unknown region names error.
+   */
+  inline diplomat::result<diplomat::result<std::string, NucleationError>, diplomat::Utf8Error> get_region_non_air_blocks_json(std::string_view region_name) const;
+  template<typename W>
+  inline diplomat::result<diplomat::result<std::monostate, NucleationError>, diplomat::Utf8Error> get_region_non_air_blocks_json_write(std::string_view region_name, W& writeable_output) const;
+
+  /**
+   * Every non-air block, same JSON shape as `get_all_blocks_json`.
+   * `block_count()`-sized regardless of the bounding volume.
+   */
+  inline std::string get_non_air_blocks_json() const;
+  template<typename W>
+  inline void get_non_air_blocks_json_write(W& writeable_output) const;
 
   /**
    * All blocks within a sub-region (chunk) of the schematic, as the same
@@ -851,6 +871,42 @@ public:
   inline diplomat::result<std::string, NucleationError> compile_insign_json() const;
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> compile_insign_json_write(W& writeable_output) const;
+
+  /**
+   * Embed a `CellContract` (JSON) in the schematic's metadata,
+   * validating it parses first. The contract is carried through
+   * `.schem` save/open and autodetected on open — schematic +
+   * contract = one self-describing typed cell.
+   */
+  inline diplomat::result<std::monostate, NucleationError> set_cell_contract_json(std::string_view json);
+
+  /**
+   * The contract embedded in the schematic's metadata, as JSON.
+   * Errors with `NotFound` when none is embedded, `Parse` when an
+   * embedded string exists but is corrupt (loud, never silent).
+   */
+  inline diplomat::result<std::string, NucleationError> cell_contract_json() const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> cell_contract_json_write(W& writeable_output) const;
+
+  /**
+   * Resolve the schematic's cell contract from its sources in
+   * strict precedence — embedded metadata over Insign signs — with
+   * loud conflict warnings. Writes `{"contract": ..., "warnings":
+   * [...]}`; errors with `NotFound` when no source defines one.
+   */
+  inline diplomat::result<std::string, NucleationError> resolve_cell_contract_json() const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> resolve_cell_contract_json_write(W& writeable_output) const;
+
+  /**
+   * Parse the schematic's IO-contract insign annotations (`#cell`
+   * header, `bus.*` port annotations, `#route_zone` zones) to JSON:
+   * `{"cell": ..., "buses": [...], "route_zones": {...}}`.
+   */
+  inline diplomat::result<std::string, NucleationError> compile_io_contracts_json() const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> compile_io_contracts_json_write(W& writeable_output) const;
 
   /**
    * Every region's palette, as a JSON object mapping region name → array of

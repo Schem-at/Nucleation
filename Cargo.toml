@@ -60,7 +60,21 @@ bridge-full = [
 # TickSimulation. Optional so plain library builds stay unchanged; the crate
 # also stays a dev-dependency for examples/tests, which is fine — the two
 # declarations are independent.
-mc-tick = ["dep:mc-tick"]
+mc-tick = ["dep:mc-tick", "nucleation-hdl?/mc-tick"]
+
+# Redstone EDA: place-and-route, DRC and STA (crates/nucleation-routing on
+# crates/pnr-core), bridged as a minimal Workspace surface. Dependency
+# direction stays one-way, like mc-tick: the routing crates never see
+# nucleation; the `routing` module converts UniversalSchematic both ways.
+routing = ["dep:nucleation-routing"]
+
+# HDL -> redstone: compile a combinational BLIF (yosys output) into a
+# dual-rail PLA schematic (crates/nucleation-hdl, the Rust port of the
+# verified redstone-eda/hdl Python pipeline). One-way like mc-tick and
+# routing; the bridge `Hdl` opaque converts the compiled cells into a
+# UniversalSchematic. With `mc-tick` also enabled, the compiler's in-sim
+# verify/bake path lights up (nucleation-hdl?/mc-tick above).
+hdl = ["dep:nucleation-hdl"]
 
 # The `nucleation` CLI lives in crates/nucleation-cli (binary name
 # `nucleation`, run with `cargo run -p nucleation-cli -- ...`). No feature
@@ -142,6 +156,10 @@ base64 = { version = "0.22", optional = true }
 # The headless tick engine, bridged behind the `mc-tick` feature. Dependency
 # direction stays one-way: mc-tick never sees nucleation.
 mc-tick = { path = "crates/mc-tick", version = "0.1.0", optional = true }
+# Redstone EDA, behind the `routing` feature. Same one-way rule as mc-tick.
+nucleation-routing = { path = "crates/nucleation-routing", version = "0.1.0", optional = true }
+# HDL -> redstone PLA compiler, behind the `hdl` feature. Same one-way rule.
+nucleation-hdl = { path = "crates/nucleation-hdl", version = "0.1.0", optional = true }
 
 # Scripting engine dependencies
 mlua = { version = "0.10", features = ["luajit", "vendored"], optional = true }

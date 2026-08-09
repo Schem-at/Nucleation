@@ -883,6 +883,31 @@ final class Schematic {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function getRegionNonAirBlocksJson(string $region_name) {
+        $__n0 = strlen($region_name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region_name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Schematic_get_region_non_air_blocks_json($this->ptr, $__view0, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function getNonAirBlocksJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->Schematic_get_non_air_blocks_json($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function getChunkBlocksJson( $offset_x,  $offset_y,  $offset_z,  $width,  $height,  $length) {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         Lib::ffi()->Schematic_get_chunk_blocks_json($this->ptr, $offset_x, $offset_y, $offset_z, $width, $height, $length, $write);
@@ -1609,6 +1634,50 @@ final class Schematic {
     public function compileInsignJson() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         $result = Lib::ffi()->Schematic_compile_insign_json($this->ptr, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function setCellContractJson(string $json) {
+        $__n0 = strlen($json);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $json, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Schematic_set_cell_contract_json($this->ptr, $__view0);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function cellContractJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Schematic_cell_contract_json($this->ptr, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function resolveCellContractJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Schematic_resolve_cell_contract_json($this->ptr, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function compileIoContractsJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Schematic_compile_io_contracts_json($this->ptr, $write);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }

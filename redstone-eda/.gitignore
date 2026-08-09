@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+build/
+out/
+*.log
+.DS_Store
+.venv/
+venv/
+eda-venv/
+genlib_build/

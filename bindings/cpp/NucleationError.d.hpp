@@ -69,6 +69,20 @@ public:
     // Prevent usage as boolean value
     explicit operator bool() const = delete;
 
+  /**
+   * Why the last failing bridge call on this thread failed, in words.
+   *
+   * The enum cannot carry a message across the FFI, so a caught error
+   * is a bare variant — `InvalidArgument` — while the layer that
+   * refused already knew it was "19.2M cells over the 8M cap". Modules
+   * that know the story record it; this reads it back, so an exception
+   * handler holding the error value can ask it for the words. Empty
+   * when the last detail-carrying call succeeded.
+   */
+  inline std::string detail() const;
+  template<typename W>
+  inline void detail_write(W& writeable_output) const;
+
     inline diplomat::capi::NucleationError AsFFI() const;
     inline static NucleationError FromFFI(diplomat::capi::NucleationError c_enum);
 private:

@@ -1,0 +1,125 @@
+"""Design-document serialization demo (DESIGN_SPEC.md section 8), on the
+idiomatic veneer: build the bus-cross design of design_demo2, save the FULL
+document as `.nucm` (project tier: cells, transforms, ports with scanned
+hardware, bus layers incl. fragments and states), reload it, prove the
+reloaded document is live (bake + 4/4 typed spot checks through the
+embedded contract), export the LAYERED `.litematic` (interchange tier:
+one named region per layer + a `NucleationDesign` manifest), reimport it
+as a design, and reopen the very same file as a plain multi-region
+litematic.
+"""
+import json
+import os
+
+import nucleation as n
+
+STONE = "minecraft:stone"
+DUST = "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]"
+LAMP = "minecraft:redstone_lamp[lit=false]"
+LEVER = "minecraft:lever[face=floor,facing=north,powered=false]"
+
+N, Y0, STEP = 8, 2, (0, 2, 0)
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def lever_bank(s, x, z, dx, dz):
+    """8 levers at 2y pitch, each with its connection dust one step in."""
+    for i in range(N):
+        y = Y0 + 2 * i
+        s.set_block_from_string(x, y - 1, z, STONE)
+        s.set_block_from_string(x, y, z, LEVER)
+        s.set_block_from_string(x + dx, y - 1, z + dz, STONE)
+        s.set_block_from_string(x + dx, y, z + dz, DUST)
+    return (x + dx, Y0, z + dz)
+
+
+def lamp_bank(s, x, z):
+    """8 lamps at 2y pitch, each lamp supporting its own connection dust."""
+    for i in range(N):
+        y = Y0 + 2 * i
+        s.set_block_from_string(x, y - 1, z, LAMP)
+        s.set_block_from_string(x, y, z, DUST)
+    return (x, Y0, z)
+
+
+def build_design():
+    s = n.Schematic.create("crossing")
+    a_in, a_out = lever_bank(s, 0, 8, 1, 0), lamp_bank(s, 16, 8)
+    b_in, b_out = lever_bank(s, 8, 0, 0, 1), lamp_bank(s, 8, 16)
+    d = n.Design.for_schematic("crossing", s)
+    d.declare_input("a_in", anchor=a_in, step=STEP, width=N, ty="uint")
+    d.declare_output("a_out", anchor=a_out, step=STEP, width=N, ty="uint")
+    d.declare_input("b_in", anchor=b_in, step=STEP, width=N, ty="uint")
+    d.declare_output("b_out", anchor=b_out, step=STEP, width=N, ty="uint")
+    bus_a = d.route_bus("bus_a", driver="a_in", sinks=["a_out"],
+                        style=n.Style(bus_block="minecraft:lime_concrete"))
+    bus_b = d.route_bus("bus_b", driver="b_in", sinks=["b_out"],
+                        style=n.Style(bus_block="minecraft:cyan_concrete",
+                                      transparent_block="minecraft:cyan_stained_glass"))
+    assert bus_a.state == "routed" and bus_b.state == "routed", (bus_a, bus_b)
+    return d
+
+
+def spot_check(d, label):
+    """4 typed spot checks through the embedded contract of a bake."""
+    ex = d.bake(4000).executor()
+    patterns = [(0x01, 0x00), (0x80, 0x01), (0xAA, 0x55), (0xFF, 0xFF)]
+    good = 0
+    for pa, pb in patterns:
+        ex["a_in"], ex["b_in"] = pa, pb
+        ex.settle(400)
+        a, b = ex["a_out"], ex["b_out"]
+        ok = a == pa and b == pb
+        good += ok
+        print("%s %s %02x/%02x -> a_out=%02x b_out=%02x"
+              % ("PASS" if ok else "FAIL", label, pa, pb, a, b))
+    print("%s: %d/%d spot checks" % (label, good, len(patterns)))
+    return good == len(patterns)
+
+
+def main():
+    d = build_design()
+
+    # ---- .nucm project tier: save the FULL document, reload it. --------
+    nucm_path = os.path.join(HERE, "..", "showcase", "bus_cross8_design.nucm")
+    d.save(nucm_path)
+    print("saved %s (%d bytes)"
+          % (os.path.normpath(nucm_path), os.path.getsize(nucm_path)))
+    d2 = n.Design.load_nucm(nucm_path)
+
+    # The reloaded document kept its bus layers and their states…
+    assert d2.bus_state("bus_a") == "routed", d2.bus_state("bus_a")
+    assert d2.bus_state("bus_b") == "routed", d2.bus_state("bus_b")
+    d2.check(strict=True)
+    print("reloaded .nucm: buses routed, check clean")
+
+    # …and is LIVE: bake + 4/4 typed spot checks through the contract.
+    if not spot_check(d2, "nucm-reload"):
+        return 1
+
+    # ---- .litematic interchange tier: layered export + manifest. ------
+    lit_path = os.path.join(HERE, "..", "showcase", "bus_cross8_design.litematic")
+    d2.save(lit_path)
+    print("exported %s (%d bytes)"
+          % (os.path.normpath(lit_path), os.path.getsize(lit_path)))
+
+    # Reimport as a design (references degrade to embedded copies).
+    d3 = n.Design.import_litematic(lit_path)
+    assert d3.bus_state("bus_a") == "routed", d3.bus_state("bus_a")
+    assert d3.bus_state("bus_b") == "routed", d3.bus_state("bus_b")
+    d3.check(strict=True)
+    print("reimported .litematic as a design: buses routed, check clean")
+
+    # The very same file also opens as a PLAIN multi-region litematic.
+    plain = n.Schematic.open(lit_path)
+    regions = json.loads(plain.region_names_json())
+    print("plain litematic regions:")
+    for r in sorted(regions):
+        print("  -", r)
+    assert "bus:bus_a" in regions and "bus:bus_b" in regions, regions
+    print("design_demo4_share: OK")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

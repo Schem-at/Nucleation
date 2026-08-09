@@ -2,8 +2,11 @@
 //!
 //! Provides a fluent API for defining circuit inputs and outputs with types and layouts.
 
+use super::bus::{BusPort, BusSpec};
+use super::physical::{Face, PortDirection};
 use super::{IoMapping, IoType, LayoutFunction, SortStrategy};
 use crate::definition_region::DefinitionRegion;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Builder for constructing IO layouts
@@ -11,6 +14,7 @@ use std::collections::HashMap;
 pub struct IoLayoutBuilder {
     inputs: HashMap<String, IoMapping>,
     outputs: HashMap<String, IoMapping>,
+    buses: HashMap<String, BusPort>,
 }
 
 impl IoLayoutBuilder {
@@ -19,6 +23,7 @@ impl IoLayoutBuilder {
         Self {
             inputs: HashMap::new(),
             outputs: HashMap::new(),
+            buses: HashMap::new(),
         }
     }
 
@@ -37,6 +42,8 @@ impl IoLayoutBuilder {
             io_type,
             layout,
             positions,
+            face: None,
+            direction: Some(PortDirection::Input),
         };
 
         // Validate the mapping
@@ -120,6 +127,8 @@ impl IoLayoutBuilder {
             io_type,
             layout,
             positions,
+            face: None,
+            direction: Some(PortDirection::Output),
         };
 
         // Validate the mapping
@@ -243,6 +252,71 @@ impl IoLayoutBuilder {
         self.add_output(name, io_type, layout, positions)
     }
 
+    /// Set the cell face of an already-added port (input or output)
+    pub fn port_face(mut self, name: &str, face: Face) -> Result<Self, String> {
+        if let Some(m) = self.inputs.get_mut(name) {
+            m.face = Some(face);
+        } else if let Some(m) = self.outputs.get_mut(name) {
+            m.face = Some(face);
+        } else {
+            return Err(format!("No port named '{}' to set face on", name));
+        }
+        Ok(self)
+    }
+
+    /// Add a bus-typed input: wire positions are derived from the spec's
+    /// pitch starting at `bit0`, and the port is registered both as a regular
+    /// typed input (so the executor's word set/read binds to it by name) and
+    /// as a [`BusPort`] carrying the geometry/encoding contract.
+    pub fn add_bus_input(
+        self,
+        name: impl Into<String>,
+        spec: BusSpec,
+        bit0: (i32, i32, i32),
+    ) -> Result<Self, String> {
+        self.add_bus_port(name, spec, bit0, PortDirection::Input)
+    }
+
+    /// Add a bus-typed output. See [`Self::add_bus_input`].
+    pub fn add_bus_output(
+        self,
+        name: impl Into<String>,
+        spec: BusSpec,
+        bit0: (i32, i32, i32),
+    ) -> Result<Self, String> {
+        self.add_bus_port(name, spec, bit0, PortDirection::Output)
+    }
+
+    fn add_bus_port(
+        mut self,
+        name: impl Into<String>,
+        spec: BusSpec,
+        bit0: (i32, i32, i32),
+        direction: PortDirection,
+    ) -> Result<Self, String> {
+        let name = name.into();
+        spec.validate()?;
+        let positions = spec.wire_positions(bit0);
+        let layout = spec.encoding.layout_function();
+        let io_type = spec.ty.clone();
+        let face = spec.face;
+        self = match direction {
+            PortDirection::Input => self.add_input(name.clone(), io_type, layout, positions)?,
+            PortDirection::Output => self.add_output(name.clone(), io_type, layout, positions)?,
+        };
+        // Record face on the underlying mapping too, so port and bus agree.
+        self = self.port_face(&name, face)?;
+        self.buses.insert(
+            name,
+            BusPort {
+                spec,
+                bit0,
+                direction,
+            },
+        );
+        Ok(self)
+    }
+
     /// Merge with another builder
     /// Returns error if there are duplicate names
     pub fn merge(mut self, other: IoLayoutBuilder) -> Result<Self, String> {
@@ -262,6 +336,14 @@ impl IoLayoutBuilder {
             self.outputs.insert(name, mapping);
         }
 
+        // Merge bus ports
+        for (name, bus) in other.buses {
+            if self.buses.contains_key(&name) {
+                return Err(format!("Duplicate bus name during merge: {}", name));
+            }
+            self.buses.insert(name, bus);
+        }
+
         Ok(self)
     }
 
@@ -270,6 +352,7 @@ impl IoLayoutBuilder {
         IoLayout {
             inputs: self.inputs,
             outputs: self.outputs,
+            buses: self.buses,
         }
     }
 
@@ -291,13 +374,26 @@ impl Default for IoLayoutBuilder {
 }
 
 /// Complete IO layout for a circuit
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IoLayout {
     pub inputs: HashMap<String, IoMapping>,
     pub outputs: HashMap<String, IoMapping>,
+
+    /// Bus ports by name: geometry/encoding contracts layered over the
+    /// identically-named entries in `inputs`/`outputs`. The executor's word
+    /// set/read binds to a bus through that shared name.
+    // TODO(executor): skew-aware reads and HexAnalog drive need explicit
+    // executor support; today binding falls back to the port mapping.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub buses: HashMap<String, BusPort>,
 }
 
 impl IoLayout {
+    /// Get a bus port by name
+    pub fn get_bus(&self, name: &str) -> Option<&BusPort> {
+        self.buses.get(name)
+    }
+
     /// Create a new builder
     pub fn builder() -> IoLayoutBuilder {
         IoLayoutBuilder::new()
@@ -337,6 +433,16 @@ impl IoLayout {
             mapping
                 .validate()
                 .map_err(|e| format!("Output '{}': {}", name, e))?;
+        }
+
+        // Validate bus ports: spec consistency + a matching typed port
+        for (name, bus) in &self.buses {
+            bus.spec
+                .validate()
+                .map_err(|e| format!("Bus '{}': {}", name, e))?;
+            if !self.inputs.contains_key(name) && !self.outputs.contains_key(name) {
+                return Err(format!("Bus '{}' has no matching input/output port", name));
+            }
         }
 
         Ok(())
@@ -516,5 +622,67 @@ mod tests {
         let output_names = layout.output_names();
         assert_eq!(output_names.len(), 1);
         assert!(output_names.contains(&"output"));
+    }
+
+    #[test]
+    fn test_bus_port_binding_and_serde() {
+        use crate::io_contract::bus::{BusEncoding, BusSpec, Pitch};
+        use crate::io_contract::physical::{Face, PortDirection};
+        use crate::transforms::Axis;
+
+        let spec = BusSpec {
+            width: 4,
+            ty: IoType::UnsignedInt { bits: 4 },
+            pitch: Pitch {
+                axis: Axis::Z,
+                spacing: 2,
+            },
+            face: Face::West,
+            encoding: BusEncoding::Binary1PerWire,
+        };
+        let layout = IoLayoutBuilder::new()
+            .add_bus_input("a", spec.clone(), (0, 0, 0))
+            .unwrap()
+            .add_bus_output("sum", spec.clone(), (9, 0, 0))
+            .unwrap()
+            .build();
+
+        layout.validate().unwrap();
+
+        // Bus registered and typed port materialized at pitch offsets
+        let bus = layout.get_bus("a").unwrap();
+        assert_eq!(bus.direction, PortDirection::Input);
+        let mapping = layout.get_input("a").unwrap();
+        assert_eq!(
+            mapping.positions,
+            vec![(0, 0, 0), (0, 0, 2), (0, 0, 4), (0, 0, 6)]
+        );
+        assert_eq!(mapping.face, Some(Face::West));
+        assert_eq!(mapping.direction, Some(PortDirection::Input));
+
+        // JSON round trip preserves buses + per-port face/direction
+        let json = serde_json::to_string(&layout).unwrap();
+        let back: IoLayout = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, layout);
+    }
+
+    #[test]
+    fn test_port_face_setter() {
+        let layout = IoLayoutBuilder::new()
+            .add_input(
+                "a",
+                IoType::Boolean,
+                LayoutFunction::OneToOne,
+                vec![(0, 0, 0)],
+            )
+            .unwrap()
+            .port_face("a", crate::io_contract::physical::Face::North)
+            .unwrap()
+            .build();
+        assert_eq!(
+            layout.get_input("a").unwrap().face,
+            Some(crate::io_contract::physical::Face::North)
+        );
+        assert!(IoLayoutBuilder::new().port_face("ghost", crate::io_contract::physical::Face::Up).is_err());
     }
 }

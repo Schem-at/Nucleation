@@ -95,6 +95,8 @@ fn test_custom_io_with_repeater_no_power() {
     inputs.insert(
         "a".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 4)], // Input at top
@@ -105,6 +107,8 @@ fn test_custom_io_with_repeater_no_power() {
     outputs.insert(
         "out".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(1, 1, 0)], // Output at bottom
@@ -208,6 +212,8 @@ fn test_custom_io_sync_wire_powers() {
     inputs.insert(
         "in".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(0, 1, 0)],
@@ -218,6 +224,8 @@ fn test_custom_io_sync_wire_powers() {
     outputs.insert(
         "out".to_string(),
         IoMapping {
+            face: None,
+            direction: None,
             io_type: IoType::Boolean,
             layout: LayoutFunction::OneToOne,
             positions: vec![(2, 1, 0)],

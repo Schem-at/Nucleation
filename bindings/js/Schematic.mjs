@@ -1506,13 +1506,68 @@ export class Schematic {
     }
 
     /**
-     * Every non-air block as a JSON array of
+     * Every IN-BOUNDS cell as a JSON array of
      * `{"x", "y", "z", "name", "properties"}` (the old `CBlockArray`).
+     * Air cells are materialized too — on a large sparse build this
+     * dump is `volume()`-sized and can exhaust wasm memory; renderers
+     * and analyzers want `get_non_air_blocks_json`.
      */
     getAllBlocksJson() {
         const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
 
     wasm.Schematic_get_all_blocks_json(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * Every non-air block of ONE named region (a flattened design names
+     * one per layer: `inst:{name}`, `bus:{name}`), same JSON shape as
+     * `get_all_blocks_json`. Unknown region names error.
+     */
+    getRegionNonAirBlocksJson(regionName) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const regionNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, regionName)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Schematic_get_region_non_air_blocks_json(diplomatReceive.buffer, this.ffiValue, regionNameSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Every non-air block, same JSON shape as `get_all_blocks_json`.
+     * `block_count()`-sized regardless of the bounding volume.
+     */
+    getNonAirBlocksJson() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Schematic_get_non_air_blocks_json(this.ffiValue, write.buffer);
 
         try {
             return write.readString8();
@@ -2979,6 +3034,121 @@ export class Schematic {
 
 
         const result = wasm.Schematic_compile_insign_json(diplomatReceive.buffer, this.ffiValue, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Embed a `CellContract` (JSON) in the schematic's metadata,
+     * validating it parses first. The contract is carried through
+     * `.schem` save/open and autodetected on open — schematic +
+     * contract = one self-describing typed cell.
+     */
+    setCellContractJson(json) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const jsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, json)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_set_cell_contract_json(diplomatReceive.buffer, this.ffiValue, jsonSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * The contract embedded in the schematic's metadata, as JSON.
+     * Errors with `NotFound` when none is embedded, `Parse` when an
+     * embedded string exists but is corrupt (loud, never silent).
+     */
+    cellContractJson() {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Schematic_cell_contract_json(diplomatReceive.buffer, this.ffiValue, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Resolve the schematic's cell contract from its sources in
+     * strict precedence — embedded metadata over Insign signs — with
+     * loud conflict warnings. Writes `{"contract": ..., "warnings":
+     * [...]}`; errors with `NotFound` when no source defines one.
+     */
+    resolveCellContractJson() {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Schematic_resolve_cell_contract_json(diplomatReceive.buffer, this.ffiValue, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Parse the schematic's IO-contract insign annotations (`#cell`
+     * header, `bus.*` port annotations, `#route_zone` zones) to JSON:
+     * `{"cell": ..., "buses": [...], "route_zones": {...}}`.
+     */
+    compileIoContractsJson() {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Schematic_compile_io_contracts_json(diplomatReceive.buffer, this.ffiValue, write.buffer);
 
         try {
             if (!diplomatReceive.resultFlag) {

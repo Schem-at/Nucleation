@@ -1025,12 +1025,63 @@ pub mod ffi {
             Ok(())
         }
 
-        /// Every non-air block as a JSON array of
+        /// Every IN-BOUNDS cell as a JSON array of
         /// `{"x", "y", "z", "name", "properties"}` (the old `CBlockArray`).
+        /// Air cells are materialized too — on a large sparse build this
+        /// dump is `volume()`-sized and can exhaust wasm memory; renderers
+        /// and analyzers want `get_non_air_blocks_json`.
         pub fn get_all_blocks_json(&self, out: &mut DiplomatWrite) {
             let items: Vec<serde_json::Value> = self
                 .0
                 .iter_blocks()
+                .map(|(pos, block)| block_json(&pos, block))
+                .collect();
+            let json = serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string());
+            let _ = write!(out, "{}", json);
+        }
+
+        /// Every non-air block of ONE named region (a flattened design names
+        /// one per layer: `inst:{name}`, `bus:{name}`), same JSON shape as
+        /// `get_all_blocks_json`. Unknown region names error.
+        pub fn get_region_non_air_blocks_json(
+            &self,
+            region_name: &str,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let region = self.0.get_region(region_name).ok_or_else(|| {
+                crate::bridge::set_last_error_detail(format!(
+                    "no region named `{region_name}`"
+                ));
+                NucleationError::NotFound
+            })?;
+            let items: Vec<serde_json::Value> = region
+                .blocks
+                .iter()
+                .enumerate()
+                .filter_map(|(index, block_index)| {
+                    let block = &region.palette[*block_index];
+                    if block.name == "minecraft:air" {
+                        return None;
+                    }
+                    let (x, y, z) = region.index_to_coords(index);
+                    Some(block_json(
+                        &crate::block_position::BlockPosition { x, y, z },
+                        block,
+                    ))
+                })
+                .collect();
+            let json = serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string());
+            let _ = write!(out, "{}", json);
+            Ok(())
+        }
+
+        /// Every non-air block, same JSON shape as `get_all_blocks_json`.
+        /// `block_count()`-sized regardless of the bounding volume.
+        pub fn get_non_air_blocks_json(&self, out: &mut DiplomatWrite) {
+            let items: Vec<serde_json::Value> = self
+                .0
+                .iter_blocks()
+                .filter(|(_, block)| block.name != "minecraft:air")
                 .map(|(pos, block)| block_json(&pos, block))
                 .collect();
             let json = serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string());
@@ -1824,6 +1875,82 @@ pub mod ffi {
         /// Compile the schematic's insign annotations to JSON.
         pub fn compile_insign_json(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
             let data = crate::insign::compile_schematic_insign(&self.0)
+                .map_err(|_| NucleationError::Parse)?;
+            let json = serde_json::to_string(&data).map_err(|_| NucleationError::Serialize)?;
+            let _ = write!(out, "{}", json);
+            Ok(())
+        }
+
+        /// Embed a `CellContract` (JSON) in the schematic's metadata,
+        /// validating it parses first. The contract is carried through
+        /// `.schem` save/open and autodetected on open — schematic +
+        /// contract = one self-describing typed cell.
+        pub fn set_cell_contract_json(
+            &mut self,
+            json: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            let json =
+                core::str::from_utf8(json).map_err(|_| NucleationError::InvalidArgument)?;
+            self.0.set_cell_contract_json(json).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::Parse
+            })
+        }
+
+        /// The contract embedded in the schematic's metadata, as JSON.
+        /// Errors with `NotFound` when none is embedded, `Parse` when an
+        /// embedded string exists but is corrupt (loud, never silent).
+        pub fn cell_contract_json(
+            &self,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let contract = self
+                .0
+                .embedded_cell_contract()
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::Parse
+                })?
+                .ok_or(NucleationError::NotFound)?;
+            let json = contract.to_json().map_err(|_| NucleationError::Serialize)?;
+            let _ = write!(out, "{json}");
+            Ok(())
+        }
+
+        /// Resolve the schematic's cell contract from its sources in
+        /// strict precedence — embedded metadata over Insign signs — with
+        /// loud conflict warnings. Writes `{"contract": ..., "warnings":
+        /// [...]}`; errors with `NotFound` when no source defines one.
+        pub fn resolve_cell_contract_json(
+            &self,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let (contract, warnings) = self
+                .0
+                .resolve_cell_contract()
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::Parse
+                })?
+                .ok_or(NucleationError::NotFound)?;
+            let json = contract.to_json().map_err(|_| NucleationError::Serialize)?;
+            let ws: Vec<String> = warnings.iter().map(|w| format!("{w:?}")).collect();
+            let _ = write!(out, "{{\"contract\":{json},\"warnings\":[{}]}}", ws.join(","));
+            Ok(())
+        }
+
+        /// Parse the schematic's IO-contract insign annotations (`#cell`
+        /// header, `bus.*` port annotations, `#route_zone` zones) to JSON:
+        /// `{"cell": ..., "buses": [...], "route_zones": {...}}`.
+        pub fn compile_io_contracts_json(
+            &self,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let signs: Vec<([i32; 3], String)> = crate::insign::extract_signs(&self.0)
+                .into_iter()
+                .map(|s| (s.pos, s.text))
+                .collect();
+            let data = crate::io_contract::insign_ext::contracts_json(&signs)
                 .map_err(|_| NucleationError::Parse)?;
             let json = serde_json::to_string(&data).map_err(|_| NucleationError::Serialize)?;
             let _ = write!(out, "{}", json);

@@ -191,6 +191,11 @@ Schematic_add_entity_from_snbt_result Schematic_add_entity_from_snbt(Schematic* 
 
 void Schematic_get_all_blocks_json(const Schematic* self, DiplomatWrite* write);
 
+typedef struct Schematic_get_region_non_air_blocks_json_result {union { NucleationError err;}; bool is_ok;} Schematic_get_region_non_air_blocks_json_result;
+Schematic_get_region_non_air_blocks_json_result Schematic_get_region_non_air_blocks_json(const Schematic* self, DiplomatStringView region_name, DiplomatWrite* write);
+
+void Schematic_get_non_air_blocks_json(const Schematic* self, DiplomatWrite* write);
+
 void Schematic_get_chunk_blocks_json(const Schematic* self, int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, DiplomatWrite* write);
 
 void Schematic_get_chunks_json(const Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, DiplomatWrite* write);
@@ -362,6 +367,18 @@ void Schematic_extract_signs_json(const Schematic* self, DiplomatWrite* write);
 
 typedef struct Schematic_compile_insign_json_result {union { NucleationError err;}; bool is_ok;} Schematic_compile_insign_json_result;
 Schematic_compile_insign_json_result Schematic_compile_insign_json(const Schematic* self, DiplomatWrite* write);
+
+typedef struct Schematic_set_cell_contract_json_result {union { NucleationError err;}; bool is_ok;} Schematic_set_cell_contract_json_result;
+Schematic_set_cell_contract_json_result Schematic_set_cell_contract_json(Schematic* self, DiplomatStringView json);
+
+typedef struct Schematic_cell_contract_json_result {union { NucleationError err;}; bool is_ok;} Schematic_cell_contract_json_result;
+Schematic_cell_contract_json_result Schematic_cell_contract_json(const Schematic* self, DiplomatWrite* write);
+
+typedef struct Schematic_resolve_cell_contract_json_result {union { NucleationError err;}; bool is_ok;} Schematic_resolve_cell_contract_json_result;
+Schematic_resolve_cell_contract_json_result Schematic_resolve_cell_contract_json(const Schematic* self, DiplomatWrite* write);
+
+typedef struct Schematic_compile_io_contracts_json_result {union { NucleationError err;}; bool is_ok;} Schematic_compile_io_contracts_json_result;
+Schematic_compile_io_contracts_json_result Schematic_compile_io_contracts_json(const Schematic* self, DiplomatWrite* write);
 
 void Schematic_all_palettes_json(const Schematic* self, DiplomatWrite* write);
 
