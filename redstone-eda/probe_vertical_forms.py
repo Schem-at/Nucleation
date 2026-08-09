@@ -440,6 +440,45 @@ for alt in (False, True):
           "driven=%s leak=%s" % (lo, hi))
 
 
+# ============================================= A. the best TORCH-FREE ascent
+# Torch burnout (probe_torch_burnout.py) disqualifies the ladder for switching
+# data, so the torch-free forms have to be compared on their own terms.  They
+# split into two kinds, and the split matters more than any single number:
+#
+#   SHAFT forms -- footprint is independent of the rise (ring riser, glass
+#                  tower).  Cost is xz area per bit, paid once.
+#   SLOPE forms -- footprint grows with the rise but is SHARED BY EVERY BIT,
+#                  because a half slope stacks lines at 2 y pitch in the very
+#                  same lane.  Cost is horizontal cells per y, for the whole
+#                  bundle.
+#
+# A1 measures the slope kind at bus width: 4 bits stacked at 2 y pitch in ONE
+# 1-wide lane, climbing together.
+NB, NC = 4, 10
+r = Rig("stacked_halfslope")
+lines = []
+for i in range(NB):
+    cs = vf.half_slope(r.b, 0, 0, 6 + 2 * i, NC, alternate=True)
+    lines.append(cs)
+    r.probe("out%d" % i, cs[-1])
+    r.lever(cs[0], d=(-1, 0))
+r.start()
+res = r.sweep(["out%d" % i for i in range(NB)])
+lo, hi = crosstalk(res, NB)
+lane = len({(c[0], c[2]) for cs in lines for c in cs})
+rise = lines[0][-1][1] - lines[0][0][1]
+V(all(v and v > 0 for v in lo) and all(v == 0 for v in hi) and r.floating == 0,
+  "A1 %d bits stacked at 2 y pitch on ONE half slope, %d/%d patterns, zero "
+  "crosstalk: the whole bundle climbs %d y inside a single %d-cell 1-wide "
+  "lane -- %.2f xz cells per bit, torch-free, 0 gt"
+  % (NB, 2 ** NB, 2 ** NB, rise, lane, lane / float(NB)),
+  "driven=%s leak=%s  2 horizontal cells per y, shared by every bit" % (lo, hi))
+V(lo[0] <= 15 - 2 * rise,
+  "A1 ...and its price is REACH, not area: -1 ss per cell is -2 ss per y on a "
+  "half slope, so a bundle climbs only %d y per source before a repeater "
+  "station" % ((15 - 1) // 2),
+  "exit ss=%s after %d y" % (lo, rise))
+
 # H5 -- why the slope has to be a HALF slope for a stacked bus
 full = vf.lower_end_of_step(vf.slope_levels(10, rise_every=1))
 half = vf.lower_end_of_step(vf.slope_levels(10, rise_every=2))
@@ -522,13 +561,23 @@ vf.ring_bus(b, 3, 3, 0, 0, 4, 12)
 rows.append(row("ring_riser 3x3, 2 bits (180)", 2, b.cells, 3 * 3,
                 "1 y/cell, BOTH ways, 0 gt, -1 ss/y"))
 
-print("--- measured density ---")
-print("%-30s %5s %-11s %10s %10s" %
-      ("form", "bits", "bbox", "blocks/y/bit", "xz-claim/bit"))
+print("--- measured density, WITH the fields that outrank it ---")
+print("%-30s %5s %-11s %10s %10s %6s %9s %9s" %
+      ("form", "bits", "bbox", "blocks/y/bit", "xz-claim/bit", "gt/y",
+       "max-tog", "data-safe"))
+KEY = {"torch_ladder x8, x-pitch 1": "torch_ladder",
+       "glass_tower x8, z-pitch 2": "glass_tower",
+       "ring_riser 11x3, 8 bits": "ring_riser",
+       "ring_riser 5x3, 4 bits": "ring_riser",
+       "ring_riser 3x3, 2 bits (180)": "ring_riser"}
 for (name, nbits, bb, py, res, note) in rows:
-    print("%-30s %5d %2dx%2dx%-5d %10.3f %10.3f   %s"
+    f = vf.FORMS[KEY[name]]
+    print("%-30s %5d %2dx%2dx%-5d %10.3f %10.3f %6.1f %9s %9s   %s"
           % (name, nbits, bb[0], bb[1], bb[2], py / float(nbits),
-             res / float(nbits), note))
+             res / float(nbits), f["gt_per_y"],
+             "unlimited" if f["max_toggle_gt"] is None
+             else ">=%dgt" % f["max_toggle_gt"],
+             "YES" if vf.data_safe(KEY[name]) else "** NO **", note))
 print("(blocks/y/bit: blocks spent on one mid-height y level -- the marginal "
       "cost per y of\n rise.  xz-claim/bit: the xz area a router must reserve, "
       "including each form's\n required neighbour pitch and, for the ladder "
