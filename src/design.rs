@@ -449,6 +449,232 @@ impl BusStyle {
     }
 }
 
+/// How a narrower word is placed inside a wider one.
+///
+/// A width mismatch is a LAYOUT question, not an error: 3 BCD-hundreds bits
+/// genuinely fit inside a 4-bit `bcd` input, and which 3 of the 4 they drive is
+/// the only thing anyone has to decide.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum BusAlign {
+    /// Bit 0 to bit 0 — the arithmetic default (a narrow value keeps its
+    /// magnitude; the destination's high bits read 0).
+    #[default]
+    Lsb,
+    /// Top bit to top bit: the source is shifted up by the width difference.
+    /// This is a MULTIPLY BY 2^(ws-wd), not a reinterpretation — it is what you
+    /// want when the two words are fixed-point fields, not integers.
+    Msb,
+    /// Place the source word `n` positions toward the MSB. Negative shifts
+    /// down (and drops the bits that fall off, which needs `truncate`).
+    Shift(i32),
+}
+
+/// The width-adaptation policy for one bus.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct WidthAdapt {
+    /// Where the source word sits in the destination.
+    pub align: BusAlign,
+    /// Permit DROPPING source bits that fall outside the destination.
+    /// Refused by default: silently losing the high bits of a word is the kind
+    /// of thing a router must make you ask for.
+    pub truncate: bool,
+}
+
+impl WidthAdapt {
+    /// LSB-aligned, no truncation — what [`Design::route_bus`] uses.
+    pub fn lsb() -> Self {
+        Self::default()
+    }
+
+    /// MSB-aligned.
+    pub fn msb() -> Self {
+        WidthAdapt {
+            align: BusAlign::Msb,
+            truncate: false,
+        }
+    }
+
+    /// Shifted `n` toward the MSB.
+    pub fn shift(n: i32) -> Self {
+        WidthAdapt {
+            align: BusAlign::Shift(n),
+            truncate: false,
+        }
+    }
+
+    /// The same policy, allowed to drop source bits.
+    pub fn truncating(mut self) -> Self {
+        self.truncate = true;
+        self
+    }
+}
+
+/// What a bus actually did about a width mismatch: the resolved bit mapping,
+/// recorded so LVS pairs the right bits and a UI can show the wiring.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WidthMap {
+    /// Driver word width.
+    pub driver_width: u8,
+    /// Sink word width.
+    pub sink_width: u8,
+    /// Positions the source is moved toward the MSB: driver bit `i` drives sink
+    /// bit `i + shift`.
+    pub shift: i32,
+    /// First driver bit that is actually connected.
+    pub from_bit: u8,
+    /// How many bits are connected (the routed stack's width).
+    pub bits: u8,
+    /// Sink bits nothing drives. Undriven dust IS logical 0 — no hardware is
+    /// needed to tie them, which is verified in
+    /// `tests/design_width_adapt.rs::an_undriven_promoted_input_reads_zero`.
+    pub tied_zero: Vec<u8>,
+    /// Driver bits DROPPED (only ever non-empty with `truncate`).
+    pub dropped: Vec<u8>,
+}
+
+impl WidthMap {
+    /// Whether this is the trivial identity (equal widths, nothing to say).
+    pub fn is_identity(&self) -> bool {
+        self.driver_width == self.sink_width && self.shift == 0 && self.dropped.is_empty()
+    }
+
+    /// The sentence to show the user.
+    pub fn note(&self, driver: &str, sink: &str) -> String {
+        let mut s = format!(
+            "{driver}[{}] -> {sink}[{}], {}",
+            self.driver_width,
+            self.sink_width,
+            match self.shift {
+                0 => "lsb-aligned".to_string(),
+                n if n > 0 => format!("shifted {n} toward the msb"),
+                n => format!("shifted {} toward the lsb", -n),
+            }
+        );
+        if !self.tied_zero.is_empty() {
+            s.push_str(&format!(
+                "; sink bit(s) {} left undriven, which reads 0",
+                ranges(&self.tied_zero)
+            ));
+        }
+        if !self.dropped.is_empty() {
+            s.push_str(&format!(
+                "; driver bit(s) {} TRUNCATED away",
+                ranges(&self.dropped)
+            ));
+        }
+        s
+    }
+
+    /// `{"driver_width":n,"sink_width":n,"shift":n,"from_bit":n,"bits":n,
+    ///   "tied_zero":[..],"dropped":[..],"pairs":[[dbit,sbit],..]}`
+    pub fn to_json(&self) -> String {
+        let list = |v: &[u8]| -> String {
+            v.iter()
+                .map(|b| b.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let pairs: Vec<String> = (0..self.bits)
+            .map(|k| {
+                let d = self.from_bit + k;
+                format!("[{},{}]", d, d as i32 + self.shift)
+            })
+            .collect();
+        format!(
+            "{{\"driver_width\":{},\"sink_width\":{},\"shift\":{},\"from_bit\":{},\
+             \"bits\":{},\"tied_zero\":[{}],\"dropped\":[{}],\"pairs\":[{}]}}",
+            self.driver_width,
+            self.sink_width,
+            self.shift,
+            self.from_bit,
+            self.bits,
+            list(&self.tied_zero),
+            list(&self.dropped),
+            pairs.join(",")
+        )
+    }
+}
+
+/// Whether two types differ ONLY in width, so a resolved width adaptation makes
+/// them compatible. Two integer words of different widths are different
+/// `IoType`s by construction, which is exactly the case adaptation exists for;
+/// an int and a float, or an int and a string, are not.
+fn same_type_family(a: &IoType, b: &IoType) -> bool {
+    matches!(
+        (a, b),
+        (IoType::UnsignedInt { .. }, IoType::UnsignedInt { .. })
+            | (IoType::SignedInt { .. }, IoType::SignedInt { .. })
+            | (IoType::UnsignedInt { .. }, IoType::Boolean)
+            | (IoType::Boolean, IoType::UnsignedInt { .. })
+    )
+}
+
+/// `[0,1,2,5]` as `"0..2, 5"` — a bit list a human can read.
+fn ranges(bits: &[u8]) -> String {
+    let mut out: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < bits.len() {
+        let start = bits[i];
+        let mut end = start;
+        while i + 1 < bits.len() && bits[i + 1] == end + 1 {
+            i += 1;
+            end = bits[i];
+        }
+        out.push(if start == end {
+            format!("{start}")
+        } else {
+            format!("{start}..{end}")
+        });
+        i += 1;
+    }
+    out.join(", ")
+}
+
+/// Resolve a width mismatch into a bit mapping, or say why it cannot be.
+fn plan_width_map(
+    driver_width: u8,
+    sink_width: u8,
+    adapt: WidthAdapt,
+) -> Result<WidthMap, String> {
+    let (wd, ws) = (driver_width as i32, sink_width as i32);
+    let shift = match adapt.align {
+        BusAlign::Lsb => 0,
+        BusAlign::Msb => ws - wd,
+        BusAlign::Shift(n) => n,
+    };
+    // Driver bits whose destination exists.
+    let from = 0.max(-shift);
+    let to = wd.min(ws - shift);
+    if to <= from {
+        return Err(format!(
+            "a {wd}-bit word shifted {shift} lands entirely outside a {ws}-bit destination, so              there is nothing to connect"
+        ));
+    }
+    let dropped: Vec<u8> = (0..wd)
+        .filter(|i| *i < from || *i >= to)
+        .map(|i| i as u8)
+        .collect();
+    if !dropped.is_empty() && !adapt.truncate {
+        return Err(format!(
+            "connecting a {wd}-bit driver to a {ws}-bit sink shifted {shift} would drop bits {} of the driver word — losing the high bits silently is not something a router should decide, so pass truncate to accept it (or align/shift so it fits)",
+            ranges(&dropped)
+        ));
+    }
+    let tied_zero: Vec<u8> = (0..ws)
+        .filter(|j| *j < from + shift || *j >= to + shift)
+        .map(|j| j as u8)
+        .collect();
+    Ok(WidthMap {
+        driver_width,
+        sink_width,
+        shift,
+        from_bit: from as u8,
+        bits: (to - from) as u8,
+        tied_zero,
+        dropped,
+    })
+}
+
 /// A bus-shaped waypoint splitting the bus into independently-routed
 /// segments.
 #[derive(Clone, Debug)]
@@ -585,6 +811,10 @@ pub struct BusLayer {
     /// changed instance hardware, which the studio has to tell the user about —
     /// it is reversible, but it is not nothing.
     pub promotions: Vec<String>,
+    /// The resolved bit mapping when the driver and sink widths DIFFER — see
+    /// [`WidthMap`]. `None` means the widths matched and every bit pairs with
+    /// its own index.
+    pub width_map: Option<WidthMap>,
 }
 
 impl BusLayer {
@@ -924,6 +1154,26 @@ impl Design {
     /// A bus layer.
     pub fn bus(&self, name: &str) -> Option<&BusLayer> {
         self.buses.get(name)
+    }
+
+    /// The resolved bit mapping of a width-adapted bus, as JSON, plus the
+    /// sentence to show the user — `null` when the widths matched.
+    ///
+    /// `{"map":{...},"note":"u1.bcd_hundreds[3] -> u3.bcd[4], msb-aligned; sink
+    /// bit(s) 0 left undriven, which reads 0"}`
+    pub fn bus_width_map_json(&self, name: &str) -> Result<String, String> {
+        let bus = self
+            .buses
+            .get(name)
+            .ok_or_else(|| format!("unknown bus `{name}`"))?;
+        Ok(match &bus.width_map {
+            None => "null".to_string(),
+            Some(m) => format!(
+                "{{\"map\":{},\"note\":{:?}}}",
+                m.to_json(),
+                m.note(&bus.driver, bus.sinks.first().map(String::as_str).unwrap_or("?"))
+            ),
+        })
     }
 
     /// The state of a bus layer.
@@ -1777,7 +2027,45 @@ impl Design {
         gates: Vec<Gate>,
         style: BusStyle,
     ) -> Result<BusState, String> {
-        self.route_bus_inner(name.into(), &[driver], sinks, gates, style, false)
+        self.route_bus_inner(
+            name.into(),
+            &[driver],
+            sinks,
+            gates,
+            style,
+            false,
+            WidthAdapt::default(),
+        )
+    }
+
+    /// [`Design::route_bus`] with an explicit WIDTH-ADAPTATION policy.
+    ///
+    /// A width mismatch is a layout question, not an error. 3 BCD-hundreds bits
+    /// fit inside a 4-bit `bcd` input; the only decision is which 3 of the 4
+    /// they drive, and the destination bits nothing drives read 0 with no
+    /// hardware at all (undriven dust IS logical 0 — verified in-sim by
+    /// `tests/design_width_adapt.rs`).
+    ///
+    /// - [`BusAlign::Lsb`] (the default): bit 0 to bit 0, magnitude preserved.
+    /// - [`BusAlign::Msb`]: top bit to top bit — a shift up by the width
+    ///   difference, which is what fixed-point fields want.
+    /// - [`BusAlign::Shift`]: place the word anywhere.
+    /// - `truncate`: permit dropping source bits that fall outside. Refused by
+    ///   default, because losing a word's high bits is not the router's call.
+    ///
+    /// Adaptation applies to a single driver and a single sink; a fanout or a
+    /// wired-OR merge still requires one common width, so nobody has to reason
+    /// about several different mappings sharing one trunk.
+    pub fn route_bus_adapted(
+        &mut self,
+        name: impl Into<String>,
+        driver: &str,
+        sinks: &[&str],
+        gates: Vec<Gate>,
+        style: BusStyle,
+        adapt: WidthAdapt,
+    ) -> Result<BusState, String> {
+        self.route_bus_inner(name.into(), &[driver], sinks, gates, style, false, adapt)
     }
 
     /// Declare AND realize a wired-OR bus: multiple drivers are legal ONLY
@@ -1792,7 +2080,15 @@ impl Design {
         gates: Vec<Gate>,
         style: BusStyle,
     ) -> Result<BusState, String> {
-        self.route_bus_inner(name.into(), drivers, sinks, gates, style, true)
+        self.route_bus_inner(
+            name.into(),
+            drivers,
+            sinks,
+            gates,
+            style,
+            true,
+            WidthAdapt::default(),
+        )
     }
 
     fn route_bus_inner(
@@ -1803,6 +2099,7 @@ impl Design {
         gates: Vec<Gate>,
         style: BusStyle,
         merge_or: bool,
+        adapt: WidthAdapt,
     ) -> Result<BusState, String> {
         if self.buses.contains_key(&name) {
             return Err(format!("bus `{name}` already exists"));
@@ -1861,6 +2158,7 @@ impl Design {
             return Err(format!("bus `{name}` needs at least one sink"));
         }
         let mut sink_ports = Vec::new();
+        let mut width_map: Option<WidthMap> = None;
         for s in sinks {
             let sp = self
                 .resolve_port(s)
@@ -1871,13 +2169,39 @@ impl Design {
                      (a design input, or a cell's output port, is a driver)"
                 ));
             }
-            if sp.width != driver_ports[0].width {
-                return Err(format!(
-                    "bus `{name}`: sink `{s}` width {} != driver width {}",
-                    sp.width, driver_ports[0].width
-                ));
+            // Adapt when the widths differ, and ALSO when the caller asked for
+            // a specific placement: `shift(2)` between two 8-bit ports is a real
+            // request, and ignoring it because the widths happen to match would
+            // be the worst kind of surprise.
+            let asked = !matches!(adapt.align, BusAlign::Lsb) || adapt.truncate;
+            if sp.width != driver_ports[0].width || asked {
+                // A width mismatch is a LAYOUT question, and the router answers
+                // it — but only where one answer is unambiguous. Several sinks
+                // sharing a trunk would each want their own mapping, so those
+                // still need one common width.
+                if sp.width != driver_ports[0].width && (sinks.len() > 1 || drivers.len() > 1) {
+                    return Err(format!(
+                        "bus `{name}`: sink `{s}` width {} != driver width {} — width adaptation \
+                         applies to a single driver and a single sink, so a fanout or wired-OR \
+                         merge needs one common width (route the odd sink as its own bus)",
+                        sp.width, driver_ports[0].width
+                    ));
+                }
+                let m = plan_width_map(driver_ports[0].width, sp.width, adapt)
+                    .map_err(|e| format!("bus `{name}`: {e}"))?;
+                // Equal widths, no shift, nothing dropped: nothing to say, so
+                // leave the bus unadorned.
+                if !m.is_identity() {
+                    width_map = Some(m);
+                }
             }
-            if sp.ty != driver_ports[0].ty {
+            // Two integer words of DIFFERENT widths are different `IoType`s by
+            // construction, so the type check has to look past the width once
+            // an adaptation has resolved it; everything else still has to match.
+            if sp.ty != driver_ports[0].ty
+                && !(width_map.is_some()
+                    && same_type_family(&driver_ports[0].ty, &sp.ty))
+            {
                 return Err(format!(
                     "bus `{name}`: sink `{s}` type {:?} != driver `{}` type {:?}",
                     sp.ty, driver_ports[0].name, driver_ports[0].ty
@@ -1901,9 +2225,17 @@ impl Design {
             gate_cells: BTreeMap::new(),
             rule: None,
             promotions,
+            width_map,
         };
 
-        match self.realize(Some(&name), &driver_ports, &sink_ports, &layer.gates, &layer.style) {
+        match self.realize(
+            Some(&name),
+            &driver_ports,
+            &sink_ports,
+            &layer.gates,
+            &layer.style,
+            layer.width_map.as_ref(),
+        ) {
             Ok(real) => {
                 Self::fill_layer(&mut layer, real.fragment, real.segments, real.gate_cells);
                 self.apply_amendments(real.amendments);
@@ -2168,6 +2500,9 @@ impl Design {
         let sink_names = layer.sinks.clone();
         let gates = layer.gates.clone();
         let style = layer.style.clone();
+        // The bit mapping is part of the bus's INTENT: a reroute keeps it, so a
+        // width-adapted bus never silently re-pairs its bits.
+        let width_map = layer.width_map.clone();
         let mut driver_ports = Vec::new();
         for dn in &driver_names {
             match self.resolve_port(dn) {
@@ -2192,7 +2527,14 @@ impl Design {
                 }
             }
         }
-        match self.realize(Some(name), &driver_ports, &sink_ports, &gates, &style) {
+        match self.realize(
+            Some(name),
+            &driver_ports,
+            &sink_ports,
+            &gates,
+            &style,
+            width_map.as_ref(),
+        ) {
             Ok(real) => {
                 self.touch_bus(name);
                 let layer = self.buses.get_mut(name).unwrap();
@@ -2713,6 +3055,7 @@ impl Design {
     /// plus a BRANCH per extra sink (fanout) and per extra driver
     /// (wired-OR), each joining the trunk at a plain-dust junction,
     /// diode-isolated by a repeater on the branch side.
+    #[allow(clippy::too_many_arguments)]
     fn realize(
         &self,
         exclude: Option<&str>,
@@ -2720,9 +3063,32 @@ impl Design {
         sinks: &[DesignPort],
         gates: &[Gate],
         style: &BusStyle,
+        width_map: Option<&WidthMap>,
     ) -> Result<Realization, String> {
         let step = (0, 2, 0);
-        let width = drivers[0].width;
+        // WIDTH ADAPTATION is pure geometry once the mapping is resolved: route
+        // the OVERLAPPING bits only, and slide each end's bit-0 anchor to the
+        // first bit it actually carries. The stack pitch is unchanged, so every
+        // template, crossing rule and DRC downstream sees an ordinary bus that
+        // happens to be narrower. Sink bits nothing drives are simply not built
+        // — undriven dust is logical 0, so tying them costs no hardware.
+        let width = width_map.map_or(drivers[0].width, |m| m.bits);
+        let (drivers, sinks) = match width_map {
+            None => (drivers.to_vec(), sinks.to_vec()),
+            Some(m) => {
+                let slide = |p: &DesignPort, bit: i32| -> DesignPort {
+                    let mut q = p.clone();
+                    q.anchor = add(q.anchor, scale(q.step, bit));
+                    q.width = m.bits;
+                    q
+                };
+                (
+                    vec![slide(&drivers[0], m.from_bit as i32)],
+                    vec![slide(&sinks[0], m.from_bit as i32 + m.shift)],
+                )
+            }
+        };
+        let (drivers, sinks) = (&drivers[..], &sinks[..]);
         for p in drivers.iter().chain(sinks.iter()) {
             if p.step != step && p.step.1 != 0 {
                 return Err(format!(
@@ -3345,7 +3711,18 @@ impl Design {
             let Ok(driver) = self.resolve_port(&bus.driver) else {
                 continue;
             };
-            for bit in 0..driver.width {
+            // A WIDTH-ADAPTED bus does not pair bit k with bit k: driver bit
+            // `from_bit + i` drives sink bit `from_bit + i + shift`, and the
+            // sink bits nothing drives are not part of any net (undriven dust is
+            // logical 0, not a broken connection). Pairing by index here would
+            // report the whole bus as opens and shorts.
+            let (first, count, shift) = bus
+                .width_map
+                .as_ref()
+                .map_or((0u8, driver.width, 0i32), |m| (m.from_bit, m.bits, m.shift));
+            for i in 0..count {
+                let bit = first + i;
+                let sink_bit = bit as i32 + shift;
                 // ONE net per bit: every driver (wired-OR merges stay one
                 // intent net) plus every sink.
                 let mut terminals = Vec::new();
@@ -3356,7 +3733,7 @@ impl Design {
                 }
                 for s in &bus.sinks {
                     if let Some(sp) = self.ports.get(s) {
-                        terminals.push(sp.wire(bit));
+                        terminals.push(sp.wire(sink_bit.max(0) as u8));
                     }
                 }
                 nets.push(crate::routing::IntentNet {

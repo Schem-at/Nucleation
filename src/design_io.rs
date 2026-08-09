@@ -29,8 +29,7 @@
 
 use crate::design::{
     BitHardware, BusLayer, BusState, BusStyle, CellDef, Design, DesignPort, Gate, Instance,
-    RunInfo, Segment, SegmentKind, P3,
-};
+    RunInfo, Segment, SegmentKind, P3, WidthMap,};
 use crate::io_contract::{CellContract, IoType, NetClassRule, PortDirection};
 use crate::UniversalSchematic;
 use serde::{Deserialize, Serialize};
@@ -141,6 +140,8 @@ struct BusMeta {
     gate_cells: BTreeMap<String, BTreeSet<P3>>,
     #[serde(default)]
     rule: Option<NetClassRule>,
+    #[serde(default)]
+    width_map: Option<WidthMapDoc>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -420,6 +421,48 @@ fn bus_meta(b: &BusLayer) -> BusMeta {
         segments: b.segments.iter().map(segment_doc).collect(),
         gate_cells: b.gate_cells.clone(),
         rule: b.rule.clone(),
+        width_map: b.width_map.as_ref().map(width_map_doc),
+    }
+}
+
+/// Serializable mirror of [`nucleation::design::WidthMap`]. PERSISTED, unlike
+/// `promotions`: the bit mapping is part of the bus's INTENT (it is what LVS
+/// pairs and what the UI shows), so a reloaded document must carry it or it
+/// would reroute to a different wiring.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct WidthMapDoc {
+    driver_width: u8,
+    sink_width: u8,
+    shift: i32,
+    from_bit: u8,
+    bits: u8,
+    #[serde(default)]
+    tied_zero: Vec<u8>,
+    #[serde(default)]
+    dropped: Vec<u8>,
+}
+
+fn width_map_doc(m: &WidthMap) -> WidthMapDoc {
+    WidthMapDoc {
+        driver_width: m.driver_width,
+        sink_width: m.sink_width,
+        shift: m.shift,
+        from_bit: m.from_bit,
+        bits: m.bits,
+        tied_zero: m.tied_zero.clone(),
+        dropped: m.dropped.clone(),
+    }
+}
+
+fn width_map_from(d: WidthMapDoc) -> WidthMap {
+    WidthMap {
+        driver_width: d.driver_width,
+        sink_width: d.sink_width,
+        shift: d.shift,
+        from_bit: d.from_bit,
+        bits: d.bits,
+        tied_zero: d.tied_zero,
+        dropped: d.dropped,
     }
 }
 
@@ -429,6 +472,7 @@ fn bus_from(name: &str, meta: BusMeta, fragment: BTreeMap<P3, String>) -> BusLay
         // `route_bus` CALL changed. A reloaded document already carries the
         // promotion in the instance's port modes, so this load promoted nothing.
         promotions: Vec::new(),
+        width_map: meta.width_map.map(width_map_from),
         name: name.to_string(),
         driver: meta.driver,
         extra_drivers: meta.extra_drivers,

@@ -535,6 +535,73 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Declare and route a bus with an explicit WIDTH-ADAPTATION policy, so
+        /// a narrower word can drive a wider port.
+        ///
+        /// `align`: 0 = lsb (bit 0 to bit 0, magnitude preserved), 1 = msb (top
+        /// bit to top bit — a shift up by the width difference), 2 = use
+        /// `shift` verbatim (positive moves toward the MSB). `truncate` permits
+        /// DROPPING source bits that fall outside the destination; without it a
+        /// lossy connection is refused, because losing a word's high bits is not
+        /// the router's call. Destination bits nothing drives read 0 with no
+        /// hardware at all.
+        ///
+        /// Writes the resulting bus state; `bus_width_map` reports the mapping.
+        #[allow(clippy::too_many_arguments)]
+        pub fn route_bus_adapted(
+            &mut self,
+            name: &DiplomatStr,
+            driver: &DiplomatStr,
+            sinks_csv: &DiplomatStr,
+            gates_json: &DiplomatStr,
+            style_json: &DiplomatStr,
+            align: u8,
+            shift: i32,
+            truncate: bool,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let sinks: Vec<String> = utf8(sinks_csv)?
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            let sink_refs: Vec<&str> = sinks.iter().map(String::as_str).collect();
+            let gates = parse_gates(utf8(gates_json)?)?;
+            let style = parse_style(utf8(style_json)?)?;
+            let adapt = crate::design::WidthAdapt {
+                align: match align {
+                    1 => crate::design::BusAlign::Msb,
+                    2 => crate::design::BusAlign::Shift(shift),
+                    _ => crate::design::BusAlign::Lsb,
+                },
+                truncate,
+            };
+            let state = self
+                .0
+                .route_bus_adapted(utf8(name)?, utf8(driver)?, &sink_refs, gates, style, adapt)
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::InvalidArgument
+                })?;
+            let _ = write!(out, "{}", state_str(&state));
+            Ok(())
+        }
+
+        /// The resolved bit mapping of a width-adapted bus (`null` when the
+        /// widths matched): `{"map":{...,"pairs":[[dbit,sbit],..]},"note":".."}`.
+        pub fn bus_width_map(
+            &self,
+            name: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let json = self.0.bus_width_map_json(utf8(name)?).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::NotFound
+            })?;
+            let _ = write!(out, "{json}");
+            Ok(())
+        }
+
         /// The current bus-layer GEOMETRY REVISION. Read it before a mutating
         /// call, pass it to `changed_layers_since` after, and redraw exactly
         /// the layers named.
