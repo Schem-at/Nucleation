@@ -1008,6 +1008,16 @@ fn is_live_mech(m: crate::routing::transport::Mechanism) -> bool {
     !matches!(m, M::SolidSupport | M::TransparentSupport | M::Inert)
 }
 
+/// Order-independent key for a short between two nets, so the same pair matches
+/// whichever way the extractor happened to report it.
+fn short_key(a: &str, b: &str) -> (String, String) {
+    if a <= b {
+        (a.to_string(), b.to_string())
+    } else {
+        (b.to_string(), a.to_string())
+    }
+}
+
 /// Chebyshev distance in cells — the natural metric for "n cells of clearance".
 fn chebyshev(a: P3, b: P3) -> i32 {
     (a.0 - b.0).abs().max((a.1 - b.1).abs()).max((a.2 - b.2).abs())
@@ -4362,16 +4372,27 @@ impl Design {
         // finding whose every witness lies inside one instance is that cell's
         // internal business, exactly as `Design::check` already treats it.
         let bodies = self.instance_bodies();
-        let interior = |cells: &[crate::routing::Pos]| -> bool {
+        let port_hw = self.port_hardware_cells();
+        let in_a_cell = |cells: &[crate::routing::Pos]| -> bool {
             !cells.is_empty()
                 && cells.iter().all(|q| {
                     let p = (q.x, q.y, q.z);
                     bodies.iter().any(|b| b.contains(&p))
                 })
         };
+        // Port hardware excuses a SHORT (a lever bank merges its own bits) but
+        // never an OPEN. An open's witnesses ARE the terminals, which are port
+        // wires by definition, so folding port hardware in here would skip every
+        // dead lane there is — including `O03_flat_obstacle`, the fixture this
+        // gate was built for.
+        let interior = |cells: &[crate::routing::Pos]| -> bool {
+            in_a_cell(cells)
+                || (!cells.is_empty()
+                    && cells.iter().all(|q| port_hw.contains(&(q.x, q.y, q.z))))
+        };
 
         for o in &lvs.opens {
-            if !mine(&o.net) || interior(&o.fragments.concat()) {
+            if !mine(&o.net) || in_a_cell(&o.fragments.concat()) {
                 continue;
             }
             let ends: Vec<String> = o
@@ -4390,11 +4411,34 @@ impl Design {
                 ends.join(" vs ")
             ));
         }
+        // A SHORT THIS ROUTE DID NOT CAUSE IS NOT THIS ROUTE'S FAILURE.
+        //
+        // Two false positives were found this way, and the second proved the
+        // first fix was too narrow. A port's own hardware column frequently
+        // merges its bits all by itself: the ADD007 adder's stacked output LAMPS
+        // do it inside an instance (caught by the cell-boundary rule below), and
+        // a LEVER BANK in the design's own loose layer does it with no instance
+        // anywhere — same wrong verdict, no black box to blame it on.
+        //
+        // So the question asked is differential: which shorts appear only WITH
+        // this bus's cells in place. `pre_shorts` is the same extraction over the
+        // same geometry minus this bus's fragment, with its intent nets still
+        // declared so the pairs remain comparable. Anything already merged
+        // without us is the port's construction, not our route.
+        //
+        // Deliberately NOT done for OPENS: with the fragment removed every net
+        // of this bus is trivially open — that is the whole point of the route —
+        // so baselining them would mask exactly the dead lanes this gate exists
+        // to catch.
+        let pre_shorts = self.shorts_without_fragment(name);
         for s in &lvs.shorts {
             if !mine(&s.net_a) && !mine(&s.net_b) {
                 continue;
             }
             if interior(&[s.at_a, s.at_b]) {
+                continue;
+            }
+            if pre_shorts.contains(&short_key(&s.net_a, &s.net_b)) {
                 continue;
             }
             why.push(format!(
@@ -4455,6 +4499,64 @@ impl Design {
                 String::new()
             }
         ))
+    }
+
+    /// Every cell that belongs to a PORT's own hardware: its connection wires,
+    /// its levers and its lamps, for declared and instance ports alike.
+    ///
+    /// A port's hardware routinely merges its own bits — eight levers or eight
+    /// lamps stacked on one conducting support column is the normal shape of a
+    /// bank — and that merge is a property of the port, not of any route that
+    /// lands on it. The design did not author it and cannot change it without
+    /// `set_port_mode`, so blaming a bus for it makes `check` permanently dirty
+    /// on geometry that simulates correctly.
+    fn port_hardware_cells(&self) -> BTreeSet<P3> {
+        let mut out = BTreeSet::new();
+        let mut add = |p: &DesignPort| {
+            out.extend(p.wires());
+            for b in &p.bits {
+                out.extend(b.lever);
+                out.extend(b.lamp);
+            }
+        };
+        for p in self.ports.values() {
+            add(p);
+        }
+        if let Ok(ports) = self.instance_ports() {
+            for ip in ports {
+                if let Some(wires) = &ip.wires {
+                    out.extend(wires.iter().copied());
+                }
+                out.extend(ip.hardware.iter().copied());
+            }
+        }
+        out
+    }
+
+    /// The net pairs already merged when this bus's cells are taken away.
+    ///
+    /// The baseline for [`Design::conduction_reason`]'s short check: the same
+    /// extraction over the same geometry with this bus's fragment replaced by
+    /// air, its intent nets still declared so the reported pairs stay
+    /// comparable. Whatever is merged here was merged by the ports' own
+    /// hardware — a lever bank or lamp column on a shared conducting support —
+    /// and blaming the route for it rejects perfectly good geometry.
+    fn shorts_without_fragment(&self, name: &str) -> BTreeSet<(String, String)> {
+        let Some(layer) = self.buses.get(name) else {
+            return BTreeSet::new();
+        };
+        let Ok(mut flat) = self.flatten() else {
+            return BTreeSet::new();
+        };
+        for (p, _) in &layer.fragment {
+            let _ = flat.set_block_from_string(p.0, p.1, p.2, "minecraft:air");
+        }
+        let ws = crate::routing::workspace_from_schematic(&flat);
+        crate::routing::lvs(ws.cells(), &self.intent_nets())
+            .shorts
+            .iter()
+            .map(|s| short_key(&s.net_a, &s.net_b))
+            .collect()
     }
 
     /// Why this bus's geometry must not be accepted on CLEARANCE grounds.
@@ -4666,12 +4768,25 @@ impl Design {
         // "accidental latch". A ring living entirely inside one placed cell is
         // that cell's verified internal state, not a design error.
         let bodies = self.instance_bodies();
-        let interior = |cells: &[crate::routing::Pos]| -> bool {
+        // A finding nobody could act on is not a gating violation: either it
+        // lives inside a placed cell (a verified black box), or its witnesses
+        // are a PORT's own hardware — eight levers on one conducting support
+        // column merge their bits by construction, whoever wires them.
+        let port_hw = self.port_hardware_cells();
+        let in_a_cell = |cells: &[crate::routing::Pos]| -> bool {
             !cells.is_empty()
                 && cells.iter().all(|q| {
                     let p = (q.x, q.y, q.z);
                     bodies.iter().any(|b| b.contains(&p))
                 })
+        };
+        // Port hardware excuses a SHORT, never an OPEN: an open's witnesses are
+        // the terminals themselves, so folding it in there would hide every
+        // dead net in the design.
+        let interior = |cells: &[crate::routing::Pos]| -> bool {
+            in_a_cell(cells)
+                || (!cells.is_empty()
+                    && cells.iter().all(|q| port_hw.contains(&(q.x, q.y, q.z))))
         };
         let design_cycles = lvs.cycles.iter().filter(|ring| !interior(ring)).count();
         let design_shorts = lvs
@@ -4682,7 +4797,7 @@ impl Design {
         let design_opens = lvs
             .opens
             .iter()
-            .filter(|o| !interior(&o.fragments.concat()))
+            .filter(|o| !in_a_cell(&o.fragments.concat()))
             .count();
         // A bus reported ROUTED must have built something. Nothing upstream can
         // produce this any more (`realize` refuses an empty plan outright), but

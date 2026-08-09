@@ -512,12 +512,6 @@ impl<'a> BusFabric<'a> {
     }
 }
 
-/// A block that would electrically interact with dust laid one cell away.
-fn is_live_redstone(block: &str) -> bool {
-    use crate::routing::engine::blocks as rblocks;
-    rblocks::is_dust(block) || rblocks::is_repeater(block)
-}
-
 fn owner_name(o: &crate::design::Occupant) -> String {
     match o {
         crate::design::Occupant::Loose => "loose block".to_string(),
