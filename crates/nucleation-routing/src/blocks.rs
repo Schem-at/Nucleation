@@ -46,8 +46,17 @@ pub fn role_block(role: &str) -> &'static str {
 }
 
 /// Whether a block string is a solid conductor.
+///
+/// ONE CLASSIFIER, NOT TWO. This used to be its own substring test over
+/// [`SOLID_HINTS`], independent of [`crate::transport::classify`], and the two
+/// drifted apart in the way that class of duplication always does: when
+/// `classify` was taught that wool, planks and terracotta are solid — the fix
+/// mattering because the verified library tiles are BUILT of wool, so their own
+/// cut cells were reading as air — this copy was not, and every consumer of it
+/// (`workspace::solid_at`, `nets`, `lvs`, `audit`, `fabric`, `wire`) kept the
+/// old wrong answer. Delegating means a material fact can only be stated once.
 pub fn is_solid_block(block: &str) -> bool {
-    SOLID_HINTS.iter().any(|h| block.contains(h))
+    crate::transport::conducts(Some(block))
 }
 
 /// Whether dust/repeaters may SIT on this block (static support legality).
@@ -57,9 +66,7 @@ pub fn is_solid_block(block: &str) -> bool {
 /// top-half slabs are full-cube supports that conduct nothing — they are
 /// exactly what a bus dip uses where a diagonal below must survive.
 pub fn is_sturdy_support(block: &str) -> bool {
-    is_solid_block(block)
-        || block.contains("glass")
-        || block.contains("slab") && block.contains("type=top")
+    crate::transport::sturdy(Some(block))
 }
 
 /// Whether a block string is redstone dust.
@@ -162,5 +169,53 @@ mod tests {
         assert!(is_dust(DUST));
         assert!(is_solid_block("minecraft:magenta_concrete"));
         assert!(!is_solid_block(DUST));
+    }
+
+    /// The divergences an audit of this file against `materials.py` turned up.
+    /// Every one was SILENT — a plausible wrong answer, never an error.
+    #[test]
+    fn the_two_classifiers_agree_on_what_a_support_is() {
+        // The wool bug, which the tiles themselves are built out of. This file
+        // knew three families; `classify` knew six and was fixed without it.
+        for b in [
+            "minecraft:red_wool",
+            "minecraft:oak_planks",
+            "minecraft:white_terracotta",
+            "minecraft:smooth_stone_slab[type=double]",
+        ] {
+            assert!(is_solid_block(b), "{b} must be a solid conductor");
+            assert!(is_sturdy_support(b), "{b} must support dust");
+        }
+        // Full cubes that used to fall through to "not a support, conducts
+        // nothing" — the default that made a polished-andesite wall invisible
+        // and sent `O03_flat_obstacle` on a detour around a block it could have
+        // run straight over.
+        for b in [
+            "minecraft:polished_andesite",
+            "minecraft:cobblestone",
+            "minecraft:smooth_stone",
+            "minecraft:stone_bricks",
+            "minecraft:deepslate",
+            "minecraft:iron_block",
+            "minecraft:obsidian",
+            "minecraft:oak_log[axis=y]",
+        ] {
+            assert!(is_solid_block(b), "{b} is a full cube and conducts");
+        }
+        // `contains("minecraft:stone")` called all of these solid conductors.
+        for b in [
+            "minecraft:stone_button[face=wall,facing=north,powered=false]",
+            "minecraft:stone_pressure_plate[powered=false]",
+            "minecraft:stone_stairs[facing=north,half=bottom,shape=straight]",
+            "minecraft:stone_slab[type=bottom]",
+        ] {
+            assert!(!is_solid_block(b), "{b} is not a full cube");
+            assert!(!is_sturdy_support(b), "{b} cannot host dust");
+        }
+        // Sturdy but NOT conducting: the distinction the crossing tiles run on.
+        for b in ["minecraft:glass", "minecraft:lime_stained_glass"] {
+            assert!(is_sturdy_support(b), "{b} supports dust");
+            assert!(!is_solid_block(b), "{b} conducts nothing");
+        }
     }
 }

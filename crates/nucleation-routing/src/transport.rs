@@ -353,12 +353,84 @@ pub fn classify(block: Option<&str>) -> Material {
             Material::SlabBottom
         };
     }
+    // REDSTONE COMPONENTS ARE NOT BUILDING MATERIAL, and they must be settled
+    // before any substring test, because `redstone_wire` and `redstone_torch`
+    // both contain "stone". That is not a hypothetical: broadening the family
+    // list below made `is_solid_block(DUST)` true and a unit test caught it
+    // immediately — the same over-match that had been calling `stone_button` a
+    // conductor, just pointed at ourselves.
+    //
+    // `redstone_lamp` and `redstone_block` are deliberately NOT here: both are
+    // full cubes that conduct, and they fall through to Solid below.
+    if blocks::is_dust(b)
+        || blocks::is_repeater(b)
+        || blocks::is_comparator(b)
+        || blocks::is_torch(b)
+        || blocks::is_lever(b)
+    {
+        return Material::Other;
+    }
+    // Full cubes that do NOT conduct and are not sturdy supports for our
+    // purposes: the movable blocks. Checked before the `_block` family.
+    if b.contains("slime_block") || b.contains("honey_block") {
+        return Material::Other;
+    }
+    // Shapes that are NOT full cubes, checked before the family list so a
+    // `stone_button` or `stone_stairs` cannot be mistaken for stone. This order
+    // is the fix for a silent over-match: the old test was
+    // `contains("minecraft:stone")`, which called buttons, pressure plates,
+    // stairs and bottom slabs solid conductors.
+    for shape in [
+        "_button",
+        "_pressure_plate",
+        "_stairs",
+        "_fence",
+        "_pane",
+        "_door",
+        "_sign",
+        "_wall",
+        "_carpet",
+        "_rail",
+        "_trapdoor",
+        "cutter",
+    ] {
+        if b.contains(shape) {
+            return Material::Other;
+        }
+    }
     if b.contains("concrete")
-        || b == blocks::STONE
         || b.contains("lamp")
         || b.contains("_wool")
         || b.contains("planks")
         || b.contains("terracotta")
+        // FULL CUBES THAT WERE READING AS AIR. The list used to be four
+        // families plus exact `minecraft:stone`, and everything else fell to
+        // `Other` — "not a support, conducts nothing". That default is wrong in
+        // both directions at once: the router refuses to lay dust on a block it
+        // does not recognise (which is why `O03_flat_obstacle` detoured around a
+        // polished-andesite wall it could simply have run over), and the
+        // interference model thinks a foreign solid severs nothing (so a
+        // diagonal that vanilla cuts reads as live). Same class as the
+        // wool/planks/terracotta bug: silent, and wrong whichever way it lands.
+        || b.contains("stone")      // stone, smooth_stone, stone_bricks, blackstone
+        || b.contains("deepslate")
+        || b.contains("cobble")
+        || b.contains("andesite")
+        || b.contains("diorite")
+        || b.contains("granite")
+        || b.contains("bricks")
+        || b.contains("obsidian")
+        || b.contains("_log")
+        || b.contains("_block")     // iron_block, gold_block, ... (NOT redstone_block: caller checks that first)
+        || b.contains("dirt")
+        || b.contains("_ore")
+        || b.contains("sandstone")
+        || b.contains("prismarine")
+        || b.contains("purpur")
+        || b.contains("basalt")
+        || b.contains("tuff")
+        || b.contains("calcite")
+        || b.contains("quartz")
     {
         return Material::Solid;
     }
@@ -381,11 +453,21 @@ pub fn conducts(block: Option<&str>) -> bool {
 
 /// Does a block in the CUT cell sever a 1-y dust step?
 ///
-/// One of the three rules that used to be a single `cuts_diagonal`
-/// predicate. The cut cell is the one directly ABOVE THE LOWER dust: any
-/// sturdy block there severs the step, conducting or not.
+/// The cut cell is the one directly ABOVE THE LOWER dust. A CONDUCTOR there
+/// severs the step; glass and top slabs do NOT.
+///
+/// This read `sturdy` — "any sturdy block, conducting or not" — which is
+/// backwards for exactly the blocks the crossing tiles are built out of. Vanilla
+/// gates the diagonal on `isRedstoneConductor`, which glass fails, and
+/// `materials.py` has `cuts_step = conducts`. `wire.rs::caps_climb` already
+/// excluded glass and top slabs, so the crate contradicted itself; the tests
+/// missed it because they only ever passed STONE as the cut cell, never glass.
+///
+/// The consequence of the old answer was that a glass support — placed
+/// PRECISELY so the diagonal beneath it survives, which is the whole mechanism
+/// of `crossing_dipunder` — was modelled as severing that diagonal.
 pub fn cuts_step(block: Option<&str>) -> bool {
-    sturdy(block)
+    conducts(block)
 }
 
 /// Does a block in the DIODE cell let a step conduct DOWNHILL?
