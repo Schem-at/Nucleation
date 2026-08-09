@@ -728,15 +728,33 @@ fn compress(cells: &[P3]) -> Vec<P3> {
 ///   the only fix.
 ///
 /// Diagnosis-only: this runs once, on the failure path, never in the search.
-fn cross_level_probe(occ: &OccupancyIndex, a: P3, b: P3, width: u8) -> String {
+/// The levels within 8 blocks up or down on which this pair DOES have a clear
+/// corridor.
+///
+/// Computed on the failure path and, until self-staging existed, only ever
+/// rendered into a sentence for the user. The adversarial audit's finding was
+/// that this is the information needed to stage the detour: a `t5_03` refusal
+/// routes with one caller-supplied waypoint, and the router had already worked
+/// out where to put it. So it is a function now, and
+/// [`crate::design::Design`] retries against it instead of printing it.
+///
+/// Nearest levels first, so a caller trying them in order pays the smallest
+/// level change that works.
+pub fn clear_levels(occ: &OccupancyIndex, a: P3, b: P3, width: u8) -> Vec<i32> {
     let effort = LADDER[0];
     let mut clear = Vec::new();
-    for dy in [-8, -6, -4, -2, 2, 4, 6, 8] {
+    for dy in [2, -2, 4, -4, 6, -6, 8, -8] {
         let (a2, b2) = ((a.0, a.1 + dy, a.2), (b.0, b.1 + dy, b.2));
         if search(occ, a2, b2, width, effort).is_some() {
             clear.push(a2.1);
         }
     }
+    clear
+}
+
+fn cross_level_probe(occ: &OccupancyIndex, a: P3, b: P3, width: u8) -> String {
+    let mut clear = clear_levels(occ, a, b, width);
+    clear.sort();
     if clear.is_empty() {
         return " No level within 8 blocks up or down is clear either, so this is real congestion \
                  rather than a level-change limitation."

@@ -2457,8 +2457,14 @@ impl Design {
         // failure, rip the buses that are in the way and let this one go first.
         // This runs for an electrical failure too: a lane shorted against a
         // neighbour is exactly the kind of thing reordering can cure.
+        //
+        // Least invasive repair first: STAGE the bus's own detour (touches
+        // nobody), then reorder against the neighbours.
         let state = if matches!(state, BusState::Failed(_)) {
-            self.rip_up_and_retry(&name)
+            match self.self_stage(&name) {
+                BusState::Routed => BusState::Routed,
+                _ => self.rip_up_and_retry(&name),
+            }
         } else {
             state
         };
@@ -2520,6 +2526,92 @@ impl Design {
             .values()
             .filter(|b| matches!(b.state, BusState::Routed))
             .count()
+    }
+
+    /// SELF-STAGING: retry a failed bus with a waypoint the router derives
+    /// itself, instead of printing one and asking the user for it.
+    ///
+    /// The adversarial audit's cheapest finding: a `t5_03` refusal routes
+    /// successfully with ONE caller-supplied waypoint, and the router's own
+    /// failure text already names the clear level it should go to — so the
+    /// information needed to succeed is in hand at the moment of failure and was
+    /// being thrown away. Across the sweep 23 problems are beaten by a
+    /// caller-supplied `gate*` variant, on a knob that has always been public
+    /// API. The router can try it itself.
+    ///
+    /// Candidates, cheapest first:
+    /// 1. a waypoint on the straight line between the endpoints, at the bus's
+    ///    OWN level — this stages a long span into two shorter problems, which
+    ///    is what `gate_early_src` / `gate_late_src` do by hand;
+    /// 2. the same fractions on each level [`crate::design_corridor::clear_levels`]
+    ///    reports clear, nearest level first — this stages a level change to a
+    ///    lane that is known to exist.
+    ///
+    /// The gate is recorded on the bus under an `auto` name, so a staged route
+    /// is inspectable and rips with the bus like any other. Tried BEFORE
+    /// rip-up-and-retry: staging disturbs nobody, while ripping rearranges the
+    /// neighbours, and the least invasive repair that works is the right one.
+    fn self_stage(&mut self, name: &str) -> BusState {
+        let Some(layer) = self.buses.get(name) else {
+            return BusState::Intended;
+        };
+        // Only single-driver / single-sink, ungated buses: a bus that already
+        // carries waypoints was staged by its author, and second-guessing a
+        // fanout's junction geometry is a different problem.
+        if !layer.gates.is_empty() || layer.sinks.len() != 1 || !layer.extra_drivers.is_empty() {
+            return layer.state.clone();
+        }
+        let (Ok(drv), Ok(snk)) = (
+            self.resolve_port(&layer.driver),
+            self.resolve_port(&layer.sinks[0]),
+        ) else {
+            return layer.state.clone();
+        };
+        let (a, b) = (drv.anchor, snk.anchor);
+        let step = drv.step;
+        let width = drv.width;
+        let failed = layer.state.clone();
+
+        let lerp = |num: i32, den: i32, y: i32| -> P3 {
+            (
+                a.0 + (b.0 - a.0) * num / den,
+                y,
+                a.2 + (b.2 - a.2) * num / den,
+            )
+        };
+        let mut levels = vec![a.1];
+        if a.1 == b.1 {
+            let occ = self.occupancy_index();
+            levels.extend(crate::design_corridor::clear_levels(&occ, a, b, width));
+        }
+        let mut candidates: Vec<P3> = Vec::new();
+        for y in levels {
+            for (num, den) in [(1, 2), (1, 4), (3, 4)] {
+                let c = lerp(num, den, y);
+                if c != a && c != b && !candidates.contains(&c) {
+                    candidates.push(c);
+                }
+            }
+        }
+
+        for anchor in candidates {
+            let before = self.buses[name].gates.clone();
+            self.buses.get_mut(name).unwrap().gates = vec![Gate {
+                name: "auto0".to_string(),
+                anchor,
+                step,
+            }];
+            if let BusState::Routed = self.reroute_one(name) {
+                return BusState::Routed;
+            }
+            self.buses.get_mut(name).unwrap().gates = before;
+        }
+        // Nothing staged: leave the bus exactly as it failed, with its original
+        // reason rather than the last candidate's.
+        self.set_failed(name, match &failed {
+            BusState::Failed(r) => r.clone(),
+            _ => "unroutable".to_string(),
+        })
     }
 
     /// RIP-UP-AND-RETRY for a bus that could not be routed: rip the buses in its
