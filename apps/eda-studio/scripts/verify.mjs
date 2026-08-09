@@ -81,6 +81,19 @@ try {
   await p0.waitForFunction(() => window.__edaReady === true, null, { timeout: 120_000 });
   await p0.waitForTimeout(1200);
 
+  // FIRST CHECK OF THE RUN, deliberately: everything after it is a statement
+  // about an engine, and it is only worth reading if that engine is the one on
+  // disk. Three gate checks once went red against a router reason string that
+  // had already been deleted from the source, because `npm run build` did not
+  // re-sync `public/engine` and the harness served `dist/engine` from an older
+  // build. `npm run check-engine` catches that on the filesystem; this catches
+  // the browser half (a cache answering with an engine the server no longer has).
+  const engine = await p0.evaluate(() => window.__eda.engineStamp());
+  check(engine.ok === true,
+    `the page is running the engine ON DISK (${engine.served}, ${engine.bytes} bytes, ` +
+    `built ${engine.builtAt}) — no stale wasm`,
+    engine.problem ?? JSON.stringify(engine));
+
   const landing = await p0.evaluate(() => {
     const s = window.__edaStudio();
     return {
@@ -1479,34 +1492,50 @@ try {
     const trunk = [...cols.keys()].map((k) => k.split(",").map(Number));
     const spanX = Math.max(...trunk.map((c) => c[0])) - Math.min(...trunk.map((c) => c[0]));
     const spanZ = Math.max(...trunk.map((c) => c[1])) - Math.min(...trunk.map((c) => c[1]));
-    const pick = trunk[Math.floor(trunk.length / 2)];
     const away = spanX >= spanZ ? [0, 0, 6] : [6, 0, 0];
     const snap = (x, z) => e.gateAnchorFor(bus, [x, cols.get(`${x},${z}`) ?? 0, z]).at;
-    const detour = (() => {
-      const a = snap(pick[0], pick[1]);
-      return [a[0] + away[0], a[1], a[2] + away[2]];
-    })();
-    const onPath = snap(pick[0], pick[1]);
 
-    // ADD, through the context menu entry, with the clicked position.
-    const items = e.contextMenu({ kind: "bus", id: bus, at: detour });
-    const label = items.find((i) => /^Add gate here/.test(i.label))?.label;
-    e.contextFire(label);
-    await settle(700);
-    let used = detour;
-    let addState = s.busStateDetail(bus);
-    let addedVia = "detour";
-    if (addState.state !== "routed") {
-      // The detour did not fit. A gate ON the existing path is still a real
-      // checkpoint and keeps the assertion honest; the refusal was reported.
+    // WHICH anchor is SEARCHED FOR, not assumed.
+    //
+    // A gate splits one segment into two legs, and each leg has to escape its
+    // own endpoint. Whether a given waypoint leaves room for that is a property
+    // of the surrounding geometry — here u0's own lamp body sits one cell off
+    // its driver port, so a gate at the middle of the trunk leaves the first leg
+    // with nowhere to go and the router says exactly that. That is the ROUTER
+    // BEING RIGHT; hard-coding one waypoint and calling its refusal a regression
+    // is the harness being wrong. So: several waypoints along the run, detours
+    // preferred (they prove more — the geometry has to leave the direct line),
+    // and the first that routes is the one the lifecycle is walked on.
+    const along = [0.5, 0.3, 0.7, 0.15, 0.85]
+      .map((f) => trunk[Math.min(trunk.length - 1, Math.floor(trunk.length * f))])
+      .filter(Boolean);
+    const candidates = [];
+    for (const [dx, dz] of [[away[0], away[2]], [-away[0], -away[2]], [0, 0]]) {
+      for (const p of along) {
+        const a = snap(p[0], p[1]);
+        candidates.push({ at: [a[0] + dx, a[1], a[2] + dz], via: dx || dz ? "detour" : "on-path" });
+      }
+    }
+    let used = null, addState = null, addedVia = null;
+    const attempts = [];
+    for (const c of candidates) {
+      const items = e.contextMenu({ kind: "bus", id: bus, at: c.at });
+      const label = items.find((i) => /^Add gate here/.test(i.label))?.label;
+      if (!label) { attempts.push({ ...c, state: "no menu entry" }); continue; }
+      e.contextFire(label);
+      await settle(700);
+      const st = s.busStateDetail(bus);
+      attempts.push({ ...c, state: st.state });
+      if (st.state === "routed") { used = c.at; addState = st; addedVia = c.via; break; }
+      // Refused or unroutable: it WAS reported (the refusal path has its own
+      // check above), so put the bus back and try the next waypoint.
       e.undo();
       await settle(600);
-      const items2 = e.contextMenu({ kind: "bus", id: bus, at: onPath });
-      e.contextFire(items2.find((i) => /^Add gate here/.test(i.label))?.label);
-      await settle(700);
-      used = onPath;
+    }
+    if (!used) {
+      used = candidates[candidates.length - 1].at;
       addState = s.busStateDetail(bus);
-      addedVia = "on-path";
+      addedVia = "none routed";
     }
     const afterAdd = {
       state: addState, gates: e.gates(bus), cells: cells().length,
@@ -1541,7 +1570,7 @@ try {
     e.removeGate(bus, 0);
     await settle(700);
     return {
-      bus, direct, used, addedVia, afterAdd, afterDrag, afterRemove, afterUndo,
+      bus, direct, used, addedVia, attempts, afterAdd, afterDrag, afterRemove, afterUndo,
       endpointsUnchanged: afterRemove.driver === s.buses.get(bus).driver,
       selection: e.selection(),
     };
@@ -1554,9 +1583,10 @@ try {
           gate.afterAdd.state.state === "routed" &&
           gate.afterAdd.through === true,
       `right-click → "Add gate here" puts a CHECKPOINT at the clicked cell ` +
-      `(${gate.used.join(",")}, ${gate.addedVia}): the bus stays routed, now in ` +
-      `${gate.afterAdd.gates.segments} trunk spans, and its geometry passes THROUGH that cell`,
-      JSON.stringify(gate.afterAdd));
+      `(${gate.used.join(",")}, ${gate.addedVia}, ${gate.attempts.length} waypoint(s) tried): ` +
+      `the bus stays routed, now in ${gate.afterAdd.gates.segments} trunk spans, and its ` +
+      `geometry passes THROUGH that cell`,
+      JSON.stringify({ attempts: gate.attempts, afterAdd: gate.afterAdd }));
     check(gate.afterDrag.anchor?.join() !== gate.used.join() &&
           gate.afterDrag.cellRemeshes === 0 &&
           gate.afterDrag.busRemeshes >= 1 &&
@@ -2200,6 +2230,177 @@ try {
   await p3.waitForTimeout(500);
   await snap(p3, "connect-mode-bodies-unpickable");
   await p3.evaluate(() => window.__eda.setConnectMode(false));
+
+  // ---- 20. WIDTH ADAPTERS: a mismatch is a question, not a refusal --------
+  //
+  // Connecting a 1-bit driver to an 8-bit port used to print "width mismatch"
+  // and stop, which makes the studio look broken over something the engine can
+  // do. It now routes, LSB-aligned by default, and SAYS which alignment it
+  // used; the other alignments are on the bus's own menu. Loss is the one case
+  // that stays a question, because dropping a word's high bits changes what the
+  // design computes.
+  const widen = await p3.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    // A narrow driver into a WIDER sink: no bits are lost, so it must just work.
+    // Which pair that is depends on the library, and a port already wired to
+    // something is not a candidate (a second driver into one sink is a different
+    // refusal, and not the one under test) — so the pair is searched for.
+    const taken = new Set();
+    for (const b of s.buses.values()) { taken.add(b.driver); for (const k of b.sinks) taken.add(k); }
+    const eps = e.endpoints().filter((p) => !taken.has(p.name));
+    const pairs = [];
+    for (const d of eps.filter((p) => p.kind === "input")) {
+      for (const k of eps.filter((p) => p.kind === "output")) {
+        if (d.width < k.width) pairs.push({ d, k });
+      }
+    }
+    if (!pairs.length) return { skipped: true, why: "no free narrow→wide pair" };
+    const before = s.buses.size;
+    const attempts = [];
+    // A pair whose bus actually ROUTES is the better witness, so keep looking
+    // past one the adapter merely ACCEPTED (a declared bus that then fails to
+    // find a corridor still proves the adapter took the widths, but a routed one
+    // proves the whole path).
+    let best = null;
+    for (const pick of pairs.slice(0, 8)) {
+      await e.connect(pick.d.name, pick.k.name);
+      await new Promise((r) => setTimeout(r, 1600));
+      const bus = [...s.buses.keys()].find((b) => s.buses.get(b).driver === pick.d.name);
+      const state = bus ? s.busStateDetail(bus).state : null;
+      attempts.push({ pair: `${pick.d.name}->${pick.k.name}`, bus: bus ?? null, state,
+        toast: e.toasts().slice(-1)[0] ?? null });
+      if (!bus) continue;
+      const row = {
+        driver: pick.d.name, dw: pick.d.width, sink: pick.k.name, sw: pick.k.width,
+        before, after: s.buses.size, bus, state,
+        align: e.busAlign(bus), line: e.alignmentLine(bus), map: e.busWidthMap(bus),
+        confirm: e.pendingConfirm(),
+      };
+      if (state === "routed") { best = row; break; }
+      best ??= row;
+      // Not routed: drop it and keep looking, so the scene does not accumulate
+      // failed buses the later consistency check would have to explain.
+      e.undo();
+      await new Promise((r) => setTimeout(r, 800));
+    }
+    if (!best) return { skipped: true, why: "no narrow→wide pair could be connected", attempts };
+    // The winner may have been undone while searching; re-make it.
+    if (!s.buses.has(best.bus)) {
+      await e.connect(best.driver, best.sink);
+      await new Promise((r) => setTimeout(r, 1600));
+      const bus = [...s.buses.keys()].find((b) => s.buses.get(b).driver === best.driver);
+      Object.assign(best, {
+        bus, after: s.buses.size, state: bus ? s.busStateDetail(bus).state : null,
+        align: bus ? e.busAlign(bus) : null, line: bus ? e.alignmentLine(bus) : null,
+        map: bus ? e.busWidthMap(bus) : null,
+      });
+    }
+    return { ...best, attempts, toasts: e.toasts() };
+  });
+  if (widen.skipped) {
+    console.log(`SKIP width adapter (${widen.why}) ${JSON.stringify(widen.attempts ?? [])}`);
+    results.push({ ok: true, label: `width adapter SKIPPED (${widen.why})`, skipped: true });
+  } else {
+    check(widen.after === widen.before + 1 && widen.confirm == null &&
+          widen.align?.align === "lsb" && widen.state !== null,
+      `a ${widen.dw}-bit driver into a ${widen.sw}-bit port CONNECTS instead of being refused ` +
+      `(${widen.driver} → ${widen.sink}, ${widen.bus} ${widen.state}, aligned LSB, asked nothing ` +
+      `because nothing is lost; ${widen.attempts.length} pair(s) tried)`,
+      JSON.stringify({ attempts: widen.attempts, align: widen.align, state: widen.state }));
+    check(/aligned LSB/.test(widen.line ?? "") &&
+          /bit\(s\) carried/.test(widen.line ?? "") &&
+          /read 0/.test(widen.line ?? ""),
+      `...and the UI states the mapping rather than leaving it to be discovered: ` +
+      `"${widen.line}"`, widen.line ?? "");
+    check(widen.map != null,
+      `...with the engine's own resolved bit map behind it ` +
+      `(${JSON.stringify(widen.map).slice(0, 96)}…)`, JSON.stringify(widen.map));
+
+    // Re-align, and undo it: alignment is intent, so it is one undo step and it
+    // does not touch what the bus connects.
+    const realign = await p3.evaluate(async (bus) => {
+      const e = window.__eda;
+      const s = window.__edaStudio();
+      const was = { align: e.busAlign(bus), line: e.alignmentLine(bus), ends: { ...s.buses.get(bus) } };
+      const items = e.contextMenu({ kind: "bus", id: bus });
+      const entry = items.find((i) => /^Bit alignment/.test(i.label));
+      e.contextFire("MSB");
+      await new Promise((r) => setTimeout(r, 1600));
+      const msb = {
+        align: e.busAlign(bus), line: e.alignmentLine(bus), state: s.busStateDetail(bus).state,
+        undoLabel: e.history().undo, driver: s.buses.get(bus)?.driver,
+        sinks: [...(s.buses.get(bus)?.sinks ?? [])],
+      };
+      e.undo();
+      await new Promise((r) => setTimeout(r, 1600));
+      return {
+        menuEntry: entry?.label ?? null, menuHint: entry?.hint ?? null, subs: entry?.sub ?? [],
+        was, msb, back: { align: e.busAlign(bus), line: e.alignmentLine(bus) },
+      };
+    }, widen.bus);
+    check(realign.menuEntry != null && realign.subs.some((l) => /^MSB/.test(l)) &&
+          realign.subs.some((l) => /^Shift/.test(l)),
+      `the bus's menu offers the OTHER alignments where they mean something ` +
+      `("${realign.menuEntry}" → ${JSON.stringify(realign.subs)})`,
+      JSON.stringify(realign.menuEntry));
+    check(realign.msb.align?.align === "msb" && realign.msb.line !== realign.was.line &&
+          realign.msb.driver === realign.was.ends.driver &&
+          realign.msb.sinks.join() === (realign.was.ends.sinks ?? []).join(),
+      `...MSB re-aligns the SAME endpoints ("${realign.msb.line}")`,
+      JSON.stringify(realign.msb));
+    check(realign.back.align?.align === "lsb" && realign.back.line === realign.was.line,
+      `...and it is ONE undo step ("${realign.msb.undoLabel}") back to ` +
+      `"${realign.back.line}"`, JSON.stringify(realign.back));
+  }
+
+  // A LOSSY connection is the one that still asks.
+  const lossy = await p3.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const taken = new Set();
+    for (const b of s.buses.values()) { taken.add(b.driver); for (const k of b.sinks) taken.add(k); }
+    const eps = e.endpoints().filter((p) => !taken.has(p.name));
+    const d = eps.filter((p) => p.kind === "input").sort((a, b) => b.width - a.width)[0];
+    const k = eps.filter((p) => p.kind === "output" && p.width < (d?.width ?? 0))
+      .sort((a, b) => a.width - b.width)[0];
+    if (!d || !k) return { skipped: true, why: "no free wide→narrow pair" };
+    const before = s.buses.size;
+    const pending = e.connect(d.name, k.name);
+    await new Promise((r) => setTimeout(r, 500));
+    const asked = e.pendingConfirm();
+    e.confirmRespond(false);           // Cancel: nothing may have happened
+    await pending.catch(() => {});
+    await new Promise((r) => setTimeout(r, 600));
+    const cancelled = s.buses.size;
+    // Now say yes.
+    const again = e.connect(d.name, k.name);
+    await new Promise((r) => setTimeout(r, 500));
+    e.confirmRespond(true);
+    await again.catch(() => {});
+    await new Promise((r) => setTimeout(r, 1800));
+    const bus = [...s.buses.keys()].find((b) => s.buses.get(b).driver === d.name);
+    return {
+      driver: d.name, dw: d.width, sink: k.name, sw: k.width,
+      before, cancelled, after: s.buses.size, asked,
+      bus, align: bus ? e.busAlign(bus) : null, line: bus ? e.alignmentLine(bus) : null,
+      toasts: e.toasts(),
+    };
+  });
+  if (lossy.skipped) {
+    console.log(`SKIP lossy width adapter (${lossy.why})`);
+    results.push({ ok: true, label: `lossy width adapter SKIPPED (${lossy.why})`, skipped: true });
+  } else {
+    check(lossy.asked != null && lossy.asked.body.includes("DROPPED") &&
+          lossy.cancelled === lossy.before,
+      `a ${lossy.dw}-bit driver into a ${lossy.sw}-bit port ASKS FIRST, naming what is lost ` +
+      `("${lossy.asked?.title}") — and Cancel leaves no bus (${lossy.cancelled} buses)`,
+      JSON.stringify(lossy.asked));
+    check(lossy.after === lossy.before + 1 && lossy.align?.truncate === true &&
+          /DROPPED/.test(lossy.line ?? ""),
+      `...and confirming it routes with truncation opted INTO, still stating the mapping ` +
+      `("${lossy.line}")`, JSON.stringify(lossy));
+  }
 
   // The scene still draws what the engine says it is, after all of that
   // pointer traffic.

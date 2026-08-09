@@ -1,8 +1,13 @@
 {
-  "when": "2026-08-09T11:12:12.425Z",
-  "passed": 117,
-  "total": 120,
+  "when": "2026-08-09T13:11:30.052Z",
+  "passed": 129,
+  "total": 129,
   "results": [
+    {
+      "ok": true,
+      "label": "the page is running the engine ON DISK (fe01b8ac1e65f0c7, 16710526 bytes, built 2026-08-09T13:04:22.542Z) — no stale wasm",
+      "detail": "{\"ok\":true,\"expected\":\"fe01b8ac1e65f0c7\",\"served\":\"fe01b8ac1e65f0c7\",\"bytes\":16710526,\"fetchedBytes\":16710526,\"builtAt\":\"2026-08-09T13:04:22.542Z\",\"problem\":null}"
+    },
     {
       "ok": true,
       "label": "the DEFAULT page lands on the verified chain, not an empty grid (u0:ADD007_8bit_, u1:BINTOBCD001_, u2:NUMDISPLAY00)",
@@ -165,7 +170,7 @@
     {
       "ok": true,
       "label": "deletion is reported",
-      "detail": "u0 rotated to 0°×bus from u0.sum — now click an input port×removed with it: bus0×u0 deleted — ripped bus0 · ⌘/Ctrl-Z to undo×"
+      "detail": "removed with it: bus0×u0 deleted — ripped bus0 · ⌘/Ctrl-Z to undo×"
     },
     {
       "ok": true,
@@ -178,8 +183,8 @@
     },
     {
       "ok": true,
-      "label": "the 1464-char engine reason becomes a sentence (corridor): \"no corridor at (54, 4, 5) for the 8-bit bus — instance u1 minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side] is in the way\" → \"move u1, or give the bus a gate so it routes in two legs\" @ [54,4,5]",
-      "detail": "{\"at\":[54,4,5],\"blame\":[\"u1\"],\"detail\":\"segment (55, 5, 5) -> (40, 2, 4): the anchors are 3 level(s) apart and every placement of the 7-cell level-shift tile was blocked: level shift mid-run ((51, 5, 5) -> (45, 2, 5)): leg into the shift: no corridor from (55, 5, 5) to (51, 5, 5) for a 8-bit bus on level y=5: the direct line is blocked at (54, 4, 5) by instance `u1` `minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side]`. A bounded detour search (margin 96 cells, 400000 nodes) found no clear rectilinear corridor either — the layers hemming the endpoints in are: instance `u1`. No level within 8 blocks up or down is clear either, so this is real congestion rather than a level-change limitation. Move one of them, give the bus a gate to route through in two legs, or free a lane at least 1 cell clear of other redstone (dust one cell apart shorts, so the corridor needs 2 cells of pitch). Template attempts: straight run: collision at (54, 4, 5): `minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side]` (instance `u1`) already there, wanted `minecraft:gray_concrete`; level shift at the driver end ((54, 5, 5) -> (48, 2, 5)): collision at (54, 4, 5): `minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side]` (instance `u1`) already there, wanted `minecraft:gray_concrete`; level shift at the sink end ((47, 5, 4) -> (41, 2, 4)): collision at (47, 4, 4): `minecraft:magenta_wool` (instance `u1`) already there, wanted `minecraft:gray_concrete`\",\"kind\":\"corridor\",\"headline\":\"no corridor at (54, 4, 5) for the 8-bit bus — instance u1 minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side] is in the way\",\"fix\":\"move u1, or give the bus a gate so it routes in two legs\"}"
+      "label": "the 1465-char engine reason becomes a sentence (corridor): \"no corridor at (54, 4, 5) for the 8-bit bus — instance u1 minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side] is in the way\" → \"move u1, or give the bus a gate so it routes in two legs\" @ [54,4,5]",
+      "detail": "{\"at\":[54,4,5],\"blame\":[\"u1\"],\"detail\":\"segment (55, 5, 5) -> (40, 2, 4): the anchors are 3 level(s) apart and every placement of the 10-cell level-shift tile was blocked: level shift at the driver end ((54, 5, 5) -> (45, 2, 5)): collision at (54, 4, 5): `minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side]` (instance `u1`) already there, wanted `minecraft:gray_concrete`; level shift mid-run ((52, 5, 5) -> (43, 2, 5)): leg into the shift: no corridor from (55, 5, 5) to (52, 5, 5) for a 8-bit bus on level y=5: the direct line is blocked at (54, 4, 5) by instance `u1` `minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side]`. A bounded detour search (margin 96 cells, 400000 nodes) found no clear rectilinear corridor either — the layers hemming the endpoints in are: instance `u1`. No level within 8 blocks up or down is clear either, so this is real congestion rather than a level-change limitation. Move one of them, give the bus a gate to route through in two legs, or free a lane at least 1 cell clear of other redstone (dust one cell apart shorts, so the corridor needs 2 cells of pitch). Template attempts: straight run: collision at (54, 4, 5): `minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side]` (instance `u1`) already there, wanted `minecraft:gray_concrete`; level shift at the sink end ((50, 5, 4) -> (41, 2, 4)): collision at (50, 4, 4): `minecraft:magenta_wool` (instance `u1`) already there, wanted `minecraft:gray_concrete`\",\"kind\":\"corridor\",\"headline\":\"no corridor at (54, 4, 5) for the 8-bit bus — instance u1 minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side] is in the way\",\"fix\":\"move u1, or give the bus a gate so it routes in two legs\"}"
     },
     {
       "ok": true,
@@ -218,7 +223,7 @@
     },
     {
       "ok": true,
-      "label": ".nucm document exported (2465729 bytes)"
+      "label": ".nucm document exported (2465730 bytes)"
     },
     {
       "ok": true,
@@ -285,12 +290,12 @@
     },
     {
       "ok": true,
-      "label": "...costing 0.02 ms of main-thread work per frame — a >999 fps budget, target >= 30 fps (<= 33 ms)"
+      "label": "...costing 0.04 ms of main-thread work per frame — a >999 fps budget, target >= 30 fps (<= 33 ms)"
     },
     {
       "ok": true,
-      "label": "live re-route commits at most one engine move per animation frame (21 commits over 20 frames, 7 ms each, scene update 3.5 ms) — no fixed throttle",
-      "detail": "{\"wallPerFrame\":104.91499999761581,\"commits\":21,\"commitMs\":7.461904798235212,\"scene\":3.533333346957252}"
+      "label": "live re-route commits at most one engine move per animation frame (21 commits over 20 frames, 12 ms each, scene update 5.2 ms) — no fixed throttle",
+      "detail": "{\"wallPerFrame\":180.9149999976158,\"commits\":21,\"commitMs\":11.804761897949945,\"scene\":5.176190444401333}"
     },
     {
       "ok": true,
@@ -299,8 +304,8 @@
     },
     {
       "ok": true,
-      "label": "re-routing bus1 re-reads exactly 1 bus layer and 0 cells, and re-meshes it 1 time(s) — the route moved (8 ms)",
-      "detail": "{\"bus\":\"bus1\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":59,\"buses\":42,\"loose\":1},\"reads\":{\"flatten\":43,\"cellDump\":1,\"instDump\":3,\"busDump\":42,\"looseDump\":1}},\"after\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":59,\"buses\":43,\"loose\":1},\"reads\":{\"flatten\":44,\"cellDump\":1,\"instDump\":3,\"busDump\":43,\"looseDump\":1}},\"ms\":8.099999904632568}"
+      "label": "re-routing bus1 re-reads exactly 1 bus layer and 0 cells, and re-meshes it 1 time(s) — the route moved (13 ms)",
+      "detail": "{\"bus\":\"bus1\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":59,\"buses\":42,\"loose\":1},\"reads\":{\"flatten\":43,\"cellDump\":1,\"instDump\":3,\"busDump\":42,\"looseDump\":1}},\"after\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":59,\"buses\":43,\"loose\":1},\"reads\":{\"flatten\":44,\"cellDump\":1,\"instDump\":3,\"busDump\":43,\"looseDump\":1}},\"ms\":12.799999952316284}"
     },
     {
       "ok": true,
@@ -394,7 +399,7 @@
     {
       "ok": true,
       "label": "...with the choice remembered in localStorage (\"translucent\"), so it survives a reload",
-      "detail": "{\"before\":{\"global\":\"translucent\",\"stored\":null,\"perBus\":{\"bus1\":\"translucent\"}},\"outline\":{\"style\":{\"global\":\"outline\",\"stored\":\"outline\",\"perBus\":{\"bus1\":\"outline\"}},\"prof\":{\"frames\":284,\"avgFrameMs\":6.203521123234655,\"avgGapMs\":63.61478873289807,\"fps\":15.719615201407642,\"drawCalls\":8,\"triangles\":38444,\"geometries\":9,\"textures\":0,\"programs\":7,\"cellGroups\":1,\"cellMeshes\":1,\"busMeshes\":2,\"looseMeshes\":1,\"sceneObjects\":4,\"markerObjects\":6,\"labels\":16,\"labelStats\":{\"total\":16,\"shown\":11,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":5,\"pxPerBlock\":28.514772354720368},\"sceneMs\":{\"placements\":0.3000001907348633,\"unique\":28.699999809265137}},\"consistent\":true},\"perBus\":{\"global\":\"outline\",\"stored\":\"outline\",\"perBus\":{\"bus1\":\"solid\"}},\"after\":{\"global\":\"translucent\",\"stored\":\"translucent\",\"perBus\":{\"bus1\":\"translucent\"}},\"stored\":\"translucent\"}"
+      "detail": "{\"before\":{\"global\":\"translucent\",\"stored\":null,\"perBus\":{\"bus1\":\"translucent\"}},\"outline\":{\"style\":{\"global\":\"outline\",\"stored\":\"outline\",\"perBus\":{\"bus1\":\"outline\"}},\"prof\":{\"frames\":260,\"avgFrameMs\":10.890000002200788,\"avgGapMs\":106.6299999998166,\"fps\":9.37822376443515,\"drawCalls\":8,\"triangles\":38444,\"geometries\":9,\"textures\":0,\"programs\":7,\"cellGroups\":1,\"cellMeshes\":1,\"busMeshes\":2,\"looseMeshes\":1,\"sceneObjects\":4,\"markerObjects\":6,\"labels\":16,\"labelStats\":{\"total\":16,\"shown\":11,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":5,\"pxPerBlock\":28.514772354720368},\"sceneMs\":{\"placements\":0.2999997138977051,\"unique\":46.49999976158142}},\"consistent\":true},\"perBus\":{\"global\":\"outline\",\"stored\":\"outline\",\"perBus\":{\"bus1\":\"solid\"}},\"after\":{\"global\":\"translucent\",\"stored\":\"translucent\",\"perBus\":{\"bus1\":\"translucent\"}},\"stored\":\"translucent\"}"
     },
     {
       "ok": true,
@@ -409,7 +414,7 @@
     {
       "ok": true,
       "label": "...\"Add gate here\" carries the clicked (x, z) into the call and snaps only the LEVEL to the bus's own (clicked 13,9,4 → 13,2,4: a bus is a 2y-pitch stack, so the block under the cursor can be any bit, and a gate off the trunk level is a level change this router refuses) — and the checkpoint landed at 13,2,4 (bus is routed)",
-      "detail": "{\"before\":0,\"after\":1,\"anchor\":[13,2,4],\"at\":[13,9,4],\"label\":\"Add gate here (13,2,4)\",\"gateable\":false,\"snapped\":[13,2,4],\"refusal\":null,\"toast\":\"undid delete bus1×u1 rotated to 180°×bus1: u1.sum → sum_out · routed · 5t, skew 0tDel deletes it · R re-routes · Esc deselects×checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×\"}"
+      "detail": "{\"before\":0,\"after\":1,\"anchor\":[13,2,4],\"at\":[13,9,4],\"label\":\"Add gate here (13,2,4)\",\"gateable\":false,\"snapped\":[13,2,4],\"refusal\":null,\"toast\":\"u1 rotated to 180°×bus1: u1.sum → sum_out · routed · 5t, skew 0tDel deletes it · R re-routes · Esc deselects×checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×\"}"
     },
     {
       "ok": true,
@@ -418,27 +423,27 @@
     {
       "ok": true,
       "label": "...and its Delete goes through the same confirm as every other delete (\"Delete u1 and rip 1 bus?\"), removes it (3 → 2), leaves the render consistent, and ⌘Z brings it back (3)",
-      "detail": "{\"inst\":\"u1\",\"onInstance\":[{\"label\":\"u1 · ADD007_8bit_cca_matt\",\"hint\":\"@ 12,-1,24 · rot 90°\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Rotate CW\",\"hint\":\"R\",\"danger\":false},{\"label\":\"Rotate CCW\",\"hint\":\"⇧R\",\"danger\":false},{\"label\":\"Duplicate\",\"hint\":\"⌘/Ctrl-D\",\"danger\":false},{\"label\":\"Copy\",\"hint\":\"⌘/Ctrl-C\",\"danger\":false},{\"label\":\"Cut\",\"hint\":\"⌘/Ctrl-X\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Port modes\",\"hint\":\"5 switchable\",\"danger\":false,\"sub\":[\"a → Executor\",\"b → Executor\",\"cin → Bus\",\"cout → Bus\",\"sum → Bus\"]},{\"label\":\"Promote all inputs to Bus\",\"hint\":\"so buses can land on them\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Frame\",\"hint\":\"F\",\"danger\":false},{\"label\":\"Rip its 1 bus(es)\",\"hint\":\"bus1\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Delete\",\"hint\":\"Del\",\"danger\":true}],\"rotBefore\":90,\"rotAfter\":180,\"onBus\":[{\"label\":\"bus1 · routed\",\"hint\":\"u1.sum → sum_out\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Add gate here (13,2,4)\",\"hint\":\"the route must pass through this point\",\"danger\":false},{\"label\":\"Re-route\",\"hint\":\"R\",\"danger\":false},{\"label\":\"Rip\",\"hint\":\"keeps the declaration\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Draw this bus\",\"hint\":\"translucent\",\"danger\":false,\"sub\":[\"○ solid\",\"● translucent\",\"○ outline\"]},{\"label\":\"Frame\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Delete\",\"hint\":\"Del\",\"danger\":true}],\"gates\":{\"before\":0,\"after\":1,\"anchor\":[13,2,4],\"at\":[13,9,4],\"label\":\"Add gate here (13,2,4)\",\"gateable\":false,\"snapped\":[13,2,4],\"refusal\":null,\"toast\":\"undid delete bus1×u1 rotated to 180°×bus1: u1.sum → sum_out · routed · 5t, skew 0tDel deletes it · R re-routes · Esc deselects×checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×\"},\"gateState\":{\"state\":\"routed\"},\"onGround\":[{\"label\":\"ground 10,0,10\",\"hint\":\"nothing under the cursor\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Paste 1 here\",\"hint\":\"⌘/Ctrl-V\",\"danger\":false},{\"label\":\"Add a component here\",\"hint\":\"8 cells\",\"danger\":false,\"sub\":[\"REGISTER001_8bit_register\",\"ADD007_8bit_cca_matt\",\"ADD005_8bit_cle\",\"NUMDISPLAY001_fast_bcd_to_7seg\",\"BINTOBCD001_8bit_comb_binary_to_bcd\",\"DIVIDE009_3_33hz_5tpb_8b_divider_zPippo\",\"REGISTERFILE001_register_file\",\"MULTIPY003_8bit_comb_multiplier\"]},{\"label\":\"-\",\"danger\":false},{\"label\":\"Frame all\",\"hint\":\"A\",\"danger\":false},{\"label\":\"Textured view\",\"hint\":\"resource pack\",\"danger\":false},{\"label\":\"Toggle IO markers\",\"hint\":\"the ▲▼ cones\",\"danger\":false},{\"label\":\"Bus drawing\",\"hint\":\"translucent\",\"danger\":false,\"sub\":[\"○ solid\",\"● translucent\",\"○ outline\"]}],\"onPort\":[{\"label\":\"sum_out\",\"hint\":\"receives · uint8\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Start a bus from here\",\"hint\":\"outputs receive\",\"danger\":false},{\"label\":\"Frame\",\"danger\":false}],\"openNow\":true,\"openAfterEsc\":false,\"delBefore\":3,\"delAfter\":2,\"prompt\":{\"title\":\"Delete u1 and rip 1 bus?\",\"body\":\"u1 carries 1 routed bus: bus1. Deleting it removes that bus too. Undo (⌘/Ctrl-Z) puts everything back.\"},\"consistent\":true,\"restored\":3,\"keys\":[\"u3\",\"u2\",\"u1\"],\"toast\":\"checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×removed with it: bus1×u1 deleted — ripped bus1 · ⌘/Ctrl-Z to undo×undid delete u1×\",\"logtail\":\"undo: delete u1\\ndeleted u1  removed=[bus1]  rerouted=[]\\naddGate bus1 @ 13,2,4 (fast path) -> routed\\nrotate u1 -> 180°  rerouted=[bus1]\\nundo: delete bus1\\ndeleted bus bus1\\npaste: u2 buses=[]\\ncopy: u1\\npaste: u3 buses=[]\\ncut: u2\\npaste: u2 buses=[]\\nundo: paste 1 instance\\npaste: u2 buses=[]\\ncopy: u1\\nundo:\"}"
+      "detail": "{\"inst\":\"u1\",\"onInstance\":[{\"label\":\"u1 · ADD007_8bit_cca_matt\",\"hint\":\"@ 12,-1,24 · rot 90°\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Rotate CW\",\"hint\":\"R\",\"danger\":false},{\"label\":\"Rotate CCW\",\"hint\":\"⇧R\",\"danger\":false},{\"label\":\"Duplicate\",\"hint\":\"⌘/Ctrl-D\",\"danger\":false},{\"label\":\"Copy\",\"hint\":\"⌘/Ctrl-C\",\"danger\":false},{\"label\":\"Cut\",\"hint\":\"⌘/Ctrl-X\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Port modes\",\"hint\":\"5 switchable\",\"danger\":false,\"sub\":[\"a → Executor\",\"b → Executor\",\"cin → Bus\",\"cout → Bus\",\"sum → Bus\"]},{\"label\":\"Promote all inputs to Bus\",\"hint\":\"so buses can land on them\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Frame\",\"hint\":\"F\",\"danger\":false},{\"label\":\"Rip its 1 bus(es)\",\"hint\":\"bus1\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Delete\",\"hint\":\"Del\",\"danger\":true}],\"rotBefore\":90,\"rotAfter\":180,\"onBus\":[{\"label\":\"bus1 · routed\",\"hint\":\"u1.sum → sum_out\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Add gate here (13,2,4)\",\"hint\":\"the route must pass through this point\",\"danger\":false},{\"label\":\"Re-route\",\"hint\":\"R\",\"danger\":false},{\"label\":\"Rip\",\"hint\":\"keeps the declaration\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Draw this bus\",\"hint\":\"translucent\",\"danger\":false,\"sub\":[\"○ solid\",\"● translucent\",\"○ outline\"]},{\"label\":\"Frame\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Delete\",\"hint\":\"Del\",\"danger\":true}],\"gates\":{\"before\":0,\"after\":1,\"anchor\":[13,2,4],\"at\":[13,9,4],\"label\":\"Add gate here (13,2,4)\",\"gateable\":false,\"snapped\":[13,2,4],\"refusal\":null,\"toast\":\"u1 rotated to 180°×bus1: u1.sum → sum_out · routed · 5t, skew 0tDel deletes it · R re-routes · Esc deselects×checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×\"},\"gateState\":{\"state\":\"routed\"},\"onGround\":[{\"label\":\"ground 10,0,10\",\"hint\":\"nothing under the cursor\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Paste 1 here\",\"hint\":\"⌘/Ctrl-V\",\"danger\":false},{\"label\":\"Add a component here\",\"hint\":\"8 cells\",\"danger\":false,\"sub\":[\"REGISTER001_8bit_register\",\"ADD007_8bit_cca_matt\",\"ADD005_8bit_cle\",\"NUMDISPLAY001_fast_bcd_to_7seg\",\"BINTOBCD001_8bit_comb_binary_to_bcd\",\"DIVIDE009_3_33hz_5tpb_8b_divider_zPippo\",\"REGISTERFILE001_register_file\",\"MULTIPY003_8bit_comb_multiplier\"]},{\"label\":\"-\",\"danger\":false},{\"label\":\"Frame all\",\"hint\":\"A\",\"danger\":false},{\"label\":\"Textured view\",\"hint\":\"resource pack\",\"danger\":false},{\"label\":\"Toggle IO markers\",\"hint\":\"the ▲▼ cones\",\"danger\":false},{\"label\":\"Bus drawing\",\"hint\":\"translucent\",\"danger\":false,\"sub\":[\"○ solid\",\"● translucent\",\"○ outline\"]}],\"onPort\":[{\"label\":\"sum_out\",\"hint\":\"receives · uint8\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Start a bus from here\",\"hint\":\"outputs receive\",\"danger\":false},{\"label\":\"Frame\",\"danger\":false}],\"openNow\":true,\"openAfterEsc\":false,\"delBefore\":3,\"delAfter\":2,\"prompt\":{\"title\":\"Delete u1 and rip 1 bus?\",\"body\":\"u1 carries 1 routed bus: bus1. Deleting it removes that bus too. Undo (⌘/Ctrl-Z) puts everything back.\"},\"consistent\":true,\"restored\":3,\"keys\":[\"u3\",\"u2\",\"u1\"],\"toast\":\"checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×removed with it: bus1×u1 deleted — ripped bus1 · ⌘/Ctrl-Z to undo×undid delete u1×\",\"logtail\":\"undo: delete u1\\ndeleted u1  removed=[bus1]  rerouted=[]\\naddGate bus1 @ 13,2,4 (fast path) -> routed\\nrotate u1 -> 180°  rerouted=[bus1]\\nundo: delete bus1\\ndeleted bus bus1\\npaste: u2 buses=[]\\ncopy: u1\\npaste: u3 buses=[]\\ncut: u2\\npaste: u2 buses=[]\\nundo: paste 1 instance\\npaste: u2 buses=[]\\ncopy: u1\\nundo:\"}"
     },
     {
-      "ok": false,
-      "label": "right-click → \"Add gate here\" puts a CHECKPOINT at the clicked cell (62,3,30, on-path): the bus stays routed, now in 2 trunk spans, and its geometry passes THROUGH that cell",
-      "detail": "{\"state\":{\"state\":\"failed\",\"reason\":\"segment (15, 3, 1) -> (62, 3, 30): no corridor from (15, 3, 1) to (62, 3, 30) for a 8-bit bus on level y=3: the direct line is blocked at (16, 3, 1) by instance `u0` `minecraft:redstone_lamp[lit=false]`. A bounded detour search (margin 96 cells, 400000 nodes) found no clear rectilinear corridor either — the layers hemming the endpoints in are: bus `bus0`, instance `u0`. A clear corridor DOES exist at y=5 or y=7 or y=9 or y=11 — this bus's level is the problem, not the workspace. The bus form is a single-level 2y-pitch stack and cannot ramp between levels, so shift an endpoint's instance in y instead of clearing space. Move one of them, give the bus a gate to route through in two legs, or free a lane at least 1 cell clear of other redstone (dust one cell apart shorts, so the corridor needs 2 cells of pitch). Template attempts: L corner x-first: collision at (16, 3, 1): `minecraft:redstone_lamp[lit=false]` (instance `u0`) already there, wanted `minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]` | L corner z-first: internal plan conflict at (60, 2, 30): `minecraft:stone` vs `minecraft:gray_concrete`\"},\"gates\":{\"gates\":[{\"name\":\"g0\",\"anchor\":[62,3,30],\"step\":[0,2,0]}],\"segments\":2},\"cells\":0,\"through\":false,\"consistent\":true,\"undoLabel\":\"add gate bus0/g0\"}"
+      "ok": true,
+      "label": "right-click → \"Add gate here\" puts a CHECKPOINT at the clicked cell (31,3,26, detour, 4 waypoint(s) tried): the bus stays routed, now in 2 trunk spans, and its geometry passes THROUGH that cell",
+      "detail": "{\"attempts\":[{\"at\":[62,3,36],\"via\":\"detour\",\"state\":\"failed\"},{\"at\":[60,3,32],\"via\":\"detour\",\"state\":\"failed\"},{\"at\":[68,3,38],\"via\":\"detour\",\"state\":\"failed\"},{\"at\":[31,3,26],\"via\":\"detour\",\"state\":\"routed\"}],\"afterAdd\":{\"state\":{\"state\":\"routed\"},\"gates\":{\"gates\":[{\"name\":\"g0\",\"anchor\":[31,3,26],\"step\":[0,2,0]}],\"segments\":2},\"cells\":1632,\"through\":true,\"consistent\":true,\"undoLabel\":\"add gate bus0/g0\"}}"
     },
     {
-      "ok": false,
-      "label": "...dragging the handle moves the checkpoint (62,3,30 → 64,3,30) and costs ZERO cell re-meshes and at most one re-mesh per bus whose geometry moved (0 of 2 bus layers; the router may amend the buses a re-routed span crosses)",
-      "detail": "{\"anchor\":[64,3,30],\"state\":{\"state\":\"failed\",\"reason\":\"segment (15, 3, 1) -> (64, 3, 30): no corridor from (15, 3, 1) to (64, 3, 30) for a 8-bit bus on level y=3: the direct line is blocked at (16, 3, 1) by instance `u0` `minecraft:redstone_lamp[lit=false]`. A bounded detour search (margin 96 cells, 400000 nodes) found no clear rectilinear corridor either — the layers hemming the endpoints in are: bus `bus0`, instance `u0`. A clear corridor DOES exist at y=7 or y=9 or y=11 — this bus's level is the problem, not the workspace. The bus form is a single-level 2y-pitch stack and cannot ramp between levels, so shift an endpoint's instance in y instead of clearing space. Move one of them, give the bus a gate to route through in two legs, or free a lane at least 1 cell clear of other redstone (dust one cell apart shorts, so the corridor needs 2 cells of pitch). Template attempts: L corner x-first: collision at (16, 3, 1): `minecraft:redstone_lamp[lit=false]` (instance `u0`) already there, wanted `minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]` | L corner z-first: internal plan conflict at (60, 2, 30): `minecraft:stone` vs `minecraft:gray_concrete`\"},\"cells\":0,\"consistent\":true,\"busRemeshes\":0,\"cellRemeshes\":0,\"buses\":2,\"undoLabel\":\"move gate bus0/g0\"}"
+      "ok": true,
+      "label": "...dragging the handle moves the checkpoint (31,3,26 → 33,3,26) and costs ZERO cell re-meshes and at most one re-mesh per bus whose geometry moved (1 of 2 bus layers; the router may amend the buses a re-routed span crosses)",
+      "detail": "{\"anchor\":[33,3,26],\"state\":{\"state\":\"routed\"},\"cells\":1632,\"consistent\":true,\"busRemeshes\":1,\"cellRemeshes\":0,\"buses\":2,\"undoLabel\":\"move gate bus0/g0\"}"
     },
     {
-      "ok": false,
-      "label": "...and removing it STRAIGHTENS the route — 0 cells with the checkpoint, 1440 without (direct route: 1440) — while the endpoints stay exactly as they were (u0.sum → u1.bin): a gate is ROUTE, an endpoint is NETLIST",
-      "detail": "{\"add\":0,\"drag\":0,\"remove\":1440}"
+      "ok": true,
+      "label": "...and removing it STRAIGHTENS the route — 1632 cells with the checkpoint, 1440 without (direct route: 1440) — while the endpoints stay exactly as they were (u0.sum → u1.bin): a gate is ROUTE, an endpoint is NETLIST",
+      "detail": "{\"add\":1632,\"drag\":1632,\"remove\":1440}"
     },
     {
       "ok": true,
       "label": "...each step is its own undo entry (\"add gate bus0/g0\", \"move gate bus0/g0\", \"remove gate bus0/g0\") and ⌘Z after the removal puts the checkpoint back",
-      "detail": "{\"gates\":{\"gates\":[{\"name\":\"g0\",\"anchor\":[64,3,30],\"step\":[0,2,0]}],\"segments\":2},\"consistent\":true}"
+      "detail": "{\"gates\":{\"gates\":[{\"name\":\"g0\",\"anchor\":[33,3,26],\"step\":[0,2,0]}],\"segments\":2},\"consistent\":true}"
     },
     {
       "ok": true,
@@ -447,7 +452,7 @@
     },
     {
       "ok": true,
-      "label": "textured view: pack loaded ({\"blockstates\":1106,\"models\":3402,\"textures\":3312}) in 271ms, meshed in 393ms"
+      "label": "textured view: pack loaded ({\"blockstates\":1106,\"models\":3402,\"textures\":3312}) in 308ms, meshed in 413ms"
     },
     {
       "ok": true,
@@ -472,12 +477,12 @@
     {
       "ok": true,
       "label": "10 placements over 3 distinct cells: 3 meshed cells, 3 instanced groups, **7 draw calls** for the whole scene (78752 triangles, 15 geometries)",
-      "detail": "{\"instances\":10,\"mesh\":{\"texture\":0,\"cells\":3,\"instancedGroups\":3,\"instanceAllocs\":0,\"matrixWrites\":10,\"buses\":0,\"loose\":0},\"prof\":{\"frames\":5,\"avgFrameMs\":0.8599999904632568,\"avgGapMs\":91.07999997138977,\"fps\":10.97935880889462,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}}"
+      "detail": "{\"instances\":10,\"mesh\":{\"texture\":0,\"cells\":3,\"instancedGroups\":3,\"instanceAllocs\":0,\"matrixWrites\":10,\"buses\":0,\"loose\":0},\"prof\":{\"frames\":4,\"avgFrameMs\":0.4249999523162842,\"avgGapMs\":110.07499998807907,\"fps\":9.084714968051767,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}}"
     },
     {
       "ok": true,
       "label": "...and the draw calls track distinct CELLS (3), not the 10 placements: 7 calls, 0.7 per instance",
-      "detail": "{\"frames\":5,\"avgFrameMs\":0.8599999904632568,\"avgGapMs\":91.07999997138977,\"fps\":10.97935880889462,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}"
+      "detail": "{\"frames\":4,\"avgFrameMs\":0.4249999523162842,\"avgGapMs\":110.07499998807907,\"fps\":9.084714968051767,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}"
     },
     {
       "ok": true,
@@ -568,7 +573,47 @@
     },
     {
       "ok": true,
-      "label": "after the whole picking suite the render still matches the engine (4 layers)",
+      "label": "a 1-bit driver into a 8-bit port CONNECTS instead of being refused (u0.cout → u0.a, bus9 failed, aligned LSB, asked nothing because nothing is lost; 8 pair(s) tried)",
+      "detail": "{\"attempts\":[{\"pair\":\"u0.cout->u0.a\",\"bus\":\"bus1\",\"state\":\"failed\",\"toast\":\"Bus bus1 failed: segment (12, 18, 7) -> (-1, 2, 4): the anchors are 16 level(s) apart, so the bus must change level: the verified level-shift tile needs 42 cells of straight …see the engine's full reason below\"},{\"pair\":\"u0.cout->u0.b\",\"bus\":\"bus2\",\"state\":\"failed\",\"toast\":\"Bus bus2 failed: segment (12, 18, 7) -> (-1, 2, 7): the anchors are 16 level(s) apart, so the bus must change level: the verified level-shift tile needs 42 cells of straight …see the engine's full reason below\"},{\"pair\":\"u0.cout->u1.a\",\"bus\":\"bus3\",\"state\":\"failed\",\"toast\":\"Bus bus3 failed: segment (12, 18, 7) -> (-1, 2, 24): the anchors are 16 level(s) apart, so the bus must change level: the verified level-shift tile needs 42 cells of straight…see the engine's full reason below\"},{\"pair\":\"u0.cout->u1.b\",\"bus\":\"bus4\",\"state\":\"failed\",\"toast\":\"Bus bus4 failed: segment (12, 18, 7) -> (-1, 2, 27): the anchors are 16 level(s) apart, so the bus must change level: the verified level-shift tile needs 42 cells of straight…see the engine's full reason below\"},{\"pair\":\"u1.cout->u0.a\",\"bus\":\"bus5\",\"state\":\"failed\",\"toast\":\"Bus bus5 failed: segment (12, 18, 27) -> (-1, 2, 4): the anchors are 16 level(s) apart, so the bus must change level: the verified level-shift tile needs 42 cells of straight…see the engine's full reason below\"},{\"pair\":\"u1.cout->u0.b\",\"bus\":\"bus6\",\"state\":\"failed\",\"toast\":\"Bus bus6 failed: segment (12, 18, 27) -> (-1, 2, 7): the anchors are 16 level(s) apart, so the bus must change level: the verified level-shift tile needs 42 cells of straight…see the engine's full reason below\"},{\"pair\":\"u1.cout->u1.a\",\"bus\":\"bus7\",\"state\":\"failed\",\"toast\":\"Bus bus7 failed: segment (12, 18, 27) -> (-1, 2, 24): the anchors are 16 level(s) apart, so the bus must change level: the verified level-shift tile needs 42 cells of straigh…see the engine's full reason below\"},{\"pair\":\"u1.cout->u1.b\",\"bus\":\"bus8\",\"state\":\"failed\",\"toast\":\"Bus bus8 failed: segment (12, 18, 27) -> (-1, 2, 27): the anchors are 16 level(s) apart, so the bus must change level: the verified level-shift tile needs 42 cells of straigh…see the engine's full reason below\"}],\"align\":{\"align\":\"lsb\"},\"state\":\"failed\"}"
+    },
+    {
+      "ok": true,
+      "label": "...and the UI states the mapping rather than leaving it to be discovered: \"u0.cout[1] → u0.a[8] aligned LSB · driver bit 0 → sink bit 0 · 1 bit(s) carried · 7 sink bit(s) read 0\"",
+      "detail": "u0.cout[1] → u0.a[8] aligned LSB · driver bit 0 → sink bit 0 · 1 bit(s) carried · 7 sink bit(s) read 0"
+    },
+    {
+      "ok": true,
+      "label": "...with the engine's own resolved bit map behind it ({\"map\":{\"driver_width\":1,\"sink_width\":8,\"shift\":0,\"from_bit\":0,\"bits\":1,\"tied_zero\":[1,2,3,4,5,6…)",
+      "detail": "{\"map\":{\"driver_width\":1,\"sink_width\":8,\"shift\":0,\"from_bit\":0,\"bits\":1,\"tied_zero\":[1,2,3,4,5,6,7],\"dropped\":[],\"pairs\":[[0,0]]},\"note\":\"u0.cout[1] -> u0.a[8], lsb-aligned; sink bit(s) 1..7 left undriven, which reads 0\"}"
+    },
+    {
+      "ok": true,
+      "label": "the bus's menu offers the OTHER alignments where they mean something (\"Bit alignment · LSB\" → [\"LSB (current)\",\"MSB\",\"Shift +1\",\"Shift -1\"])",
+      "detail": "\"Bit alignment · LSB\""
+    },
+    {
+      "ok": true,
+      "label": "...MSB re-aligns the SAME endpoints (\"u0.cout[1] → u0.a[8] aligned MSB · driver bit 0 → sink bit 7 · 1 bit(s) carried · 7 sink bit(s) read 0\")",
+      "detail": "{\"align\":{\"align\":\"msb\",\"truncate\":false},\"line\":\"u0.cout[1] → u0.a[8] aligned MSB · driver bit 0 → sink bit 7 · 1 bit(s) carried · 7 sink bit(s) read 0\",\"state\":\"failed\",\"undoLabel\":\"align bus9 msb\",\"driver\":\"u0.cout\",\"sinks\":[\"u0.a\"]}"
+    },
+    {
+      "ok": true,
+      "label": "...and it is ONE undo step (\"align bus9 msb\") back to \"u0.cout[1] → u0.a[8] aligned LSB · driver bit 0 → sink bit 0 · 1 bit(s) carried · 7 sink bit(s) read 0\"",
+      "detail": "{\"align\":{\"align\":\"lsb\"},\"line\":\"u0.cout[1] → u0.a[8] aligned LSB · driver bit 0 → sink bit 0 · 1 bit(s) carried · 7 sink bit(s) read 0\"}"
+    },
+    {
+      "ok": true,
+      "label": "a 8-bit driver into a 1-bit port ASKS FIRST, naming what is lost (\"Connect 8 bits into 1?\") — and Cancel leaves no bus (2 buses)",
+      "detail": "{\"title\":\"Connect 8 bits into 1?\",\"body\":\"u1.sum is 8 bits wide and u0.cin is 1. Aligned LSB, bits 0–0 carry and the top 7 bit(s) of u1.sum are DROPPED — u0.cin reads u1.sum mod 2^1. Pick a different alignment afterwards from the bus's right-click menu.\"}"
+    },
+    {
+      "ok": true,
+      "label": "...and confirming it routes with truncation opted INTO, still stating the mapping (\"u1.sum[8] → u0.cin[1] aligned LSB · driver bit 0 → sink bit 0 · 1 bit(s) carried · 7 DROPPED\")",
+      "detail": "{\"driver\":\"u1.sum\",\"dw\":8,\"sink\":\"u0.cin\",\"sw\":1,\"before\":2,\"cancelled\":2,\"after\":3,\"asked\":{\"title\":\"Connect 8 bits into 1?\",\"body\":\"u1.sum is 8 bits wide and u0.cin is 1. Aligned LSB, bits 0–0 carry and the top 7 bit(s) of u1.sum are DROPPED — u0.cin reads u1.sum mod 2^1. Pick a different alignment afterwards from the bus's right-click menu.\"},\"bus\":\"bus10\",\"align\":{\"align\":\"lsb\",\"truncate\":true},\"line\":\"u1.sum[8] → u0.cin[1] aligned LSB · driver bit 0 → sink bit 0 · 1 bit(s) carried · 7 DROPPED\",\"toasts\":[\"Bus bus9 failed: segment (12, 18, 7) -> (-1, 16, 4): the anchors are 2 level(s) apart and every placement of the 8-cell level-shift tile was blocked: level shift at the sink …\",\"kept u1.sum unconnected\",\"bus10: u1.sum[8] → u0.cin[1] aligned LSB · driver bit 0 → sink bit 0 · 1 bit(s) carried · 7 DROPPEDright-click the bus → Bit alignment to use MSB or a shift instead\",\"bus10 routed: u1.sum → u0.cin\"]}"
+    },
+    {
+      "ok": true,
+      "label": "after the whole picking suite the render still matches the engine (6 layers)",
       "detail": "[]"
     },
     {

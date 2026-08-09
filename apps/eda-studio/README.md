@@ -36,6 +36,12 @@ npm run dev          # syncs public/engine + public/cells, serves :8455
 
 Open <http://localhost:8455/>.
 
+`dev`, `build` and `verify` all re-sync the engine and then **verify** that every
+copy of it is the one on disk (`npm run check-engine`); the header badge turns
+red and says `STALE ENGINE` if the page ever loads a different one. See
+[The engine you are measuring](#the-engine-you-are-measuring) for why that guard
+exists — it is the difference between a red check and a red herring.
+
 ### What you land on
 
 The default page is **not an empty grid**: it loads the chain
@@ -133,6 +139,40 @@ bodies are not in the pick list at all, so a press can only ever be a port. The
 canvas says so with a badge, and the verify asserts that every body pixel on the
 canvas stops resolving to an instance while every port keeps resolving to itself
 (`docs/19-connect-mode-bodies-unpickable.png`).
+
+### Different widths are a question, not a refusal
+
+Connecting a 1-bit carry to an 8-bit word used to print `width mismatch` and
+stop. Worse, it usually printed `type mismatch` first — because `ty` is a
+*display* string with the width baked into it (`uint8`), so comparing two of them
+answered "same type **and** same width?" and every width difference came back as
+a type error. The studio looked broken over something the engine has an adapter
+for.
+
+Now the connect **routes**, LSB-aligned by default (bit 0 to bit 0, so the
+magnitude survives), and the toast states the mapping rather than leaving it to
+be discovered by poking values through it:
+
+```
+bus3: u0.cout[1] → u1.a[8] aligned LSB · driver bit 0 → sink bit 0
+      · 1 bit(s) carried · 7 sink bit(s) read 0
+```
+
+Destination bits nothing drives read 0 with no hardware at all (the engine
+reports them as `tied_zero`). The other alignments live on the bus's own
+right-click menu — **MSB** (top bit to top bit), **Shift ±1** — because the
+choice is worth changing without redoing the connection; re-aligning is one undo
+step and touches the endpoints not at all. Alignment is part of the bus's
+*intent*, so it survives a re-route, a gate edit, an undo and a restore.
+
+Type checking now compares FAMILIES: a boolean is a 1-bit unsigned word, exactly
+as it is in Verilog. **Signedness** is the difference that really does change
+what the bits mean, and it is still refused, and now says why.
+
+The one case that stays a question is **loss**. Bits of the source that fall
+outside the destination are dropped, which changes what the design computes, so
+it goes through the same confirm every destructive action does — naming the count
+— and `truncate` is only ever opted into, never assumed.
 
 ### Copy / paste
 
@@ -572,7 +612,25 @@ npm run profile                 # -> docs/profile-current.json
 EDA_PROFILE_TAG=before npm run profile   # tag a baseline to diff against
 ```
 
-**120 checks**, all through the same code paths the mouse and keyboard drive
+### The engine you are measuring
+
+The **first** check of the run asserts that the page is running the engine that
+is on disk, because everything after it is a statement about a router and is
+worth nothing if that router is two builds old. This is not hypothetical: `npm
+run build` used to skip `sync-engine`, so `dist/engine/` (what the harness
+serves) drifted from `dist/npm-eda/`, and three gate checks went red against a
+reason string — "cannot ramp between levels" — that had already been deleted
+from the engine. The failure was then blamed on the wrong lane.
+
+Three defences now, because there are three ways to serve the wrong engine:
+
+| defence | catches |
+| --- | --- |
+| `build` runs `sync-engine`, and `npm run check-engine` compares `dist/npm-eda` / `public/engine` / `dist/engine` by sha256 | a build or a verify against a copy that drifted, on the filesystem, before a browser is involved |
+| `/engine/*` is served `no-store` in dev **and** preview | a browser cache answering with an engine the server no longer has |
+| `__ENGINE_SHA__` (baked at build) vs `engine/BUILD.json` (shipped beside the wasm), surfaced as `__eda.engineStamp()` and a red **STALE ENGINE** badge | the page having loaded something other than what this build was made against — asserted first thing by the verify |
+
+**129 checks**, all through the same code paths the mouse and keyboard drive
 (`window.__eda`) — and the picking suite goes further and drives the **real
 pointer** (`page.mouse`), because the whole claim there is that the browser's own
 events resolve the way we say they do. Green means the UI works and not just the
@@ -638,6 +696,18 @@ reverse), plus the **UX contract**:
 | the hint bar says "click to start a bus from `<port>`" | the bar's whole job is the next click |
 | connect mode: every body pixel stops resolving to an instance, every port still resolves | the dense-scene escape hatch, as a measurement over the canvas |
 
+...and the **width adapters**:
+
+| assertion | why it is the right thing to assert |
+| --- | --- |
+| a narrow driver into a wider port CONNECTS, LSB-aligned, asking nothing | nothing is lost, so there is nothing to ask — the old refusal was the bug |
+| ...and the UI states the mapping (bits carried, sink bits reading 0) | a width-adapted bus is the one routed bus that does not mean what a reader assumes |
+| ...with the engine's own resolved bit map behind it | the sentence must be the engine's answer, not the app's guess |
+| the bus's menu offers MSB and Shift ± only where the ends differ | a menu full of inapplicable entries stops being read |
+| MSB re-aligns the SAME endpoints, and it is one undo step | alignment is route-level intent, not netlist |
+| a lossy connection asks first, naming the dropped count, and Cancel leaves no bus | dropping a word's high bits is not the router's call |
+| ...and confirming it opts `truncate` in explicitly | the permission has to be recorded, not inferred |
+
 ...and the **performance contract**, re-run unchanged:
 
 | assertion | why it is the right thing to assert |
@@ -661,7 +731,10 @@ The counters behind these are `viewer.meshBuilds` (`cells`, `instancedGroups`,
 `__eda.pickStats()` (`portPicks`, `bodyPicks`, `portOverBody`, `dragsStarted`,
 `clicksBelowThreshold`), `__eda.pickThresholds()`, `__eda.probeAt(x, y)`,
 `__eda.portScreen(name)`, `__eda.onCanvas(x, y, inset)`, `__eda.hoverPort()` and
-`__eda.connectMode()`. All are on
+`__eda.connectMode()`; the width ones are `__eda.connect(a, b)`,
+`__eda.busAlign(bus)`, `__eda.setBusAlign(bus, adapt)`, `__eda.busWidthMap(bus)`
+and `__eda.alignmentLine(bus)`; and `__eda.engineStamp()` says which engine
+answered any of it. All are on
 `window.__eda`. Results land in `docs/verify-out.json`; screenshots in `docs/`.
 
 The textured check needs a resource pack at the repo root (`pack.zip`, **not**
@@ -695,14 +768,11 @@ Regenerated by `npm run verify` into `docs/`:
 
 ## Known rough edges
 
-- **Three gate checks are RED against the current engine build, and it is not
-  this app.** `addGate` now yields a bus whose realized geometry is empty
-  (`0 cells with the checkpoint, 1440 without`), so "the route passes THROUGH the
-  gate cell", the gate-drag re-mesh count and the straightening assertion all
-  fail. Reproduced with this app's sources stashed, i.e. against the engine
-  alone. Needs a look in `crates/nucleation-routing` (gate/span realization);
-  the same build also routes a bus the router used to refuse, which is why the
-  FAILED-bus scenario is now *searched for* rather than hard-coded.
+- **A width-adapted bus in the two-adder demo often routes FAILED.** The
+  adaptation itself lands (the engine returns the bit map, `tied_zero` and all);
+  the demo is simply a tight scene, and a 1-bit carry into an 8-bit word has
+  nowhere to run. The verify tries eight pairs and reports the state it got, so
+  the number is never quietly a pass.
 - **`Check` is never clean with community cells placed.** An ADD007 alone,
   with zero buses, produces 253 DRC violations (`floating`,
   `unattached_wall_torch`, `repeater_cycle`) inside its own body. That is a

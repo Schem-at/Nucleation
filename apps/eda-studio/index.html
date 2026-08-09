@@ -208,6 +208,9 @@
         font: inherit; font-size: 10px; border-radius: 3px; padding: 1px 5px; cursor: pointer;
       }
       .badge { font-size: 10px; border: 1px solid var(--edge); border-radius: 3px; padding: 0 4px; color: var(--dim); }
+      /* A stale engine makes every measurement below it a lie about a router
+         that is no longer on disk. It gets the loudest thing in the header. */
+      .badge.is-stale { color: #0b0d11; background: var(--err, #e5534b); border-color: var(--err, #e5534b); font-weight: 700; }
       /* ---- first-run coach ----------------------------------------------
          Four steps, bottom-right, clear of the hint bar. Dismissible, and the
          dismissal is remembered so it teaches once and then gets out of the
