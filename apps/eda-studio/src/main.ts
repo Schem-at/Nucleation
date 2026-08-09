@@ -11,6 +11,7 @@ import {
   Viewer, type PortMarker, type GateMarker, type InstanceMarker, type Selection,
 } from "./viewer";
 import { verilogToBlif, guessTop } from "./yosys";
+import { humanReason, busFailureLine, fmtAt, type HumanReason } from "./reasons";
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) =>
   document.querySelector(sel) as T;
@@ -24,17 +25,52 @@ const log = (msg: string) => {
   el.textContent = `${msg}\n${el.textContent ?? ""}`.slice(0, 8000);
   console.log(`[eda] ${msg}`);
 };
-const toast = (() => {
-  let timer = 0;
-  return (msg: string, kind: "ok" | "err" = "ok") => {
-    const el = $("#toast");
-    el.textContent = msg;
-    el.className = kind === "err" ? "is-err" : "";
-    el.style.display = "block";
-    clearTimeout(timer);
-    timer = window.setTimeout(() => (el.style.display = "none"), kind === "err" ? 6000 : 2800);
-  };
-})();
+
+/** A stacked, dismissible toast.
+ *
+ *  The old one was a single node whose text the next message overwrote: a
+ *  connect gesture that promoted a port and then failed to route replaced the
+ *  first half of its own story before you could read it. Now they stack (newest
+ *  at the bottom of the column, oldest evicted past four), each has an ×, an
+ *  optional second line naming the FIX, and an optional button that flies the
+ *  camera to the coordinate the engine complained about.
+ *
+ *  `#toast` is the container, so `#toast`.textContent is still every visible
+ *  message — which is what the headless verify reads. */
+interface ToastOpts {
+  kind?: "ok" | "err";
+  /** Second line: what to do about it. */
+  fix?: string;
+  /** Adds a "→ show me" button that focuses this world position. */
+  at?: Vec3 | null;
+  /** ms; errors linger. */
+  ms?: number;
+}
+let onToastFocus: ((at: Vec3) => void) | null = null;
+const MAX_TOASTS = 4;
+function toast(msg: string, kindOrOpts: "ok" | "err" | ToastOpts = "ok") {
+  const o: ToastOpts = typeof kindOrOpts === "string" ? { kind: kindOrOpts } : kindOrOpts;
+  const kind = o.kind ?? "ok";
+  const box = $("#toast");
+  const item = document.createElement("div");
+  item.className = `toast-item${kind === "err" ? " is-err" : ""}`;
+  item.innerHTML =
+    `<span class="msg">${esc(msg)}${o.fix ? `<span class="fix">${esc(o.fix)}</span>` : ""}</span>` +
+    (o.at ? `<button class="go" title="fly the camera there">→ ${esc(fmtAt(o.at))}</button>` : "") +
+    `<button class="x" title="dismiss">×</button>`;
+  const kill = () => { clearTimeout(timer); item.remove(); };
+  item.querySelector(".x")!.addEventListener("click", kill);
+  if (o.at) {
+    item.querySelector(".go")!.addEventListener("click", () => onToastFocus?.(o.at as Vec3));
+  }
+  box.appendChild(item);
+  while (box.children.length > MAX_TOASTS) box.firstElementChild!.remove();
+  const timer = window.setTimeout(kill, o.ms ?? (kind === "err" ? 9000 : 3200));
+  return item;
+}
+/** Every visible toast, for the headless verify. */
+const toastTexts = () =>
+  [...$("#toast").children].map((c) => c.textContent?.replace(/[×]|→ \(.*?\)/g, "").trim() ?? "");
 
 const DEMO_VERILOG = `module add2(input [1:0] a, input [1:0] b, output [2:0] y);
   assign y = a + b;
@@ -76,6 +112,149 @@ async function boot() {
     }
   }
 
+  // ---- first-30-seconds coach -------------------------------------------
+  //
+  // The app's model is three ideas deep (ports have a DIRECTION, ports have a
+  // MODE, buses have a STATE) and none of them are guessable from an empty
+  // grid. So the default landing state is a WORKING design — the verified
+  // add -> bcd -> 7-seg chain, both buses routed — and this walks through the
+  // four things you do to it. Dismissed once, dismissed for good.
+
+  const COACH_KEY = "eda.coach.done";
+  const COACH: { title: string; body: string }[] = [
+    {
+      title: "1/4 · this is a routed design",
+      body: "Three community cells (adder → binary-to-BCD → 7-segment) with two " +
+        "routed buses between them. Drag to orbit, wheel to zoom, click a cell to select it.",
+    },
+    {
+      title: "2/4 · click a port to start a bus",
+      body: "Green ▲ ports drive a bus, blue ▼ ports receive one. Click a green ▲ " +
+        "then a blue ▼ and the router builds it. A grey ✗ port is executor-only " +
+        "(a lever) — clicking it as a target promotes it for you.",
+    },
+    {
+      title: "3/4 · R rotates, Del deletes",
+      body: "With something selected: R / ⇧R rotates 90°, G grabs it, F frames it, " +
+        "Del removes it (and names the buses that go with it). Esc always cancels. " +
+        "⌘/Ctrl-Z undoes. Press ? for every key.",
+    },
+    {
+      title: "4/4 · Exec/Bus, then Bake and Export",
+      body: "Each port chip in the outliner carries a reversible Exec/Bus switch. " +
+        "Bake turns the design into a typed executor you can poke (right panel), " +
+        "and Export writes .schem / .litematic / .nucm.",
+    },
+  ];
+  let coachStep = 0;
+  let coachOpen = false;
+
+  function renderCoach() {
+    $("#coach").classList.toggle("is-open", coachOpen);
+    if (!coachOpen) return;
+    const s = COACH[coachStep];
+    $("#coach-title").textContent = s.title;
+    $("#coach-body").textContent = s.body;
+    $("#coach-dots").innerHTML = COACH.map((_, i) =>
+      `<i class="${i === coachStep ? "on" : ""}"></i>`).join("");
+    ($("#coach-back") as HTMLButtonElement).disabled = coachStep === 0;
+    $("#coach-next").textContent = coachStep === COACH.length - 1 ? "Done" : "Next";
+  }
+  function coachShow(force = false) {
+    if (!force && localStorage.getItem(COACH_KEY) === "1") return;
+    coachOpen = true;
+    coachStep = 0;
+    renderCoach();
+  }
+  function coachDismiss() {
+    coachOpen = false;
+    try { localStorage.setItem(COACH_KEY, "1"); } catch { /* private mode */ }
+    renderCoach();
+  }
+  function coachNext(delta = 1) {
+    coachStep += delta;
+    if (coachStep >= COACH.length) { coachDismiss(); return; }
+    if (coachStep < 0) coachStep = 0;
+    renderCoach();
+  }
+  $("#coach-next").addEventListener("click", () => coachNext(1));
+  $("#coach-back").addEventListener("click", () => coachNext(-1));
+  $("#coach-skip").addEventListener("click", coachDismiss);
+
+  // ---- shortcuts overlay (press ?) --------------------------------------
+
+  const shortcutsOpen = () => $("#shortcuts").classList.contains("is-open");
+  function setShortcuts(on: boolean) {
+    $("#shortcuts").classList.toggle("is-open", on);
+  }
+  $("#btn-help").addEventListener("click", () => setShortcuts(!shortcutsOpen()));
+  $("#shortcuts-close").addEventListener("click", () => setShortcuts(false));
+
+  // ---- destructive confirm ----------------------------------------------
+  //
+  // In-app, not `window.confirm`: a native dialog blocks the engine, cannot
+  // carry the count, and is auto-dismissed by every headless driver. Enter
+  // accepts, Esc cancels, and `window.__eda.confirmRespond` drives it in tests.
+
+  let pendingConfirm: { title: string; body: string; resolve: (ok: boolean) => void } | null = null;
+  function confirmDestructive(title: string, body: string, okLabel = "Delete"): Promise<boolean> {
+    return new Promise((resolve) => {
+      pendingConfirm = { title, body, resolve };
+      $("#confirm-title").textContent = title;
+      $("#confirm-body").textContent = body;
+      $("#confirm-ok").innerHTML = `${esc(okLabel)} <kbd>↵</kbd>`;
+      $("#confirm").classList.add("is-open");
+    });
+  }
+  function confirmRespond(ok: boolean) {
+    const p = pendingConfirm;
+    if (!p) return false;
+    pendingConfirm = null;
+    $("#confirm").classList.remove("is-open");
+    p.resolve(ok);
+    return true;
+  }
+  $("#confirm-ok").addEventListener("click", () => confirmRespond(true));
+  $("#confirm-cancel").addEventListener("click", () => confirmRespond(false));
+
+  // ---- empty state -------------------------------------------------------
+
+  function renderEmptyState() {
+    const empty = studio.instances.size === 0 && studio.ports.size === 0;
+    $("#empty-state").classList.toggle("is-open", empty);
+  }
+  $("#empty-chain").addEventListener("click", () => void loadChainDemo());
+  $("#empty-adder").addEventListener("click", () => void loadAdderDemo());
+  $("#empty-help").addEventListener("click", () => setShortcuts(true));
+
+  // ---- undo / redo -------------------------------------------------------
+
+  function renderHistory() {
+    const u = $("#btn-undo") as HTMLButtonElement;
+    const r = $("#btn-redo") as HTMLButtonElement;
+    u.disabled = !studio.canUndo();
+    r.disabled = !studio.canRedo();
+    u.title = studio.canUndo() ? `Undo ${studio.undoLabel()} (⌘/Ctrl-Z)` : "Nothing to undo";
+    r.title = studio.canRedo() ? `Redo ${studio.redoLabel()} (⇧⌘/Ctrl-Z)` : "Nothing to redo";
+  }
+  function doUndo() {
+    const label = studio.undo();
+    if (!label) { toast("nothing left to undo"); return; }
+    if (selection?.kind === "instance" && !studio.instances.has(selection.id)) select(null);
+    log(`undo: ${label}`);
+    toast(`undid ${label}`);
+    refresh();
+  }
+  function doRedo() {
+    const label = studio.redo();
+    if (!label) { toast("nothing to redo"); return; }
+    log(`redo: ${label}`);
+    toast(`redid ${label}`);
+    refresh();
+  }
+  $("#btn-undo").addEventListener("click", doUndo);
+  $("#btn-redo").addEventListener("click", doRedo);
+
   // ---- hint bar: always says what the next click does --------------------
 
   function setHint() {
@@ -100,15 +279,17 @@ async function boot() {
     }
     if (selection?.kind === "instance") {
       el.innerHTML = `<code>${esc(selection.id)}</code> selected &nbsp;·&nbsp; ` +
-        `<kbd>R</kbd> rotate 90° &nbsp; <kbd>G</kbd> move &nbsp; <kbd>Del</kbd> remove &nbsp; ` +
-        `<kbd>Esc</kbd> deselect &nbsp;·&nbsp; ${nav}`;
+        `<kbd>R</kbd> rotate 90° &nbsp; <kbd>G</kbd> move &nbsp; <kbd>F</kbd> frame &nbsp; ` +
+        `<kbd>Del</kbd> remove &nbsp; <kbd>Esc</kbd> deselect &nbsp;·&nbsp; ${nav} &nbsp;·&nbsp; ` +
+        `<kbd>?</kbd> keys`;
       return;
     }
     const driver = endpoints.some((e) => e.routable && e.kind === "input");
     el.innerHTML = driver
       ? `<b>click a green ▲ output port</b> to start a bus, or click a component to select it` +
-        ` &nbsp;·&nbsp; ${nav}`
-      : `<b>Load demo</b>, or place a cell from the Library` + ` &nbsp;·&nbsp; ${nav}`;
+        ` &nbsp;·&nbsp; ${nav} &nbsp;·&nbsp; <kbd>?</kbd> keys`
+      : `<b>Chain demo</b>, or click a cell in the Library and then the ground` +
+        ` &nbsp;·&nbsp; ${nav} &nbsp;·&nbsp; <kbd>?</kbd> keys`;
   }
 
   function setMode(next: Mode) {
@@ -177,30 +358,41 @@ async function boot() {
       applyMove(kind, id, ground, "drop");
     },
     onGroundClick(ground) {
-      if (mode.kind === "placing") {
-        const cell = mode.cell;
-        setMode({ kind: "idle" });
-        try {
-          const inst = studio.placeInstance(cell, ground);
-          log(`placed ${inst.name} (${cell}) at ${ground.join(",")}`);
-          select({ kind: "instance", id: inst.name });
-          toast(`${inst.name} placed — R rotates, Del removes, its ports are on the canvas`);
-        } catch (err) {
-          toast(String(err), "err");
-          log(`place failed: ${err}`);
-        }
-        return;
-      }
-      if (mode.kind === "grabbing") {
-        const inst = mode.instance;
-        setMode({ kind: "idle" });
-        applyMove("instance", inst, ground, "drop");
-        return;
-      }
-      if (mode.kind === "connecting") { setMode({ kind: "idle" }); return; }
-      select(null);
+      handleGroundClick(ground);
     },
   });
+
+  /** A click on empty ground. Placing puts the cell down, grabbing drops it,
+   *  connecting cancels — and otherwise it DESELECTS, which is the escape
+   *  hatch people reach for before they find Esc. */
+  function handleGroundClick(ground: Vec3) {
+    if (mode.kind === "placing") {
+      const cell = mode.cell;
+      setMode({ kind: "idle" });
+      try {
+        const inst = studio.placeInstance(cell, ground);
+        log(`placed ${inst.name} (${cell}) at ${ground.join(",")}`);
+        select({ kind: "instance", id: inst.name });
+        toast(`${inst.name} placed`, { fix: "R rotates · G moves · Del removes · its ports are on the canvas" });
+      } catch (err) {
+        toast(String(err), "err");
+        log(`place failed: ${err}`);
+      }
+      return;
+    }
+    if (mode.kind === "grabbing") {
+      const inst = mode.instance;
+      setMode({ kind: "idle" });
+      applyMove("instance", inst, ground, "drop");
+      return;
+    }
+    if (mode.kind === "connecting") { setMode({ kind: "idle" }); return; }
+    select(null);
+  }
+
+  // A toast's "→ (x,y,z)" button, and every click-to-focus row in the
+  // outliner, go through the one camera move.
+  onToastFocus = (at: Vec3) => viewer.focusOn(at);
 
   // Ghost line + grab preview follow the cursor.
   $("#canvas-wrap").addEventListener("pointermove", (e) => {
@@ -247,8 +439,16 @@ async function boot() {
       if (kind === "instance") {
         // Includes the refresh() the document's onChange fires: this IS the
         // whole cost of one drag frame.
-        const report = timed("dragFrame", () => studio.moveInstance(id, ground));
-        if (phase === "drop") reportBuses(`move ${id} -> ${ground.join(",")}`, report);
+        //
+        // `coalesce` on the live frames is what makes a drag ONE undo step:
+        // sixty committed moves collapse into "where the gesture started" ->
+        // "where it ended".
+        const report = timed("dragFrame", () =>
+          studio.moveInstance(id, ground, undefined, phase === "live"));
+        if (phase === "drop") {
+          studio.endGesture();
+          reportBuses(`move ${id} -> ${ground.join(",")}`, report);
+        }
       } else {
         const [busName, gateName] = id.split(" ");
         const bus = studio.buses.get(busName);
@@ -256,8 +456,9 @@ async function boot() {
         if (!gate) return;
         const report = studio.moveGate(busName, gateName, [ground[0], gate.anchor[1], ground[2]]);
         if (phase === "drop") {
+          studio.endGesture();
           log(`gate ${id} -> ${ground[0]},${gate.anchor[1]},${ground[2]}  state=${report.state} segments=${report.rerouted_segments}`);
-          if (report.state.startsWith("failed")) toast(`bus ${busName} ${report.state} (shown red)`, "err");
+          if (report.state.startsWith("failed")) failToast(busName, report.state.replace(/^failed:?\s*/, ""));
         }
       }
     } catch (err) {
@@ -270,6 +471,17 @@ async function boot() {
     }
   }
 
+  /** One failed bus, as a sentence: what happened, what to do, and a button
+   *  that flies the camera to the coordinate the router named. */
+  function failToast(bus: string, reason: string) {
+    const h = humanReason(reason);
+    lastFailure = { bus, ...h };
+    toast(`Bus ${bus} failed: ${h.headline}`, { kind: "err", fix: h.fix, at: h.at });
+    return h;
+  }
+  /** The last failure the UI reported, for the outliner and the verify. */
+  let lastFailure: ({ bus: string } & HumanReason) | null = null;
+
   function reportBuses(what: string, report: { rerouted: string[]; failed: Record<string, string>; removed_buses?: string[] }) {
     const failed = Object.entries(report.failed ?? {});
     const removed = report.removed_buses ?? [];
@@ -277,9 +489,9 @@ async function boot() {
       (removed.length ? `  removed=[${removed}]` : "") +
       `  rerouted=[${report.rerouted ?? []}]` +
       (failed.length ? `  FAILED: ${failed.map(([b, r]) => `${b}: ${r}`).join("; ")}` : ""));
-    if (failed.length) {
-      toast(`bus failed: ${failed.map(([b]) => b).join(", ")} — shown red, see Buses panel`, "err");
-    } else if (removed.length) {
+    for (const [bus, reason] of failed.slice(0, 2)) failToast(bus, reason);
+    if (failed.length > 2) toast(`${failed.length - 2} more bus(es) failed — see the Buses panel`, "err");
+    if (!failed.length && removed.length) {
       toast(`removed with it: ${removed.join(", ")}`);
     }
   }
@@ -338,11 +550,14 @@ async function boot() {
       }
       return;
     }
-    toast(
-      `${name} is executor-only IO — no bus can land on it. ${p.blocked ?? ""}` +
-      (p.instance ? " (and it cannot be promoted — see the log)" : ""),
-      "err",
-    );
+    const h = humanReason(p.blocked);
+    toast(`${name}: ${h.headline}`, {
+      kind: "err",
+      fix: p.instance
+        ? "and it cannot be promoted here — drive it by hand after Bake, or move the cell so a form adapter fits"
+        : h.fix,
+      at: h.at,
+    });
   }
 
   function togglePortMode(instance: string, port: string) {
@@ -424,17 +639,51 @@ async function boot() {
     if (selection?.kind === "instance" && !studio.instances.has(selection.id)) selection = null;
     viewer.setSelection(selection);
     timed("renderPanels", () => renderPanels());
+    renderHistory();
+    renderEmptyState();
     setHint();
   }
   studio.onChange = refresh;
 
   // ---- keyboard ---------------------------------------------------------
 
+  /** Delete an instance, confirming first if buses die with it — with the
+   *  COUNT in the prompt, because "3 buses will be ripped" is the whole
+   *  reason to ask. */
+  async function deleteInstance(name: string) {
+    const carried = studio.busesOn(name);
+    if (carried.length) {
+      const ok = await confirmDestructive(
+        `Delete ${name} and rip ${carried.length} bus${carried.length === 1 ? "" : "es"}?`,
+        `${name} carries ${carried.length} routed bus${carried.length === 1 ? "" : "es"}: ` +
+        `${carried.join(", ")}. Deleting it removes ${carried.length === 1 ? "that bus" : "them"} too. ` +
+        `Undo (⌘/Ctrl-Z) puts everything back.`,
+        `Delete ${name}`,
+      );
+      if (!ok) { toast(`kept ${name}`); return; }
+    }
+    try {
+      const report = studio.removeInstance(name);
+      if (selection?.kind === "instance" && selection.id === name) select(null);
+      reportBuses(`deleted ${name}`, report);
+      toast(`${name} deleted` +
+        (report.removed_buses.length ? ` — ripped ${report.removed_buses.join(", ")}` : "") +
+        " · ⌘/Ctrl-Z to undo");
+    } catch (err) {
+      toast(String(err), "err");
+    }
+  }
+
   window.addEventListener("keydown", (e) => {
     const t = e.target as HTMLElement;
     if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
     const key = e.key.toLowerCase();
+    // Esc unwinds ONE layer at a time, outermost first: a modal, then an
+    // overlay, then the gesture, then the selection. Never a dead key.
     if (e.key === "Escape") {
+      if (pendingConfirm) { confirmRespond(false); return; }
+      if (shortcutsOpen()) { setShortcuts(false); return; }
+      if (coachOpen) { coachDismiss(); return; }
       if (mode.kind === "grabbing") {
         applyMove("instance", mode.instance, mode.origin, "drop");
       }
@@ -442,12 +691,40 @@ async function boot() {
       select(null);
       return;
     }
-    if (!selection || selection.kind !== "instance") return;
+    if (pendingConfirm) {
+      if (e.key === "Enter") { e.preventDefault(); confirmRespond(true); }
+      return;
+    }
+    if (e.key === "?" || (key === "/" && e.shiftKey)) {
+      e.preventDefault();
+      setShortcuts(!shortcutsOpen());
+      return;
+    }
+    if (key === "z" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      if (e.shiftKey) doRedo(); else doUndo();
+      return;
+    }
+    if (key === "y" && e.ctrlKey) { e.preventDefault(); doRedo(); return; }
+    // `A` frames the whole design; so does `F` when nothing is selected.
+    if (key === "a" && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      if (viewer.frameAll()) toast("framed the whole design");
+      return;
+    }
+    if (!selection || selection.kind !== "instance") {
+      if (key === "f") {
+        e.preventDefault();
+        if (viewer.frameAll()) toast("framed the whole design");
+      }
+      return;
+    }
     const name = selection.id;
     if (key === "r") {
       e.preventDefault();
       try {
         const report = studio.rotateInstance(name, e.shiftKey ? -90 : 90);
+        studio.endGesture();
         reportBuses(`rotate ${name} -> ${report.rot}°`, report);
         toast(`${name} rotated to ${report.rot}°`);
       } catch (err) {
@@ -455,17 +732,14 @@ async function boot() {
       }
       return;
     }
+    if (key === "f") {
+      e.preventDefault();
+      if (viewer.focusInstance(name)) toast(`framed ${name}`);
+      return;
+    }
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
-      try {
-        const report = studio.removeInstance(name);
-        select(null);
-        reportBuses(`deleted ${name}`, report);
-        toast(`${name} deleted` +
-          (report.removed_buses.length ? ` — ripped ${report.removed_buses.join(", ")}` : ""));
-      } catch (err) {
-        toast(String(err), "err");
-      }
+      void deleteInstance(name);
       return;
     }
     if (key === "g") {
@@ -477,7 +751,34 @@ async function boot() {
 
   // ---- outliner panels --------------------------------------------------
 
+  /** A port chip: `▲ name : type` plus its Exec/Bus mode badge. */
+  function portChip(p: (typeof endpoints)[number], withMode: boolean): string {
+    const dir = p.kind === "input" ? "drives" : "receives";
+    const arrow = p.kind === "input" ? "▲" : "▼";
+    const title = p.routable
+      ? `${p.name} · ${p.kind === "input" ? "drives a bus — click to start one" : "receives a bus — click to finish one"}` +
+        ` · ${p.ty}[${p.width}] @ ${p.anchor.join(",")}`
+      : humanReason(p.blocked).headline;
+    return `<span class="port-row">
+      <button class="port-chip ${dir}${p.routable ? "" : " blocked"}"
+              data-port="${esc(p.name)}" title="${esc(title)}">
+        ${arrow} ${esc(p.port ?? p.name.split(".").pop())} <span class="pty">: ${esc(p.ty)}</span>${p.routable ? "" : " ✗"}
+      </button>${withMode ? modeToggle(p) : ""}</span>`;
+  }
+
   function renderPanels() {
+    // Counts in every section header, so the panel says how big the design is
+    // before you scroll it.
+    $("#cell-count").textContent = `${studio.cells.size}`;
+    $("#instance-count").textContent =
+      `${studio.instances.size} in ${new Set([...studio.instances.values()].map((i) => i.cell)).size} type(s)`;
+    $("#port-count").textContent = `${studio.ports.size}`;
+    const busStates = [...studio.buses.keys()].map((n) => studio.busStateDetail(n).state);
+    $("#bus-count").textContent = busStates.length
+      ? `${busStates.length} · ${busStates.filter((s) => s === "routed").length} routed` +
+        (busStates.some((s) => s === "failed") ? ` · ${busStates.filter((s) => s === "failed").length} failed` : "")
+      : "0";
+
     // (a) LIBRARY
     $("#cell-list").innerHTML = [...studio.cells.values()].map((c) => {
       const io = c.ports
@@ -498,31 +799,58 @@ async function boot() {
       });
     }
 
-    // (b) INSTANCES + their ports
+    // (b) INSTANCES, GROUPED BY CELL TYPE
+    //
+    // Ten placements of one adder used to be ten indistinguishable cards. The
+    // grouping is also the mental model the renderer uses (one mesh per cell,
+    // N placements), so the panel and the machine now agree.
     const insts = [...studio.instances.values()];
-    $("#instance-list").innerHTML = insts.map((i) => {
-      const mine = endpoints.filter((p) => p.instance === i.name);
-      const sel = selection?.kind === "instance" && selection.id === i.name;
-      return `<div class="item${sel ? " is-selected" : ""}" data-inst="${esc(i.name)}">
-        <span class="name">${esc(i.name)}</span>
-        <span class="meta">${esc(i.cell)} @ ${i.at.join(",")} · rot ${i.rot}°</span>
-        <div class="ports">${mine.map((p) => `
-          <span class="port-row">
-          <button class="port-chip ${p.kind === "input" ? "drives" : "receives"}${p.routable ? "" : " blocked"}"
-                  data-port="${esc(p.name)}"
-                  title="${p.routable ? "click to start/finish a bus" : esc(p.blocked ?? "not routable")}">
-            ${p.kind === "input" ? "▲" : "▼"} ${esc(p.port ?? p.name.split(".").pop())} : ${esc(p.ty)}${p.routable ? "" : " ✗"}
-          </button>${modeToggle(p)}</span>`).join("")}</div>
-        <div class="row">
-          <button data-rot="${esc(i.name)}">R ↻</button>
-          <button data-del="${esc(i.name)}">Del ✕</button>
-        </div>
+    const byCell = new Map<string, typeof insts>();
+    for (const i of insts) {
+      let list = byCell.get(i.cell);
+      if (!list) byCell.set(i.cell, (list = []));
+      list.push(i);
+    }
+    $("#instance-list").innerHTML = [...byCell.entries()].map(([cell, list]) => {
+      const head = `<div class="group">
+        <span class="gname">${esc(cell)}</span>
+        <span class="gcount">× ${list.length}</span>
       </div>`;
+      return head + list.map((i) => {
+        const mine = endpoints.filter((p) => p.instance === i.name);
+        const buses = studio.busesOn(i.name);
+        const sel = selection?.kind === "instance" && selection.id === i.name;
+        return `<div class="item${sel ? " is-selected" : ""}" data-inst="${esc(i.name)}"
+                     title="click to select and frame it">
+          <span class="name">${esc(i.name)}</span>
+          <span class="meta">@ ${i.at.join(",")} · rot ${i.rot}°${
+            buses.length ? ` · ${buses.length} bus${buses.length === 1 ? "" : "es"}` : ""}</span>
+          <div class="ports">${mine.map((p) => portChip(p, true)).join("")}</div>
+          <div class="row">
+            <button data-rot="${esc(i.name)}" title="rotate 90°">R ↻</button>
+            <button data-focus-inst="${esc(i.name)}" title="frame it (F)">Frame</button>
+            <button data-del="${esc(i.name)}" class="danger"
+                    title="${buses.length ? `asks first: ${buses.length} bus(es) go with it` : "delete"}">Del ✕</button>
+          </div>
+        </div>`;
+      }).join("");
     }).join("") || `<span class="meta">none — click a cell in the Library, then click the ground</span>`;
+    for (const el of $("#instance-list").querySelectorAll<HTMLElement>("[data-focus-inst]")) {
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        viewer.focusInstance(el.dataset.focusInst!);
+      });
+    }
     for (const el of $("#instance-list").querySelectorAll<HTMLElement>("[data-inst]")) {
       el.addEventListener("click", (ev) => {
         if ((ev.target as HTMLElement).closest("button")) return;
         select({ kind: "instance", id: el.dataset.inst! });
+      });
+      // Double-click frames it, the way an outliner is expected to behave —
+      // single click must NOT move the camera, or every selection is a jump.
+      el.addEventListener("dblclick", (ev) => {
+        if ((ev.target as HTMLElement).closest("button")) return;
+        viewer.focusInstance(el.dataset.inst!);
       });
     }
     for (const el of $("#instance-list").querySelectorAll<HTMLElement>("[data-mode]")) {
@@ -533,15 +861,17 @@ async function boot() {
       });
     }
     for (const el of $("#instance-list").querySelectorAll<HTMLElement>("[data-rot]")) {
-      el.addEventListener("click", () => {
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
         const r = studio.rotateInstance(el.dataset.rot!);
+        studio.endGesture();
         reportBuses(`rotate ${el.dataset.rot} -> ${r.rot}°`, r);
       });
     }
     for (const el of $("#instance-list").querySelectorAll<HTMLElement>("[data-del]")) {
-      el.addEventListener("click", () => {
-        const r = studio.removeInstance(el.dataset.del!);
-        reportBuses(`deleted ${el.dataset.del}`, r);
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        void deleteInstance(el.dataset.del!);
       });
     }
     for (const el of $("#instance-list").querySelectorAll<HTMLElement>("[data-port]")) {
@@ -551,44 +881,86 @@ async function boot() {
     // design ports (declared on loose hardware)
     const declared = endpoints.filter((p) => !p.instance);
     $("#port-list").innerHTML = declared.map((p) => `
-      <div class="item"><button class="port-chip ${p.kind === "input" ? "drives" : "receives"}"
-             data-port="${esc(p.name)}">${p.kind === "input" ? "▲" : "▼"} ${esc(p.name)} : ${esc(p.ty)}</button>
-        <span class="meta">@ ${p.anchor.join(",")} step ${p.step.join(",")}</span></div>`).join("")
-      || `<span class="meta">none — Load demo declares typed ports</span>`;
+      <div class="item" data-focus="${esc(p.anchor.join(","))}" title="click to fly here">
+        ${portChip(p, false)}
+        <span class="meta where">@ ${p.anchor.join(",")} step ${p.step.join(",")} · ${p.width} bit</span></div>`).join("")
+      || `<span class="meta">none — the demos declare typed ports on loose hardware</span>`;
     for (const el of $("#port-list").querySelectorAll<HTMLElement>("[data-port]")) {
-      el.addEventListener("click", () => viewerPortClick(el.dataset.port!));
+      el.addEventListener("click", (ev) => { ev.stopPropagation(); viewerPortClick(el.dataset.port!); });
     }
 
-    // (c) BUSES
+    // (c) BUSES — endpoints, state, timing, and a FAILED bus you can click
+    //     to fly to whatever is in the way.
     $("#bus-list").innerHTML = [...studio.buses.values()].map((b) => {
       const { state, reason } = studio.busStateDetail(b.name);
       const cls = state === "failed" ? "state-failed"
         : state === "routed" ? "state-routed" : "state-intended";
-      return `<div class="item">
-        <span class="swatch" style="background:#${b.color.toString(16).padStart(6, "0")}"></span>
+      const h = reason ? humanReason(reason) : null;
+      const skew = state === "routed" ? studio.busSkew(b.name) : null;
+      // A failed bus focuses the BLOCKAGE; a routed one focuses its driver.
+      const focus = h?.at ?? endpoint(b.driver)?.anchor ?? null;
+      return `<div class="item"${focus ? ` data-focus="${esc(focus.join(","))}"` : ""}
+                   title="${focus ? "click to fly to this bus" : ""}">
+        <span class="swatch" style="background:${state === "failed" ? "var(--c-failed)"
+          : `#${b.color.toString(16).padStart(6, "0")}`}"
+          title="${state === "failed" ? "failed buses draw red" : "this bus's colour on the canvas"}"></span>
         <span class="name">${esc(b.name)}</span> <span class="${cls}">${state}</span>
-        <span class="meta">${esc(b.driver)} → ${esc(b.sinks.join(","))}${b.gates.length ? ` · gates: ${esc(b.gates.map((g) => g.name).join(","))}` : ""}</span>
-        ${reason ? `<span class="meta reason">${esc(reason)}</span>` : ""}
+        ${skew ? `<span class="badge" title="round-trip ticks: worst bit, and the spread across bits">${skew.max_rt}t · skew ${skew.skew_rt}t</span>` : ""}
+        <span class="meta">${esc(b.driver)} → ${esc(b.sinks.join(", "))} · ${
+          endpoint(b.driver)?.width ?? "?"} bit${b.gates.length ? ` · gates ${esc(b.gates.map((g) => g.name).join(","))}` : ""}</span>
+        ${h ? `<span class="meta reason">${esc(h.headline)}</span>` : ""}
+        ${h?.fix ? `<span class="meta fix">↳ ${esc(h.fix)}</span>` : ""}
+        ${h ? `<details><summary>the engine's own words${h.at ? ` · ${esc(fmtAt(h.at))}` : ""}</summary><div class="raw">${esc(h.detail)}</div></details>` : ""}
         <div class="row">
-          <button data-rip="${esc(b.name)}">Rip</button>
-          <button data-reroute="${esc(b.name)}">Re-route</button>
-          <button data-delbus="${esc(b.name)}">Delete</button>
+          <button data-rip="${esc(b.name)}" title="remove its blocks, keep the declaration">Rip</button>
+          <button data-reroute="${esc(b.name)}" title="try again from the stored declaration">Re-route</button>
+          ${focus ? `<button data-focus-btn="${esc(focus.join(","))}" title="fly to ${esc(fmtAt(focus))}">Focus</button>` : ""}
+          <button data-delbus="${esc(b.name)}" class="danger">Delete</button>
         </div>
       </div>`;
-    }).join("") || `<span class="meta">click an output port then an input port to route one</span>`;
+    }).join("") || `<span class="meta">click a green ▲ output port then a blue ▼ input port to route one</span>`;
+    // Click-to-focus, on the row and on the explicit button.
+    for (const el of $("#right").querySelectorAll<HTMLElement>("[data-focus], [data-focus-btn]")) {
+      el.addEventListener("click", (ev) => {
+        if (el.hasAttribute("data-focus") && (ev.target as HTMLElement).closest("button")) return;
+        const raw = el.dataset.focus ?? el.dataset.focusBtn ?? "";
+        const at = raw.split(",").map(Number) as Vec3;
+        if (at.length === 3 && at.every((n) => Number.isFinite(n))) viewer.focusOn(at);
+      });
+    }
     for (const el of $("#bus-list").querySelectorAll<HTMLElement>("[data-rip]")) {
-      el.addEventListener("click", () => { studio.ripBus(el.dataset.rip!); log(`ripped ${el.dataset.rip}`); });
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        studio.ripBus(el.dataset.rip!);
+        log(`ripped ${el.dataset.rip}`);
+        toast(`ripped ${el.dataset.rip} — its declaration is kept, press Re-route or ⌘/Ctrl-Z`);
+      });
     }
     for (const el of $("#bus-list").querySelectorAll<HTMLElement>("[data-reroute]")) {
-      el.addEventListener("click", () => {
-        const state = studio.rerouteBus(el.dataset.reroute!);
-        log(`re-routed ${el.dataset.reroute}: ${state}`);
-        if (state.startsWith("failed")) toast(`${el.dataset.reroute} still failed: ${state}`, "err");
-        else toast(`${el.dataset.reroute} ${state}`);
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const name = el.dataset.reroute!;
+        const state = studio.rerouteBus(name);
+        log(`re-routed ${name}: ${state}`);
+        if (state.startsWith("failed")) failToast(name, state.replace(/^failed:?\s*/, ""));
+        else toast(`${name} ${state}`);
       });
     }
     for (const el of $("#bus-list").querySelectorAll<HTMLElement>("[data-delbus]")) {
-      el.addEventListener("click", () => { studio.removeBus(el.dataset.delbus!); log(`deleted bus ${el.dataset.delbus}`); });
+      el.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        const name = el.dataset.delbus!;
+        const ok = await confirmDestructive(
+          `Delete bus ${name}?`,
+          `${name} is ${studio.busStateDetail(name).state}. Deleting it drops the declaration ` +
+          `as well as the blocks (Rip keeps the declaration). ⌘/Ctrl-Z puts it back.`,
+          `Delete ${name}`,
+        );
+        if (!ok) return;
+        studio.removeBus(name);
+        log(`deleted bus ${name}`);
+        toast(`deleted ${name} · ⌘/Ctrl-Z to undo`);
+      });
     }
 
     renderPoke();
@@ -726,14 +1098,15 @@ async function boot() {
         promoted.push(typeof p === "string" ? p : (p?.note ?? JSON.stringify(p)));
       }
       const { state, reason } = studio.busStateDetail(bus.name);
-      const promo = promoted.length ? `promoted ${promoted.join("; ")}; ` : "";
       log(`routed ${bus.name}: ${driver.name} -> ${sink.name} (${state}${reason ? `: ${reason}` : ""})` +
         (promoted.length ? `  [${promoted.join(" | ")}]` : ""));
       lastConnect = { bus: bus.name, state, promoted: [...promoted] };
-      if (state === "failed") toast(`${promo}${bus.name} FAILED: ${reason}`, "err");
-      else toast(`${promo}${bus.name} routed: ${driver.name} → ${sink.name}`);
+      if (promoted.length) toast(`promoted ${promoted.join("; ")}`);
+      if (state === "failed") failToast(bus.name, reason ?? "");
+      else toast(`${bus.name} routed: ${driver.name} → ${sink.name}`);
     } catch (err) {
-      toast(String(err).replace(/^Error:\s*/, ""), "err");
+      const h = humanReason(String(err).replace(/^Error:\s*/, ""));
+      toast(h.headline, { kind: "err", fix: h.fix, at: h.at });
       log(`route failed: ${err}`);
     }
   }
@@ -957,8 +1330,83 @@ async function boot() {
     log("  drive a lever, so cell-to-cell chaining needs a cell with dust ports");
     log("  (compile one from Verilog). Drive the levers with Bake -> poke instead:");
     log("  set u0.a=99, u0.b=28 and sum_out reads 127.");
+    studio.clearHistory();
     refresh();
-    toast("Bake, then poke u0.a=99 u0.b=28 → sum_out = 127");
+    viewer.frameAll();
+    toast("adder demo loaded", { fix: "Bake, then poke u0.a=99 u0.b=28 → sum_out = 127" });
+    coachShow();
+  }
+
+  /** THE LANDING STATE: the chain `tests/design_promotion.rs` verifies end to
+   *  end in the tick engine — ADD007 → BINTOBCD001 → NUMDISPLAY001, both buses
+   *  routed, 8/8 BCD values and 8/8 segment patterns exact.
+   *
+   *  It is the default because it is the only starting point that shows all
+   *  three ideas at once: ports have a direction (green drives, blue receives),
+   *  ports have a mode (both `bin` and `bcd` are lever banks the connect
+   *  gesture promotes), and buses have a state.
+   *
+   *  The placements are the test's, not guesses. A bus realizes a single-level
+   *  2y-pitch stack, so each stage sits at the y that puts its bit-0
+   *  connection cell on the previous stage's level:
+   *  add at y=0 → bcd at y=-2 → seg at y=1. */
+  async function loadChainDemo(): Promise<boolean> {
+    const s = core.Schematic.create("add-bcd-7seg");
+    studio = new Studio(core, d, "add-bcd-7seg", s);
+    studio.onChange = refresh;
+    await loadLibrary();
+    const find = (p: string) => [...studio.cells.keys()].find((n) => n.startsWith(p));
+    const add = find("ADD007"), bcd = find("BINTOBCD001"), seg = find("NUMDISPLAY001");
+    if (!add || !bcd) {
+      log("chain demo: the enhanced library is unavailable; falling back to the adder demo");
+      await loadAdderDemo();
+      return false;
+    }
+    const t0 = performance.now();
+    const u0 = studio.placeInstance(add, [0, 0, 0]);
+    const u1 = studio.placeInstance(bcd, [60, -2, 40]);
+    const routed: string[] = [];
+    const failed: string[] = [];
+    const link = (driver: string, sink: string) => {
+      try {
+        // `sink` is a lever bank: the engine promotes it, exactly as a click
+        // on the canvas would.
+        const p = studio.allEndpoints().find((e) => e.name === sink);
+        if (p && !p.routable && p.instance && p.promotable) {
+          studio.setPortMode(p.instance, p.port, "bus");
+        }
+        const bus = studio.routeBus(driver, [sink]);
+        const { state, reason } = studio.busStateDetail(bus.name);
+        if (state === "routed") routed.push(`${bus.name} (${driver} → ${sink})`);
+        else failed.push(`${bus.name}: ${humanReason(reason).headline}`);
+      } catch (err) {
+        failed.push(`${driver} → ${sink}: ${String(err).replace(/^Error:\s*/, "").slice(0, 160)}`);
+      }
+    };
+    link(`${u0.name}.sum`, `${u1.name}.bin`);
+    if (seg) {
+      const p = studio.allEndpoints().find((e) => e.name === `${u1.name}.bcd_ones`);
+      if (p && !p.routable && p.promotable) studio.setPortMode(u1.name, "bcd_ones", "bus");
+      const u2 = studio.placeInstance(seg, [110, 1, 40]);
+      link(`${u1.name}.bcd_ones`, `${u2.name}.bcd`);
+    }
+    // A demo is a starting point, not an edit you undo your way out of.
+    studio.clearHistory();
+    refresh();
+    viewer.frameAll();
+    log(`chain: ${add} → ${bcd}${seg ? ` → ${seg}` : ""} in ${(performance.now() - t0).toFixed(0)}ms`);
+    for (const r of routed) log(`  routed ${r}`);
+    for (const f of failed) log(`  FAILED ${f}`);
+    log("  drive it: Bake, then poke u0.a / u0.b and read the BCD digits + segments.");
+    if (failed.length) {
+      toast(`${routed.length} bus(es) routed, ${failed.length} failed — see the Buses panel`,
+        { kind: "err", fix: "click a failed bus to fly to whatever is in the way" });
+    } else {
+      toast(`chain loaded: ${routed.length} buses routed through ${studio.instances.size} cells`,
+        { fix: "Bake, then poke u0.a=99 u0.b=28" });
+    }
+    coachShow();
+    return failed.length === 0;
   }
 
   /** The original DESIGN_SPEC acceptance sketch: two crossing 8-bit buses. */
@@ -997,18 +1445,29 @@ async function boot() {
     const busA = studio.routeBus("a_in", ["a_out"], [{ name: "g0", anchor: [8, 2, 8] as Vec3, step: STEP }]);
     const busB = studio.routeBus("b_in", ["b_out"]);
     log(`crossing demo: ${busA.name}=${studio.busState(busA.name)} ${busB.name}=${studio.busState(busB.name)}`);
+    studio.clearHistory();
     void loadLibrary();
     refresh();
+    viewer.frameAll();
+    coachShow();
   }
 
   $("#btn-demo").addEventListener("click", () => void loadAdderDemo());
+  $("#btn-demo-chain").addEventListener("click", () => void loadChainDemo());
   $("#btn-demo-crossing").addEventListener("click", loadCrossingDemo);
 
   await loadLibrary();
   refresh();
+  // Landing state. A blank grid teaches nothing, so the DEFAULT is the
+  // verified chain; `?empty=1` opts out (the instancing benchmark needs a
+  // scene it fully controls), and the other flags pick a specific demo.
   const params = new URLSearchParams(location.search);
   if (params.has("demo")) await loadAdderDemo();
-  if (params.has("crossing")) loadCrossingDemo();
+  else if (params.has("crossing")) loadCrossingDemo();
+  else if (params.has("chain")) await loadChainDemo();
+  else if (params.has("empty")) { renderEmptyState(); coachShow(); }
+  else await loadChainDemo();
+  if (params.has("coach")) coachShow(true);
 
   (window as any).__edaReady = true;
   (window as any).__edaStudio = () => studio;
@@ -1027,6 +1486,10 @@ async function boot() {
     hint: () => $("#hint").textContent,
     endpoints: () => endpoints,
     clickPort: (name: string) => onPortChip(name),
+    /** A click on empty ground, through the same path the pointer drives. */
+    groundClick: (at: Vec3 = [0, 0, 0]) => handleGroundClick(at),
+    /** Arm cell placement, as clicking a Library row does. */
+    arm: (cell: string) => { setMode({ kind: "placing", cell }); },
     key: (key: string, shift = false) =>
       window.dispatchEvent(new KeyboardEvent("keydown", { key, shiftKey: shift })),
     place: (cell: string, at: Vec3) => studio.placeInstance(cell, at),
@@ -1046,7 +1509,51 @@ async function boot() {
     },
     remesh,
     demo: loadAdderDemo,
+    chain: loadChainDemo,
     crossing: loadCrossingDemo,
+    // ---- UX surface, so the polish is checkable and not just claimed ------
+    /** Every visible toast, oldest first. */
+    toasts: toastTexts,
+    /** Coach state: `{open, step, steps, dismissed}`. */
+    coach: () => ({
+      open: coachOpen, step: coachStep, steps: COACH.length,
+      title: $("#coach-title").textContent, body: $("#coach-body").textContent,
+      dismissed: localStorage.getItem(COACH_KEY) === "1",
+    }),
+    coachShow: (force = true) => { coachShow(force); },
+    coachNext: (d = 1) => coachNext(d),
+    coachDismiss,
+    /** Is the empty state visible? */
+    emptyState: () => $("#empty-state").classList.contains("is-open"),
+    /** The `?` overlay. */
+    shortcuts: () => shortcutsOpen(),
+    /** The pending destructive confirm, `null` when none is up. */
+    pendingConfirm: () => pendingConfirm && { title: pendingConfirm.title, body: pendingConfirm.body },
+    confirmRespond,
+    /** Undo/redo, and what they would do. */
+    history: () => ({
+      canUndo: studio.canUndo(), canRedo: studio.canRedo(),
+      undo: studio.undoLabel(), redo: studio.redoLabel(),
+    }),
+    undo: doUndo,
+    redo: doRedo,
+    /** Buses that terminate on an instance — what a delete would rip. */
+    busesOn: (name: string) => studio.busesOn(name),
+    /** The last bus failure as the UI phrased it, plus its focus target. */
+    lastFailure: () => lastFailure,
+    /** The reason translator, so its parsing is testable on real strings. */
+    humanReason,
+    busFailureLine,
+    /** Label declutter: counts and the thresholds they are measured against. */
+    labels: () => ({ ...viewer.labelStats, thresholds: { ...Viewer.LABELS } }),
+    /** Where the camera was last sent by a click-to-focus. */
+    focus: () => viewer.lastFocus,
+    focusOn: (at: Vec3) => viewer.focusOn(at),
+    /** Orbit distance — what the label thresholds are a function of. */
+    frameAll: () => viewer.frameAll(),
+    zoom: (radius: number) => { viewer.setOrbitRadius(radius); return viewer.orbitRadius(); },
+    /** Per-bus timing, when the engine reports it. */
+    busSkew: (name: string) => studio.busSkew(name),
     /** `{bus, state, promoted}` from the last connect gesture — how the verify
      *  script checks that a connect AUTO-PROMOTED and said so. */
     lastConnect: () => lastConnect,

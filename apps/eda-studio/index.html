@@ -8,17 +8,27 @@
       :root {
         --bg: #14161a; --panel: #1c1f26; --edge: #2c313c; --text: #d7dae0;
         --dim: #8b93a1; --accent: #4fc3f7; --ok: #7bd88f; --bad: #ff6d6d;
+        --sel: #ffe082; --warn: #ffb74d;
+        /* One colour, one meaning. The legend in the left panel prints these
+           same six swatches, so what the canvas says and what the UI says
+           cannot drift apart. */
+        --c-driver: #7bd88f;   /* drives a bus */
+        --c-sink: #4fc3f7;     /* receives a bus */
+        --c-blocked: #8d8d8d;  /* executor-only */
+        --c-selected: #ffe082;
+        --c-failed: #ff4040;
+        --c-gate: #ffb74d;
       }
       * { box-sizing: border-box; }
       body {
         margin: 0; height: 100vh; display: grid;
-        grid-template-rows: 42px 1fr; grid-template-columns: 300px 1fr 320px;
+        grid-template-rows: 42px 1fr; grid-template-columns: 300px 1fr 330px;
         grid-template-areas: "top top top" "left canvas right";
         background: var(--bg); color: var(--text);
         font: 13px/1.45 "SF Mono", ui-monospace, Menlo, monospace;
       }
       header {
-        grid-area: top; display: flex; align-items: center; gap: 12px;
+        grid-area: top; display: flex; align-items: center; gap: 10px;
         padding: 0 12px; border-bottom: 1px solid var(--edge); background: var(--panel);
       }
       header h1 { font-size: 14px; margin: 0; color: var(--accent); font-weight: 600; }
@@ -28,14 +38,16 @@
       #right { grid-area: right; border-left: 1px solid var(--edge); }
       #canvas-wrap { grid-area: canvas; position: relative; min-width: 0; }
       #canvas-wrap canvas { display: block; }
-      /* Always-on "what does the next click do" bar. */
+      /* Always-on "what does the next click do" bar. Overlays anchored to the
+         bottom keep clear of it (see --hint-h). */
       #hint {
         position: absolute; left: 0; right: 0; bottom: 0; color: var(--text);
-        font-size: 11px; pointer-events: none; padding: 6px 10px;
+        font-size: 11px; pointer-events: none; padding: 6px 10px; min-height: 28px;
         background: linear-gradient(transparent, rgba(10,12,16,0.92) 40%);
+        z-index: 3;
       }
       #hint code { color: var(--accent); }
-      #hint b { color: #ffe082; font-weight: 600; }
+      #hint b { color: var(--sel); font-weight: 600; }
       kbd {
         border: 1px solid var(--edge); border-bottom-width: 2px; border-radius: 3px;
         padding: 0 4px; background: #232833; font-size: 10px; color: var(--text);
@@ -43,20 +55,27 @@
       #hover-info {
         position: absolute; left: 10px; top: 10px; color: var(--dim);
         font-size: 11px; pointer-events: none; background: rgba(16,19,26,0.8);
-        padding: 2px 6px; border-radius: 3px;
+        padding: 2px 6px; border-radius: 3px; z-index: 2;
       }
-      /* Floating IO / instance labels, projected each frame by the Viewer. */
-      .label-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+      /* ---- floating IO / instance labels ---------------------------------
+         Projected each frame by the Viewer, which also DECLUTTERS them: a
+         label whose blocks project smaller than the legibility threshold is
+         hidden (its 3-D marker stays), and labels that would overlap lose to
+         the one nearest the camera. */
+      .label-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 1; }
       .mk-label {
         position: absolute; transform: translate(-50%, -100%);
         font-size: 10px; white-space: nowrap; padding: 1px 4px; border-radius: 3px;
-        background: rgba(16,19,26,0.82); border: 1px solid var(--edge);
+        background: rgba(10,12,16,0.9); border: 1px solid var(--edge);
+        /* Readable over a bright resource-pack block as well as over the dark
+           abstract view. */
+        text-shadow: 0 1px 2px #000, 0 0 3px #000;
       }
-      .mk-label.io-driver { color: var(--ok); border-color: #2f6b41; }
-      .mk-label.io-sink { color: var(--accent); border-color: #2b5b70; }
-      .mk-label.io-blocked { color: #9aa0aa; border-color: #3a3f49; opacity: 0.75; }
-      .mk-label.inst-label { color: #ffe082; border-color: #6b5a2a; font-weight: 600; }
-      .mk-label.is-selected { outline: 1px solid #ffe082; }
+      .mk-label.io-driver { color: var(--c-driver); border-color: #2f6b41; }
+      .mk-label.io-sink { color: var(--c-sink); border-color: #2b5b70; }
+      .mk-label.io-blocked { color: #9aa0aa; border-color: #3a3f49; }
+      .mk-label.inst-label { color: var(--sel); border-color: #6b5a2a; font-weight: 600; }
+      .mk-label.is-selected { outline: 1px solid var(--sel); }
       .mk-label.is-hovered { background: #262b35; color: #fff; }
       /* Clickable port chips in the outliner. */
       .ports { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0 2px; }
@@ -64,10 +83,11 @@
         font-size: 10px; padding: 1px 5px; border-radius: 3px; cursor: pointer;
         background: #1d222b; border: 1px solid var(--edge); color: var(--text);
       }
-      .port-chip.drives { color: var(--ok); border-color: #2f6b41; }
-      .port-chip.receives { color: var(--accent); border-color: #2b5b70; }
-      .port-chip.blocked { color: #8d8d8d; border-color: #3a3f49; opacity: 0.7; }
-      .port-chip:hover { border-color: #ffe082; }
+      .port-chip.drives { color: var(--c-driver); border-color: #2f6b41; }
+      .port-chip.receives { color: var(--c-sink); border-color: #2b5b70; }
+      .port-chip.blocked { color: var(--c-blocked); border-color: #3a3f49; }
+      .port-chip:hover { border-color: var(--sel); }
+      .port-chip .pty { color: var(--dim); }
       /* A port's MODE switch. A greyed x port is not a dead end: community
          cells drive their inputs with levers, and nothing in redstone drives a
          lever, so the port is waiting to be promoted. Reversible, hence a
@@ -78,32 +98,52 @@
         font-size: 9px; padding: 1px 4px; cursor: pointer; letter-spacing: .02em;
         border: 1px solid var(--edge); border-left: none;
         border-top-right-radius: 3px; border-bottom-right-radius: 3px;
-        background: #171a21; color: #8d8d8d;
+        background: #171a21; color: var(--c-blocked);
       }
       .mode-toggle.is-bus { background: #23323d; color: var(--accent); border-color: #2b5b70; }
-      .mode-toggle:hover { border-color: #ffe082; color: #ffe082; }
+      .mode-toggle:hover { border-color: var(--sel); color: var(--sel); }
       /* While an interaction owns the pointer the camera is locked. */
       canvas.camera-locked { cursor: crosshair; }
-      .item.is-selected { border-color: #ffe082; background: #23242099; }
+      .item.is-selected { border-color: var(--sel); background: #23242099; }
       .item.is-active { border-color: var(--accent); }
-      .item[data-place], .item[data-inst] { cursor: pointer; }
+      .item[data-place], .item[data-inst], .item[data-focus] { cursor: pointer; }
       .item .meta.io { display: block; color: #7f8794; }
-      .item .meta.reason { display: block; color: var(--bad); white-space: pre-wrap; }
+      .item .meta.reason { display: block; color: var(--bad); white-space: normal; }
+      .item .meta.fix { display: block; color: var(--warn); white-space: normal; }
+      .item .meta.where { color: var(--dim); }
+      .item details { margin-top: 3px; }
+      .item details summary { color: var(--dim); font-size: 10px; cursor: pointer; }
+      .item details .raw {
+        color: #9aa0aa; font-size: 10px; white-space: pre-wrap; margin-top: 3px;
+        max-height: 130px; overflow-y: auto;
+      }
+      /* ---- group headers in the outliner --------------------------------- */
+      .group { margin: 6px 0 2px; display: flex; align-items: baseline; gap: 6px; }
+      .group .gname { color: var(--text); font-size: 11px; }
+      .group .gcount { color: var(--dim); font-size: 10px; }
+      .group + .item { margin-top: 2px; }
+      /* ---- the colour legend (documented semantics) ---------------------- */
       #legend { color: var(--dim); font-size: 10px; line-height: 1.7; }
       #legend .k { color: var(--text); }
+      .sem { display: grid; grid-template-columns: 12px 1fr; gap: 3px 6px; align-items: center; }
+      .sem .dot { width: 10px; height: 10px; border-radius: 2px; }
       section { margin-bottom: 14px; }
       section > h2 {
         font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
         color: var(--dim); margin: 0 0 6px; border-bottom: 1px solid var(--edge);
-        padding-bottom: 3px;
+        padding-bottom: 3px; display: flex; justify-content: space-between;
       }
+      section > h2 .count { color: #6c7381; letter-spacing: 0; text-transform: none; }
       button {
         background: #262b35; color: var(--text); border: 1px solid var(--edge);
         border-radius: 4px; padding: 3px 9px; font: inherit; cursor: pointer;
       }
       button:hover { border-color: var(--accent); }
       button.primary { background: #103246; border-color: var(--accent); }
-      button:disabled { opacity: 0.4; cursor: default; }
+      button.danger { border-color: #6b2f2f; color: #ffbcbc; }
+      button.danger:hover { border-color: var(--bad); }
+      button:disabled { opacity: 0.35; cursor: default; }
+      button.icon { padding: 2px 7px; }
       textarea, input[type="text"], input[type="number"] {
         width: 100%; background: #10131a; color: var(--text);
         border: 1px solid var(--edge); border-radius: 4px; padding: 4px 6px;
@@ -127,13 +167,96 @@
         max-height: 180px; overflow-y: auto; background: #10131a;
         border: 1px solid var(--edge); border-radius: 4px; padding: 6px;
       }
+      /* ---- toast STACK ---------------------------------------------------
+         `#toast` is the container, not a card: several messages stack instead
+         of the newest erasing the one you were still reading, each is
+         dismissible, and the column is anchored top-centre so it can never
+         cover the hint bar. */
       #toast {
         position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-        background: #262b35; border: 1px solid var(--edge); border-radius: 6px;
-        padding: 6px 14px; display: none; z-index: 5; max-width: 70%;
+        display: flex; flex-direction: column; gap: 6px; align-items: center;
+        max-width: 74%; z-index: 6; pointer-events: none;
       }
-      #toast.is-err { border-color: var(--bad); color: #ffdcdc; background: #2e1f22; }
+      .toast-item {
+        background: #262b35; border: 1px solid var(--edge); border-radius: 6px;
+        padding: 6px 10px 6px 12px; display: flex; gap: 10px; align-items: flex-start;
+        pointer-events: auto; box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+        animation: toast-in 140ms ease-out;
+      }
+      @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } }
+      .toast-item.is-err { border-color: var(--bad); color: #ffdcdc; background: #2e1f22; }
+      .toast-item .msg { flex: 1; }
+      .toast-item .msg .fix { display: block; color: var(--warn); font-size: 11px; margin-top: 2px; }
+      .toast-item .x {
+        border: none; background: none; color: var(--dim); cursor: pointer;
+        padding: 0 2px; font-size: 13px; line-height: 1;
+      }
+      .toast-item .x:hover { color: var(--text); }
+      .toast-item .go {
+        border: 1px solid var(--edge); background: #1d222b; color: var(--accent);
+        font: inherit; font-size: 10px; border-radius: 3px; padding: 1px 5px; cursor: pointer;
+      }
       .badge { font-size: 10px; border: 1px solid var(--edge); border-radius: 3px; padding: 0 4px; color: var(--dim); }
+      /* ---- first-run coach ----------------------------------------------
+         Four steps, bottom-right, clear of the hint bar. Dismissible, and the
+         dismissal is remembered so it teaches once and then gets out of the
+         way. */
+      #coach {
+        position: absolute; right: 12px; bottom: 38px; width: 320px; z-index: 7;
+        background: #1b2028; border: 1px solid var(--accent); border-radius: 7px;
+        padding: 10px 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.55); display: none;
+      }
+      #coach.is-open { display: block; }
+      #coach h3 { margin: 0 0 4px; font-size: 12px; color: var(--accent); }
+      #coach p { margin: 0 0 8px; font-size: 11.5px; color: var(--text); line-height: 1.5; }
+      #coach .dots { display: flex; gap: 4px; flex: 1; align-items: center; }
+      #coach .dots i { width: 6px; height: 6px; border-radius: 50%; background: #39404d; }
+      #coach .dots i.on { background: var(--accent); }
+      #coach .foot { display: flex; gap: 6px; align-items: center; }
+      /* ---- empty state --------------------------------------------------- */
+      #empty-state {
+        position: absolute; inset: 0; display: none; z-index: 4;
+        align-items: center; justify-content: center; pointer-events: none;
+      }
+      #empty-state.is-open { display: flex; }
+      #empty-state .card {
+        pointer-events: auto; background: rgba(24,28,35,0.94); border: 1px solid var(--edge);
+        border-radius: 8px; padding: 16px 20px; max-width: 460px;
+      }
+      #empty-state h3 { margin: 0 0 8px; font-size: 13px; color: var(--accent); }
+      #empty-state ol { margin: 0 0 10px; padding-left: 20px; color: var(--text); font-size: 12px; line-height: 1.7; }
+      #empty-state .meta { color: var(--dim); font-size: 11px; }
+      /* ---- destructive confirm ------------------------------------------ */
+      #confirm {
+        position: absolute; inset: 0; display: none; z-index: 9;
+        align-items: center; justify-content: center; background: rgba(8,10,13,0.55);
+      }
+      #confirm.is-open { display: flex; }
+      #confirm .card {
+        background: #1b2028; border: 1px solid var(--bad); border-radius: 8px;
+        padding: 14px 16px; max-width: 440px;
+      }
+      #confirm h3 { margin: 0 0 6px; font-size: 12.5px; color: #ffbcbc; }
+      #confirm p { margin: 0 0 10px; font-size: 11.5px; color: var(--text); line-height: 1.5; }
+      /* ---- shortcuts overlay (press ?) ---------------------------------- */
+      #shortcuts {
+        position: absolute; inset: 0; display: none; z-index: 8;
+        align-items: center; justify-content: center; background: rgba(8,10,13,0.7);
+      }
+      #shortcuts.is-open { display: flex; }
+      #shortcuts .card {
+        background: #1b2028; border: 1px solid var(--edge); border-radius: 8px;
+        padding: 14px 18px; max-width: 620px; max-height: 86%; overflow-y: auto;
+      }
+      #shortcuts h3 { margin: 0 0 8px; font-size: 13px; color: var(--accent); }
+      #shortcuts table { border-collapse: collapse; font-size: 11.5px; }
+      #shortcuts td { padding: 2px 10px 2px 0; vertical-align: top; }
+      #shortcuts td.k { text-align: right; white-space: nowrap; }
+      #shortcuts .cols { display: flex; gap: 26px; flex-wrap: wrap; }
+      #shortcuts h4 {
+        margin: 8px 0 4px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+        color: var(--dim);
+      }
     </style>
   </head>
   <body>
@@ -141,10 +264,14 @@
       <h1>Redstone EDA Studio</h1>
       <span id="status" class="badge">loading engine…</span>
       <span class="spacer"></span>
+      <button id="btn-undo" class="icon" title="Undo (Ctrl/⌘Z)" disabled>↶</button>
+      <button id="btn-redo" class="icon" title="Redo (⇧Ctrl/⌘Z)" disabled>↷</button>
       <label class="row" style="margin:0"><input type="checkbox" id="show-io" checked />show IO</label>
       <label class="row" style="margin:0"><input type="checkbox" id="textured" />textured</label>
       <label class="row" style="margin:0"><input type="checkbox" id="live-reroute" checked />live reroute</label>
-      <button id="btn-demo" class="primary">Load demo</button>
+      <button id="btn-help" title="Keyboard + colour legend (?)">?</button>
+      <button id="btn-demo-chain" class="primary" title="ADD007 → BINTOBCD001 → NUMDISPLAY001">Chain demo</button>
+      <button id="btn-demo">Adder demo</button>
       <button id="btn-demo-crossing">Crossing demo</button>
       <button id="btn-check">Check</button>
       <button id="btn-bake" class="primary">Bake</button>
@@ -152,12 +279,12 @@
 
     <aside id="left">
       <section>
-        <h2>Library</h2>
+        <h2>Library <span class="count" id="cell-count"></span></h2>
         <input type="file" id="cell-file" multiple accept=".schem,.litematic,.nbt,.mcstructure,.snapshot" />
         <div id="cell-list"></div>
       </section>
       <section>
-        <h2>Instances</h2>
+        <h2>Instances <span class="count" id="instance-count"></span></h2>
         <div id="instance-list"></div>
       </section>
       <section>
@@ -175,17 +302,32 @@
         <div class="meta" id="pack-status">load a resource-pack ZIP to see real blocks</div>
       </section>
       <section>
-        <h2>Keyboard</h2>
+        <h2>Legend</h2>
         <div id="legend">
-          <div><kbd>click</kbd> <span class="k">select instance</span> · <kbd>drag</kbd> move it</div>
-          <div><kbd>R</kbd> <span class="k">rotate 90°</span> (<kbd>⇧R</kbd> back)</div>
-          <div><kbd>G</kbd> <span class="k">grab / move</span> · click to drop</div>
-          <div><kbd>Del</kbd> / <kbd>⌫</kbd> <span class="k">remove instance</span> (rips its buses)</div>
-          <div><kbd>Esc</kbd> <span class="k">cancel / deselect</span></div>
-          <div style="margin-top:4px">
-            <span style="color:var(--ok)">▲ green</span> drives a bus ·
-            <span style="color:var(--accent)">▼ blue</span> receives ·
-            <span style="color:#8d8d8d">✗ grey</span> executor-only
+          <div class="sem">
+            <span class="dot" style="background:var(--c-driver)"></span>
+            <span><span class="k">▲ drives a bus</span> — start a bus here</span>
+            <span class="dot" style="background:var(--c-sink)"></span>
+            <span><span class="k">▼ receives a bus</span> — finish a bus here</span>
+            <span class="dot" style="background:var(--c-blocked)"></span>
+            <span><span class="k">✗ executor-only</span> — promotes on click</span>
+            <span class="dot" style="background:var(--c-selected)"></span>
+            <span><span class="k">selected</span> — shell, axes, outline</span>
+            <span class="dot" style="background:#fff"></span>
+            <span><span class="k">hovered</span> — white, enlarged</span>
+            <span class="dot" style="background:var(--c-failed)"></span>
+            <span><span class="k">failed bus</span> — red, with a reason</span>
+            <span class="dot" style="background:var(--c-gate)"></span>
+            <span><span class="k">gate</span> — drag to re-route two legs</span>
+          </div>
+          <div style="margin-top:6px">
+            Routed buses take the palette colours in the Buses panel; they are
+            <span class="k">lit</span> so they read against cell bodies and against
+            a resource pack.
+          </div>
+          <div style="margin-top:6px">
+            <kbd>?</kbd> <span class="k">all keys</span> · labels hide when the view
+            zooms out past legibility (markers stay).
           </div>
         </div>
       </section>
@@ -194,16 +336,98 @@
     <div id="canvas-wrap">
       <div id="toast"></div>
       <div id="hover-info"></div>
+      <div id="empty-state">
+        <div class="card">
+          <h3>No design yet</h3>
+          <ol>
+            <li>Click a cell in <b>Library</b> (left) — it arms placement.</li>
+            <li>Click the ground to place it.</li>
+            <li>Click a green <b>▲</b> port, then a blue <b>▼</b> port, to route a bus.</li>
+            <li><b>Bake</b>, then poke its typed inputs (right panel).</li>
+          </ol>
+          <div class="row">
+            <button id="empty-chain" class="primary">Load the verified chain</button>
+            <button id="empty-adder">Adder demo</button>
+            <button id="empty-help">Show the keys</button>
+          </div>
+          <div class="meta">The chain is ADD007 → BINTOBCD001 → NUMDISPLAY001, both buses routed.</div>
+        </div>
+      </div>
+      <div id="coach">
+        <h3 id="coach-title"></h3>
+        <p id="coach-body"></p>
+        <div class="foot">
+          <div class="dots" id="coach-dots"></div>
+          <button id="coach-skip">Skip</button>
+          <button id="coach-back">Back</button>
+          <button id="coach-next" class="primary">Next</button>
+        </div>
+      </div>
+      <div id="confirm">
+        <div class="card">
+          <h3 id="confirm-title"></h3>
+          <p id="confirm-body"></p>
+          <div class="row" style="justify-content:flex-end">
+            <button id="confirm-cancel">Cancel <kbd>Esc</kbd></button>
+            <button id="confirm-ok" class="danger">Delete <kbd>↵</kbd></button>
+          </div>
+        </div>
+      </div>
+      <div id="shortcuts">
+        <div class="card">
+          <h3>Keyboard &amp; colour legend</h3>
+          <div class="cols">
+            <div>
+              <h4>Selection &amp; editing</h4>
+              <table>
+                <tr><td class="k"><kbd>click</kbd></td><td>select an instance · click empty ground to deselect</td></tr>
+                <tr><td class="k"><kbd>drag</kbd></td><td>move it (buses reroute live)</td></tr>
+                <tr><td class="k"><kbd>R</kbd> / <kbd>⇧R</kbd></td><td>rotate 90° / −90°</td></tr>
+                <tr><td class="k"><kbd>G</kbd></td><td>grab-move · click to drop</td></tr>
+                <tr><td class="k"><kbd>Del</kbd> <kbd>⌫</kbd></td><td>delete (confirms if it carries buses)</td></tr>
+                <tr><td class="k"><kbd>F</kbd></td><td>frame the selection (or the whole design)</td></tr>
+                <tr><td class="k"><kbd>A</kbd></td><td>frame the whole design</td></tr>
+                <tr><td class="k"><kbd>Esc</kbd></td><td>cancel anything · close overlays · deselect</td></tr>
+              </table>
+              <h4>Document</h4>
+              <table>
+                <tr><td class="k"><kbd>⌘/Ctrl Z</kbd></td><td>undo</td></tr>
+                <tr><td class="k"><kbd>⇧⌘/Ctrl Z</kbd></td><td>redo</td></tr>
+                <tr><td class="k"><kbd>?</kbd></td><td>this panel</td></tr>
+              </table>
+            </div>
+            <div>
+              <h4>Wiring</h4>
+              <table>
+                <tr><td class="k">green ▲</td><td>drives a bus — click first</td></tr>
+                <tr><td class="k">blue ▼</td><td>receives a bus — click second</td></tr>
+                <tr><td class="k">grey ✗</td><td>executor-only: clicking it as a target promotes it</td></tr>
+                <tr><td class="k">Exec/Bus</td><td>the reversible port-mode switch on each chip</td></tr>
+                <tr><td class="k">orange ◆</td><td>a gate — drag it to re-route two legs</td></tr>
+              </table>
+              <h4>States</h4>
+              <table>
+                <tr><td class="k">yellow</td><td>selected (shell + axis arrows + outline)</td></tr>
+                <tr><td class="k">white</td><td>hovered</td></tr>
+                <tr><td class="k">red</td><td>a FAILED bus — click it in the Buses panel to fly to the blockage</td></tr>
+              </table>
+            </div>
+          </div>
+          <div class="row" style="justify-content:flex-end;margin-top:10px">
+            <button id="shortcuts-close" class="primary">Close</button>
+          </div>
+        </div>
+      </div>
       <div id="hint"></div>
     </div>
 
     <aside id="right">
       <section>
-        <h2>Design ports</h2>
+        <h2>Design ports <span class="count" id="port-count"></span></h2>
         <div id="port-list"></div>
       </section>
       <section>
-        <h2>Buses</h2>
+        <h2>Buses <span class="count" id="bus-count"></span></h2>
         <div id="bus-list"></div>
       </section>
       <section>
@@ -217,6 +441,7 @@
           <button id="btn-export-litematic">.litematic</button>
           <button id="btn-export-nucm">.nucm</button>
         </div>
+        <div class="meta">.schem = composited artifact · .litematic keeps inst:/bus: regions · .nucm is the editable project</div>
       </section>
       <section>
         <h2>Log</h2>
