@@ -1,12 +1,12 @@
 {
-  "when": "2026-08-09T13:11:30.052Z",
+  "when": "2026-08-09T13:16:49.413Z",
   "passed": 129,
   "total": 129,
   "results": [
     {
       "ok": true,
-      "label": "the page is running the engine ON DISK (fe01b8ac1e65f0c7, 16710526 bytes, built 2026-08-09T13:04:22.542Z) — no stale wasm",
-      "detail": "{\"ok\":true,\"expected\":\"fe01b8ac1e65f0c7\",\"served\":\"fe01b8ac1e65f0c7\",\"bytes\":16710526,\"fetchedBytes\":16710526,\"builtAt\":\"2026-08-09T13:04:22.542Z\",\"problem\":null}"
+      "label": "the page is running the engine ON DISK (fe01b8ac1e65f0c7, 16710526 bytes, built 2026-08-09T13:13:45.184Z) — no stale wasm",
+      "detail": "{\"ok\":true,\"expected\":\"fe01b8ac1e65f0c7\",\"served\":\"fe01b8ac1e65f0c7\",\"bytes\":16710526,\"fetchedBytes\":16710526,\"builtAt\":\"2026-08-09T13:13:45.184Z\",\"problem\":null}"
     },
     {
       "ok": true,
@@ -170,7 +170,7 @@
     {
       "ok": true,
       "label": "deletion is reported",
-      "detail": "removed with it: bus0×u0 deleted — ripped bus0 · ⌘/Ctrl-Z to undo×"
+      "detail": "u0 rotated to 0°×bus from u0.sum — now click an input port×removed with it: bus0×u0 deleted — ripped bus0 · ⌘/Ctrl-Z to undo×"
     },
     {
       "ok": true,
@@ -290,12 +290,12 @@
     },
     {
       "ok": true,
-      "label": "...costing 0.04 ms of main-thread work per frame — a >999 fps budget, target >= 30 fps (<= 33 ms)"
+      "label": "...costing 0.07 ms of main-thread work per frame — a >999 fps budget, target >= 30 fps (<= 33 ms)"
     },
     {
       "ok": true,
-      "label": "live re-route commits at most one engine move per animation frame (21 commits over 20 frames, 12 ms each, scene update 5.2 ms) — no fixed throttle",
-      "detail": "{\"wallPerFrame\":180.9149999976158,\"commits\":21,\"commitMs\":11.804761897949945,\"scene\":5.176190444401333}"
+      "label": "live re-route commits at most one engine move per animation frame (21 commits over 20 frames, 8 ms each, scene update 3.5 ms) — no fixed throttle",
+      "detail": "{\"wallPerFrame\":113.72999999523162,\"commits\":21,\"commitMs\":8.247619072596232,\"scene\":3.504761877514067}"
     },
     {
       "ok": true,
@@ -304,8 +304,8 @@
     },
     {
       "ok": true,
-      "label": "re-routing bus1 re-reads exactly 1 bus layer and 0 cells, and re-meshes it 1 time(s) — the route moved (13 ms)",
-      "detail": "{\"bus\":\"bus1\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":59,\"buses\":42,\"loose\":1},\"reads\":{\"flatten\":43,\"cellDump\":1,\"instDump\":3,\"busDump\":42,\"looseDump\":1}},\"after\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":59,\"buses\":43,\"loose\":1},\"reads\":{\"flatten\":44,\"cellDump\":1,\"instDump\":3,\"busDump\":43,\"looseDump\":1}},\"ms\":12.799999952316284}"
+      "label": "re-routing bus1 re-reads exactly 1 bus layer and 0 cells, and re-meshes it 1 time(s) — the route moved (9 ms)",
+      "detail": "{\"bus\":\"bus1\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":59,\"buses\":42,\"loose\":1},\"reads\":{\"flatten\":43,\"cellDump\":1,\"instDump\":3,\"busDump\":42,\"looseDump\":1}},\"after\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":59,\"buses\":43,\"loose\":1},\"reads\":{\"flatten\":44,\"cellDump\":1,\"instDump\":3,\"busDump\":43,\"looseDump\":1}},\"ms\":9}"
     },
     {
       "ok": true,
@@ -399,7 +399,7 @@
     {
       "ok": true,
       "label": "...with the choice remembered in localStorage (\"translucent\"), so it survives a reload",
-      "detail": "{\"before\":{\"global\":\"translucent\",\"stored\":null,\"perBus\":{\"bus1\":\"translucent\"}},\"outline\":{\"style\":{\"global\":\"outline\",\"stored\":\"outline\",\"perBus\":{\"bus1\":\"outline\"}},\"prof\":{\"frames\":260,\"avgFrameMs\":10.890000002200788,\"avgGapMs\":106.6299999998166,\"fps\":9.37822376443515,\"drawCalls\":8,\"triangles\":38444,\"geometries\":9,\"textures\":0,\"programs\":7,\"cellGroups\":1,\"cellMeshes\":1,\"busMeshes\":2,\"looseMeshes\":1,\"sceneObjects\":4,\"markerObjects\":6,\"labels\":16,\"labelStats\":{\"total\":16,\"shown\":11,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":5,\"pxPerBlock\":28.514772354720368},\"sceneMs\":{\"placements\":0.2999997138977051,\"unique\":46.49999976158142}},\"consistent\":true},\"perBus\":{\"global\":\"outline\",\"stored\":\"outline\",\"perBus\":{\"bus1\":\"solid\"}},\"after\":{\"global\":\"translucent\",\"stored\":\"translucent\",\"perBus\":{\"bus1\":\"translucent\"}},\"stored\":\"translucent\"}"
+      "detail": "{\"before\":{\"global\":\"translucent\",\"stored\":null,\"perBus\":{\"bus1\":\"translucent\"}},\"outline\":{\"style\":{\"global\":\"outline\",\"stored\":\"outline\",\"perBus\":{\"bus1\":\"outline\"}},\"prof\":{\"frames\":268,\"avgFrameMs\":7.060074628289066,\"avgGapMs\":73.41567164125728,\"fps\":13.621069965639759,\"drawCalls\":8,\"triangles\":38444,\"geometries\":9,\"textures\":0,\"programs\":7,\"cellGroups\":1,\"cellMeshes\":1,\"busMeshes\":2,\"looseMeshes\":1,\"sceneObjects\":4,\"markerObjects\":6,\"labels\":16,\"labelStats\":{\"total\":16,\"shown\":11,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":5,\"pxPerBlock\":28.514772354720368},\"sceneMs\":{\"placements\":0.7000000476837158,\"unique\":35.90000104904175}},\"consistent\":true},\"perBus\":{\"global\":\"outline\",\"stored\":\"outline\",\"perBus\":{\"bus1\":\"solid\"}},\"after\":{\"global\":\"translucent\",\"stored\":\"translucent\",\"perBus\":{\"bus1\":\"translucent\"}},\"stored\":\"translucent\"}"
     },
     {
       "ok": true,
@@ -414,7 +414,7 @@
     {
       "ok": true,
       "label": "...\"Add gate here\" carries the clicked (x, z) into the call and snaps only the LEVEL to the bus's own (clicked 13,9,4 → 13,2,4: a bus is a 2y-pitch stack, so the block under the cursor can be any bit, and a gate off the trunk level is a level change this router refuses) — and the checkpoint landed at 13,2,4 (bus is routed)",
-      "detail": "{\"before\":0,\"after\":1,\"anchor\":[13,2,4],\"at\":[13,9,4],\"label\":\"Add gate here (13,2,4)\",\"gateable\":false,\"snapped\":[13,2,4],\"refusal\":null,\"toast\":\"u1 rotated to 180°×bus1: u1.sum → sum_out · routed · 5t, skew 0tDel deletes it · R re-routes · Esc deselects×checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×\"}"
+      "detail": "{\"before\":0,\"after\":1,\"anchor\":[13,2,4],\"at\":[13,9,4],\"label\":\"Add gate here (13,2,4)\",\"gateable\":false,\"snapped\":[13,2,4],\"refusal\":null,\"toast\":\"undid delete bus1×u1 rotated to 180°×bus1: u1.sum → sum_out · routed · 5t, skew 0tDel deletes it · R re-routes · Esc deselects×checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×\"}"
     },
     {
       "ok": true,
@@ -423,7 +423,7 @@
     {
       "ok": true,
       "label": "...and its Delete goes through the same confirm as every other delete (\"Delete u1 and rip 1 bus?\"), removes it (3 → 2), leaves the render consistent, and ⌘Z brings it back (3)",
-      "detail": "{\"inst\":\"u1\",\"onInstance\":[{\"label\":\"u1 · ADD007_8bit_cca_matt\",\"hint\":\"@ 12,-1,24 · rot 90°\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Rotate CW\",\"hint\":\"R\",\"danger\":false},{\"label\":\"Rotate CCW\",\"hint\":\"⇧R\",\"danger\":false},{\"label\":\"Duplicate\",\"hint\":\"⌘/Ctrl-D\",\"danger\":false},{\"label\":\"Copy\",\"hint\":\"⌘/Ctrl-C\",\"danger\":false},{\"label\":\"Cut\",\"hint\":\"⌘/Ctrl-X\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Port modes\",\"hint\":\"5 switchable\",\"danger\":false,\"sub\":[\"a → Executor\",\"b → Executor\",\"cin → Bus\",\"cout → Bus\",\"sum → Bus\"]},{\"label\":\"Promote all inputs to Bus\",\"hint\":\"so buses can land on them\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Frame\",\"hint\":\"F\",\"danger\":false},{\"label\":\"Rip its 1 bus(es)\",\"hint\":\"bus1\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Delete\",\"hint\":\"Del\",\"danger\":true}],\"rotBefore\":90,\"rotAfter\":180,\"onBus\":[{\"label\":\"bus1 · routed\",\"hint\":\"u1.sum → sum_out\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Add gate here (13,2,4)\",\"hint\":\"the route must pass through this point\",\"danger\":false},{\"label\":\"Re-route\",\"hint\":\"R\",\"danger\":false},{\"label\":\"Rip\",\"hint\":\"keeps the declaration\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Draw this bus\",\"hint\":\"translucent\",\"danger\":false,\"sub\":[\"○ solid\",\"● translucent\",\"○ outline\"]},{\"label\":\"Frame\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Delete\",\"hint\":\"Del\",\"danger\":true}],\"gates\":{\"before\":0,\"after\":1,\"anchor\":[13,2,4],\"at\":[13,9,4],\"label\":\"Add gate here (13,2,4)\",\"gateable\":false,\"snapped\":[13,2,4],\"refusal\":null,\"toast\":\"u1 rotated to 180°×bus1: u1.sum → sum_out · routed · 5t, skew 0tDel deletes it · R re-routes · Esc deselects×checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×\"},\"gateState\":{\"state\":\"routed\"},\"onGround\":[{\"label\":\"ground 10,0,10\",\"hint\":\"nothing under the cursor\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Paste 1 here\",\"hint\":\"⌘/Ctrl-V\",\"danger\":false},{\"label\":\"Add a component here\",\"hint\":\"8 cells\",\"danger\":false,\"sub\":[\"REGISTER001_8bit_register\",\"ADD007_8bit_cca_matt\",\"ADD005_8bit_cle\",\"NUMDISPLAY001_fast_bcd_to_7seg\",\"BINTOBCD001_8bit_comb_binary_to_bcd\",\"DIVIDE009_3_33hz_5tpb_8b_divider_zPippo\",\"REGISTERFILE001_register_file\",\"MULTIPY003_8bit_comb_multiplier\"]},{\"label\":\"-\",\"danger\":false},{\"label\":\"Frame all\",\"hint\":\"A\",\"danger\":false},{\"label\":\"Textured view\",\"hint\":\"resource pack\",\"danger\":false},{\"label\":\"Toggle IO markers\",\"hint\":\"the ▲▼ cones\",\"danger\":false},{\"label\":\"Bus drawing\",\"hint\":\"translucent\",\"danger\":false,\"sub\":[\"○ solid\",\"● translucent\",\"○ outline\"]}],\"onPort\":[{\"label\":\"sum_out\",\"hint\":\"receives · uint8\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Start a bus from here\",\"hint\":\"outputs receive\",\"danger\":false},{\"label\":\"Frame\",\"danger\":false}],\"openNow\":true,\"openAfterEsc\":false,\"delBefore\":3,\"delAfter\":2,\"prompt\":{\"title\":\"Delete u1 and rip 1 bus?\",\"body\":\"u1 carries 1 routed bus: bus1. Deleting it removes that bus too. Undo (⌘/Ctrl-Z) puts everything back.\"},\"consistent\":true,\"restored\":3,\"keys\":[\"u3\",\"u2\",\"u1\"],\"toast\":\"checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×removed with it: bus1×u1 deleted — ripped bus1 · ⌘/Ctrl-Z to undo×undid delete u1×\",\"logtail\":\"undo: delete u1\\ndeleted u1  removed=[bus1]  rerouted=[]\\naddGate bus1 @ 13,2,4 (fast path) -> routed\\nrotate u1 -> 180°  rerouted=[bus1]\\nundo: delete bus1\\ndeleted bus bus1\\npaste: u2 buses=[]\\ncopy: u1\\npaste: u3 buses=[]\\ncut: u2\\npaste: u2 buses=[]\\nundo: paste 1 instance\\npaste: u2 buses=[]\\ncopy: u1\\nundo:\"}"
+      "detail": "{\"inst\":\"u1\",\"onInstance\":[{\"label\":\"u1 · ADD007_8bit_cca_matt\",\"hint\":\"@ 12,-1,24 · rot 90°\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Rotate CW\",\"hint\":\"R\",\"danger\":false},{\"label\":\"Rotate CCW\",\"hint\":\"⇧R\",\"danger\":false},{\"label\":\"Duplicate\",\"hint\":\"⌘/Ctrl-D\",\"danger\":false},{\"label\":\"Copy\",\"hint\":\"⌘/Ctrl-C\",\"danger\":false},{\"label\":\"Cut\",\"hint\":\"⌘/Ctrl-X\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Port modes\",\"hint\":\"5 switchable\",\"danger\":false,\"sub\":[\"a → Executor\",\"b → Executor\",\"cin → Bus\",\"cout → Bus\",\"sum → Bus\"]},{\"label\":\"Promote all inputs to Bus\",\"hint\":\"so buses can land on them\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Frame\",\"hint\":\"F\",\"danger\":false},{\"label\":\"Rip its 1 bus(es)\",\"hint\":\"bus1\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Delete\",\"hint\":\"Del\",\"danger\":true}],\"rotBefore\":90,\"rotAfter\":180,\"onBus\":[{\"label\":\"bus1 · routed\",\"hint\":\"u1.sum → sum_out\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Add gate here (13,2,4)\",\"hint\":\"the route must pass through this point\",\"danger\":false},{\"label\":\"Re-route\",\"hint\":\"R\",\"danger\":false},{\"label\":\"Rip\",\"hint\":\"keeps the declaration\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Draw this bus\",\"hint\":\"translucent\",\"danger\":false,\"sub\":[\"○ solid\",\"● translucent\",\"○ outline\"]},{\"label\":\"Frame\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Delete\",\"hint\":\"Del\",\"danger\":true}],\"gates\":{\"before\":0,\"after\":1,\"anchor\":[13,2,4],\"at\":[13,9,4],\"label\":\"Add gate here (13,2,4)\",\"gateable\":false,\"snapped\":[13,2,4],\"refusal\":null,\"toast\":\"undid delete bus1×u1 rotated to 180°×bus1: u1.sum → sum_out · routed · 5t, skew 0tDel deletes it · R re-routes · Esc deselects×checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×\"},\"gateState\":{\"state\":\"routed\"},\"onGround\":[{\"label\":\"ground 10,0,10\",\"hint\":\"nothing under the cursor\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Paste 1 here\",\"hint\":\"⌘/Ctrl-V\",\"danger\":false},{\"label\":\"Add a component here\",\"hint\":\"8 cells\",\"danger\":false,\"sub\":[\"REGISTER001_8bit_register\",\"ADD007_8bit_cca_matt\",\"ADD005_8bit_cle\",\"NUMDISPLAY001_fast_bcd_to_7seg\",\"BINTOBCD001_8bit_comb_binary_to_bcd\",\"DIVIDE009_3_33hz_5tpb_8b_divider_zPippo\",\"REGISTERFILE001_register_file\",\"MULTIPY003_8bit_comb_multiplier\"]},{\"label\":\"-\",\"danger\":false},{\"label\":\"Frame all\",\"hint\":\"A\",\"danger\":false},{\"label\":\"Textured view\",\"hint\":\"resource pack\",\"danger\":false},{\"label\":\"Toggle IO markers\",\"hint\":\"the ▲▼ cones\",\"danger\":false},{\"label\":\"Bus drawing\",\"hint\":\"translucent\",\"danger\":false,\"sub\":[\"○ solid\",\"● translucent\",\"○ outline\"]}],\"onPort\":[{\"label\":\"sum_out\",\"hint\":\"receives · uint8\",\"danger\":false},{\"label\":\"-\",\"danger\":false},{\"label\":\"Start a bus from here\",\"hint\":\"outputs receive\",\"danger\":false},{\"label\":\"Frame\",\"danger\":false}],\"openNow\":true,\"openAfterEsc\":false,\"delBefore\":3,\"delAfter\":2,\"prompt\":{\"title\":\"Delete u1 and rip 1 bus?\",\"body\":\"u1 carries 1 routed bus: bus1. Deleting it removes that bus too. Undo (⌘/Ctrl-Z) puts everything back.\"},\"consistent\":true,\"restored\":3,\"keys\":[\"u3\",\"u2\",\"u1\"],\"toast\":\"checkpoint 1 of 1 on bus1 at 13,2,4 — routedy snapped to the bus's own level (2); drag the ◆ to steer the route · Del removes it · ⌘/Ctrl-Z undoes it→ (13, 2, 4)×removed with it: bus1×u1 deleted — ripped bus1 · ⌘/Ctrl-Z to undo×undid delete u1×\",\"logtail\":\"undo: delete u1\\ndeleted u1  removed=[bus1]  rerouted=[]\\naddGate bus1 @ 13,2,4 (fast path) -> routed\\nrotate u1 -> 180°  rerouted=[bus1]\\nundo: delete bus1\\ndeleted bus bus1\\npaste: u2 buses=[]\\ncopy: u1\\npaste: u3 buses=[]\\ncut: u2\\npaste: u2 buses=[]\\nundo: paste 1 instance\\npaste: u2 buses=[]\\ncopy: u1\\nundo:\"}"
     },
     {
       "ok": true,
@@ -452,7 +452,7 @@
     },
     {
       "ok": true,
-      "label": "textured view: pack loaded ({\"blockstates\":1106,\"models\":3402,\"textures\":3312}) in 308ms, meshed in 413ms"
+      "label": "textured view: pack loaded ({\"blockstates\":1106,\"models\":3402,\"textures\":3312}) in 310ms, meshed in 611ms"
     },
     {
       "ok": true,
@@ -477,12 +477,12 @@
     {
       "ok": true,
       "label": "10 placements over 3 distinct cells: 3 meshed cells, 3 instanced groups, **7 draw calls** for the whole scene (78752 triangles, 15 geometries)",
-      "detail": "{\"instances\":10,\"mesh\":{\"texture\":0,\"cells\":3,\"instancedGroups\":3,\"instanceAllocs\":0,\"matrixWrites\":10,\"buses\":0,\"loose\":0},\"prof\":{\"frames\":4,\"avgFrameMs\":0.4249999523162842,\"avgGapMs\":110.07499998807907,\"fps\":9.084714968051767,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}}"
+      "detail": "{\"instances\":10,\"mesh\":{\"texture\":0,\"cells\":3,\"instancedGroups\":3,\"instanceAllocs\":0,\"matrixWrites\":10,\"buses\":0,\"loose\":0},\"prof\":{\"frames\":4,\"avgFrameMs\":0.675000011920929,\"avgGapMs\":117.92500001192093,\"fps\":8.479966079278448,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}}"
     },
     {
       "ok": true,
       "label": "...and the draw calls track distinct CELLS (3), not the 10 placements: 7 calls, 0.7 per instance",
-      "detail": "{\"frames\":4,\"avgFrameMs\":0.4249999523162842,\"avgGapMs\":110.07499998807907,\"fps\":9.084714968051767,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}"
+      "detail": "{\"frames\":4,\"avgFrameMs\":0.675000011920929,\"avgGapMs\":117.92500001192093,\"fps\":8.479966079278448,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}"
     },
     {
       "ok": true,
@@ -609,7 +609,7 @@
     {
       "ok": true,
       "label": "...and confirming it routes with truncation opted INTO, still stating the mapping (\"u1.sum[8] → u0.cin[1] aligned LSB · driver bit 0 → sink bit 0 · 1 bit(s) carried · 7 DROPPED\")",
-      "detail": "{\"driver\":\"u1.sum\",\"dw\":8,\"sink\":\"u0.cin\",\"sw\":1,\"before\":2,\"cancelled\":2,\"after\":3,\"asked\":{\"title\":\"Connect 8 bits into 1?\",\"body\":\"u1.sum is 8 bits wide and u0.cin is 1. Aligned LSB, bits 0–0 carry and the top 7 bit(s) of u1.sum are DROPPED — u0.cin reads u1.sum mod 2^1. Pick a different alignment afterwards from the bus's right-click menu.\"},\"bus\":\"bus10\",\"align\":{\"align\":\"lsb\",\"truncate\":true},\"line\":\"u1.sum[8] → u0.cin[1] aligned LSB · driver bit 0 → sink bit 0 · 1 bit(s) carried · 7 DROPPED\",\"toasts\":[\"Bus bus9 failed: segment (12, 18, 7) -> (-1, 16, 4): the anchors are 2 level(s) apart and every placement of the 8-cell level-shift tile was blocked: level shift at the sink …\",\"kept u1.sum unconnected\",\"bus10: u1.sum[8] → u0.cin[1] aligned LSB · driver bit 0 → sink bit 0 · 1 bit(s) carried · 7 DROPPEDright-click the bus → Bit alignment to use MSB or a shift instead\",\"bus10 routed: u1.sum → u0.cin\"]}"
+      "detail": "{\"driver\":\"u1.sum\",\"dw\":8,\"sink\":\"u0.cin\",\"sw\":1,\"before\":2,\"cancelled\":2,\"after\":3,\"asked\":{\"title\":\"Connect 8 bits into 1?\",\"body\":\"u1.sum is 8 bits wide and u0.cin is 1. Aligned LSB, bits 0–0 carry and the top 7 bit(s) of u1.sum are DROPPED — u0.cin reads u1.sum mod 2^1. Pick a different alignment afterwards from the bus's right-click menu.\"},\"bus\":\"bus10\",\"align\":{\"align\":\"lsb\",\"truncate\":true},\"line\":\"u1.sum[8] → u0.cin[1] aligned LSB · driver bit 0 → sink bit 0 · 1 bit(s) carried · 7 DROPPED\",\"toasts\":[\"Bus bus9 failed: segment (12, 18, 7) -> (-1, 16, 4): the anchors are 2 level(s) apart and every placement of the 8-cell level-shift tile was blocked: level shift at the sink …\",\"bus10: u1.sum[8] → u0.cin[1] aligned LSB · driver bit 0 → sink bit 0 · 1 bit(s) carried · 7 DROPPEDright-click the bus → Bit alignment to use MSB or a shift instead\",\"bus10 routed: u1.sum → u0.cin\"]}"
     },
     {
       "ok": true,
