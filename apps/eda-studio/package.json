@@ -5,14 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "npm run sync-engine && npm run sync-cells && vite",
-    "build": "npm run sync-cells && tsc && vite build",
+    "build": "npm run sync-engine && npm run sync-cells && tsc && vite build && npm run check-engine",
     "preview": "vite preview",
     "smoke": "node scripts/smoke.mjs",
     "screenshot": "node scripts/screenshot.mjs",
-    "verify": "node scripts/verify.mjs",
+    "check-engine": "node scripts/engine-stamp.mjs --check",
+    "verify": "npm run check-engine && node scripts/verify.mjs",
     "profile": "node scripts/profile.mjs",
     "sync-cells": "node scripts/sync-cells.mjs",
-    "sync-engine": "rm -rf public/engine && mkdir -p public/engine && cp -R ../../dist/npm-eda/. public/engine/ && node -e \"const fs=require('fs');if(!fs.existsSync('public/engine/Design.mjs')||!fs.existsSync('public/engine/veneer/design.mjs')){console.error('\\n  engine lacks the Design bridge or veneer — rebuild:\\n  NUCLEATION_WASM_FEATURES=bridge,simulation,mc-tick,routing,hdl,meshing ./tools/package-npm.sh dist/npm-eda\\n');process.exit(1)}\""
+    "sync-engine": "rm -rf public/engine && mkdir -p public/engine && cp -R ../../dist/npm-eda/. public/engine/ && node -e \"const fs=require('fs');if(!fs.existsSync('public/engine/Design.mjs')||!fs.existsSync('public/engine/veneer/design.mjs')){console.error('\\n  engine lacks the Design bridge or veneer — rebuild:\\n  NUCLEATION_WASM_FEATURES=bridge,simulation,mc-tick,routing,hdl,meshing ./tools/package-npm.sh dist/npm-eda\\n');process.exit(1)}\" && node scripts/engine-stamp.mjs --write"
   },
   "dependencies": {
     "@yowasp/yosys": "^0.44.407",
