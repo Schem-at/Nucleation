@@ -114,8 +114,25 @@ tier_pre_land() {
   step "wasm32: browser engine" cargo check --target wasm32-unknown-unknown --no-default-features \
     --features bridge,simulation,mc-tick,routing,hdl,meshing || true
 
+  # Pre-flight the preview port. `npm run verify` starts its own vite preview
+  # server; when a stray one from an earlier session still holds the port, vite
+  # logs "Port 8461 is already in use" and the run then dies many lines later
+  # with an opaque `page.goto ... ERR_CONNECTION_REFUSED`. Say what is actually
+  # wrong, and who is holding it, before spending 28s to find out.
+  step "studio: preview port free" bash -c '
+    port=$(grep -oE "localhost:[0-9]+" apps/eda-studio/scripts/verify.mjs | head -1 | cut -d: -f2)
+    port=${port:-8461}
+    holder=$(lsof -ti ":$port" 2>/dev/null | head -1)
+    if [ -n "$holder" ]; then
+      echo "port $port is held by pid $holder:"
+      ps -o command= -p "$holder" 2>/dev/null | cut -c1-100
+      echo "stop it first (a stray \`vite preview\`, often via apps/preview.pid), then re-run"
+      exit 1
+    fi
+    echo "port $port is free"' || true
+
   step "studio: headless verify" bash -c \
-    'cd apps/eda-studio && [ -d node_modules ] || npm ci; npm run verify' || true
+    'cd apps/eda-studio && { [ -d node_modules ] || npm ci; }; npm run verify' || true
 
   step "python demo smoke" ./examples/bridge_smoke/python/run.sh || true
 }

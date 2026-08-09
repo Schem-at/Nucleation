@@ -147,6 +147,24 @@ Homebrew's `lld` pulls the full ~2 GB `llvm`. And the two dominant measurements
 are `cargo check`, which never links. Revisit only if link time actually shows
 up in `cargo build --timings`.
 
+## Two known failure modes that are not your change
+
+`pre-land` was measured at **644s** on master. Both of its failures were
+environmental, and both are worth recognising before you go bug-hunting:
+
+- **`simulation::typed_executor::compiled::tests::bench_compiled_vs_schematic_start`**
+  asserts `compiled_us <= full_us * 2` — a wall-clock ratio, inside a unit test.
+  It fails under parallel load and passes 3/3 in isolation. This is the same
+  effect as the known-unreliable bench gate: if this is the only red test, check
+  whether something else was building at the time before believing it. A timing
+  assertion like this belongs in `benches/`, not in the `--lib` suite.
+- **`studio: headless verify` dying with `page.goto ... ERR_CONNECTION_REFUSED`**
+  usually means a stray `vite preview` from an earlier session still holds the
+  preview port, so `npm run verify` could not start its own server (the real
+  clue, `Port 8461 is already in use`, is buried ~20 lines earlier). `pre-land`
+  now pre-flights the port and names the process holding it — often the pid in
+  `apps/preview.pid`.
+
 ## Disk hygiene
 
 `target/` grows without bound because each feature combination, each wasm32
