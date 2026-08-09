@@ -1,5 +1,6 @@
 node_modules/
 dist/
 public/engine/
+public/cells/
 preview.log
 preview.pid

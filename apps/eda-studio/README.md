@@ -1,95 +1,175 @@
 # EDA Studio
 
-Browser front-end for the redstone-EDA design document: drag components,
-drag bus gates, watch buses re-route live, compile Verilog to placeable
-redstone cells in-browser, poke typed I/O through the embedded contract,
-export `.schem` / `.litematic` / `.nucm`. Fully static — the wasm engine
-and yosys both run client-side; there is no backend.
+A browser front end for nucleation's redstone EDA tier (`src/design.rs`): a
+Photoshop-style layer stack of **cell instances**, **loose hardware** and
+**routed buses**, edited on a 3-D canvas, checked (DRC/LVS/STA), baked, poked
+through its typed contract, and exported.
+
+Everything runs in the browser: the engine is the nucleation wasm build
+(`bridge,simulation,mc-tick,routing,hdl,meshing`) plus the hand-written
+`Design` veneer; Verilog synthesis is YoWASP yosys; textured rendering is
+nucleation's own meshing pipeline.
 
 ## Run
 
 ```sh
-# 1. build the engine (repo root) — routing + hdl + the tick engine
-NUCLEATION_WASM_FEATURES=bridge,simulation,mc-tick,routing,hdl ./tools/package-npm.sh dist/npm-eda
+# 1. build the engine (repo root) — routing + hdl + tick engine + meshing
+NUCLEATION_WASM_FEATURES=bridge,simulation,mc-tick,routing,hdl,meshing \
+  ./tools/package-npm.sh dist/npm-eda
 
 # 2. run the app (this directory)
 npm install
-npm run dev          # syncs public/engine from dist/npm-eda, serves :8455
+npm run dev          # syncs public/engine + public/cells, serves :8455
 ```
 
-Open http://localhost:8455/ and press **Load demo** (or open `/?demo=1`) —
-it builds DESIGN_SPEC acceptance sketch (1): two crossing 8-bit buses over
-lever/lamp endpoint hardware, typed `uint[8]` ports, one draggable gate.
+Open <http://localhost:8455/> and press **Load demo** (or `/?demo=1`).
 
-Verification (headless):
+## The interaction model
+
+One selection, one mode, and a hint bar that always says what the next click
+does. `Esc` always cancels back to idle.
+
+| key | action |
+| --- | --- |
+| click | select an instance (raycast); click empty ground to deselect |
+| drag | move the selected instance; buses reroute live |
+| `R` / `⇧R` | rotate 90° / −90° in place; buses reroute, the gizmo shows the new axes |
+| `G` | grab-move; click to drop, `Esc` puts it back |
+| `Del` / `⌫` | delete the instance — buses that terminated on it are ripped and named |
+| `Esc` | cancel placing/connecting/grabbing, or deselect |
+
+The selected instance gets a highlighted bounding box, a translucent shell and
+an **axis indicator** (red = local +X, blue = local +Z after `rot`).
+
+### IO and wiring
+
+Ports render as cones at their bit column, coloured by what they do:
+
+- **green ▲ drives a bus** (a design input, or a *cell output*),
+- **blue ▼ receives a bus** (a design output, or a *cell input*),
+- **grey ✗ executor-only** — real IO that no bus can land on.
+
+Each carries a floating label (`u0.sum : uint8`). Hovering highlights the port
+and prints its geometry; **click a green ▲, then a blue ▼** to route a bus — a
+dashed ghost line follows the cursor in between. Width/type mismatches and
+non-routable ports are refused with a readable toast, never a silent no-op.
+`show IO` toggles the whole layer.
+
+### The one thing that surprises everyone
+
+You cannot bus the output of one community adder into the input of another.
+Their contracts name **executor hardware**: inputs are *levers*, outputs are
+*lamps*. Nothing in redstone drives a lever, so `ADD007.a` is grey ✗ with the
+reason spelled out. `ADD007.sum` *is* routable, because that cell happens to
+have dust beside its lamp column — and the engine derives that dust
+**connection cell** by hardware scan (see below).
+
+So the demo does the honest thing: it busses `u0.sum` into an 8-bit lamp
+readout, drives the adder's levers with the typed executor, and shows the
+other ports greyed with their reasons. For genuine cell→cell chaining, compile
+a cell whose ports are dust (**Verilog → cell**).
+
+## Instance ports (the engine feature this app needed)
+
+`Design::place` used to register nothing connectable: `route_bus` only knew
+*declared* design ports, so a placed cell's contract ports were unreachable.
+Now instances expose them as first-class endpoints named `{instance}.{port}`:
+
+```js
+d.place("add0", "ADD007", [0, -1, 4], 0);
+d.instancePorts();  // [{name: "add0.sum", role: "output", routable: true,
+                    //   wires: [[15,2,5], ...], step: [0,2,0]}, ...]
+d.routeBus("sum_bus", { driver: "add0.sum", sinks: ["sum_out"] });
+```
+
+Three things make that work (`src/design.rs`):
+
+- **transform** — the cell's contract, mapped through the instance transform.
+- **dust taps** — a contract names executor hardware (levers/lamps) while a bus
+  lands on *dust*, so each bit's connection cell is the cell itself if it holds
+  dust, else the first dust neighbour. No tap on every bit ⇒ `routable: false`
+  with the reason, rather than a mis-route.
+- **pin access** — a bus may enter the influence halo of the instances it
+  terminates on (routing *into* what you are connecting to is what a pin is
+  for); every other instance's halo still blocks, and hard body cells always do.
+
+`resolve_port` returns DESIGN-facing direction, so a cell **output** resolves
+to a driver. Directions are checked both ways: driving *out of* a cell input is
+refused by name.
+
+## Renderer
+
+Two views, one scene (toggle: **textured**):
+
+- **abstract** (default) — flat-shaded instanced cubes coloured by layer and
+  block kind, per-bus colours, FAILED layers red. Rebuilds in milliseconds, so
+  it is what you drag against.
+- **textured** — nucleation's `meshing` feature turns the composited design
+  into a GLB against a resource-pack ZIP you supply (file input, left panel);
+  three.js loads it with `GLTFLoader`. Measured on a 1.4k-block design: pack
+  load ~260 ms, mesh ~380 ms, ~900 KB GLB. Cached per document version, so
+  orbiting is free and only a real edit re-meshes.
+
+Bus layers stay abstract *on top* of the textured mesh — routing is what the
+colours encode, and a resource pack cannot show it. Markers, gizmos and labels
+draw in both views. `rendering` (wgpu) stays out of the wasm build; `meshing`
+is enough and is already the package default.
+
+## Export tiers
+
+| button | tier | what it contains |
+| --- | --- | --- |
+| `.schem` | artifact | every layer composited into one region + the merged contract |
+| `.litematic` | interchange | same blocks, `inst:*` / `bus:*` regions preserved |
+| `.nucm` | project | the full document: cell references, transforms, bus states, gates |
+
+**Fixed here:** `.schem` export silently dropped whole layers. `flatten()`
+keeps named regions, but the region merge mirrors
+`UniversalSchematic::get_block`, which answers from the *default* region first
+whenever a coordinate lies inside its (dense) bounding box — so a bus fragment
+threading the endpoint hardware's own bbox read back as air. A 1091-block
+design exported as 739 blocks. `Design::flatten_composite()` now composites the
+stack explicitly (topmost non-air wins) before writing, and the verify script
+asserts `.schem` block count == flattened count. The underlying
+`get_block`/`get_merged_region` precedence is still inverted for layered
+documents — a core issue beyond this app.
+
+## Verification
 
 ```sh
-npm run smoke        # node-only: veneer + engine, 13 checks incl. bake,
-                     # walking-ones, .nucm roundtrip, Hdl.compileBlif
-npm run build && npm run screenshot
-                     # drives the real app in headless chromium, writes
-                     # docs/0*.png + docs/verify-out.json
+npm run smoke                  # node-only: veneer + engine, no browser
+npm run build && npm run verify # drives the REAL app in headless chromium
 ```
 
-## What works
+`npm run verify` exercises the same code paths the mouse and keyboard drive
+(`window.__eda`), so green means the UI works, not just the engine: library
+auto-load, instance ports (routable + refused-with-reason), selection and the
+hint bar, `R` rotate, `Del` delete ripping its bus, click-to-connect, a bus
+FAILED then healed, a typed poke through the routed chain (`u1.a=99 + u1.b=28
+→ sum_out=127`), and all three export tiers. Results land in
+`docs/verify-out.json`; screenshots in `docs/`.
 
-- **Design canvas** — the flattened document rendered as per-layer colored
-  voxels; every bus gets its own color, a FAILED bus renders red.
-- **Gate drag** — drag the orange octahedron; exactly the two adjacent
-  segments rip and re-route (report logged). Unroutable moves leave the
-  bus visibly `failed: …`, never half-routed.
-- **Component drag** — drag an instance wireframe; the move always lands
-  (the document's truth) and affected buses co-re-route. "live reroute"
-  re-routes at a bounded rate *during* the drag; off = commit on drop.
-- **Click-connect** — click an input port cone, then an output port cone:
-  `route_bus` with an auto-assigned color.
-- **Library** — load `.schem` / `.litematic` / … (format autodetected);
-  contracts resolve from embedded metadata (Insign fallback), warnings
-  surface in the list. Place with click.
-- **Verilog → cell** — textbox → YoWASP yosys (wasm) with the verified
-  pipeline's exact recipe (`synth -lut 4; write_blif`) → `Hdl.compileBlif`
-  → contract embedded → a placeable library cell.
-- **Bake + poke** — `bake()` settles the artifact in the mc-tick engine;
-  the poke panel drives typed inputs and reads typed outputs through the
-  embedded contract (`CellExecutor`).
-- **Export** — `.schem` (flattened artifact), `.litematic` (layered
-  interchange tier), `.nucm` (full project tier, reopens mid-edit).
-
-## Renderer decision
-
-Option (a): a purpose-built three.js instanced-voxel renderer over the
-engine's own layer model (see the header comment in `src/viewer.ts`).
-`flatten()` already names a region per layer (`bus:x`, `inst:y`, loose),
-which is exactly the EDA view: per-bus colors and red failed layers matter
-more here than textured terrain, and the whole renderer is a few hundred
-lines that rebuild in milliseconds on every edit. The preferred option
-(b), the schemati WebGPU renderer, was evaluated at
-`~/Documents/code/schemati/renderer` and skipped: it is healthy as an
-app but not consumable as a library tonight (47k LOC, `private`,
-version 0.0.0, pinned to nucleation 0.3.3 from npm — not this branch's
-engine). Revisit once it is packaged. Option (c) legacy
-schematic-renderer is being sunset and was not adopted. Nucleation's
-textured meshing (`MeshResult`/GLB) remains available for an
-export-quality view later.
-
-## Notes / TODO
-
-- The engine runs on the main thread; big designs should move it into a
-  worker (door-cert-wasm has the pattern).
-- Instance ports are not auto-declared as design ports yet: click-connect
-  works between design-level ports (the demo's lever/lamp banks). The
-  contract positions are available (`resolveCellContractJson`), so
-  auto-declaring `inst.port` endpoints is wiring, not research — but
-  output ports need readable hardware (lamps) at the probe cells, which
-  HDL cells do not carry yet.
-- `getAllBlocksJson` (dense, materializes air) can OOM the wasm side on
-  placed HDL cells (multi-million-cell bounding volumes); the app uses
-  `getNonAirBlocksJson` (added with this app) and only falls back to the
-  dense dump on old engines.
-- Rotation UI (place is rot 0 only), wired-OR routing UI, and net-class
-  rule editing are not exposed yet — the veneer supports them all.
+The textured check needs a resource pack at the repo root (`pack.zip`, **not**
+committed); it is skipped, not failed, when absent.
 
 ## Screenshots
 
-`docs/01-demo-crossing.png` … `05-verilog-compile.png`, regenerated by
-`npm run screenshot` (also writes `docs/verify-out.json` with the checks).
+`docs/01-demo-adder-instance-ports.png` … `08-textured-resource-pack.png`,
+regenerated by `npm run verify`.
+
+## Known rough edges
+
+- **`Check` is never clean with community cells placed.** An ADD007 alone,
+  with zero buses, produces 253 DRC violations (`floating`,
+  `unattached_wall_torch`, `repeater_cycle`) inside its own body. That is a
+  DRC-vs-community-hardware gap in the routing crate, not something this app
+  causes or can fix; the demo therefore does not claim a clean check.
+- Only `ADD007.sum` is routable across the whole enhanced library — every other
+  cell's ports are bare levers/lamps/buttons with no adjacent dust. The
+  library lists them all and says why each is refused.
+- The engine runs on the main thread. Meshing a 1.4k-block design is ~380 ms,
+  and edits are milliseconds, so a worker was not worth the transfer cost; a
+  much larger design would want one.
+- Buses realize a single-level 2y-pitch stack: both endpoints must share a y.
+  Moving an instance off that level reports FAILED with that explanation
+  (which is what the verify script's failure case uses).

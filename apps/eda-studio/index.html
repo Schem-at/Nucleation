@@ -28,10 +28,53 @@
       #right { grid-area: right; border-left: 1px solid var(--edge); }
       #canvas-wrap { grid-area: canvas; position: relative; min-width: 0; }
       #canvas-wrap canvas { display: block; }
+      /* Always-on "what does the next click do" bar. */
       #hint {
-        position: absolute; left: 10px; bottom: 8px; color: var(--dim);
-        font-size: 11px; pointer-events: none; white-space: pre;
+        position: absolute; left: 0; right: 0; bottom: 0; color: var(--text);
+        font-size: 11px; pointer-events: none; padding: 6px 10px;
+        background: linear-gradient(transparent, rgba(10,12,16,0.92) 40%);
       }
+      #hint code { color: var(--accent); }
+      #hint b { color: #ffe082; font-weight: 600; }
+      kbd {
+        border: 1px solid var(--edge); border-bottom-width: 2px; border-radius: 3px;
+        padding: 0 4px; background: #232833; font-size: 10px; color: var(--text);
+      }
+      #hover-info {
+        position: absolute; left: 10px; top: 10px; color: var(--dim);
+        font-size: 11px; pointer-events: none; background: rgba(16,19,26,0.8);
+        padding: 2px 6px; border-radius: 3px;
+      }
+      /* Floating IO / instance labels, projected each frame by the Viewer. */
+      .label-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+      .mk-label {
+        position: absolute; transform: translate(-50%, -100%);
+        font-size: 10px; white-space: nowrap; padding: 1px 4px; border-radius: 3px;
+        background: rgba(16,19,26,0.82); border: 1px solid var(--edge);
+      }
+      .mk-label.io-driver { color: var(--ok); border-color: #2f6b41; }
+      .mk-label.io-sink { color: var(--accent); border-color: #2b5b70; }
+      .mk-label.io-blocked { color: #9aa0aa; border-color: #3a3f49; opacity: 0.75; }
+      .mk-label.inst-label { color: #ffe082; border-color: #6b5a2a; font-weight: 600; }
+      .mk-label.is-selected { outline: 1px solid #ffe082; }
+      .mk-label.is-hovered { background: #262b35; color: #fff; }
+      /* Clickable port chips in the outliner. */
+      .ports { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0 2px; }
+      .port-chip {
+        font-size: 10px; padding: 1px 5px; border-radius: 3px; cursor: pointer;
+        background: #1d222b; border: 1px solid var(--edge); color: var(--text);
+      }
+      .port-chip.drives { color: var(--ok); border-color: #2f6b41; }
+      .port-chip.receives { color: var(--accent); border-color: #2b5b70; }
+      .port-chip.blocked { color: #8d8d8d; border-color: #3a3f49; opacity: 0.7; }
+      .port-chip:hover { border-color: #ffe082; }
+      .item.is-selected { border-color: #ffe082; background: #23242099; }
+      .item.is-active { border-color: var(--accent); }
+      .item[data-place], .item[data-inst] { cursor: pointer; }
+      .item .meta.io { display: block; color: #7f8794; }
+      .item .meta.reason { display: block; color: var(--bad); white-space: pre-wrap; }
+      #legend { color: var(--dim); font-size: 10px; line-height: 1.7; }
+      #legend .k { color: var(--text); }
       section { margin-bottom: 14px; }
       section > h2 {
         font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
@@ -71,8 +114,9 @@
       #toast {
         position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
         background: #262b35; border: 1px solid var(--edge); border-radius: 6px;
-        padding: 6px 14px; display: none; z-index: 5;
+        padding: 6px 14px; display: none; z-index: 5; max-width: 70%;
       }
+      #toast.is-err { border-color: var(--bad); color: #ffdcdc; background: #2e1f22; }
       .badge { font-size: 10px; border: 1px solid var(--edge); border-radius: 3px; padding: 0 4px; color: var(--dim); }
     </style>
   </head>
@@ -81,8 +125,11 @@
       <h1>Redstone EDA Studio</h1>
       <span id="status" class="badge">loading engine…</span>
       <span class="spacer"></span>
+      <label class="row" style="margin:0"><input type="checkbox" id="show-io" checked />show IO</label>
+      <label class="row" style="margin:0"><input type="checkbox" id="textured" />textured</label>
       <label class="row" style="margin:0"><input type="checkbox" id="live-reroute" checked />live reroute</label>
-      <button id="btn-demo">Load demo</button>
+      <button id="btn-demo" class="primary">Load demo</button>
+      <button id="btn-demo-crossing">Crossing demo</button>
       <button id="btn-check">Check</button>
       <button id="btn-bake" class="primary">Bake</button>
     </header>
@@ -94,8 +141,12 @@
         <div id="cell-list"></div>
       </section>
       <section>
+        <h2>Instances</h2>
+        <div id="instance-list"></div>
+      </section>
+      <section>
         <h2>Verilog &rarr; cell</h2>
-        <textarea id="verilog" rows="8" spellcheck="false"></textarea>
+        <textarea id="verilog" rows="6" spellcheck="false"></textarea>
         <div class="row">
           <input type="text" id="verilog-name" placeholder="cell name" value="my_cell" />
           <button id="btn-compile">Compile</button>
@@ -103,20 +154,36 @@
         <div class="meta" id="verilog-status"></div>
       </section>
       <section>
-        <h2>Instances</h2>
-        <div id="instance-list"></div>
+        <h2>Textured view</h2>
+        <input type="file" id="pack-file" accept=".zip" />
+        <div class="meta" id="pack-status">load a resource-pack ZIP to see real blocks</div>
+      </section>
+      <section>
+        <h2>Keyboard</h2>
+        <div id="legend">
+          <div><kbd>click</kbd> <span class="k">select instance</span> · <kbd>drag</kbd> move it</div>
+          <div><kbd>R</kbd> <span class="k">rotate 90°</span> (<kbd>⇧R</kbd> back)</div>
+          <div><kbd>G</kbd> <span class="k">grab / move</span> · click to drop</div>
+          <div><kbd>Del</kbd> / <kbd>⌫</kbd> <span class="k">remove instance</span> (rips its buses)</div>
+          <div><kbd>Esc</kbd> <span class="k">cancel / deselect</span></div>
+          <div style="margin-top:4px">
+            <span style="color:var(--ok)">▲ green</span> drives a bus ·
+            <span style="color:var(--accent)">▼ blue</span> receives ·
+            <span style="color:#8d8d8d">✗ grey</span> executor-only
+          </div>
+        </div>
       </section>
     </aside>
 
     <div id="canvas-wrap">
       <div id="toast"></div>
-      <div id="hint">drag: orbit &nbsp; shift-drag: pan &nbsp; wheel: zoom
-click instance/gate then drag on ground to move &nbsp; click two ports to route a bus</div>
+      <div id="hover-info"></div>
+      <div id="hint"></div>
     </div>
 
     <aside id="right">
       <section>
-        <h2>Ports</h2>
+        <h2>Design ports</h2>
         <div id="port-list"></div>
       </section>
       <section>

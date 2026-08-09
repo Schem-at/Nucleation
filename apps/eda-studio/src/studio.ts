@@ -14,6 +14,8 @@ export interface CellInfo {
   dims: Vec3;
   warnings: string[];
   source: "file" | "verilog";
+  /** Contract port summary for the library panel. */
+  ports: { name: string; dir: "in" | "out"; width: number }[];
 }
 
 export interface InstanceInfo {
@@ -30,6 +32,58 @@ export interface PortInfo {
   step: Vec3;
   width: number;
   ty: string;
+}
+
+/** An endpoint contributed by a placed instance, straight from the engine's
+ *  `instancePorts()`. `name` is `{instance}.{port}` — what routeBus takes.
+ *
+ *  `role` is the CELL-facing direction (`"output"` drives a bus). A cell
+ *  contract names EXECUTOR hardware — levers/buttons in, lamps out — while a
+ *  bus lands on DUST, so the engine derives `wires` by hardware scan. A port
+ *  with no dust to tap (a bare lever input) is real IO that no bus can drive:
+ *  `routable: false`, with the reason in `blocked`. */
+export interface InstancePortInfo {
+  name: string;
+  instance: string;
+  port: string;
+  role: "input" | "output";
+  ty: unknown;
+  width: number;
+  hardware: Vec3[];
+  wires: Vec3[] | null;
+  step: Vec3 | null;
+  routable: boolean;
+  blocked: string | null;
+}
+
+/** The cell's own contract ports, for the library listing. Reads the
+ *  schematic's EMBEDDED contract (these cells are one artifact, schematic +
+ *  contract); a cell without one simply lists nothing. */
+export function cellPortSummary(schematic: any): CellInfo["ports"] {
+  try {
+    const c = JSON.parse(schematic.cellContractJson());
+    const grab = (m: any, dir: "in" | "out") =>
+      Object.entries(m ?? {}).map(([name, p]: [string, any]) => ({
+        name, dir, width: (p.positions ?? []).length || 1,
+      }));
+    return [...grab(c.io?.inputs, "in"), ...grab(c.io?.outputs, "out")];
+  } catch {
+    return [];
+  }
+}
+
+/** Human-readable type name for a label: `uint8`, `bool`, ... */
+export function tyName(ty: unknown, width: number): string {
+  if (typeof ty === "string") return ty.toLowerCase();
+  if (ty && typeof ty === "object") {
+    const o = ty as Record<string, any>;
+    if (o.UnsignedInt) return `uint${o.UnsignedInt.bits}`;
+    if (o.SignedInt) return `int${o.SignedInt.bits}`;
+    if (o.Float) return "float";
+    const k = Object.keys(o)[0];
+    if (k) return `${k.toLowerCase()}${width > 1 ? width : ""}`;
+  }
+  return width > 1 ? `uint${width}` : "bool";
 }
 
 export interface GateInfo {
@@ -98,6 +152,7 @@ export class Studio {
     const info: CellInfo = {
       name, schematic, source, warnings,
       dims: [dm.x, dm.y, dm.z] as Vec3,
+      ports: cellPortSummary(schematic),
     };
     this.cells.set(name, info);
     this.bump();
@@ -125,6 +180,64 @@ export class Studio {
     if (rot != null) inst.rot = rot;
     this.bump();
     return report;
+  }
+
+  /** Rotate in place by `delta` degrees (snapped to 90). */
+  rotateInstance(name: string, delta = 90) {
+    const inst = this.instances.get(name);
+    if (!inst) throw new Error(`no instance ${name}`);
+    const rot = (((inst.rot + delta) % 360) + 360) % 360;
+    return { rot, ...this.moveInstance(name, inst.at, rot) };
+  }
+
+  /** Delete an instance. Buses that terminated on one of its ports are
+   *  deleted with it (they lost an endpoint) and reported by name. */
+  removeInstance(name: string): { removed_buses: string[]; rerouted: string[]; failed: Record<string, string> } {
+    if (!this.instances.has(name)) throw new Error(`no instance ${name}`);
+    const report = this.design.removeInstance(name);
+    this.instances.delete(name);
+    for (const b of report.removed_buses ?? []) this.buses.delete(b);
+    this.bump();
+    return report;
+  }
+
+  // -- instance ports ------------------------------------------------------
+
+  /** Every endpoint the placed instances expose, live from the engine. */
+  instancePorts(): InstancePortInfo[] {
+    if (this.instances.size === 0) return [];
+    try {
+      return this.design.instancePorts() as InstancePortInfo[];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Declared design ports and instance ports in one connectable list. */
+  allEndpoints(): {
+    name: string; port: string; kind: "input" | "output"; anchor: Vec3; step: Vec3;
+    width: number; ty: string; routable: boolean; blocked?: string; instance?: string;
+  }[] {
+    const out = [...this.ports.values()].map((p) => ({
+      name: p.name, port: p.name, kind: p.kind, anchor: p.anchor, step: p.step,
+      width: p.width, ty: p.ty === "bool" ? "bool" : `${p.ty}${p.width}`,
+      routable: true as boolean, blocked: undefined as string | undefined,
+      instance: undefined as string | undefined,
+    }));
+    for (const ip of this.instancePorts()) {
+      // The engine's `role` is CELL-facing; the canvas speaks FABRIC
+      // direction, where a cell output is what drives a bus.
+      const kind: "input" | "output" = ip.role === "output" ? "input" : "output";
+      const anchor = (ip.wires?.[0] ?? ip.hardware[0]) as Vec3;
+      out.push({
+        name: ip.name, port: ip.port, kind, anchor,
+        step: (ip.step ?? [0, 2, 0]) as Vec3,
+        width: ip.width, ty: tyName(ip.ty, ip.width),
+        routable: ip.routable, blocked: ip.blocked ?? undefined,
+        instance: ip.instance,
+      });
+    }
+    return out;
   }
 
   // -- ports ---------------------------------------------------------------
@@ -179,6 +292,71 @@ export class Studio {
   ripBus(name: string): void {
     this.design.rip(name);
     this.bump();
+  }
+
+  /** Try the bus again from its stored declaration (heal after the blocker
+   *  moved). Returns the resulting state, `failed: reason` included. */
+  rerouteBus(name: string): string {
+    const state = this.design.reroute(name);
+    this.bump();
+    return state;
+  }
+
+  /** Delete a bus outright, freeing its name. */
+  removeBus(name: string): void {
+    this.design.removeBus(name);
+    this.buses.delete(name);
+    this.bump();
+  }
+
+  /** `{state, reason}` — `busState()` returns `failed: <reason>` as one
+   *  string; the panel wants the halves apart. */
+  busStateDetail(name: string): { state: "routed" | "intended" | "failed"; reason?: string } {
+    const raw = this.busState(name);
+    if (raw.startsWith("failed")) {
+      return { state: "failed", reason: raw.replace(/^failed:?\s*/, "") || "unroutable" };
+    }
+    return { state: raw as "routed" | "intended" };
+  }
+
+  // -- textured view ---------------------------------------------------------
+
+  /** A resource pack loaded from a user-supplied ZIP, kept for re-meshing. */
+  pack: any | null = null;
+  packInfo: { blockstates: number; models: number; textures: number } | null = null;
+  private meshVersion = -1;
+  private meshCache: ArrayBuffer | null = null;
+
+  loadPack(bytes: Uint8Array): void {
+    this.pack = this.core.ResourcePack.fromBytes(Array.from(bytes));
+    this.packInfo = {
+      blockstates: this.pack.blockstateCount(),
+      models: this.pack.modelCount(),
+      textures: this.pack.textureCount(),
+    };
+    this.meshVersion = -1;
+    this.meshCache = null;
+  }
+
+  /** Mesh the COMPOSITED design to a GLB against the loaded pack.
+   *
+   *  Composited, not layered: `.glb` has no layer concept, and the region
+   *  merge would drop named-layer cells shadowed by the loose layer's
+   *  bounding box. Cached per document version so orbiting is free and only
+   *  a real edit re-meshes. */
+  meshGlb(): ArrayBuffer | null {
+    if (!this.pack) return null;
+    if (this.meshCache && this.meshVersion === this.version) return this.meshCache;
+    const flat = this.design.flattenComposite();
+    const cfg = this.core.MeshConfig.create();
+    const mesh = this.core.MeshResult.create(flat.raw, this.pack, cfg);
+    const b64 = mesh.glbDataB64();
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    this.meshCache = bytes.buffer;
+    this.meshVersion = this.version;
+    return this.meshCache;
   }
 
   // -- loose layer -----------------------------------------------------------

@@ -1,34 +1,119 @@
-[
-  {
-    "ok": true,
-    "label": "demo buses routed (routed,routed)"
-  },
-  {
-    "ok": true,
-    "label": "gate drag {\"state\":\"routed\",\"rerouted_segments\":2} clean=true"
-  },
-  {
-    "ok": true,
-    "label": "bake + poke a_out=0x55 b_out=0xaa"
-  },
-  {
-    "ok": true,
-    "label": "hdl cell placed (404 blocks) as u0"
-  },
-  {
-    "ok": true,
-    "label": "instance drag-through fails buses VISIBLY (2 failed)"
-  },
-  {
-    "ok": true,
-    "label": "drag away re-heals: [\"bus0=routed\",\"bus1=routed\"]"
-  },
-  {
-    "ok": true,
-    "label": "verilog->yosys->redstone cell (ok: 2824 blocks, 155×66×84)"
-  },
-  {
-    "ok": true,
-    "label": "exports {\"schem\":2902,\"litematic\":4438,\"nucm\":14450233}"
-  }
-]
+{
+  "when": "2026-08-09T02:47:32.934Z",
+  "passed": 26,
+  "total": 26,
+  "results": [
+    {
+      "ok": true,
+      "label": "library auto-loaded 8 cells, all with contract ports",
+      "detail": "[\"REGISTER001_8bit_register:4\",\"ADD007_8bit_cca_matt:5\",\"ADD005_8bit_cle:5\",\"NUMDISPLAY001_fast_bcd_to_7seg:8\",\"BINTOBCD001_8bit_comb_binary_to_bcd:4\",\"DIVIDE009_3_33hz_5tpb_8b_divider_zPippo:4\",\"REGISTERFILE001_register_file:8\",\"MULTIPY003_8bit_comb_multiplier:3\"]"
+    },
+    {
+      "ok": true,
+      "label": "demo placed 2 cells ([{\"name\":\"u0\",\"cell\":\"ADD007_8bit_cca_matt\",\"rot\":0},{\"name\":\"u1\",\"cell\":\"ADD007_8bit_cca_matt\",\"rot\":0}])"
+    },
+    {
+      "ok": true,
+      "label": "instance port u0.sum is a routable driver, uint8",
+      "detail": "{\"name\":\"u0.sum\",\"kind\":\"input\",\"ty\":\"uint8\",\"routable\":true}"
+    },
+    {
+      "ok": true,
+      "label": "instance port u0.a is reported non-routable WITH a reason",
+      "detail": "{\"name\":\"u0.a\",\"kind\":\"output\",\"ty\":\"uint8\",\"routable\":false,\"blocked\":\"bit 0: no dust connection cell at or beside (0, 2, 4) (holds `minecraft:lever[face=wall,facing=west,powered=false]`) — this port is executor-only hardware and cannot terminate a bus\"}"
+    },
+    {
+      "ok": true,
+      "label": "demo bus u0.sum -> sum_out routed ([{\"name\":\"bus0\",\"state\":\"routed\"}])"
+    },
+    {
+      "ok": true,
+      "label": "click selects u0"
+    },
+    {
+      "ok": true,
+      "label": "hint bar tells you what R/Del do",
+      "detail": "u0 selected  ·  R rotate 90°   G move   Del remove   Esc deselect  ·  drag: orbit · wheel: zoom"
+    },
+    {
+      "ok": true,
+      "label": "IO labels rendered (12)"
+    },
+    {
+      "ok": true,
+      "label": "R rotates u0 to 90° (got 90)"
+    },
+    {
+      "ok": true,
+      "label": "three more R return u0 to 0° (got 0)"
+    },
+    {
+      "ok": true,
+      "label": "starting a bus updates the hint to the next action",
+      "detail": "bus from u0.sum (uint8)  →  click a blue ▼ input port to finish  ·  Esc cancel"
+    },
+    {
+      "ok": true,
+      "label": "routing into a lever input is refused with a readable reason",
+      "detail": "u1.a is executor-only IO: bit 0: no dust connection cell at or beside (0, 2, 24) (holds `minecraft:lever[face=wall,facing=west,powered=false]`) — this port is executor-only hardware and cannot terminate a bus"
+    },
+    {
+      "ok": true,
+      "label": "Delete removes u0 ([\"u1\"])"
+    },
+    {
+      "ok": true,
+      "label": "its bus went with it ([])"
+    },
+    {
+      "ok": true,
+      "label": "deletion is reported",
+      "detail": "u0 deleted — ripped bus0"
+    },
+    {
+      "ok": true,
+      "label": "click u1.sum then sum_out routes a bus (bus1: routed)"
+    },
+    {
+      "ok": true,
+      "label": "moving the driver away leaves the bus FAILED with a reason",
+      "detail": "{\"state\":\"failed\",\"reason\":\"segment (15, 6, 25) -> (40, 2, 4): this bus form is a SINGLE-LEVEL 2y-pitch stack, but the two anchors' bit-0 dust sits at y=6 and y=2 (a 4-block level change). Move one endpoint's instance by -4 in y so both ports share a level, or split the run with a gate placed at the target level — vertical level adapters are not implemented yet\"}"
+    },
+    {
+      "ok": true,
+      "label": "moving it back heals the bus (routed)"
+    },
+    {
+      "ok": true,
+      "label": "typed poke through the bus: u1.a=99 + u1.b=28 -> sum_out=127 (want 127)"
+    },
+    {
+      "ok": true,
+      "label": ".schem export composites EVERY layer (1427/1427 blocks)"
+    },
+    {
+      "ok": true,
+      "label": ".schem carries the merged contract (u1.a present)"
+    },
+    {
+      "ok": true,
+      "label": ".litematic keeps blocks AND inst:/bus: regions (1427, [\"Main\",\"bus:bus1\",\"inst:u1\"])"
+    },
+    {
+      "ok": true,
+      "label": ".nucm document exported (2465721 bytes)"
+    },
+    {
+      "ok": true,
+      "label": ".nucm reload keeps the model (routed, 1427 blocks)"
+    },
+    {
+      "ok": true,
+      "label": "textured view: pack loaded ({\"blockstates\":1106,\"models\":3402,\"textures\":3312}) in 268ms, meshed in 317ms"
+    },
+    {
+      "ok": true,
+      "label": "no console errors (0)"
+    }
+  ]
+}
