@@ -1,5 +1,11 @@
 # Material-model generalization — user-specified techniques (to probe + implement)
 
+> **See also `TRANSPORT_MODEL.md`** — this file answers *what may sit
+> where*; that one answers *how the signal moves*, tabulates the 11
+> transport mechanisms, and splits the three rules this file's
+> `cuts_diagonal`/`conducts` pair used to conflate (CUT cell vs DIODE cell
+> vs WEAK-CARRY cell). Probes: `probe_transport.py` 25/25.
+
 ## PROBED — empirical material table (probe_materials.py, mc-tick, 2026-08-08)
 
 | material | dust sits | conducts weak | cuts diagonal | vertical step up | vertical step down |

@@ -71,7 +71,8 @@ def classify(block):
         if "type=double" in block:
             return "solid"
         return "slab_top" if "type=top" in block else "slab_bottom"
-    if "concrete" in block or block == STONE or "lamp" in block:
+    if ("concrete" in block or block == STONE or "lamp" in block
+            or "_wool" in block or "planks" in block or "terracotta" in block):
         return "solid"
     return "other"
 
@@ -90,13 +91,35 @@ def conducts(block):
     return classify(block) == "solid"
 
 
-def cuts_diagonal(block):
-    """THE CUT LAW: a block directly above the LOWER dust of a 1-y diagonal
-    severs that diagonal iff it conducts (probed CUT_UP/CUT_DOWN: the rule
-    runs on conductivity, not solidity)."""
+#   THREE RULES, ONE PREDICATE, THREE DIFFERENT CELLS.  All three read
+#   is_redstone_conductor, which is why they used to be one function -- but
+#   they apply at different cells and have different consequences, so a
+#   planner that conflates them cannot express the crossing tricks.
+#   Probed as an explicit 2x2x2 matrix in probe_transport.py (group C, 8/8).
+
+def cuts_step(block):
+    """CUT RULE.  Cell: directly ABOVE THE LOWER dust of a 1-y step.
+    A conductor there severs the step in BOTH directions."""
     return conducts(block)
 
 
+def gates_downhill(block):
+    """DIODE RULE.  Cell: the UPPER dust's SUPPORT.  A conductor there lets
+    the step conduct downhill as well as up; a non-conductor (glass, top
+    slab) makes the step a one-way UPHILL diode.  Note this is the *other*
+    cell from cuts_step -- a glass DIODE cell does not cut anything, and a
+    solid CUT cell blocks even when the diode cell is solid."""
+    return conducts(block)
+
+
+def carries_weak(block):
+    """WEAK-CARRY RULE.  Cell: the block a dust POINTS INTO.  A conductor
+    there becomes a weakly powered block, which drives device backs but
+    lights no dust at all (probe_transport W1/W2)."""
+    return conducts(block)
+
+
+cuts_diagonal = cuts_step     # backward-compat alias (the old conflated name)
 conductor = conducts          # backward-compat alias
 
 
@@ -126,6 +149,304 @@ def dust_drives_block(entry_on_pointing_axis):
     exempt (probe D): a station EXIT block lights dust on ANY side, so a
     corner directly after an exit block is free."""
     return entry_on_pointing_axis
+
+
+def step_reads(cut_block, upper_support, downhill):
+    """The full 1-y step law, both cells at once (probe_transport group C).
+
+        uphill   conducts iff the CUT cell is clear
+        downhill conducts iff the CUT cell is clear AND the DIODE cell conducts
+
+    `step_conducts()` above is this with the cut cell assumed clear; it stays
+    for the existing patterns."""
+    if cuts_step(cut_block):
+        return False
+    return (not downhill) or gates_downhill(upper_support)
+
+
+# -- 2b. TRANSPORT MECHANISMS ----------------------------------------------
+#
+# One row per way a signal MOVES.  A row declares, in a canonical frame whose
+# forward is +X:
+#
+#   support   what must be under it            (static legality)
+#   attach    what it hangs off, if anything   (torches)
+#   emits     (kind, offset) pairs it energises
+#   reads     offsets it takes input from
+#   reader    which emission kinds it can pick up
+#
+# Everything else -- occupancy legality, what interferes with what -- is
+# COMPUTED from those five fields, so a new trick is a new row, not a new
+# special case.  See TRANSPORT_MODEL.md for the same table in prose plus the
+# probe that fixed each field.
+
+STRONG, WEAK, WIRE, SOURCE = "strong", "weak", "wire", "source"
+
+#   Reader classes: which emission kinds actually reach this consumer.
+#   The single most useful line in this file: DUST DOES NOT READ WEAK.
+READER_KINDS = {
+    "dust":   (STRONG, SOURCE, WIRE),                 # probe_transport W1
+    "device": (STRONG, WEAK, SOURCE, WIRE),           # probe_transport W2
+    "none":   (),
+}
+
+NB6 = ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1))
+NB4 = ((1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1))
+DIRV = {"east": (1, 0, 0), "west": (-1, 0, 0),
+        "south": (0, 0, 1), "north": (0, 0, -1)}
+
+
+def _xform(off, fwd):
+    """Canonical (forward, up, right) offset -> world offset for `fwd`."""
+    f = fwd
+    r = (-f[2], 0, f[0])
+    a, b, c = off
+    return tuple(a * f[i] + b * (0, 1, 0)[i] + c * r[i] for i in range(3))
+
+
+def _add(p, d):
+    return (p[0] + d[0], p[1] + d[1], p[2] + d[2])
+
+
+class Mechanism(object):
+    def __init__(self, name, block, support=None, attach=None, emits=(),
+                 reads=(), reader="none", decay=0, refresh=False, exact=False,
+                 delay_gt=0, inverts=False, probe="", note=""):
+        self.name, self.block = name, block
+        self.support = support          # "sturdy" | None  (cell (0,-1,0))
+        self.attach = attach            # offset that must be sturdy-faced
+        self.emits = tuple(emits)
+        self.reads = tuple(reads)
+        self.reader = reader
+        self.decay = decay              # signal strength lost per cell
+        self.refresh = refresh          # re-emits 15 regardless of input
+        self.exact = exact              # preserves the analog value
+        self.delay_gt = delay_gt        # game ticks
+        self.inverts = inverts
+        self.probe = probe              # the probe that fixed this row
+        self.note = note
+
+    def __repr__(self):
+        return "<mech %s>" % self.name
+
+    # ---- what the row REQUIRES of its neighbourhood
+    def requires(self, cell, fwd=(1, 0, 0)):
+        """{role: (cell, predicate_name)} that must hold for this placement."""
+        need = {}
+        if self.support == "sturdy":
+            need["support"] = (_add(cell, (0, -1, 0)), "sturdy")
+        if self.attach is not None:
+            need["attach"] = (_add(cell, _xform(self.attach, fwd)), "sturdy")
+        return need
+
+    # ---- what the row EMITS
+    def emission(self, cell, fwd=(1, 0, 0)):
+        """{cell: kind} this placement energises.  ALL_SIDES expands to the 6
+        neighbours (probe_transport S2); POINTING is data-dependent and is
+        supplied by the caller via `pointing=`."""
+        out = {}
+        for kind, off in self.emits:
+            if off == "ALL_SIDES":
+                for d in NB6:
+                    out[_add(cell, d)] = kind
+            elif off == "SELF":
+                out[cell] = kind
+            elif off == "POINTING":
+                pass                    # see dust_emission()
+            else:
+                out[_add(cell, _xform(off, fwd))] = kind
+        return out
+
+    def inputs(self, cell, fwd=(1, 0, 0)):
+        return [_add(cell, _xform(o, fwd)) for o in self.reads]
+
+    def sensitive(self, cell, fwd=(1, 0, 0)):
+        """The cells where a FOREIGN emission energises this placement.
+
+        Dust is energised by anything that emits INTO ITS OWN CELL (it scans
+        its 6 neighbours, which is the same relation seen from the source).
+        A device is energised only at its declared input cells -- that
+        asymmetry is why a repeater may stand on a hard-powered block and why
+        a repeater beside a live rail is inert (probe_transport S4,
+        probe_station S)."""
+        if self.reader == "none":
+            return []
+        if self.reader == "dust":
+            return [cell]
+        return self.inputs(cell, fwd)
+
+
+def dust_emission(cell, pointing):
+    """Dust's emission depends on its CONNECTION AXES (the pointing law,
+    probe_pivot A/B/C): WEAK into the block below and into every block it
+    points at; the cell itself carries WIRE.  It never powers the block
+    ABOVE it (probe_transport W3) -- that is what lets a lid over a live run
+    carry a foreign line."""
+    out = {cell: WIRE, _add(cell, (0, -1, 0)): WEAK}
+    for d in pointing:
+        out[_add(cell, d)] = WEAK
+    return out
+
+
+MECH = {}
+
+
+def _m(*a, **kw):
+    m = Mechanism(*a, **kw)
+    MECH[m.name] = m
+    return m
+
+
+#   ------------------------------------------------------------ the carriers
+_m("dust", DUST, support="sturdy", reader="dust", decay=1,
+   emits=((WIRE, "SELF"), (WEAK, (0, -1, 0)), (WEAK, "POINTING")),
+   reads=list(NB6),
+   probe="probe_materials.py SIT; probe_transport.py W1/W3; probe_pivot A/B/C",
+   note="the only decaying carrier: 15 cells max, no delay, no refresh")
+
+_m("dust_step", DUST, support="sturdy", reader="dust", decay=1,
+   emits=((WIRE, "SELF"), (WEAK, (0, -1, 0)), (WEAK, "POINTING")),
+   reads=list(NB6),
+   probe="probe_transport.py C (8/8 matrix); probe_pivot E",
+   note="a 1-y dust step: legality is step_reads(cut cell, diode cell, dir)")
+
+#   NOTE ON "SELF": a powered block is read two ways.  Dust sitting on one of
+#   its FACES reads it as a neighbour (offset ALL_SIDES); a device whose input
+#   cell IS that block reads it in place (offset SELF).  Same physical fact,
+#   two consumer geometries -- emitting both is what lets `interferes()` use
+#   one uniform rule for dust and for device backs.
+_m("strong_block", None, reader="none",
+   emits=((STRONG, "ALL_SIDES"), (STRONG, "SELF")),
+   probe="probe_transport.py S1/S2/S3",
+   note="a conductor driven by a repeater/comparator/torch/lever output face."
+        " Lights dust on ALL SIX faces at 15 and NEVER chains to another"
+        " block -- so two of them may be neighbours.  THE crossing primitive."
+        " Needs no support of its own and carries dust on top of it.")
+
+_m("weak_block", None, reader="none",
+   emits=((WEAK, "ALL_SIDES"), (WEAK, "SELF")),
+   probe="probe_transport.py W1/W2",
+   note="a conductor a dust POINTS INTO. Drives device backs; lights no dust."
+        " Two weak blocks may touch, and a weak block may carry foreign dust.")
+
+_m("repeater", None, support="sturdy", reader="device", refresh=True,
+   delay_gt=2, emits=((STRONG, (1, 0, 0)),), reads=((-1, 0, 0),),
+   probe="probe_station.py A/I/B/Z/F/S; probe_transport.py S4",
+   note="reads its BACK only: immune to its floor, its sides and the block"
+        " above (no quasi-connectivity), so it may stand ON a hard-powered"
+        " block.  delay_gt = 2*delay property. Locks from the side.")
+
+_m("comparator", None, support="sturdy", reader="device", exact=True,
+   delay_gt=2, emits=((STRONG, (1, 0, 0)),),
+   reads=((-1, 0, 0), (0, 0, 1), (0, 0, -1)),
+   probe="probe_station.py C1..C4",
+   note="the only ANALOG-exact relay; also reads both sides (max) and reads"
+        " container fill through a conductor")
+
+_m("torch_floor", rs.TORCH,
+   attach=(0, -1, 0), reader="device", refresh=True, delay_gt=2, inverts=True,
+   emits=(((STRONG, (0, 1, 0)), (SOURCE, "SELF"))
+          + tuple((SOURCE, d) for d in NB4)),
+   reads=((0, -1, 0),),
+   probe="probe_transport.py T1/T2/T3",
+   note="INVERTS its attachment block; strongly powers the block ABOVE it and"
+        " gives 15 to the 4 horizontal dusts; never powers its own attachment"
+        " block, which is what makes a torch TOWER the vertical carrier"
+        " (2 gt and one inversion per level)")
+
+_m("redstone_block", "minecraft:redstone_block", reader="none",
+   emits=((SOURCE, "SELF"),) + tuple((SOURCE, d) for d in NB6),
+   probe="probe_transport.py B1/B2",
+   note="an unconditional 15 SOURCE, not a powered block: dust beside it"
+        " reads 15, but the solid block beside it stays dead")
+
+_m("lever", rs.LEVER_OFF, attach=(0, -1, 0), reader="none",
+   emits=(((STRONG, (0, -1, 0)), (SOURCE, "SELF"))
+          + tuple((SOURCE, d) for d in NB6)),
+   probe="probe_pivot.py A; every rig in this directory",
+   note="strong-powers its attachment block; the test-rig source")
+
+#   -------------------------------------------------- the passive space-savers
+_m("solid_support", STONE, reader="none",
+   probe="probe_materials.py; bus8_probe.py P1",
+   note="sturdy AND conducting: occupy a DIODE cell to make a step two-way,"
+        " occupy a CUT cell to sever a foreign step, or lay it over a live"
+        " straight run as a separator/lid that carries another line")
+
+_m("transparent_support", GLASS, reader="none",
+   probe="probe_materials.py CUT_UP/CUT_DOWN/DIODE_*; probe_transport.py C",
+   note="sturdy and NON-conducting: in a CUT cell it lets a step survive; in"
+        " a DIODE cell it makes the step one-way UPHILL; it never carries"
+        " weak power")
+
+
+# -------------------------------------------------- mechanism-level questions
+
+def can_occupy(mech, cell, grid, fwd=(1, 0, 0)):
+    """(ok, reason).  May mechanism `mech` sit at `cell` in `grid`?"""
+    m = MECH[mech] if isinstance(mech, str) else mech
+    if grid.get(cell) is not None:
+        return False, "cell %r is occupied by %s" % (cell, grid[cell])
+    for role, (c, pred) in m.requires(cell, fwd).items():
+        if pred == "sturdy" and not sturdy(grid.get(c)):
+            return False, "%s cell %r is %r, not sturdy" % (role, c, grid.get(c))
+    return True, "ok"
+
+
+def wire_connects(grid, p, q):
+    """Do two dust cells belong to the same net?  Exactly vanilla's
+    calculateTargetStrength neighbour scan, which is where the CUT cell and
+    the DIODE cell come from (see probe_transport.py group C)."""
+    if p == q:
+        return True
+    dx, dy, dz = q[0] - p[0], q[1] - p[1], q[2] - p[2]
+    if abs(dx) + abs(dz) != 1 or abs(dy) > 1:
+        return False                       # dust has no planar diagonal (P3)
+    side = (p[0] + dx, p[1], p[2] + dz)
+    if dy == 0:
+        return True
+    if dy == 1:                            # p is LOWER, reads up
+        return (gates_downhill(grid.get(side))
+                and not cuts_step(grid.get((p[0], p[1] + 1, p[2]))))
+    return not cuts_step(grid.get(side))    # p is UPPER, reads down
+
+
+def interferes(a, b, grid=None):
+    """Do two PLACEMENTS of different nets interact?  (ok, reason).
+
+    `a`/`b` are (mech_name, cell, fwd, net) tuples; `pointing` for dust is
+    taken from the grid when one is supplied.  Interference is exactly
+    'one side's emission lands where the other side reads, in a kind the
+    other side can actually read'.  Everything the crossing tiles exploit
+    falls out of that: STRONG never lands on a block, WEAK never lands on a
+    dust, and a repeater only reads one cell."""
+    ma, ca, fa, na = a
+    mb, cb, fb, nb = b
+    if na == nb:
+        return False, "same net"
+    A, B = MECH[ma], MECH[mb]
+    for (m_src, c_src, f_src), (m_dst, c_dst, f_dst) in (
+            ((ma, ca, fa), (mb, cb, fb)), ((mb, cb, fb), (ma, ca, fa))):
+        src, dst = MECH[m_src], MECH[m_dst]
+        emit = src.emission(c_src, f_src)
+        kinds = READER_KINDS[dst.reader]
+        for c in dst.sensitive(c_dst, f_dst):
+            k = emit.get(c)
+            if k is not None and k in kinds and k != WIRE:
+                return True, ("%s at %r emits %s into %s's %r"
+                              % (m_src, c_src, k, m_dst, c))
+    if A.reader == "dust" and B.reader == "dust" and grid is not None:
+        if wire_connects(grid, ca, cb):
+            return True, "the two dust cells are wire-connected at %r/%r" % (ca, cb)
+    return False, "isolated"
+
+
+def mechanism_table():
+    """The rows, in the order TRANSPORT_MODEL.md tabulates them."""
+    return [MECH[k] for k in (
+        "dust", "dust_step", "strong_block", "weak_block", "repeater",
+        "comparator", "torch_floor", "redstone_block", "lever",
+        "solid_support", "transparent_support")]
 
 
 # -- 3. cell choosers -------------------------------------------------------
