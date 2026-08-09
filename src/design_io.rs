@@ -37,7 +37,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 const NUCM_MAGIC: &[u8; 4] = b"NUCM";
-const NUCM_VERSION: u32 = 1;
+// v2 adds `InstanceCore::port_modes` (promotion). bincode is positional, so
+// the version gate is what keeps a v1 document from being misread.
+const NUCM_VERSION: u32 = 2;
 
 /// Root-level NBT tag carrying the design manifest in a layered
 /// `.litematic` export (beside `Metadata`, like `NucleationTest`).
@@ -145,6 +147,55 @@ struct InstanceCore {
     cell: String,
     at: P3,
     rot_y: i32,
+    /// Per-port mode overrides (promotion). Always written: the `.nucm`
+    /// payload is bincode, which is not self-describing, so a `serde(default)`
+    /// field would desynchronise the stream rather than default. Documents
+    /// from before port modes existed are rejected by the version check.
+    port_modes: BTreeMap<String, PortModeDoc>,
+}
+
+/// A port's remembered both-forms state (see `design::PortOverride`).
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct PortModeDoc {
+    mode: String,
+    writes: BTreeMap<P3, Option<String>>,
+    saved: BTreeMap<P3, Option<String>>,
+    wires: Vec<P3>,
+    hardware: Vec<P3>,
+    step: P3,
+    pivoted: bool,
+    note: String,
+}
+
+impl PortModeDoc {
+    fn of(o: &crate::design::PortOverride) -> Self {
+        PortModeDoc {
+            mode: o.mode.as_str().to_string(),
+            writes: o.patch.writes.clone(),
+            saved: o.patch.saved.clone(),
+            wires: o.patch.wires.clone(),
+            hardware: o.patch.hardware.clone(),
+            step: o.patch.step,
+            pivoted: o.patch.pivoted,
+            note: o.patch.note.clone(),
+        }
+    }
+
+    fn into_override(self) -> crate::design::PortOverride {
+        crate::design::PortOverride {
+            mode: crate::design::PortMode::parse(&self.mode)
+                .unwrap_or(crate::design::PortMode::Executor),
+            patch: crate::design_promote::PortPatch {
+                writes: self.writes,
+                saved: self.saved,
+                wires: self.wires,
+                hardware: self.hardware,
+                step: self.step,
+                pivoted: self.pivoted,
+                note: self.note,
+            },
+        }
+    }
 }
 
 // ---------------------------------------------------------------------
@@ -476,6 +527,11 @@ impl Design {
                     cell: i.cell.clone(),
                     at: i.at,
                     rot_y: i.rot_y,
+                    port_modes: i
+                        .port_modes
+                        .iter()
+                        .map(|(k, v)| (k.clone(), PortModeDoc::of(v)))
+                        .collect(),
                 })
                 .collect(),
             ports: ports.iter().map(|(n, p)| (n.clone(), port_doc(p))).collect(),
@@ -569,6 +625,11 @@ impl Design {
                     cell: i.cell,
                     at: i.at,
                     rot_y: i.rot_y,
+                    port_modes: i
+                        .port_modes
+                        .into_iter()
+                        .map(|(k, v)| (k, v.into_override()))
+                        .collect(),
                 })
                 .collect(),
             ports,
@@ -587,6 +648,11 @@ impl Design {
                     cell: inst.cell.clone(),
                     at: inst.at,
                     rot_y: inst.rot_y,
+                    port_modes: inst
+                        .port_modes
+                        .iter()
+                        .map(|(k, v)| (k.clone(), PortModeDoc::of(v)))
+                        .collect(),
                 },
                 contract: self.instance_contract(&inst.name)?.to_json()?,
             });
@@ -701,6 +767,7 @@ impl Design {
                 cell: cell_key,
                 at,
                 rot_y: 0,
+                port_modes: BTreeMap::new(),
             });
         }
 

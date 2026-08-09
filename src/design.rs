@@ -152,6 +152,53 @@ pub struct Instance {
     pub at: P3,
     /// Y rotation in degrees (0/90/180/270), about the cell's min corner.
     pub rot_y: i32,
+    /// Per-port mode overrides. A port absent here is in
+    /// [`PortMode::Executor`]; see [`Design::set_port_mode`].
+    pub port_modes: BTreeMap<String, PortOverride>,
+}
+
+/// How a port presents itself. The two modes are mutually exclusive by
+/// physics, not by policy: a lever cannot be driven by redstone, and dust
+/// cannot be flipped by a player.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PortMode {
+    /// The shipped hardware (levers/buttons in, lamps out). Drivable by
+    /// `CellExecutor`; NOT routable.
+    Executor,
+    /// Promoted: the hardware is replaced by a driver stub ending in dust.
+    /// Routable; no longer hand-drivable.
+    Bus,
+}
+
+impl PortMode {
+    /// `"executor"` / `"bus"`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PortMode::Executor => "executor",
+            PortMode::Bus => "bus",
+        }
+    }
+
+    /// Parse `"executor"` / `"bus"`.
+    pub fn parse(s: &str) -> Option<PortMode> {
+        match s {
+            "executor" => Some(PortMode::Executor),
+            "bus" => Some(PortMode::Bus),
+            _ => None,
+        }
+    }
+}
+
+/// A port's remembered BOTH-FORMS state: the current mode plus the reversible
+/// patch that realizes [`PortMode::Bus`].
+///
+/// The patch is kept even in `Executor` mode so toggling is instant and a UI
+/// can say in advance what promoting would change. The cell library itself is
+/// never mutated, which is what makes Bus -> Executor a byte-exact undo.
+#[derive(Clone, Debug)]
+pub struct PortOverride {
+    pub mode: PortMode,
+    pub patch: crate::design_promote::PortPatch,
 }
 
 /// Scanned per-bit hardware capabilities of a port (derived, not declared).
@@ -487,6 +534,68 @@ pub struct OccupancyIndex {
     pub halos: BTreeMap<P3, String>,
 }
 
+/// One cell a port-mode switch rewrote, with both sides of the change so a UI
+/// can say exactly what happened ("removed lever at (19,5,5)").
+#[derive(Clone, Debug)]
+pub struct PortModeChange {
+    /// World position (the instance transform already applied).
+    pub at: P3,
+    pub from: Option<String>,
+    pub to: Option<String>,
+}
+
+/// Outcome of [`Design::set_port_mode`].
+#[derive(Clone, Debug)]
+pub struct PortModeReport {
+    /// `{instance}.{port}`.
+    pub port: String,
+    /// The mode now in effect.
+    pub mode: PortMode,
+    /// Every cell the switch rewrote, in position order.
+    pub changed: Vec<PortModeChange>,
+    /// Buses deleted because they terminated on this port.
+    pub removed_buses: Vec<String>,
+    /// Reroute outcome for buses that merely crossed the changed space.
+    pub moves: MoveReport,
+    /// The reversible patch, as JSON.
+    pub patch_json: String,
+    /// One human sentence, ready for a toast.
+    pub note: String,
+}
+
+impl PortModeReport {
+    /// `{"port":..,"mode":..,"note":..,"changed":[{"at":[x,y,z],"from":..,
+    ///   "to":..}],"removed_buses":[..],"moves":{..},"patch":{..}}`
+    pub fn to_json(&self) -> String {
+        let changed: Vec<String> = self
+            .changed
+            .iter()
+            .map(|c| {
+                format!(
+                    "{{\"at\":[{},{},{}],\"from\":{},\"to\":{}}}",
+                    c.at.0,
+                    c.at.1,
+                    c.at.2,
+                    c.from.as_ref().map(|s| format!("{s:?}")).unwrap_or("null".into()),
+                    c.to.as_ref().map(|s| format!("{s:?}")).unwrap_or("null".into()),
+                )
+            })
+            .collect();
+        let removed: Vec<String> = self.removed_buses.iter().map(|n| format!("{n:?}")).collect();
+        format!(
+            "{{\"port\":{:?},\"mode\":{:?},\"note\":{:?},\"changed\":[{}],\
+             \"removed_buses\":[{}],\"moves\":{},\"patch\":{}}}",
+            self.port,
+            self.mode.as_str(),
+            self.note,
+            changed.join(","),
+            removed.join(","),
+            self.moves.to_json(),
+            self.patch_json,
+        )
+    }
+}
+
 /// Outcome of a drag ([`Design::move_instance`]): the move itself always
 /// succeeds (the document's truth); buses fail VISIBLY, never half-routed.
 #[derive(Clone, Debug, Default)]
@@ -686,9 +795,283 @@ impl Design {
             cell: cell.to_string(),
             at,
             rot_y: rot_y.rem_euclid(360),
+            port_modes: BTreeMap::new(),
         });
         Ok(())
     }
+
+    // ------------------------------------------------------------------
+    // Port modes (promotion): executor hardware <-> routable dust
+    // ------------------------------------------------------------------
+
+    /// The mode a port currently presents in ([`PortMode::Executor`] unless it
+    /// has been switched).
+    pub fn port_mode(&self, instance: &str, port: &str) -> PortMode {
+        self.instances
+            .iter()
+            .find(|i| i.name == instance)
+            .and_then(|i| i.port_modes.get(port))
+            .map(|o| o.mode)
+            .unwrap_or(PortMode::Executor)
+    }
+
+    /// Switch a port between executor hardware and a routable dust input.
+    ///
+    /// This is the composability switch: community cells name LEVERS for their
+    /// inputs, and nothing in redstone drives a lever, so `add.sum -> bcd.bin`
+    /// is impossible until `bin` is in [`PortMode::Bus`]. The conversion is a
+    /// reversible per-instance patch (see [`crate::design_promote`]) — the cell
+    /// library is untouched, so switching back restores the original blocks
+    /// byte-exactly.
+    ///
+    /// Buses attached to the port are RIPPED (their endpoint physically stops
+    /// existing) and named in the report; every other affected bus is
+    /// co-rerouted exactly as for a drag, so a toggle never leaves stale
+    /// geometry.
+    pub fn set_port_mode(
+        &mut self,
+        instance: &str,
+        port: &str,
+        mode: PortMode,
+    ) -> Result<PortModeReport, String> {
+        let idx = self
+            .instances
+            .iter()
+            .position(|i| i.name == instance)
+            .ok_or_else(|| format!("unknown instance `{instance}`"))?;
+        if self.port_mode(instance, port) == mode {
+            return Ok(PortModeReport {
+                port: format!("{instance}.{port}"),
+                mode,
+                changed: Vec::new(),
+                removed_buses: Vec::new(),
+                moves: MoveReport::default(),
+                patch_json: self.instances[idx]
+                    .port_modes
+                    .get(port)
+                    .map(|o| o.patch.to_json())
+                    .unwrap_or_else(|| "null".to_string()),
+                note: format!("`{instance}.{port}` is already in {} mode", mode.as_str()),
+            });
+        }
+        // Plan the patch once and remember it, so toggling is symmetric.
+        if !self.instances[idx].port_modes.contains_key(port) {
+            let patch = self.plan_port_patch(instance, port)?;
+            self.instances[idx].port_modes.insert(
+                port.to_string(),
+                PortOverride {
+                    mode: PortMode::Executor,
+                    patch,
+                },
+            );
+        }
+        // Buses that terminate on this port lose their endpoint geometry.
+        let full = format!("{instance}.{port}");
+        let doomed: Vec<String> = self
+            .buses
+            .values()
+            .filter(|b| {
+                b.driver_names()
+                    .iter()
+                    .chain(b.sinks.iter())
+                    .any(|p| *p == full)
+            })
+            .map(|b| b.name.clone())
+            .collect();
+        for b in &doomed {
+            self.buses.remove(b);
+        }
+        // Everything that touched the instance's space is re-attempted.
+        let old_region = self.instance_region(idx);
+        self.instances[idx]
+            .port_modes
+            .get_mut(port)
+            .expect("just inserted")
+            .mode = mode;
+        let new_region = self.instance_region(idx);
+        let mut affected: BTreeSet<String> = BTreeSet::new();
+        for bus in self.buses.values() {
+            match &bus.state {
+                BusState::Routed
+                    if bus
+                        .fragment
+                        .keys()
+                        .any(|p| old_region.contains(p) || new_region.contains(p)) =>
+                {
+                    affected.insert(bus.name.clone());
+                }
+                BusState::Failed(_) => {
+                    affected.insert(bus.name.clone());
+                }
+                _ => {}
+            }
+        }
+        let moves = self.co_reroute(affected);
+        let over = self.instances[idx].port_modes[port].clone();
+        let inst = &self.instances[idx];
+        let cell = &self.cells[&inst.cell];
+        let bbox = cell_bounds(&cell.schematic);
+        let map = |p: P3| transform_pos(p, bbox.min, bbox.max, inst.rot_y, inst.at);
+        let mut changed = Vec::new();
+        for (p, want) in &over.patch.writes {
+            let before = over.patch.saved.get(p).and_then(|o| o.clone());
+            let (from, to) = match mode {
+                PortMode::Bus => (before, want.clone()),
+                PortMode::Executor => (want.clone(), before),
+            };
+            changed.push(PortModeChange {
+                at: map(*p),
+                from,
+                to,
+            });
+        }
+        let note = match mode {
+            PortMode::Bus => format!(
+                "`{full}` is now a BUS input: {} — bit 0 lands on dust at {:?}",
+                over.patch.note,
+                over.patch.wires.first().map(|w| map(*w)).unwrap_or((0, 0, 0))
+            ),
+            PortMode::Executor => format!(
+                "`{full}` is back to EXECUTOR hardware: {} cell(s) restored exactly as shipped",
+                over.patch.writes.len()
+            ),
+        };
+        Ok(PortModeReport {
+            port: full,
+            mode,
+            changed,
+            removed_buses: doomed,
+            moves,
+            patch_json: over.patch.to_json(),
+            note,
+        })
+    }
+
+    /// [`Design::set_port_mode`] to [`PortMode::Bus`] — the "promote this
+    /// lever input to something a bus can land on" verb.
+    pub fn promote_input(&mut self, instance: &str, port: &str) -> Result<PortModeReport, String> {
+        self.set_port_mode(instance, port, PortMode::Bus)
+    }
+
+    /// [`Design::set_port_mode`] to [`PortMode::Bus`] for an OUTPUT port: a
+    /// dust tap on its lamps, so a bus can pick the value up. The lamps stay,
+    /// so the port remains readable through the typed executor too.
+    pub fn promote_output(&mut self, instance: &str, port: &str) -> Result<PortModeReport, String> {
+        self.set_port_mode(instance, port, PortMode::Bus)
+    }
+
+    /// Plan (but do not apply) the Bus-mode patch for a port. Useful for a UI
+    /// that wants to describe the change before the user commits to it.
+    pub fn plan_port_patch(
+        &self,
+        instance: &str,
+        port: &str,
+    ) -> Result<crate::design_promote::PortPatch, String> {
+        let inst = self
+            .instances
+            .iter()
+            .find(|i| i.name == instance)
+            .ok_or_else(|| format!("unknown instance `{instance}`"))?;
+        let cell = &self.cells[&inst.cell];
+        let (dirn, mapping) = if let Some(m) = cell.contract.io.inputs.get(port) {
+            (PortDirection::Input, m)
+        } else if let Some(m) = cell.contract.io.outputs.get(port) {
+            (PortDirection::Output, m)
+        } else {
+            let have: Vec<&str> = cell
+                .contract
+                .io
+                .inputs
+                .keys()
+                .chain(cell.contract.io.outputs.keys())
+                .map(String::as_str)
+                .collect();
+            return Err(format!(
+                "instance `{instance}` (cell `{}`) has no port `{port}` (has: {})",
+                inst.cell,
+                have.join(", ")
+            ));
+        };
+        match dirn {
+            PortDirection::Input => {
+                crate::design_promote::plan_input(&cell.schematic, &mapping.positions)
+            }
+            PortDirection::Output => {
+                crate::design_promote::plan_output(&cell.schematic, &mapping.positions)
+            }
+        }
+        .map_err(|e| format!("cannot promote `{instance}.{port}`: {e}"))
+    }
+
+    /// Every port's mode as JSON, for a UI:
+    /// `[{"name":"u0.bin","mode":"bus","patch":{..}}, ..]`
+    pub fn port_modes_json(&self) -> String {
+        let mut items = Vec::new();
+        for inst in &self.instances {
+            for (port, over) in &inst.port_modes {
+                items.push(format!(
+                    "{{\"name\":{:?},\"mode\":{:?},\"patch\":{}}}",
+                    format!("{}.{}", inst.name, port),
+                    over.mode.as_str(),
+                    over.patch.to_json()
+                ));
+            }
+        }
+        format!("[{}]", items.join(","))
+    }
+
+    /// Bus-mode patches in effect for an instance.
+    fn active_patches<'a>(&self, inst: &'a Instance) -> Vec<&'a crate::design_promote::PortPatch> {
+        inst.port_modes
+            .values()
+            .filter(|o| o.mode == PortMode::Bus)
+            .map(|o| &o.patch)
+            .collect()
+    }
+
+    /// The CELL-LOCAL blocks an instance contributes, with its Bus-mode port
+    /// patches applied. This is the one place that knows a placed cell is the
+    /// library body PLUS its promotions — every occupancy, flatten and scan
+    /// path goes through it, so a promoted lever can never be half-visible.
+    fn instance_local_blocks(&self, inst: &Instance) -> Vec<(P3, crate::BlockState)> {
+        let cell = &self.cells[&inst.cell];
+        let patches = self.active_patches(inst);
+        if patches.is_empty() {
+            return cell
+                .schematic
+                .iter_blocks()
+                .map(|(bp, bs)| ((bp.x, bp.y, bp.z), bs.clone()))
+                .collect();
+        }
+        let mut overlay: BTreeMap<P3, Option<String>> = BTreeMap::new();
+        for pa in &patches {
+            for (p, b) in &pa.writes {
+                overlay.insert(*p, b.clone());
+            }
+        }
+        let mut out = Vec::new();
+        for (bp, bs) in cell.schematic.iter_blocks() {
+            let p = (bp.x, bp.y, bp.z);
+            match overlay.remove(&p) {
+                Some(Some(b)) => {
+                    if let Ok(st) = crate::BlockState::from_block_string(&b) {
+                        out.push((p, st));
+                    }
+                }
+                Some(None) => {}
+                None => out.push((p, bs.clone())),
+            }
+        }
+        for (p, b) in overlay {
+            if let Some(b) = b {
+                if let Ok(st) = crate::BlockState::from_block_string(&b) {
+                    out.push((p, st));
+                }
+            }
+        }
+        out
+    }
+
 
     /// The transformed contract an instance exposes: port cells and step
     /// vectors mapped through the instance transform; types, delays and
@@ -702,6 +1085,18 @@ impl Design {
         let cell = &self.cells[&inst.cell];
         let bbox = cell_bounds(&cell.schematic);
         let mut contract = cell.contract.clone();
+        // A port in Bus mode presents its promoted CONNECTION CELLS, not the
+        // executor hardware it replaced.
+        for (port, over) in &inst.port_modes {
+            if over.mode != PortMode::Bus {
+                continue;
+            }
+            if let Some(m) = contract.io.inputs.get_mut(port) {
+                m.positions = over.patch.wires.clone();
+            } else if let Some(m) = contract.io.outputs.get_mut(port) {
+                m.positions = over.patch.wires.clone();
+            }
+        }
         let map = |p: P3| transform_pos(p, bbox.min, bbox.max, inst.rot_y, inst.at);
         for mapping in contract
             .io
@@ -1063,12 +1458,12 @@ impl Design {
         for inst in &self.instances {
             let cell = &self.cells[&inst.cell];
             let bbox = cell_bounds(&cell.schematic);
-            for (bp, bs) in cell.schematic.iter_blocks() {
-                let s = transform_state(bs, inst.rot_y).to_string();
+            for (bp, bs) in self.instance_local_blocks(inst) {
+                let s = transform_state(&bs, inst.rot_y).to_string();
                 if s.contains("minecraft:air") {
                     continue;
                 }
-                let p = transform_pos((bp.x, bp.y, bp.z), bbox.min, bbox.max, inst.rot_y, inst.at);
+                let p = transform_pos(bp, bbox.min, bbox.max, inst.rot_y, inst.at);
                 out.insert(p, s);
             }
         }
@@ -1370,11 +1765,11 @@ impl Design {
         let bbox = cell_bounds(&cell.schematic);
         let map = |p: P3| transform_pos(p, bbox.min, bbox.max, inst.rot_y, inst.at);
         let mut region = BTreeSet::new();
-        for (bp, bs) in cell.schematic.iter_blocks() {
+        for (bp, bs) in self.instance_local_blocks(inst) {
             if bs.to_string().contains("minecraft:air") {
                 continue;
             }
-            region.insert(map((bp.x, bp.y, bp.z)));
+            region.insert(map(bp));
         }
         for (min, max) in Self::halo_boxes(cell, bbox.min, bbox.max) {
             let a = map(min);
@@ -1778,12 +2173,12 @@ impl Design {
         for inst in &self.instances {
             let cell = &self.cells[&inst.cell];
             let bbox = cell_bounds(&cell.schematic);
-            for (bp, bs) in cell.schematic.iter_blocks() {
-                let s = transform_state(bs, inst.rot_y).to_string();
+            for (bp, bs) in self.instance_local_blocks(inst) {
+                let s = transform_state(&bs, inst.rot_y).to_string();
                 if s.contains("minecraft:air") {
                     continue;
                 }
-                let p = transform_pos((bp.x, bp.y, bp.z), bbox.min, bbox.max, inst.rot_y, inst.at);
+                let p = transform_pos(bp, bbox.min, bbox.max, inst.rot_y, inst.at);
                 if skip.contains(&p) {
                     continue;
                 }
@@ -2106,13 +2501,13 @@ impl Design {
             let cell = &self.cells[&inst.cell];
             let bbox = cell_bounds(&cell.schematic);
             let region = format!("inst:{}", inst.name);
-            for (bp, bs) in cell.schematic.iter_blocks() {
+            for (bp, bs) in self.instance_local_blocks(inst) {
                 let s = bs.to_string();
                 if s.contains("minecraft:air") {
                     continue;
                 }
-                let p = transform_pos((bp.x, bp.y, bp.z), bbox.min, bbox.max, inst.rot_y, inst.at);
-                let state = transform_state(bs, inst.rot_y);
+                let p = transform_pos(bp, bbox.min, bbox.max, inst.rot_y, inst.at);
+                let state = transform_state(&bs, inst.rot_y);
                 if !flat.set_block_in_region(&region, p.0, p.1, p.2, &state) {
                     return Err(format!(
                         "flatten: could not place {s} at {:?} in region {region}",

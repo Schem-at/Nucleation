@@ -55,6 +55,8 @@ pub mod design_corridor;
 #[cfg(feature = "routing")]
 pub mod design_io;
 #[cfg(feature = "routing")]
+pub mod design_promote;
+#[cfg(feature = "routing")]
 pub mod routing;
 #[cfg(feature = "rendering")]
 pub mod rendering;
