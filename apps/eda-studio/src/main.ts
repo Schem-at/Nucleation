@@ -5,8 +5,9 @@
  *  modal-by-accident. There is exactly one `mode`, the hint bar always spells
  *  out what the next click does, and Esc always cancels back to `idle`.
  */
-import { loadEngine } from "./engine";
-import { Studio, type Vec3, type PortInfo, type Clip, type PasteReport } from "./studio";
+import { loadEngine, engineStamp } from "./engine";
+import { Studio, type Vec3, type PortInfo, type Clip, type PasteReport,
+  type WidthAdapt } from "./studio";
 import {
   Viewer, type PortMarker, type GateMarker, type InstanceMarker, type Selection,
   type BusStyle, type PickTarget,
@@ -87,7 +88,13 @@ type Mode =
 
 async function boot() {
   const { core, d } = await loadEngine();
-  $("#status").textContent = "engine ready";
+  // A stale engine is not a warning, it is a wrong answer: everything measured
+  // afterwards describes a router that is not on disk any more. Say so where it
+  // cannot be missed, and keep saying it.
+  const stamp = engineStamp();
+  $("#status").textContent = stamp.ok ? "engine ready" : "STALE ENGINE — see console";
+  $("#status").classList.toggle("is-stale", !stamp.ok);
+  if (!stamp.ok) $("#status").title = stamp.problem ?? "";
   (window as any).__edaCore = core;
 
   let studio = new Studio(core, d, "studio");
@@ -413,7 +420,7 @@ async function boot() {
         if (mode.from === name) { setMode({ kind: "idle" }); return; }
         const from = mode.from;
         setMode({ kind: "idle" });
-        connectPorts(from, name);
+        void connectPorts(from, name);
         return;
       }
       select({ kind: "port", id: name });
@@ -1177,6 +1184,15 @@ async function boot() {
             run: () => removeGate(name, i),
           })),
         }] : []),
+        // BIT ALIGNMENT, offered only where it means something: the ends have
+        // different widths. This is the "rather than refusing" half of the width
+        // adapter — the connect picks LSB so the click works, and the choice
+        // lives here, where it can be changed without redoing the connection.
+        ...alignChoices(name).map((choice) => ({
+          label: `Bit alignment · ${choice.current}`,
+          hint: choice.line,
+          sub: choice.options,
+        })),
         { label: "Re-route", hint: "R", run: () => {
           const state = studio.rerouteBus(name);
           if (state.startsWith("failed")) failToast(name, state.replace(/^failed:?\s*/, ""));
@@ -1877,7 +1893,7 @@ async function boot() {
     if (mode.kind === "connecting" && mode.from !== name) {
       const from = mode.from;
       setMode({ kind: "idle" });
-      connectPorts(from, name);
+      void connectPorts(from, name);
       return;
     }
     if (!p.routable) {
@@ -1936,7 +1952,89 @@ async function boot() {
    *  ports that genuinely cannot be converted (a ceiling lever, a button),
    *  with the engine's own reason. The explicit Exec/Bus toggle stays for
    *  manual control and for converting back. */
-  function connectPorts(a: string, b: string) {
+  /** The alignment submenu for a bus, or `[]` when its ends are the same width
+   *  and there is nothing to align. Building it as a list means the caller
+   *  spreads it and the entry simply is not there when it is meaningless —
+   *  a menu full of inapplicable entries is how a menu stops being read. */
+  function alignChoices(bus: string): {
+    current: string; line: string;
+    options: { label: string; hint: string; run: () => void }[];
+  }[] {
+    const b = studio.buses.get(bus);
+    const driver = endpoint(b?.driver ?? "");
+    const sink = endpoint(b?.sinks?.[0] ?? "");
+    if (!b || !driver || !sink || driver.width === sink.width) return [];
+    const now = b.adapt ?? { align: "lsb" as const };
+    const lossy = driver.width > sink.width;
+    const opts: WidthAdapt[] = [
+      { align: "lsb", truncate: lossy },
+      { align: "msb", truncate: lossy },
+      { align: "shift", shift: 1, truncate: lossy },
+      { align: "shift", shift: -1, truncate: lossy },
+    ];
+    const nameOf = (a: WidthAdapt) =>
+      a.align === "shift" ? `Shift ${(a.shift ?? 0) >= 0 ? "+" : ""}${a.shift ?? 0}` : a.align.toUpperCase();
+    return [{
+      current: nameOf(now),
+      line: alignmentLine(driver, sink, now),
+      options: opts.map((a) => ({
+        label: `${nameOf(a)}${a.align === now.align && (a.shift ?? 0) === (now.shift ?? 0) ? " (current)" : ""}`,
+        hint: alignmentLine(driver, sink, a),
+        run: () => {
+          try {
+            const state = studio.setBusAlign(bus, a);
+            log(`align ${bus} ${nameOf(a)} -> ${state}`);
+            if (state.startsWith("failed")) {
+              failToast(bus, state.replace(/^failed:?\s*/, ""));
+              return;
+            }
+            toast(`${bus}: ${alignmentLine(driver, sink, a)}`,
+              { fix: "⌘/Ctrl-Z restores the previous alignment" });
+          } catch (err) {
+            toast(`${bus} will not take that alignment`, {
+              kind: "err",
+              fix: `the router refused it and the bus is unchanged: ${err}`,
+            });
+            log(`align ${bus} ${nameOf(a)} REFUSED: ${err}`);
+          }
+        },
+      })),
+    }];
+  }
+
+  /** WHICH BITS WENT WHERE, in one sentence.
+   *
+   *  A width-adapted bus is the one case where a routed bus does not mean what a
+   *  reader would assume, so the mapping is stated at the moment it is chosen
+   *  rather than left to be discovered by poking values through it. */
+  function alignmentLine(driver: { name: string; width: number },
+                         sink: { name: string; width: number },
+                         adapt: WidthAdapt): string {
+    const off = adapt.align === "msb" ? sink.width - driver.width
+      : adapt.align === "shift" ? (adapt.shift ?? 0) : 0;
+    const carried = Math.max(0, Math.min(driver.width, sink.width - off) - Math.max(0, -off));
+    const dropped = driver.width - carried;
+    return `${driver.name}[${driver.width}] → ${sink.name}[${sink.width}] aligned ` +
+      `${adapt.align.toUpperCase()}${adapt.align === "shift" ? ` ${off >= 0 ? "+" : ""}${off}` : ""}` +
+      ` · driver bit 0 → sink bit ${off}` +
+      ` · ${carried} bit(s) carried` +
+      (dropped > 0 ? ` · ${dropped} DROPPED` : "") +
+      (sink.width - carried > 0 ? ` · ${sink.width - carried} sink bit(s) read 0` : "");
+  }
+
+  function reportAlignment(bus: string, driver: { name: string; width: number },
+                           sink: { name: string; width: number }, adapt: WidthAdapt) {
+    const line = alignmentLine(driver, sink, adapt);
+    log(`${bus}: ${line}`);
+    const map = studio.busWidthMap(bus);
+    if (map) log(`  engine map: ${JSON.stringify(map).slice(0, 200)}`);
+    toast(`${bus}: ${line}`, {
+      kind: driver.width > sink.width ? "err" : "ok",
+      fix: "right-click the bus → Bit alignment to use MSB or a shift instead",
+    });
+  }
+
+  async function connectPorts(a: string, b: string) {
     let pa = endpoint(a), pb = endpoint(b);
     if (!pa || !pb) return;
     const driverName = pa.kind === "input" ? a : b;
@@ -1981,16 +2079,47 @@ async function boot() {
       toast(`${bad.name} is executor-only IO: ${bad.blocked ?? "no dust connection cell"}`, "err");
       return;
     }
-    if (driver.width !== sink.width) {
-      toast(`width mismatch: ${driver.name}[${driver.width}] → ${sink.name}[${sink.width}]`, "err");
+    // TYPE and WIDTH are different questions, and conflating them is what made
+    // "connect a 1-bit carry into an 8-bit word" report a TYPE MISMATCH: `ty` is
+    // a display string with the width baked in (`uint8`), so comparing two of
+    // them rejected every width difference and the width adapter below was
+    // unreachable. Compare FAMILIES: a boolean is a 1-bit unsigned word, and
+    // signedness is the difference that really does change what the bits mean.
+    const unsigned = (b: string) => b === "uint" || b === "bool";
+    if (!(unsigned(driver.base) && unsigned(sink.base)) && driver.base !== sink.base) {
+      toast(`type mismatch: ${driver.name} is ${driver.ty} (${driver.base}), ` +
+        `${sink.name} is ${sink.ty} (${sink.base}) — signedness changes what the bits mean`, "err");
       return;
     }
-    if (driver.ty !== sink.ty) {
-      toast(`type mismatch: ${driver.name} is ${driver.ty}, ${sink.name} is ${sink.ty}`, "err");
-      return;
+    // DIFFERENT WIDTHS ARE NOT A REFUSAL any more, they are a question with a
+    // sane default. A 4-bit word driving an 8-bit port is an ordinary thing to
+    // want; refusing it made the studio look broken and taught nothing. The
+    // engine's width adapter is asked for LSB alignment (bit 0 to bit 0, so the
+    // magnitude survives), the toast SAYS which alignment it used, and the bus's
+    // context menu offers MSB and a shift.
+    //
+    // The one case that stays a question is LOSS: bits of the source that fall
+    // outside the destination are dropped, which changes what the design
+    // computes, so it goes through the same confirm every destructive action
+    // does rather than happening quietly.
+    const adapt: WidthAdapt | undefined = driver.width === sink.width
+      ? undefined : { align: "lsb" };
+    if (adapt && driver.width > sink.width) {
+      const ok = await confirmDestructive(
+        `Connect ${driver.width} bits into ${sink.width}?`,
+        `${driver.name} is ${driver.width} bits wide and ${sink.name} is ${sink.width}. ` +
+        `Aligned LSB, bits 0–${sink.width - 1} carry and the top ` +
+        `${driver.width - sink.width} bit(s) of ${driver.name} are DROPPED — ` +
+        `${sink.name} reads ${driver.name} mod 2^${sink.width}. ` +
+        `Pick a different alignment afterwards from the bus's right-click menu.`,
+        `Connect and drop ${driver.width - sink.width} bit(s)`,
+      );
+      if (!ok) { toast(`kept ${driver.name} unconnected`); return; }
+      adapt.truncate = true;
     }
     try {
-      const bus = studio.routeBus(driver.name, [sink.name]);
+      const bus = studio.routeBus(driver.name, [sink.name], [], undefined, adapt);
+      if (adapt) reportAlignment(bus.name, driver, sink, adapt);
       // A core that promotes inside route_bus reports it here; either way the
       // summary names every conversion the one click caused.
       for (const p of (bus.promotions ?? []) as any[]) {
@@ -2395,6 +2524,9 @@ async function boot() {
     /** Is the camera free to orbit? Must be false while connecting/grabbing. */
     cameraFree: () => viewer.cameraFree,
     cameraLock: () => viewer.cameraLockReason,
+    /** WHICH ENGINE this page is running. Asserted first by the verify: a green
+     *  run against a stale engine is worse than a red one. */
+    engineStamp,
     /** Cumulative mesh builds, so a test can assert a drag causes none. */
     meshBuilds: () => ({ ...viewer.meshBuilds }),
 
@@ -2568,6 +2700,23 @@ async function boot() {
     setBusStyleFor: (bus: string, s: BusStyle | null) => viewer.setBusStyleFor(bus, s),
     /** Commits refused for being out of order — the drag race, counted. */
     staleCommits: () => staleCommits,
+
+    // ---- width adapters ----------------------------------------------------
+    /** Connect two ports through the same path a click does (async: a lossy
+     *  connection asks first, via `pendingConfirm`). */
+    connect: (a: string, b: string) => connectPorts(a, b),
+    /** The stored alignment of a bus, `null` when its ends match. */
+    busAlign: (bus: string) => studio.buses.get(bus)?.adapt ?? null,
+    /** The engine's own resolved bit mapping. */
+    busWidthMap: (bus: string) => studio.busWidthMap(bus),
+    /** Re-align an existing bus — what the context-menu entry does. */
+    setBusAlign: (bus: string, adapt: WidthAdapt) => studio.setBusAlign(bus, adapt),
+    /** The sentence the UI shows for a mapping, for a test to read. */
+    alignmentLine: (bus: string) => {
+      const b = studio.buses.get(bus);
+      const d = endpoint(b?.driver ?? ""), s = endpoint(b?.sinks?.[0] ?? "");
+      return b && d && s ? alignmentLine(d, s, b.adapt ?? { align: "lsb" }) : null;
+    },
 
     // ---- the full-scene consistency check ---------------------------------
     /** Does what is DRAWN match what the engine says the design is?

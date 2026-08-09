@@ -86,10 +86,39 @@ export function tyName(ty: unknown, width: number): string {
   return width > 1 ? `uint${width}` : "bool";
 }
 
+/** The type FAMILY, with the width stripped off.
+ *
+ *  `tyName` returns a display string (`uint8`, `bool`) that folds the width into
+ *  the type, so comparing two of them answers "same type AND same width?" — and
+ *  the studio was using it to answer "same type?". Every width mismatch came
+ *  back as a type mismatch, which made the width adapter unreachable and the
+ *  message wrong about why. A boolean is a 1-bit unsigned word (as in Verilog);
+ *  SIGNEDNESS is the difference that genuinely changes the meaning of the bits. */
+export function baseTy(ty: unknown, width: number): "uint" | "int" | "bool" {
+  const s = tyName(ty, width);
+  if (/^u?int|^uint/.test(s) === false && /^bool/.test(s)) return "bool";
+  if (/^int/.test(s)) return "int";
+  if (/^uint/.test(s)) return "uint";
+  return width > 1 ? "uint" : "bool";
+}
+
 export interface GateInfo {
   name: string;
   anchor: Vec3;
   step: Vec3;
+}
+
+/** How a bus whose ends are DIFFERENT WIDTHS lines its bits up.
+ *
+ *  `lsb` keeps the magnitude (bit 0 to bit 0), `msb` keeps the top bit (a shift
+ *  up by the width difference), `shift` states the offset outright. `truncate`
+ *  opts INTO losing source bits that fall outside the destination — the engine
+ *  refuses a lossy connection otherwise, and it is right to: dropping a word's
+ *  high bits changes what the design computes, so it has to be asked for. */
+export interface WidthAdapt {
+  align: "lsb" | "msb" | "shift";
+  shift?: number;
+  truncate?: boolean;
 }
 
 export interface BusInfo {
@@ -101,6 +130,10 @@ export interface BusInfo {
   /** Executor-only ports the ROUTER promoted so this bus could land (empty on
    *  cores that route without promoting, or that do not report it). */
   promotions?: unknown[];
+  /** The width-adaptation policy, when the ends are different widths. Part of
+   *  the bus's INTENT: a re-route, an undo, a paste and a reload all have to
+   *  reproduce it. `undefined` when the widths matched. */
+  adapt?: WidthAdapt;
 }
 
 export interface Block { x: number; y: number; z: number; name: string }
@@ -434,7 +467,15 @@ export class Studio {
   private restoreBuses(list: BusInfo[]) {
     for (const b of list) {
       try {
-        this.design.routeBus(b.name, { driver: b.driver, sinks: b.sinks, gates: b.gates });
+        // The alignment travels with the intent: restoring a width-adapted bus
+        // without it would silently re-route it lsb and change what the design
+        // computes.
+        if (b.adapt) {
+          this.design.routeBusAdapted(b.name,
+            { driver: b.driver, sinks: b.sinks, gates: b.gates, ...b.adapt });
+        } else {
+          this.design.routeBus(b.name, { driver: b.driver, sinks: b.sinks, gates: b.gates });
+        }
         this.buses.set(b.name, b);
         this.dirtyBuses.add(b.name);
       } catch { /* the geometry it needed is gone; leave it out */ }
@@ -884,6 +925,15 @@ export class Studio {
   allEndpoints(): {
     name: string; port: string; kind: "input" | "output"; anchor: Vec3; step: Vec3;
     width: number; ty: string; routable: boolean; blocked?: string; instance?: string;
+    /** The type FAMILY, width stripped: `"uint"`, `"int"` or `"bool"`.
+     *
+     *  `ty` is a display string with the width baked in (`uint8`), which made
+     *  "same type?" and "same width?" the same question — so every width
+     *  mismatch was reported as a TYPE mismatch and the width adapter was
+     *  unreachable. A boolean is a 1-bit unsigned word here, exactly as it is in
+     *  Verilog: driving bit 0 of a `uint8` with one is width adaptation, not a
+     *  type error. Signedness is the difference that stays a real one. */
+    base: "uint" | "int" | "bool";
     /** Port mode, for instance ports only: `"bus"` once promoted. */
     mode?: "bus" | "executor";
     /** Whether this port CAN be promoted (and what that would do), so a UI can
@@ -893,6 +943,7 @@ export class Studio {
     const out = [...this.ports.values()].map((p) => ({
       name: p.name, port: p.name, kind: p.kind, anchor: p.anchor, step: p.step,
       width: p.width, ty: p.ty === "bool" ? "bool" : `${p.ty}${p.width}`,
+      base: baseTy(p.ty, p.width),
       routable: true as boolean, blocked: undefined as string | undefined,
       instance: undefined as string | undefined,
       mode: undefined as "bus" | "executor" | undefined,
@@ -907,7 +958,7 @@ export class Studio {
       out.push({
         name: ip.name, port: ip.port, kind, anchor,
         step: (ip.step ?? [0, 2, 0]) as Vec3,
-        width: ip.width, ty: tyName(ip.ty, ip.width),
+        width: ip.width, ty: tyName(ip.ty, ip.width), base: baseTy(ip.ty, ip.width),
         routable: ip.routable, blocked: ip.blocked ?? undefined,
         instance: ip.instance,
         mode,
@@ -1008,15 +1059,22 @@ export class Studio {
 
   // -- buses ---------------------------------------------------------------
 
-  routeBus(driver: string, sinks: string[], gates: GateInfo[] = [], forceName?: string): BusInfo {
+  routeBus(driver: string, sinks: string[], gates: GateInfo[] = [], forceName?: string,
+           adapt?: WidthAdapt): BusInfo {
     const name = forceName ?? `bus${this.nextBus++}`;
     const color = BUS_PALETTE[this.buses.size % BUS_PALETTE.length];
-    const bus = this.design.routeBus(name, { driver, sinks, gates });
+    const bus = adapt
+      ? this.design.routeBusAdapted(name, { driver, sinks, gates, ...adapt })
+      : this.design.routeBus(name, { driver, sinks, gates });
     const info: BusInfo = {
       name, driver, sinks: [...sinks], color,
       gates: gates.map((g, i) => ({ ...g, name: g.name || `g${i}` })),
       // Ports the ROUTER promoted on its own, when the core reports them.
       promotions: bus.promotions ?? [],
+      // The alignment is part of the bus's INTENT, not of its geometry: a
+      // re-route, an undo and a paste all have to reproduce it, so it is stored
+      // beside the driver and the sinks rather than recovered from the blocks.
+      adapt: adapt ? { ...adapt } : undefined,
     };
     this.buses.set(name, info);
     // Realizing a bus can amend the buses it crosses, so they are suspect too.
@@ -1024,10 +1082,35 @@ export class Studio {
     this.record({
       label: `route ${name}`,
       undo: () => this.removeBus(name),
-      redo: () => this.routeBus(driver, sinks, gates, name),
+      redo: () => this.routeBus(driver, sinks, gates, name, adapt),
     });
     this.bump();
     return info;
+  }
+
+  /** How a width-adapted bus's bits line up, straight from the engine. `null`
+   *  when the widths matched (nothing to adapt) or the core cannot say. */
+  busWidthMap(name: string): unknown | null {
+    try {
+      return this.design.busWidthMap?.(name) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Re-declare an existing bus with a different width alignment. ONE undo step
+   *  (the transaction groups the re-declaration), and the same endpoints:
+   *  alignment is how the bits line up, not what the bus connects. */
+  setBusAlign(name: string, adapt: WidthAdapt): string {
+    const b = this.buses.get(name);
+    if (!b) throw new Error(`no bus ${name}`);
+    const { driver, sinks, gates } = b;
+    const kept = { sinks: [...sinks], gates: gates.map((g) => ({ ...g })) };
+    this.transaction(`align ${name} ${adapt.align}`, () => {
+      this.removeBus(name);
+      this.routeBus(driver, kept.sinks, kept.gates, name, adapt);
+    });
+    return this.busState(name);
   }
 
   /** Per-bus timing from the engine's STA machinery: `{per_bit_rt, skew_rt,
@@ -1102,14 +1185,16 @@ export class Studio {
     const driver = bus.driver;
     const sinks = [...bus.sinks];
     const was = bus.gates.map((g) => ({ ...g }));
+    // A gate edit must not silently re-align a width-adapted bus.
+    const adapt = bus.adapt ? { ...bus.adapt } : undefined;
     this.transaction(label, () => {
       this.removeBus(name);
       try {
-        this.routeBus(driver, sinks, gates.map((g) => ({ ...g })), name);
+        this.routeBus(driver, sinks, gates.map((g) => ({ ...g })), name, adapt);
       } catch (err) {
         // Re-declaring must never LOSE the bus. Put the old declaration back
         // (failed is a state; missing is data loss) and report the refusal.
-        this.routeBus(driver, sinks, was, name);
+        this.routeBus(driver, sinks, was, name, adapt);
         throw err;
       }
       const now = this.buses.get(name);

@@ -272,6 +272,38 @@ class DesignBase {
     const raw = this._d.routeBusOr(name, namesJson(drivers), namesJson(sinks), gj, styleJson(style));
     return new Bus(this, name, gateNames, optionalReport(raw));
   }
+  /** Route a bus whose driver and sinks are DIFFERENT WIDTHS, with the
+   *  alignment stated rather than guessed.
+   *
+   *  `align`: `"lsb"` (default — bit 0 to bit 0, so the magnitude survives),
+   *  `"msb"` (top bit to top bit, i.e. a shift up by the width difference), or
+   *  `"shift"` with `shift` bits (positive moves toward the MSB).
+   *  `truncate` permits DROPPING source bits that fall outside the destination;
+   *  without it a lossy connection is refused, because throwing away a word's
+   *  high bits is not the router's decision to make. Destination bits nothing
+   *  drives read 0 with no hardware at all.
+   */
+  routeBusAdapted(name, { driver, sinks, gates = [], style = null,
+                          align = "lsb", shift = 0, truncate = false }) {
+    const [gj, gateNames] = gatesJson(gates);
+    const code = { lsb: 0, msb: 1, shift: 2 }[String(align).toLowerCase()];
+    if (code === undefined) {
+      throw new TypeError(`align must be "lsb", "msb" or "shift" (got ${JSON.stringify(align)})`);
+    }
+    const raw = this._d.routeBusAdapted(
+      name, driver, [...sinks].join(","), gj, styleJson(style), code, shift | 0, !!truncate);
+    return new Bus(this, name, gateNames, optionalReport(raw));
+  }
+  /** How a bus's bits line up: `{driver, width, sinks: [{port, width, bits}]}`
+   *  shaped by the core. `null` on cores that do not report it. */
+  busWidthMap(name) {
+    if (typeof this._d.busWidthMap !== "function") return null;
+    try {
+      return JSON.parse(this._d.busWidthMap(name));
+    } catch {
+      return null;
+    }
+  }
   addGate(bus, gate, anchor, step) {
     const [x, y, z] = anchor, [sx, sy, sz] = step;
     return this._d.addGate(bus, gate, x, y, z, sx, sy, sz);
