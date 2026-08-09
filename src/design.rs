@@ -948,6 +948,18 @@ pub struct OccupancyIndex {
     pub cells: BTreeMap<P3, (String, Occupant)>,
     /// Influence halo cells -> owning instance name (never hard-occupied).
     pub halos: BTreeMap<P3, String>,
+    /// The subset of [`Self::halos`] that is only a PROXY for electrical
+    /// interference: the default one-cell dilation a cell gets when its
+    /// contract declares no explicit keepouts.
+    ///
+    /// A designer-declared keepout is intent and stays absolute. This set is
+    /// not: it was a scalar stand-in for "something in here might interact
+    /// with a bus", and the router now answers that question exactly, with
+    /// [`nucleation_routing::transport::interferes`]. An inert stone flank
+    /// emits nothing and reads nothing, so a bus may lay dust flush against
+    /// it — which the blanket shell forbade, and which was the single largest
+    /// exclusion bucket in `tests/design_routability.rs`.
+    pub soft_halos: BTreeSet<P3>,
 }
 
 /// One cell a port-mode switch rewrote, with both sides of the change so a UI
@@ -3126,6 +3138,10 @@ impl Design {
             let cell = &self.cells[&inst.cell];
             let bbox = cell_bounds(&cell.schematic);
             let map = |p: P3| transform_pos(p, bbox.min, bbox.max, inst.rot_y, inst.at);
+            // A declared keepout is designer INTENT and stays absolute; the
+            // default dilation is only a proxy for electrical interference,
+            // which the transport model now decides exactly.
+            let soft = cell.contract.physical.keepouts.is_empty();
             for (min, max) in Self::halo_boxes(cell, bbox.min, bbox.max) {
                 let a = map(min);
                 let b = map(max);
@@ -3139,6 +3155,9 @@ impl Design {
                                 continue;
                             }
                             idx.halos.insert(p, inst.name.clone());
+                            if soft {
+                                idx.soft_halos.insert(p);
+                            }
                         }
                     }
                 }

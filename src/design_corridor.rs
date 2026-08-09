@@ -10,9 +10,13 @@
 //! real footprint:
 //!
 //! - the search runs on the bit-0 dust plane `y = y0`, one node per column;
-//! - a column is legal only when the WHOLE vertical stack it would occupy
+//! - a column is legal when the WHOLE vertical stack it would occupy
 //!   (`y0 - 1 ..= y0 + 2*(width-1)`: a support and a dust per bit) is free of
-//!   hard occupancy and of every foreign instance halo;
+//!   hard occupancy, outside every DECLARED keepout, and free of mechanism-level
+//!   INTERFERENCE with foreign hardware — see [`BusFabric::column_free`];
+//! - a column inside a cell's former blanket halo is legal but costs
+//!   [`HUG_COST`], because that shell is the lane the cell's own ports escape
+//!   through;
 //! - turns cost real money (a corner needs a joint column and adds delay) and
 //!   are illegal until the current leg is at least [`MIN_LEG`] cells long, so
 //!   the search cannot emit a zigzag whose legs read into each other.
@@ -23,6 +27,7 @@
 //! here — only the order in which the existing tiles are laid down.
 
 use crate::design::{OccupancyIndex, P3};
+use crate::routing::engine::transport::{self, BlockView, Mechanism, Placement};
 use pnr_core::astar::{route, RouteRequest};
 use pnr_core::fabric::{Budget, Candidate, Fabric, RouteCtx, State};
 use pnr_core::grid::{Aabb, Pos};
@@ -135,7 +140,14 @@ pub struct BusFabric<'a> {
     /// once per incoming move, so without this the stack scan runs ~20x per
     /// column — the difference between an interactive reroute and a stall.
     memo: RefCell<HashMap<(i32, i32), bool>>,
+    /// Memo for [`BusFabric::column_hugs`], on the same hot path.
+    hug_memo: RefCell<HashMap<(i32, i32), bool>>,
 }
+
+/// Extra cost per column that runs inside a cell's soft halo. Charged per
+/// cell of travel, so a clean lane a few cells further out always wins, while
+/// a hug still beats no route at all.
+const HUG_COST: u32 = 4;
 
 impl<'a> BusFabric<'a> {
     /// Every cell a bus column at `(x, z)` would occupy: a support and a dust
@@ -148,18 +160,31 @@ impl<'a> BusFabric<'a> {
 
     /// Can the bus stand a column here?
     ///
-    /// Two conditions, and the second one is the whole reason a free-form
+    /// Three conditions, and the third one is the whole reason a free-form
     /// corridor is harder than a template run:
     ///
-    /// 1. the column's cells are unoccupied and outside every foreign halo;
-    /// 2. no cell of the column is ORTHOGONALLY ADJACENT to foreign redstone
-    ///    (another bus's dust or repeater, or a cell's exposed dust). Two dust
-    ///    runs one cell apart short without ever sharing a cell — the template
-    ///    planner never hit this because parallel runs collide outright, but a
-    ///    corridor that is free to bend will happily hug a neighbour.
+    /// 1. the column's cells are unoccupied;
+    /// 2. no cell of the column sits in a DECLARED keepout (designer intent);
+    /// 3. no cell of the column INTERFERES with foreign hardware, in the
+    ///    mechanism sense of
+    ///    [`nucleation_routing::transport::interferes`]: one side's emission
+    ///    lands where the other side reads, in a kind that side can read.
     ///
-    /// The bus's own endpoint columns are exempt from both: landing on the port
-    /// and touching its dust is the entire point of a pin.
+    /// Condition 3 replaced two blunter rules — a blanket one-cell shell
+    /// dilated around every instance, and "no cell orthogonally adjacent to
+    /// foreign redstone". Both over-forbade. An inert stone flank emits
+    /// nothing and reads nothing, so a bus may lay dust flush against a cell
+    /// body; a weakly powered block is invisible to dust; a repeater is blind
+    /// to everything but its own back cell. The scalar halo forbade all of
+    /// those, and it was the single largest exclusion bucket in
+    /// `tests/design_routability.rs`. What condition 3 still forbids is every
+    /// relation that is electrically real: foreign dust that would
+    /// wire-connect to ours, a foreign repeater front or strong block driving
+    /// our dust, and a support of ours that would sever a foreign net's 1-y
+    /// step.
+    ///
+    /// The bus's own endpoint columns are exempt from all three: landing on
+    /// the port and touching its dust is the entire point of a pin.
     pub fn column_free(&self, x: i32, z: i32) -> bool {
         if self.exempt.contains(&(x, z)) {
             return true;
@@ -167,26 +192,145 @@ impl<'a> BusFabric<'a> {
         if let Some(hit) = self.memo.borrow().get(&(x, z)) {
             return *hit;
         }
-        let free = self.column_cells(x, z).all(|p| {
-            if self.occ.cells.contains_key(&p) || self.occ.halos.contains_key(&p) {
-                return false;
-            }
-            // Electrical clearance against foreign redstone.
-            [(1, 0), (-1, 0), (0, 1), (0, -1)].iter().all(|(dx, dz)| {
-                let q = (p.0 + dx, p.1, p.2 + dz);
-                if self.exempt.contains(&(q.0, q.2)) {
-                    return true; // our own port column
-                }
-                !self
-                    .occ
-                    .cells
-                    .get(&q)
-                    .is_some_and(|(b, _)| is_live_redstone(b))
-            })
-        });
+        let free = self
+            .column_cells(x, z)
+            .all(|p| self.cell_placeable(p, self.mech_at(p)));
         self.memo.borrow_mut().insert((x, z), free);
         free
     }
+
+    /// Does a column here run inside some cell's soft halo?
+    ///
+    /// Electrically this is fine — that is the whole point of the transport
+    /// predicate — but it is still *impolite*: the one-cell shell around a
+    /// cell body is the lane that cell's own ports need in order to escape.
+    /// The old blanket halo enforced that by forbidding the shell outright,
+    /// which cost four legal routes; charging [`HUG_COST`] instead keeps
+    /// corridors out of the shell whenever an open lane exists, and lets them
+    /// in when the alternative is failing the bus.
+    pub fn column_hugs(&self, x: i32, z: i32) -> bool {
+        if self.exempt.contains(&(x, z)) {
+            return false;
+        }
+        if let Some(hit) = self.hug_memo.borrow().get(&(x, z)) {
+            return *hit;
+        }
+        let hugs = self
+            .column_cells(x, z)
+            .any(|p| self.occ.soft_halos.contains(&p));
+        self.hug_memo.borrow_mut().insert((x, z), hugs);
+        hugs
+    }
+
+    /// What the bus puts at this height. The stack alternates support / dust
+    /// on a 2y pitch from `y0 - 1`, so the parity off the support level says
+    /// which mechanism a cell carries — and the two answer to different rules.
+    fn mech_at(&self, p: P3) -> Mechanism {
+        if (p.1 - self.y0).rem_euclid(2) == 0 {
+            Mechanism::Dust
+        } else {
+            Mechanism::SolidSupport
+        }
+    }
+
+    /// Condition 1-3 for a single cell.
+    fn cell_placeable(&self, p: P3, mech: Mechanism) -> bool {
+        if self.occ.cells.contains_key(&p) {
+            return false;
+        }
+        // A DECLARED keepout is absolute. A soft halo is only the old scalar
+        // proxy for interference, so it defers to the real predicate below.
+        if self.occ.halos.contains_key(&p) && !self.occ.soft_halos.contains(&p) {
+            return false;
+        }
+        let view = OccView(self.occ);
+        let ours = Placement {
+            mech,
+            cell: Pos::new(p.0, p.1, p.2),
+            fwd: (1, 0, 0),
+            net: OUR_NET,
+        };
+        for q in interference_scan(p) {
+            if self.exempt.contains(&(q.0, q.2)) {
+                continue; // our own port column
+            }
+            let Some((block, owner)) = self.occ.cells.get(&q) else {
+                continue;
+            };
+            let theirs = Placement {
+                mech: transport::mech_of(block),
+                cell: Pos::new(q.0, q.1, q.2),
+                fwd: transport::fwd_of(block),
+                net: &owner_name(owner),
+            };
+            if transport::interferes(&theirs, &ours, &view).is_some() {
+                return false;
+            }
+        }
+        // A solid support of ours must not sever a foreign net's 1-y step:
+        // the CUT cell is the one directly above the lower dust, and any
+        // sturdy block there kills the step whether it conducts or not.
+        if mech == Mechanism::SolidSupport && self.cuts_a_foreign_step(p) {
+            return false;
+        }
+        true
+    }
+
+    /// Would a sturdy block at `p` sever a foreign dust step that currently
+    /// conducts? `p` is the CUT cell of a step whose lower dust is directly
+    /// beneath it and whose upper dust is one cell out, level with `p`.
+    fn cuts_a_foreign_step(&self, p: P3) -> bool {
+        let lower = (p.0, p.1 - 1, p.2);
+        let Some((lb, lo)) = self.occ.cells.get(&lower) else {
+            return false;
+        };
+        if transport::mech_of(lb) != Mechanism::Dust {
+            return false;
+        }
+        let lower_owner = owner_name(lo);
+        [(1, 0), (-1, 0), (0, 1), (0, -1)].iter().any(|(dx, dz)| {
+            let upper = (p.0 + dx, p.1, p.2 + dz);
+            self.occ.cells.get(&upper).is_some_and(|(ub, uo)| {
+                transport::mech_of(ub) == Mechanism::Dust && owner_name(uo) == lower_owner
+            })
+        })
+    }
+}
+
+/// The cells whose contents can electrically reach `p`.
+///
+/// Every mechanism emits only into its own cell or its six faces, so an
+/// emission relation never spans more than one cell. Dust's wire connection
+/// reaches one cell horizontally with a 1-y step, which adds the eight
+/// horizontal-plus-vertical offsets the six faces miss.
+fn interference_scan(p: P3) -> impl Iterator<Item = P3> {
+    let mut out = Vec::with_capacity(14);
+    out.push((p.0, p.1 + 1, p.2));
+    out.push((p.0, p.1 - 1, p.2));
+    for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+        for dy in [-1, 0, 1] {
+            out.push((p.0 + dx, p.1 + dy, p.2 + dz));
+        }
+    }
+    out.into_iter()
+}
+
+/// A [`BlockView`] over the design's occupancy index, so the transport
+/// predicates run against placed geometry without knowing what placed it.
+struct OccView<'a>(&'a OccupancyIndex);
+
+impl BlockView for OccView<'_> {
+    fn block_at(&self, p: Pos) -> Option<&str> {
+        self.0.cells.get(&(p.x, p.y, p.z)).map(|(b, _)| b.as_str())
+    }
+}
+
+/// The net name for the bus being routed. Nothing already placed can own it,
+/// so every hard cell in the index counts as foreign — which is right: the
+/// bus's own surviving runs are ripped into `skip` before the search starts.
+const OUR_NET: &str = "\0routing";
+
+impl<'a> BusFabric<'a> {
 
     /// Who blocks a column here, if anybody — the location and the owner, for
     /// the user-facing failure reason.
@@ -194,12 +338,23 @@ impl<'a> BusFabric<'a> {
         if self.exempt.contains(&(x, z)) {
             return None;
         }
+        // Must agree with `column_free`, or the reason the studio shows the
+        // user names a cause the search does not actually honour. A SOFT halo
+        // is passable now, so it is never a blocker.
         for p in self.column_cells(x, z) {
             if let Some((block, owner)) = self.occ.cells.get(&p) {
                 return Some((p, format!("{} `{block}`", owner_name(owner))));
             }
             if let Some(inst) = self.occ.halos.get(&p) {
-                return Some((p, format!("the influence halo of instance `{inst}`")));
+                if !self.occ.soft_halos.contains(&p) {
+                    return Some((p, format!("the declared keepout of instance `{inst}`")));
+                }
+            }
+            if !self.cell_placeable(p, self.mech_at(p)) {
+                return Some((
+                    p,
+                    "foreign redstone that would interfere with the bus here".to_string(),
+                ));
             }
         }
         None
@@ -257,7 +412,9 @@ impl Fabric for BusFabric<'_> {
                     pos: to,
                     mem: Leg { heading: h, run },
                 },
-                base_cost: 1 + if turning { self.turn_cost } else { 0 },
+                base_cost: 1
+                    + if turning { self.turn_cost } else { 0 }
+                    + if self.column_hugs(to.x, to.z) { HUG_COST } else { 0 },
                 tag: h,
                 footprint: vec![to],
             });
@@ -299,6 +456,7 @@ fn fabric<'a>(
         bound,
         turn_cost: effort.turn_cost,
         memo: RefCell::new(HashMap::new()),
+        hug_memo: RefCell::new(HashMap::new()),
     }
 }
 
