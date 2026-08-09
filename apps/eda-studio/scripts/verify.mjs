@@ -5,10 +5,19 @@
  *
  *  Everything is driven through the same code paths the mouse and keyboard
  *  drive (`window.__eda`), so a green run means the UI itself works — not
- *  just the engine underneath it. Covers: the auto-loaded cell library,
- *  placing cells, instance ports as connectable endpoints, the click-to-
- *  connect flow, rotate/delete by keyboard, a bus FAILED then healed, a typed
- *  poke through the routed chain, and the export tiers.
+ *  just the engine underneath it.
+ *
+ *  Three parts:
+ *
+ *    0. the first thirty seconds — the DEFAULT landing state (the verified
+ *       chain, framed, buses routed), the coach, the `?` legend, the grouped
+ *       outliner, label declutter, undo/redo, destructive confirms, toasts;
+ *    1. the interaction model on the two-adder demo — instance ports, connect,
+ *       rotate/delete, a bus FAILED (as a SENTENCE, with a focus target) then
+ *       healed, a typed poke, the export tiers, auto-promotion, and the
+ *       performance contract;
+ *    2. instancing at scale, on a page with `?empty=1` so nothing else is in
+ *       the scene.
  */
 import { chromium } from "playwright";
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -48,12 +57,327 @@ const check = (ok, label, detail) => {
 let shot = 0;
 async function snap(page, name) {
   await page.waitForTimeout(500);
-  await page.screenshot({ path: path.join(docs, `${String(++shot).padStart(2, "0")}-${name}.png`) });
+  const file = `${String(++shot).padStart(2, "0")}-${name}.png`;
+  await page.screenshot({ path: path.join(docs, file) });
+  return file;
 }
 
 try {
   await waitForServer(`http://localhost:${PORT}/`);
   const browser = await chromium.launch();
+
+  // ======================================================================
+  // PART 0 — the first thirty seconds.
+  //
+  // The default landing state has to teach the model with no reading: a
+  // WORKING design, and a coach that names the four things you do to it. These
+  // checks are on their own page because "what you get with no URL flags" is
+  // exactly what they are about.
+  // ======================================================================
+  const p0 = await browser.newPage({ viewport: { width: 1680, height: 980 } });
+  const p0errors = [];
+  p0.on("console", (m) => { if (m.type() === "error") p0errors.push(m.text()); });
+  await p0.goto(`http://localhost:${PORT}/`, { waitUntil: "load" });
+  await p0.waitForFunction(() => window.__edaReady === true, null, { timeout: 120_000 });
+  await p0.waitForTimeout(1200);
+
+  const landing = await p0.evaluate(() => {
+    const s = window.__edaStudio();
+    return {
+      instances: [...s.instances.values()].map((i) => ({ name: i.name, cell: i.cell, at: i.at })),
+      buses: [...s.buses.keys()].map((b) => ({ name: b, state: s.busState(b) })),
+      coach: window.__eda.coach(),
+      hint: window.__eda.hint(),
+      empty: window.__eda.emptyState(),
+      history: window.__eda.history(),
+    };
+  });
+  check(landing.instances.length >= 2 &&
+        landing.instances.some((i) => /ADD007/.test(i.cell)) &&
+        landing.instances.some((i) => /BINTOBCD001/.test(i.cell)),
+    `the DEFAULT page lands on the verified chain, not an empty grid ` +
+    `(${landing.instances.map((i) => `${i.name}:${i.cell.slice(0, 12)}`).join(", ")})`,
+    JSON.stringify(landing.instances));
+  check(landing.buses.length >= 1 && landing.buses.every((b) => b.state === "routed"),
+    `...with its buses already ROUTED, so the model is visible before you click ` +
+    `(${JSON.stringify(landing.buses)})`);
+  check(landing.coach.open === true && landing.coach.steps === 4 && landing.coach.step === 0,
+    `a 4-step coach overlay opens on the first visit, at step 1 ` +
+    `("${landing.coach.title}")`, JSON.stringify(landing.coach));
+  check(!landing.empty && landing.history.canUndo === false,
+    `the empty state is hidden and the demo is NOT an undoable edit`,
+    JSON.stringify({ empty: landing.empty, history: landing.history }));
+  await snap(p0, "onboarding-coach");
+
+  // The coach walks, and dismissal sticks.
+  const coach = await p0.evaluate(async () => {
+    const e = window.__eda;
+    const seen = [];
+    for (let i = 0; i < 4; i++) { seen.push(e.coach().title); e.coachNext(1); }
+    const afterLast = e.coach();
+    return { seen, afterLast, dismissed: afterLast.dismissed };
+  });
+  check(coach.seen.length === 4 && new Set(coach.seen).size === 4 &&
+        coach.afterLast.open === false && coach.dismissed === true,
+    `Next walks all 4 steps and the last one dismisses it for good ` +
+    `(${coach.seen.map((t) => t.split("·")[0].trim()).join(" → ")})`,
+    JSON.stringify(coach));
+
+  // Reloading does not nag: a dismissed coach stays dismissed.
+  await p0.reload({ waitUntil: "load" });
+  await p0.waitForFunction(() => window.__edaReady === true, null, { timeout: 120_000 });
+  await p0.waitForTimeout(1000);
+  const again = await p0.evaluate(() => window.__eda.coach());
+  check(again.open === false && again.dismissed === true,
+    `a second visit does not re-open it (dismissal is remembered)`, JSON.stringify(again));
+  await snap(p0, "chain-routed");
+
+  // The keyboard legend is discoverable, and Esc closes it.
+  const help = await p0.evaluate(async () => {
+    const e = window.__eda;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
+    const open = e.shortcuts();
+    const rows = document.querySelectorAll("#shortcuts table tr").length;
+    e.key("Escape");
+    return { open, rows, closed: !e.shortcuts() };
+  });
+  check(help.open === true && help.closed === true && help.rows >= 12,
+    `? opens the keyboard + colour legend (${help.rows} rows) and Esc closes it`,
+    JSON.stringify(help));
+
+  // Grouped outliner: instances by TYPE with counts, buses with state + timing.
+  const outliner = await p0.evaluate(() => {
+    const s = window.__edaStudio();
+    const groups = [...document.querySelectorAll("#instance-list .group")].map((g) => ({
+      name: g.querySelector(".gname")?.textContent?.trim(),
+      count: g.querySelector(".gcount")?.textContent?.trim(),
+    }));
+    const chips = [...document.querySelectorAll("#instance-list .port-chip")].map((c) =>
+      c.textContent.replace(/\s+/g, " ").trim());
+    const bus = [...s.buses.keys()][0];
+    return {
+      groups,
+      counts: {
+        cells: document.querySelector("#cell-count")?.textContent,
+        instances: document.querySelector("#instance-count")?.textContent,
+        buses: document.querySelector("#bus-count")?.textContent,
+      },
+      chips: chips.slice(0, 4),
+      typed: chips.filter((c) => /:\s*(uint\d+|bool|int\d+)/.test(c)).length,
+      modeBadges: document.querySelectorAll("#instance-list .mode-toggle").length,
+      busRowText: document.querySelector("#bus-list .item")?.textContent?.replace(/\s+/g, " ").trim().slice(0, 160),
+      skew: window.__eda.busSkew(bus),
+      focusables: document.querySelectorAll("#right [data-focus], #right [data-focus-btn]").length,
+    };
+  });
+  check(outliner.groups.length >= 2 && outliner.groups.every((g) => /× \d+/.test(g.count ?? "")),
+    `the outliner groups instances by cell TYPE with counts ` +
+    `(${outliner.groups.map((g) => `${g.name?.slice(0, 14)} ${g.count}`).join(", ")})`,
+    JSON.stringify(outliner.groups));
+  check(/\d/.test(outliner.counts.instances ?? "") && /\d/.test(outliner.counts.buses ?? "") &&
+        outliner.typed >= 3 && outliner.modeBadges >= 3,
+    `...section headers carry counts ("${outliner.counts.instances}", ` +
+    `"${outliner.counts.buses}"), chips read "name : type" (${outliner.typed} typed) ` +
+    `and each carries a mode badge (${outliner.modeBadges})`,
+    JSON.stringify(outliner));
+  check(outliner.focusables >= 2 && /routed/.test(outliner.busRowText ?? ""),
+    `...bus rows show endpoints + state${outliner.skew ? ` + timing (${outliner.skew.max_rt}t, skew ${outliner.skew.skew_rt}t)` : ""} ` +
+    `and ${outliner.focusables} rows are click-to-focus`,
+    outliner.busRowText);
+  await p0.evaluate(() => {
+    const s = window.__edaStudio();
+    window.__eda.select([...s.instances.keys()][1] ?? [...s.instances.keys()][0]);
+  });
+  await snap(p0, "outliner-grouped");
+
+  // ---- label declutter thresholds --------------------------------------
+  //
+  // Zoomed out, 40 labels are a grey mat over the geometry. The rule is a
+  // measured one — screen pixels per block at the label's own depth — so it can
+  // be checked rather than eyeballed. The cone MARKERS must survive: you lose
+  // the name, never the affordance.
+  const labels = await p0.evaluate(async () => {
+    const e = window.__eda;
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    e.key("Escape");                       // nothing selected: no exempt labels
+    await frame();
+    e.zoom(120); await frame();
+    const framed = e.labels();
+    e.zoom(900); await frame();
+    const wide = e.labels();
+    const markers = e.profile().markerObjects;
+    // The exemption: what you have SELECTED keeps its label at any distance.
+    e.select([...window.__edaStudio().instances.keys()][0]);
+    await frame();
+    const wideSelected = e.labels();
+    e.key("Escape");
+    e.zoom(120); await frame();
+    return { framed, wide, wideSelected, markers, thresholds: framed.thresholds };
+  });
+  check(labels.framed.shown > 0 && labels.wide.shown === 0 && labels.wide.hiddenSmall > 0,
+    `labels declutter by projected size: ${labels.framed.shown}/${labels.framed.total} shown with ` +
+    `the design framed (${labels.framed.pxPerBlock.toFixed(1)} px per block), ` +
+    `${labels.wide.shown} zoomed out — all ${labels.wide.hiddenSmall} below the ` +
+    `${labels.thresholds.minPxPerBlock} px-per-block legibility threshold`,
+    JSON.stringify({ framed: labels.framed, wide: labels.wide }));
+  check(labels.markers > 0,
+    `...and the 3-D port markers stay visible and pickable when their labels go ` +
+    `(${labels.markers} marker objects)`);
+  check(labels.wideSelected.shown === 1,
+    `...with one exemption: the SELECTED instance keeps its label at any zoom ` +
+    `(${labels.wideSelected.shown} of ${labels.wideSelected.total} survive at 900 blocks out)`,
+    JSON.stringify(labels.wideSelected));
+  check(labels.framed.shown > 0 &&
+        labels.framed.hiddenOverlap + labels.framed.shown + labels.framed.hiddenSmall +
+          labels.framed.hiddenBehind === labels.framed.total,
+    `...and colliding labels lose to the one nearest the camera, with every label ` +
+    `accounted for (${labels.framed.shown} shown, ${labels.framed.hiddenOverlap} overlapping, ` +
+    `${labels.framed.hiddenSmall} too small, ${labels.framed.hiddenBehind} behind the camera)`,
+    JSON.stringify(labels.framed));
+
+  // ---- undo / redo -------------------------------------------------------
+  const undo = await p0.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const settle = (ms = 500) => new Promise((r) => setTimeout(r, ms));
+    const cell = [...s.cells.keys()][0];
+
+    // (1) place -> undo -> redo
+    const u = e.place(cell, [400, -1, 400]);
+    await settle();
+    const afterPlace = s.instances.size;
+    const label = e.history().undo;
+    e.undo(); await settle();
+    const afterUndo = s.instances.size;
+    e.redo(); await settle();
+    const afterRedo = s.instances.size;
+    e.undo(); await settle();   // leave the document as we found it
+
+    // (2) a DRAG is one undo step, not sixty
+    const inst = [...s.instances.values()][0];
+    const home = [...inst.at];
+    const before = e.history();
+    for (let i = 0; i < 20; i++) {
+      window.__edaDragMove("instance", inst.name, [home[0] + i, home[1], home[2]]);
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    window.__edaDrag("instance", inst.name, [home[0] + 19, home[1], home[2]]);
+    await settle(800);
+    const moved = [...s.instances.get(inst.name).at];
+    e.undo(); await settle(800);
+    const restored = [...s.instances.get(inst.name).at];
+
+    // (3) deleting an instance that carries buses, then undoing it, brings the
+    //     BUS back too — the only undo that has to rebuild more than a transform.
+    const withBus = [...s.instances.values()].find((i) => e.busesOn(i.name).length > 0);
+    let busUndo = { skipped: true };
+    if (withBus) {
+      const carried = e.busesOn(withBus.name);
+      const before2 = { instances: s.instances.size, buses: s.buses.size };
+      s.removeInstance(withBus.name);
+      await settle(700);
+      const mid = { instances: s.instances.size, buses: s.buses.size };
+      e.undo();
+      await settle(1200);
+      busUndo = {
+        skipped: false, inst: withBus.name, carried,
+        before: before2, mid,
+        after: { instances: s.instances.size, buses: s.buses.size },
+        state: s.buses.size ? s.busState([...s.buses.keys()][0]) : "none",
+      };
+    }
+    return {
+      place: { name: u.name, afterPlace, afterUndo, afterRedo, label },
+      drag: { home, moved, restored, undoStepsAdded: 1, before },
+      busUndo,
+    };
+  });
+  check(undo.place.afterUndo === undo.place.afterPlace - 1 &&
+        undo.place.afterRedo === undo.place.afterPlace,
+    `undo/redo a placement: ${undo.place.afterPlace} → ${undo.place.afterUndo} → ` +
+    `${undo.place.afterRedo} instances ("${undo.place.label}")`, JSON.stringify(undo.place));
+  check(undo.drag.moved.join() !== undo.drag.home.join() &&
+        undo.drag.restored.join() === undo.drag.home.join(),
+    `a 20-frame drag is ONE undo step: ${undo.drag.moved.join(",")} → undo → ` +
+    `${undo.drag.restored.join(",")} (back where the gesture started)`,
+    JSON.stringify(undo.drag));
+  if (undo.busUndo.skipped) {
+    results.push({ ok: true, label: "undo of a bus-carrying delete SKIPPED (no such instance)", skipped: true });
+  } else {
+    check(undo.busUndo.mid.buses < undo.busUndo.before.buses &&
+          undo.busUndo.after.instances === undo.busUndo.before.instances &&
+          undo.busUndo.after.buses === undo.busUndo.before.buses &&
+          undo.busUndo.state === "routed",
+      `undoing the delete of ${undo.busUndo.inst} (carrying ${undo.busUndo.carried.join(", ")}) ` +
+      `restores the instance AND re-routes its bus ` +
+      `(${JSON.stringify(undo.busUndo.before)} → ${JSON.stringify(undo.busUndo.mid)} → ` +
+      `${JSON.stringify(undo.busUndo.after)}, ${undo.busUndo.state})`,
+      JSON.stringify(undo.busUndo));
+  }
+
+  // ---- confirm on destructive, with the COUNT in the prompt --------------
+  const confirmed = await p0.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const inst = [...s.instances.values()].find((i) => e.busesOn(i.name).length > 0);
+    if (!inst) return { skipped: true };
+    const carried = e.busesOn(inst.name);
+    e.select(inst.name);
+    e.key("Delete");
+    await new Promise((r) => setTimeout(r, 200));
+    const prompt = e.pendingConfirm();
+    e.confirmRespond(false);                       // Cancel
+    await new Promise((r) => setTimeout(r, 400));
+    return {
+      inst: inst.name, carried, prompt,
+      stillThere: s.instances.has(inst.name),
+      cleared: e.pendingConfirm() === null,
+      toasts: e.toasts(),
+    };
+  });
+  if (confirmed.skipped) {
+    results.push({ ok: true, label: "destructive confirm SKIPPED (no bus-carrying instance)", skipped: true });
+  } else {
+    check(confirmed.prompt != null &&
+          confirmed.prompt.title.includes(String(confirmed.carried.length)) &&
+          confirmed.carried.every((b) => confirmed.prompt.body.includes(b)) &&
+          confirmed.stillThere && confirmed.cleared,
+      `deleting ${confirmed.inst} asks first and puts the COUNT in the prompt ` +
+      `("${confirmed.prompt?.title}"), and Cancel keeps it`,
+      JSON.stringify(confirmed));
+  }
+
+  // ---- toasts stack, and each one dismisses -----------------------------
+  const toasts = await p0.evaluate(async () => {
+    const e = window.__eda;
+    document.querySelector("#toast").replaceChildren();
+    e.focusOn([0, 0, 0]);                       // harmless, just to have UI up
+    e.key("Escape");
+    e.select([...window.__edaStudio().instances.keys()][0]);
+    e.key("r"); await new Promise((r) => setTimeout(r, 500));
+    e.key("f");
+    e.key("r"); await new Promise((r) => setTimeout(r, 500));
+    const n = document.querySelectorAll("#toast .toast-item").length;
+    const overlapsHint = (() => {
+      const t = document.querySelector("#toast").getBoundingClientRect();
+      const h = document.querySelector("#hint").getBoundingClientRect();
+      return t.bottom > h.top;
+    })();
+    document.querySelector("#toast .toast-item .x")?.click();
+    const after = document.querySelectorAll("#toast .toast-item").length;
+    return { n, after, overlapsHint };
+  });
+  check(toasts.n >= 2 && toasts.after === toasts.n - 1 && toasts.overlapsHint === false,
+    `toasts STACK (${toasts.n} at once), each × dismisses one (${toasts.after} left), ` +
+    `and the column never overlaps the hint bar`, JSON.stringify(toasts));
+
+  check(p0errors.length === 0, `landing page: no console errors (${p0errors.length})`,
+    p0errors.slice(0, 3).join(" | "));
+  await p0.close();
+
+  // ======================================================================
+  // PART 1 — the interaction model, on the two-adder demo.
+  // ======================================================================
   const page = await browser.newPage({ viewport: { width: 1680, height: 980 } });
   const errors = [];
   page.on("console", (m) => { if (m.type() === "error") { errors.push(m.text()); console.log("console:", m.text()); } });
@@ -137,18 +461,29 @@ try {
 
   // ---- 6. delete by keyboard rips its bus -------------------------------
   const del = await page.evaluate(async () => {
-    window.__eda.key("Escape");
-    window.__eda.select("u0");
-    window.__eda.key("Delete");
-    await new Promise((r) => setTimeout(r, 800));
+    const e = window.__eda;
+    e.key("Escape");
+    e.select("u0");
+    const carried = e.busesOn("u0");
+    e.key("Delete");
+    await new Promise((r) => setTimeout(r, 250));
+    // u0 carries a bus, so this asks first — with the count.
+    const prompt = e.pendingConfirm();
+    e.confirmRespond(true);
+    await new Promise((r) => setTimeout(r, 900));
     const s = window.__edaStudio();
     return {
+      carried, prompt,
       instances: [...s.instances.keys()],
       buses: [...s.buses.keys()],
       toast: document.querySelector("#toast")?.textContent ?? "",
     };
   });
-  check(!del.instances.includes("u0"), `Delete removes u0 (${JSON.stringify(del.instances)})`);
+  check(del.prompt != null && del.prompt.title.includes(String(del.carried.length)) &&
+        del.carried.every((b) => del.prompt.body.includes(b)),
+    `Delete on a bus-carrying instance confirms first, naming the ${del.carried.length} bus(es) ` +
+    `("${del.prompt?.title}")`, JSON.stringify(del.prompt));
+  check(!del.instances.includes("u0"), `...and then removes u0 (${JSON.stringify(del.instances)})`);
   check(del.buses.length === 0, `its bus went with it (${JSON.stringify(del.buses)})`);
   check(/deleted/i.test(del.toast), `deletion is reported`, del.toast);
 
@@ -180,7 +515,55 @@ try {
   check(failed.state.startsWith("failed"),
     `moving the driver away leaves the bus FAILED with a reason`,
     JSON.stringify(failed.detail));
-  await snap(page, "bus-failed-red");
+
+  // The reason is 300+ characters of engine prose. What the UI must show is a
+  // SENTENCE: what failed, where, and what to move — with the raw text still
+  // one click away, and the coordinate wired to the camera.
+  const said = await page.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const bus = [...s.buses.keys()][0];
+    const raw = s.busStateDetail(bus).reason ?? "";
+    const h = e.humanReason(raw);
+    // The Buses panel: the human line, the fix, the raw detail, and the row
+    // that flies the camera to the blockage.
+    const row = document.querySelector("#bus-list .item");
+    return {
+      bus, rawLen: raw.length, h,
+      panelHeadline: row?.querySelector(".reason")?.textContent?.trim(),
+      panelFix: row?.querySelector(".fix")?.textContent?.trim(),
+      hasDetails: !!row?.querySelector("details .raw")?.textContent?.length,
+      line: e.busFailureLine(bus, raw),
+      toasts: e.toasts(),
+    };
+  });
+  check(said.h.kind !== "raw" && said.h.headline.length < said.rawLen / 2 &&
+        said.h.fix.length > 0 && Array.isArray(said.h.at),
+    `the ${said.rawLen}-char engine reason becomes a sentence (${said.h.kind}): ` +
+    `"${said.h.headline}" → "${said.h.fix}" @ ${JSON.stringify(said.h.at)}`,
+    JSON.stringify(said.h));
+  check(said.panelHeadline === said.h.headline && said.panelFix?.includes(said.h.fix.slice(0, 24)) &&
+        said.hasDetails,
+    `...the Buses panel shows headline + fix, and keeps the engine's own words ` +
+    `behind a disclosure`, JSON.stringify({ headline: said.panelHeadline, fix: said.panelFix }));
+  check(said.toasts.some((t) => /failed/i.test(t) && /Bus /.test(t)),
+    `...a toast says "Bus <name> failed: <what> — <fix>"`, JSON.stringify(said.toasts));
+  await snap(page, "bus-failed-reason");
+
+  // ...and the row flies the camera to the coordinate the router named.
+  const flew = await page.evaluate(async () => {
+    const e = window.__eda;
+    const before = e.focus();
+    document.querySelector("#bus-list .item [data-focus-btn]")?.click();
+    await new Promise((r) => setTimeout(r, 200));
+    const after = e.focus();
+    e.frameAll();                       // put the camera back for later shots
+    return { before, after };
+  });
+  check(flew.after && flew.after.target.join() === said.h.at.join(),
+    `...and the FAILED row is click-to-focus: the camera flew to ` +
+    `${JSON.stringify(flew.after?.target)}, the coordinate the router named`,
+    JSON.stringify(flew));
 
   const healed = await page.evaluate(async () => {
     const s = window.__edaStudio();
@@ -262,6 +645,48 @@ try {
   check(cam.before === true && cam.connecting.free === false && cam.after === true,
     `camera locks while connecting ("${cam.connecting.lock}") and frees on Esc`,
     JSON.stringify(cam));
+
+  // (a2) Esc cancels EVERY mode back to idle, and a click on empty ground
+  //      deselects. Two escape hatches, neither of which may leave state behind.
+  const cancels = await page.evaluate(async () => {
+    const e = window.__eda;
+    const s = window.__edaStudio();
+    const out = {};
+    const inst = [...s.instances.values()][0];
+    // A copy: `inst.at` is the live document state and every move mutates it.
+    const home = [...inst.at];
+
+    e.arm([...s.cells.keys()][0]);
+    out.placing = e.mode().kind;
+    e.key("Escape");
+    out.afterPlacing = { mode: e.mode().kind, camera: e.cameraFree() };
+
+    e.select(inst.name);
+    e.key("g");
+    out.grabbing = e.mode().kind;
+    window.__edaDragMove("instance", inst.name, [home[0] + 9, home[1], home[2] + 9]);
+    await new Promise((r) => setTimeout(r, 400));
+    e.key("Escape");
+    await new Promise((r) => setTimeout(r, 700));
+    out.afterGrab = {
+      mode: e.mode().kind, camera: e.cameraFree(),
+      at: [...s.instances.get(inst.name).at], home,
+    };
+
+    e.select(inst.name);
+    e.groundClick([300, 0, 300]);
+    out.afterGroundClick = e.selection();
+    return out;
+  });
+  check(cancels.placing === "placing" && cancels.afterPlacing.mode === "idle" &&
+        cancels.grabbing === "grabbing" && cancels.afterGrab.mode === "idle" &&
+        cancels.afterGrab.camera === true &&
+        cancels.afterGrab.at.join() === cancels.afterGrab.home.join(),
+    `Esc cancels cleanly from placing AND grabbing — the grab is put back where ` +
+    `it started (${cancels.afterGrab.at.join(",")}) and the camera is free again`,
+    JSON.stringify(cancels));
+  check(cancels.afterGroundClick === null,
+    `clicking empty ground deselects`, JSON.stringify(cancels.afterGroundClick));
 
   // (b) a greyed executor-only port offers a REVERSIBLE mode toggle.
   const promo = await page.evaluate(() => {
@@ -564,10 +989,21 @@ try {
 
   // The headline number, measured on a CLEAN page so nothing else is in the
   // scene: 10 placements over 3 distinct cells.
+  // `?empty=1`: the landing chain would be in the scene otherwise, and this
+  // measurement is about exactly ten placements and nothing else.
   const page2 = await browser.newPage({ viewport: { width: 1680, height: 980 } });
-  await page2.goto(`http://localhost:${PORT}/`, { waitUntil: "load" });
+  await page2.goto(`http://localhost:${PORT}/?empty=1`, { waitUntil: "load" });
   await page2.waitForFunction(() => window.__edaReady === true, null, { timeout: 120_000 });
   await page2.waitForFunction(() => window.__edaStudio().cells.size >= 3, null, { timeout: 120_000 });
+  const emptyState = await page2.evaluate(() => ({
+    open: window.__eda.emptyState(),
+    text: document.querySelector("#empty-state .card")?.textContent?.replace(/\s+/g, " ").trim() ?? "",
+    instances: window.__edaStudio().instances.size,
+  }));
+  check(emptyState.open === true && emptyState.instances === 0 &&
+        /Click a cell in Library/i.test(emptyState.text) && /click the ground/i.test(emptyState.text),
+    `with no design the canvas says what to do FIRST, in order ` +
+    `("${emptyState.text.slice(0, 96)}…")`, JSON.stringify(emptyState));
   const draws = await page2.evaluate(async () => {
     const e = window.__eda;
     const s = window.__edaStudio();
@@ -592,7 +1028,7 @@ try {
     `...and the draw calls track distinct CELLS (3), not the 10 placements: ` +
     `${draws.prof.drawCalls} calls, ${(draws.prof.drawCalls / draws.instances).toFixed(1)} per instance`,
     JSON.stringify(draws.prof));
-  await page2.screenshot({ path: path.join(docs, "09-instanced-10-placements.png") });
+  await snap(page2, "instanced-10-placements");
   await page2.close();
 
   check(errors.length === 0, `no console errors (${errors.length})`,

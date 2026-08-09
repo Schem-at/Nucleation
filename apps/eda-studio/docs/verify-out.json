@@ -1,8 +1,105 @@
 {
-  "when": "2026-08-09T06:00:32.568Z",
-  "passed": 43,
-  "total": 43,
+  "when": "2026-08-09T07:53:41.936Z",
+  "passed": 71,
+  "total": 71,
   "results": [
+    {
+      "ok": true,
+      "label": "the DEFAULT page lands on the verified chain, not an empty grid (u0:ADD007_8bit_, u1:BINTOBCD001_, u2:NUMDISPLAY00)",
+      "detail": "[{\"name\":\"u0\",\"cell\":\"ADD007_8bit_cca_matt\",\"at\":[0,0,0]},{\"name\":\"u1\",\"cell\":\"BINTOBCD001_8bit_comb_binary_to_bcd\",\"at\":[60,-2,40]},{\"name\":\"u2\",\"cell\":\"NUMDISPLAY001_fast_bcd_to_7seg\",\"at\":[110,1,40]}]"
+    },
+    {
+      "ok": true,
+      "label": "...with its buses already ROUTED, so the model is visible before you click ([{\"name\":\"bus0\",\"state\":\"routed\"},{\"name\":\"bus1\",\"state\":\"routed\"}])"
+    },
+    {
+      "ok": true,
+      "label": "a 4-step coach overlay opens on the first visit, at step 1 (\"1/4 · this is a routed design\")",
+      "detail": "{\"open\":true,\"step\":0,\"steps\":4,\"title\":\"1/4 · this is a routed design\",\"body\":\"Three community cells (adder → binary-to-BCD → 7-segment) with two routed buses between them. Drag to orbit, wheel to zoom, click a cell to select it.\",\"dismissed\":false}"
+    },
+    {
+      "ok": true,
+      "label": "the empty state is hidden and the demo is NOT an undoable edit",
+      "detail": "{\"empty\":false,\"history\":{\"canUndo\":false,\"canRedo\":false,\"undo\":null,\"redo\":null}}"
+    },
+    {
+      "ok": true,
+      "label": "Next walks all 4 steps and the last one dismisses it for good (1/4 → 2/4 → 3/4 → 4/4)",
+      "detail": "{\"seen\":[\"1/4 · this is a routed design\",\"2/4 · click a port to start a bus\",\"3/4 · R rotates, Del deletes\",\"4/4 · Exec/Bus, then Bake and Export\"],\"afterLast\":{\"open\":false,\"step\":4,\"steps\":4,\"title\":\"4/4 · Exec/Bus, then Bake and Export\",\"body\":\"Each port chip in the outliner carries a reversible Exec/Bus switch. Bake turns the design into a typed executor you can poke (right panel), and Export writes .schem / .litematic / .nucm.\",\"dismissed\":true},\"dismissed\":true}"
+    },
+    {
+      "ok": true,
+      "label": "a second visit does not re-open it (dismissal is remembered)",
+      "detail": "{\"open\":false,\"step\":0,\"steps\":4,\"title\":\"\",\"body\":\"\",\"dismissed\":true}"
+    },
+    {
+      "ok": true,
+      "label": "? opens the keyboard + colour legend (19 rows) and Esc closes it",
+      "detail": "{\"open\":true,\"rows\":19,\"closed\":true}"
+    },
+    {
+      "ok": true,
+      "label": "the outliner groups instances by cell TYPE with counts (ADD007_8bit_cc × 1, BINTOBCD001_8b × 1, NUMDISPLAY001_ × 1)",
+      "detail": "[{\"name\":\"ADD007_8bit_cca_matt\",\"count\":\"× 1\"},{\"name\":\"BINTOBCD001_8bit_comb_binary_to_bcd\",\"count\":\"× 1\"},{\"name\":\"NUMDISPLAY001_fast_bcd_to_7seg\",\"count\":\"× 1\"}]"
+    },
+    {
+      "ok": true,
+      "label": "...section headers carry counts (\"3 in 3 type(s)\", \"2 · 2 routed\"), chips read \"name : type\" (17 typed) and each carries a mode badge (11)",
+      "detail": "{\"groups\":[{\"name\":\"ADD007_8bit_cca_matt\",\"count\":\"× 1\"},{\"name\":\"BINTOBCD001_8bit_comb_binary_to_bcd\",\"count\":\"× 1\"},{\"name\":\"NUMDISPLAY001_fast_bcd_to_7seg\",\"count\":\"× 1\"}],\"counts\":{\"cells\":\"8\",\"instances\":\"3 in 3 type(s)\",\"buses\":\"2 · 2 routed\"},\"chips\":[\"▼ a : uint8 ✗\",\"▼ b : uint8 ✗\",\"▼ cin : boolean ✗\",\"▲ cout : boolean ✗\"],\"typed\":17,\"modeBadges\":11,\"busRowText\":\"bus0 routed 7t · skew 0t u0.sum → u1.bin · 8 bit Rip Re-route Focus Delete\",\"skew\":{\"per_bit_rt\":[7,7,7,7,7,7,7,7],\"skew_rt\":0,\"max_rt\":7},\"focusables\":4}"
+    },
+    {
+      "ok": true,
+      "label": "...bus rows show endpoints + state + timing (7t, skew 0t) and 4 rows are click-to-focus",
+      "detail": "bus0 routed 7t · skew 0t u0.sum → u1.bin · 8 bit Rip Re-route Focus Delete"
+    },
+    {
+      "ok": true,
+      "label": "labels declutter by projected size: 16/17 shown with the design framed (8.3 px per block), 0 zoomed out — all 17 below the 3.2 px-per-block legibility threshold",
+      "detail": "{\"framed\":{\"total\":17,\"shown\":16,\"hiddenSmall\":0,\"hiddenOverlap\":1,\"hiddenBehind\":0,\"pxPerBlock\":8.333461338252564,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}},\"wide\":{\"total\":17,\"shown\":0,\"hiddenSmall\":17,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":0,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}}}"
+    },
+    {
+      "ok": true,
+      "label": "...and the 3-D port markers stay visible and pickable when their labels go (6 marker objects)"
+    },
+    {
+      "ok": true,
+      "label": "...with one exemption: the SELECTED instance keeps its label at any zoom (1 of 18 survive at 900 blocks out)",
+      "detail": "{\"total\":18,\"shown\":1,\"hiddenSmall\":17,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":1.04601243037357,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}}"
+    },
+    {
+      "ok": true,
+      "label": "...and colliding labels lose to the one nearest the camera, with every label accounted for (16 shown, 1 overlapping, 0 too small, 0 behind the camera)",
+      "detail": "{\"total\":17,\"shown\":16,\"hiddenSmall\":0,\"hiddenOverlap\":1,\"hiddenBehind\":0,\"pxPerBlock\":8.333461338252564,\"thresholds\":{\"minPxPerBlock\":3.2,\"fadePxPerBlock\":9,\"cell\":[86,15]}}"
+    },
+    {
+      "ok": true,
+      "label": "undo/redo a placement: 4 → 3 → 4 instances (\"place u3\")",
+      "detail": "{\"name\":\"u3\",\"afterPlace\":4,\"afterUndo\":3,\"afterRedo\":4,\"label\":\"place u3\"}"
+    },
+    {
+      "ok": true,
+      "label": "a 20-frame drag is ONE undo step: 19,0,0 → undo → 0,0,0 (back where the gesture started)",
+      "detail": "{\"home\":[0,0,0],\"moved\":[19,0,0],\"restored\":[0,0,0],\"undoStepsAdded\":1,\"before\":{\"canUndo\":false,\"canRedo\":true,\"undo\":null,\"redo\":\"place u3\"}}"
+    },
+    {
+      "ok": true,
+      "label": "undoing the delete of u0 (carrying bus0) restores the instance AND re-routes its bus ({\"instances\":3,\"buses\":2} → {\"instances\":2,\"buses\":1} → {\"instances\":3,\"buses\":2}, routed)",
+      "detail": "{\"skipped\":false,\"inst\":\"u0\",\"carried\":[\"bus0\"],\"before\":{\"instances\":3,\"buses\":2},\"mid\":{\"instances\":2,\"buses\":1},\"after\":{\"instances\":3,\"buses\":2},\"state\":\"routed\"}"
+    },
+    {
+      "ok": true,
+      "label": "deleting u1 asks first and puts the COUNT in the prompt (\"Delete u1 and rip 2 buses?\"), and Cancel keeps it",
+      "detail": "{\"inst\":\"u1\",\"carried\":[\"bus1\",\"bus0\"],\"prompt\":{\"title\":\"Delete u1 and rip 2 buses?\",\"body\":\"u1 carries 2 routed buses: bus1, bus0. Deleting it removes them too. Undo (⌘/Ctrl-Z) puts everything back.\"},\"stillThere\":true,\"cleared\":true,\"toasts\":[\"undid delete u0\",\"kept u1\"]}"
+    },
+    {
+      "ok": true,
+      "label": "toasts STACK (3 at once), each × dismisses one (2 left), and the column never overlaps the hint bar",
+      "detail": "{\"n\":3,\"after\":2,\"overlapsHint\":false}"
+    },
+    {
+      "ok": true,
+      "label": "landing page: no console errors (0)"
+    },
     {
       "ok": true,
       "label": "library auto-loaded 8 cells, all with contract ports",
@@ -33,7 +130,7 @@
     {
       "ok": true,
       "label": "hint bar tells you what R/Del do",
-      "detail": "u0 selected  ·  R rotate 90°   G move   Del remove   Esc deselect  ·  drag: orbit · wheel: zoom"
+      "detail": "u0 selected  ·  R rotate 90°   G move   F frame   Del remove   Esc deselect  ·  drag: orbit · wheel: zoom  ·  ? keys"
     },
     {
       "ok": true,
@@ -54,7 +151,12 @@
     },
     {
       "ok": true,
-      "label": "Delete removes u0 ([\"u1\"])"
+      "label": "Delete on a bus-carrying instance confirms first, naming the 1 bus(es) (\"Delete u0 and rip 1 bus?\")",
+      "detail": "{\"title\":\"Delete u0 and rip 1 bus?\",\"body\":\"u0 carries 1 routed bus: bus0. Deleting it removes that bus too. Undo (⌘/Ctrl-Z) puts everything back.\"}"
+    },
+    {
+      "ok": true,
+      "label": "...and then removes u0 ([\"u1\"])"
     },
     {
       "ok": true,
@@ -63,7 +165,7 @@
     {
       "ok": true,
       "label": "deletion is reported",
-      "detail": "u0 deleted — ripped bus0"
+      "detail": "u0 rotated to 0°×bus from u0.sum — now click an input port×removed with it: bus0×u0 deleted — ripped bus0 · ⌘/Ctrl-Z to undo×"
     },
     {
       "ok": true,
@@ -73,6 +175,26 @@
       "ok": true,
       "label": "moving the driver away leaves the bus FAILED with a reason",
       "detail": "{\"state\":\"failed\",\"reason\":\"segment (15, 6, 25) -> (40, 2, 4): this bus form is a SINGLE-LEVEL 2y-pitch stack, but the two anchors' bit-0 dust sits at y=6 and y=2 (a 4-block level change). Move one endpoint's instance by -4 in y so both ports share a level, or split the run with a gate placed at the target level — vertical level adapters are not implemented yet\"}"
+    },
+    {
+      "ok": true,
+      "label": "the 335-char engine reason becomes a sentence (level): \"the two ends are on different levels — driver bit 0 at y=6, sink bit 0 at y=2 between (15, 6, 25) and (40, 2, 4)\" → \"move one endpoint's instance by -4 in y so both ports share a level, or split the run with a gate at the target level\" @ [15,6,25]",
+      "detail": "{\"at\":[15,6,25],\"blame\":[],\"detail\":\"segment (15, 6, 25) -> (40, 2, 4): this bus form is a SINGLE-LEVEL 2y-pitch stack, but the two anchors' bit-0 dust sits at y=6 and y=2 (a 4-block level change). Move one endpoint's instance by -4 in y so both ports share a level, or split the run with a gate placed at the target level — vertical level adapters are not implemented yet\",\"kind\":\"level\",\"headline\":\"the two ends are on different levels — driver bit 0 at y=6, sink bit 0 at y=2 between (15, 6, 25) and (40, 2, 4)\",\"fix\":\"move one endpoint's instance by -4 in y so both ports share a level, or split the run with a gate at the target level\"}"
+    },
+    {
+      "ok": true,
+      "label": "...the Buses panel shows headline + fix, and keeps the engine's own words behind a disclosure",
+      "detail": "{\"headline\":\"the two ends are on different levels — driver bit 0 at y=6, sink bit 0 at y=2 between (15, 6, 25) and (40, 2, 4)\",\"fix\":\"↳ move one endpoint's instance by -4 in y so both ports share a level, or split the run with a gate at the target level\"}"
+    },
+    {
+      "ok": true,
+      "label": "...a toast says \"Bus <name> failed: <what> — <fix>\"",
+      "detail": "[\"Bus bus1 failed: the two ends are on different levels — driver bit 0 at y=6, sink bit 0 at y=2 between (15, 6, 25) and (40, 2, 4)move one endpoint's instance by -4 in y so both ports share a level, or split the run with a gate at the target level\"]"
+    },
+    {
+      "ok": true,
+      "label": "...and the FAILED row is click-to-focus: the camera flew to [15,6,25], the coordinate the router named",
+      "detail": "{\"before\":{\"target\":[19.75,8,15.5],\"radius\":75.07753966353312},\"after\":{\"target\":[15,6,25],\"radius\":26}}"
     },
     {
       "ok": true,
@@ -109,13 +231,23 @@
     },
     {
       "ok": true,
+      "label": "Esc cancels cleanly from placing AND grabbing — the grab is put back where it started (0,-1,24) and the camera is free again",
+      "detail": "{\"placing\":\"placing\",\"afterPlacing\":{\"mode\":\"idle\",\"camera\":true},\"grabbing\":\"grabbing\",\"afterGrab\":{\"mode\":\"idle\",\"camera\":true,\"at\":[0,-1,24],\"home\":[0,-1,24]},\"afterGroundClick\":null}"
+    },
+    {
+      "ok": true,
+      "label": "clicking empty ground deselects",
+      "detail": "null"
+    },
+    {
+      "ok": true,
       "label": "u1.a: Exec->Bus makes it routable (step [0,2,0]), Bus->Exec restores it, and the outliner shows the toggle",
       "detail": "{\"port\":\"u1.a\",\"before\":\"executor\",\"promotedRoutable\":true,\"promotedStep\":[0,2,0],\"note\":\"`u1.a` is now a BUS input: 8 bit(s): repeater into the attachment block, connection dust one cell out — bit 0 lands on dust at (-1, 2, 24)\",\"hasToggle\":true,\"toggleLabel\":\"Bus\",\"restoredRoutable\":false,\"restoredNote\":\"`u1.a` is back to EXECUTOR hardware: 32 cell(s) restored exactly as shipped\"}"
     },
     {
       "ok": true,
       "label": "clicking executor-only u2.a as a bus target AUTO-PROMOTES it (executor -> bus, now routable) with no separate Promote click",
-      "detail": "{\"inst\":\"u2\",\"target\":\"u2.a\",\"modeBefore\":\"executor\",\"blockedBefore\":true,\"busesBefore\":1,\"toast\":\"promoted u2.a: 8 lever → 16 stone + 8 redstone_wire + 8 repeater; bus2 routed: u1.sum → u2.a\",\"lastConnect\":{\"bus\":\"bus2\",\"state\":\"routed\",\"promoted\":[\"u2.a: 8 lever → 16 stone + 8 redstone_wire + 8 repeater\"]},\"modeAfter\":\"bus\",\"routableAfter\":true,\"buses\":2,\"cellRemeshes\":1}"
+      "detail": "{\"inst\":\"u2\",\"target\":\"u2.a\",\"modeBefore\":\"executor\",\"blockedBefore\":true,\"busesBefore\":1,\"toast\":\"bus from u1.sum — now click an input port×promoted u2.a: 8 lever → 16 stone + 8 redstone_wire + 8 repeater×bus2 routed: u1.sum → u2.a×\",\"lastConnect\":{\"bus\":\"bus2\",\"state\":\"routed\",\"promoted\":[\"u2.a: 8 lever → 16 stone + 8 redstone_wire + 8 repeater\"]},\"modeAfter\":\"bus\",\"routableAfter\":true,\"buses\":2,\"cellRemeshes\":1}"
     },
     {
       "ok": true,
@@ -125,7 +257,7 @@
     {
       "ok": true,
       "label": "the gesture REPORTS what it promoted: \"u2.a: 8 lever → 16 stone + 8 redstone_wire + 8 repeater\"",
-      "detail": "toast: promoted u2.a: 8 lever → 16 stone + 8 redstone_wire + 8 repeater; bus2 routed: u1.sum → u2.a"
+      "detail": "toast: bus from u1.sum — now click an input port×promoted u2.a: 8 lever → 16 stone + 8 redstone_wire + 8 repeater×bus2 routed: u1.sum → u2.a×"
     },
     {
       "ok": true,
@@ -144,55 +276,60 @@
     {
       "ok": true,
       "label": "dragging an instance 20 frames triggers 0 cell re-meshes and 0 texture re-meshes (cells 4 -> 4)",
-      "detail": "{\"texture\":0,\"cells\":4,\"instancedGroups\":4,\"instanceAllocs\":0,\"matrixWrites\":33,\"buses\":15,\"loose\":1}"
+      "detail": "{\"texture\":0,\"cells\":4,\"instancedGroups\":4,\"instanceAllocs\":0,\"matrixWrites\":35,\"buses\":17,\"loose\":1}"
     },
     {
       "ok": true,
       "label": "...and reads NOTHING back out of wasm: it is 19 matrix writes",
-      "detail": "{\"before\":{\"flatten\":16,\"cellDump\":1,\"instDump\":2,\"busDump\":15,\"looseDump\":1},\"after\":{\"flatten\":16,\"cellDump\":1,\"instDump\":2,\"busDump\":15,\"looseDump\":1}}"
+      "detail": "{\"before\":{\"flatten\":18,\"cellDump\":1,\"instDump\":2,\"busDump\":17,\"looseDump\":1},\"after\":{\"flatten\":18,\"cellDump\":1,\"instDump\":2,\"busDump\":17,\"looseDump\":1}}"
     },
     {
       "ok": true,
-      "label": "...costing 0.03 ms of main-thread work per frame — a >999 fps budget, target >= 30 fps (<= 33 ms)"
+      "label": "...costing 0.04 ms of main-thread work per frame — a >999 fps budget, target >= 30 fps (<= 33 ms)"
     },
     {
       "ok": true,
-      "label": "live re-route commits at most one engine move per animation frame (21 commits over 20 frames, 7 ms each, scene update 3.1 ms) — no fixed throttle",
-      "detail": "{\"wallPerFrame\":103.575,\"commits\":21,\"commitMs\":6.7428571950821645,\"scene\":3.0523809591929116}"
+      "label": "live re-route commits at most one engine move per animation frame (21 commits over 20 frames, 7 ms each, scene update 3.3 ms) — no fixed throttle",
+      "detail": "{\"wallPerFrame\":33.52999999523163,\"commits\":21,\"commitMs\":7.0238095465160555,\"scene\":3.2714285736992244}"
     },
     {
       "ok": true,
       "label": "a port-mode toggle on u1.a re-meshes exactly 1 cell variant (+1 cell, +1 instance region read)",
-      "detail": "{\"port\":\"u1.a\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":4,\"instancedGroups\":4,\"instanceAllocs\":0,\"matrixWrites\":54,\"buses\":37,\"loose\":1},\"reads\":{\"flatten\":38,\"cellDump\":1,\"instDump\":2,\"busDump\":37,\"looseDump\":1}},\"mid\":{\"mesh\":{\"texture\":0,\"cells\":5,\"instancedGroups\":5,\"instanceAllocs\":0,\"matrixWrites\":55,\"buses\":38,\"loose\":1},\"reads\":{\"flatten\":39,\"cellDump\":1,\"instDump\":3,\"busDump\":38,\"looseDump\":1}}}"
+      "detail": "{\"port\":\"u1.a\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":4,\"instancedGroups\":4,\"instanceAllocs\":0,\"matrixWrites\":56,\"buses\":39,\"loose\":1},\"reads\":{\"flatten\":40,\"cellDump\":1,\"instDump\":2,\"busDump\":39,\"looseDump\":1}},\"mid\":{\"mesh\":{\"texture\":0,\"cells\":5,\"instancedGroups\":5,\"instanceAllocs\":0,\"matrixWrites\":57,\"buses\":40,\"loose\":1},\"reads\":{\"flatten\":41,\"cellDump\":1,\"instDump\":3,\"busDump\":40,\"looseDump\":1}}}"
     },
     {
       "ok": true,
-      "label": "re-routing bus1 re-meshes exactly 1 bus and 0 cells, in 7 ms",
-      "detail": "{\"bus\":\"bus1\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":56,\"buses\":39,\"loose\":1},\"reads\":{\"flatten\":40,\"cellDump\":1,\"instDump\":3,\"busDump\":39,\"looseDump\":1}},\"after\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":56,\"buses\":40,\"loose\":1},\"reads\":{\"flatten\":41,\"cellDump\":1,\"instDump\":3,\"busDump\":40,\"looseDump\":1}},\"ms\":6.6000001430511475}"
+      "label": "re-routing bus1 re-meshes exactly 1 bus and 0 cells, in 8 ms",
+      "detail": "{\"bus\":\"bus1\",\"before\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":58,\"buses\":41,\"loose\":1},\"reads\":{\"flatten\":42,\"cellDump\":1,\"instDump\":3,\"busDump\":41,\"looseDump\":1}},\"after\":{\"mesh\":{\"texture\":0,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":58,\"buses\":42,\"loose\":1},\"reads\":{\"flatten\":43,\"cellDump\":1,\"instDump\":3,\"busDump\":42,\"looseDump\":1}},\"ms\":7.599999904632568}"
     },
     {
       "ok": true,
-      "label": "textured view: pack loaded ({\"blockstates\":1106,\"models\":3402,\"textures\":3312}) in 274ms, meshed in 296ms"
+      "label": "textured view: pack loaded ({\"blockstates\":1106,\"models\":3402,\"textures\":3312}) in 255ms, meshed in 200ms"
     },
     {
       "ok": true,
       "label": "5 placements of REGISTER001_8bit_register cost exactly 1 cell mesh build and 1 instanced group (one InstancedMesh, vertex-coloured, 5 rows)",
-      "detail": "{\"before\":{\"texture\":1,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":56,\"buses\":41,\"loose\":1},\"after\":{\"texture\":6,\"cells\":7,\"instancedGroups\":7,\"instanceAllocs\":1,\"matrixWrites\":65,\"buses\":46,\"loose\":1}}"
+      "detail": "{\"before\":{\"texture\":1,\"cells\":6,\"instancedGroups\":6,\"instanceAllocs\":0,\"matrixWrites\":58,\"buses\":43,\"loose\":1},\"after\":{\"texture\":6,\"cells\":7,\"instancedGroups\":7,\"instanceAllocs\":1,\"matrixWrites\":67,\"buses\":48,\"loose\":1}}"
     },
     {
       "ok": true,
       "label": "...read out of wasm ONCE, from the cell itself — no per-instance region dumps (instDump 3 -> 3)",
-      "detail": "{\"before\":{\"flatten\":41,\"cellDump\":1,\"instDump\":3,\"busDump\":40,\"looseDump\":1},\"after\":{\"flatten\":46,\"cellDump\":2,\"instDump\":3,\"busDump\":45,\"looseDump\":1}}"
+      "detail": "{\"before\":{\"flatten\":43,\"cellDump\":1,\"instDump\":3,\"busDump\":42,\"looseDump\":1},\"after\":{\"flatten\":48,\"cellDump\":2,\"instDump\":3,\"busDump\":47,\"looseDump\":1}}"
+    },
+    {
+      "ok": true,
+      "label": "with no design the canvas says what to do FIRST, in order (\"No design yet Click a cell in Library (left) — it arms placement. Click the ground to place it. …\")",
+      "detail": "{\"open\":true,\"text\":\"No design yet Click a cell in Library (left) — it arms placement. Click the ground to place it. Click a green ▲ port, then a blue ▼ port, to route a bus. Bake, then poke its typed inputs (right panel). Load the verified chain Adder demo Show the keys The chain is ADD007 → BINTOBCD001 → NUMDISPLAY001, both buses routed.\",\"instances\":0}"
     },
     {
       "ok": true,
       "label": "10 placements over 3 distinct cells: 3 meshed cells, 3 instanced groups, **7 draw calls** for the whole scene (78752 triangles, 15 geometries)",
-      "detail": "{\"instances\":10,\"mesh\":{\"texture\":0,\"cells\":3,\"instancedGroups\":3,\"instanceAllocs\":0,\"matrixWrites\":10,\"buses\":0,\"loose\":0},\"prof\":{\"frames\":0,\"avgFrameMs\":0,\"avgGapMs\":0,\"fps\":0,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"sceneMs\":{\"placements\":0,\"unique\":0}}}"
+      "detail": "{\"instances\":10,\"mesh\":{\"texture\":0,\"cells\":3,\"instancedGroups\":3,\"instanceAllocs\":0,\"matrixWrites\":10,\"buses\":0,\"loose\":0},\"prof\":{\"frames\":3,\"avgFrameMs\":0.4333333174387614,\"avgGapMs\":167.43333331743875,\"fps\":5.972526379225148,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}}"
     },
     {
       "ok": true,
       "label": "...and the draw calls track distinct CELLS (3), not the 10 placements: 7 calls, 0.7 per instance",
-      "detail": "{\"frames\":0,\"avgFrameMs\":0,\"avgGapMs\":0,\"fps\":0,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"sceneMs\":{\"placements\":0,\"unique\":0}}"
+      "detail": "{\"frames\":3,\"avgFrameMs\":0.4333333174387614,\"avgGapMs\":167.43333331743875,\"fps\":5.972526379225148,\"drawCalls\":7,\"triangles\":78752,\"geometries\":15,\"textures\":0,\"programs\":5,\"cellGroups\":3,\"cellMeshes\":3,\"busMeshes\":0,\"looseMeshes\":0,\"sceneObjects\":3,\"markerObjects\":13,\"labels\":46,\"labelStats\":{\"total\":46,\"shown\":46,\"hiddenSmall\":0,\"hiddenOverlap\":0,\"hiddenBehind\":0,\"pxPerBlock\":32.137140779948645},\"sceneMs\":{\"placements\":0,\"unique\":0}}"
     },
     {
       "ok": true,
