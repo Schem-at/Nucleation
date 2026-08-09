@@ -188,12 +188,34 @@ class FlatBase {
 // bus handle
 // --------------------------------------------------------------------------
 
+/** Anything the core writes back from a call that used to be void — a route
+ *  report, say. `null` when the core wrote nothing, so a caller can treat
+ *  "this build does not report it" and "nothing to report" the same way. */
+function optionalReport(raw) {
+  if (typeof raw !== "string" || raw.trim() === "") return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 /** Handle returned by `routeBus`: live `.state`, drag and rip. */
 export class Bus {
-  constructor(design, name, gateNames) {
+  constructor(design, name, gateNames, report = null) {
     this.design = design;
     this.name = name;
     this.gateNames = [...gateNames];
+    /** What realizing the bus did beyond routing it — e.g. `promotions`, the
+     *  executor-only ports it converted so the bus could land. `null` on cores
+     *  that do not report it. */
+    this.report = report;
+  }
+  /** Ports the router promoted to make this bus land, as
+   *  `[{port, from, to, note}]` (best effort: `[]` when unreported). */
+  get promotions() {
+    const p = this.report?.promotions ?? this.report?.promoted ?? [];
+    return Array.isArray(p) ? p : [];
   }
   get state() { return this.design.busState(this.name); }
   get skew() { return this.design.busSkew(this.name); }
@@ -242,13 +264,13 @@ class DesignBase {
 
   routeBus(name, { driver, sinks, gates = [], style = null }) {
     const [gj, gateNames] = gatesJson(gates);
-    this._d.routeBus(name, driver, namesJson(sinks), gj, styleJson(style));
-    return new Bus(this, name, gateNames);
+    const raw = this._d.routeBus(name, driver, namesJson(sinks), gj, styleJson(style));
+    return new Bus(this, name, gateNames, optionalReport(raw));
   }
   routeBusOr(name, { drivers, sinks, gates = [], style = null }) {
     const [gj, gateNames] = gatesJson(gates);
-    this._d.routeBusOr(name, namesJson(drivers), namesJson(sinks), gj, styleJson(style));
-    return new Bus(this, name, gateNames);
+    const raw = this._d.routeBusOr(name, namesJson(drivers), namesJson(sinks), gj, styleJson(style));
+    return new Bus(this, name, gateNames, optionalReport(raw));
   }
   addGate(bus, gate, anchor, step) {
     const [x, y, z] = anchor, [sx, sy, sz] = step;
