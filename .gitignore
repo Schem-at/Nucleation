@@ -118,3 +118,17 @@ tests/corpus/lithium/
 
 # Scratch run logs.
 /logs
+
+# ---------------------------------------------------------------------------
+# Build output must never be committed. target/ reached 102 GB on one machine
+# (774k files in debug/deps alone); a single tracked artifact makes every clone
+# pay for it forever. The `hygiene` job in .github/workflows/dev-tiers.yml
+# fails the build if any of this becomes tracked.
+# See docs/DEV.md → "Disk hygiene" for when and how to prune.
+# ---------------------------------------------------------------------------
+# Cargo target dirs anywhere in the tree (crates/*, bindings/*, examples/*),
+# not just the root one already listed at the top of this file.
+**/target/
+# Input stamps written by tools/package-npm.sh so an unchanged wasm/npm package
+# is skipped instead of rebuilt.
+.build-stamp

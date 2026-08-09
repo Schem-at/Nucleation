@@ -113,15 +113,28 @@ saved, and is saved settled so what you paste is what was proven.
 
 Also in the box: layer-art templates (schematics from ASCII art).
 
+**Start here: [`docs/DEV.md`](docs/DEV.md) — the iteration recipe.** The crate
+builds under many feature combinations, and each one recompiles all 159
+dependencies into its own artifacts; picking features ad hoc is what turned
+edit-check loops into hour-long ones. `docs/DEV.md` has the canonical feature
+set, the tier table, and the disk-hygiene rules.
+
 ```bash
+brew install sccache                # prerequisite (wired in .cargo/config.toml)
+tools/dev.sh fast [crate]           # the loop — seconds
+tools/dev.sh pre-land               # tests + wasm32 + studio + smoke — minutes
+tools/dev.sh full                   # the merge gate — exhaustive, all features
+tools/doctor.sh                     # "why is my loop slow?" / disk hygiene
+
 cargo test                          # core suite
 ./tools/gen-bindings.sh             # regenerate bindings (diplomat-tool fork)
 ./examples/bridge_smoke/js/run.sh   # end-to-end smoke per language
 ```
 
-The release/manual CI matrix regenerates bindings and fails on drift, exercises
-every built wheel and the assembled JAR, and smoke-tests all seven language
-bindings.
+`.github/workflows/dev-tiers.yml` runs those same tiers on push and PR with
+sccache and target caching. The release/manual CI matrix regenerates bindings
+and fails on drift, exercises every built wheel and the assembled JAR, and
+smoke-tests all seven language bindings.
 
 ## License
 

@@ -328,9 +328,29 @@ Python with every coordinate read from the contract. Remaining gaps:
 
 ## Process
 
+- **Iteration speed (LANDED, 2026-08-09).** Iterations were 1h15–1h45. Measured
+  causes, in order of size: (1) every one of the 159 dependencies compiled at
+  `debuginfo=2` with macOS `split-debuginfo=unpacked`, per feature combination —
+  774,187 files and 85 GB in `target/debug`, and a 180s `cargo check` after
+  touching one file; (2) three concurrent cargo processes (dev loop, wasm32
+  build, RustRover flycheck on a *different* feature set) serialising on the
+  build-directory lock; (3) no compiler cache across feature sets. Fixes:
+  `[profile.dev.package."*"] debug = 0`, sccache as `build.rustc-wrapper`, one
+  canonical loop feature set (`bridge-full,routing,hdl,meshing`), and
+  `tools/dev.sh` tiers. Result: touch-one-file check **180.3s → 11.3s**,
+  `cargo test -p mc-tick` **52.8s → 12.3s**, `target/` **102 GB → 19 GB**,
+  and a `fast` tier at **~4s**. A no-op check was *not* improved (0.4s in
+  steady state both before and after; the occasional 30s first-run is a cold
+  page cache, not fingerprint count — that hypothesis was tested and rejected).
+  **The exhaustive sim suites below are now sampled outside the `full` tier** —
+  `tools/dev.sh fast` passes `--cases 24`; `tools/dev.sh full` sets
+  `EDA_EXHAUSTIVE=1` and runs them whole. Recipe: [`docs/DEV.md`](../docs/DEV.md).
+  Disk hygiene: `tools/doctor.sh`.
 - **P1 CI for the demo suite.** demo1–4, `rca_cells --bits 2`, `seg7`,
-  `seq_probe`, `accumulator` all run in minutes and gate the whole stack;
-  none run in CI. This move was verified by hand — that should be a workflow.
+  `seq_probe`, `accumulator` all run in minutes and gate the whole stack.
+  `tools/dev.sh full` + `.github/workflows/dev-tiers.yml` now run the
+  exhaustive adder/ALU/genlib/rca/hdl sweeps on PRs and nightly; the remaining
+  demo scripts (`seq_probe`, `accumulator`, demo1–4) still need adding there.
 - **P1 Wheel-drift detection.** A stale venv wheel silently lacked
   `Routing.lvs` during the post-move verification (AttributeError deep in a
   40-minute run). Scripts should assert the bridge surface they need at
