@@ -6,12 +6,23 @@ cells.  Physics + rankings: `../notes-vertical-transport.md`.
 Templates: `../vforms.py`.  Probes: `../probe_vertical_forms.py`,
 `../probe_spiral_tiling.py`.
 
+  vriser_ring53.schem   **THE RECOMMENDED RISER.**  4-bit spiral staircase on
+                        one 5x3 ring, bits at path-offset 3 (the generalisation
+                        of "offset 180 degrees").  0 gt, no toggle limit, and
+                        the same geometry climbs AND descends.
   vriser_ladder8.schem  8-bit torch-ladder riser, towers at x-PITCH 1 with
                         ports on alternating sides -- 1 block per y per bit,
-                        the densest legal riser.  UP only, inverts per torch.
-  vriser_ring53.schem   4-bit spiral-staircase riser on one 5x3 ring, bits at
-                        path-offset 3 (the generalisation of "offset 180
-                        degrees") -- the densest form that also goes DOWN.
+                        but ⚠ **STATIC / LOW-TOGGLE SIGNALS ONLY**: 1 gt per y
+                        on the critical path, and its torches BURN OUT above
+                        one input change per 4 gt (`../probe_torch_burnout.py`).
+                        Kept as a reference for configuration and mode lines,
+                        NOT for bus data.
+
+Note what these checks do and do not cover: the lever matrix here is driven
+with `rs.Levers`, which SETTLES after every flip, so it proves isolation and
+conduction and says nothing about burnout.  Rate-driven verification lives in
+`../probe_torch_burnout.py` -- see the methodology section of
+`../notes-vertical-transport.md`.
 """
 import itertools
 import os
@@ -106,13 +117,18 @@ def ring53():
 
 
 bad = 0
-for name, mk in (("vriser_ladder8", ladder8), ("vriser_ring53", ring53)):
+for name, mk, tag in (("vriser_ring53", ring53, "recommended riser"),
+                      ("vriser_ladder8", ladder8,
+                       "STATIC SIGNALS ONLY -- burns out above 1 change/4 gt")):
     b, levs, outs, nets = mk()
     if check(name, b, levs, outs, nets):
         path = os.path.join(HERE, name + ".schem")
         b.s.save_to_file(path)
-        print("     saved %s (%d blocks)" % (path, len(b.cells)))
+        print("     saved %s (%d blocks) -- %s" % (path, len(b.cells), tag))
     else:
         bad += 1
+# the contract the notes' ranking rests on, asserted here too
+assert vf.data_safe("ring_riser") and not vf.data_safe("torch_ladder"), \
+    "vforms.data_safe must gate the ladder and pass the ring riser"
 print("showcase_vertical: %d/2" % (2 - bad))
 raise SystemExit(1 if bad else 0)
