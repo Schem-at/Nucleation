@@ -348,26 +348,47 @@ impl UniversalSchematic {
     /// `overlapping_named_regions_have_stable_lexicographic_precedence`), then
     /// named regions in stable lexicographic order.
     ///
-    /// KNOWN DEFECT, deliberately not papered over here: the masking volume is
-    /// [`Region::get_bounding_box`], which reports a region's ALLOCATED
-    /// envelope rather than its contents — a 10x18x6 schematic built with
-    /// `set_block_from_string` reports `(0,0,0)..(10,65,65)`. Since a region
-    /// also densely materializes air (`Some(air)` for every in-bounds cell it
-    /// was never written to), the default region masks that whole phantom
-    /// envelope, hiding named `inst:*` / `bus:*` layers that `iter_blocks` and
-    /// the export path can both see. Making air transparent here would fix
-    /// composites but breaks the intentional `main_air_masks` contract, so the
-    /// real fix belongs in `Region::get_bounding_box` (report the true block
-    /// extent) — see the ignored tests in `tests/design_layer_precedence.rs`.
+    /// The masking volume is [`Region::get_tight_bounds`] — the extent of the
+    /// blocks a region actually holds — NOT [`Region::get_bounding_box`], which
+    /// reports the ALLOCATED envelope (a 10x18x6 schematic built with
+    /// `set_block_from_string` reports `(0,0,0)..(10,65,65)`). A region also
+    /// densely materializes air (`Some(air)` for every in-bounds cell it was
+    /// never written to), so masking on the allocated envelope hid a
+    /// composite's named `inst:*` / `bus:*` layers behind phantom air that
+    /// `iter_blocks` and the export path could both see — see
+    /// `tests/design_layer_precedence.rs`. Tight bounds keep the intentional
+    /// `main_air_masks` contract (air BETWEEN two of the region's own blocks is
+    /// inside its tight bounds and does still mask) while dropping the phantom.
+    /// Two separate questions, and conflating them was the bug: WHO MASKS WHOM
+    /// (tight bounds) versus WHAT AN UNCLAIMED IN-BOUNDS CELL READS AS (the
+    /// allocated envelope, where a region answers `Some(air)`).
+    ///
+    /// Pass 1 resolves precedence over the cells regions actually hold. Only if
+    /// nobody holds the cell does pass 2 fall back to the dense-air answer, so
+    /// `get_block` still reports `Some(air)` inside a region's storage — the
+    /// contract `formats::litematic` and `schematic_builder` depend on — without
+    /// that phantom air masking the layer underneath.
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> Option<&BlockState> {
-        if self.default_region.get_bounding_box().contains((x, y, z)) {
-            // Fall through on a genuine absence rather than discarding the
-            // named layers, matching `get_block_entity`.
+        // Pass 1: real content, in precedence order.
+        if Self::region_holds(&self.default_region, (x, y, z)) {
             if let Some(b) = self.default_region.get_block(x, y, z) {
                 return Some(b);
             }
         }
-        // Named regions in stable lexicographic precedence.
+        for region in Self::sorted_named_regions(self) {
+            if Self::region_holds(region, (x, y, z)) {
+                if let Some(b) = region.get_block(x, y, z) {
+                    return Some(b);
+                }
+            }
+        }
+        // Pass 2: nobody holds this cell. Report it as the owning storage sees
+        // it, which for a region that has allocated the cell is `Some(air)`.
+        if self.default_region.get_bounding_box().contains((x, y, z)) {
+            if let Some(b) = self.default_region.get_block(x, y, z) {
+                return Some(b);
+            }
+        }
         for region in Self::sorted_named_regions(self) {
             if region.get_bounding_box().contains((x, y, z)) {
                 if let Some(b) = region.get_block(x, y, z) {
@@ -376,6 +397,15 @@ impl UniversalSchematic {
             }
         }
         None
+    }
+
+    /// Does `region` actually HOLD content at `pos`?
+    ///
+    /// True only inside the region's TIGHT bounds — the extent of the blocks it
+    /// really has. A region that never wrote near `pos` claims nothing there, so
+    /// it cannot shadow a layer below it with phantom air.
+    fn region_holds(region: &Region, pos: (i32, i32, i32)) -> bool {
+        region.get_tight_bounds().is_some_and(|bb| bb.contains(pos))
     }
 
     pub fn get_block_entity(&self, position: BlockPosition) -> Option<&BlockEntity> {

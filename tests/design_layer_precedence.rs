@@ -1,27 +1,36 @@
 //! Two composite-document bugs that made a `Design` look broken from outside.
 //!
-//! 1. `get_block` precedence — the default region's allocated BOUNDING BOX
-//!    shadows every named layer inside it, so a composite's `inst:*` /
-//!    `bus:*` layers are invisible to point queries even though `iter_blocks`
-//!    and the export path can see them. STILL OPEN, and the two tests below
-//!    are `#[ignore]`d executable specifications of it rather than passing
-//!    assertions, because the fix does not belong in `get_block`:
+//! 1. `get_block` precedence — the default region's allocated BOUNDING BOX used
+//!    to shadow every named layer inside it, so a composite's `inst:*` /
+//!    `bus:*` layers were invisible to point queries even though `iter_blocks`
+//!    and the export path could see them. FIXED: the masking volume is now
+//!    `Region::get_tight_bounds()`, the extent of the blocks a region actually
+//!    holds. The three facts that made the bug:
 //!
 //!    - `Region::get_bounding_box()` reports a region's ALLOCATED envelope,
 //!      not its contents — a 10x18x6 schematic reports `(0,0,0)..(10,65,65)`.
 //!    - a region densely materializes air, answering `Some(air)` for every
 //!      in-bounds cell it was never written to.
-//!    - so the default region masks that entire phantom envelope.
+//!    - so the default region masked that entire phantom envelope.
 //!
-//!    Making air transparent in `get_block` would fix composites but breaks
-//!    `main_air_masks` in
+//!    Making air transparent in `get_block` would have fixed composites but
+//!    broken `main_air_masks` in
 //!    `universal_schematic::tests::overlapping_named_regions_have_stable_lexicographic_precedence`,
-//!    which deliberately asserts that Main's air DOES mask a named layer. Both
-//!    can only hold once `Region::get_bounding_box` reports the true block
-//!    extent, which is a core change with a wide blast radius (export formats,
-//!    meshing, stamping) and wants its own review. `Design` already sidesteps
-//!    it: `design.rs::cell_bounds` computes the true extent itself, without
-//!    which every ROTATED instance was placed tens of blocks off.
+//!    which deliberately asserts that Main's air DOES mask a named layer.
+//!    Tight bounds satisfy both: air BETWEEN two of Main's own blocks is inside
+//!    Main's tight bounds and still masks, while an envelope Main never wrote to
+//!    is outside them and masks nothing.
+//!
+//!    What tight bounds do NOT fix is dense air INSIDE a region's true extent,
+//!    which is the one case `main_air_masks` pins to the opposite answer. See
+//!    `a_routed_design_is_point_queryable_through_its_bus_layer`, still ignored,
+//!    for the measurement and why it needs its own decision.
+//!
+//!    This is the THIRD defect from the allocated-envelope class. The first was
+//!    every ROTATED instance landing tens of blocks off, which `Design`
+//!    sidesteps in `design.rs::cell_bounds` by computing the true extent
+//!    itself. Anything sizing, rotating or transforming content wants tight
+//!    bounds; only storage/allocation questions want the envelope.
 //! 2. `check()` blamed the design for a LIBRARY CELL's interior. Hand-built
 //!    community redstone breaks the route-oriented DRC conventions by design
 //!    (one 8-bit community adder reports hundreds of "floating" cells), so
@@ -41,9 +50,6 @@ const LEVER: &str = "minecraft:lever[face=floor,facing=north,powered=false]";
 const DUST: &str = "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]";
 
 #[test]
-#[ignore = "open: Region::get_bounding_box reports the allocated envelope, not the \
-            true block extent, so the default region's air masks named layers inside it. \
-            See the module docs."]
 fn a_named_layer_is_visible_through_the_default_regions_envelope() {
     let mut s = UniversalSchematic::new("composite".to_string());
     // A default-region block far out, so the default region's envelope grows
@@ -70,10 +76,99 @@ fn a_named_layer_is_visible_through_the_default_regions_envelope() {
     );
 }
 
+/// Regression pin for the allocated-envelope defect class, stating BOTH halves
+/// of the contract in one place so a future "simplification" of `get_block`
+/// cannot satisfy one by breaking the other.
+///
+/// Half A: air a region actually surrounds DOES mask the layers below it.
+/// Half B: an envelope a region never wrote to masks NOTHING.
 #[test]
-#[ignore = "open: same phantom-envelope masking as above, seen end to end — a routed \
-            bus layer is invisible to get_block inside the loose layer's envelope."]
+fn masking_follows_tight_bounds_not_the_allocated_envelope() {
+    // Half A — the `main_air_masks` contract. Main holds blocks either side of
+    // (10,0,0) but not the cell itself, so (10,0,0) is inside Main's TIGHT
+    // bounds and Main's air wins over the named layer.
+    let mut air_masks = UniversalSchematic::new("air-masks".to_string());
+    assert!(air_masks.set_block_in_region_str("inst:u0", 10, 0, 0, STONE));
+    air_masks.set_block_from_string(9, 0, 0, STONE).unwrap();
+    air_masks.set_block_from_string(11, 0, 0, STONE).unwrap();
+    assert_eq!(
+        air_masks.get_block(10, 0, 0).map(|b| b.name.to_string()).as_deref(),
+        Some("minecraft:air"),
+        "air a region surrounds must still mask the layer below it"
+    );
+
+    // Half B — the phantom envelope. A region's storage is padded when it GROWS,
+    // so two blocks at (0,0,0) and (80,40,80) allocate out to (144,104,144)
+    // while the true extent stops at (80,40,80). (100,50,100) is inside the
+    // allocated envelope and outside the content: pure phantom.
+    let phantom_cell = (100, 50, 100);
+    let mut phantom = UniversalSchematic::new("phantom".to_string());
+    phantom.set_block_from_string(0, 0, 0, STONE).unwrap();
+    phantom.set_block_from_string(80, 40, 80, STONE).unwrap();
+    assert!(phantom.set_block_in_region_str(
+        "bus:net",
+        phantom_cell.0,
+        phantom_cell.1,
+        phantom_cell.2,
+        STONE
+    ));
+    assert!(
+        phantom.default_region.get_bounding_box().contains(phantom_cell),
+        "precondition: the allocated envelope must cover the queried cell, or \
+         this test is not exercising the defect"
+    );
+    assert_eq!(
+        phantom.default_region.get_tight_bounds().map(|bb| bb.contains(phantom_cell)),
+        Some(false),
+        "precondition: tight bounds must NOT cover it"
+    );
+    assert_eq!(
+        phantom
+            .get_block(phantom_cell.0, phantom_cell.1, phantom_cell.2)
+            .map(|b| b.name.to_string())
+            .as_deref(),
+        Some("minecraft:stone"),
+        "a phantom envelope must not mask a named layer"
+    );
+
+    // A region holding nothing at all claims nothing at all.
+    let mut empty_main = UniversalSchematic::new("empty-main".to_string());
+    assert!(empty_main.set_block_in_region_str("inst:u0", 0, 0, 0, STONE));
+    assert_eq!(
+        empty_main.get_block(0, 0, 0).map(|b| b.name.to_string()).as_deref(),
+        Some("minecraft:stone")
+    );
+}
+
+#[test]
+#[ignore = "open, and NOT the same bug as above — see the comment in the body. Needs a \
+            product decision on whether UNWRITTEN air masks, which directly contradicts \
+            the `main_air_masks` contract. Workaround: query `bus:*` by region."]
 fn a_routed_design_is_point_queryable_through_its_bus_layer() {
+    // WHY THIS IS STILL IGNORED, precisely (measured 2026-08-09).
+    //
+    // Tight-bounds masking fixed the PHANTOM ENVELOPE half of this bug class:
+    // a region no longer masks an area it never wrote to. This case is the
+    // other half, and it is a genuine contract conflict, not an oversight:
+    //
+    //   - The loose layer legitimately holds blocks at x=0..1 and x=24, y=1..16,
+    //     z=8, so its TIGHT bounds envelop the whole bus corridor. The bus is
+    //     routed through cells like (2,1,8) that are inside those tight bounds
+    //     and that the loose layer never wrote — dense air.
+    //   - `main_air_masks` in
+    //     `universal_schematic::tests::overlapping_named_regions_have_stable_lexicographic_precedence`
+    //     asserts that Main's air at (10,0,0) — ALSO never written, also merely
+    //     inside Main's tight bounds — DOES mask a named layer.
+    //
+    // Those are the same configuration with opposite expected answers, so no
+    // masking volume can satisfy both. `Region` cannot tell written air from
+    // dense air either: `set_block` only extends tight bounds for non-air
+    // (src/region.rs:226), and nothing records explicit air writes. Resolving
+    // this means deciding which contract wins and paying the blast radius
+    // (export formats, meshing, stamping) — a reviewable change of its own.
+    //
+    // Until then `Design` consumers read a bus layer by name rather than by
+    // point query, which is unambiguous and needs no precedence rule.
     // The end-to-end shape of bug 1: a routed bus lives in region `bus:*`,
     // inside the loose layer's envelope.
     let mut s = UniversalSchematic::new("d".to_string());
