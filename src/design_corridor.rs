@@ -53,6 +53,10 @@ pub struct Effort {
 /// call in the studio, and a bus that cannot be routed has to say so quickly.
 /// A hopeless search explores its whole bound before failing, so the bound —
 /// not the iteration cap — is what keeps the worst case bearable.
+/// A third, far more determined rung (`turn_cost: 1, margin: 256, max_iter:
+/// 1_500_000`) was measured on 2026-08-09 and recovered ZERO of the four
+/// residual `design_routability` failures while adding ~25s to the suite. The
+/// residuals are not search-budget-bound; see [`cross_level_probe`].
 pub const LADDER: [Effort; 2] = [
     Effort {
         turn_cost: 12,
@@ -389,6 +393,46 @@ fn compress(cells: &[P3]) -> Vec<P3> {
     out
 }
 
+/// Would this bus route if it were allowed to change level?
+///
+/// Separates the two ways a corridor search can come back empty, which the user
+/// has to fix in completely different ways:
+///
+/// - the bus's own LEVEL is congested, but a clear lane exists a few blocks up
+///   or down. Nothing the user places can help; the bus form is a single-level
+///   2y-pitch stack and cannot ramp (bit `k`'s dust at `y0 + 2k` is capped by
+///   bit `k+1`'s opaque support at `y0 + 2k + 1`, so the stack cannot climb
+///   without first spreading its pitch). This names the capability gap.
+/// - no level is clear, so the workspace really is full and moving something is
+///   the only fix.
+///
+/// Diagnosis-only: this runs once, on the failure path, never in the search.
+fn cross_level_probe(occ: &OccupancyIndex, a: P3, b: P3, width: u8) -> String {
+    let effort = LADDER[0];
+    let mut clear = Vec::new();
+    for dy in [-8, -6, -4, -2, 2, 4, 6, 8] {
+        let (a2, b2) = ((a.0, a.1 + dy, a.2), (b.0, b.1 + dy, b.2));
+        if search(occ, a2, b2, width, effort).is_some() {
+            clear.push(a2.1);
+        }
+    }
+    if clear.is_empty() {
+        return " No level within 8 blocks up or down is clear either, so this is real congestion \
+                 rather than a level-change limitation."
+            .to_string();
+    }
+    format!(
+        " A clear corridor DOES exist at y={} — this bus's level is the problem, not the \
+         workspace. The bus form is a single-level 2y-pitch stack and cannot ramp between levels, \
+         so shift an endpoint's instance in y instead of clearing space.",
+        clear
+            .iter()
+            .map(|y| y.to_string())
+            .collect::<Vec<_>>()
+            .join(" or y=")
+    )
+}
+
 /// The user-facing reason a corridor could not be found. Names the cause AND
 /// the location, because the studio shows this string to the user verbatim.
 ///
@@ -434,11 +478,12 @@ pub fn diagnose(occ: &OccupancyIndex, a: P3, b: P3, width: u8, tried: &[String])
         None => "the direct line is clear but the template shapes were rejected".to_string(),
     };
     let culprits = blocking_layers(&f, a, b);
+    let level = cross_level_probe(occ, a, b, width);
     format!(
         "no corridor from {:?} to {:?} for a {width}-bit bus on level y={}: {line}. A bounded \
          detour search (margin {} cells, {} nodes) found no clear rectilinear corridor either — \
-         the layers hemming the endpoints in are: {}. Move one of them, give the bus a gate to \
-         route through in two legs, or free a lane at least 1 cell clear of other redstone \
+         the layers hemming the endpoints in are: {}.{level} Move one of them, give the bus a gate \
+         to route through in two legs, or free a lane at least 1 cell clear of other redstone \
          (dust one cell apart shorts, so the corridor needs 2 cells of pitch). Template \
          attempts: {}",
         a,

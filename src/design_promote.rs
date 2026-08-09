@@ -39,12 +39,45 @@
 //! it, so dust placed on top of the lamp reads the signal without touching the
 //! lamp at all — the port stays executor-READABLE and becomes routable.
 //!
+//! ## Why not use a repeater for EVERY face?
+//!
+//! Tempting, because a repeater takes its input from BEHIND, horizontally, so a
+//! bus could approach in the port's own row orientation and the pivot below
+//! would be unnecessary. It does not work for a FLOOR lever, and the reason is
+//! geometric rather than a tuning matter: a repeater emits from its front FACE,
+//! horizontally. It never powers the block BENEATH it, and a floor lever's
+//! attachment block is precisely the block beneath it.
+//!
+//! Measured in the tick engine on 2026-08-09 (attachment block below the
+//! driver, consumer = a repeater reading that block from behind):
+//!
+//! | driver in the lever's cell | consumer sees |
+//! |----------------------------|---------------|
+//! | floor LEVER (reference)    | 15 — DRIVES   |
+//! | REPEATER                   | 0  — DEAD     |
+//! | DUST (what we do)          | 15 — DRIVES   |
+//!
+//! So the per-face split above is not an accident of history; it is the only
+//! assignment that works. The repeater strategy stays where the attachment
+//! block is BESIDE the driver (`face=wall`), which is exactly where it is used.
+//!
 //! # Form: the PIVOT
 //!
 //! Promotion is only half the job. A bus realizes the verified vertical
 //! 2y-pitch stack, and community IO is often a horizontal ROW (`BINTOBCD001`'s
 //! `bin` levers march along x at pitch 2). Such a port is dust, routable in
 //! principle, and still unusable — its step is `(2,0,0)`, not `(0,2,0)`.
+//!
+//! The pivot is a WORKAROUND for a realizer limitation, not a design goal, and
+//! it is the reason promoted buses look more complicated than they should. The
+//! form is not "forced vertical" by promotion — it is forced by
+//! `design.rs::realize`, which hard-rejects any step other than `(0,2,0)`, and
+//! by everything keyed to that stack: the corridor fabric's column test
+//! (`y0-1 ..= y0+2*(width-1)`), the refresh-repeater stations, the crossing
+//! rules and the DRC. Inferring the form from port geometry, as `DESIGN_SPEC`
+//! describes, therefore means a SECOND realizer for the horizontal form rather
+//! than relaxing a guard; until that exists the pivot is what makes a row port
+//! routable at all.
 //!
 //! [`pivot_row_to_stack`] therefore grows a *form adapter*: bit `i` leaves the
 //! row in its own private lane, climbs `2i` blocks on a dust staircase, runs
