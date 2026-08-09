@@ -154,12 +154,40 @@ struct InstanceCore {
     port_modes: BTreeMap<String, PortModeDoc>,
 }
 
+/// One cell of a promotion patch: the position and what goes there
+/// (`None` = clear the cell).
+///
+/// A LIST of these, not a map keyed by position, and that is load-bearing:
+/// `P3` is a tuple, and **serde_json cannot serialize a map with a non-string
+/// key** — it fails with "key must be a string". The `.nucm` payload is bincode
+/// and never cared, but the `.litematic` manifest is JSON, so a `BTreeMap<P3,
+/// _>` here made `Design::to_litematic_layered_bytes` fail for EVERY design with
+/// a promoted port. See `promoting_a_port_does_not_break_any_export`.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct PatchCellDoc {
+    at: P3,
+    block: Option<String>,
+}
+
+fn patch_cells(m: &BTreeMap<P3, Option<String>>) -> Vec<PatchCellDoc> {
+    m.iter()
+        .map(|(at, block)| PatchCellDoc {
+            at: *at,
+            block: block.clone(),
+        })
+        .collect()
+}
+
+fn patch_map(v: Vec<PatchCellDoc>) -> BTreeMap<P3, Option<String>> {
+    v.into_iter().map(|c| (c.at, c.block)).collect()
+}
+
 /// A port's remembered both-forms state (see `design::PortOverride`).
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct PortModeDoc {
     mode: String,
-    writes: BTreeMap<P3, Option<String>>,
-    saved: BTreeMap<P3, Option<String>>,
+    writes: Vec<PatchCellDoc>,
+    saved: Vec<PatchCellDoc>,
     wires: Vec<P3>,
     hardware: Vec<P3>,
     step: P3,
@@ -171,8 +199,8 @@ impl PortModeDoc {
     fn of(o: &crate::design::PortOverride) -> Self {
         PortModeDoc {
             mode: o.mode.as_str().to_string(),
-            writes: o.patch.writes.clone(),
-            saved: o.patch.saved.clone(),
+            writes: patch_cells(&o.patch.writes),
+            saved: patch_cells(&o.patch.saved),
             wires: o.patch.wires.clone(),
             hardware: o.patch.hardware.clone(),
             step: o.patch.step,
@@ -186,8 +214,8 @@ impl PortModeDoc {
             mode: crate::design::PortMode::parse(&self.mode)
                 .unwrap_or(crate::design::PortMode::Executor),
             patch: crate::design_promote::PortPatch {
-                writes: self.writes,
-                saved: self.saved,
+                writes: patch_map(self.writes),
+                saved: patch_map(self.saved),
                 wires: self.wires,
                 hardware: self.hardware,
                 step: self.step,
@@ -393,6 +421,10 @@ fn bus_meta(b: &BusLayer) -> BusMeta {
 
 fn bus_from(name: &str, meta: BusMeta, fragment: BTreeMap<P3, String>) -> BusLayer {
     BusLayer {
+        // Not persisted, and correctly so: `promotions` reports what a
+        // `route_bus` CALL changed. A reloaded document already carries the
+        // promotion in the instance's port modes, so this load promoted nothing.
+        promotions: Vec::new(),
         name: name.to_string(),
         driver: meta.driver,
         extra_drivers: meta.extra_drivers,

@@ -499,6 +499,11 @@ pub struct BusLayer {
     /// Optional net-class discipline enforced by [`Design::check`]
     /// (`max_len_rt` delay budget, `y_band` layer assignment).
     pub rule: Option<NetClassRule>,
+    /// Ports this bus PROMOTED for itself on the way in, one human-readable
+    /// note each (see [`Design::set_auto_promote`]). Non-empty means routing
+    /// changed instance hardware, which the studio has to tell the user about —
+    /// it is reversible, but it is not nothing.
+    pub promotions: Vec<String>,
 }
 
 impl BusLayer {
@@ -677,6 +682,7 @@ pub struct Design {
     instances: Vec<Instance>,
     ports: BTreeMap<String, DesignPort>,
     buses: BTreeMap<String, BusLayer>,
+    auto_promote: bool,
 }
 
 impl Design {
@@ -690,6 +696,7 @@ impl Design {
             instances: Vec::new(),
             ports: BTreeMap::new(),
             buses: BTreeMap::new(),
+            auto_promote: true,
         }
     }
 
@@ -699,6 +706,23 @@ impl Design {
         let mut d = Design::new(name);
         d.base = base;
         d
+    }
+
+    /// Does [`Design::route_bus`] promote executor-only endpoints by itself?
+    /// On by default.
+    pub fn auto_promote(&self) -> bool {
+        self.auto_promote
+    }
+
+    /// Turn automatic promotion off (or back on).
+    ///
+    /// With it ON — the default — routing to a community cell's LEVER input
+    /// just works: `route_bus` switches the port to [`PortMode::Bus`] first and
+    /// records what it did. With it OFF, such a bus is refused with the
+    /// instruction to promote explicitly, which is what a UI wants when the
+    /// user must confirm a hardware change before it happens.
+    pub fn set_auto_promote(&mut self, on: bool) {
+        self.auto_promote = on;
     }
 
     /// The design name.
@@ -945,6 +969,37 @@ impl Design {
             patch_json: over.patch.to_json(),
             note,
         })
+    }
+
+    /// Promote `endpoint` if — and only if — that is what stands between it and
+    /// terminating a bus. Returns the note to report, or `None` to leave the
+    /// endpoint (and its own error message) exactly as it was.
+    ///
+    /// Deliberately conservative: it promotes ONLY when the port does not
+    /// currently resolve, is still in [`PortMode::Executor`], and promoting
+    /// actually makes it resolve. Anything else — a width mismatch, an unknown
+    /// port, a ceiling lever that cannot be promoted at all — is left for the
+    /// caller's own error path, so auto-promotion can never mask a different
+    /// problem or half-apply a patch. A promotion that does not help is rolled
+    /// back to `Executor`.
+    fn auto_promote_endpoint(&mut self, endpoint: &str) -> Option<String> {
+        if self.resolve_port(endpoint).is_ok() {
+            return None;
+        }
+        let (inst, port) = endpoint.split_once('.')?;
+        if self.port_mode(inst, port) != PortMode::Executor {
+            return None;
+        }
+        let (inst, port) = (inst.to_string(), port.to_string());
+        // Refuse to touch anything unless the patch plans cleanly first.
+        self.plan_port_patch(&inst, &port).ok()?;
+        let report = self.set_port_mode(&inst, &port, PortMode::Bus).ok()?;
+        if self.resolve_port(endpoint).is_err() {
+            // Promotion was not the blocker. Put the hardware back.
+            let _ = self.set_port_mode(&inst, &port, PortMode::Executor);
+            return None;
+        }
+        Some(format!("auto-promoted `{endpoint}`: {}", report.note))
     }
 
     /// [`Design::set_port_mode`] to [`PortMode::Bus`] — the "promote this
@@ -1578,6 +1633,24 @@ impl Design {
                 drivers.len()
             ));
         }
+        // Promote executor-only endpoints before resolving them, so routing to
+        // a community cell's lever input just works. Nothing else about the
+        // route changes: a promoted port resolves like any other dust port.
+        // Ordered and deduplicated so the promotions recorded on the bus are
+        // deterministic regardless of how the endpoints were listed.
+        let mut promotions: Vec<String> = Vec::new();
+        if self.auto_promote {
+            let mut seen: BTreeSet<String> = BTreeSet::new();
+            for ep in drivers.iter().chain(sinks.iter()) {
+                if !seen.insert(ep.to_string()) {
+                    continue;
+                }
+                if let Some(note) = self.auto_promote_endpoint(ep) {
+                    promotions.push(note);
+                }
+            }
+        }
+
         let mut driver_ports: Vec<DesignPort> = Vec::new();
         for dn in drivers {
             let drv = self
@@ -1642,6 +1715,7 @@ impl Design {
             segments: Vec::new(),
             gate_cells: BTreeMap::new(),
             rule: None,
+            promotions,
         };
 
         match self.realize(Some(&name), &driver_ports, &sink_ports, &layer.gates, &layer.style) {
@@ -2492,6 +2566,77 @@ impl Design {
     // flatten / check / bake
     // ------------------------------------------------------------------
 
+    /// One instance's non-air blocks in WORLD space, transform applied.
+    ///
+    /// The single definition of "where an instance's blocks actually are",
+    /// shared by [`Design::flatten`] and
+    /// [`Design::instance_blocks_json`] so a viewer can never disagree with an
+    /// export about an instance's position.
+    fn placed_instance_blocks(&self, inst: &Instance) -> BTreeMap<P3, crate::BlockState> {
+        let cell = &self.cells[&inst.cell];
+        let bbox = cell_bounds(&cell.schematic);
+        let mut out = BTreeMap::new();
+        for (bp, bs) in self.instance_local_blocks(inst) {
+            if bs.to_string().contains("minecraft:air") {
+                continue;
+            }
+            let p = transform_pos(bp, bbox.min, bbox.max, inst.rot_y, inst.at);
+            out.insert(p, transform_state(&bs, inst.rot_y));
+        }
+        out
+    }
+
+    /// `[[x,y,z,"block"],..]` for ONE bus layer's cells.
+    ///
+    /// Exists for live re-routing: fetching a single changed bus through
+    /// [`Design::flatten`] means rebuilding every layer in the document (~22ms
+    /// on a real design) to read back a few hundred cells. This reads the bus's
+    /// own fragment directly. An unrouted bus has no cells and yields `[]` —
+    /// that is a legal answer, not an error, so a caller can poll a bus it just
+    /// failed to route without special-casing.
+    ///
+    /// Positional array-of-arrays rather than `{"at":..,"block":..}` on purpose:
+    /// the whole point is byte volume across the bridge.
+    pub fn bus_blocks_json(&self, name: &str) -> Result<String, String> {
+        let bus = self
+            .buses
+            .get(name)
+            .ok_or_else(|| format!("unknown bus `{name}`"))?;
+        Ok(Self::cells_json(bus.fragment.iter().map(|(p, b)| (*p, b.as_str()))))
+    }
+
+    /// `[[x,y,z,"block"],..]` for ONE instance's placed blocks, transform
+    /// applied. Same reasoning as [`Design::bus_blocks_json`].
+    pub fn instance_blocks_json(&self, name: &str) -> Result<String, String> {
+        let inst = self
+            .instances
+            .iter()
+            .find(|i| i.name == name)
+            .ok_or_else(|| format!("unknown instance `{name}`"))?;
+        let placed: Vec<(P3, String)> = self
+            .placed_instance_blocks(inst)
+            .into_iter()
+            .map(|(p, b)| (p, b.to_string()))
+            .collect();
+        Ok(Self::cells_json(
+            placed.iter().map(|(p, b)| (*p, b.as_str())),
+        ))
+    }
+
+    /// Render `(pos, block)` pairs as `[[x,y,z,"block"],..]`.
+    fn cells_json<'a>(cells: impl Iterator<Item = (P3, &'a str)>) -> String {
+        let items: Vec<String> = cells
+            .map(|(p, b)| {
+                // Block states are `ns:name[k=v,..]` — no quotes to escape in
+                // practice, but go through the serializer rather than trusting
+                // that: a malformed state must not be able to forge JSON.
+                let block = serde_json::to_string(b).unwrap_or_else(|_| "\"\"".to_string());
+                format!("[{},{},{},{}]", p.0, p.1, p.2, block)
+            })
+            .collect();
+        format!("[{}]", items.join(","))
+    }
+
     /// Collapse the layer stack into ONE self-describing schematic: the
     /// loose layer stays in the base regions, every instance becomes region
     /// `inst:{name}`, every routed bus region `bus:{name}`, and the merged
@@ -2502,20 +2647,11 @@ impl Design {
         flat.metadata.name = Some(self.name.clone());
 
         for inst in &self.instances {
-            let cell = &self.cells[&inst.cell];
-            let bbox = cell_bounds(&cell.schematic);
             let region = format!("inst:{}", inst.name);
-            for (bp, bs) in self.instance_local_blocks(inst) {
-                let s = bs.to_string();
-                if s.contains("minecraft:air") {
-                    continue;
-                }
-                let p = transform_pos(bp, bbox.min, bbox.max, inst.rot_y, inst.at);
-                let state = transform_state(&bs, inst.rot_y);
+            for (p, state) in self.placed_instance_blocks(inst) {
                 if !flat.set_block_in_region(&region, p.0, p.1, p.2, &state) {
                     return Err(format!(
-                        "flatten: could not place {s} at {:?} in region {region}",
-                        p
+                        "flatten: could not place {state} at {p:?} in region {region}"
                     ));
                 }
             }
@@ -2993,6 +3129,9 @@ impl Design {
             instances,
             ports,
             buses,
+            // Policy, not document state: a reloaded design routes the same way
+            // a fresh one does.
+            auto_promote: true,
         }
     }
 }

@@ -229,6 +229,155 @@ fn promotion_makes_a_lever_port_routable_and_says_what_it_did() {
     assert_eq!(now.width, 8);
 }
 
+/// AUTO-PROMOTION: `route_bus` promotes an executor-only endpoint by itself.
+///
+/// The user's report was "it should automatically promote". This is that: no
+/// `promote_input` call anywhere, a bus declared straight onto a community
+/// cell's LEVER input, and it routes — with the hardware change reported and
+/// still reversible. The opt-out keeps the old strict refusal for a UI that
+/// wants the user to confirm first.
+#[test]
+fn route_bus_auto_promotes_a_lever_input_and_reports_it() {
+    let Some(bcd) = load(BCD) else { return };
+
+    // Where does the promoted column land? Ask a scratch design, so the design
+    // under test can stay pristine and never see an explicit promotion.
+    let wires = {
+        let mut probe = Design::new("probe");
+        probe.add_cell("bcd", bcd.clone()).unwrap();
+        probe.place("u0", "bcd", (0, 0, 0), 0).unwrap();
+        probe.promote_input("u0", "bin").unwrap();
+        probe
+            .instance_ports()
+            .unwrap()
+            .into_iter()
+            .find(|p| p.name == "u0.bin")
+            .unwrap()
+            .wires
+            .unwrap()
+    };
+
+    let build = || {
+        let mut d = Design::new("t");
+        d.add_cell("bcd", bcd.clone()).unwrap();
+        d.place("u0", "bcd", (0, 0, 0), 0).unwrap();
+        let a = (wires[0].0 - 30, wires[0].1, wires[0].2);
+        for k in 0..8i32 {
+            let y = a.1 + 2 * k;
+            d.set_block((a.0, y - 1, a.2), "minecraft:stone").unwrap();
+            d.set_block((a.0, y, a.2), "minecraft:lever[face=floor,facing=north,powered=false]")
+                .unwrap();
+            d.set_block((a.0 + 1, y - 1, a.2), "minecraft:stone").unwrap();
+            d.set_block(
+                (a.0 + 1, y, a.2),
+                "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]",
+            )
+            .unwrap();
+        }
+        d.declare_input(
+            "din",
+            (a.0 + 1, a.1, a.2),
+            (0, 2, 0),
+            8,
+            nucleation::io_contract::IoType::UnsignedInt { bits: 8 },
+        )
+        .unwrap();
+        d
+    };
+
+    // The port really is executor-only to start with, or this proves nothing.
+    let mut d = build();
+    let shipped = instance_blocks(&d);
+    assert_eq!(d.port_mode("u0", "bin"), PortMode::Executor);
+
+    assert!(d.auto_promote(), "auto-promotion must be the default");
+    let state = d
+        .route_bus("net", "din", &["u0.bin"], vec![], BusStyle::default())
+        .unwrap();
+    assert_eq!(
+        state,
+        BusState::Routed,
+        "a bus onto an un-promoted lever input must route by itself"
+    );
+
+    // It has to SAY it changed hardware.
+    let promotions = &d.bus("net").unwrap().promotions;
+    assert_eq!(promotions.len(), 1, "expected one promotion, got {promotions:?}");
+    assert!(
+        promotions[0].contains("u0.bin"),
+        "the promotion note must name the port: {}",
+        promotions[0]
+    );
+    println!("[auto] {}", promotions[0]);
+    assert_eq!(d.port_mode("u0", "bin"), PortMode::Bus);
+    assert!(d.check().unwrap().clean, "auto-promoted route must be DRC/LVS clean");
+
+    // And it has to stay reversible: demoting rips the bus and restores the
+    // shipped hardware byte-exactly.
+    let rep = d.set_port_mode("u0", "bin", PortMode::Executor).unwrap();
+    assert_eq!(rep.removed_buses, vec!["net".to_string()]);
+    assert_eq!(
+        instance_blocks(&d),
+        shipped,
+        "demoting an AUTO-promoted port must restore the cell byte-exactly"
+    );
+
+    // Opt-out: the strict refusal is still available, and still actionable.
+    let mut strict = build();
+    strict.set_auto_promote(false);
+    let err = strict
+        .route_bus("net", "din", &["u0.bin"], vec![], BusStyle::default())
+        .expect_err("auto_promote=false must refuse an executor-only endpoint");
+    assert!(
+        err.contains("executor-only"),
+        "the refusal must still name the cause: {err}"
+    );
+    assert_eq!(
+        strict.port_mode("u0", "bin"),
+        PortMode::Executor,
+        "a refused route must not have touched the hardware"
+    );
+}
+
+/// Auto-promotion must never fire for a reason that is not promotion. A width
+/// mismatch has to surface as a width mismatch, with the hardware untouched.
+#[test]
+fn auto_promotion_does_not_mask_an_unrelated_failure() {
+    let Some(bcd) = load(BCD) else { return };
+    let mut d = Design::new("t");
+    d.add_cell("bcd", bcd).unwrap();
+    d.place("u0", "bcd", (0, 0, 0), 0).unwrap();
+    // A 4-bit driver against the 8-bit `bin` port.
+    for k in 0..4i32 {
+        let y = 2 + 2 * k;
+        d.set_block((-30, y - 1, 0), "minecraft:stone").unwrap();
+        d.set_block((-30, y, 0), "minecraft:lever[face=floor,facing=north,powered=false]")
+            .unwrap();
+        d.set_block((-29, y - 1, 0), "minecraft:stone").unwrap();
+        d.set_block(
+            (-29, y, 0),
+            "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]",
+        )
+        .unwrap();
+    }
+    d.declare_input(
+        "din4",
+        (-29, 2, 0),
+        (0, 2, 0),
+        4,
+        nucleation::io_contract::IoType::UnsignedInt { bits: 4 },
+    )
+    .unwrap();
+
+    let err = d
+        .route_bus("net", "din4", &["u0.bin"], vec![], BusStyle::default())
+        .expect_err("a width mismatch must be an error");
+    assert!(
+        err.contains("width"),
+        "the width mismatch must be the reported cause, not a promotion story: {err}"
+    );
+}
+
 // ----------------------------------------------------------------------
 // 2. Function preservation
 // ----------------------------------------------------------------------
