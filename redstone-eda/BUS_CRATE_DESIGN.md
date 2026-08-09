@@ -450,7 +450,9 @@ route past a piston we cannot reason about.
 > *"We need different kind of transports; if we take a hex bus for example [it]
 > is a typical hex bus that uses repeaters to transport the signal — it's wider
 > and less easy to fit but way faster than alternating comparators dusts and
-> blocks."*
+> blocks."* — **since measured and confirmed with numbers**;
+> `redstone-eda/notes-hex-transport.md` is authoritative, and §4.6 records both the
+> profile and the rule it refuted.
 
 Today's model is **one hardcoded shape**: N bits stacked at 2y pitch (the
 `bus8` v2 form), single-level, one carrier, with `BusForm` a small closed enum
@@ -701,12 +703,17 @@ nothing may assume a sub-bundle shares its parent's orientation.
 
 ### 4.6 The `Carrier` axis — how the bits actually move
 
-> **Requirement (user), from a real build** (`TRANSMIT002_hex_transmit_flat`,
-> being probed separately; a copy is already in
-> `redstone-eda/corpus/TRANSMIT002_hex_transmit_flat.schem`): *"we need different
-> kind of transports, if we take a hex bus for example [it] is a typical hex bus
-> that uses repeaters to transport the signal — it's wider and less easy to fit
-> but way faster than alternating comparators dusts and blocks."*
+> **Requirement (user), from a real build** — now **MEASURED**. The build is
+> `TRANSMIT002_hex_transmit_flat`; the characterization is
+> `redstone-eda/notes-hex-transport.md` (probes `probe_hex_transmit.py` 66/66 and
+> `probe_hex_vs_comparator.py` 22/22, corpus copy in
+> `redstone-eda/corpus/`). The user's claim: *"we need different kind of
+> transports, if we take a hex bus for example [it] is a typical hex bus that uses
+> repeaters to transport the signal — it's wider and less easy to fit but way
+> faster than alternating comparators dusts and blocks."*
+>
+> **Confirmed with numbers: 4.00× faster at spans 16/32/48, exactly, at 3× the
+> width and 2.8× the blocks — and analog-lossless over all 16 levels.**
 
 The same `BusType`, the same `LaneOrder` and the same cross-section *shape* can
 be realized by **different carriers**, each with its own profile. This is a
@@ -716,40 +723,62 @@ topology.
 ```rust
 pub struct CarrierProfile {
     pub id: CarrierId,                // open registry, same discipline as tiles
-    /// Cells consumed per lane per cell of travel, and the (u,v) width one lane
-    /// occupies. A repeater chain is WIDER per lane than a dust run.
-    pub lane_cells: u16,
+    /// The (u,v) footprint ONE lane of this carrier occupies. Note this is the
+    /// whole bundle for a multi-column carrier: the hex comb is 3 wide and its
+    /// middle column is DEVICES, not wire.
     pub lane_width: (i16, i16),
-    /// Ticks per cell of travel. THE trade against footprint.
-    pub delay_gt_per_cell: Rational,
-    /// Signal-strength cost per cell, and whether the carrier refreshes.
-    pub decay_per_cell: u8,
-    pub refresh: Refresh,             // None | EveryNCells(u16) | Always
+    /// How this carrier is priced. NOT always per-cell — see (d).
+    pub pricing: Pricing,
     /// Support/scaffold demands, expressed as `Clearance` predicates so
     /// `CrossSection::scaffold` can be generated from the carrier.
     pub scaffold: Vec<((i16, i16), Clearance)>,
     /// Mechanism rows this carrier is built from (TRANSPORT_MODEL.md §A/§B).
     pub mechanisms: &'static [Mechanism],
-    /// *** CORRECTNESS, not cost. See below. ***
-    pub value_preserving: bool,
+    /// Does the internal conduction path depend on the transported VALUE? See (e).
+    pub value_dependent_conduction: bool,
+    /// *** CORRECTNESS, not cost. MEASURED, never inferred. See (c). ***
+    pub value_preserving: ValuePreserving,
     pub inverts: bool,                // torch-based carriers flip parity
     pub provenance: &'static str,     // the probe run that earned these numbers
+}
+
+pub enum Pricing {
+    /// Genuinely additive: cost accumulates per cell of travel. Safe as A* edges.
+    PerCell { delay_gt: Rational, decay_per_cell: u8, refresh: Refresh },
+    /// An indivisible stage with an entry/exit CONTRACT. Priced as one unit.
+    AtomicStage(StageContract),
+}
+
+/// A carrier stage that cannot be subdivided: you place the whole thing or none
+/// of it, and its ss delta may be ZERO or NEGATIVE (a gain).
+pub struct StageContract {
+    pub span: u16,                 // cells of travel consumed, FIXED
+    pub footprint: (i16, i16, u16),// the stage's whole envelope
+    pub delay_gt: u32,             // for the whole stage
+    pub entry_ss: SsReq,           // what must arrive
+    /// exit = f(entry). May be identity, or a GAIN. Not a per-cell decay.
+    pub exit_ss: SsLaw,
+    pub pipeline_depth_gt: u32,    // how soon the next value may be injected
+    pub min_separation_gt: u32,    // shorter gaps between values are SWALLOWED
 }
 ```
 
 Seed carriers (an **open** set — pistons, observers, torch towers,
 strong-powered-block chains and anything else follow the same
-declared-profile-plus-probe discipline as the eleven mechanism rows):
+declared-profile-plus-probe discipline as the eleven mechanism rows). Only the
+rows citing a probe are trustworthy; the rest are *estimates awaiting
+characterization* and are marked so:
 
-| carrier | per-lane width | speed | decay | value-preserving | notes |
-|---|---|---|---|---|---|
-| `DustOnSolid` | narrowest | 0 gt, but 15-cell reach | 1/cell | yes | today's only carrier |
-| `ComparatorChain` | narrow | slow (1 gt each) | refreshes | **yes** | "alternating comparators, dusts and blocks" — compact, slow, analog-safe |
-| `RepeaterChain` | **wide** | **fast** (long hops per gate) | refreshes to 15 | **NO** | the hex-bus transport; "less easy to fit but way faster" |
-| `StrongBlockChain` | 1-cell pitch legal | 0 gt | refreshes | no | ranked unlock #5 |
-| `TorchTower` | narrow, vertical | 2 gt/level | refreshes | no | `inverts = true`, so parity joins the state |
+| carrier | lane footprint | speed | ss law | value-preserving | pricing | evidence |
+|---|---|---|---|---|---|---|
+| `DustOnSolid` | 1 × 2 | 0 gt | −1/cell, 15-cell reach | yes | `PerCell` | today's only carrier |
+| `ComparatorChain` | 1 × 2 | **1.000 gt/block** | refreshes each link; pitch 2 is its best legal packing (pitch 3 costs a level) | **yes** | `PerCell` | measured, `probe_hex_vs_comparator` C0/C1/C3 |
+| **`HexCombStage`** | **3 × 2**, 16 z per stage | **0.250 gt/block** chained (0.143 for the bare transport section) | **`out = min(15, v + (15 − comb_len))`** — identity at the full 15-rung comb, a **GAIN** for a short one | **YES**, all 16 levels | **`AtomicStage`** | measured, `probe_hex_transmit` H2.2/H4.8/H6.3/H7.5 |
+| `RepeaterLine` (binary only) | 1 × 2 | 0.125 gt/block | arrives normalised to 15 | **no** | `PerCell` | measured, C3b |
+| `StrongBlockChain` | 1 × 2, pitch 1 legal | 0 gt | refreshes | unmeasured | *estimate* | ranked unlock #5 |
+| `TorchTower` | 1 × 2, vertical | 2 gt/level | refreshes | unmeasured | *estimate* | `inverts = true`, so parity joins the state |
 
-Three things follow, and all three are load-bearing.
+Five things follow, and all five are load-bearing.
 
 **(a) Carrier crosses with cross-section.** A wider carrier inflates the per-lane
 footprint and therefore *changes the legal lane pitch*. So cross-section legality
@@ -757,8 +786,13 @@ is only meaningful **for a given carrier** — which is why `validate` and
 `min_pitch` in §4.3 both take `Carrier`. This is the same statement as "pitch 2
 is not an axiom", now fully generalized: **pitch is a function of (carrier,
 neighbours)**, computed from the mechanism rows via `interferes()`, never written
-down as a constant. A `RepeaterChain` hex bus is wide *because the model derives
-that it must be*, not because someone typed a 3.
+down as a constant. Two distinct sources of width, and they must not be conflated:
+a carrier's **intrinsic** lane footprint (`HexCombStage` is 3 × 2 because a stage
+*is* two dust lanes plus a comb column between them — measured, H0.13/H7.5, and
+constant for any number of chained stages), and the **derived** neighbour pitch
+(2 lateral for that stage, because its output lane runs hot at 15 and leaks ss 14
+at gap 1 — H8.6/H8.7). The first is declared by the profile; only the second is
+solved by `min_pitch`. Neither is a typed-in constant.
 
 **(b) Carrier selection is a genuine cost decision, and it validates the cost
 vector.** Repeater-vs-comparator is *literally* `delay_rt` traded against
@@ -770,36 +804,207 @@ by the same ranked search as everything else (§5.3):
 for (policy, carrier, roll) in ctx.candidate_forms(port_a, port_b) { … }
 ```
 
-and **it may differ per segment**: a fast `RepeaterChain` down the long open
-trunk, a compact `ComparatorChain` through a congested pinch where the wide
-carrier does not fit, joined by a `Recarrier` transition (§4.7). That segmented
-choice is a strictly better plan than either carrier alone, and it is only
-expressible because carrier is per-`Form` and `Form` is per-segment.
+and **it may differ per segment**: a fast `HexCombStage` down the long open trunk
+(0.25 gt/block, 3 × 2), a compact `ComparatorChain` through a congested pinch
+where the 3-wide bundle does not fit (1.0 gt/block, 1 × 2), joined by a
+`Recarrier` transition (§4.7). Both are `value_preserving = Measured`, so the
+swap is legal for an analog payload — that is a *measured* fact about both
+carriers, not an assumption. The measured trade is stark enough to make the
+per-segment choice obviously worth having: **4.00× latency for 3× width and 2.8×
+blocks**, constant across spans 16/32/48. Segmented choice is only expressible
+because carrier is per-`Form` and `Form` is per-segment.
 
-**(c) ANALOG vs BINARY is a carrier-level correctness rule, not a preference.**
-A **repeater normalizes its output to 15 and destroys the analog
-signal-strength value**; a **comparator preserves it**. Therefore:
+**(c) ANALOG vs BINARY is a correctness rule — and `value_preserving` is a
+property of the COMPOSED STAGE, never of the block kind.**
 
-> **Hard rule.** A bus whose `Encoding` carries meaning in the signal *strength*
-> — `Encoding::HexAnalog` and any future analog encoding — **must refuse** any
-> carrier with `value_preserving == false`. The planner checks this **before**
-> cost, as a precondition, and reports the refusal by name.
+> ### ⚠ Cautionary note: this document was wrong, and the wrongness was plausible
+>
+> An earlier revision of this section stated as a **hard rule**: *"a repeater
+> normalizes its output to 15 and destroys the analog signal-strength value; a
+> comparator preserves it,"* and mandated a test named
+> `hexanalog_bus_refuses_repeater_carrier`.
+>
+> The premise is **true per block** — feed a repeater 8, read 15
+> (`probe_hex_vs_comparator` C3b.3, re-measured) — and **false per stage**.
+> `TRANSMIT002` carries an analog 0–15 value through a comb of **15 delay-1
+> repeaters, losslessly** (H2.2, H3.2): a comparator drives a decaying dust lane;
+> the comb fires on every rung where ss ≥ 1, so exactly `v` rungs fire and the
+> lowest sits at `z = 17 − v`; that rung injects 15 into a second dust lane, which
+> decays back down to a tap comparator reading exactly `v`. **Strength → unary rung
+> POSITION → strength are exact inverses.** The decay spent is
+> `(v−1) + (15−v) = 14` cells for a 14-block traverse *for every* `v` — the refresh
+> lands exactly where the budget runs out.
+>
+> So `normalizes(repeater)` does **not** imply `normalizes(stage containing
+> repeaters)`. As originally written, our planner would have **refused the user's
+> own working, fastest analog carrier, by name.**
+>
+> This is exactly the plausible-but-wrong axiom the whole model exists to
+> prevent — the same failure mode as "pitch 2 in y" (§4.3) and "the instant
+> crossing always works" (§5). The rule read as physics; it was a generalization
+> from one block to an unexamined composition. **The lesson is structural, not
+> anecdotal: no correctness property of a carrier may be inferred from its
+> palette. Every one must be measured on the composed stage.**
 
-Getting this wrong is **silent data corruption**: the geometry routes, DRC
-passes, the wire lights up, and every value reads 15. That is exactly the failure
-class this project keeps paying for, so it gets a precondition and a test rather
-than a comment. Existing analog work to check against:
-`redstone-eda/compositor/hexanalog.py`, `compositor/hexanalog_bus8.py`,
-`showcase/hexanalog_trunk.schem` and `showcase/hexanalog_bus8.schem`, plus the
-`Encoding::HexAnalog` variant already in `crates/nucleation-routing/src/bus.rs`
-and `src/io_contract/bus.rs`.
+The *intent* of the old rule stands — silent corruption is the failure class this
+project keeps paying for — so the gate stays. Only its **basis** changes, from
+inference to measurement:
 
-Two tests, both cheap and both mandatory:
-`hexanalog_bus_refuses_repeater_carrier` (the refusal fires, with a reason
-naming the carrier), and `value_preserving_carriers_round_trip_all_16_levels`
-(drive 0..15 through each `value_preserving` carrier in-sim under the `mc-tick`
-feature and assert the level survives) — the second is what makes the flag
-trustworthy rather than aspirational.
+```rust
+pub enum ValuePreserving {
+    /// Earned by passing the 16-level in-sim round trip. Carries the citation.
+    Measured { probe: &'static str },
+    /// Measured to NORMALIZE or otherwise alter the value. Carries the citation.
+    MeasuredNot { probe: &'static str, observed: &'static str },
+    /// Never characterized. Treated as NOT preserving for gating purposes, and
+    /// reported as "unmeasured", which is a different sentence from "unsafe".
+    Unmeasured,
+}
+```
+
+> **Hard rule (restated).** A bus whose `Encoding` carries meaning in the signal
+> *strength* — `Encoding::HexAnalog` and any future analog encoding — **must refuse
+> any carrier whose `value_preserving` is not `Measured`.** The planner checks
+> this **before** cost, as a precondition, and reports the refusal by name *and by
+> reason* — distinguishing "measured to normalize" from "never measured", because
+> those call for different actions from the user (pick another carrier vs. run the
+> probe).
+
+**The single source of truth for the flag is the in-sim round trip.** It is the
+same test this document already mandated, now promoted from corroboration to
+*definition*:
+
+* `value_preserving_carriers_round_trip_all_16_levels` — for every carrier
+  claiming `Measured`, drive 0..15 through it in-sim under the `mc-tick` feature
+  and assert `v_out == v_in` for all 16. A carrier that cannot pass this cannot
+  hold `Measured`. This is what makes the flag trustworthy rather than
+  aspirational, and it is the *only* way to obtain it.
+* `no_carrier_claims_measured_without_a_probe_citation` — a cheap structural test
+  over the registry, so `Measured { probe: "" }` cannot slip in.
+* **Deleted:** `hexanalog_bus_refuses_repeater_carrier`. It encoded the block-kind
+  inference in its *name* and would fail on `HexCombStage` forever. Replaced by
+  `hexanalog_bus_refuses_carriers_that_are_not_measured_preserving`, which
+  `HexCombStage` **passes** (it is `Measured`) and `RepeaterLine` fails.
+* The fuzz oracle (§6.5 item 6) is unchanged in intent and gains precision: no
+  random combination may route an analog bus on a carrier that is not `Measured`.
+
+Existing analog work to check against: `redstone-eda/notes-hex-transport.md`
+(authoritative for `HexCombStage`), `compositor/hexanalog.py`,
+`compositor/hexanalog_bus8.py`, `showcase/hexanalog_trunk.schem`,
+`showcase/hexanalog_bus8.schem`, and the `Encoding::HexAnalog` variant already in
+`crates/nucleation-routing/src/bus.rs` and `src/io_contract/bus.rs`. Note that
+`hexanalog.py` *encodes and decodes* a nibble to and from a strength, whereas
+`TRANSMIT002` is **pure transport** with no encoder or decoder — a distinction the
+`Encoding` field must keep straight.
+
+**(d) Carrier cost is NOT additive over cells — some stages are atomic tiles.**
+
+Every cost model in the fabric charges per cell (`TRANSPORT_MODEL.md`, "What the
+search state must become", point 3: dust 1 ss / 0 gt, a hop +1 ss, a repeater 0 ss
+/ 2 gt). `HexCombStage` breaks that in two ways at once:
+
+* it costs **0 ss over 16 blocks** — not 16 × something; and
+* with a comb shorter than 15 rungs it costs **negative ss**:
+  `out = min(15, v + (15 − comb_len))`, exact over 20 measured combinations
+  (H6.3). A short comb is a **free level shifter**.
+
+A negative edge weight destroys the monotonicity that A\* and Dijkstra require:
+with negative edges, a settled node is no longer final, `f` is no longer
+non-decreasing along a path, and any admissible heuristic over ss becomes
+unusable. Guessing at a "reduced cost" transform here would be exactly the kind of
+plausible-but-wrong move (c) just warned about. So:
+
+> **Rule.** A carrier stage whose ss law is not a per-cell decay is modelled as an
+> **`AtomicStage`: an indivisible tile with an entry/exit contract**
+> (`entry_ss` requirement → `exit_ss` law, fixed `span`, fixed `delay_gt`, fixed
+> `footprint`), priced as **one unit**. It is **never** decomposed into per-cell
+> moves, and its internal cells are never individually routable.
+
+How admissibility is preserved:
+
+1. **Two disjoint pricing kinds.** `Pricing::PerCell` carriers may become A\*
+   edges, because their costs genuinely accumulate and are non-negative.
+   `Pricing::AtomicStage` carriers may not; they are **placed**, like the crossing
+   and pivot tiles in §5, through `select_tile` with preconditions and a ranked
+   fallback. The `Pricing` enum is what stops a stage leaking into the edge
+   relaxation, and a debug assertion should enforce it.
+2. **Stages are edges of fixed length in the coarse graph.** A stage becomes a
+   single edge from its entry port to its exit port, `span` cells long, with
+   weight taken from the **`delay_gt` / footprint / coherence** terms — all
+   non-negative. The ss delta is *not* a cost term at all: it is a
+   **precondition and a post-condition** carried in the `DecayLedger`, checked
+   like `entry_ss_min` in §5.3 step 3. Signal strength is a *resource with a
+   budget*, not a distance. That reframing is what removes the negative weight
+   entirely, and it is the same treatment §5 already gives every tile.
+3. **A gain is a capability, not a discount.** Because the ss delta never enters
+   the cost function, a `+k` stage cannot be exploited to manufacture a shorter
+   path. It shows up only as a *wider* set of legal successors — a stage that can
+   *raise* a stale value opens routes a decaying carrier could not reach.
+4. **Fixed span means fixed geometry.** A stage's `span` is a constant, so the
+   planner must reserve exactly that room (the same worst-case-reservation
+   discipline `shift_len_max` already uses for level shifts) and must handle
+   spans that are not a whole multiple of the stage length — for `HexCombStage`
+   the remainder surfaces as a deliberate level shift, not a graceful loss.
+
+**Level shifting is therefore a first-class carrier capability.** `StageContract`
+should expose it directly:
+
+```rust
+impl StageContract { pub fn ss_gain(&self) -> i8; }   // HexCombStage: 15 - comb_len
+```
+
+A carrier that can raise a value subsumes part of what a dedicated refresh station
+or level-shift tile is for — `shift_plan` / `bus_levelshift.py` exist to move a
+bundle in *y*, but the refresh-station machinery inside them (`REFRESH_AT`,
+`SHIFT_DUST_CAP`, the `StationEntry`/`StationRepeater`/`StationExit` columns) is
+solving the same ss-budget problem a `+k` stage solves for free. When the chosen
+carrier already refreshes or gains, **the planner must not also insert a station**.
+That is a concrete simplification to look for during §8 step 4b/5, and a scenario
+family in §6.1: *a bus on a gaining carrier plans zero refresh stations.*
+
+**(e) A route is a path; some carriers are FIELDS.** `HexCombStage` is ~60 cells
+of a **single net**, and *which rung conducts depends on the transported value*:
+`v = 3` conducts through rung `z = 14`, `v = 15` through rung `z = 2` (H2.4). The
+geometry is value-independent; the electrical path inside it is not. No "sequence
+of cells + delay" representation can express that.
+
+Consequences, all of them requirements rather than observations:
+
+* **Occupancy and interference are computed over the stage's whole footprint, for
+  ALL values** — never for one static conduction pattern. A planner that sampled
+  the build at `v = 0` would see 15 dark rungs and conclude the lane was free to
+  neighbour at pitch 1; the measured truth is that the OUTPUT lane runs **hot at
+  15 along most of its length**, so a foreign dust one cell away picks up ss 14
+  (H8.6) and pitch 2 is mandatory (H8.7). The clearance predicate must be the
+  **union over all 16 values**, i.e. the worst case, computed once per stage and
+  cached in the profile. This is why `interferes()` is evaluated against the
+  stage's declared envelope, not against a sampled snapshot.
+* **DRC and LVS must treat the stage as ONE net.** Any check asserting "one driver
+  per net cell" or "a net is a simple path" will flag a correct build: here 15
+  repeaters legitimately drive one output lane, and the active driver changes with
+  the value. So `drc` needs a stage-aware exemption keyed on the placed tile
+  (which the planner knows, because it placed it), and `lvs` must collapse the
+  stage to a single two-terminal element with the measured `exit_ss` law rather
+  than tracing conduction through it. Cheap to state now, expensive to discover
+  later from a false DRC failure on the user's own build.
+* `value_dependent_conduction: bool` on the profile is what tells the rest of the
+  system to take this path. It is also a **flag no carrier may set without a
+  probe**, for the same reason as (c).
+* Two hex buses side by side therefore need `3 + 1 = 4` u-cells each: the pitch-2
+  rule applies to the **bundle**, not to a wire. Note also that this is a carrier
+  whose middle column is **devices, not wire** — a lane shape the old
+  one-claim-per-cell, dust-only model has no name for.
+
+Two further measured facts worth carrying into the profile, because both are
+planner-visible and neither is guessable: the stage is **pipelined to depth 4 gt**
+(two values genuinely in flight), and values closer than **3 gt** are *swallowed*
+by the delay-1 repeaters and never appear at the output (H5.8) — the comparator
+chain filters identically (C4.2), so this is a property to *record*, not a defect
+to hold against either carrier. And one clearance trap from the same probe run,
+which belongs in the mechanism model rather than here: **a floor lever strongly
+powers its attachment block, and dust reads a strong block at 15 on all six
+faces**, so a lever attachment must be treated as a 6-directional 15-source. It
+silently corrupted an analog lane during the probe build.
 
 **Openness.** `CarrierId` is registry-addressed with a declared profile and a
 `provenance` citation, exactly like `TileSpec`. Adding a piston-based or
@@ -807,7 +1012,9 @@ observer-based transport must be *data plus a probe*, never a router change. Not
 that pistons and observers are recorded in `TRANSPORT_MODEL.md` as **not
 modelled**, so such a carrier cannot be added until its mechanism rows are probed
 — the profile's `mechanisms` field is what makes that dependency explicit and
-checkable.
+checkable. `notes-hex-transport.md` proposes `hex_comb_stage` as **row 12** of
+that table, with full §A/§B entries; adopting it there is the natural home for the
+mechanism-level half of this carrier.
 
 ### 4.7 `FormTransition`: changing form is a tile
 
@@ -829,6 +1036,15 @@ pub enum TransitionKind {
     Recarrier,         // change `Carrier` mid-route
 }
 ```
+
+`Recarrier` deserves one note now that carriers can be atomic (§4.6d): a
+transition into an `AtomicStage` carrier must satisfy that stage's `entry_ss`
+requirement and reserve its full fixed `span`, and a transition *out of* one starts
+the next segment's `DecayLedger` from the stage's measured `exit_ss` — for
+`HexCombStage` the exact value `min(15, v + (15 − comb_len))`, not an assumed 15
+and not a decayed remainder. A `Recarrier` is therefore the one transition whose
+pre- and post-conditions come from the carrier registry rather than from the tile's
+own geometry.
 
 The existing verified pivot tiles (`PivotKind` v2h / h2v / flat90,
 `pivot_tiles.md`, `pivot_fragment`) are **one instance** of this — specifically
@@ -868,13 +1084,15 @@ measurable, and its doc comment already says why they are separate:
 
 Form selection therefore needs no separate mechanism: enumerate candidate
 `LayoutPolicy × Carrier × Roll` combinations, **drop the ones that fail a
-precondition** (a normalizing carrier under an analog encoding, §4.6c; a
+precondition** (a carrier that is not `Measured` value-preserving under an analog
+encoding, §4.6c; a stage whose `entry_ss` requirement the ledger cannot meet; a
 cross-section that fails `validate` for that carrier, §4.3), plan or estimate the
 survivors, and rank by the same weighted `BusCostVector` the tile selector uses
 (§5.3). Same cost vector, same precondition-then-cost ordering, same
-ranked-fallback discipline, same reporting — *"chose `RepeaterChain` +
-`Nest{horizontal-in-vertical}`: 4× faster, 2.1× footprint; rejected
-`ComparatorChain`: delay budget; rejected `Linear`: coherence 1840"*.
+ranked-fallback discipline, same reporting — *"chose `HexCombStage` +
+`Nest{horizontal-in-vertical}`: 4.00× faster, 3× width; rejected
+`ComparatorChain`: delay budget; rejected `RepeaterLine`: value_preserving =
+MeasuredNot (arrives normalised to 15); rejected `Linear`: coherence 1840"*.
 
 ### 4.9 Consequences for the rest of this document
 
@@ -894,10 +1112,21 @@ ranked-fallback discipline, same reporting — *"chose `RepeaterChain` +
   order (with significance flagged `Ambiguous`, since geometry cannot reveal
   endianness), `CrossSection` from the *measured* offsets — irregular ones
   included, which is why `from_offsets` must be first-class — `Carrier` from the
-  mechanisms found along the run (`mech_of`), and `Form` from the travel axis. If
-  the discovered carrier is not `value_preserving`, the port cannot be an analog
-  port, which is a useful inference in both directions. The plugin is exactly the
-  case where no contract exists, so `Confidence` matters most here.
+  mechanisms found along the run (`mech_of`), and `Form` from the travel axis. The
+  plugin is exactly the case where no contract exists, so `Confidence` matters
+  most here. Two hard-won cautions:
+  * **Discovery must not infer `value_preserving` from what it sees.** Finding
+    repeaters says nothing (§4.6c) — the flag comes only from a registry entry that
+    already passed the round trip. If discovery matches a *known* carrier, it
+    inherits that carrier's measured flag; if it matches nothing, the flag is
+    `Unmeasured` and an analog route is refused pending a probe. Never guess from
+    the palette; that is the exact error this document made.
+  * **A recognised `AtomicStage` must be discovered whole.** Walking
+    `TRANSMIT002`'s 60-odd cells as a path would produce nonsense: it is one net,
+    3 wide, with a device column in the middle and a value-dependent conduction
+    path (§4.6e). Discovery therefore needs stage-shaped template matching against
+    the carrier registry *before* it falls back to per-cell run tracing, and a port
+    on a stage carrier is the stage's entry/exit contract, not a set of dust cells.
 * The harness (§6) gains cross-section and carrier scenario families, plus
   property tests that `min_pitch` is derived rather than assumed and that
   irregular cross-sections are not second-class.
@@ -1115,12 +1344,30 @@ and are the whole reason the model was generalized:
   inner/outer direction pairs (vertical-in-horizontal, horizontal-in-vertical,
   and both same-direction cases), `Tile`, and `Interleave`. Tracks which policy
   the cost vector actually picks per scenario — that ranking *is* the deliverable.
-* **carrier sweep** — the same bus under every registered carrier, in a wide-open
-  world (where `RepeaterChain` should win on `delay_rt`) and in a tight corridor
-  (where it should not fit and `ComparatorChain` should win). The scenario that
-  proves per-segment carrier choice beats either carrier alone belongs here.
-* **analog safety** — a `HexAnalog` bus offered a normalizing carrier. Expected
-  result is a *refusal with a named reason*, not a route. Seeded from
+* **carrier sweep** — the same bus under every registered carrier, at spans
+  16/32/48 so the measured head-to-head is reproduced as a regression: a wide-open
+  world (where `HexCombStage` must win on `delay_rt`, 4.00× and exactly constant
+  across the three spans) and a 1-wide corridor (where its 3 × 2 bundle must not
+  fit and `ComparatorChain` must win). The scenario proving **per-segment** carrier
+  choice beats either carrier alone — open trunk plus a narrow pinch — belongs
+  here, and the baseline numbers come straight from
+  `notes-hex-transport.md` §3.
+* **atomic-stage arithmetic** — spans that are and are not whole multiples of a
+  stage's fixed `span`. For `HexCombStage` the remainder must surface as a
+  *reported level shift* (`out = min(15, v + (15 − comb_len))`), never as a
+  silent loss and never as a routing failure. Include the deliberate short comb as
+  a **+k level shifter** used on purpose.
+* **gaining carriers plan no stations** — a bus on a carrier that refreshes or
+  gains must plan **zero** refresh stations. Guards the double-spend §4.6d warns
+  about, where `REFRESH_AT` / `SHIFT_DUST_CAP` machinery fires needlessly on top
+  of a carrier that already solved the ss budget.
+* **analog safety** — a `HexAnalog` bus offered each carrier in turn. Expected:
+  `RepeaterLine` refused (`MeasuredNot`, arrives normalised to 15), an uncited
+  carrier refused (`Unmeasured`, with a "run the probe" reason), and
+  **`HexCombStage` ACCEPTED** — it is a repeater carrier and it is
+  `value_preserving = Measured`. That last case is the regression test for the
+  error in §4.6c, and it must be present precisely because the intuitive
+  expectation is wrong. Seeded from `notes-hex-transport.md`,
   `showcase/hexanalog_trunk.schem` and `compositor/hexanalog.py`.
 
 ### 6.2 Tracked metrics
@@ -1184,12 +1431,33 @@ zero-dep aesthetic wins.
 * **Sub-bundle orientation is free.** For every inner/outer direction pair,
   `Nest` must produce a routable form in an empty world. No pair may be
   privileged, and none may fail for a reason other than a reported precondition.
-* **A normalizing carrier is refused under an analog encoding.** `HexAnalog` ×
-  `refresh = Always, value_preserving = false` ⇒ `Err`, with the carrier named.
-  Fuzz this: no random combination may ever produce a *routed* analog bus on a
-  normalizing carrier. Silent corruption must be structurally impossible.
-* **Every `value_preserving` carrier round-trips all 16 levels** in-sim
-  (`mc-tick` feature). This is what makes the flag trustworthy.
+* **A carrier that is not `Measured` value-preserving is refused under an analog
+  encoding.** `HexAnalog` × (`MeasuredNot` | `Unmeasured`) ⇒ `Err`, with the
+  carrier named *and the reason distinguished*. Fuzz it: no random combination may
+  ever produce a *routed* analog bus on such a carrier. Silent corruption must be
+  structurally impossible. Conversely — and this is the important half —
+  `HexAnalog` × `HexCombStage` must **route**, because a repeater-based carrier can
+  be lossless (§4.6c).
+* **`Measured` is unforgeable.** Every carrier claiming `Measured` round-trips all
+  16 levels in-sim under the `mc-tick` feature, and every `Measured` carries a
+  non-empty probe citation. This test *is* the definition of the flag, not a
+  corroboration of it.
+* **No `AtomicStage` cost ever enters an A\* edge.** Assert structurally: a stage
+  is placed via `select_tile`, never relaxed as an edge, and no edge weight in the
+  search is negative. This is the property that keeps the heuristic admissible in
+  the presence of a `+k` gaining stage (§4.6d).
+* **A gain cannot shorten a route.** Adding a gaining carrier to the registry must
+  never reduce a plan's `length` below what a non-gaining carrier achieves on the
+  same scenario — signal strength is a budget, not a distance. If this fails, ss
+  has leaked into the cost function.
+* **Value-dependent conduction is handled as a worst case.** For a carrier with
+  `value_dependent_conduction`, the clearance/occupancy footprint computed by the
+  planner must equal the **union over all 16 values**, and must therefore forbid a
+  pitch-1 neighbour on `HexCombStage`'s output lane even though at `v = 0` every
+  rung is dark (§4.6e, H8.6). Sampling one value must not be able to pass.
+* **A stage is one net to DRC and LVS.** A correctly placed `HexCombStage` must
+  produce zero DRC violations, despite 15 repeaters driving one output lane. A
+  false positive here is the failure mode §4.6e predicts.
 * **Removing a gate never lengthens the plan.** Monotonicity in the request.
 * **Enlarging the free region never worsens the cost vector.** Monotonicity in
   the world. This catches ladder/effort bugs where a later rung "wins" with a
@@ -1217,10 +1485,13 @@ route" — unroutable is a legitimate answer. It is:
 3. never return `Ok` with an unsatisfied post-condition;
 4. never exceed the node budget;
 5. never write outside `bounds()` or into an `Immovable` cell;
-6. never return `Ok` for an analog encoding on a non-`value_preserving` carrier
-   (§4.6c) — the one oracle whose violation is invisible in the geometry;
+6. never return `Ok` for an analog encoding on a carrier whose `value_preserving`
+   is not `Measured` (§4.6c) — the one oracle whose violation is invisible in the
+   geometry;
 7. never return `Ok` for a cross-section that `validate` rejects for the chosen
-   carrier.
+   carrier;
+8. never subdivide, overlap or partially place an `AtomicStage`, and never emit a
+   negative edge weight (§4.6d).
 
 Every DRC-failing case found gets minimized and committed as a regression
 scenario. This is the mechanism by which "the instant crossing might not always
@@ -1234,10 +1505,16 @@ work" stops being an intuition and becomes a test.
   square, multi-trunk and irregular bundles are all the same code path
   (§4.3–§4.5). `vec3<f32>` composes, with each sub-bundle free to have its own
   orientation.
-* **Transports stop being hardcoded.** A repeater-carried hex bus (fast, wide) and
-  a comparator/dust/block bus (slow, compact) are two `Carrier` values ranked by
-  the existing cost vector, choosable per segment (§4.6) — and an analog bus can
-  no longer be silently normalized to 15.
+* **Transports stop being hardcoded.** The user's repeater-carried hex bus
+  (**measured** 4.00× faster, 3× wider, analog-lossless) and a comparator/dust/block
+  trunk (compact, 1.0 gt/block) are two `Carrier` values ranked by the existing cost
+  vector, choosable per segment (§4.6) — and an analog bus still cannot be silently
+  normalized to 15, because the gate is now the measured round trip rather than a
+  guess about repeaters.
+* **Carrier cost stops being assumed additive.** Stages with a fixed span and a
+  zero-or-negative ss delta are priced as atomic tiles, which keeps A\* admissible
+  and turns a short comb into a free level shifter instead of an unroutable
+  negative edge (§4.6d).
 * The congruent fast path gets deleted rather than maintained (§4.4).
 * The `xw_updown` / `xw_hop` / `xw_buffered` trio becomes selectable *by
   condition* instead of by assumption — ranked unlock #2, and the answer to
@@ -1292,7 +1569,7 @@ commit.
 `shift_len`, `shift_len_max`, `SHIFT_DUST_CAP`, `REFRESH_AT` →
 `nucleation_bus::levelshift`; `BusCost`, `BusCostVector` →
 `nucleation_bus::cost`; `RunInfo`, `Segment`, `SegmentKind`, `BusStyle` →
-`nucleation_bus::plan`; `WidthMap` → `nucleation_bus::form`. `Design::route_bus`
+`nucleation_bus::plan`; `WidthMap` → `nucleation_bus::ty`. `Design::route_bus`
 shrinks to: build `DesignWorld`, call `nucleation_bus::plan`, apply the
 `BusPlan` into the `bus:<name>` layer, map failure to `BusState::Failed`.
 
@@ -1321,9 +1598,19 @@ the step, each sub-step green:
    `min_pitch(DustOnSolid, vertical) == 2` **falls out** and the existing `bus8`
    v2 geometry is reproduced byte-for-byte.
 3. `Carrier` + `CarrierProfile` registry, seeded with `DustOnSolid` only, so
-   behaviour is unchanged. Then add `ComparatorChain` and `RepeaterChain` with
-   probed profiles (the `TRANSMIT002_hex_transmit_flat` probe is the input) and
-   the `value_preserving` gate + its two tests.
+   behaviour is unchanged. Then the `Pricing` split (`PerCell` vs `AtomicStage`)
+   **before** any non-additive carrier is added — otherwise the first stage to land
+   will be silently decomposed into edges. Then `ComparatorChain` and `RepeaterLine`
+   (both `PerCell`, both already measured in `probe_hex_vs_comparator`), then
+   `HexCombStage` as the first `AtomicStage`, transcribing the profile table from
+   `notes-hex-transport.md` §4 verbatim with its probe citations. Finally the
+   `ValuePreserving` gate and its tests — including the *acceptance* case
+   (`HexAnalog` × `HexCombStage` routes), which is the regression test for the
+   error recorded in §4.6c.
+   Also in this sub-step: the stage-aware `drc`/`lvs` exemption (§4.6e), since a
+   placed `HexCombStage` will otherwise trip "one driver per net cell" the moment
+   it lands. That touches `crates/nucleation-routing`, so it must be sequenced with
+   whoever owns that crate rather than bundled blindly.
 4. `Form` into the search state; `LayoutPolicy` registry; `BusForm` demoted to a
    classifier.
 5. **Delete the congruent fast path** and prove the general search still satisfies
@@ -1400,30 +1687,43 @@ without a callback ABI. Two options:
 7. **Where does the carrier registry live if the plugin must extend it?**
    In-crate `&'static` profiles are cheapest but are not extensible from Kotlin
    across the Diplomat boundary.
-8. **Analog beyond hex.** `value_preserving` is a bool today. Are there carriers
-   that preserve *some* of the range (a comparator subtract chain, a container
-   read) and so need a declared range/precision rather than a flag?
-9. **Fallback semantics on a latency-critical bus.** If only `xw_buffered` fits
-   and the bus is declared latency-critical, do we (a) use it and report the
-   +2 gt, (b) fail and ask the user, or (c) reroute to avoid the crossing
-   entirely? (c) is the best answer and much the most work.
-10. **Foreign-redstone policy.** Is "unmodelled mechanism ⇒ keepout + halo"
+8. **Analog beyond lossless/not.** `ValuePreserving` is now three-valued
+   (`Measured` / `MeasuredNot` / `Unmeasured`), which fixed the block-kind error —
+   but are there carriers that preserve only *part* of the range, or preserve it
+   with a known offset (a comparator subtract chain, a container read, a short comb
+   used deliberately as `+k`)? If so the flag wants to become the same `SsLaw` the
+   `StageContract` already carries, and "value-preserving" is just `SsLaw::Identity`.
+   Deciding this before the registry is populated is much cheaper than after.
+9. **How does a carrier get characterized in the first place?** `HexCombStage`
+   exists as a profile only because a user handed us a build and someone wrote two
+   probe scripts. Is there a repeatable harness — "point it at a schematic, get a
+   `CarrierProfile`" — or does every carrier stay a bespoke probe? The `mc-tick`
+   feature plus the round-trip test are most of the machinery already.
+10. **Does `TRANSPORT_MODEL.md` adopt `hex_comb_stage` as row 12?**
+    `notes-hex-transport.md` §4 proposes it with full §A/§B entries. The mechanism
+    table is currently all *primitives*; a composed stage is a different kind of
+    row, so this may want its own table rather than row 12.
+11. **Fallback semantics on a latency-critical bus.** If only `xw_buffered` fits
+    and the bus is declared latency-critical, do we (a) use it and report the
+    +2 gt, (b) fail and ask the user, or (c) reroute to avoid the crossing
+    entirely? (c) is the best answer and much the most work.
+12. **Foreign-redstone policy.** Is "unmodelled mechanism ⇒ keepout + halo"
     absolute, or may a user opt into routing adjacent to unknown redstone? What
     halo radius is defensible without quasi-connectivity or observer modelling?
-11. **Live-world consent.** Does the plugin require an explicit permitted region
+13. **Live-world consent.** Does the plugin require an explicit permitted region
     (WorldGuard-style)? May a plan ever *break* existing redstone with consent?
-12. **Plugin platform** — Paper/Spigot, Fabric, or both? Decides the
+14. **Plugin platform** — Paper/Spigot, Fabric, or both? Decides the
     JNI/Panama story and whether physics-suppressed batch writes exist.
-13. **Snapshot vs callback `BusWorld` across the FFI** (§8 step 7). Is
+15. **Snapshot vs callback `BusWorld` across the FFI** (§8 step 7). Is
     snapshot-only acceptable for v1, and what region cap (128³?) is reasonable?
-14. **Does negotiated congestion become the default bus router** as part of this
+16. **Does negotiated congestion become the default bus router** as part of this
     extraction, or stay a follow-up? It changes plans, so it changes goldens —
     better to decide before the goldens are written than after.
-15. **Python's role.** Do `redstone-eda/*.py` remain the authoritative tile
+17. **Python's role.** Do `redstone-eda/*.py` remain the authoritative tile
     spec, or does the golden-file registry become authoritative with the Python
     probes demoted to verification?
-16. **Publishing.** `pnr-core` and `nucleation-routing` already carry
+18. **Publishing.** `pnr-core` and `nucleation-routing` already carry
     `license = "MIT"` and descriptions. Does `nucleation-bus` publish to
     crates.io, or stay path-only?
-17. **`no_std + alloc`** — worth requiring, given the crate already cannot use
+19. **`no_std + alloc`** — worth requiring, given the crate already cannot use
     fs, threads or clocks? (*Speculative*: may cost nothing.)
