@@ -1,0 +1,125 @@
+name: Dev tiers
+
+# The everyday gates, mirroring tools/dev.sh so CI and local runs cannot drift.
+# ci.yml stays the release/publish pipeline (tags + manual only).
+#
+#   push            -> fast + pre-land
+#   PR into master  -> full (the merge gate)
+#   nightly         -> full, to catch dependency/toolchain drift
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+    - cron: '0 14 * * *'
+  workflow_dispatch:
+
+concurrency:
+  # A new push supersedes an in-flight run on the same ref.
+  group: dev-tiers-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Keep debug info off dependencies in CI too — same reason as locally, and it
+  # keeps the target cache small enough to actually round-trip.
+  CARGO_INCREMENTAL: 0
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: sccache
+
+jobs:
+  # ---------------------------------------------------------------- fast tier
+  fast:
+    name: fast (canonical check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # Feature set is part of the fingerprint; key on it so the fast and
+          # pre-land tiers share one warm cache instead of fighting.
+          key: canonical
+      - run: tools/dev.sh fast
+      - name: sccache stats
+        if: always()
+        run: sccache -s
+
+  # ------------------------------------------------------------ pre-land tier
+  pre-land:
+    name: pre-land (tests + wasm32 + studio + smoke)
+    runs-on: ubuntu-latest
+    needs: fast
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: canonical
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: tools/dev.sh pre-land
+      - name: sccache stats
+        if: always()
+        run: sccache -s
+
+  # ---------------------------------------------------------------- full tier
+  # The merge gate. Exhaustive sim suites, every feature permutation, wheel and
+  # npm rebuild, and the prepush gates (bindings freshness + determinism +
+  # bridge coverage + all five language smokes). Do not narrow this.
+  full:
+    name: full (merge gate)
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: full
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install diplomat-tool (fork with PHP backend)
+        run: cargo install --git https://github.com/Nano112/diplomat --branch nanobind-public-api diplomat-tool
+      - name: maturin (wheel build in the full tier)
+        run: pipx install maturin
+      - run: tools/dev.sh full
+      - name: sccache stats
+        if: always()
+        run: sccache -s
+
+  # ------------------------------------------------------------------ hygiene
+  # Fails the build if someone commits target artifacts.
+  hygiene:
+    name: hygiene (no build output committed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No tracked build artifacts
+        run: |
+          # Anything under a target/ or dist/ dir, or a compiled object, that is
+          # actually tracked by git. target/ reached 102 GB locally; a single
+          # committed artifact makes every clone pay for it forever.
+          if git ls-files | grep -nE '(^|/)(target|dist|pkg)/|\.(o|rlib|rmeta|dylib|so|wasm)$' \
+               | grep -vE '^\s*[0-9]+:tests/corpus/' ; then
+            echo "::error::tracked build artifacts found (see docs/DEV.md 'Disk hygiene')"
+            exit 1
+          fi
+          echo "no tracked build artifacts"
