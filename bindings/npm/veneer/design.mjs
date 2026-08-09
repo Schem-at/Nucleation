@@ -262,6 +262,10 @@ class DesignBase {
   busState(name) { return this._d.busState(name); }
   busSkew(name) { return JSON.parse(this._d.busSkew(name)); }
   rip(name) { this._d.rip(name); }
+  /** Re-realize a ripped/failed bus from its stored declaration; -> state. */
+  reroute(name) { return this._d.reroute(name); }
+  /** Delete a bus outright — fragment AND declaration, freeing the name. */
+  removeBus(name) { this._d.removeBus(name); }
 
   // -- cells / instances ---------------------------------------------------
 
@@ -274,6 +278,31 @@ class DesignBase {
     const [x, y, z] = at;
     return JSON.parse(this._d.moveInstance(name, x, y, z, rot));
   }
+  /** Remove an instance. Buses that terminated on one of its ports are
+   *  DELETED (they lost an endpoint) and named in the report; buses that
+   *  merely crossed its space are ripped and co-rerouted.
+   *  -> `{removed_buses, rerouted, failed}`. */
+  removeInstance(name) { return JSON.parse(this._d.removeInstance(name)); }
+
+  // -- instance ports (derived routing endpoints) ---------------------------
+
+  /** Every endpoint the placed instances expose, as
+   *  `{name: "u0.sum", instance, port, role, ty, width, hardware, wires,
+   *    step, routable, blocked}`.
+   *
+   *  `name` is exactly what `routeBus` accepts. `role` is the CELL-facing
+   *  direction: `"output"` drives a bus, `"input"` receives one. A cell
+   *  contract names EXECUTOR hardware (levers/buttons in, lamps out) while a
+   *  bus lands on dust, so `wires` carries the derived dust connection cells
+   *  — and a port with no dust to tap (a bare lever input) reports
+   *  `routable: false` with the reason in `blocked`. */
+  instancePorts() { return JSON.parse(this._d.instancePorts()); }
+
+  /** Resolve one endpoint name to the geometry a bus would use:
+   *  `{name, anchor, step, width, direction, connectable}`. `direction` is
+   *  DESIGN-facing, so `"input"` drives buses. Throws with the reason when
+   *  the name is unknown or the port cannot terminate a bus. */
+  resolvePort(name) { return JSON.parse(this._d.resolvePort(name)); }
 
   // -- loose layer (explicit forward; more via `.raw`) ---------------------
 
@@ -287,20 +316,30 @@ class DesignBase {
     return report;
   }
   flatten() { return new (surfaces.get(this._core).Flat)(this._d.flatten()); }
+  /** The flattened stack composited into ONE region — what an interchange
+   *  artifact wants. `flatten()` keeps `inst:*`/`bus:*` regions (the
+   *  renderer needs them); a single-region schematic cannot lose a
+   *  named-layer cell to the loose layer's bounding box. */
+  flattenComposite() {
+    return new (surfaces.get(this._core).Flat)(this._d.flattenComposite());
+  }
   bake(budget = 4000) { return new (surfaces.get(this._core).Flat)(this._d.bake(budget)); }
 
   // -- persistence ---------------------------------------------------------
 
   toNucmB64() { return this._d.toNucmB64(); }
   toLitematicB64() { return this._d.toLitematicB64(); }
+  toSchemB64() { return this._d.toSchemB64(); }
   /** Document/artifact bytes by suffix: `.nucm` -> project tier,
    *  `.litematic` -> layered interchange, anything else -> the flattened
-   *  artifact (the browser-side spelling of Python's `d.save(path)`). */
+   *  artifact, composited (the browser-side spelling of Python's
+   *  `d.save(path)`). */
   toBytes(pathOrSuffix) {
     const suffix = String(pathOrSuffix).split(".").pop();
     if (suffix === "nucm") return b64ToBytes(this._d.toNucmB64());
     if (suffix === "litematic") return b64ToBytes(this._d.toLitematicB64());
-    return this.flatten().toBytes(suffix);
+    if (suffix === "schem" || suffix === "schematic") return b64ToBytes(this._d.toSchemB64());
+    return this.flattenComposite().toBytes(suffix);
   }
   /** Node-only path save, tier dispatched by suffix like Python's. */
   async save(path) {

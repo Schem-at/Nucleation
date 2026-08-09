@@ -341,16 +341,38 @@ impl UniversalSchematic {
             .collect()
     }
 
+    /// The block at a cell, resolving the region stack.
+    ///
+    /// Precedence: the default region masks the named regions wherever it
+    /// claims the cell (including with AIR — see the `main_air_masks` case in
+    /// `overlapping_named_regions_have_stable_lexicographic_precedence`), then
+    /// named regions in stable lexicographic order.
+    ///
+    /// KNOWN DEFECT, deliberately not papered over here: the masking volume is
+    /// [`Region::get_bounding_box`], which reports a region's ALLOCATED
+    /// envelope rather than its contents — a 10x18x6 schematic built with
+    /// `set_block_from_string` reports `(0,0,0)..(10,65,65)`. Since a region
+    /// also densely materializes air (`Some(air)` for every in-bounds cell it
+    /// was never written to), the default region masks that whole phantom
+    /// envelope, hiding named `inst:*` / `bus:*` layers that `iter_blocks` and
+    /// the export path can both see. Making air transparent here would fix
+    /// composites but breaks the intentional `main_air_masks` contract, so the
+    /// real fix belongs in `Region::get_bounding_box` (report the true block
+    /// extent) — see the ignored tests in `tests/design_layer_precedence.rs`.
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> Option<&BlockState> {
-        // Check default region first
         if self.default_region.get_bounding_box().contains((x, y, z)) {
-            return self.default_region.get_block(x, y, z);
+            // Fall through on a genuine absence rather than discarding the
+            // named layers, matching `get_block_entity`.
+            if let Some(b) = self.default_region.get_block(x, y, z) {
+                return Some(b);
+            }
         }
-
-        // Check named regions in stable lexicographic precedence.
+        // Named regions in stable lexicographic precedence.
         for region in Self::sorted_named_regions(self) {
             if region.get_bounding_box().contains((x, y, z)) {
-                return region.get_block(x, y, z);
+                if let Some(b) = region.get_block(x, y, z) {
+                    return Some(b);
+                }
             }
         }
         None

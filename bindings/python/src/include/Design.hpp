@@ -50,6 +50,27 @@ namespace capi {
     typedef struct Design_move_instance_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Design_move_instance_result;
     Design_move_instance_result Design_move_instance(nucleation::capi::Design* self, nucleation::diplomat::capi::DiplomatStringView name, int32_t x, int32_t y, int32_t z, int32_t rot_y, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Design_remove_instance_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Design_remove_instance_result;
+    Design_remove_instance_result Design_remove_instance(nucleation::capi::Design* self, nucleation::diplomat::capi::DiplomatStringView name, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_reroute_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Design_reroute_result;
+    Design_reroute_result Design_reroute(nucleation::capi::Design* self, nucleation::diplomat::capi::DiplomatStringView name, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_remove_bus_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Design_remove_bus_result;
+    Design_remove_bus_result Design_remove_bus(nucleation::capi::Design* self, nucleation::diplomat::capi::DiplomatStringView name);
+
+    typedef struct Design_to_schem_b64_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Design_to_schem_b64_result;
+    Design_to_schem_b64_result Design_to_schem_b64(const nucleation::capi::Design* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_flatten_composite_result {union {nucleation::capi::Schematic* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Design_flatten_composite_result;
+    Design_flatten_composite_result Design_flatten_composite(const nucleation::capi::Design* self);
+
+    typedef struct Design_instance_ports_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Design_instance_ports_result;
+    Design_instance_ports_result Design_instance_ports(const nucleation::capi::Design* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_resolve_port_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Design_resolve_port_result;
+    Design_resolve_port_result Design_resolve_port(const nucleation::capi::Design* self, nucleation::diplomat::capi::DiplomatStringView name, nucleation::diplomat::capi::DiplomatWrite* write);
+
     typedef struct Design_add_gate_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Design_add_gate_result;
     Design_add_gate_result Design_add_gate(nucleation::capi::Design* self, nucleation::diplomat::capi::DiplomatStringView bus, nucleation::diplomat::capi::DiplomatStringView gate, int32_t x, int32_t y, int32_t z, int32_t sx, int32_t sy, int32_t sz, nucleation::diplomat::capi::DiplomatWrite* write);
 
@@ -256,6 +277,98 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
         y,
         z,
         rot_y,
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Design::remove_instance(std::string_view name) {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::Design_remove_instance(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Design::remove_instance_write(std::string_view name, W& writeable) {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::Design_remove_instance(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Design::reroute(std::string_view name) {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::Design_reroute(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Design::reroute_write(std::string_view name, W& writeable) {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::Design_reroute(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Design::remove_bus(std::string_view name) {
+    auto result = nucleation::capi::Design_remove_bus(this->AsFFI(),
+        {name.data(), name.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Design::to_schem_b64() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::Design_to_schem_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Design::to_schem_b64_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::Design_to_schem_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError> nucleation::Design::flatten_composite() const {
+    auto result = nucleation::capi::Design_flatten_composite(this->AsFFI());
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Schematic>>(std::unique_ptr<nucleation::Schematic>(nucleation::Schematic::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Design::instance_ports() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::Design_instance_ports(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Design::instance_ports_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::Design_instance_ports(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Design::resolve_port(std::string_view name) const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::Design_resolve_port(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Design::resolve_port_write(std::string_view name, W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::Design_resolve_port(this->AsFFI(),
+        {name.data(), name.size()},
         &write);
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }

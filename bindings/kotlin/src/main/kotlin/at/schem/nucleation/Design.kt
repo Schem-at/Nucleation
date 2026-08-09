@@ -17,6 +17,13 @@ internal interface DesignLib: Library {
     fun Design_route_bus_or(handle: Pointer, name: Slice, driversJson: Slice, sinksJson: Slice, gatesJson: Slice, styleJson: Slice, write: Pointer): ResultUnitInt
     fun Design_set_block(handle: Pointer, x: Int, y: Int, z: Int, block: Slice): ResultUnitInt
     fun Design_move_instance(handle: Pointer, name: Slice, x: Int, y: Int, z: Int, rotY: Int, write: Pointer): ResultUnitInt
+    fun Design_remove_instance(handle: Pointer, name: Slice, write: Pointer): ResultUnitInt
+    fun Design_reroute(handle: Pointer, name: Slice, write: Pointer): ResultUnitInt
+    fun Design_remove_bus(handle: Pointer, name: Slice): ResultUnitInt
+    fun Design_to_schem_b64(handle: Pointer, write: Pointer): ResultUnitInt
+    fun Design_flatten_composite(handle: Pointer): ResultPointerInt
+    fun Design_instance_ports(handle: Pointer, write: Pointer): ResultUnitInt
+    fun Design_resolve_port(handle: Pointer, name: Slice, write: Pointer): ResultUnitInt
     fun Design_add_gate(handle: Pointer, bus: Slice, gate: Slice, x: Int, y: Int, z: Int, sx: Int, sy: Int, sz: Int, write: Pointer): ResultUnitInt
     fun Design_move_gate(handle: Pointer, bus: Slice, gate: Slice, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
     fun Design_set_bus_rule(handle: Pointer, bus: Slice, ruleJson: Slice): ResultUnitInt
@@ -388,6 +395,149 @@ class Design internal constructor (
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.Design_move_instance(handle, nameSliceMemory.slice, x, y, z, rotY, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            nameSliceMemory.close()
+        }
+    }
+
+    /** Remove an instance layer. Buses that terminate on one of its
+    *ports are DELETED (they lost an endpoint); buses that merely
+    *crossed its space are ripped and co-rerouted. Writes
+    *`{"removed_buses": [...], "rerouted": [...], "failed": {...}}`.
+    */
+    fun removeInstance(name: String): Result<String> {
+        val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_remove_instance(handle, nameSliceMemory.slice, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            nameSliceMemory.close()
+        }
+    }
+
+    /** Re-realize a bus from its stored declaration (the counterpart to
+    *`rip`); writes the resulting bus state.
+    */
+    fun reroute(name: String): Result<String> {
+        val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_reroute(handle, nameSliceMemory.slice, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            nameSliceMemory.close()
+        }
+    }
+
+    /** Delete a bus outright — fragment AND declaration, freeing the
+    *name. `rip` keeps the declaration so the bus can be rerouted.
+    */
+    fun removeBus(name: String): Result<Unit> {
+        val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
+
+        val returnVal = lib.Design_remove_bus(handle, nameSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            nameSliceMemory.close()
+        }
+    }
+
+    /** The flattened artifact as `.schem` bytes, base64. Unlike
+    *`flatten()` + the schematic writer, this composites the layer
+    *stack into ONE region first: `.schem` has no layers, and the
+    *region merge drops named-layer cells that the loose layer's
+    *bounding box shadows.
+    */
+    fun toSchemB64(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_to_schem_b64(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** The flattened artifact composited into ONE region (see
+    *`to_schem_b64`) — the shape an interchange export wants.
+    */
+    fun flattenComposite(): Result<Schematic> {
+
+        val returnVal = lib.Design_flatten_composite(handle);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            val selfEdges: List<Any> = listOf()
+            val handle = nativeOkVal
+            val returnOpaque = Schematic(handle, selfEdges, true)
+            return returnOpaque.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Every routing endpoint the placed instances expose, as a JSON
+    *array of `{name, instance, port, role, ty, width, hardware,
+    *wires, step, routable, blocked}`. `name` is `{instance}.{port}`
+    *— exactly what `route_bus` accepts; `role` is the CELL-facing
+    *direction, so `"output"` drives a bus and `"input"` receives
+    *one. A port whose bits have no dust connection cell (a lever
+    *input, say) reports `routable: false` and why in `blocked`.
+    */
+    fun instancePorts(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_instance_ports(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Resolve one routing endpoint name — a declared design port or an
+    *instance port `{instance}.{port}` — to the geometry a bus would
+    *use: `{"name","anchor","step","width","direction","connectable"}`.
+    *`direction` is DESIGN-facing (`"input"` drives buses).
+    */
+    fun resolvePort(name: String): Result<String> {
+        val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Design_resolve_port(handle, nameSliceMemory.slice, write);
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {

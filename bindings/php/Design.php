@@ -304,6 +304,106 @@ final class Design {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function removeInstance(string $name) {
+        $__n0 = strlen($name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Design_remove_instance($this->ptr, $__view0, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function reroute(string $name) {
+        $__n0 = strlen($name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Design_reroute($this->ptr, $__view0, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function removeBus(string $name) {
+        $__n0 = strlen($name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Design_remove_bus($this->ptr, $__view0);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function toSchemB64() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Design_to_schem_b64($this->ptr, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function flattenComposite() {
+        $result = Lib::ffi()->Design_flatten_composite($this->ptr);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Schematic($result->ok, true);
+    }
+
+    public function instancePorts() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Design_instance_ports($this->ptr, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function resolvePort(string $name) {
+        $__n0 = strlen($name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Design_resolve_port($this->ptr, $__view0, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function addGate(string $bus, string $gate,  $x,  $y,  $z,  $sx,  $sy,  $sz) {
         $__n0 = strlen($bus);
         $__view0 = Lib::ffi()->new('DiplomatStringView');

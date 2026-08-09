@@ -51,6 +51,8 @@ mod python_callback;
 #[cfg(feature = "routing")]
 pub mod design;
 #[cfg(feature = "routing")]
+pub mod design_corridor;
+#[cfg(feature = "routing")]
 pub mod design_io;
 #[cfg(feature = "routing")]
 pub mod routing;

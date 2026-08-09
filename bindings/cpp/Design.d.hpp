@@ -115,6 +115,70 @@ public:
   inline diplomat::result<std::monostate, NucleationError> move_instance_write(std::string_view name, int32_t x, int32_t y, int32_t z, int32_t rot_y, W& writeable_output);
 
   /**
+   * Remove an instance layer. Buses that terminate on one of its
+   * ports are DELETED (they lost an endpoint); buses that merely
+   * crossed its space are ripped and co-rerouted. Writes
+   * `{"removed_buses": [...], "rerouted": [...], "failed": {...}}`.
+   */
+  inline diplomat::result<std::string, NucleationError> remove_instance(std::string_view name);
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> remove_instance_write(std::string_view name, W& writeable_output);
+
+  /**
+   * Re-realize a bus from its stored declaration (the counterpart to
+   * `rip`); writes the resulting bus state.
+   */
+  inline diplomat::result<std::string, NucleationError> reroute(std::string_view name);
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> reroute_write(std::string_view name, W& writeable_output);
+
+  /**
+   * Delete a bus outright — fragment AND declaration, freeing the
+   * name. `rip` keeps the declaration so the bus can be rerouted.
+   */
+  inline diplomat::result<std::monostate, NucleationError> remove_bus(std::string_view name);
+
+  /**
+   * The flattened artifact as `.schem` bytes, base64. Unlike
+   * `flatten()` + the schematic writer, this composites the layer
+   * stack into ONE region first: `.schem` has no layers, and the
+   * region merge drops named-layer cells that the loose layer's
+   * bounding box shadows.
+   */
+  inline diplomat::result<std::string, NucleationError> to_schem_b64() const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> to_schem_b64_write(W& writeable_output) const;
+
+  /**
+   * The flattened artifact composited into ONE region (see
+   * `to_schem_b64`) — the shape an interchange export wants.
+   */
+  inline diplomat::result<std::unique_ptr<Schematic>, NucleationError> flatten_composite() const;
+
+  /**
+   * Every routing endpoint the placed instances expose, as a JSON
+   * array of `{name, instance, port, role, ty, width, hardware,
+   * wires, step, routable, blocked}`. `name` is `{instance}.{port}`
+   * — exactly what `route_bus` accepts; `role` is the CELL-facing
+   * direction, so `"output"` drives a bus and `"input"` receives
+   * one. A port whose bits have no dust connection cell (a lever
+   * input, say) reports `routable: false` and why in `blocked`.
+   */
+  inline diplomat::result<std::string, NucleationError> instance_ports() const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> instance_ports_write(W& writeable_output) const;
+
+  /**
+   * Resolve one routing endpoint name — a declared design port or an
+   * instance port `{instance}.{port}` — to the geometry a bus would
+   * use: `{"name","anchor","step","width","direction","connectable"}`.
+   * `direction` is DESIGN-facing (`"input"` drives buses).
+   */
+  inline diplomat::result<std::string, NucleationError> resolve_port(std::string_view name) const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> resolve_port_write(std::string_view name, W& writeable_output) const;
+
+  /**
    * Add a gate to an existing bus (splitting the segment it lands
    * in) and re-realize it. Writes the resulting bus state.
    */

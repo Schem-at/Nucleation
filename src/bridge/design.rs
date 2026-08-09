@@ -243,6 +243,121 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Remove an instance layer. Buses that terminate on one of its
+        /// ports are DELETED (they lost an endpoint); buses that merely
+        /// crossed its space are ripped and co-rerouted. Writes
+        /// `{"removed_buses": [...], "rerouted": [...], "failed": {...}}`.
+        pub fn remove_instance(
+            &mut self,
+            name: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let report = self.0.remove_instance(utf8(name)?).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::InvalidArgument
+            })?;
+            let _ = write!(out, "{}", report.to_json());
+            Ok(())
+        }
+
+        /// Re-realize a bus from its stored declaration (the counterpart to
+        /// `rip`); writes the resulting bus state.
+        pub fn reroute(
+            &mut self,
+            name: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let state = self.0.reroute(utf8(name)?).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::InvalidArgument
+            })?;
+            let _ = write!(out, "{}", state_str(&state));
+            Ok(())
+        }
+
+        /// Delete a bus outright — fragment AND declaration, freeing the
+        /// name. `rip` keeps the declaration so the bus can be rerouted.
+        pub fn remove_bus(&mut self, name: &DiplomatStr) -> Result<(), NucleationError> {
+            self.0.remove_bus(utf8(name)?).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::InvalidArgument
+            })
+        }
+
+        /// The flattened artifact as `.schem` bytes, base64. Unlike
+        /// `flatten()` + the schematic writer, this composites the layer
+        /// stack into ONE region first: `.schem` has no layers, and the
+        /// region merge drops named-layer cells that the loose layer's
+        /// bounding box shadows.
+        pub fn to_schem_b64(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
+            let bytes = self.0.to_schem_bytes().map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::InvalidArgument
+            })?;
+            let _ = write!(out, "{}", crate::bridge::schematic::b64(&bytes));
+            Ok(())
+        }
+
+        /// The flattened artifact composited into ONE region (see
+        /// `to_schem_b64`) — the shape an interchange export wants.
+        pub fn flatten_composite(&self) -> Result<Box<Schematic>, NucleationError> {
+            let flat = self.0.flatten_composite().map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::InvalidArgument
+            })?;
+            Ok(Box::new(Schematic(flat)))
+        }
+
+        /// Every routing endpoint the placed instances expose, as a JSON
+        /// array of `{name, instance, port, role, ty, width, hardware,
+        /// wires, step, routable, blocked}`. `name` is `{instance}.{port}`
+        /// — exactly what `route_bus` accepts; `role` is the CELL-facing
+        /// direction, so `"output"` drives a bus and `"input"` receives
+        /// one. A port whose bits have no dust connection cell (a lever
+        /// input, say) reports `routable: false` and why in `blocked`.
+        pub fn instance_ports(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
+            let json = self.0.instance_ports_json().map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::InvalidArgument
+            })?;
+            let _ = write!(out, "{json}");
+            Ok(())
+        }
+
+        /// Resolve one routing endpoint name — a declared design port or an
+        /// instance port `{instance}.{port}` — to the geometry a bus would
+        /// use: `{"name","anchor","step","width","direction","connectable"}`.
+        /// `direction` is DESIGN-facing (`"input"` drives buses).
+        pub fn resolve_port(
+            &self,
+            name: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let p = self.0.resolve_port(utf8(name)?).map_err(|e| {
+                crate::bridge::set_last_error_detail(e);
+                NucleationError::InvalidArgument
+            })?;
+            let _ = write!(
+                out,
+                "{{\"name\":{:?},\"anchor\":[{},{},{}],\"step\":[{},{},{}],\"width\":{},\
+                 \"direction\":{:?},\"connectable\":{}}}",
+                p.name,
+                p.anchor.0,
+                p.anchor.1,
+                p.anchor.2,
+                p.step.0,
+                p.step.1,
+                p.step.2,
+                p.width,
+                match p.direction {
+                    crate::io_contract::PortDirection::Input => "input",
+                    crate::io_contract::PortDirection::Output => "output",
+                },
+                p.bits.iter().all(|b| b.connectable)
+            );
+            Ok(())
+        }
+
         /// Add a gate to an existing bus (splitting the segment it lands
         /// in) and re-realize it. Writes the resulting bus state.
         #[allow(clippy::too_many_arguments)]

@@ -184,11 +184,17 @@ fn unroutable_gate_drag_fails_visibly() {
     assert!(d.check().unwrap().clean);
 }
 
-/// DESIGN_SPEC acceptance sketch (3): a component dragged through the A
-/// bus co-reroutes the affected set or fails VISIBLY; dragged away, the
-/// reroute succeeds. The move itself always succeeds.
+/// DESIGN_SPEC acceptance sketch (3): a component dragged through the A bus
+/// co-reroutes the affected set or fails VISIBLY; dragged away, the reroute
+/// succeeds. The move itself always succeeds.
+///
+/// Both halves of "or" are exercised here. A 3x3x3 cube dropped on the line is
+/// something the corridor search routes AROUND, so the bus survives the drag —
+/// it used to fail, because the planner only knew a straight run and one L
+/// corner. A wall that genuinely seals the corridor still fails visibly, with a
+/// reason that names the blocker.
 #[test]
-fn component_drag_through_bus_fails_visibly_then_recovers() {
+fn component_drag_through_bus_reroutes_then_fails_visibly_when_sealed() {
     let mut s = UniversalSchematic::new("blocker".to_string());
     let a_in = lever_bank(&mut s, 0, 8, 1, 0);
     let a_out = lamp_bank(&mut s, 16, 8);
@@ -217,19 +223,18 @@ fn component_drag_through_bus_fails_visibly_then_recovers() {
     assert_eq!(state, BusState::Routed);
     assert!(d.check().unwrap().clean);
 
-    // Drag c0 THROUGH the bus: the move succeeds, the bus fails visibly.
+    // Drag c0 THROUGH the bus: the move succeeds AND the bus survives, by
+    // co-rerouting around the obstacle instead of dying on it.
     let report = d.move_instance("c0", (4, 0, 8), 0).unwrap();
-    assert!(report.rerouted.is_empty(), "{report:?}");
-    assert_eq!(report.failed.len(), 1, "{report:?}");
-    assert_eq!(report.failed[0].0, "bus_a");
-    match d.bus_state("bus_a").unwrap() {
-        BusState::Failed(reason) => assert!(
-            reason.contains("c0") || reason.contains("collision") || reason.contains("halo"),
-            "{reason}"
-        ),
-        other => panic!("expected Failed, got {other:?}"),
+    assert_eq!(report.rerouted, vec!["bus_a".to_string()], "{report:?}");
+    assert!(report.failed.is_empty(), "{report:?}");
+    assert_eq!(d.bus_state("bus_a"), Some(&BusState::Routed));
+    assert!(d.check().unwrap().clean, "{}", d.check().unwrap().json);
+    // The detour is real: nothing of the bus sits in c0's footprint or halo.
+    for p in d.bus("bus_a").unwrap().fragment.keys() {
+        let inside = (3..=7).contains(&p.0) && (-1..=3).contains(&p.1) && (7..=11).contains(&p.2);
+        assert!(!inside, "bus cell {p:?} is inside c0's footprint/halo");
     }
-    assert!(d.bus("bus_a").unwrap().fragment.is_empty(), "never half-routed");
     // c0 IS moved — the truth of the document.
     let occ = d.occupancy_index();
     assert!(
@@ -237,16 +242,36 @@ fn component_drag_through_bus_fails_visibly_then_recovers() {
             occ.cells.get(&(4, 0, 8)),
             Some((_, nucleation::design::Occupant::Instance(n))) if n == "c0"
         ),
-        "instance moved despite the failed bus"
+        "instance moved"
     );
 
-    // Drag it away: the FAILED bus is re-attempted and reroutes.
+    // Drag it away again. The detoured bus no longer touches c0 at all, so the
+    // affected set can legitimately be empty — what matters is that no bus
+    // ends up failed and the design stays clean.
     let report = d.move_instance("c0", (4, 0, 20), 0).unwrap();
-    assert_eq!(report.rerouted, vec!["bus_a".to_string()], "{report:?}");
     assert!(report.failed.is_empty(), "{report:?}");
     assert_eq!(d.bus_state("bus_a"), Some(&BusState::Routed));
+    // An explicit reroute with the obstacle out of the way takes the direct
+    // line again.
+    assert_eq!(d.reroute("bus_a").unwrap(), BusState::Routed);
     let check = d.check().unwrap();
     assert!(check.clean, "{}", check.json);
+
+    // Now SEAL the corridor: a wall no detour can get around. The bus must
+    // fail visibly, never half-routed, with a reason naming the blocker.
+    for z in -260..=260 {
+        for y in 0..=20 {
+            d.set_block((12, y, z), STONE).unwrap();
+        }
+    }
+    match d.reroute("bus_a").unwrap() {
+        BusState::Failed(reason) => {
+            assert!(reason.contains("no corridor"), "{reason}");
+            assert!(reason.contains("(12,"), "names the blocker location: {reason}");
+        }
+        other => panic!("expected Failed, got {other:?}"),
+    }
+    assert!(d.bus("bus_a").unwrap().fragment.is_empty(), "never half-routed");
 }
 
 /// The influence halo (bounds + 1 without declared keepouts) counts as
@@ -279,13 +304,22 @@ fn influence_halo_counts_as_interference() {
 
     // Body at z 9..11 — one cell away from the z=8 dust line, but the
     // +1 halo reaches it (dust one step up/down shorts without sharing a
-    // cell).
+    // cell). The bus is ripped and rerouted, and the REROUTE must respect the
+    // halo: interference is what forces the detour, not what kills the bus.
     let report = d.move_instance("c0", (4, 0, 9), 0).unwrap();
-    assert_eq!(report.failed.len(), 1, "{report:?}");
-    match d.bus_state("bus_a").unwrap() {
-        BusState::Failed(reason) => assert!(reason.contains("halo"), "{reason}"),
-        other => panic!("expected Failed, got {other:?}"),
+    assert_eq!(report.rerouted, vec!["bus_a".to_string()], "{report:?}");
+    assert!(report.failed.is_empty(), "{report:?}");
+    assert_eq!(d.bus_state("bus_a"), Some(&BusState::Routed));
+    // c0 body x4..6, y0..2, z9..11 -> halo x3..7, y-1..3, z8..12. Not one bus
+    // cell may sit in it, which forces the trunk off the z=8 lane.
+    let mut in_halo = 0;
+    for p in d.bus("bus_a").unwrap().fragment.keys() {
+        if (3..=7).contains(&p.0) && (-1..=3).contains(&p.1) && (8..=12).contains(&p.2) {
+            in_halo += 1;
+        }
     }
+    assert_eq!(in_halo, 0, "the reroute must refuse halo cells");
+    assert!(d.check().unwrap().clean, "{}", d.check().unwrap().json);
 }
 
 /// Multi-sink trunk: 1 driver -> 2 sinks realized as a shared trunk plus

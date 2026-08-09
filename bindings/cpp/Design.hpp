@@ -50,6 +50,27 @@ namespace capi {
     typedef struct Design_move_instance_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_move_instance_result;
     Design_move_instance_result Design_move_instance(diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name, int32_t x, int32_t y, int32_t z, int32_t rot_y, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Design_remove_instance_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_remove_instance_result;
+    Design_remove_instance_result Design_remove_instance(diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_reroute_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_reroute_result;
+    Design_reroute_result Design_reroute(diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_remove_bus_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_remove_bus_result;
+    Design_remove_bus_result Design_remove_bus(diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name);
+
+    typedef struct Design_to_schem_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_to_schem_b64_result;
+    Design_to_schem_b64_result Design_to_schem_b64(const diplomat::capi::Design* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_flatten_composite_result {union {diplomat::capi::Schematic* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Design_flatten_composite_result;
+    Design_flatten_composite_result Design_flatten_composite(const diplomat::capi::Design* self);
+
+    typedef struct Design_instance_ports_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_instance_ports_result;
+    Design_instance_ports_result Design_instance_ports(const diplomat::capi::Design* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Design_resolve_port_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_resolve_port_result;
+    Design_resolve_port_result Design_resolve_port(const diplomat::capi::Design* self, diplomat::capi::DiplomatStringView name, diplomat::capi::DiplomatWrite* write);
+
     typedef struct Design_add_gate_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Design_add_gate_result;
     Design_add_gate_result Design_add_gate(diplomat::capi::Design* self, diplomat::capi::DiplomatStringView bus, diplomat::capi::DiplomatStringView gate, int32_t x, int32_t y, int32_t z, int32_t sx, int32_t sy, int32_t sz, diplomat::capi::DiplomatWrite* write);
 
@@ -256,6 +277,98 @@ inline diplomat::result<std::monostate, NucleationError> Design::move_instance_w
         y,
         z,
         rot_y,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Design::remove_instance(std::string_view name) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_remove_instance(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::remove_instance_write(std::string_view name, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_remove_instance(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Design::reroute(std::string_view name) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_reroute(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::reroute_write(std::string_view name, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_reroute(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Design::remove_bus(std::string_view name) {
+    auto result = diplomat::capi::Design_remove_bus(this->AsFFI(),
+        {name.data(), name.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Design::to_schem_b64() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_to_schem_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::to_schem_b64_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_to_schem_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Schematic>, NucleationError> Design::flatten_composite() const {
+    auto result = diplomat::capi::Design_flatten_composite(this->AsFFI());
+    return result.is_ok ? diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Ok<std::unique_ptr<Schematic>>(std::unique_ptr<Schematic>(Schematic::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Design::instance_ports() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_instance_ports(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::instance_ports_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_instance_ports(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Design::resolve_port(std::string_view name) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Design_resolve_port(this->AsFFI(),
+        {name.data(), name.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Design::resolve_port_write(std::string_view name, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Design_resolve_port(this->AsFFI(),
+        {name.data(), name.size()},
         &write);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }

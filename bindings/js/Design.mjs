@@ -366,6 +366,220 @@ export class Design {
     }
 
     /**
+     * Remove an instance layer. Buses that terminate on one of its
+     * ports are DELETED (they lost an endpoint); buses that merely
+     * crossed its space are ripped and co-rerouted. Writes
+     * `{"removed_buses": [...], "rerouted": [...], "failed": {...}}`.
+     */
+    removeInstance(name) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const nameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, name)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Design_remove_instance(diplomatReceive.buffer, this.ffiValue, nameSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Re-realize a bus from its stored declaration (the counterpart to
+     * `rip`); writes the resulting bus state.
+     */
+    reroute(name) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const nameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, name)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Design_reroute(diplomatReceive.buffer, this.ffiValue, nameSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Delete a bus outright — fragment AND declaration, freeing the
+     * name. `rip` keeps the declaration so the bus can be rerouted.
+     */
+    removeBus(name) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const nameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, name)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Design_remove_bus(diplomatReceive.buffer, this.ffiValue, nameSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * The flattened artifact as `.schem` bytes, base64. Unlike
+     * `flatten()` + the schematic writer, this composites the layer
+     * stack into ONE region first: `.schem` has no layers, and the
+     * region merge drops named-layer cells that the loose layer's
+     * bounding box shadows.
+     */
+    toSchemB64() {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Design_to_schem_b64(diplomatReceive.buffer, this.ffiValue, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * The flattened artifact composited into ONE region (see
+     * `to_schem_b64`) — the shape an interchange export wants.
+     */
+    flattenComposite() {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Design_flatten_composite(diplomatReceive.buffer, this.ffiValue);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new Schematic(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Every routing endpoint the placed instances expose, as a JSON
+     * array of `{name, instance, port, role, ty, width, hardware,
+     * wires, step, routable, blocked}`. `name` is `{instance}.{port}`
+     * — exactly what `route_bus` accepts; `role` is the CELL-facing
+     * direction, so `"output"` drives a bus and `"input"` receives
+     * one. A port whose bits have no dust connection cell (a lever
+     * input, say) reports `routable: false` and why in `blocked`.
+     */
+    instancePorts() {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Design_instance_ports(diplomatReceive.buffer, this.ffiValue, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Resolve one routing endpoint name — a declared design port or an
+     * instance port `{instance}.{port}` — to the geometry a bus would
+     * use: `{"name","anchor","step","width","direction","connectable"}`.
+     * `direction` is DESIGN-facing (`"input"` drives buses).
+     */
+    resolvePort(name) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const nameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, name)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Design_resolve_port(diplomatReceive.buffer, this.ffiValue, nameSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
      * Add a gate to an existing bus (splitting the segment it lands
      * in) and re-realize it. Writes the resulting bus state.
      */

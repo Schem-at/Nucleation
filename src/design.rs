@@ -48,6 +48,84 @@ fn scale(a: P3, k: i32) -> P3 {
     (a.0 * k, a.1 * k, a.2 * k)
 }
 
+/// A cell's TRUE block extent, min and max corner inclusive.
+pub struct CellBounds {
+    pub min: P3,
+    pub max: P3,
+}
+
+/// The cell's real occupied extent — NOT `UniversalSchematic::get_bounding_box`.
+///
+/// `get_bounding_box()` reports the region's allocated envelope, which for a
+/// programmatically built schematic is its growth capacity, not its contents: a
+/// 10x18x6 cell built with `set_block_from_string` reports
+/// `(0,0,0)..(10,65,65)`. [`transform_pos`] derives the rotation's footprint
+/// size from that box, so an over-reported extent flings every ROTATED
+/// instance — its blocks, its ports, its halo — tens of blocks away from where
+/// the user placed it, while rot_y=0 (where only `min` matters) looks fine.
+/// That asymmetry is exactly what "the bus fails as soon as I rotate a cell"
+/// looks like from the studio.
+///
+/// Air is excluded so a padded schematic does not inflate the footprint.
+fn cell_bounds(sch: &UniversalSchematic) -> CellBounds {
+    let mut min: Option<P3> = None;
+    let mut max: Option<P3> = None;
+    for (bp, bs) in sch.iter_blocks() {
+        if bs.to_string().contains("minecraft:air") {
+            continue;
+        }
+        let p = (bp.x, bp.y, bp.z);
+        min = Some(match min {
+            None => p,
+            Some(m) => (m.0.min(p.0), m.1.min(p.1), m.2.min(p.2)),
+        });
+        max = Some(match max {
+            None => p,
+            Some(m) => (m.0.max(p.0), m.1.max(p.1), m.2.max(p.2)),
+        });
+    }
+    match (min, max) {
+        (Some(min), Some(max)) => CellBounds { min, max },
+        _ => {
+            // An empty cell: fall back to the declared envelope.
+            let bb = sch.get_bounding_box();
+            CellBounds {
+                min: bb.min,
+                max: bb.max,
+            }
+        }
+    }
+}
+
+/// The single straight run realizing an axis-aligned anchor pair, or `None`
+/// when the pair needs a corner (differs on both horizontal axes, or on y).
+fn axis_run(a: P3, b: P3, width: u8) -> Option<RunInfo> {
+    if a.1 != b.1 {
+        return None;
+    }
+    if a.2 == b.2 && a.0 != b.0 {
+        return Some(RunInfo {
+            along_x: true,
+            fixed: a.2,
+            y0: a.1,
+            from: a.0,
+            to: b.0,
+            width,
+        });
+    }
+    if a.0 == b.0 && a.2 != b.2 {
+        return Some(RunInfo {
+            along_x: false,
+            fixed: a.0,
+            y0: a.1,
+            from: a.2,
+            to: b.2,
+            width,
+        });
+    }
+    None
+}
+
 /// Dust cells between refresh repeaters. 7 keeps the worst joint-spanning
 /// gap (tail + joint column + head = 15) inside dust's 15-cell reach.
 const REFRESH_AT: u32 = 7;
@@ -116,6 +194,97 @@ impl DesignPort {
     /// All connection cells in bit order.
     pub fn wires(&self) -> Vec<P3> {
         (0..self.width).map(|k| self.wire(k)).collect()
+    }
+}
+
+/// Neighbour scan order of a connection cell (deterministic: the first dust
+/// found in this order is the cell's tap).
+const AROUND: [P3; 6] = [
+    (1, 0, 0),
+    (-1, 0, 0),
+    (0, 0, 1),
+    (0, 0, -1),
+    (0, 1, 0),
+    (0, -1, 0),
+];
+
+/// A routing endpoint contributed by a placed instance, named
+/// `{instance}.{port}`.
+///
+/// Instance ports are DERIVED, never declared: the cell's contract port
+/// transformed by the instance transform, plus the dust CONNECTION CELLS a
+/// bus can actually land on. A cell contract stores *executor-facing*
+/// hardware (levers/buttons for its inputs, lamps for its outputs) while a
+/// bus terminates on *dust*, so each bit's connection cell is found by
+/// hardware scan: the contract position itself when it already holds dust,
+/// else the first dust neighbour in [`AROUND`] order.
+///
+/// A port with no dust tap on every bit is reported `blocked` rather than
+/// silently mis-routed — a lever input, for instance, can only ever be
+/// driven by the executor, never by a bus.
+#[derive(Clone, Debug)]
+pub struct InstancePort {
+    /// `{instance}.{port}` — the name [`Design::route_bus`] accepts.
+    pub name: String,
+    pub instance: String,
+    pub port: String,
+    /// Direction as the CELL sees it: an `Output` drives the fabric, an
+    /// `Input` receives from it (the design-facing direction is the flip,
+    /// see [`Design::resolve_port`]).
+    pub cell_direction: PortDirection,
+    pub ty: IoType,
+    pub width: u8,
+    /// Executor-facing hardware in bit order, transformed.
+    pub hardware: Vec<P3>,
+    /// Dust connection cells in bit order, when every bit has one.
+    pub wires: Option<Vec<P3>>,
+    /// Step between consecutive connection cells, when uniform.
+    pub step: Option<P3>,
+    /// Why a bus cannot terminate here; `None` when it can.
+    pub blocked: Option<String>,
+}
+
+impl InstancePort {
+    /// A bus may terminate on this port.
+    pub fn routable(&self) -> bool {
+        self.blocked.is_none()
+    }
+
+    /// `{"name","instance","port","role","ty","width","hardware","wires",
+    ///   "step","routable","blocked"}` — `role` is the CELL-facing
+    /// direction (`"output"` drives a bus, `"input"` receives one).
+    pub fn to_json(&self) -> String {
+        let pos = |ps: &[P3]| {
+            let items: Vec<String> = ps
+                .iter()
+                .map(|p| format!("[{},{},{}]", p.0, p.1, p.2))
+                .collect();
+            format!("[{}]", items.join(","))
+        };
+        format!(
+            "{{\"name\":{:?},\"instance\":{:?},\"port\":{:?},\"role\":{:?},\"ty\":{},\
+             \"width\":{},\"hardware\":{},\"wires\":{},\"step\":{},\"routable\":{},\
+             \"blocked\":{}}}",
+            self.name,
+            self.instance,
+            self.port,
+            match self.cell_direction {
+                PortDirection::Input => "input",
+                PortDirection::Output => "output",
+            },
+            serde_json::to_string(&self.ty).unwrap_or_else(|_| "null".to_string()),
+            self.width,
+            pos(&self.hardware),
+            self.wires.as_ref().map(|w| pos(w)).unwrap_or("null".into()),
+            self.step
+                .map(|s| format!("[{},{},{}]", s.0, s.1, s.2))
+                .unwrap_or("null".into()),
+            self.routable(),
+            self.blocked
+                .as_ref()
+                .map(|b| format!("{b:?}"))
+                .unwrap_or("null".into()),
+        )
     }
 }
 
@@ -345,6 +514,32 @@ impl MoveReport {
     }
 }
 
+/// Outcome of [`Design::remove_instance`].
+#[derive(Clone, Debug)]
+pub struct RemoveReport {
+    /// Buses deleted because they terminated on the removed instance.
+    pub removed_buses: Vec<String>,
+    /// Reroute outcome for the buses that merely crossed its space.
+    pub moves: MoveReport,
+}
+
+impl RemoveReport {
+    /// `{"removed_buses":[...],"rerouted":[...],"failed":{...}}`.
+    pub fn to_json(&self) -> String {
+        let removed: Vec<String> = self
+            .removed_buses
+            .iter()
+            .map(|b| format!("{b:?}"))
+            .collect();
+        let moves = self.moves.to_json();
+        format!(
+            "{{\"removed_buses\":[{}],{}",
+            removed.join(","),
+            &moves[1..]
+        )
+    }
+}
+
 /// Outcome of [`Design::move_gate`].
 #[derive(Clone, Debug)]
 pub struct GateMoveReport {
@@ -505,7 +700,7 @@ impl Design {
             .find(|i| i.name == name)
             .ok_or_else(|| format!("unknown instance `{name}`"))?;
         let cell = &self.cells[&inst.cell];
-        let bbox = cell.schematic.get_bounding_box();
+        let bbox = cell_bounds(&cell.schematic);
         let mut contract = cell.contract.clone();
         let map = |p: P3| transform_pos(p, bbox.min, bbox.max, inst.rot_y, inst.at);
         for mapping in contract
@@ -528,6 +723,224 @@ impl Design {
             keepout.max = (a.0.max(b.0), a.1.max(b.1), a.2.max(b.2));
         }
         Ok(contract)
+    }
+
+    /// Remove an instance layer. Buses that terminate on one of its ports
+    /// lose their endpoint and are DELETED (named in the report); buses that
+    /// merely ran through its footprint or halo are ripped and co-rerouted,
+    /// as for a drag.
+    pub fn remove_instance(&mut self, name: &str) -> Result<RemoveReport, String> {
+        let idx = self
+            .instances
+            .iter()
+            .position(|i| i.name == name)
+            .ok_or_else(|| format!("unknown instance `{name}`"))?;
+        let region = self.instance_region(idx);
+        let prefix = format!("{name}.");
+
+        // Buses whose declaration names a port of this instance cannot
+        // survive it.
+        let doomed: Vec<String> = self
+            .buses
+            .values()
+            .filter(|b| {
+                b.driver_names()
+                    .iter()
+                    .chain(b.sinks.iter())
+                    .any(|p| p.starts_with(&prefix))
+            })
+            .map(|b| b.name.clone())
+            .collect();
+        // Buses to re-attempt: anything that touched the vacated space, plus
+        // every already-FAILED bus (the removal may have unblocked it).
+        let mut affected: BTreeSet<String> = BTreeSet::new();
+        for bus in self.buses.values() {
+            if doomed.contains(&bus.name) {
+                continue;
+            }
+            match &bus.state {
+                BusState::Routed if bus.fragment.keys().any(|p| region.contains(p)) => {
+                    affected.insert(bus.name.clone());
+                }
+                BusState::Failed(_) => {
+                    affected.insert(bus.name.clone());
+                }
+                _ => {}
+            }
+        }
+        for b in &doomed {
+            self.buses.remove(b);
+        }
+        self.instances.remove(idx);
+        let moves = self.co_reroute(affected);
+        Ok(RemoveReport {
+            removed_buses: doomed,
+            moves,
+        })
+    }
+
+    // ------------------------------------------------------------------
+    // Instance ports (derived routing endpoints)
+    // ------------------------------------------------------------------
+
+    /// Every routing endpoint the placed instances expose, in
+    /// `{instance}.{port}` name order. Ports that cannot terminate a bus
+    /// are included with `blocked` set, so a UI can list them and say why.
+    pub fn instance_ports(&self) -> Result<Vec<InstancePort>, String> {
+        let overlay = self.instance_blocks();
+        let mut out = Vec::new();
+        let names: Vec<String> = self.instances.iter().map(|i| i.name.clone()).collect();
+        for inst in &names {
+            let contract = self.instance_contract(inst)?;
+            for (dirn, mappings) in [
+                (PortDirection::Input, &contract.io.inputs),
+                (PortDirection::Output, &contract.io.outputs),
+            ] {
+                for (pname, mapping) in mappings {
+                    out.push(self.derive_instance_port(
+                        inst,
+                        pname,
+                        dirn,
+                        mapping.io_type.clone(),
+                        mapping.positions.clone(),
+                        &overlay,
+                    ));
+                }
+            }
+        }
+        out.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(out)
+    }
+
+    /// [`Design::instance_ports`] as a JSON array.
+    pub fn instance_ports_json(&self) -> Result<String, String> {
+        let items: Vec<String> = self.instance_ports()?.iter().map(|p| p.to_json()).collect();
+        Ok(format!("[{}]", items.join(",")))
+    }
+
+    fn derive_instance_port(
+        &self,
+        instance: &str,
+        port: &str,
+        cell_direction: PortDirection,
+        ty: IoType,
+        hardware: Vec<P3>,
+        overlay: &BTreeMap<P3, String>,
+    ) -> InstancePort {
+        let name = format!("{instance}.{port}");
+        let width = hardware.len().min(u8::MAX as usize) as u8;
+        let mut wires = Vec::with_capacity(hardware.len());
+        let mut blocked = None;
+        let mut step = None;
+        for (k, hp) in hardware.iter().enumerate() {
+            match self.dust_tap(*hp, overlay) {
+                Some(w) => wires.push(w),
+                None => {
+                    blocked = Some(format!(
+                        "bit {k}: no dust connection cell at or beside {:?} (holds `{}`) — this \
+                         port is executor-only hardware and cannot terminate a bus",
+                        hp,
+                        self.block_at(*hp, overlay)
+                            .unwrap_or_else(|| "air".to_string())
+                    ));
+                    break;
+                }
+            }
+        }
+        if blocked.is_none() {
+            if wires.is_empty() {
+                blocked = Some("port declares no positions".to_string());
+            } else if wires.len() == 1 {
+                // A 1-bit port has no measurable pitch: adopt the canonical
+                // vertical bus form so bools are routable.
+                step = Some((0, 2, 0));
+            } else {
+                let s = (
+                    wires[1].0 - wires[0].0,
+                    wires[1].1 - wires[0].1,
+                    wires[1].2 - wires[0].2,
+                );
+                if s == (0, 0, 0) {
+                    blocked = Some("connection cells collapse onto one cell".to_string());
+                } else if !wires
+                    .windows(2)
+                    .all(|w| (w[1].0 - w[0].0, w[1].1 - w[0].1, w[1].2 - w[0].2) == s)
+                {
+                    blocked = Some(format!(
+                        "connection cells {wires:?} do not lie on a uniform step"
+                    ));
+                } else {
+                    step = Some(s);
+                }
+            }
+        }
+        InstancePort {
+            name,
+            instance: instance.to_string(),
+            port: port.to_string(),
+            cell_direction,
+            ty,
+            width,
+            hardware,
+            wires: blocked.is_none().then_some(wires),
+            step,
+            blocked,
+        }
+    }
+
+    /// Resolve a routing endpoint name: a declared design port, or an
+    /// instance port `{instance}.{port}` derived from the instance's
+    /// transformed contract.
+    ///
+    /// The returned [`DesignPort::direction`] is DESIGN-facing — which way
+    /// signal flows in the fabric — so a cell OUTPUT resolves to
+    /// `PortDirection::Input` (it drives buses) and a cell INPUT resolves to
+    /// `PortDirection::Output` (it receives them).
+    pub fn resolve_port(&self, name: &str) -> Result<DesignPort, String> {
+        if let Some(p) = self.ports.get(name) {
+            return Ok(p.clone());
+        }
+        let Some((inst, port)) = name.split_once('.') else {
+            return Err(format!("unknown port `{name}`"));
+        };
+        if !self.instances.iter().any(|i| i.name == inst) {
+            return Err(format!(
+                "unknown port `{name}`: nothing declared under that name and no instance `{inst}`"
+            ));
+        }
+        let ports = self.instance_ports()?;
+        let ip = ports.iter().find(|p| p.name == name).ok_or_else(|| {
+            let have: Vec<&str> = ports
+                .iter()
+                .filter(|p| p.instance == inst)
+                .map(|p| p.port.as_str())
+                .collect();
+            format!(
+                "instance `{inst}` has no contract port `{port}` (has: {})",
+                have.join(", ")
+            )
+        })?;
+        if let Some(why) = &ip.blocked {
+            return Err(format!("instance port `{name}` cannot terminate a bus: {why}"));
+        }
+        let wires = ip.wires.clone().expect("a routable port has wires");
+        let overlay = self.instance_blocks();
+        let bits = wires
+            .iter()
+            .map(|w| self.scan_bit_with(*w, &overlay))
+            .collect();
+        Ok(DesignPort {
+            name: name.to_string(),
+            anchor: wires[0],
+            step: ip.step.expect("a routable port has a step"),
+            width: ip.width,
+            ty: ip.ty.clone(),
+            direction: match ip.cell_direction {
+                PortDirection::Output => PortDirection::Input,
+                PortDirection::Input => PortDirection::Output,
+            },
+            bits,
+        })
     }
 
     // ------------------------------------------------------------------
@@ -566,15 +979,18 @@ impl Design {
                 ty.bit_count()
             ));
         }
+        // Instance bodies count as hardware: a design port may be declared
+        // over a placed cell's dust, not only over loose blocks.
+        let overlay = self.instance_blocks();
         let mut bits = Vec::with_capacity(width as usize);
         for k in 0..width {
             let cell = add(anchor, scale(step, k as i32));
-            let hw = self.scan_bit(cell);
+            let hw = self.scan_bit_with(cell, &overlay);
             if !hw.connectable {
                 return Err(format!(
                     "port `{name}` bit {k}: connection cell {:?} holds `{}`, not dust",
                     cell,
-                    self.base_block_string(cell).unwrap_or_default()
+                    self.block_at(cell, &overlay).unwrap_or_default()
                 ));
             }
             match direction {
@@ -638,25 +1054,61 @@ impl Design {
             .filter(|s| !s.contains("minecraft:air"))
     }
 
-    /// Hardware scan of one connection cell.
-    fn scan_bit(&self, cell: P3) -> BitHardware {
+    /// The blocks the instance layers contribute, transformed — the overlay
+    /// a hardware scan needs so it sees cell bodies as well as loose
+    /// hardware. Built on demand; scans are one-shot (declaration, port
+    /// resolution), never per-planned-cell.
+    fn instance_blocks(&self) -> BTreeMap<P3, String> {
+        let mut out = BTreeMap::new();
+        for inst in &self.instances {
+            let cell = &self.cells[&inst.cell];
+            let bbox = cell_bounds(&cell.schematic);
+            for (bp, bs) in cell.schematic.iter_blocks() {
+                let s = transform_state(bs, inst.rot_y).to_string();
+                if s.contains("minecraft:air") {
+                    continue;
+                }
+                let p = transform_pos((bp.x, bp.y, bp.z), bbox.min, bbox.max, inst.rot_y, inst.at);
+                out.insert(p, s);
+            }
+        }
+        out
+    }
+
+    /// The block at `p`: loose layer first, then the instance overlay.
+    fn block_at(&self, p: P3, overlay: &BTreeMap<P3, String>) -> Option<String> {
+        self.base_block_string(p)
+            .or_else(|| overlay.get(&p).cloned())
+    }
+
+    /// The dust CONNECTION CELL for one piece of executor hardware: the cell
+    /// itself when it already holds dust, else the first dust neighbour in
+    /// [`AROUND`] order.
+    fn dust_tap(&self, hardware: P3, overlay: &BTreeMap<P3, String>) -> Option<P3> {
+        if self
+            .block_at(hardware, overlay)
+            .is_some_and(|b| rblocks::is_dust(&b))
+        {
+            return Some(hardware);
+        }
+        AROUND
+            .iter()
+            .map(|d| add(hardware, *d))
+            .find(|q| self.block_at(*q, overlay).is_some_and(|b| rblocks::is_dust(&b)))
+    }
+
+    /// Hardware scan of one connection cell, seeing `overlay` (instance
+    /// bodies) as well as the loose layer.
+    fn scan_bit_with(&self, cell: P3, overlay: &BTreeMap<P3, String>) -> BitHardware {
         let mut hw = BitHardware::default();
         hw.connectable = self
-            .base_block_string(cell)
+            .block_at(cell, overlay)
             .is_some_and(|b| rblocks::is_dust(&b));
         // Levers power adjacent dust: the 4 horizontal neighbours, the cell
         // above and the support below.
-        let around = [
-            (1, 0, 0),
-            (-1, 0, 0),
-            (0, 0, 1),
-            (0, 0, -1),
-            (0, 1, 0),
-            (0, -1, 0),
-        ];
-        for d in around {
+        for d in AROUND {
             let q = add(cell, d);
-            if let Some(b) = self.base_block_string(q) {
+            if let Some(b) = self.block_at(q, overlay) {
                 if hw.lever.is_none() && rblocks::is_lever(&b) {
                     hw.lever = Some(q);
                 }
@@ -727,25 +1179,26 @@ impl Design {
                 drivers.len()
             ));
         }
-        let mut driver_ports = Vec::new();
+        let mut driver_ports: Vec<DesignPort> = Vec::new();
         for dn in drivers {
             let drv = self
-                .ports
-                .get(*dn)
-                .ok_or_else(|| format!("unknown driver port `{dn}`"))?;
+                .resolve_port(dn)
+                .map_err(|e| format!("bus `{name}`: driver {e}"))?;
             if drv.direction == PortDirection::Output {
                 return Err(format!(
-                    "bus `{name}`: driver `{dn}` is a declared output; bidirectional buses are \
-                     modeled but reserved (Phase 2), and outputs cannot drive"
+                    "bus `{name}`: `{dn}` receives signal, it cannot drive — swap the endpoints \
+                     (a design output, or a cell's input port, is a sink)"
                 ));
             }
-            if drv.width != self.ports[drivers[0]].width {
-                return Err(format!(
-                    "bus `{name}`: driver `{dn}` width {} != driver `{}` width {}",
-                    drv.width, drivers[0], self.ports[drivers[0]].width
-                ));
+            if let Some(first) = driver_ports.first() {
+                if drv.width != first.width {
+                    return Err(format!(
+                        "bus `{name}`: driver `{dn}` width {} != driver `{}` width {}",
+                        drv.width, first.name, first.width
+                    ));
+                }
             }
-            driver_ports.push(drv.clone());
+            driver_ports.push(drv);
         }
         if sinks.is_empty() {
             return Err(format!("bus `{name}` needs at least one sink"));
@@ -753,16 +1206,27 @@ impl Design {
         let mut sink_ports = Vec::new();
         for s in sinks {
             let sp = self
-                .ports
-                .get(*s)
-                .ok_or_else(|| format!("unknown sink port `{s}`"))?;
+                .resolve_port(s)
+                .map_err(|e| format!("bus `{name}`: sink {e}"))?;
+            if sp.direction == PortDirection::Input {
+                return Err(format!(
+                    "bus `{name}`: `{s}` drives signal, it cannot be a sink — swap the endpoints \
+                     (a design input, or a cell's output port, is a driver)"
+                ));
+            }
             if sp.width != driver_ports[0].width {
                 return Err(format!(
                     "bus `{name}`: sink `{s}` width {} != driver width {}",
                     sp.width, driver_ports[0].width
                 ));
             }
-            sink_ports.push(sp.clone());
+            if sp.ty != driver_ports[0].ty {
+                return Err(format!(
+                    "bus `{name}`: sink `{s}` type {:?} != driver `{}` type {:?}",
+                    sp.ty, driver_ports[0].name, driver_ports[0].ty
+                ));
+            }
+            sink_ports.push(sp);
         }
 
         let mut layer = BusLayer {
@@ -903,7 +1367,7 @@ impl Design {
     fn instance_region(&self, idx: usize) -> BTreeSet<P3> {
         let inst = &self.instances[idx];
         let cell = &self.cells[&inst.cell];
-        let bbox = cell.schematic.get_bounding_box();
+        let bbox = cell_bounds(&cell.schematic);
         let map = |p: P3| transform_pos(p, bbox.min, bbox.max, inst.rot_y, inst.at);
         let mut region = BTreeSet::new();
         for (bp, bs) in cell.schematic.iter_blocks() {
@@ -997,10 +1461,10 @@ impl Design {
         let style = layer.style.clone();
         let mut driver_ports = Vec::new();
         for dn in &driver_names {
-            match self.ports.get(dn) {
-                Some(p) => driver_ports.push(p.clone()),
-                None => {
-                    let state = BusState::Failed(format!("driver port `{dn}` no longer exists"));
+            match self.resolve_port(dn) {
+                Ok(p) => driver_ports.push(p),
+                Err(why) => {
+                    let state = BusState::Failed(format!("driver port `{dn}`: {why}"));
                     self.buses.get_mut(name).unwrap().state = state.clone();
                     return state;
                 }
@@ -1008,10 +1472,10 @@ impl Design {
         }
         let mut sink_ports = Vec::new();
         for sn in &sink_names {
-            match self.ports.get(sn) {
-                Some(p) => sink_ports.push(p.clone()),
-                None => {
-                    let state = BusState::Failed(format!("sink port `{sn}` no longer exists"));
+            match self.resolve_port(sn) {
+                Ok(p) => sink_ports.push(p),
+                Err(why) => {
+                    let state = BusState::Failed(format!("sink port `{sn}`: {why}"));
                     self.buses.get_mut(name).unwrap().state = state.clone();
                     return state;
                 }
@@ -1178,7 +1642,12 @@ impl Design {
             .unwrap_or(1);
         let style = layer.style.clone();
 
-        let occ = self.occupancy_for_plan(&ripped);
+        let endpoints: Vec<String> = layer
+            .driver_names()
+            .into_iter()
+            .chain(layer.sinks.iter().cloned())
+            .collect();
+        let occ = self.occupancy_for_plan(&ripped, &self.halo_exempt(&endpoints));
         let mut planner = Planner::new(self, Some(bus), &style, &occ);
         let plan = (|| -> Result<(), String> {
             // The refresh count entering a mid-bus segment is unknown; a
@@ -1248,14 +1717,52 @@ impl Design {
         Ok(())
     }
 
+    /// Re-realize a bus from its stored declaration (endpoints, gates, style
+    /// and rule all kept). The counterpart to [`Design::rip`]: rip to free
+    /// the space, reroute to try again once the obstacle moved.
+    pub fn reroute(&mut self, name: &str) -> Result<BusState, String> {
+        if !self.buses.contains_key(name) {
+            return Err(format!("unknown bus `{name}`"));
+        }
+        let _ = self.rip(name);
+        Ok(self.reroute_one(name))
+    }
+
+    /// Delete a bus outright: its fragment AND its declaration. Unlike
+    /// [`Design::rip`] (which keeps the declaration so it can be rerouted),
+    /// the name becomes free again.
+    pub fn remove_bus(&mut self, name: &str) -> Result<(), String> {
+        self.rip(name)?;
+        self.buses.remove(name);
+        Ok(())
+    }
+
     /// The design-wide spatial occupancy index: loose blocks, instance
     /// footprints, routed bus fragments, and instance influence halos.
     pub fn occupancy_index(&self) -> OccupancyIndex {
-        self.occupancy_for_plan(&BTreeSet::new())
+        self.occupancy_for_plan(&BTreeSet::new(), &BTreeSet::new())
     }
 
-    /// The occupancy index minus `skip` (cells a partial rip vacated).
-    fn occupancy_for_plan(&self, skip: &BTreeSet<P3>) -> OccupancyIndex {
+    /// The instances whose influence halo a bus with these endpoints may
+    /// enter: the ones that own an endpoint. Routing *into* the cell you are
+    /// connecting to is legal — that is what a pin is for — while the
+    /// instance's hard body cells still protect themselves, and every other
+    /// instance's halo still blocks.
+    fn halo_exempt(&self, endpoints: &[String]) -> BTreeSet<String> {
+        endpoints
+            .iter()
+            .filter_map(|p| p.split_once('.').map(|(i, _)| i.to_string()))
+            .filter(|i| self.instances.iter().any(|inst| &inst.name == i))
+            .collect()
+    }
+
+    /// The occupancy index minus `skip` (cells a partial rip vacated), with
+    /// the halos of `halo_exempt` instances suppressed (pin access).
+    fn occupancy_for_plan(
+        &self,
+        skip: &BTreeSet<P3>,
+        halo_exempt: &BTreeSet<String>,
+    ) -> OccupancyIndex {
         let mut idx = OccupancyIndex::default();
         for (bp, bs) in self.base.iter_blocks() {
             let s = bs.to_string();
@@ -1270,7 +1777,7 @@ impl Design {
         }
         for inst in &self.instances {
             let cell = &self.cells[&inst.cell];
-            let bbox = cell.schematic.get_bounding_box();
+            let bbox = cell_bounds(&cell.schematic);
             for (bp, bs) in cell.schematic.iter_blocks() {
                 let s = transform_state(bs, inst.rot_y).to_string();
                 if s.contains("minecraft:air") {
@@ -1293,8 +1800,11 @@ impl Design {
         }
         // Influence halos never shadow hard cells.
         for inst in &self.instances {
+            if halo_exempt.contains(&inst.name) {
+                continue;
+            }
             let cell = &self.cells[&inst.cell];
-            let bbox = cell.schematic.get_bounding_box();
+            let bbox = cell_bounds(&cell.schematic);
             let map = |p: P3| transform_pos(p, bbox.min, bbox.max, inst.rot_y, inst.at);
             for (min, max) in Self::halo_boxes(cell, bbox.min, bbox.max) {
                 let a = map(min);
@@ -1360,30 +1870,57 @@ impl Design {
         waypoints.push(sinks[0].anchor);
         for pair in waypoints.windows(2) {
             if pair[0].1 != pair[1].1 {
+                let (lo, hi) = (pair[0], pair[1]);
                 return Err(format!(
-                    "segment {:?} -> {:?}: endpoints differ in y; level changes land in a later \
-                     phase",
-                    pair[0], pair[1]
+                    "segment {:?} -> {:?}: this bus form is a SINGLE-LEVEL 2y-pitch stack, but \
+                     the two anchors' bit-0 dust sits at y={} and y={} (a {}-block level change). \
+                     Move one endpoint's instance by {} in y so both ports share a level, or \
+                     split the run with a gate placed at the target level — vertical level \
+                     adapters are not implemented yet",
+                    lo,
+                    hi,
+                    lo.1,
+                    hi.1,
+                    (hi.1 - lo.1).abs(),
+                    hi.1 - lo.1
                 ));
             }
         }
 
-        // Trunk geometry (x-first corners) for the branch junction search.
-        let trunk_runs = Self::trunk_geometry(&waypoints, width)?;
-        let mut branches: Vec<(String, RunInfo, P3, bool)> = Vec::new();
+        // Pin access: this bus may enter the halo of the instances it
+        // terminates on.
+        let endpoints: Vec<String> = drivers
+            .iter()
+            .chain(sinks.iter())
+            .map(|p| p.name.clone())
+            .collect();
+        let occ = self.occupancy_for_plan(&BTreeSet::new(), &self.halo_exempt(&endpoints));
+
+        // Branch junctions must sit on the trunk the planner ACTUALLY lays,
+        // and a trunk pair may now detour around an obstacle instead of
+        // taking the x-first template. So when there are branches, plan the
+        // trunk once as a probe to learn its real runs, then plan for real
+        // with the junctions kept as plain dust. Without branches the probe
+        // is pure waste, so skip it.
+        let has_branches = sinks.len() > 1 || drivers.len() > 1;
+        let trunk_runs = if has_branches {
+            Self::probe_trunk_runs(self, exclude, style, &occ, &waypoints, width)?
+        } else {
+            Vec::new()
+        };
+        let mut branches: Vec<(String, RunInfo, P3, bool, P3)> = Vec::new();
         let mut keep: BTreeSet<P3> = BTreeSet::new();
         for sp in &sinks[1..] {
             let (run, junction) = Self::branch_geometry(&trunk_runs, sp, false)?;
             keep.insert(junction);
-            branches.push((sp.name.clone(), run, junction, false));
+            branches.push((sp.name.clone(), run, junction, false, sp.anchor));
         }
         for dp in &drivers[1..] {
             let (run, junction) = Self::branch_geometry(&trunk_runs, dp, true)?;
             keep.insert(junction);
-            branches.push((dp.name.clone(), run, junction, true));
+            branches.push((dp.name.clone(), run, junction, true, dp.anchor));
         }
 
-        let occ = self.occupancy_for_plan(&BTreeSet::new());
         let mut planner = Planner::new(self, exclude, style, &occ);
         let mut since = 0u32;
         for (i, pair) in waypoints.windows(2).enumerate() {
@@ -1398,7 +1935,7 @@ impl Design {
         for g in gates {
             planner.plan_column(&g.name, g.anchor, width)?;
         }
-        for (port, run, junction, is_driver) in &branches {
+        for (port, run, junction, is_driver, port_anchor) in &branches {
             // The junction must have survived as plain dust on the trunk
             // (a flipped corner or a crossing window would have eaten it).
             if !planner
@@ -1414,9 +1951,9 @@ impl Design {
                 ));
             }
             let (a, b) = if *is_driver {
-                (self.ports[port].anchor, *junction)
+                (*port_anchor, *junction)
             } else {
-                (*junction, self.ports[port].anchor)
+                (*junction, *port_anchor)
             };
             planner.begin_segment(SegmentKind::Branch(port.clone()), a, b);
             planner
@@ -1427,9 +1964,40 @@ impl Design {
         Ok(planner.finish())
     }
 
+    /// Plan the trunk as a throwaway probe and report the runs it actually
+    /// laid down. Branch junctions are derived from THESE runs, not from the
+    /// x-first template guess: a pair that had to detour around an obstacle
+    /// ends up nowhere near its template, and a junction chosen off the guess
+    /// would not exist on the real trunk.
+    ///
+    /// The probe is deterministic, so the real pass reproduces its geometry
+    /// exactly (the only difference is the `keep` set, which changes whether a
+    /// refresh repeater may land on a junction cell, never the corridor).
+    fn probe_trunk_runs(
+        &self,
+        exclude: Option<&str>,
+        style: &BusStyle,
+        occ: &OccupancyIndex,
+        waypoints: &[P3],
+        width: u8,
+    ) -> Result<Vec<RunInfo>, String> {
+        let mut probe = Planner::new(self, exclude, style, occ);
+        let mut since = 0u32;
+        for (i, pair) in waypoints.windows(2).enumerate() {
+            probe.begin_segment(SegmentKind::Trunk(i), pair[0], pair[1]);
+            since = probe
+                .plan_pair(pair[0], pair[1], width, &BTreeSet::new(), since)
+                .map_err(|e| format!("segment {:?} -> {:?}: {e}", pair[0], pair[1]))?;
+            probe.end_segment();
+            since = since.saturating_add(1);
+        }
+        Ok(probe.finish().segments.iter().flat_map(|s| s.runs.clone()).collect())
+    }
+
     /// The trunk's straight runs from its waypoint chain, choosing the
     /// x-first corner for non-straight pairs (deterministic; the planner
     /// may flip a congested corner z-first at plan time).
+    #[allow(dead_code)]
     fn trunk_geometry(waypoints: &[P3], width: u8) -> Result<Vec<RunInfo>, String> {
         let mut runs = Vec::new();
         for pair in waypoints.windows(2) {
@@ -1536,7 +2104,7 @@ impl Design {
 
         for inst in &self.instances {
             let cell = &self.cells[&inst.cell];
-            let bbox = cell.schematic.get_bounding_box();
+            let bbox = cell_bounds(&cell.schematic);
             let region = format!("inst:{}", inst.name);
             for (bp, bs) in cell.schematic.iter_blocks() {
                 let s = bs.to_string();
@@ -1636,7 +2204,7 @@ impl Design {
             if bus.state != BusState::Routed {
                 continue;
             }
-            let Some(driver) = self.ports.get(&bus.driver) else {
+            let Ok(driver) = self.resolve_port(&bus.driver) else {
                 continue;
             };
             for bit in 0..driver.width {
@@ -1675,14 +2243,49 @@ impl Design {
             aliases: vec![],
             skip_decay: true,
         };
-        let violations = crate::routing::drc_schematic(&flat, &opts);
+        let all = crate::routing::drc_schematic(&flat, &opts);
+        // Split the DRC report at the cell boundary. A placed cell is a
+        // VERIFIED BLACK BOX behind its keepout: hand-built community redstone
+        // legitimately breaks the route-oriented conventions these rules
+        // encode (one 8-bit community adder reports 253 "floating" cells for
+        // dust our support predicate does not recognise), and blaming the
+        // design for a library cell's interior means `check()` is never clean
+        // and the whole report becomes noise. Interior findings are reported
+        // under `cells` for information; only what the DESIGN itself owns —
+        // the loose layer and the routed bus fragments — gates `clean`.
+        let (violations, cell_violations): (Vec<_>, Vec<_>) =
+            all.into_iter().partition(|v| !self.is_inside_an_instance(v));
         let ws = crate::routing::workspace_from_schematic(&flat);
         let lvs = crate::routing::lvs(ws.cells(), &self.intent_nets());
         let (sta_json, rule_violations) = self.sta_and_rules(&flat);
+        // The cell boundary applies to LVS too, and here it is not merely
+        // noise-reduction: a register's latch IS a repeater ring, so
+        // `lvs.cycles` reports every memory cell in the library as an
+        // "accidental latch". A ring living entirely inside one placed cell is
+        // that cell's verified internal state, not a design error.
+        let bodies = self.instance_bodies();
+        let interior = |cells: &[crate::routing::Pos]| -> bool {
+            !cells.is_empty()
+                && cells.iter().all(|q| {
+                    let p = (q.x, q.y, q.z);
+                    bodies.iter().any(|b| b.contains(&p))
+                })
+        };
+        let design_cycles = lvs.cycles.iter().filter(|ring| !interior(ring)).count();
+        let design_shorts = lvs
+            .shorts
+            .iter()
+            .filter(|s| !interior(&[s.at_a, s.at_b]))
+            .count();
+        let design_opens = lvs
+            .opens
+            .iter()
+            .filter(|o| !interior(&o.fragments.concat()))
+            .count();
         let clean = violations.is_empty()
-            && lvs.opens.is_empty()
-            && lvs.shorts.is_empty()
-            && lvs.cycles.is_empty()
+            && design_opens == 0
+            && design_shorts == 0
+            && design_cycles == 0
             && rule_violations.is_empty();
         let bus_states: Vec<String> = self
             .buses
@@ -1698,8 +2301,10 @@ impl Design {
             .collect();
         let rules: Vec<String> = rule_violations.iter().map(|r| format!("{r:?}")).collect();
         let json = format!(
-            "{{\"clean\":{clean},\"drc\":{},\"lvs\":{},\"buses\":{{{}}},\"sta\":{sta_json},\"rules\":[{}]}}",
+            "{{\"clean\":{clean},\"drc\":{},\"cells\":{},\"lvs\":{},\"buses\":{{{}}},\
+             \"sta\":{sta_json},\"rules\":[{}]}}",
             crate::routing::violations_json(&violations),
+            crate::routing::violations_json(&cell_violations),
             crate::routing::lvs_report_json(&lvs),
             bus_states.join(","),
             rules.join(",")
@@ -1707,12 +2312,48 @@ impl Design {
         Ok(DesignCheck { clean, json })
     }
 
+    /// Whether every cell a DRC violation points at lies inside some placed
+    /// instance's own footprint — i.e. the finding is about a library cell's
+    /// interior, not about anything this design laid down.
+    ///
+    /// A violation straddling the boundary (a cell's dust shorting against a
+    /// bus, say) is NOT interior: it stays in the gating report, which is
+    /// exactly where an integration error belongs.
+    fn is_inside_an_instance(&self, v: &crate::routing::Violation) -> bool {
+        let cells = Self::violation_cells(v);
+        if cells.is_empty() {
+            return false;
+        }
+        let bodies = self.instance_bodies();
+        cells
+            .iter()
+            .all(|c| bodies.iter().any(|body| body.contains(c)))
+    }
+
+    /// Every placed instance's occupied cells, one set per instance.
+    fn instance_bodies(&self) -> Vec<BTreeSet<P3>> {
+        (0..self.instances.len()).map(|i| self.instance_region(i)).collect()
+    }
+
+    /// The cells a DRC violation implicates.
+    fn violation_cells(v: &crate::routing::Violation) -> Vec<P3> {
+        use crate::routing::Violation as V;
+        let p = |q: &crate::routing::Pos| (q.x, q.y, q.z);
+        match v {
+            V::Short { at_a, at_b, .. } => vec![p(at_a), p(at_b)],
+            V::Floating { at, .. } => vec![p(at)],
+            V::UnattachedWallTorch { at, anchor } => vec![p(at), p(anchor)],
+            V::RepeaterCycle { diodes } => diodes.iter().map(p).collect(),
+            V::PowerStarved { at, .. } => vec![p(at)],
+        }
+    }
+
     /// Per-bit repeater delay (redstone ticks) of a routed bus, from its
     /// fragment: a repeater at even offset from the canonical level
     /// belongs to that bit's straight run, at odd offset to the bit's dip
     /// station one level down.
     pub fn bus_bit_delays(&self, bus: &BusLayer) -> Vec<u64> {
-        let Some(driver) = self.ports.get(&bus.driver) else {
+        let Ok(driver) = self.resolve_port(&bus.driver) else {
             return Vec::new();
         };
         let width = driver.width as i32;
@@ -1871,8 +2512,35 @@ impl Design {
 
     /// Flatten and save the artifact as `.schem` bytes (the flat-artifact
     /// serialization tier; the embedded contract rides along).
+    /// The flattened artifact as a SINGLE-REGION composite.
+    ///
+    /// `.schem` has no layer concept, and a layered schematic pushed through
+    /// the region merge loses every named-layer cell that the loose layer's
+    /// bounding box shadows — the merge mirrors [`UniversalSchematic::get_block`],
+    /// which answers from the default region first whenever a coordinate falls
+    /// inside its (dense) bounds, so a bus fragment threading the endpoint
+    /// hardware's own bounding box reads back as air. Compositing the layers
+    /// explicitly, topmost non-air wins, keeps the artifact whole. Layers are
+    /// disjoint by construction (the planner refuses collisions), so the
+    /// union is unambiguous.
+    pub fn flatten_composite(&self) -> Result<UniversalSchematic, String> {
+        let layered = self.flatten()?;
+        let mut flat = UniversalSchematic::new(self.name.clone());
+        for (pos, state) in layered.iter_blocks() {
+            if state.name == "minecraft:air" {
+                continue;
+            }
+            let s = state.to_string();
+            flat.set_block_from_string(pos.x, pos.y, pos.z, &s)
+                .map_err(|e| format!("composite: {s} at {:?}: {e}", (pos.x, pos.y, pos.z)))?;
+        }
+        flat.metadata = layered.metadata.clone();
+        flat.metadata.name = Some(self.name.clone());
+        Ok(flat)
+    }
+
     pub fn to_schem_bytes(&self) -> Result<Vec<u8>, String> {
-        let flat = self.flatten()?;
+        let flat = self.flatten_composite()?;
         crate::formats::schematic::to_schematic(&flat).map_err(|e| e.to_string())
     }
 
@@ -2052,11 +2720,23 @@ impl<'a> Planner<'a> {
         Ok(())
     }
 
-    /// Plan one trunk waypoint pair: a straight run, or an L through one
-    /// implicit corner joint (x-first, deterministically flipped z-first
-    /// when the first choice collides). `since0` is the dust count since
-    /// the last refresh entering the pair; the exit count is returned so
-    /// refresh spacing stays sound across joints.
+    /// Plan one trunk waypoint pair, climbing a retry ladder instead of
+    /// giving up on the first blocked template:
+    ///
+    /// 1. the straight run (axis-aligned pairs) or the two single-corner Ls
+    ///    (x-first then z-first) — the deterministic templates, tried first so
+    ///    an unobstructed design realizes byte-for-byte as it always did;
+    /// 2. a real rectilinear corridor from [`crate::design_corridor`], which
+    ///    routes AROUND whatever blocked the templates (a foreign instance's
+    ///    body or halo, a loose wall, another bus), at three escalating
+    ///    efforts — tidier corridors first, then wider search bounds.
+    ///
+    /// Every rung's failure is collected, so the reason a pair is finally
+    /// unroutable names each shape that was tried and why it lost.
+    ///
+    /// `since0` is the dust count since the last refresh entering the pair;
+    /// the exit count is returned so refresh spacing stays sound across
+    /// joints.
     fn plan_pair(
         &mut self,
         a: P3,
@@ -2068,39 +2748,90 @@ impl<'a> Planner<'a> {
         if a == b {
             return Err("zero-length segment".to_string());
         }
-        if a.2 == b.2 && a.0 != b.0 {
-            let run = RunInfo {
-                along_x: true,
-                fixed: a.2,
-                y0: a.1,
-                from: a.0,
-                to: b.0,
-                width,
-            };
-            return self.plan_run(&run, keep, since0, false, false);
-        }
-        if a.0 == b.0 && a.2 != b.2 {
-            let run = RunInfo {
-                along_x: false,
-                fixed: a.0,
-                y0: a.1,
-                from: a.2,
-                to: b.2,
-                width,
-            };
-            return self.plan_run(&run, keep, since0, false, false);
-        }
-        let corner_x_first = (b.0, a.1, a.2);
-        let corner_z_first = (a.0, a.1, b.2);
         let snap = self.snapshot();
-        match self.plan_l(a, b, corner_x_first, true, width, keep, since0) {
-            Ok(out) => Ok(out),
-            Err(e1) => {
-                self.restore(snap);
-                self.plan_l(a, b, corner_z_first, false, width, keep, since0)
-                    .map_err(|e2| format!("L corner x-first: {e1}; z-first: {e2}"))
+        let mut tried: Vec<String> = Vec::new();
+
+        if let Some(run) = axis_run(a, b, width) {
+            match self.plan_run(&run, keep, since0, false, false) {
+                Ok(out) => return Ok(out),
+                Err(e) => {
+                    self.restore(snap.clone());
+                    tried.push(format!("straight run: {e}"));
+                }
+            }
+        } else {
+            for (corner, x_first) in [((b.0, a.1, a.2), true), ((a.0, a.1, b.2), false)] {
+                match self.plan_l(a, b, corner, x_first, width, keep, since0) {
+                    Ok(out) => return Ok(out),
+                    Err(e) => {
+                        self.restore(snap.clone());
+                        tried.push(format!(
+                            "L corner {}: {e}",
+                            if x_first { "x-first" } else { "z-first" }
+                        ));
+                    }
+                }
             }
         }
+
+        // The templates are out of ideas; search for an actual corridor.
+        //
+        // A corridor may loop back near itself. That is electrically harmless
+        // here: every cell a bus lays belongs to ONE net and, at a given
+        // level, to one BIT, so two nearby legs carry the same signal — a
+        // redundant path, not a short. Different bits cannot meet because the
+        // 2y pitch keeps their dust two levels apart, and dust never reads the
+        // block above it. `Design::check` (DRC + LVS) is the backstop.
+        let mut seen: Vec<Vec<P3>> = Vec::new();
+        for (rung, effort) in crate::design_corridor::LADDER.iter().enumerate() {
+            let Some(chain) = crate::design_corridor::search(self.occ, a, b, width, *effort) else {
+                continue;
+            };
+            // A rung that reproduces a corridor an earlier rung already failed
+            // on cannot do better; skip the replan.
+            if seen.contains(&chain) {
+                continue;
+            }
+            seen.push(chain.clone());
+            match self.plan_chain(&chain, width, keep, since0) {
+                Ok(out) => return Ok(out),
+                Err(e) => {
+                    self.restore(snap.clone());
+                    tried.push(format!(
+                        "corridor (effort {}, {} legs via {:?}): {e}",
+                        rung + 1,
+                        chain.len() - 1,
+                        &chain[1..chain.len().saturating_sub(1)]
+                    ));
+                }
+            }
+        }
+        Err(crate::design_corridor::diagnose(self.occ, a, b, width, &tried))
+    }
+
+    /// Plan a multi-leg corridor: a straight run per leg with a joint column
+    /// at every interior corner — the same vocabulary [`Planner::plan_l`] uses
+    /// for its single corner, generalized to N.
+    fn plan_chain(
+        &mut self,
+        chain: &[P3],
+        width: u8,
+        keep: &BTreeSet<P3>,
+        since0: u32,
+    ) -> Result<u32, String> {
+        let mut since = since0;
+        for (i, leg) in chain.windows(2).enumerate() {
+            let (a, b) = (leg[0], leg[1]);
+            let run = axis_run(a, b, width)
+                .ok_or_else(|| format!("corridor leg {:?} -> {:?} is not axis-aligned", a, b))?;
+            since = self.plan_run(&run, keep, since, false, false)?;
+            if i + 2 < chain.len() {
+                self.column(b, width)?;
+                // The corner joint is one more dust cell between refreshes.
+                since = since.saturating_add(1);
+            }
+        }
+        Ok(since)
     }
 
     /// One L-shaped pair through `corner`.
@@ -2253,16 +2984,31 @@ impl<'a> Planner<'a> {
                 if !run.strictly_inside(center, 3) || !orun.strictly_inside(run.fixed, 3) {
                     continue;
                 }
+                // Two lines that cross in plan view but occupy DISJOINT
+                // vertical bands never touch: no dip, no station, nothing to
+                // adapt. Only an actual overlap needs the crossing tile, and
+                // only then does a level/width mismatch matter.
+                let ours = (run.y0 - 1, run.y0 + 2 * (run.width as i32 - 1));
+                let theirs = (orun.y0 - 1, orun.y0 + 2 * (orun.width as i32 - 1));
+                if theirs.1 < ours.0 || ours.1 < theirs.0 {
+                    continue;
+                }
                 if orun.y0 != run.y0 || orun.width != run.width {
                     return Err(format!(
-                        "crossing with bus `{}` at {:?}: levels/widths differ (theirs y0={} \
-                         w={}, ours y0={} w={}); level adapters land in a later phase",
+                        "crossing with bus `{}` at {:?}: the two stacks overlap vertically (ours \
+                         y {}..={} at {} bits, theirs y {}..={} at {} bits) but do not share a \
+                         level, so the dip-under tile does not apply. Give the two buses \
+                         non-overlapping y bands (a `y_band` net-class rule), or make their \
+                         widths and bit-0 levels match — vertical level adapters are not \
+                         implemented yet",
                         other.name,
                         (run.fixed, orun.fixed),
-                        orun.y0,
-                        orun.width,
-                        run.y0,
-                        run.width
+                        ours.0,
+                        ours.1,
+                        run.width,
+                        theirs.0,
+                        theirs.1,
+                        orun.width
                     ));
                 }
                 if Self::dips_at(other, orun, run.fixed) {
@@ -2577,6 +3323,120 @@ mod tests {
             .unwrap();
     }
 
+    /// A library cell shaped like the community ones: its contract names
+    /// EXECUTOR hardware (levers in, lamps out), not dust. Bit 0 of `dead`
+    /// is a bare lamp with no dust anywhere near it.
+    fn buffer_cell() -> UniversalSchematic {
+        let mut s = UniversalSchematic::new("buf".to_string());
+        let d_hw: Vec<P3> = (0..8).map(|i| (0, 2 + 2 * i, 0)).collect();
+        let q_hw: Vec<P3> = (0..8).map(|i| (4, 1 + 2 * i, 0)).collect();
+        for i in 0..8 {
+            let y = 2 + 2 * i;
+            // input lever + its connection dust one step in
+            s.set_block_from_string(0, y - 1, 0, STONE).unwrap();
+            s.set_block_from_string(0, y, 0, LEVER).unwrap();
+            s.set_block_from_string(1, y - 1, 0, STONE).unwrap();
+            s.set_block_from_string(1, y, 0, rblocks::DUST).unwrap();
+            // output lamp supporting its connection dust
+            s.set_block_from_string(4, y - 1, 0, LAMP).unwrap();
+            s.set_block_from_string(4, y, 0, rblocks::DUST).unwrap();
+        }
+        // A lamp with no dust neighbour at all: executor-readable, never
+        // bus-routable.
+        s.set_block_from_string(4, 40, 0, LAMP).unwrap();
+        let layout = crate::io_contract::IoLayoutBuilder::new()
+            .add_input(
+                "d".to_string(),
+                IoType::UnsignedInt { bits: 8 },
+                LayoutFunction::OneToOne,
+                d_hw,
+            )
+            .unwrap()
+            .add_output(
+                "q".to_string(),
+                IoType::UnsignedInt { bits: 8 },
+                LayoutFunction::OneToOne,
+                q_hw,
+            )
+            .unwrap()
+            .add_output(
+                "dead".to_string(),
+                IoType::Boolean,
+                LayoutFunction::OneToOne,
+                vec![(4, 40, 0)],
+            )
+            .unwrap()
+            .build();
+        s.set_cell_contract(&CellContract::new("buf".to_string(), layout))
+            .unwrap();
+        s
+    }
+
+    /// The blocker this module exists to remove: a PLACED INSTANCE exposes
+    /// its contract ports as routable endpoints under `{inst}.{port}`,
+    /// transformed, with the dust connection cell derived by hardware scan —
+    /// so `route_bus` takes `u0.q` directly.
+    #[test]
+    fn instance_ports_are_first_class_routing_endpoints() {
+        let mut s = UniversalSchematic::new("host".to_string());
+        let out = lamp_bank(&mut s, 24, 8);
+        let mut d = Design::for_schematic("host", s);
+        d.add_cell("buf", buffer_cell()).unwrap();
+        // The cell's own bbox starts at y=1, so `at` y=1 lands bit 0's
+        // connection dust on the design's canonical y=2 bus level.
+        d.place("u0", "buf", (0, 1, 8), 0).unwrap();
+        d.declare_output("q_out", out, (0, 2, 0), 8, IoType::UnsignedInt { bits: 8 })
+            .unwrap();
+
+        let ports = d.instance_ports().unwrap();
+        let names: Vec<&str> = ports.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(names, vec!["u0.d", "u0.dead", "u0.q"], "{names:?}");
+
+        // The contract names the lamp column; the routable endpoint is the
+        // dust ON those lamps, one cell up, transformed by the placement.
+        let q = ports.iter().find(|p| p.name == "u0.q").unwrap();
+        assert!(q.routable(), "{:?}", q.blocked);
+        assert_eq!(q.hardware[0], (4, 1, 8));
+        assert_eq!(q.wires.as_ref().unwrap()[0], (4, 2, 8));
+        assert_eq!(q.step, Some((0, 2, 0)));
+
+        // A lamp with no dust anywhere near it is reported, not mis-routed.
+        let dead = ports.iter().find(|p| p.name == "u0.dead").unwrap();
+        assert!(!dead.routable());
+        assert!(
+            dead.blocked.as_ref().unwrap().contains("no dust connection cell"),
+            "{:?}",
+            dead.blocked
+        );
+
+        // resolve_port flips to the DESIGN-facing direction: the cell's
+        // output drives the fabric.
+        let rq = d.resolve_port("u0.q").unwrap();
+        assert_eq!(rq.direction, PortDirection::Input);
+        assert_eq!(d.resolve_port("u0.d").unwrap().direction, PortDirection::Output);
+        let err = d.resolve_port("u0.nope").unwrap_err();
+        assert!(err.contains("no contract port `nope`"), "{err}");
+
+        // ...and a bus takes the instance port by name. The endpoint sits on
+        // the instance's own body, so pin access must beat its halo.
+        let state = d
+            .route_bus("chain", "u0.q", &["q_out"], vec![], BusStyle::default())
+            .unwrap();
+        assert_eq!(state, BusState::Routed, "{state:?}");
+        assert!(d.check().unwrap().clean, "{}", d.check().unwrap().json);
+
+        // Driving into a cell input is legal; driving OUT of one is not.
+        let err = d
+            .route_bus("bad", "u0.d", &["q_out"], vec![], BusStyle::default())
+            .unwrap_err();
+        assert!(err.contains("cannot drive"), "{err}");
+
+        // Removing the instance takes its bus with it, loudly.
+        let report = d.remove_instance("u0").unwrap();
+        assert_eq!(report.removed_buses, vec!["chain".to_string()]);
+        assert!(d.instance_ports().unwrap().is_empty());
+    }
+
     #[test]
     fn two_crossing_buses_route_with_an_implicit_dip_under() {
         let mut d = crossing_design();
@@ -2621,16 +3481,24 @@ mod tests {
     #[test]
     fn unroutable_is_a_state_not_an_exception() {
         let mut d = crossing_design();
-        // A stone wall across the a-line: the straight run collides ->
-        // FAILED, no panic, no partial fragment.
-        for y in 0..=18 {
-            d.set_block((12, y, 8), STONE).unwrap();
+        // A SEALED stone wall across the a-line. A single blocking column is
+        // no longer enough — the corridor search routes around one of those —
+        // so unroutability now needs a wall the bus genuinely cannot get past.
+        // The reason must name the blocker and what to do about it.
+        for z in -260..=260 {
+            for y in 0..=20 {
+                d.set_block((12, y, z), STONE).unwrap();
+            }
         }
         let state = d
             .route_bus("bus_a", "a_in", &["a_out"], vec![], BusStyle::default())
             .unwrap();
         match state {
-            BusState::Failed(reason) => assert!(reason.contains("collision"), "{reason}"),
+            BusState::Failed(reason) => {
+                assert!(reason.contains("no corridor"), "{reason}");
+                assert!(reason.contains("(12,"), "names the blocker location: {reason}");
+                assert!(reason.contains("loose block"), "names the owner: {reason}");
+            }
             other => panic!("expected Failed, got {other:?}"),
         }
         assert!(d.bus("bus_a").unwrap().fragment.is_empty());

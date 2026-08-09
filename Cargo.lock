@@ -3532,6 +3532,7 @@ dependencies = [
  "num-complex",
  "palette",
  "phf 0.11.3",
+ "pnr-core",
  "pollster",
  "quartz_nbt",
  "rand 0.8.5",

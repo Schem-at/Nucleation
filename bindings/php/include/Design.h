@@ -47,6 +47,27 @@ Design_set_block_result Design_set_block(Design* self, int32_t x, int32_t y, int
 typedef struct Design_move_instance_result {union { NucleationError err;}; bool is_ok;} Design_move_instance_result;
 Design_move_instance_result Design_move_instance(Design* self, DiplomatStringView name, int32_t x, int32_t y, int32_t z, int32_t rot_y, DiplomatWrite* write);
 
+typedef struct Design_remove_instance_result {union { NucleationError err;}; bool is_ok;} Design_remove_instance_result;
+Design_remove_instance_result Design_remove_instance(Design* self, DiplomatStringView name, DiplomatWrite* write);
+
+typedef struct Design_reroute_result {union { NucleationError err;}; bool is_ok;} Design_reroute_result;
+Design_reroute_result Design_reroute(Design* self, DiplomatStringView name, DiplomatWrite* write);
+
+typedef struct Design_remove_bus_result {union { NucleationError err;}; bool is_ok;} Design_remove_bus_result;
+Design_remove_bus_result Design_remove_bus(Design* self, DiplomatStringView name);
+
+typedef struct Design_to_schem_b64_result {union { NucleationError err;}; bool is_ok;} Design_to_schem_b64_result;
+Design_to_schem_b64_result Design_to_schem_b64(const Design* self, DiplomatWrite* write);
+
+typedef struct Design_flatten_composite_result {union {Schematic* ok; NucleationError err;}; bool is_ok;} Design_flatten_composite_result;
+Design_flatten_composite_result Design_flatten_composite(const Design* self);
+
+typedef struct Design_instance_ports_result {union { NucleationError err;}; bool is_ok;} Design_instance_ports_result;
+Design_instance_ports_result Design_instance_ports(const Design* self, DiplomatWrite* write);
+
+typedef struct Design_resolve_port_result {union { NucleationError err;}; bool is_ok;} Design_resolve_port_result;
+Design_resolve_port_result Design_resolve_port(const Design* self, DiplomatStringView name, DiplomatWrite* write);
+
 typedef struct Design_add_gate_result {union { NucleationError err;}; bool is_ok;} Design_add_gate_result;
 Design_add_gate_result Design_add_gate(Design* self, DiplomatStringView bus, DiplomatStringView gate, int32_t x, int32_t y, int32_t z, int32_t sx, int32_t sy, int32_t sz, DiplomatWrite* write);
 

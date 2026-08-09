@@ -66,7 +66,7 @@ mc-tick = ["dep:mc-tick", "nucleation-hdl?/mc-tick"]
 # crates/pnr-core), bridged as a minimal Workspace surface. Dependency
 # direction stays one-way, like mc-tick: the routing crates never see
 # nucleation; the `routing` module converts UniversalSchematic both ways.
-routing = ["dep:nucleation-routing"]
+routing = ["dep:nucleation-routing", "dep:pnr-core"]
 
 # HDL -> redstone: compile a combinational BLIF (yosys output) into a
 # dual-rail PLA schematic (crates/nucleation-hdl, the Rust port of the
@@ -158,6 +158,10 @@ base64 = { version = "0.22", optional = true }
 mc-tick = { path = "crates/mc-tick", version = "0.1.0", optional = true }
 # Redstone EDA, behind the `routing` feature. Same one-way rule as mc-tick.
 nucleation-routing = { path = "crates/nucleation-routing", version = "0.1.0", optional = true }
+# The generic P&R core underneath nucleation-routing. `design.rs` routes bus
+# corridors with its weighted A* / negotiated congestion instead of carrying a
+# second pathfinder; same one-way rule (pnr-core never sees nucleation).
+pnr-core = { path = "crates/pnr-core", version = "0.1.0", optional = true }
 # HDL -> redstone PLA compiler, behind the `hdl` feature. Same one-way rule.
 nucleation-hdl = { path = "crates/nucleation-hdl", version = "0.1.0", optional = true }
 

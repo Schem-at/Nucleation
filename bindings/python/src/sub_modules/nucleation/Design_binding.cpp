@@ -24,14 +24,20 @@ void add_Design_binding(nb::module_ mod) {
         .def("declare_output", &nucleation::Design::declare_output, "name"_a, "ax"_a, "ay"_a, "az"_a, "sx"_a, "sy"_a, "sz"_a, "width"_a, "ty"_a)
         .def("export_litematic", &nucleation::Design::export_litematic, "path"_a)
         .def("flatten", std::move(maybe_op_unwrap(&nucleation::Design::flatten)))
+        .def("flatten_composite", std::move(maybe_op_unwrap(&nucleation::Design::flatten_composite)))
         .def_static("for_schematic", std::move(maybe_op_unwrap(&nucleation::Design::for_schematic)), "name"_a, "base"_a)
         .def_static("from_litematic", std::move(maybe_op_unwrap(&nucleation::Design::from_litematic)), "data"_a)
         .def_static("from_nucm", std::move(maybe_op_unwrap(&nucleation::Design::from_nucm)), "data"_a)
         .def_static("import_litematic", std::move(maybe_op_unwrap(&nucleation::Design::import_litematic)), "path"_a)
+        .def("instance_ports", &nucleation::Design::instance_ports)
         .def_static("load_nucm", std::move(maybe_op_unwrap(&nucleation::Design::load_nucm)), "path"_a)
         .def("move_gate", &nucleation::Design::move_gate, "bus"_a, "gate"_a, "x"_a, "y"_a, "z"_a)
         .def("move_instance", &nucleation::Design::move_instance, "name"_a, "x"_a, "y"_a, "z"_a, "rot_y"_a)
         .def("place", &nucleation::Design::place, "name"_a, "cell"_a, "x"_a, "y"_a, "z"_a, "rot_y"_a)
+        .def("remove_bus", &nucleation::Design::remove_bus, "name"_a)
+        .def("remove_instance", &nucleation::Design::remove_instance, "name"_a)
+        .def("reroute", &nucleation::Design::reroute, "name"_a)
+        .def("resolve_port", &nucleation::Design::resolve_port, "name"_a)
         .def("rip", &nucleation::Design::rip, "name"_a)
         .def("route_bus", &nucleation::Design::route_bus, "name"_a, "driver"_a, "sinks_json"_a, "gates_json"_a, "style_json"_a)
         .def("route_bus_or", &nucleation::Design::route_bus_or, "name"_a, "drivers_json"_a, "sinks_json"_a, "gates_json"_a, "style_json"_a)
@@ -39,7 +45,8 @@ void add_Design_binding(nb::module_ mod) {
         .def("set_block", &nucleation::Design::set_block, "x"_a, "y"_a, "z"_a, "block"_a)
         .def("set_bus_rule", &nucleation::Design::set_bus_rule, "bus"_a, "rule_json"_a)
         .def("to_litematic_b64", &nucleation::Design::to_litematic_b64)
-        .def("to_nucm_b64", &nucleation::Design::to_nucm_b64);
+        .def("to_nucm_b64", &nucleation::Design::to_nucm_b64)
+        .def("to_schem_b64", &nucleation::Design::to_schem_b64);
 }
 
 }
