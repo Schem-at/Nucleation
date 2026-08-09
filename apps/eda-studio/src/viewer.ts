@@ -196,8 +196,9 @@ export class Viewer {
   private cb: ViewerCallbacks;
   private pickables: THREE.Object3D[] = [];
   private labelLayer: HTMLDivElement;
-  /** name -> {el, world} for the projected label pass. */
-  private labels: { el: HTMLDivElement; world: THREE.Vector3 }[] = [];
+  /** `{el, world, prio}` for the projected label pass. `prio` breaks
+   *  declutter ties: a selected/hovered label always survives. */
+  private labels: { el: HTMLDivElement; world: THREE.Vector3; prio: number }[] = [];
   private ports: PortMarker[] = [];
   private instances: InstanceMarker[] = [];
   private selection: Selection = null;
@@ -294,6 +295,7 @@ export class Viewer {
         + this.looseGroup.children.length,
       markerObjects: this.markerGroup.children.length,
       labels: this.labels.length,
+      labelStats: { ...this.labelStats },
       sceneMs: { ...this.sceneMs },
     };
   }
@@ -476,8 +478,17 @@ export class Viewer {
     const isBus = name.startsWith("bus:");
     this.meshBuilds[isBus ? "buses" : "loose"]++;
     const override = layer.failed ? FAILED_COLOR : layer.color;
+    // Buses are LIT, cells are not. Cell bodies are diffuse-only voxels in
+    // muted block colours; a routed bus is the signal, and half the palette
+    // (the teal, the mid-green) sat right on top of the stone/quartz greys it
+    // threads through. A dim emissive term on the bus layers alone separates
+    // "wiring" from "structure" by brightness as well as by hue, and it is the
+    // same trick that keeps them readable over a resource-pack mesh.
+    const emissive = new THREE.Color(override ?? 0xffffff)
+      .multiplyScalar(layer.failed ? 0.5 : isBus ? 0.42 : 0);
     const mat = new THREE.MeshLambertMaterial({
       vertexColors: true,
+      emissive: isBus || layer.failed ? emissive : new THREE.Color(0x000000),
       transparent: layer.failed || (this.textured && isBus),
       opacity: layer.failed ? 0.85 : this.textured && isBus ? 0.75 : 1,
     });
@@ -658,13 +669,14 @@ export class Viewer {
     this.refreshMarkers();
   }
 
-  private label(text: string, cls: string, world: THREE.Vector3): HTMLDivElement {
+  private label(text: string, cls: string, world: THREE.Vector3, prio = 0) {
     const el = document.createElement("div");
     el.className = `mk-label ${cls}`;
     el.textContent = text;
     this.labelLayer.appendChild(el);
-    this.labels.push({ el, world });
-    return el;
+    const entry = { el, world, prio };
+    this.labels.push(entry);
+    return entry;
   }
 
   /** Cone/octahedron geometries are shared and pre-built in both sizes: the
@@ -692,6 +704,9 @@ export class Viewer {
   private portRows: {
     p: PortMarker; group: "solid" | "ghost"; row: number; world: THREE.Vector3;
     el: HTMLDivElement; pos: Vec3;
+    /** The projected-label entry, so selection/hover can raise its priority
+     *  above the declutter rules without a lookup. */
+    lab: { el: HTMLDivElement; world: THREE.Vector3; prio: number };
   }[] = [];
   private portMeshes: { solid: THREE.InstancedMesh | null; ghost: THREE.InstancedMesh | null } =
     { solid: null, ghost: null };
@@ -749,8 +764,8 @@ export class Viewer {
           const world = new THREE.Vector3(pos[0], pos[1] + 1.1, pos[2]);
           const cls = [p.kind === "input" ? "io-driver" : "io-sink", p.routable ? "" : "io-blocked"]
             .join(" ");
-          const el = this.label(`${p.name} : ${p.ty}${p.routable ? "" : " ✗"}`, cls, world);
-          this.portRows.push({ p, group: key, row, world, el, pos });
+          const lab = this.label(`${p.name} : ${p.ty}${p.routable ? "" : " ✗"}`, cls, world);
+          this.portRows.push({ p, group: key, row, world, el: lab.el, pos, lab });
         });
       }
     }
@@ -795,8 +810,12 @@ export class Viewer {
   private rebuildEdges() {
     for (const o of [this.edgesRest, this.edgesSelected]) {
       if (!o) continue;
-      o.geometry.dispose();
-      (o.material as THREE.Material).dispose();
+      // The selected box carries a dark backing child; dispose both.
+      o.traverse((c) => {
+        const m = c as Partial<THREE.LineSegments>;
+        m.geometry?.dispose();
+        (m.material as THREE.Material | undefined)?.dispose();
+      });
       o.removeFromParent();
     }
     this.edgesRest = null;
@@ -808,9 +827,21 @@ export class Viewer {
       if (inst.name === sel) {
         const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, l));
         this.edgesSelected = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
-          color: SELECT_COLOR, transparent: true, opacity: 1,
+          color: SELECT_COLOR, transparent: true, opacity: 1, depthTest: false,
         }));
         this.edgesSelected.position.copy(center);
+        this.edgesSelected.renderOrder = 11;
+        // A dark backing box just outside the yellow one. Yellow-on-yellow is
+        // the one case a bright resource pack can hide the selection in, and
+        // one extra LineSegments on ONE instance is not a cost worth arguing
+        // about.
+        const back = new THREE.LineSegments(
+          new THREE.EdgesGeometry(new THREE.BoxGeometry(w + 0.22, h + 0.22, l + 0.22)),
+          new THREE.LineBasicMaterial({ color: 0x0b0d11, transparent: true, opacity: 0.9, depthTest: false }));
+        back.position.copy(center);
+        back.renderOrder = 10;
+        this.edgesSelected.add(back);
+        back.position.set(0, 0, 0);
         this.markerGroup.add(this.edgesSelected);
         continue;
       }
@@ -852,6 +883,8 @@ export class Viewer {
         selected ? "is-selected" : "",
         hovered ? "is-hovered" : "",
       ].join(" ")}`;
+      // What you are pointing at is never decluttered away.
+      row.lab.prio = selected || hovered ? 2 : 0;
     }
     for (const mesh of [this.portMeshes.solid, this.portMeshes.ghost]) {
       if (!mesh) continue;
@@ -899,31 +932,193 @@ export class Viewer {
       [[Math.sin(rad), 0, Math.cos(rad)], 0x4fc3f7],
     ];
     for (const [dir, color] of axes) {
-      this.gizmoGroup.add(new THREE.ArrowHelper(
+      const arrow = new THREE.ArrowHelper(
         new THREE.Vector3(...dir).normalize(), origin,
-        Math.max(3, Math.min(w, l) * 0.6), color, 1.0, 0.5));
+        Math.max(3, Math.min(w, l) * 0.6), color, 1.0, 0.5);
+      // A gizmo that disappears inside the cell it is describing is not a
+      // gizmo. Drawing it last, without depth testing, is what makes it
+      // readable against a dark abstract body AND against a bright
+      // resource-pack block.
+      Viewer.alwaysOnTop(arrow, 10);
+      this.gizmoGroup.add(arrow);
     }
     this.gizmoLabelWorld = new THREE.Vector3(center.x, inst.at[1] + h + 0.8, center.z);
     this.gizmoLabels.push(this.label(
       `${inst.name} · ${inst.cell} · rot ${inst.rot}°`, "inst-label is-selected",
-      this.gizmoLabelWorld));
+      this.gizmoLabelWorld, 2).el);
+  }
+
+  /** Draw an overlay object over everything, whatever its depth. */
+  private static alwaysOnTop(obj: THREE.Object3D, order: number) {
+    obj.renderOrder = order;
+    obj.traverse((o) => {
+      o.renderOrder = order;
+      const mats = (o as THREE.Mesh).material;
+      for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) {
+        (m as THREE.Material).depthTest = false;
+        (m as THREE.Material).transparent = true;
+      }
+    });
   }
 
   private gizmoLabels: HTMLDivElement[] = [];
 
-  /** Project label anchors to screen space once per frame. */
+  // ---- label legibility ---------------------------------------------------
+  //
+  // A 12-instance design carries ~50 port labels. Zoomed in they are the whole
+  // point; zoomed out they are a grey mat over the geometry, and they hide the
+  // thing they are labelling. Three rules, all keyed off ONE measurement — how
+  // many screen pixels a block spans at that label's depth:
+  //
+  //   * below MIN_PX_PER_BLOCK the label is dropped entirely. Its 3-D cone
+  //     marker stays, so the port is still visible and still clickable: you
+  //     lose the name, not the affordance.
+  //   * between there and FADE_PX_PER_BLOCK it fades, so labels recede with
+  //     distance instead of all shouting equally (depth cue, not decoration).
+  //   * labels that would land in the same screen cell collide, and the one
+  //     NEAREST the camera wins. Selected and hovered labels outrank both
+  //     rules and are never dropped.
+  static LABELS = {
+    /** Hide below this: at 3.2 px a block, a 10 px label is bigger than the
+     *  thing it names. */
+    minPxPerBlock: 3.2,
+    /** Fully opaque at or above this. */
+    fadePxPerBlock: 9,
+    /** Declutter cell, in CSS pixels (a port label is ~80x14). */
+    cell: [86, 15] as [number, number],
+  };
+
+  /** Last frame's label accounting, for the UI and for `npm run verify`. */
+  labelStats = { total: 0, shown: 0, hiddenSmall: 0, hiddenOverlap: 0, hiddenBehind: 0, pxPerBlock: 0 };
+
   private labelScratch = new THREE.Vector3();
+  private labelSlots = new Map<string, number>();
+  private labelOrder: { el: HTMLDivElement; prio: number; d: number; x: number; y: number; px: number }[] = [];
+
   private projectLabels() {
-    if (this.labels.length === 0) return;
+    if (this.labels.length === 0) {
+      this.labelStats = { total: 0, shown: 0, hiddenSmall: 0, hiddenOverlap: 0, hiddenBehind: 0, pxPerBlock: 0 };
+      return;
+    }
     const rect = this.renderer.domElement.getBoundingClientRect();
     const v = this.labelScratch;
-    for (const { el, world } of this.labels) {
+    const L = Viewer.LABELS;
+    // Pixels per world unit at depth d: rect.height / (2 tan(fov/2) d).
+    const k = rect.height / (2 * Math.tan(((this.camera.fov / 2) * Math.PI) / 180));
+    const stats = { total: this.labels.length, shown: 0, hiddenSmall: 0, hiddenOverlap: 0, hiddenBehind: 0, pxPerBlock: 0 };
+    this.labelOrder.length = 0;
+
+    for (const { el, world, prio } of this.labels) {
+      const d = this.camera.position.distanceTo(world);
+      const px = k / Math.max(d, 0.001);
       v.copy(world).project(this.camera);
-      if (v.z > 1) { el.style.display = "none"; continue; }
-      el.style.display = "";
-      el.style.left = `${((v.x + 1) / 2) * rect.width}px`;
-      el.style.top = `${((-v.y + 1) / 2) * rect.height}px`;
+      if (v.z > 1) { el.style.display = "none"; stats.hiddenBehind++; continue; }
+      if (px < L.minPxPerBlock && prio <= 0) { el.style.display = "none"; stats.hiddenSmall++; continue; }
+      this.labelOrder.push({
+        el, prio, d, px,
+        x: ((v.x + 1) / 2) * rect.width,
+        y: ((-v.y + 1) / 2) * rect.height,
+      });
     }
+
+    // Nearest first, and priority ahead of distance: whoever claims a screen
+    // cell first keeps it.
+    this.labelOrder.sort((a, b) => b.prio - a.prio || a.d - b.d);
+    this.labelSlots.clear();
+    let pxSum = 0;
+    for (const l of this.labelOrder) {
+      const key = `${Math.round(l.x / L.cell[0])},${Math.round(l.y / L.cell[1])}`;
+      if (l.prio <= 0 && this.labelSlots.has(key)) {
+        l.el.style.display = "none";
+        stats.hiddenOverlap++;
+        continue;
+      }
+      this.labelSlots.set(key, 1);
+      l.el.style.display = "";
+      l.el.style.left = `${l.x}px`;
+      l.el.style.top = `${l.y}px`;
+      // Depth fade, floored so a far label is dim but never illegible.
+      const t = Math.min(1, Math.max(0, (l.px - L.minPxPerBlock) / (L.fadePxPerBlock - L.minPxPerBlock)));
+      l.el.style.opacity = l.prio > 0 ? "1" : (0.45 + 0.55 * t).toFixed(2);
+      stats.shown++;
+      pxSum += l.px;
+    }
+    stats.pxPerBlock = stats.shown ? pxSum / stats.shown : 0;
+    this.labelStats = stats;
+  }
+
+  /** Frame a world position: keep the camera's direction, put the point at the
+   *  centre of the orbit and pull in to `radius`. The one motion every
+   *  click-to-focus affordance in the outliner uses. */
+  focusOn(pos: Vec3, radius = 26) {
+    const target = new THREE.Vector3(pos[0], pos[1], pos[2]);
+    const dir = this.camera.position.clone().sub(this.controls.target);
+    if (dir.lengthSq() < 1e-6) dir.set(1, 1, 1);
+    dir.normalize().multiplyScalar(radius);
+    this.controls.target.copy(target);
+    this.camera.position.copy(target).add(dir);
+    this.controls.update();
+    this.lastFocus = { target: [...pos] as Vec3, radius };
+  }
+
+  /** Where `focusOn` last aimed — a headless check for click-to-focus. */
+  lastFocus: { target: Vec3; radius: number } | null = null;
+
+  /** Pull the camera in/out along its current direction. The declutter rules
+   *  are a function of this distance, so this is how a test walks them. */
+  setOrbitRadius(r: number) {
+    const dir = this.camera.position.clone().sub(this.controls.target);
+    if (dir.lengthSq() < 1e-6) dir.set(1, 1, 1);
+    this.camera.position.copy(this.controls.target).add(dir.normalize().multiplyScalar(r));
+    this.controls.update();
+  }
+
+  orbitRadius(): number {
+    return this.camera.position.distanceTo(this.controls.target);
+  }
+
+  /** Frame the WHOLE document.
+   *
+   *  The default camera was pitched for the 16x16 crossing sketch; the verified
+   *  chain is 140 blocks wide, so landing on it put the viewer inside a bus.
+   *  A demo (or `F` with nothing selected) now fits the bounding volume of
+   *  every placed cell and every realized bus, from a fixed three-quarter
+   *  angle — the first frame has to read as a diagram, not as a green wall. */
+  frameAll(padding = 1.25): boolean {
+    const box = new THREE.Box3();
+    for (const inst of this.instances) {
+      const { w, h, l } = Viewer.instBox(inst);
+      box.expandByPoint(new THREE.Vector3(inst.at[0] - 0.5, inst.at[1] - 0.5, inst.at[2] - 0.5));
+      box.expandByPoint(new THREE.Vector3(inst.at[0] + w - 0.5, inst.at[1] + h - 0.5, inst.at[2] + l - 0.5));
+    }
+    const layers = [...(this.lastScene?.buses ?? [])];
+    if (this.lastScene?.loose) layers.push(this.lastScene.loose);
+    for (const layer of layers) {
+      for (const b of layer.blocks) box.expandByPoint(new THREE.Vector3(b.x, b.y, b.z));
+    }
+    if (box.isEmpty()) return false;
+    const center = box.getCenter(new THREE.Vector3());
+    const r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 3);
+    const fovY = (this.camera.fov * Math.PI) / 180;
+    const fovX = 2 * Math.atan(Math.tan(fovY / 2) * Math.max(this.camera.aspect, 0.2));
+    const dist = (r / Math.sin(Math.min(fovY, fovX) / 2)) * padding;
+    this.controls.target.copy(center);
+    this.camera.position.copy(center).add(
+      new THREE.Vector3(0.62, 0.55, 0.56).normalize().multiplyScalar(dist));
+    this.camera.far = Math.max(4000, dist * 4);
+    this.camera.updateProjectionMatrix();
+    this.controls.update();
+    this.lastFocus = { target: [center.x, center.y, center.z], radius: dist };
+    return true;
+  }
+
+  /** Frame an instance by its bounding box, so `F` fills the view with it. */
+  focusInstance(name: string): boolean {
+    const inst = this.instances.find((i) => i.name === name);
+    if (!inst) return false;
+    const { w, h, l, center } = Viewer.instBox(inst);
+    this.focusOn([center.x, center.y, center.z], Math.max(12, Math.max(w, h, l) * 1.6));
+    return true;
   }
 
   // -- picking / drag -------------------------------------------------------
