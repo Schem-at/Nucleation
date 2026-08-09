@@ -98,13 +98,67 @@ export interface BusInfo {
   sinks: string[];
   gates: GateInfo[];
   color: number;
+  /** Executor-only ports the ROUTER promoted so this bus could land (empty on
+   *  cores that route without promoting, or that do not report it). */
+  promotions?: unknown[];
 }
+
+export interface Block { x: number; y: number; z: number; name: string }
 
 export interface LayerBlocks {
   layer: string; // "loose" | "bus:<name>" | "inst:<name>" | region name
   color: number | null; // bus color override, else null (block colors)
   failed: boolean;
-  blocks: { x: number; y: number; z: number; name: string }[];
+  blocks: Block[];
+}
+
+/** One distinct thing to mesh: a library cell plus whatever per-instance
+ *  port-mode patches are in effect, in CELL-LOCAL coordinates.
+ *
+ *  `Design::transform_pos` places a cell as `at + R_rot(p - cellBounds.min)`,
+ *  where `cellBounds` is the min/max over the PRISTINE cell's non-air blocks
+ *  and `R_rot` is a quarter-turn about the min corner. So the geometry below
+ *  is rotation-independent: every placement of this variant, at every one of
+ *  the four rotations, is the SAME mesh under a different matrix. */
+export interface CellVariant {
+  key: string;
+  cell: string;
+  /** `p - cellBounds.min` for each non-air block. */
+  blocks: Block[];
+  /** Rotation footprint `(sx, sy, sz)` from those same bounds. */
+  size: Vec3;
+}
+
+/** Where one instance puts a variant. Everything a renderer needs to build
+ *  the instance matrix — and nothing that would make it re-mesh. */
+export interface Placement {
+  instance: string;
+  cell: string;
+  variant: string;
+  at: Vec3;
+  rot: number;
+}
+
+/** The renderable document, with an explicit statement of what changed since
+ *  the previous call. The renderer rebuilds only the named parts; everything
+ *  else it already holds is still valid by construction. */
+export interface SceneModel {
+  variants: Map<string, CellVariant>;
+  placements: Placement[];
+  /** Bus layers, world coordinates, one unique mesh each (never instanced —
+   *  no two buses are the same shape). */
+  buses: LayerBlocks[];
+  /** The design's own loose hardware, world coordinates, one unique mesh. */
+  loose: LayerBlocks;
+  dirty: {
+    /** Variants whose geometry must be (re)built. */
+    variants: string[];
+    /** Instance transforms changed: matrix writes, no re-mesh. */
+    placements: boolean;
+    /** Bus layers whose blocks changed. */
+    buses: string[];
+    loose: boolean;
+  };
 }
 
 const BUS_PALETTE = [0x76d275, 0x4fc3f7, 0xffb74d, 0xba68c8, 0x4db6ac, 0xf06292, 0xa2cf6e, 0x7986cb];
@@ -139,6 +193,34 @@ export class Studio {
     this.onChange?.();
   }
 
+  // -- what changed, and therefore what must be re-read from wasm ----------
+  //
+  // The baseline profile said the whole cost of a drag frame was JSON coming
+  // back across the wasm boundary: a full non-air dump (36 ms at 2.5k blocks)
+  // plus one dense region dump PER INSTANCE (~14 ms each). None of it had
+  // changed. These flags are how the scene stops asking.
+
+  /** Buses whose realized blocks may have changed. */
+  private dirtyBuses = new Set<string>();
+  /** The loose layer's blocks may have changed. */
+  private dirtyLoose = true;
+  /** Instance transforms changed (cheap: matrix writes only). */
+  private dirtyPlacements = true;
+
+  /** Every bus is suspect — for the rare structural edits where working out
+   *  which ones moved costs more than re-reading them. */
+  private dirtyAllBuses() {
+    for (const n of this.buses.keys()) this.dirtyBuses.add(n);
+  }
+
+  /** Wasm round-trips the scene made, by kind. The performance assertions in
+   *  `scripts/verify.mjs` are written against these: a drag must add zero
+   *  `cellDump`s, a port-mode toggle exactly one. */
+  sceneReads = { flatten: 0, cellDump: 0, instDump: 0, busDump: 0, looseDump: 0 };
+  /** Wall time in each of those, so the report can name the engine call that
+   *  still dominates a live-reroute drag frame. */
+  sceneMs = { flatten: 0, cellDump: 0, instDump: 0, busDump: 0, looseDump: 0 };
+
   // -- library -------------------------------------------------------------
 
   addCellFromBytes(name: string, bytes: Uint8Array): CellInfo {
@@ -166,6 +248,8 @@ export class Studio {
     this.design.place(name, cell, at, rot);
     const info: InstanceInfo = { name, cell, at: [...at] as Vec3, rot };
     this.instances.set(name, info);
+    this.dirtyPlacements = true;
+    this.dirtyAllBuses(); // a new body is a new obstacle
     this.bump();
     return info;
   }
@@ -178,6 +262,12 @@ export class Studio {
     const report = this.design.moveInstance(name, at, rot ?? inst.rot);
     inst.at = [...at] as Vec3;
     if (rot != null) inst.rot = rot;
+    // A move changes this instance's MATRIX and nothing else about its blocks.
+    // The only geometry that can have changed is the buses the engine names in
+    // the report — so a drag over open ground re-reads nothing at all.
+    this.dirtyPlacements = true;
+    for (const b of report.rerouted ?? []) this.dirtyBuses.add(b);
+    for (const b of Object.keys(report.failed ?? {})) this.dirtyBuses.add(b);
     this.bump();
     return report;
   }
@@ -196,7 +286,9 @@ export class Studio {
     if (!this.instances.has(name)) throw new Error(`no instance ${name}`);
     const report = this.design.removeInstance(name);
     this.instances.delete(name);
+    this.dirtyAllBuses();
     for (const b of report.removed_buses ?? []) this.buses.delete(b);
+    this.dirtyPlacements = true;
     this.bump();
     return report;
   }
@@ -275,7 +367,13 @@ export class Studio {
    *  from — so the UI never offers a toggle that cannot fire. */
   private promoCache = new Map<string, boolean>();
   canPromote(instance: string, port: string): boolean {
-    const key = `${this.version}:${instance}.${port}`;
+    // Keyed by CELL, not by document version: `plan_input`/`plan_output` are
+    // planned against the library cell's own schematic and its port mapping,
+    // so the answer cannot change as the document is edited. Keying it by
+    // version (as this did) re-planned every port on every drag frame — 12 ms
+    // of the old 21 ms `allEndpoints()`.
+    const cell = this.instances.get(instance)?.cell ?? instance;
+    const key = `${cell}.${port}`;
     const hit = this.promoCache.get(key);
     if (hit != null) return hit;
     let ok = false;
@@ -294,7 +392,12 @@ export class Studio {
    *  and co-reroutes the rest. */
   setPortMode(instance: string, port: string, mode: "bus" | "executor") {
     const report = this.design.setPortMode(instance, port, mode);
+    this.dirtyAllBuses();
     for (const name of report.removed_buses ?? []) this.buses.delete(name);
+    // This is the ONE edit that changes a placed cell's blocks, so it is the
+    // one edit that costs a cell re-mesh — of the affected instance's variant
+    // only. Every other instance keeps the mesh it already has.
+    this.dirtyPlacements = true;
     this.bump();
     return report;
   }
@@ -322,8 +425,12 @@ export class Studio {
     const info: BusInfo = {
       name, driver, sinks: [...sinks], color,
       gates: gates.map((g, i) => ({ ...g, name: g.name || `g${i}` })),
+      // Ports the ROUTER promoted on its own, when the core reports them.
+      promotions: bus.promotions ?? [],
     };
     this.buses.set(name, info);
+    // Realizing a bus can amend the buses it crosses, so they are suspect too.
+    this.dirtyAllBuses();
     this.bump();
     return info;
   }
@@ -338,6 +445,7 @@ export class Studio {
     const gname = `g${bus.gates.length}`;
     const state = this.design.addGate(busName, gname, anchor, step);
     bus.gates.push({ name: gname, anchor: [...anchor] as Vec3, step: [...step] as Vec3 });
+    this.dirtyBuses.add(busName);
     this.bump();
     return state;
   }
@@ -349,12 +457,14 @@ export class Studio {
     if (!bus || !gate) throw new Error(`no gate ${busName}/${gateName}`);
     const report = this.design.moveGate(busName, gateName, anchor);
     gate.anchor = [...anchor] as Vec3;
+    this.dirtyBuses.add(busName);
     this.bump();
     return report;
   }
 
   ripBus(name: string): void {
     this.design.rip(name);
+    this.dirtyBuses.add(name);
     this.bump();
   }
 
@@ -362,6 +472,7 @@ export class Studio {
    *  moved). Returns the resulting state, `failed: reason` included. */
   rerouteBus(name: string): string {
     const state = this.design.reroute(name);
+    this.dirtyBuses.add(name);
     this.bump();
     return state;
   }
@@ -370,6 +481,7 @@ export class Studio {
   removeBus(name: string): void {
     this.design.removeBus(name);
     this.buses.delete(name);
+    this.dirtyBuses.add(name);
     this.bump();
   }
 
@@ -427,6 +539,7 @@ export class Studio {
 
   setBlock(x: number, y: number, z: number, block: string): void {
     this.design.setBlock(x, y, z, block);
+    this.dirtyLoose = true;
     // no bump: demo hardware placement calls this in bulk, caller bumps
   }
 
@@ -468,42 +581,212 @@ export class Studio {
 
   // -- scene extraction ------------------------------------------------------
 
-  /** The flattened document split into render layers.
+  /** Per-cell rotation bounds, mirroring the engine's `cell_bounds`: the
+   *  min/max over the PRISTINE cell's non-air blocks (NOT the region bounding
+   *  box, which can include air). */
+  private cellBounds = new Map<string, { min: Vec3; size: Vec3 }>();
+  /** Cell-local blocks of an unpatched cell, straight from its own schematic
+   *  (~1 ms) — no flatten, no instance region dump. */
+  private cellLocal = new Map<string, Block[]>();
+  /** Built variants, keyed by `variantKey`. */
+  private variants = new Map<string, CellVariant>();
+  private busBlocks = new Map<string, Block[]>();
+  private looseBlocks: Block[] = [];
+
+  /** Which variant an instance draws: its cell, plus the ports it has
+   *  promoted. `Design::instance_local_blocks` is exactly "the library body
+   *  PLUS its Bus-mode port patches", so two instances agreeing on both agree
+   *  on every block — and can share one mesh. */
+  variantKey(instance: string): string {
+    const inst = this.instances.get(instance);
+    if (!inst) return "";
+    const promoted: string[] = [];
+    for (const [name, mode] of this.portModes()) {
+      if (mode !== "bus") continue;
+      const dot = name.indexOf(".");
+      if (name.slice(0, dot) === instance) promoted.push(name.slice(dot + 1));
+    }
+    promoted.sort();
+    return promoted.length ? `${inst.cell}#${promoted.join(",")}` : inst.cell;
+  }
+
+  /** Where every instance sits — pure JS state, no wasm call. */
+  placements(): Placement[] {
+    return [...this.instances.values()].map((i) => ({
+      instance: i.name, cell: i.cell, variant: this.variantKey(i.name),
+      at: i.at, rot: i.rot,
+    }));
+  }
+
+  private boundsFor(cell: string): { min: Vec3; size: Vec3 } {
+    const hit = this.cellBounds.get(cell);
+    if (hit) return hit;
+    const blocks = this.cellBlocks(cell);
+    let mn: Vec3 = [0, 0, 0], mx: Vec3 = [0, 0, 0];
+    if (blocks.length) {
+      mn = [blocks[0].x, blocks[0].y, blocks[0].z];
+      mx = [...mn] as Vec3;
+      for (const b of blocks) {
+        if (b.x < mn[0]) mn[0] = b.x; if (b.x > mx[0]) mx[0] = b.x;
+        if (b.y < mn[1]) mn[1] = b.y; if (b.y > mx[1]) mx[1] = b.y;
+        if (b.z < mn[2]) mn[2] = b.z; if (b.z > mx[2]) mx[2] = b.z;
+      }
+    }
+    const out = { min: mn, size: [mx[0] - mn[0] + 1, mx[1] - mn[1] + 1, mx[2] - mn[2] + 1] as Vec3 };
+    this.cellBounds.set(cell, out);
+    return out;
+  }
+
+  private cellBlocks(cell: string): Block[] {
+    const hit = this.cellLocal.get(cell);
+    if (hit) return hit;
+    const sch = this.cells.get(cell)?.schematic;
+    let blocks: Block[] = [];
+    if (sch) {
+      this.sceneReads.cellDump++;
+      try {
+        blocks = JSON.parse(sch.getNonAirBlocksJson()) as Block[];
+      } catch {
+        blocks = [];
+      }
+    }
+    this.cellLocal.set(cell, blocks);
+    return blocks;
+  }
+
+  /** Invert `Design::transform_pos`: world -> cell-local. */
+  private static toLocal(b: Block, at: Vec3, rot: number, sx: number, sz: number): Block {
+    const rx = b.x - at[0], ry = b.y - at[1], rz = b.z - at[2];
+    switch ((((rot % 360) + 360) % 360) / 90) {
+      case 1: return { x: rz, y: ry, z: sz - 1 - rx, name: b.name };
+      case 2: return { x: sx - 1 - rx, y: ry, z: sz - 1 - rz, name: b.name };
+      case 3: return { x: sx - 1 - rz, y: ry, z: rx, name: b.name };
+      default: return { x: rx, y: ry, z: rz, name: b.name };
+    }
+  }
+
+  /** Build a variant's cell-local geometry.
+   *
+   *  Unpatched: read the cell's own schematic (~1 ms). Patched: read ONE
+   *  representative instance's flattened region and invert its transform —
+   *  the engine stays the authority on what a promotion did to the body,
+   *  and it is read once per variant, not once per instance. */
+  private buildVariant(key: string, rep: Placement, flat: () => any): CellVariant {
+    const { min, size } = this.boundsFor(rep.cell);
+    let blocks: Block[];
+    if (key === rep.cell) {
+      blocks = this.cellBlocks(rep.cell).map((b) => ({
+        x: b.x - min[0], y: b.y - min[1], z: b.z - min[2], name: b.name,
+      }));
+    } else {
+      this.sceneReads.instDump++;
+      const world = JSON.parse(flat().getRegionNonAirBlocksJson(`inst:${rep.instance}`)) as Block[];
+      blocks = world.map((b) => Studio.toLocal(b, rep.at, rep.rot, size[0], size[2]));
+    }
+    return { key, cell: rep.cell, blocks, size };
+  }
+
+  /** The renderable document, with only the changed parts re-read.
    *
    *  flatten() writes each layer into a NAMED SCHEMATIC REGION
    *  (`inst:{name}`, `bus:{name}`) plus the default region for the loose
    *  base; each is read back with the per-region NON-AIR dump. The dense
    *  dumps (`getAllBlocksJson`, DefinitionRegion `blocksJson`) are
    *  deliberately avoided: they materialize every in-bounds air cell, and
-   *  one placed HDL cell has a multi-million-cell bounding volume —
-   *  enough to exhaust wasm memory. */
-  layers(): LayerBlocks[] {
-    const flat = this.design.flatten();
-    const s = flat.raw;
-    const names = JSON.parse(s.regionNamesJson()) as string[];
-    const layers: LayerBlocks[] = [];
-    const claimed = new Set<string>();
-    for (const name of names) {
-      if (!name.startsWith("bus:") && !name.startsWith("inst:")) continue;
-      let blocks: LayerBlocks["blocks"];
-      try {
-        blocks = JSON.parse(s.getRegionNonAirBlocksJson(name));
-      } catch {
-        continue;
+   *  one placed HDL cell has a multi-million-cell bounding volume — enough
+   *  to exhaust wasm memory.
+   *
+   *  What is new here is that NONE of it happens on a transform-only edit.
+   *  The old `layers()` re-read the whole document on every drag frame
+   *  (a full non-air dump plus one region dump per instance, ~340 ms at 12
+   *  instances); a drag now re-reads only the buses the engine says moved. */
+  scene(): SceneModel {
+    const placements = this.placements();
+    const wanted = new Map<string, Placement>();
+    for (const p of placements) if (!wanted.has(p.variant)) wanted.set(p.variant, p);
+    const newVariants = [...wanted.keys()].filter((k) => !this.variants.has(k));
+    const dirtyBusNames = [...this.dirtyBuses].filter((n) => this.buses.has(n));
+
+    // ONE flatten, and only if something actually needs it.
+    let flatRaw: any = null;
+    const flat = () => {
+      if (!flatRaw) {
+        this.sceneReads.flatten++;
+        const t = performance.now();
+        flatRaw = this.design.flatten().raw;
+        this.sceneMs.flatten += performance.now() - t;
       }
-      for (const b of blocks) claimed.add(`${b.x},${b.y},${b.z}`);
-      let color: number | null = null;
-      let failed = false;
-      if (name.startsWith("bus:")) {
-        const busName = name.slice(4);
-        color = this.buses.get(busName)?.color ?? null;
-        failed = this.busState(busName).startsWith("failed");
-      }
-      layers.push({ layer: name, color, failed, blocks });
+      return flatRaw;
+    };
+
+    for (const key of newVariants) {
+      this.variants.set(key, this.buildVariant(key, wanted.get(key)!, flat));
     }
-    const all = JSON.parse(s.getNonAirBlocksJson()) as LayerBlocks["blocks"];
-    const loose = all.filter((b) => !claimed.has(`${b.x},${b.y},${b.z}`));
-    layers.push({ layer: "loose", color: null, failed: false, blocks: loose });
-    return layers;
+    // Drop variants nothing places any more (a port toggled back, a cell
+    // deleted): their meshes go with them.
+    for (const key of [...this.variants.keys()]) {
+      if (!wanted.has(key)) this.variants.delete(key);
+    }
+
+    for (const name of dirtyBusNames) {
+      try {
+        const raw = flat();
+        const t = performance.now();
+        this.busBlocks.set(name, JSON.parse(raw.getRegionNonAirBlocksJson(`bus:${name}`)) as Block[]);
+        this.sceneMs.busDump += performance.now() - t;
+        this.sceneReads.busDump++;
+      } catch {
+        this.busBlocks.set(name, []);
+      }
+    }
+    for (const name of [...this.busBlocks.keys()]) {
+      if (!this.buses.has(name)) this.busBlocks.delete(name);
+    }
+    this.dirtyBuses.clear();
+
+    const looseWas = this.dirtyLoose;
+    if (this.dirtyLoose) {
+      // The loose layer is exactly the design's own region(s) — everything
+      // flatten() did NOT put in an `inst:`/`bus:` layer. Verified equal to
+      // the base schematic's non-air blocks, so no set subtraction over a
+      // full-document dump is needed (that dump was 36 ms at 2.5k blocks and
+      // grows with every placed cell).
+      const names = JSON.parse(flat().regionNamesJson()) as string[];
+      const out: Block[] = [];
+      for (const n of names) {
+        if (n.startsWith("bus:") || n.startsWith("inst:")) continue;
+        try {
+          out.push(...(JSON.parse(flat().getRegionNonAirBlocksJson(n)) as Block[]));
+        } catch { /* a region with no blocks */ }
+      }
+      this.sceneReads.looseDump++;
+      this.looseBlocks = out;
+      this.dirtyLoose = false;
+    }
+
+    const buses: LayerBlocks[] = [...this.buses.values()].map((b) => ({
+      layer: `bus:${b.name}`,
+      color: b.color,
+      failed: this.busState(b.name).startsWith("failed"),
+      blocks: this.busBlocks.get(b.name) ?? [],
+    }));
+
+    const dirty = {
+      variants: newVariants,
+      placements: this.dirtyPlacements,
+      buses: dirtyBusNames,
+      loose: looseWas,
+    };
+    this.dirtyPlacements = false;
+    return {
+      variants: new Map(this.variants),
+      placements,
+      buses,
+      loose: { layer: "loose", color: null, failed: false, blocks: this.looseBlocks },
+      dirty,
+    };
   }
+
+  /** Set alongside `dirtyLoose` so `scene()` can report it after clearing. */
+  private looseDirtyLast = true;
 }
