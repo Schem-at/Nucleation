@@ -406,6 +406,37 @@ debug = true
 lto = true
 opt-level = 3
 
+# Debug-info budget. This is the single biggest lever on iteration speed here,
+# and it is a disk problem before it is a CPU problem.
+#
+# Measured 2026-08-09 before this stanza existed: target/ was 102 GB, with
+# 774,187 files in target/debug/deps, because every one of the 159
+# dependencies was compiled at `-C debuginfo=2 -C split-debuginfo=unpacked`
+# (the macOS dev default), which leaves a fan of .o object files per crate per
+# feature combination. At that file count a NO-OP `cargo check` spent 31.8s
+# doing nothing but stat-ing fingerprints.
+#
+# Dependencies get no debuginfo — you do not single-step through `naga` or
+# `wgpu`. Our own crates keep line tables, so panics and `RUST_BACKTRACE`
+# still name the file and line; only in-debugger variable inspection is lost.
+# If you genuinely need to step through our code, temporarily run with
+# `RUSTFLAGS="-C debuginfo=2"` rather than editing this.
+[profile.dev]
+debug = "line-tables-only"
+incremental = true
+
+[profile.dev.package."*"]
+debug = 0
+
+# `cargo test` builds under this profile; it inherits dev, so state the same
+# budget explicitly rather than letting a future dev-profile edit change what
+# the test loop costs.
+[profile.test]
+debug = "line-tables-only"
+
+[profile.test.package."*"]
+debug = 0
+
 # Patch for MCHPRS compatibility
 [patch.crates-io]
 hematite-nbt = { git = "https://github.com/StackDoubleFlow/hematite_nbt" }
