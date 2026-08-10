@@ -31,6 +31,9 @@
 //! (they are the document's truth); buses fail into a visible
 //! `BusState::Failed`, never a half-routed fragment.
 
+use crate::design_decay::{
+    tile_dust_debt, Carrier, DecayLedger, CROSSING_ALLOWANCE, DUST_BUDGET,
+};
 use crate::io_contract::{CellContract, IoType, LayoutFunction, NetClassRule, PortDirection};
 use crate::routing::engine::blocks as rblocks;
 use crate::UniversalSchematic;
@@ -126,15 +129,22 @@ fn axis_run(a: P3, b: P3, width: u8) -> Option<RunInfo> {
     None
 }
 
-/// Dust cells between refresh repeaters. 7 keeps the worst joint-spanning
-/// gap (tail + joint column + head = 15) inside dust's 15-cell reach.
-const REFRESH_AT: u32 = 7;
+/// Dust cells a mid-bus segment must assume were already spent when the count
+/// entering it is genuinely unknown (a port patch splicing into the middle of
+/// somebody else's route). This is the ONLY place a blanket constant is still
+/// right: there is no upstream geometry to measure.
+///
+/// Refresh spacing everywhere else is decided by
+/// [`crate::design_decay::DecayLedger`] from the strength actually spent — see
+/// that module for why a single constant was both too dense on a straight run
+/// and too optimistic through a form conversion.
+const UNKNOWN_ARRIVAL: u32 = DUST_BUDGET / 2;
 
 /// Dust cells tolerated between refresh stations INSIDE a level shift. A
 /// staircase cell cannot host a repeater (a repeater does not power
-/// diagonally), so a slope spends the signal 2 cells per level; 12 leaves the
-/// exit cell plus a joint column inside dust's 15-cell reach.
-const SHIFT_DUST_CAP: u32 = 12;
+/// diagonally), so a slope spends the signal 2 cells per level; leaving 2 in
+/// hand keeps the exit cell plus a joint column inside dust's reach.
+const SHIFT_DUST_CAP: u32 = DUST_BUDGET - 2;
 
 /// One column of the verified BUS LEVEL-SHIFT tile ([`shift_plan`]).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -174,16 +184,31 @@ enum ShiftCell {
 /// all-on / alternating / 8 random patterns, 3040 output checks, zero
 /// crosstalk. All-solid, all-glass and swapped-parity variants all FAIL,
 /// so the alternation below is load-bearing in both directions.
-fn shift_plan(k: u32, down: bool, since0: u32) -> (Vec<(i32, i32, ShiftCell)>, u32) {
+/// `exit_reserve` is the strength the geometry PAST the tile's exit spends and
+/// cannot refresh — a sink's form adapter. A shift placed hard against the sink
+/// end exits onto that anchor with nothing between, so without this the tile's
+/// stale-exit case (`SHIFT_DUST_CAP` spent, plus the exit cell) and the
+/// adapter's own debt add up past dust's reach. One trailing station buys it
+/// back; it is the same Entry/Rep/Exit triple the tile already inserts mid-slope
+/// and `bus_levelshift.py` already verifies against a stale arrival.
+fn shift_plan(
+    k: u32,
+    down: bool,
+    since0: u32,
+    exit_reserve: u32,
+) -> (Vec<(i32, i32, ShiftCell)>, u32) {
     let sgn = if down { -1 } else { 1 };
     let mut cols = Vec::new();
     let (mut o, mut dy, mut since) = (0i32, 0i32, since0);
+    let station = |cols: &mut Vec<(i32, i32, ShiftCell)>, o: &mut i32, dy: i32| {
+        for kind in [ShiftCell::Entry, ShiftCell::Rep, ShiftCell::Exit] {
+            cols.push((*o, dy, kind));
+            *o += 1;
+        }
+    };
     for _ in 0..k {
         if since + 2 > SHIFT_DUST_CAP {
-            for kind in [ShiftCell::Entry, ShiftCell::Rep, ShiftCell::Exit] {
-                cols.push((o, dy, kind));
-                o += 1;
-            }
+            station(&mut cols, &mut o, dy);
             since = 0;
         }
         cols.push((o, dy, ShiftCell::Step));
@@ -193,24 +218,34 @@ fn shift_plan(k: u32, down: bool, since0: u32) -> (Vec<(i32, i32, ShiftCell)>, u
         o += 1;
         since += 2;
     }
+    // The exit cell is one more dust cell, and whatever waits past it spends
+    // `exit_reserve` more with nothing to refresh in between.
+    if since + 1 + exit_reserve > DUST_BUDGET {
+        station(&mut cols, &mut o, dy);
+        since = 0;
+    }
     cols.push((o, dy, ShiftCell::Flat));
     (cols, since + 1)
 }
 
 /// Cells of straight run a `k`-level shift consumes (entry cell included).
-fn shift_len(k: u32, down: bool, since0: u32) -> i32 {
-    shift_plan(k, down, since0).0.last().map_or(0, |c| c.0 + 1)
+fn shift_len(k: u32, down: bool, since0: u32, exit_reserve: u32) -> i32 {
+    shift_plan(k, down, since0, exit_reserve)
+        .0
+        .last()
+        .map_or(0, |c| c.0 + 1)
 }
 
-/// The MOST cells a `k`-level shift can ever consume.
+/// The MOST cells a `k`-level shift can ever consume when what follows its exit
+/// spends `exit_reserve`.
 ///
 /// The tile's real length depends on how much of the dust budget the leg into
 /// it already spent — a stale arrival buys a leading refresh station, three
 /// cells the caller cannot know about before planning that leg. Placement is
 /// therefore checked against the worst case, so a tile can never grow past the
 /// room reserved for it and leave a gap at its exit.
-fn shift_len_max(k: u32, down: bool) -> i32 {
-    shift_len(k, down, SHIFT_DUST_CAP)
+fn shift_len_max(k: u32, down: bool, exit_reserve: u32) -> i32 {
+    shift_len(k, down, SHIFT_DUST_CAP, exit_reserve)
 }
 
 /// A library cell: schematic + resolved contract, stored once and shared by
@@ -3289,10 +3324,12 @@ impl Design {
         let occ = self.occupancy_for_plan(&ripped, &self.halo_exempt(&endpoints));
         let mut planner = Planner::new(self, Some(bus), &style, &occ);
         let plan = (|| -> Result<(), String> {
-            // The refresh count entering a mid-bus segment is unknown; a
-            // conservative REFRESH_AT forces the earliest legal refresh.
+            // The strength entering a mid-bus segment is unknown — the geometry
+            // upstream belongs to somebody else's route — so there is nothing to
+            // measure and a conservative half-budget arrival stands in.
             planner.begin_segment(SegmentKind::Trunk(gi), wp_before, anchor);
-            let since = planner.plan_pair(wp_before, anchor, width, &BTreeSet::new(), REFRESH_AT)?;
+            let since =
+                planner.plan_pair(wp_before, anchor, width, &BTreeSet::new(), UNKNOWN_ARRIVAL)?;
             planner.end_segment();
             planner.begin_segment(SegmentKind::Trunk(gi + 1), anchor, wp_after);
             planner.plan_pair(anchor, wp_after, width, &BTreeSet::new(), since.saturating_add(1))?;
@@ -3674,6 +3711,40 @@ impl Design {
             }
         }
         let occ = occ;
+
+        // WHAT THE ADAPTERS ALREADY SPENT, measured off their stamped cells.
+        //
+        // A form adapter's gather column is not a fresh 15: the deepest bit's
+        // gather leg can be seven dust cells past its last diode, so a run
+        // LEAVING that column starts seven cells down, and a run ARRIVING at
+        // one must leave seven cells in hand for it. Neither was accounted
+        // anywhere; the old blanket `REFRESH_AT = 7` reserved exactly this
+        // much slack by halving dust's reach for every run in the design,
+        // which is why widening it broke the form conversions and nothing
+        // else. Measuring it instead pays for it only where it is owed.
+        //
+        // Read off the geometry, not re-derived from `design_promote`'s pitch
+        // arithmetic: a plan is the truth about what was stamped, and the two
+        // cannot drift apart.
+        let adapter_debt: BTreeMap<String, u32> = adapters
+            .iter()
+            .map(|(name, _, plan)| {
+                // The station pattern is identical for every bit (matched skew),
+                // so the binding constraint is the WORST bit's debt.
+                let debt = plan
+                    .column
+                    .iter()
+                    .map(|&c| {
+                        tile_dust_debt(c, |q| {
+                            plan.cells.get(&q).is_some_and(|b| rblocks::is_dust(b))
+                        })
+                    })
+                    .max()
+                    .unwrap_or(0);
+                (name.clone(), debt)
+            })
+            .collect();
+
         // Downstream everything — waypoints, branch geometry, the planner —
         // works from the ADAPTED port: its anchor is the adapter's column head
         // and its form is the canonical stack. Nothing else needs to know.
@@ -3724,6 +3795,14 @@ impl Design {
         }
 
         let mut planner = Planner::new(self, exclude, style, &occ);
+        // Every SINK's adapter debt becomes an exit reserve at its anchor, so a
+        // run that ends there stops spending in time for the adapter to finish
+        // the job. Sink branches are covered too: they end at their own anchor.
+        for sp in sinks.iter() {
+            if let Some(&debt) = adapter_debt.get(&sp.name) {
+                planner.reserves.insert(sp.anchor, debt);
+            }
+        }
         // Stamp the form adapters FIRST: they are this bus's cells, so the
         // planner must be allowed to write them even though they are in `occ`
         // (which is what makes the other legs route around them).
@@ -3737,7 +3816,8 @@ impl Design {
             }
             planner.end_segment();
         }
-        let mut since = 0u32;
+        // The trunk leaves the primary driver's adapter already in debt.
+        let mut since = adapter_debt.get(&drivers[0].name).copied().unwrap_or(0);
         for (i, pair) in waypoints.windows(2).enumerate() {
             planner.begin_segment(SegmentKind::Trunk(i), pair[0], pair[1]);
             since = planner
@@ -3771,8 +3851,17 @@ impl Design {
                 (*junction, *port_anchor)
             };
             planner.begin_segment(SegmentKind::Branch(port.clone()), a, b);
+            // A SINK branch opens with a forced diode at the junction, so it
+            // starts fresh; a DRIVER branch starts at its own adapter's debt.
+            // (Its exit reserve is already registered above when the far end is
+            // a sink anchor with an adapter.)
+            let since0 = if *is_driver {
+                adapter_debt.get(port).copied().unwrap_or(0)
+            } else {
+                0
+            };
             planner
-                .plan_run(run, &BTreeSet::new(), 0, !*is_driver, *is_driver)
+                .plan_run(run, &BTreeSet::new(), since0, !*is_driver, *is_driver)
                 .map_err(|e| format!("branch for `{port}`: {e}"))?;
             planner.end_segment();
         }
@@ -5287,6 +5376,16 @@ struct Planner<'a> {
     /// legs, which recurse into `plan_pair`; without this a pair that cannot be
     /// routed at ANY level would hop forever.
     hops: u32,
+    /// Signal-strength headroom a run ENDING at each anchor must leave behind,
+    /// in dust cells: the debt of a form adapter downstream of that anchor,
+    /// measured from the adapter's stamped geometry by
+    /// [`crate::design_decay::tile_dust_debt`].
+    ///
+    /// The router plans the trunk to the ADAPTED anchor and then stops, so
+    /// without this the strength the sink's own gather column spends is spent
+    /// by nobody's budget. It is the second half of what the old blanket
+    /// `REFRESH_AT = 7` was silently reserving.
+    reserves: BTreeMap<P3, u32>,
 }
 
 impl<'a> Planner<'a> {
@@ -5306,7 +5405,14 @@ impl<'a> Planner<'a> {
             cur_seg: None,
             cur_gate: None,
             hops: 0,
+            reserves: BTreeMap::new(),
         }
+    }
+
+    /// The exit headroom a run ending at `anchor` must leave (0 unless a form
+    /// adapter downstream of it is going to spend some).
+    fn exit_reserve(&self, anchor: P3) -> u32 {
+        self.reserves.get(&anchor).copied().unwrap_or(0)
     }
 
     fn begin_segment(&mut self, kind: SegmentKind, a: P3, b: P3) {
@@ -5495,7 +5601,7 @@ impl<'a> Planner<'a> {
                 }
                 let k = dy.unsigned_abs();
                 // Each end needs a shift, plus a cell so neither lands on a port.
-                let leg = shift_len_max(k, dy < 0) + 1;
+                let leg = shift_len_max(k, dy < 0, self.exit_reserve(b)) + 1;
                 let along_x = (b.0 - a.0).abs() >= (b.2 - a.2).abs();
                 let (span, sign) = if along_x {
                     ((b.0 - a.0).abs(), (b.0 - a.0).signum())
@@ -5554,7 +5660,7 @@ impl<'a> Planner<'a> {
     ) -> Result<u32, String> {
         let k = (b.1 - a.1).unsigned_abs();
         let down = b.1 < a.1;
-        let len = shift_len_max(k, down);
+        let len = shift_len_max(k, down, self.exit_reserve(b));
         let places = Self::shift_placements(self.occ, a, b, len, width, keep);
         if places.is_empty() {
             return Err(format!(
@@ -5607,7 +5713,11 @@ impl<'a> Planner<'a> {
                 .plan_pair(a, entry, width, keep, since)
                 .map_err(|e| format!("leg into the shift: {e}"))?;
         }
-        let (out, exit) = self.plan_level_shift(entry, along_x, sign, k, down, width, since)?;
+        // A tile whose exit IS the far anchor has nothing after it to carry the
+        // sink adapter's debt, so the tile itself must leave the headroom.
+        let tile_reserve = self.exit_reserve(b);
+        let (out, exit) =
+            self.plan_level_shift(entry, along_x, sign, k, down, width, since, tile_reserve)?;
         since = out;
         if exit != b {
             // The tile's exit cell is one more dust cell between refreshes.
@@ -5748,6 +5858,7 @@ impl<'a> Planner<'a> {
         down: bool,
         width: u8,
         since0: u32,
+        exit_reserve: u32,
     ) -> Result<(u32, P3), String> {
         let bus_block = self.style.bus_block.clone();
         let transparent = self.style.transparent_block.clone();
@@ -5758,7 +5869,7 @@ impl<'a> Planner<'a> {
             rblocks::facing_name(0, -sign)
         }
         .expect("axis-aligned unit step");
-        let (cols, since_out) = shift_plan(k, down, since0);
+        let (cols, since_out) = shift_plan(k, down, since0, exit_reserve);
         let pos_at = |o: i32, y: i32| -> P3 {
             if along_x {
                 (entry.0 + o * sign, y, entry.2)
@@ -6076,39 +6187,152 @@ impl<'a> Planner<'a> {
             }
         }
 
-        let mut since_out = since0;
+        // ------------------------------------------------------------------
+        // THE ELECTRICAL CHAIN, decided ONCE for the whole run.
+        //
+        // Every bit gets the same cell kinds at the same offsets (matched skew
+        // is a requirement, not a nicety), so the refresh decision is made once
+        // here from a decay ledger and then merely STAMPED per bit below.
+        //
+        // The chain is what the signal actually traverses, which is not the
+        // same as the cells this run writes: a crossing window contributes two
+        // dust cells before its own repeater and two after, and the run used to
+        // skip all of them as if the window were free. Debiting them is why a
+        // widened budget is safe here where a widened constant was not.
+        // ------------------------------------------------------------------
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum Slot {
+            /// Ordinary run dust. `station_ok` = a refresh station may stand here.
+            Dust { station_ok: bool },
+            /// A repeater this run must emit whatever the budget says (a branch
+            /// diode), or one the ledger asked for.
+            Rep,
+            /// A crossing window's own repeater: written by the window loops
+            /// below, refreshes the chain here.
+            WindowRefresh,
+            /// A crossing window's block: written below, spends nothing.
+            WindowBlock,
+            /// A crossing window's dust: written below, spends one cell.
+            WindowDust,
+        }
+        let window_slot = |o: i32| match o {
+            0 | 2 => Slot::WindowBlock,
+            1 => Slot::WindowRefresh,
+            _ => Slot::WindowDust,
+        };
+        // What the geometry PAST this run's exit spends without refreshing (a
+        // sink's form adapter). Needed before the chain, because a run that owes
+        // one is allowed to refresh in a cell an unencumbered run would leave
+        // alone — see `station_ok` below.
+        let reserve = self.exit_reserve(pos_at(run.to, run.y0));
+        let mut chain: Vec<(i32, Slot)> = Vec::new();
+        {
+            let mut c = run.from + sign;
+            while c != run.to {
+                let slot = if let Some(o) = dips
+                    .iter()
+                    .map(|&cc| (c - cc) * sign)
+                    .find(|o| (-2..=4).contains(o))
+                {
+                    window_slot(o)
+                } else if let Some(o) = stations
+                    .iter()
+                    .map(|&cc| (c - cc) * sign)
+                    .find(|o| (0..=2).contains(o))
+                {
+                    window_slot(o)
+                } else {
+                    let is_first = c == run.from + sign;
+                    let is_last = c == run.to - sign;
+                    if (first_rep && is_first) || (last_rep && is_last) {
+                        Slot::Rep
+                    } else {
+                        let steps_from_ends = (c - run.from).abs().min((run.to - c).abs());
+                        // Stations normally keep two cells clear of both
+                        // anchors. A run that OWES an exit reserve may use its
+                        // last cell anyway: a short final leg into a form
+                        // adapter has nowhere else to stand, and the alternative
+                        // is not a tidier route but a dead word — `t3_02`'s
+                        // one-cell leg out of its level shift into a 7-cell
+                        // gather column is exactly that case, and it is the same
+                        // placement `last_rep` already uses for branch diodes.
+                        let room = steps_from_ends >= 2 || (reserve > 0 && is_last);
+                        Slot::Dust {
+                            station_ok: room
+                                && !keep.contains(&pos_at(c, run.y0))
+                                && !near_dip(c)
+                                && !near_station(c),
+                        }
+                    }
+                };
+                chain.push((c, slot));
+                c += sign;
+            }
+        }
+
+        // MANDATORY TAIL per slot: how many cells AFTER this one must be
+        // carried before anything could possibly refresh again — a window's
+        // approach cells, the two cells at each end of the run, a kept
+        // junction — plus `reserve` when the run simply ENDS with no station
+        // site left, because the sink's own geometry spends that much more.
+        //
+        // Without this lookahead the ledger would happily spend its last cell
+        // one step before a stretch it cannot legally refresh in, and the word
+        // would die inside a crossing window or inside a form adapter.
+        let mut tail = vec![0u32; chain.len()];
+        {
+            let mut acc = reserve;
+            for i in (0..chain.len()).rev() {
+                tail[i] = acc;
+                match chain[i].1 {
+                    Slot::Rep | Slot::WindowRefresh => acc = 0,
+                    Slot::Dust { station_ok: true } => acc = 0,
+                    Slot::Dust { station_ok: false } | Slot::WindowDust => {
+                        acc = acc.saturating_add(1)
+                    }
+                    Slot::WindowBlock => {}
+                }
+            }
+        }
+
+        // Spend the budget: carry while the ledger admits it, refresh when it
+        // would otherwise strand the signal. Placing each station as LATE as
+        // the physics allows is what minimizes their number.
+        let mut ledger = DecayLedger::entering(Carrier::Dust, since0)
+            .reserving(reserve)
+            .allowing(CROSSING_ALLOWANCE);
+        for (i, slot) in chain.iter_mut().enumerate() {
+            match slot.1 {
+                Slot::WindowBlock => {}
+                Slot::Rep | Slot::WindowRefresh => ledger.refresh(),
+                Slot::WindowDust => ledger.carry_cell(),
+                Slot::Dust { station_ok } => {
+                    if station_ok && ledger.needs_station(tail[i]) {
+                        slot.1 = Slot::Rep;
+                        ledger.refresh();
+                    } else {
+                        ledger.carry_cell();
+                    }
+                }
+            }
+        }
+        let since_out = ledger.spent();
+
         for bit in 0..run.width {
             let y = run.y0 + 2 * bit as i32;
             let d = y - 1;
-            let mut since_refresh = since0;
-            let mut c = run.from + sign;
-            while c != run.to {
-                if in_dip(c) || in_station(c) {
-                    since_refresh = 0; // the window's own repeater refreshes
-                    c += sign;
-                    continue;
+            for &(c, slot) in &chain {
+                match slot {
+                    Slot::WindowBlock | Slot::WindowRefresh | Slot::WindowDust => continue,
+                    Slot::Rep => {
+                        self.put(pos_at(c, y - 1), &bus_block)?;
+                        self.put(pos_at(c, y), &rblocks::repeater(toward_driver, 1))?;
+                    }
+                    Slot::Dust { .. } => {
+                        self.put(pos_at(c, y - 1), &bus_block)?;
+                        self.put(pos_at(c, y), rblocks::DUST)?;
+                    }
                 }
-                let is_first = c == run.from + sign;
-                let is_last = c == run.to - sign;
-                let keep_here = keep.contains(&pos_at(c, run.y0));
-                let steps_from_ends = (c - run.from).abs().min((run.to - c).abs());
-                let force_rep = (first_rep && is_first) || (last_rep && is_last);
-                if force_rep
-                    || (since_refresh >= REFRESH_AT
-                        && steps_from_ends >= 2
-                        && !keep_here
-                        && !near_dip(c)
-                        && !near_station(c))
-                {
-                    self.put(pos_at(c, y - 1), &bus_block)?;
-                    self.put(pos_at(c, y), &rblocks::repeater(toward_driver, 1))?;
-                    since_refresh = 0;
-                } else {
-                    self.put(pos_at(c, y - 1), &bus_block)?;
-                    self.put(pos_at(c, y), rblocks::DUST)?;
-                    since_refresh += 1;
-                }
-                c += sign;
             }
 
             // Dip-under windows (bus8_cross.py v2 canonical tile): step
@@ -6152,9 +6376,6 @@ impl<'a> Planner<'a> {
                 self.put(at(1, y - 1), &bus_block)?;
                 self.put(at(1, y), &rblocks::repeater(toward_driver, 1))?;
                 self.put(at(2, y), &bus_block)?;
-            }
-            if bit == 0 {
-                since_out = since_refresh;
             }
         }
         if let Some(seg) = self.cur_seg.as_mut() {
@@ -6292,6 +6513,114 @@ mod tests {
             s.set_block_from_string(x, y, z, rblocks::DUST).unwrap();
         }
         (x, 2, z)
+    }
+
+    /// 8 lamps in a horizontal ROW at 2z pitch — a port whose form is NOT the
+    /// canonical 2y stack, so routing to it builds a form adapter.
+    fn lamp_row(s: &mut UniversalSchematic, x: i32, z: i32) -> P3 {
+        for i in 0..8 {
+            let zz = z + 2 * i;
+            s.set_block_from_string(x, 1, zz, LAMP).unwrap();
+            s.set_block_from_string(x, 2, zz, rblocks::DUST).unwrap();
+        }
+        (x, 2, z)
+    }
+
+    /// The refresh stations on bit 0 of a straight bus, along its run axis.
+    fn station_pitches(d: &Design, bus: &str, along_x: bool) -> Vec<i32> {
+        let layer = d.buses.get(bus).expect("bus");
+        let mut at: Vec<i32> = layer
+            .fragment
+            .iter()
+            .filter(|(p, b)| p.1 == 2 && b.starts_with("minecraft:repeater"))
+            .map(|(p, _)| if along_x { p.0 } else { p.2 })
+            .collect();
+        at.sort();
+        at.dedup();
+        at.windows(2).map(|w| w[1] - w[0]).collect()
+    }
+
+    /// A LONG STRAIGHT RUN BETWEEN TWO NATIVE-FORM PORTS SPENDS THE WHOLE
+    /// BUDGET.
+    ///
+    /// This is the measured win: nothing upstream or downstream of the anchors
+    /// spends any strength, so the ledger has all 14 cells to give and the
+    /// stations sit ~15 apart instead of ~8. Pinning the pitch is what stops a
+    /// future edit from quietly reintroducing the unconditional constant.
+    #[test]
+    fn a_clear_straight_run_refreshes_at_the_full_dust_budget() {
+        let mut s = UniversalSchematic::new("long".to_string());
+        let a = lever_bank(&mut s, 0, 8, 1, 0);
+        let b = lamp_bank(&mut s, 80, 8);
+        let mut d = Design::for_schematic("long", s);
+        let step = (0, 2, 0);
+        let ty = IoType::UnsignedInt { bits: 8 };
+        d.declare_input("a", a, step, 8, ty.clone()).unwrap();
+        d.declare_output("b", b, step, 8, ty).unwrap();
+        d.route_bus("w", "a", &["b"], vec![], BusStyle::default())
+            .unwrap();
+        assert_eq!(d.bus_state("w"), Some(&BusState::Routed), "the bus must route");
+        let pitches = station_pitches(&d, "w", true);
+        assert!(!pitches.is_empty(), "a 79-cell run must refresh at all");
+        for p in &pitches {
+            assert!(
+                *p >= 8,
+                "the ledger placed a station every {p} cells; the whole point is that a clear \
+                 run no longer pays the old ~8-cell pitch (pitches {pitches:?})"
+            );
+            assert!(
+                *p as u32 <= DUST_BUDGET - CROSSING_ALLOWANCE + 1,
+                "a {p}-cell gap means {} dust cells, past the budget a run may spend \
+                 (pitches {pitches:?})",
+                p - 1
+            );
+        }
+        // The interior gaps should be AT the budget: latest-legal placement.
+        assert!(
+            pitches
+                .iter()
+                .any(|p| *p as u32 == DUST_BUDGET - CROSSING_ALLOWANCE + 1),
+            "no gap reached the full budget; the placement is not latest-legal ({pitches:?})"
+        );
+    }
+
+    /// A FORM CONVERSION KEEPS ITS APPROACH TIGHT.
+    ///
+    /// The adversarial sweep's nine failures are all runs into or out of a form
+    /// adapter, whose gather column spends strength the run never saw. The
+    /// ledger charges that debt, so the stretch touching the adapter must stay
+    /// SHORTER than the budget even though the interior of the same bus widens.
+    #[test]
+    fn a_run_into_a_form_adapter_leaves_it_headroom() {
+        let mut s = UniversalSchematic::new("conv".to_string());
+        let a = lever_bank(&mut s, 0, 8, 1, 0);
+        let b = lamp_row(&mut s, 80, 8);
+        let mut d = Design::for_schematic("conv", s);
+        let ty = IoType::UnsignedInt { bits: 8 };
+        d.declare_input("a", a, (0, 2, 0), 8, ty.clone()).unwrap();
+        d.declare_output("b", b, (0, 0, 2), 8, ty).unwrap();
+        d.route_bus("w", "a", &["b"], vec![], BusStyle::default())
+            .unwrap();
+        assert_eq!(d.bus_state("w"), Some(&BusState::Routed), "the bus must route");
+        let layer = d.buses.get("w").expect("bus");
+        // The adapter owes something: it is a row->stack gather with a diode at
+        // the mouth and one per gather leg, so its column is not a fresh 15.
+        let debt = layer
+            .fragment
+            .keys()
+            .filter(|p| p.1 == 2)
+            .map(|&p| {
+                tile_dust_debt(p, |q| {
+                    layer.fragment.get(&q).is_some_and(|b| rblocks::is_dust(b))
+                })
+            })
+            .max()
+            .unwrap_or(0);
+        assert!(
+            debt <= DUST_BUDGET,
+            "some dust chain on bit 0 runs {debt} cells with nothing refreshing it, past the \
+             {DUST_BUDGET}-cell budget — the ledger is not charging something it should"
+        );
     }
 
     fn crossing_design() -> Design {
