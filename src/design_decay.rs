@@ -38,6 +38,47 @@
 //! `decay()` / `refreshes()`. A divergence between those three tables has been
 //! a real bug class in this repo, so [`Carrier::decay_per_cell`] is written to
 //! be read side by side with them.
+//!
+//! # CORRECTION to `redstone-eda/adversarial/REPORT.md` §8
+//!
+//! That report is what motivated this module, and implementing it turned up two
+//! places where its evidence does not say what it claims. Recorded here because
+//! this is the code the claims are about; the report itself belongs to another
+//! author and is left alone.
+//!
+//! **1. "The conservative pitch is load-bearing" is false as stated.** All nine
+//! of §8's must-stay-dense problems pass every vector against this module, five
+//! of them with FEWER repeaters than the constant emitted. What those nine
+//! actually need is for the strength their adapters, crossing windows and level
+//! shifts spend to be ACCOUNTED — not for the pitch to stay at 7. The pitch was
+//! only ever a proxy for that accounting, and a bad one, because it charged
+//! every straight run in the design for slack that three specific geometries
+//! owed.
+//!
+//! **2. The demolition test is ANISOTROPIC, so 947 is a lower bound.**
+//! `prune_check.py` buckets repeaters by `(y, z)` and thins along **x only**. A
+//! run along z puts every repeater in its own single-element bucket, so it can
+//! never be pruned and was never tested. It also selects on the block name
+//! alone, so it does not distinguish a refresh station from a structural diode —
+//! for an x-axis row (`p_form_4`, `flat_x`) that deletes the per-bit gather
+//! diodes which are the only thing isolating one bit's lane from the next, and
+//! the failure it records there is crosstalk rather than decay.
+//!
+//! Deliberately NOT claimed: that all nine failed for that reason. Six of them
+//! (`p_form_2`, `t3_01`..`t3_05`) convert to or from a **z**-stepping row, whose
+//! gather the x-only rule cannot touch, so their pruned repeaters really were
+//! refresh stations and their failures really were strength. Which mechanism
+//! killed which problem was not isolated here; only the conclusion above is
+//! measured.
+//!
+//! **2. The ACCEPTED verdicts were optimistic too.** The sweep prunes a single
+//! finished schematic, so it never exercises the ROUTE ORDER — and a crossing
+//! amendment is stamped into a bus that was already planned. Four multi-bus
+//! problems (`t4_00`, `t4_01`, `t5_02`, `t5_04`) route clean, pass DRC/LVS, and
+//! deliver ZERO at 15 cells of pitch: the amendment moves the amended bus's own
+//! station one cell later than it budgeted for. They pass at 14. That is
+//! [`CROSSING_ALLOWANCE`], and it means a demolition test on one schematic
+//! cannot certify a pitch for a design where buses are added incrementally.
 
 /// Dust cells a strongly-powered source lights before the signal dies.
 ///
