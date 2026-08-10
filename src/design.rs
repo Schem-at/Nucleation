@@ -6256,7 +6256,20 @@ impl<'a> Planner<'a> {
                         // one-cell leg out of its level shift into a 7-cell
                         // gather column is exactly that case, and it is the same
                         // placement `last_rep` already uses for branch diodes.
-                        let room = steps_from_ends >= 2 || (reserve > 0 && is_last);
+                        //
+                        // The ENTRY side is the same problem mirrored, and it
+                        // bites hardest: a leg out of a level-shift tile can
+                        // arrive with the tile's whole dust cap already spent,
+                        // which is more than the budget, and then the two cells
+                        // it may not refresh in overspend before the first legal
+                        // station. `P02_permute8` routes eight 1-bit buses
+                        // through 8-level shifts and loses three vectors exactly
+                        // there. So a run that arrives with no room refreshes in
+                        // its FIRST cell.
+                        let arrives_broke = since0 + 1 + 1 > DUST_BUDGET - CROSSING_ALLOWANCE;
+                        let room = steps_from_ends >= 2
+                            || (reserve > 0 && is_last)
+                            || (arrives_broke && is_first);
                         Slot::Dust {
                             station_ok: room
                                 && !keep.contains(&pos_at(c, run.y0))
