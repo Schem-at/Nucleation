@@ -3816,8 +3816,28 @@ impl Design {
             }
             planner.end_segment();
         }
-        // The trunk leaves the primary driver's adapter already in debt.
+        // The trunk leaves the primary driver's adapter already in debt — and if
+        // the driver is an INSTANCE port, with an unknown debt on top of that.
+        //
+        // A cell OUTPUT port is a dust tap on the cell's own wire, and how far
+        // that wire has already run inside the cell lives in the cell's
+        // schematic, which the router never reads. The arrival is therefore
+        // opaque and the conservative value is the only honest one — the exact
+        // fallback the adversarial report prescribes for geometry whose budget is
+        // not modelled, and what `plan_port_patch` already does for a mid-bus
+        // splice. A SINK instance port needs nothing: `design_promote::plan_input`
+        // puts a repeater into the attachment block, so that boundary refreshes.
+        //
+        // This is the whole of the BCD-chain regression. Every endpoint in the
+        // adversarial corpus is loose lever/lamp hardware the router adapts
+        // itself, so 103 problems never exercised an opaque arrival and the
+        // chained adder -> BCD pipeline went 8/8 -> 1/8 while they stayed green.
+        // It costs zero repeaters on that corpus (1956 either way) and restores
+        // `bcd_arith`/`bcd_sevenseg` to 8/8.
         let mut since = adapter_debt.get(&drivers[0].name).copied().unwrap_or(0);
+        if drivers[0].name.contains('.') {
+            since = since.max(UNKNOWN_ARRIVAL);
+        }
         for (i, pair) in waypoints.windows(2).enumerate() {
             planner.begin_segment(SegmentKind::Trunk(i), pair[0], pair[1]);
             since = planner
