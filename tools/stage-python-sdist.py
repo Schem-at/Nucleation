@@ -45,9 +45,35 @@ for target_root in ("examples", "tests", "benches"):
 for member in sorted((ROOT / "crates").glob("*")):
     if not (member / "Cargo.toml").is_file():
         continue
-    (DEST / "crates" / member.name).mkdir(parents=True, exist_ok=True)
-    shutil.copy2(member / "Cargo.toml", DEST / "crates" / member.name / "Cargo.toml")
-    shutil.copytree(member / "src", DEST / "crates" / member.name / "src")
+    member_dest = DEST / "crates" / member.name
+    member_dest.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(member / "Cargo.toml", member_dest / "Cargo.toml")
+    shutil.copytree(member / "src", member_dest / "src")
+
+    # Cargo validates conventional targets named by [[bin]], [[example]],
+    # [[test]], and [[bench]] while loading a workspace manifest, even when the
+    # requested build is `--lib`. Copy only Rust sources, keeping large test
+    # fixtures and benchmark captures out of the sdist.
+    for target_root in ("examples", "tests", "benches"):
+        root = member / target_root
+        if not root.exists():
+            continue
+        for source in root.rglob("*.rs"):
+            destination = member_dest / source.relative_to(member)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+
+    # Non-conventional explicit target paths need the same treatment. Paths in
+    # a member manifest are relative to that member, not the workspace root.
+    member_manifest = (member / "Cargo.toml").read_text()
+    for relative in sorted(
+        set(re.findall(r'^path\s*=\s*"([^"]+)"', member_manifest, re.MULTILINE))
+    ):
+        source = member / relative
+        if source.is_file() and not relative.startswith("src/"):
+            destination = member_dest / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
 
 # Cargo validates every explicitly declared target path even when only --lib is
 # built. Copy those target sources without dragging unrelated examples/assets
