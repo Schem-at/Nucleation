@@ -28,6 +28,12 @@ manifest = Path(__file__).resolve().parent.parent / "Cargo.toml"
 text = manifest.read_text()
 original = text
 
+# The registry package is the root library, not the monorepo workspace. Leaving
+# the workspace envelope in place makes Cargo resolve local members such as the
+# CLI, whose manifests legitimately request features removed below. The source
+# package does not include `crates/**` anyway, so stage it as a standalone crate.
+text = re.sub(r"(?ms)^\[workspace\]\n.*?(?=^\[package\])", "", text)
+
 # Drop the git-only deps (mchprs_* and the simulation-only hematite-nbt).
 # schematic-mesher is intentionally NOT dropped: it is a dual version+git
 # dep, cargo publish keeps the version side.
@@ -78,6 +84,7 @@ for marker in (
     'nucleation-hdl = { path =',
     'mc-tick-trace = { path =',
     'mc-test = { path =',
+    "[workspace]",
 ):
     if marker in text:
         sys.exit(f"strip-git-deps: marker still present after rewrite: {marker!r}")
