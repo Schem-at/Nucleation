@@ -1,0 +1,254 @@
+{
+ "artifact": "artifacts/X02b_hex_idle_vertical.schem",
+ "artifact_blocks": 664,
+ "buses": {
+  "bus_bin": {
+   "call": "d.route_bus('bus_bin', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:lime_concrete', 'transparent_block': 'minecraft:lime_stained_glass'}))",
+   "error": null,
+   "seconds": 0.1677,
+   "state": "routed"
+  }
+ },
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "cost_vector": {
+  "coherence": null,
+  "delay_rt": 3,
+  "footprint": 2016,
+  "length": 216,
+  "skew_rt": 0
+ },
+ "expect": "solved",
+ "fixtures": {
+  "hex0": {
+   "kind": "hex_comb_stage",
+   "provenance": "probe_hex_transmit.py::Rig (66/66) against corpus/TRANSMIT002_hex_transmit_flat.schem"
+  }
+ },
+ "id": "X02b_hex_idle_vertical",
+ "log": [
+  "verify 12/12 (binary lanes intact, hex trunk unpowered 12/12)"
+ ],
+ "loose_blocks": 184,
+ "notes": "Read together with X02: same cells, same DRC, and the only difference is whether the analog carrier is live.",
+ "per_bus": {
+  "bus_bin": {
+   "bbox": [
+    [
+     1,
+     1,
+     -1
+    ],
+    [
+     14,
+     16,
+     7
+    ]
+   ],
+   "cells": 480,
+   "delay_rt": 3,
+   "devices": 24,
+   "footprint": 2016,
+   "glass": 0,
+   "per_bit_rt": [
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3
+   ],
+   "skew_rt": 0,
+   "wire": 216
+  }
+ },
+ "question": "X02's route, with every hex injector off.  Does the bundle conduct when its neighbour is quiet?",
+ "scenario": {
+  "_file": "scenarios/X02b_hex_idle_vertical.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_bin",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:lime_concrete",
+     "transparent_block": "minecraft:lime_stained_glass"
+    }
+   }
+  ],
+  "expect": "solved",
+  "fixtures": [
+   {
+    "at": [
+     6,
+     0,
+     0
+    ],
+    "kind": "hex_trunk",
+    "name": "hex0",
+    "values": [
+     1,
+     3,
+     7,
+     11,
+     15
+    ]
+   }
+  ],
+  "id": "X02b_hex_idle_vertical",
+  "notes": "Read together with X02: same cells, same DRC, and the only difference is whether the analog carrier is live.",
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     8
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     14,
+     2,
+     8
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "X02's route, with every hex injector off.  Does the bundle conduct when its neighbour is quiet?",
+  "render": {
+   "pitch": 28,
+   "yaw": 150,
+   "zoom": 1.8
+  },
+  "title": "Control: the same crossing with the hex trunk idle",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "binary lanes intact, hex trunk unpowered",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.1677,
+ "solved": true,
+ "solver_produced": true,
+ "title": "Control: the same crossing with the hex trunk idle",
+ "verification": {
+  "cases": [
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "binary lanes intact, hex trunk unpowered",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "binary lanes intact, hex trunk unpowered",
+    "want": 2
+   },
+   {
+    "got": 4,
+    "in": 4,
+    "ok": true,
+    "section": "binary lanes intact, hex trunk unpowered",
+    "want": 4
+   },
+   {
+    "got": 8,
+    "in": 8,
+    "ok": true,
+    "section": "binary lanes intact, hex trunk unpowered",
+    "want": 8
+   },
+   {
+    "got": 16,
+    "in": 16,
+    "ok": true,
+    "section": "binary lanes intact, hex trunk unpowered",
+    "want": 16
+   },
+   {
+    "got": 32,
+    "in": 32,
+    "ok": true,
+    "section": "binary lanes intact, hex trunk unpowered",
+    "want": 32
+   },
+   {
+    "got": 64,
+    "in": 64,
+    "ok": true,
+    "section": "binary lanes intact, hex trunk unpowered",
+    "want": 64
+   },
+   {
+    "got": 128,
+    "in": 128,
+    "ok": true,
+    "section": "binary lanes intact, hex trunk unpowered",
+    "want": 128
+   },
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "binary lanes intact, hex trunk unpowered",
+    "want": 0
+   },
+   {
+    "got": 255,
+    "in": 255,
+    "ok": true,
+    "section": "binary lanes intact, hex trunk unpowered",
+    "want": 255
+   },
+   {
+    "got": 170,
+    "in": 170,
+    "ok": true,
+    "section": "binary lanes intact, hex trunk unpowered",
+    "want": 170
+   },
+   {
+    "got": 85,
+    "in": 85,
+    "ok": true,
+    "section": "binary lanes intact, hex trunk unpowered",
+    "want": 85
+   }
+  ],
+  "ok": true,
+  "passed": 12,
+  "sections": {
+   "binary lanes intact, hex trunk unpowered": {
+    "passed": 12,
+    "total": 12
+   }
+  },
+  "total": 12
+ },
+ "wall_seconds": 0.311
+}

@@ -57,14 +57,17 @@ def main():
           % (n, len(b.cells), x1 - x0 + 1, y1 - y0 + 1, z1 - z0 + 1,
              100 * len(b.cells) / vol))
 
-    import audit, nets
+    import audit, nets, drc
     problems = audit.audit(b.cells)
     shorts = nets.check(b.cells, labels, aliases)
     for kind, items in problems.items():
         if items:
             print("STRUCTURAL %s x%d e.g. %s" % (kind, len(items), items[0]))
     print("net check: %d shorts" % len(shorts))
-    if any(problems.values()) or shorts:
+    # The first of the three ring latches was here: two cells' port approaches
+    # formed opposite-facing repeaters in a ring on an aliased net.
+    rings_ok = drc.check_rings("rca%d" % n, b.cells)
+    if any(problems.values()) or shorts or not rings_ok:
         for s in shorts[:4]:
             print("   ", s)
         return 1

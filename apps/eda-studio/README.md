@@ -260,9 +260,9 @@ that can exist: gate steering needs a world position, and no panel has one.
 The design layer offers `rip` / `reroute` / `remove_*` / `set_port_mode` but no
 document history, so the studio keeps an **operation journal**: every mutator
 records its inverse. Place, move, rotate, delete, route, rip, delete-bus and
-port-mode toggles are all reversible, and a **drag is one undo step** — the
-sixty committed live-reroute frames coalesce into "where the gesture started"
-→ "where it ended". Undoing the delete of a bus-carrying instance re-places
+port-mode toggles are all reversible, and a **drag is one undo step** — any
+adaptive pause commits and the final drop coalesce into "where the gesture
+started" → "where it ended". Undoing the delete of a bus-carrying instance re-places
 the body, re-applies its promotions and **re-routes its buses**; the verify
 script asserts exactly that. Gate add/move/remove and pastes are journalled too,
 a paste as **one** step via `Studio.transaction` (which also defers the change
@@ -563,26 +563,26 @@ instances (headless chromium, software GL):
 | JS heap | 87.5 MB | **33.5 MB** |
 | draw calls, 10 instances / 3 cells | 26 | **7** |
 
-The pointer path is now free: with live re-route off, a drag is 0.05 ms a frame
-and bounded only by the display. The fixed **250 ms live-reroute throttle is
-gone** — the gesture previews on the GPU immediately and the document commit is
-coalesced to at most one per animation frame, so the engine runs as often as it
-can finish instead of on a timer.
+The pointer path is free: a drag is a GPU matrix preview and does no wasm work.
+**Adaptive reroute** learns the measured cost per object: a route known to fit a
+32 ms frame may refresh after a 160 ms pointer pause; an unknown or slow route is
+computed once on drop. This prevents a synchronous router from turning every
+small pointer movement into a multi-frame stall while preserving live feedback
+where the measured cost genuinely permits it.
 
-**What is still slow, and why.** With live re-route ON the drag is bounded by the
-engine, not the renderer: ~88 ms per committed frame, of which ~22 ms is
-`Design::flatten()` (it materializes every instance's blocks into regions just so
-the app can read one re-routed bus back) and the rest is the router. Two things
-would fix it, both outside this app:
+`Design::bus_blocks_json(name)` already keeps the redraw local. The remaining
+long-pole is the synchronous router/acceptance pass itself; moving the engine
+into a **Web Worker** would take that final drop computation
+off the main thread entirely. Not done here: every `Studio`/`window.__eda` call
+plus the whole verify script is synchronous against the engine, so the port is
+a larger change than this pass.
 
-1. a `Design::bus_blocks_json(name)` (or `flatten_buses()`) so a live drag reads
-   one bus instead of flattening the document — would take that 22 ms to ~1 ms;
-2. moving the engine into a **Web Worker**, which would take the router's ~65 ms
-   off the main thread entirely. Not done here: the measured bottleneck was
-   marshalling volume, not thread contention (the same 88 ms would still be 88 ms
-   in a worker, just not blocking paint), and every `Studio`/`window.__eda` call
-   plus the whole verify script is synchronous against the engine, so the port is
-   a larger change than this pass.
+The current routing pass is recorded in `docs/profile-adaptive-before.json` and
+`docs/profile-pin-context.json`. On that same 12-instance scene, bus rerouting
+fell from **1821 ms to 630 ms** by validating only the current bus intent and the
+electrical neighbourhood of its endpoint pins. A 30-frame drag fell from **31
+routes to one route on drop**; pointer handling itself averages **0.03 ms** per
+move and performs no wasm reads or cell remeshing.
 
 ## Export tiers
 

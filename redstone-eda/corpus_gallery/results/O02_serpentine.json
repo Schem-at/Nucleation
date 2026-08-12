@@ -1,0 +1,259 @@
+{
+ "artifact": "artifacts/O02_serpentine.schem",
+ "artifact_blocks": 968,
+ "buses": {
+  "bus_a": {
+   "call": "d.route_bus('bus_a', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:lime_concrete', 'transparent_block': 'minecraft:lime_stained_glass'}))",
+   "error": null,
+   "seconds": 0.0915,
+   "state": "routed"
+  }
+ },
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "cost_vector": {
+  "coherence": null,
+  "delay_rt": 1,
+  "footprint": 1440,
+  "length": 200,
+  "skew_rt": 0
+ },
+ "expect": "solved",
+ "fixtures": {},
+ "id": "O02_serpentine",
+ "log": [
+  "verify 12/12 (bundle conducts through the S 12/12)"
+ ],
+ "loose_blocks": 552,
+ "notes": "This geometry is reused by the C-series configurability triptych, so the three configs are compared on the same problem.",
+ "per_bus": {
+  "bus_a": {
+   "bbox": [
+    [
+     1,
+     1,
+     -1
+    ],
+    [
+     18,
+     16,
+     3
+    ]
+   ],
+   "cells": 416,
+   "delay_rt": 1,
+   "devices": 8,
+   "footprint": 1440,
+   "glass": 0,
+   "per_bit_rt": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "skew_rt": 0,
+   "wire": 200
+  }
+ },
+ "question": "Two walls with disjoint gaps.  Does the router find the S-shaped corridor, and what does the detour cost in delay and skew?",
+ "scenario": {
+  "_file": "scenarios/O02_serpentine.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_a",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:lime_concrete",
+     "transparent_block": "minecraft:lime_stained_glass"
+    }
+   }
+  ],
+  "expect": "solved",
+  "id": "O02_serpentine",
+  "notes": "This geometry is reused by the C-series configurability triptych, so the three configs are compared on the same problem.",
+  "obstacles": [
+   {
+    "block": "minecraft:polished_andesite",
+    "max": [
+     6,
+     20,
+     10
+    ],
+    "min": [
+     6,
+     0,
+     0
+    ]
+   },
+   {
+    "block": "minecraft:polished_diorite",
+    "max": [
+     12,
+     20,
+     20
+    ],
+    "min": [
+     12,
+     0,
+     8
+    ]
+   }
+  ],
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     18,
+     2,
+     4
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "Two walls with disjoint gaps.  Does the router find the S-shaped corridor, and what does the detour cost in delay and skew?",
+  "render": {
+   "pitch": 30,
+   "yaw": 150,
+   "zoom": 1.75
+  },
+  "title": "Congestion: staggered walls force a serpentine",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "bundle conducts through the S",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0915,
+ "solved": true,
+ "solver_produced": true,
+ "title": "Congestion: staggered walls force a serpentine",
+ "verification": {
+  "cases": [
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "bundle conducts through the S",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "bundle conducts through the S",
+    "want": 2
+   },
+   {
+    "got": 4,
+    "in": 4,
+    "ok": true,
+    "section": "bundle conducts through the S",
+    "want": 4
+   },
+   {
+    "got": 8,
+    "in": 8,
+    "ok": true,
+    "section": "bundle conducts through the S",
+    "want": 8
+   },
+   {
+    "got": 16,
+    "in": 16,
+    "ok": true,
+    "section": "bundle conducts through the S",
+    "want": 16
+   },
+   {
+    "got": 32,
+    "in": 32,
+    "ok": true,
+    "section": "bundle conducts through the S",
+    "want": 32
+   },
+   {
+    "got": 64,
+    "in": 64,
+    "ok": true,
+    "section": "bundle conducts through the S",
+    "want": 64
+   },
+   {
+    "got": 128,
+    "in": 128,
+    "ok": true,
+    "section": "bundle conducts through the S",
+    "want": 128
+   },
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "bundle conducts through the S",
+    "want": 0
+   },
+   {
+    "got": 255,
+    "in": 255,
+    "ok": true,
+    "section": "bundle conducts through the S",
+    "want": 255
+   },
+   {
+    "got": 170,
+    "in": 170,
+    "ok": true,
+    "section": "bundle conducts through the S",
+    "want": 170
+   },
+   {
+    "got": 85,
+    "in": 85,
+    "ok": true,
+    "section": "bundle conducts through the S",
+    "want": 85
+   }
+  ],
+  "ok": true,
+  "passed": 12,
+  "sections": {
+   "bundle conducts through the S": {
+    "passed": 12,
+    "total": 12
+   }
+  },
+  "total": 12
+ },
+ "wall_seconds": 0.192
+}

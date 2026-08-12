@@ -4,6 +4,8 @@
 //! land parcels, plot claims, administrative regions. The caller assigns
 //! meaning; segmentation only enforces the boundaries.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::world_segment::ids::ContentId;
@@ -68,6 +70,13 @@ pub enum PartitionPolicy {
 /// workers given the same hints in different orders always agree.
 pub struct PartitionIndex {
     hints: Vec<PartitionHint>,
+    /// Candidate hint indices by 512x512 world region. This keeps large,
+    /// regularly-partitioned maps cheap without changing deterministic index
+    /// assignment (indices still refer to the canonical sorted `hints`).
+    buckets: BTreeMap<(i32, i32), Vec<u32>>,
+    /// Very large hints are cheaper to test globally than to duplicate into a
+    /// huge number of buckets.
+    global: Vec<u32>,
 }
 
 impl PartitionIndex {
@@ -77,7 +86,31 @@ impl PartitionIndex {
                 .then_with(|| a.bbox_xz.cmp(&b.bbox_xz))
                 .then_with(|| a.y_range.cmp(&b.y_range))
         });
-        PartitionIndex { hints }
+        let mut buckets: BTreeMap<(i32, i32), Vec<u32>> = BTreeMap::new();
+        let mut global = Vec::new();
+        for (index, hint) in hints.iter().enumerate() {
+            let (x0, x1, z0, z1) = hint.bbox_xz;
+            let rx0 = x0.div_euclid(512);
+            let rx1 = x1.div_euclid(512);
+            let rz0 = z0.div_euclid(512);
+            let rz1 = z1.div_euclid(512);
+            let bucket_count =
+                (i64::from(rx1) - i64::from(rx0) + 1) * (i64::from(rz1) - i64::from(rz0) + 1);
+            if bucket_count > 4_096 {
+                global.push(index as u32);
+                continue;
+            }
+            for rx in rx0..=rx1 {
+                for rz in rz0..=rz1 {
+                    buckets.entry((rx, rz)).or_default().push(index as u32);
+                }
+            }
+        }
+        PartitionIndex {
+            hints,
+            buckets,
+            global,
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -134,19 +167,21 @@ impl PartitionIndex {
     }
 
     pub fn partition_at(&self, x: i32, y: i32, z: i32) -> Option<&str> {
-        self.hints
-            .iter()
-            .find(|h| h.contains(x, y, z))
-            .map(|h| h.id.as_str())
+        self.id_index_at(x, y, z)
+            .map(|index| self.id_of_index(index))
     }
 
     /// Stable numeric handle for the partition at this point, for cheap
     /// per-cell comparison during dilation.
     pub fn id_index_at(&self, x: i32, y: i32, z: i32) -> Option<u32> {
-        self.hints
-            .iter()
-            .position(|h| h.contains(x, y, z))
-            .map(|i| i as u32)
+        let bucket = (x.div_euclid(512), z.div_euclid(512));
+        let local = self.buckets.get(&bucket).into_iter().flatten().copied();
+        // Both lists are canonically ascending. Taking the minimum matching
+        // index preserves the old first-match semantics even with overlaps.
+        local
+            .chain(self.global.iter().copied())
+            .filter(|index| self.hints[*index as usize].contains(x, y, z))
+            .min()
     }
 
     /// Looks up the id for a previously-obtained index.
@@ -163,6 +198,12 @@ impl PartitionIndex {
             self.hints.len()
         );
         &self.hints[index as usize].id
+    }
+
+    /// Geometry for a numeric handle returned by [`Self::id_index_at`].
+    pub fn hint_of_index(&self, index: u32) -> &PartitionHint {
+        debug_assert!((index as usize) < self.hints.len());
+        &self.hints[index as usize]
     }
 }
 

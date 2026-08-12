@@ -174,10 +174,19 @@ fn every_selection_yields_the_frame_at_its_own_start() {
         assert_eq!(selection.start_tick(), start);
         assert_eq!(selection.end_tick(), end);
         let frame = timeline.initial_frame(selection, sim.registry());
-        assert_eq!(frame.tick, start, "the frame is the one the selection names");
+        assert_eq!(
+            frame.tick, start,
+            "the frame is the one the selection names"
+        );
     }
-    assert!(timeline.select_ticks(0, 9_999).is_err(), "out of span is refused");
-    assert!(timeline.select_ticks(5, 5).is_err(), "an empty range is refused");
+    assert!(
+        timeline.select_ticks(0, 9_999).is_err(),
+        "out of span is refused"
+    );
+    assert!(
+        timeline.select_ticks(5, 5).is_err(),
+        "an empty range is refused"
+    );
 }
 
 #[test]
@@ -211,8 +220,15 @@ fn stopping_a_recording_keeps_it_and_stops_the_log_growing() {
 
     let stopped = sim.stop_timeline().expect("a recording was running");
     let changes_at_stop = stopped.changes.len();
-    assert!(changes_at_stop > 0, "the door did something worth recording");
-    assert_eq!(stopped.end_tick, sim.tick_count(), "the span ends where the run was");
+    assert!(
+        changes_at_stop > 0,
+        "the door did something worth recording"
+    );
+    assert_eq!(
+        stopped.end_tick,
+        sim.tick_count(),
+        "the span ends where the run was"
+    );
 
     // The simulation carries on; the recording does not.
     sim.run(40);
@@ -227,7 +243,10 @@ fn stopping_a_recording_keeps_it_and_stops_the_log_growing() {
     );
     // It is still a usable recording.
     assert!(stopped.frame_at(stopped.end_tick, sim.registry()).is_some());
-    assert!(sim.stop_timeline().is_none(), "stopping twice is not an error");
+    assert!(
+        sim.stop_timeline().is_none(),
+        "stopping twice is not an error"
+    );
 }
 
 /// The change log is ordered by tick, which is what lets `changed_between`

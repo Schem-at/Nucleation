@@ -271,7 +271,8 @@ fn run_export(mut config: RunConfig<'_>) -> Result<ExportSummary, String> {
         .ok_or_else(|| "timeline recorder unexpectedly stopped".to_string())?;
     let cycles = timeline.detect_cycles(sim.registry());
     let selection = select_range(&timeline, config.range, sim.registry())?;
-    let initial = nucleation::tick_timeline::selection_schematic(&timeline, selection, sim.registry())?;
+    let initial =
+        nucleation::tick_timeline::selection_schematic(&timeline, selection, sim.registry())?;
     let (timeline_json, projection) = nucleation::tick_timeline::mesher_timeline_json(
         &timeline,
         selection,

@@ -9,7 +9,11 @@ use nucleation_routing::via::ViaRegistry;
 use nucleation_routing::{Aabb, Pos, RedstoneRouter, SignalBudget, Workspace};
 use pnr_core::fabric::{Candidate, Fabric, RouteCtx, State};
 
-fn fabric<'a>(ws: &'a Workspace, specs: &'a [NetSpec], vias: &'a ViaRegistry) -> RedstoneFabric<'a> {
+fn fabric<'a>(
+    ws: &'a Workspace,
+    specs: &'a [NetSpec],
+    vias: &'a ViaRegistry,
+) -> RedstoneFabric<'a> {
     RedstoneFabric {
         ws,
         nets: specs,
@@ -135,7 +139,10 @@ fn rule_stair_corner_must_be_clear() {
         tag: RMove::Down,
         footprint: vec![Pos::new(1, 0, 0), Pos::new(1, -1, 0)],
     };
-    assert!(!f3.legal(&from, &down, &ctx()), "corner-blocked descent passed");
+    assert!(
+        !f3.legal(&from, &down, &ctx()),
+        "corner-blocked descent passed"
+    );
 }
 
 /// RULE: stair chains <= 4 (stairs cannot host repeaters).
@@ -155,7 +162,9 @@ fn rule_stair_chain_cap() {
     };
     let moves = f.moves(&capped, &ctx());
     assert!(
-        moves.iter().all(|c| !matches!(c.tag, RMove::Up | RMove::Down)),
+        moves
+            .iter()
+            .all(|c| !matches!(c.tag, RMove::Up | RMove::Down)),
         "a 5th consecutive stair was generated"
     );
     // Below the cap, stairs are offered.
@@ -345,7 +354,10 @@ fn rule_route_to_net_excludes_source_side() {
     let res = router
         .route_to_net(&mut ws, Pos::new(0, 1, 0), &all, "cout", &[])
         .unwrap();
-    assert_eq!(res.cells, 1, "expected the degenerate self-satisfying route");
+    assert_eq!(
+        res.cells, 1,
+        "expected the degenerate self-satisfying route"
+    );
     // Excluding the source side forces a real join.
     let east: Vec<Pos> = all.iter().copied().filter(|p| p.x >= 10).collect();
     let res = router

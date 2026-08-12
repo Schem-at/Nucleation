@@ -75,10 +75,10 @@ impl Problem {
                 }
                 let (xi, zi) = s[i];
                 let (xj, zj) = s[j];
-                let ox = (xi + self.cells[i].w + MARGIN).min(xj + self.cells[j].w + MARGIN)
-                    - xi.max(xj);
-                let oz = (zi + self.cells[i].d + MARGIN).min(zj + self.cells[j].d + MARGIN)
-                    - zi.max(zj);
+                let ox =
+                    (xi + self.cells[i].w + MARGIN).min(xj + self.cells[j].w + MARGIN) - xi.max(xj);
+                let oz =
+                    (zi + self.cells[i].d + MARGIN).min(zj + self.cells[j].d + MARGIN) - zi.max(zj);
                 if ox > 0 && oz > 0 {
                     total += ox * oz;
                 }
@@ -222,6 +222,9 @@ fn main() {
         result.proposed
     );
     for (i, cell) in problem.cells.iter().enumerate() {
-        println!("place {} {} {}", cell.id, result.best[i].0, result.best[i].1);
+        println!(
+            "place {} {} {}",
+            cell.id, result.best[i].0, result.best[i].1
+        );
     }
 }

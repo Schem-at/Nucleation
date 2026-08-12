@@ -1,0 +1,33 @@
+[workspace]
+
+[package]
+name = "adv-harness"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Deliberately OUTSIDE the nucleation workspace: this harness owns nothing in
+# the main tree, so it can be built and run while other agents edit `src/`.
+# Its own target dir keeps cargo's lock off the shared 33G target.
+
+[dependencies]
+nucleation = { path = "../../..", features = [
+    "routing",
+    "simulation",
+    "bridge",
+    "mc-tick",
+] }
+serde_json = "1.0"
+
+[[bin]]
+name = "adv-harness"
+path = "src/main.rs"
+
+# `[patch]` is not inherited across workspaces: without this the graph carries
+# TWO `nbt` crates and nucleation's mchprs bridge stops compiling.
+[patch.crates-io]
+hematite-nbt = { git = "https://github.com/StackDoubleFlow/hematite_nbt" }
+
+[profile.release]
+opt-level = 2
+debug = false

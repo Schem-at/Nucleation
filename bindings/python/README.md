@@ -24,6 +24,27 @@ schematic.save_to_file("demo.litematic")
 loaded = nucleation.Schematic.load_from_file("demo.litematic")
 ```
 
+### Split disconnected builds
+
+Keep every meaningful connected machine independent while attaching only tiny,
+nearby loose parts:
+
+```python
+schematic = nucleation.Schematic.open("combined.schem")
+pieces = schematic.split_connected_attach_nearby(
+    16,  # components this large always remain standalone
+    3,   # tiny parts may attach across at most three empty blocks
+)
+
+for index in range(pieces.len()):
+    pieces.piece(index).save(f"machine-{index + 1}.schem")
+```
+
+Attachment is lossless and non-transitive: fragments cannot form a chain that
+recombines otherwise independent builds. Whole-world extraction, including the
+Python control plane and remote Store worker, is documented in the
+[world-segmentation guide](../../docs/features/world-segmentation.md).
+
 ## What is included
 
 The published wheel contains the core feature set: schematic editing, all schematic formats,

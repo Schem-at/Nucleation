@@ -63,8 +63,7 @@ pub fn sx(i: i32) -> i32 {
 
 /// Fully spelled-out dust: a bare `minecraft:redstone_wire` interns a
 /// property-less state the engine never normalises — always spell it out.
-pub const DUST: &str =
-    "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]";
+pub const DUST: &str = "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]";
 /// A lit standing torch.
 pub const TORCH: &str = "minecraft:redstone_torch[lit=true]";
 /// A floor lever, off.
@@ -414,17 +413,20 @@ pub fn plan(
 #[allow(clippy::type_complexity)]
 pub fn layout(
     stages: Vec<Stage>,
-) -> Result<(Vec<Planned>, HashMap<String, (usize, i32, usize)>, Vec<Route>), HdlError> {
+) -> Result<
+    (
+        Vec<Planned>,
+        HashMap<String, (usize, i32, usize)>,
+        Vec<Route>,
+    ),
+    HdlError,
+> {
     let (mut planned, produced) = plan(stages)?;
     for p in &mut planned {
         let mut geom = BTreeMap::new();
         for (sl, groups) in &p.st.nodes {
             for (gi, (out, terms)) in groups.iter().enumerate() {
-                let taps: Vec<i32> = terms
-                    .iter()
-                    .flatten()
-                    .map(|s| 3 * p.slot[s] + 2)
-                    .collect();
+                let taps: Vec<i32> = terms.iter().flatten().map(|s| 3 * p.slot[s] + 2).collect();
                 let gate = taps.iter().max().copied().unwrap_or(0) + 2;
                 geom.insert(
                     out.clone(),
@@ -468,13 +470,22 @@ pub fn layout(
     // Same-signal routes to different stages share the same riser x
     // deliberately: the overlap becomes a common trunk and `run` treats
     // re-laying the same dust as a no-op.
-    let all_cols: Vec<i32> = COL_A.iter().chain(COL_B.iter()).chain(EXTRA_COLS.iter()).copied().collect();
+    let all_cols: Vec<i32> = COL_A
+        .iter()
+        .chain(COL_B.iter())
+        .chain(EXTRA_COLS.iter())
+        .copied()
+        .collect();
     let mut per_slice: BTreeMap<(usize, i32), Vec<usize>> = BTreeMap::new();
     for (ri, r) in routes.iter_mut().enumerate() {
         let gi = produced[&r.sig].2;
         let nterms = planned[r.src].geom[&r.sig].terms.len();
         // last actual column of the producing node == the east end of its lane
-        r.riser = if gi != 0 { COL_B[0] } else { all_cols[nterms - 1] };
+        r.riser = if gi != 0 {
+            COL_B[0]
+        } else {
+            all_cols[nterms - 1]
+        };
         per_slice.entry((r.src, r.slice)).or_default().push(ri);
     }
     for ((si, sl), ris) in &per_slice {
@@ -569,9 +580,9 @@ impl Build {
     }
 
     fn solid_at(&self, x: i32, y: i32, z: i32) -> bool {
-        self.cells.get(&(x, y, z)).is_some_and(|b| {
-            b.contains("concrete") || b == "minecraft:stone" || b.contains("lamp")
-        })
+        self.cells
+            .get(&(x, y, z))
+            .is_some_and(|b| b.contains("concrete") || b == "minecraft:stone" || b.contains("lamp"))
     }
 
     /// `(min, max)` corners of the authored cells.
@@ -759,7 +770,12 @@ impl Pla {
     }
 
     fn build_nodes(&mut self) -> Result<(), HdlError> {
-        let all_cols: Vec<i32> = COL_A.iter().chain(COL_B.iter()).chain(EXTRA_COLS.iter()).copied().collect();
+        let all_cols: Vec<i32> = COL_A
+            .iter()
+            .chain(COL_B.iter())
+            .chain(EXTRA_COLS.iter())
+            .copied()
+            .collect();
         for si in 0..self.stages.len() {
             let geoms: Vec<(String, Geom)> = self.stages[si]
                 .geom
@@ -821,7 +837,12 @@ impl Pla {
             // from y=2 cannot work: the block above the rail dust is the
             // rail's own lid, and blocking that diagonal is the entire point
             // of the lid.
-            cells.extend([(cx, 3, dz - 3), (cx, 2, dz - 2), (cx, 1, dz - 1), (cx, 1, dz)]);
+            cells.extend([
+                (cx, 3, dz - 3),
+                (cx, 2, dz - 2),
+                (cx, 1, dz - 1),
+                (cx, 1, dz),
+            ]);
             self.run(&cells, &r.sig)?;
         }
         Ok(())
@@ -911,11 +932,7 @@ impl Pla {
         };
         let cells: Vec<crate::seq::SeqCell> = self.stages[si].st.seq.clone();
         let zb = self.stages[si].z;
-        let nslots = self.stages[si]
-            .slot
-            .values()
-            .max()
-            .map_or(0, |m| m + 1);
+        let nslots = self.stages[si].slot.values().max().map_or(0, |m| m + 1);
         let dz = zb + 3 * nslots + 6;
         let spine_z = dz - 2;
         let lo_slice = cells.iter().map(|c| c.slice).min().expect("seq not empty");
@@ -979,11 +996,8 @@ impl Pla {
                     // y3 flyover spur: supports double as caps over every
                     // rail row crossed (incl. the clock spine), which also
                     // severs the descent diagonals into foreign dust
-                    let mut path: Vec<(i32, i32, i32)> = vec![
-                        (x0, 1, rz + 1),
-                        (x0, 2, rz + 2),
-                        (x0, 3, rz + 3),
-                    ];
+                    let mut path: Vec<(i32, i32, i32)> =
+                        vec![(x0, 1, rz + 1), (x0, 2, rz + 2), (x0, 3, rz + 3)];
                     path.extend((rz + 4..=dz - 2).map(|z| (x0, 3, z)));
                     path.push((x0, 2, dz - 1));
                     self.run(&path, d)?;

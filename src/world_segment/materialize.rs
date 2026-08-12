@@ -3,12 +3,15 @@
 
 use std::collections::BTreeMap;
 
+use crate::block_entity::BlockEntity;
+use crate::block_position::BlockPosition;
 use crate::universal_schematic::UniversalSchematic;
 use crate::world_segment::ids::ContentId;
 use crate::world_segment::provenance::{Provenance, StableBuildId};
 use crate::world_segment::score::Tier;
 use crate::world_segment::stitch::Build;
 use crate::BlockState;
+use crate::{ProvenanceBounds, SchematicProvenance};
 
 pub struct MaterializeCtx<'a> {
     pub source_id: &'a str,
@@ -25,6 +28,20 @@ pub fn materialize(
     stable_id: StableBuildId,
     ctx: &MaterializeCtx,
 ) -> (UniversalSchematic, Provenance) {
+    materialize_with_block_entities(build, blocks, &BTreeMap::new(), tier, stable_id, ctx)
+}
+
+/// Materialize a build while retaining NBT-bearing blocks. Block-entity keys
+/// and their embedded positions are translated from world space to the
+/// schematic's local origin alongside the block states.
+pub fn materialize_with_block_entities(
+    build: &Build,
+    blocks: &BTreeMap<(i32, i32, i32), BlockState>,
+    block_entities: &BTreeMap<(i32, i32, i32), BlockEntity>,
+    tier: Tier,
+    stable_id: StableBuildId,
+    ctx: &MaterializeCtx,
+) -> (UniversalSchematic, Provenance) {
     debug_assert!(
         blocks.len() as u64 == build.block_count,
         "materialize: {} blocks vs build.block_count {}",
@@ -37,6 +54,22 @@ pub fn materialize(
     for (&(x, y, z), state) in blocks.iter() {
         schem.set_block(x - min.0, y - min.1, z - min.2, state);
     }
+    for (&(x, y, z), block_entity) in block_entities {
+        if !blocks.contains_key(&(x, y, z)) {
+            continue;
+        }
+        let local = (x - min.0, y - min.1, z - min.2);
+        let mut translated = block_entity.clone();
+        translated.position = local;
+        schem.set_block_entity(
+            BlockPosition {
+                x: local.0,
+                y: local.1,
+                z: local.2,
+            },
+            translated,
+        );
+    }
     let fp = crate::fingerprint::fingerprint(&schem, &fingerprint_spec());
     let prov = Provenance {
         stable_build_id: stable_id,
@@ -45,6 +78,7 @@ pub fn materialize(
         snapshot_id: ctx.snapshot_id.to_string(),
         world_bbox: build.bbox,
         origin_offset: min,
+        partition_id: build.partition_id.clone(),
         // Provenance describes the schematic actually materialized from `blocks`,
         // not the build's nominal count; the debug_assert above is the dev-time
         // signal that a caller assembled `blocks` incorrectly for `build`.
@@ -58,6 +92,23 @@ pub fn materialize(
         profile_hash: ctx.profile_hash,
         extracted_at: ctx.extracted_at,
     };
+    let mut embedded =
+        SchematicProvenance::new(ctx.source_id).expect("world-segment source_id must be non-empty");
+    embedded.snapshot_id = Some(ctx.snapshot_id.to_string());
+    embedded.world_bbox = Some(
+        ProvenanceBounds::new(
+            [build.bbox.0 .0, build.bbox.0 .1, build.bbox.0 .2],
+            [build.bbox.1 .0, build.bbox.1 .1, build.bbox.1 .2],
+        )
+        .expect("build bbox is ordered"),
+    );
+    embedded.origin = Some([min.0, min.1, min.2]);
+    embedded.partition_id = build.partition_id.clone();
+    embedded.stable_build_id = Some(stable_id.to_string());
+    embedded.extracted_at = Some(ctx.extracted_at);
+    embedded.config_hash = Some(ctx.config_hash.to_string());
+    embedded.profile_hash = Some(ctx.profile_hash.to_string());
+    schem.metadata.provenance = Some(embedded);
     (schem, prov)
 }
 
@@ -139,6 +190,31 @@ mod tests {
             p1, p2,
             "same inputs → identical provenance (incl. fingerprint)"
         );
+    }
+
+    #[test]
+    fn materialize_translates_and_preserves_block_entities() {
+        let mut blocks = BTreeMap::new();
+        blocks.insert((10, -60, 10), BlockState::new("minecraft:chest"));
+        blocks.insert((11, -60, 10), BlockState::new("minecraft:repeater"));
+        let mut block_entities = BTreeMap::new();
+        block_entities.insert(
+            (10, -60, 10),
+            BlockEntity::new("minecraft:chest".to_string(), (10, -60, 10)),
+        );
+        let sid = StableBuildId::seed("w", build().id);
+        let (schem, _) = materialize_with_block_entities(
+            &build(),
+            &blocks,
+            &block_entities,
+            Tier::Confident,
+            sid,
+            &ctx(),
+        );
+        let entities = schem.get_block_entities_as_list();
+        assert_eq!(entities.len(), 1);
+        assert_eq!(entities[0].position, (0, 0, 0));
+        assert_eq!(entities[0].id, "minecraft:chest");
     }
 
     /// provenance.block_count tracks the materialized `blocks` map, not

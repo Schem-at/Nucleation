@@ -29,10 +29,11 @@
 use crate::design::{OccupancyIndex, P3};
 use crate::routing::engine::transport::{self, BlockView, Mechanism, Placement};
 use pnr_core::astar::{route, RouteRequest};
+use pnr_core::congestion::{route_all, CongestionOpts, NetReq};
 use pnr_core::fabric::{Budget, Candidate, Fabric, RouteCtx, State};
 use pnr_core::grid::{Aabb, Pos};
 use std::cell::RefCell;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// Minimum straight cells before a corner may turn again. Two corners closer
 /// than this would put their joint columns diagonally adjacent, and dust reads
@@ -123,10 +124,18 @@ pub struct Leg {
     run: u8,
 }
 
-/// The bus form as a [`Fabric`]: columns on the bit-0 dust plane, legal only
-/// when the whole stack clears.
-pub struct BusFabric<'a> {
-    occ: &'a OccupancyIndex,
+/// The bus form of ONE net: which level its bit-0 dust runs on, how many bits
+/// it stacks, which columns are its own pinned hardware, and how far it may
+/// wander.
+///
+/// Every one of these is per-net, which is what makes the fabric usable by
+/// [`pnr_core::congestion::route_all`]: negotiation routes net after net
+/// against a shared congestion map, and asks the SAME fabric about each. A
+/// fabric carrying one scalar `y0`/`width` can only answer for one of them, so
+/// a single-net fabric cannot be negotiated with at all — it would evaluate
+/// every net's columns against the first net's stack. See [`negotiate`].
+#[derive(Clone, Debug)]
+pub struct NetForm {
     /// Bit-0 canonical dust level.
     y0: i32,
     /// Bus width in bits.
@@ -134,23 +143,66 @@ pub struct BusFabric<'a> {
     /// Columns exempt from the occupancy test: the bus's own endpoint
     /// hardware, which is already dust on a support and is never re-stamped.
     exempt: BTreeSet<(i32, i32)>,
+    /// How far from its own endpoints this net may wander.
     bound: Aabb,
+}
+
+impl NetForm {
+    /// The vertical extent this net's stack occupies, inclusive.
+    fn y_span(&self) -> (i32, i32) {
+        (self.y0 - 1, self.y0 + 2 * (self.width as i32 - 1))
+    }
+}
+
+/// The bus form as a [`Fabric`]: columns on the bit-0 dust plane, legal only
+/// when the whole stack clears.
+///
+/// MULTI-NET. `nets` is indexed by [`RouteCtx::net`], so one fabric answers for
+/// every net in a negotiation and each net is judged against its own stack.
+pub struct BusFabric<'a> {
+    occ: &'a OccupancyIndex,
+    /// Per-net bus form, indexed by [`RouteCtx::net`].
+    nets: Vec<NetForm>,
     turn_cost: u32,
-    /// Column-legality memo. The search visits a column once per heading and
-    /// once per incoming move, so without this the stack scan runs ~20x per
-    /// column — the difference between an interactive reroute and a stall.
-    memo: RefCell<HashMap<(i32, i32), bool>>,
+    /// Column-legality memo, keyed by net: the same column is legal for a
+    /// 1-bit bus and illegal for an 8-bit one. The search visits a column once
+    /// per heading and once per incoming move, so without this the stack scan
+    /// runs ~20x per column — the difference between an interactive reroute
+    /// and a stall.
+    memo: RefCell<HashMap<(usize, i32, i32), bool>>,
     /// Memo for [`BusFabric::column_hugs`], on the same hot path.
-    hug_memo: RefCell<HashMap<(i32, i32), bool>>,
-    /// Columns that are some FOREIGN port's last remaining escape lane.
-    /// Precomputed once per query — see [`BusFabric::column_reserved`].
-    reserved: BTreeSet<(i32, i32)>,
+    hug_memo: RefCell<HashMap<(usize, i32, i32), bool>>,
+    /// Per-net columns that are some FOREIGN port's last remaining escape
+    /// lane. Precomputed once per query — see [`BusFabric::column_reserved`].
+    /// Per-net because "foreign" is relative: a net's own endpoint ports are
+    /// not foreign to it.
+    reserved: Vec<BTreeSet<(i32, i32)>>,
+    /// Price of a column inside a cell's soft halo. Resolved once per query
+    /// rather than read per node — see [`hug_cost`].
+    hug_cost: u32,
 }
 
 /// Extra cost per column that runs inside a cell's soft halo. Charged per
 /// cell of travel, so a clean lane a few cells further out always wins, while
 /// a hug still beats no route at all.
 const HUG_COST: u32 = 4;
+
+/// MEASUREMENT SWITCH, and the reason it exists.
+///
+/// `HUG_COST` was added because the mechanism-accurate `interferes()` predicate
+/// on its own dropped routability 91.1% -> 80.0%: the scalar halo it replaced
+/// had been the router's ONLY channel-reservation discipline, and pricing the
+/// halo put a weak version of that discipline back. Escape-lane reservation,
+/// rip-up-and-retry and negotiation now do real reservation, so the price may be
+/// redundant — but "may be" is not a measurement, and the two sibling agents
+/// editing this tree make a stash-based A/B unsafe. `NUCLEATION_HUG_COST`
+/// overrides it so ONE binary answers both arms.
+fn hug_cost() -> u32 {
+    std::env::var("NUCLEATION_HUG_COST")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(HUG_COST)
+}
 
 /// Cost of consuming a foreign port's LAST escape lane.
 ///
@@ -169,10 +221,11 @@ const HUG_COST: u32 = 4;
 const ESCAPE_COST: u32 = 200;
 
 impl<'a> BusFabric<'a> {
-    /// Every cell a bus column at `(x, z)` would occupy: a support and a dust
-    /// per bit, contiguous from `y0 - 1` to `y0 + 2*(width-1)`.
-    fn column_cells(&self, x: i32, z: i32) -> impl Iterator<Item = P3> + '_ {
-        stack_cells(x, z, self.y0, self.width)
+    /// Every cell net `net`'s column at `(x, z)` would occupy: a support and a
+    /// dust per bit, contiguous from `y0 - 1` to `y0 + 2*(width-1)`.
+    fn column_cells(&self, net: usize, x: i32, z: i32) -> impl Iterator<Item = P3> {
+        let f = &self.nets[net];
+        stack_cells(x, z, f.y0, f.width)
     }
 
     /// Is a `width`-bit stack based at `y0` placeable in this column, for a bus
@@ -190,9 +243,17 @@ impl<'a> BusFabric<'a> {
     /// looks stranded already, and nothing ever gets reserved. The question is
     /// whether the port's OWN bus could stand there, and that bus is exempt
     /// from its own hardware.
-    fn stack_free(&self, x: i32, z: i32, y0: i32, width: u8, port_col: (i32, i32)) -> bool {
+    fn stack_free(
+        &self,
+        net: usize,
+        x: i32,
+        z: i32,
+        y0: i32,
+        width: u8,
+        port_col: (i32, i32),
+    ) -> bool {
         stack_cells(x, z, y0, width)
-            .all(|p| self.cell_placeable_exempting(p, mech_at_level(p.1, y0), Some(port_col)))
+            .all(|p| self.cell_placeable_exempting(net, p, mech_at_level(p.1, y0), Some(port_col)))
     }
 
     /// Can the bus stand a column here?
@@ -222,17 +283,17 @@ impl<'a> BusFabric<'a> {
     ///
     /// The bus's own endpoint columns are exempt from all three: landing on
     /// the port and touching its dust is the entire point of a pin.
-    pub fn column_free(&self, x: i32, z: i32) -> bool {
-        if self.exempt.contains(&(x, z)) {
+    pub fn column_free(&self, net: usize, x: i32, z: i32) -> bool {
+        if self.nets[net].exempt.contains(&(x, z)) {
             return true;
         }
-        if let Some(hit) = self.memo.borrow().get(&(x, z)) {
+        if let Some(hit) = self.memo.borrow().get(&(net, x, z)) {
             return *hit;
         }
         let free = self
-            .column_cells(x, z)
-            .all(|p| self.cell_placeable(p, self.mech_at(p)));
-        self.memo.borrow_mut().insert((x, z), free);
+            .column_cells(net, x, z)
+            .all(|p| self.cell_placeable(net, p, self.mech_at(net, p)));
+        self.memo.borrow_mut().insert((net, x, z), free);
         free
     }
 
@@ -245,25 +306,25 @@ impl<'a> BusFabric<'a> {
     /// which cost four legal routes; charging [`HUG_COST`] instead keeps
     /// corridors out of the shell whenever an open lane exists, and lets them
     /// in when the alternative is failing the bus.
-    pub fn column_hugs(&self, x: i32, z: i32) -> bool {
-        if self.exempt.contains(&(x, z)) {
+    pub fn column_hugs(&self, net: usize, x: i32, z: i32) -> bool {
+        if self.nets[net].exempt.contains(&(x, z)) {
             return false;
         }
-        if let Some(hit) = self.hug_memo.borrow().get(&(x, z)) {
+        if let Some(hit) = self.hug_memo.borrow().get(&(net, x, z)) {
             return *hit;
         }
         let hugs = self
-            .column_cells(x, z)
+            .column_cells(net, x, z)
             .any(|p| self.occ.soft_halos.contains(&p));
-        self.hug_memo.borrow_mut().insert((x, z), hugs);
+        self.hug_memo.borrow_mut().insert((net, x, z), hugs);
         hugs
     }
 
     /// What the bus puts at this height. The stack alternates support / dust
     /// on a 2y pitch from `y0 - 1`, so the parity off the support level says
     /// which mechanism a cell carries — and the two answer to different rules.
-    fn mech_at(&self, p: P3) -> Mechanism {
-        mech_at_level(p.1, self.y0)
+    fn mech_at(&self, net: usize, p: P3) -> Mechanism {
+        mech_at_level(p.1, self.nets[net].y0)
     }
 
     /// Is this column some FOREIGN port's last remaining escape lane?
@@ -280,8 +341,8 @@ impl<'a> BusFabric<'a> {
     /// Reserved columns are charged [`ESCAPE_COST`] rather than forbidden, so
     /// the rule is monotone: an early bus detours while a detour exists, and
     /// still takes the lane when the alternative is failing.
-    pub fn column_reserved(&self, x: i32, z: i32) -> bool {
-        self.reserved.contains(&(x, z))
+    pub fn column_reserved(&self, net: usize, x: i32, z: i32) -> bool {
+        self.reserved[net].contains(&(x, z))
     }
 
     /// Every column that is the LAST free neighbour of a foreign port.
@@ -290,13 +351,13 @@ impl<'a> BusFabric<'a> {
     /// nothing: that bus occupies the lane, so the lane is not free and there is
     /// nothing left to protect — which is exactly right, and is why this can run
     /// unconditionally over every port in the design.
-    fn compute_reserved(&self) -> BTreeSet<(i32, i32)> {
+    fn compute_reserved(&self, net: usize) -> BTreeSet<(i32, i32)> {
         let mut out = BTreeSet::new();
         for (anchor, step, width) in &self.occ.port_lanes {
             let (px, py, pz) = *anchor;
             // Our own endpoints are not foreign ports; landing on them is the
             // point of the route.
-            if self.exempt.contains(&(px, pz)) {
+            if self.nets[net].exempt.contains(&(px, pz)) {
                 continue;
             }
             // The column model is the verified 2y-pitch stack. A port on some
@@ -313,7 +374,7 @@ impl<'a> BusFabric<'a> {
             let mut free = Vec::with_capacity(4);
             for h in Heading::ALL {
                 let (dx, dz) = h.delta();
-                if self.stack_free(px + dx, pz + dz, y0, *width, (px, pz)) {
+                if self.stack_free(net, px + dx, pz + dz, y0, *width, (px, pz)) {
                     free.push((px + dx, pz + dz));
                 }
             }
@@ -352,8 +413,8 @@ impl<'a> BusFabric<'a> {
     }
 
     /// Condition 1-3 for a single cell, for the bus being routed.
-    fn cell_placeable(&self, p: P3, mech: Mechanism) -> bool {
-        self.cell_placeable_exempting(p, mech, None)
+    fn cell_placeable(&self, net: usize, p: P3, mech: Mechanism) -> bool {
+        self.cell_placeable_exempting(net, p, mech, None)
     }
 
     /// Condition 1-3 with ONE extra column treated as own hardware.
@@ -362,6 +423,7 @@ impl<'a> BusFabric<'a> {
     /// question on behalf of a foreign port rather than of the route in hand.
     fn cell_placeable_exempting(
         &self,
+        net: usize,
         p: P3,
         mech: Mechanism,
         extra_exempt: Option<(i32, i32)>,
@@ -382,7 +444,7 @@ impl<'a> BusFabric<'a> {
             net: OUR_NET,
         };
         for q in interference_scan(p) {
-            if self.exempt.contains(&(q.0, q.2)) || extra_exempt == Some((q.0, q.2)) {
+            if self.nets[net].exempt.contains(&(q.0, q.2)) || extra_exempt == Some((q.0, q.2)) {
                 continue; // our own port column
             }
             let Some((block, owner)) = self.occ.cells.get(&q) else {
@@ -482,17 +544,16 @@ impl BlockView for OccView<'_> {
 const OUR_NET: &str = "\0routing";
 
 impl<'a> BusFabric<'a> {
-
     /// Who blocks a column here, if anybody — the location and the owner, for
-    /// the user-facing failure reason.
-    pub fn blocker(&self, x: i32, z: i32) -> Option<(P3, String)> {
-        if self.exempt.contains(&(x, z)) {
+    /// the user-facing failure reason. Asked of net `net`'s stack.
+    pub fn blocker(&self, net: usize, x: i32, z: i32) -> Option<(P3, String)> {
+        if self.nets[net].exempt.contains(&(x, z)) {
             return None;
         }
         // Must agree with `column_free`, or the reason the studio shows the
         // user names a cause the search does not actually honour. A SOFT halo
         // is passable now, so it is never a blocker.
-        for p in self.column_cells(x, z) {
+        for p in self.column_cells(net, x, z) {
             if let Some((block, owner)) = self.occ.cells.get(&p) {
                 return Some((p, format!("{} `{block}`", owner_name(owner))));
             }
@@ -501,7 +562,7 @@ impl<'a> BusFabric<'a> {
                     return Some((p, format!("the declared keepout of instance `{inst}`")));
                 }
             }
-            if !self.cell_placeable(p, self.mech_at(p)) {
+            if !self.cell_placeable(net, p, self.mech_at(net, p)) {
                 return Some((
                     p,
                     "foreign redstone that would interfere with the bus here".to_string(),
@@ -531,7 +592,9 @@ impl Fabric for BusFabric<'_> {
         }
     }
 
-    fn moves(&self, from: &State<Leg>, _ctx: &RouteCtx) -> Vec<Candidate<Leg, Heading>> {
+    fn moves(&self, from: &State<Leg>, ctx: &RouteCtx) -> Vec<Candidate<Leg, Heading>> {
+        let net = ctx.net;
+        let y0 = self.nets[net].y0;
         let mut out = Vec::with_capacity(4);
         for h in Heading::ALL {
             // No U-turns, and no corner until the current leg is long enough
@@ -546,7 +609,7 @@ impl Fabric for BusFabric<'_> {
                 }
             }
             let (dx, dz) = h.delta();
-            let to = Pos::new(from.pos.x + dx, self.y0, from.pos.z + dz);
+            let to = Pos::new(from.pos.x + dx, y0, from.pos.z + dz);
             let run = if turning || from.mem.heading == Heading::Start {
                 1
             } else {
@@ -559,8 +622,12 @@ impl Fabric for BusFabric<'_> {
                 },
                 base_cost: 1
                     + if turning { self.turn_cost } else { 0 }
-                    + if self.column_hugs(to.x, to.z) { HUG_COST } else { 0 }
-                    + if self.column_reserved(to.x, to.z) {
+                    + if self.column_hugs(net, to.x, to.z) {
+                        self.hug_cost
+                    } else {
+                        0
+                    }
+                    + if self.column_reserved(net, to.x, to.z) {
                         ESCAPE_COST
                     } else {
                         0
@@ -572,9 +639,9 @@ impl Fabric for BusFabric<'_> {
         out
     }
 
-    fn legal(&self, _from: &State<Leg>, cand: &Candidate<Leg, Heading>, _ctx: &RouteCtx) -> bool {
+    fn legal(&self, _from: &State<Leg>, cand: &Candidate<Leg, Heading>, ctx: &RouteCtx) -> bool {
         let p = cand.to.pos;
-        self.bound.contains(p) && self.column_free(p.x, p.z)
+        self.nets[ctx.net].bound.contains(p) && self.column_free(ctx.net, p.x, p.z)
     }
 
     fn budget(&self) -> Budget {
@@ -582,39 +649,60 @@ impl Fabric for BusFabric<'_> {
     }
 }
 
-/// Build the fabric for one corridor query.
-fn fabric<'a>(
-    occ: &'a OccupancyIndex,
-    a: P3,
-    b: P3,
-    width: u8,
-    effort: Effort,
-) -> BusFabric<'a> {
+/// The bus form of one net, as the caller states it: two anchors on one level
+/// and a bit width. The fabric derives everything else.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct NetSpec {
+    /// Driver anchor (bit-0 cell).
+    pub a: P3,
+    /// Sink anchor (bit-0 cell).
+    pub b: P3,
+    /// Bus width in bits.
+    pub width: u8,
+}
+
+/// The [`NetForm`] one spec implies at one effort rung.
+fn form_of(spec: NetSpec, effort: Effort) -> NetForm {
+    let (a, b) = (spec.a, spec.b);
     let mut exempt = BTreeSet::new();
     exempt.insert((a.0, a.2));
     exempt.insert((b.0, b.2));
     let m = effort.margin;
-    let bound = Aabb::new(
-        Pos::new(a.0.min(b.0) - m, a.1, a.2.min(b.2) - m),
-        Pos::new(a.0.max(b.0) + m, a.1, a.2.max(b.2) + m),
-    );
+    NetForm {
+        y0: a.1,
+        width: spec.width,
+        exempt,
+        bound: Aabb::new(
+            Pos::new(a.0.min(b.0) - m, a.1, a.2.min(b.2) - m),
+            Pos::new(a.0.max(b.0) + m, a.1, a.2.max(b.2) + m),
+        ),
+    }
+}
+
+/// Build a fabric over any number of nets.
+fn multi_fabric<'a>(occ: &'a OccupancyIndex, specs: &[NetSpec], effort: Effort) -> BusFabric<'a> {
+    let nets: Vec<NetForm> = specs.iter().map(|s| form_of(*s, effort)).collect();
+    let n = nets.len();
     let mut f = BusFabric {
         occ,
-        y0: a.1,
-        width,
-        exempt,
-        bound,
+        nets,
         turn_cost: effort.turn_cost,
         memo: RefCell::new(HashMap::new()),
         hug_memo: RefCell::new(HashMap::new()),
-        reserved: BTreeSet::new(),
+        reserved: vec![BTreeSet::new(); n],
+        hug_cost: hug_cost(),
     };
     // Two-phase: the reservation set is computed BY the fabric (it needs
     // `stack_free`), so the fabric exists first with an empty set. Nothing reads
     // `reserved` during the computation, so the intermediate state is not
     // observable.
-    f.reserved = f.compute_reserved();
+    f.reserved = (0..n).map(|i| f.compute_reserved(i)).collect();
     f
+}
+
+/// Build the fabric for one corridor query.
+fn fabric<'a>(occ: &'a OccupancyIndex, a: P3, b: P3, width: u8, effort: Effort) -> BusFabric<'a> {
+    multi_fabric(occ, &[NetSpec { a, b, width }], effort)
 }
 
 /// Search for a corridor from `a` to `b` for a `width`-bit bus. Both anchors
@@ -647,6 +735,183 @@ pub fn search(occ: &OccupancyIndex, a: P3, b: P3, width: u8, effort: Effort) -> 
     }
     Some(chain)
 }
+
+/// Route SEVERAL buses at once with negotiated congestion (PathFinder).
+///
+/// [`search`] answers "where can THIS bus go, given everything already
+/// placed", and that question has a first-come-first-served answer: the bus
+/// that asks first takes the only lane and the bus that asks last fails, even
+/// when the reverse assignment routes both. Reordering (rip-up-and-retry) fixes
+/// that for ONE relationship at a time; `skip4` contests four earlier buses at
+/// once, so no single reordering reaches it.
+///
+/// Negotiation reverses the framing: every net is routed every round, overlap
+/// is ALLOWED during a round, and the cells two nets fought over get more
+/// expensive for the next round ([`CongestionOpts::history_increment`]) until
+/// the nets have sorted themselves onto disjoint corridors. Nobody is first.
+///
+/// The loop itself is [`pnr_core::congestion::route_all`] — this function only
+/// supplies the multi-net [`BusFabric`] and the electrical conflict predicate
+/// that plain cell-sharing cannot see (two dust runs one column apart short
+/// without sharing a cell, and two stacks on DIFFERENT levels never share a
+/// search cell at all even when their columns collide).
+///
+/// Returns one waypoint chain per spec, in the caller's order, or `None` if any
+/// net came back unrouted or unrealizable. The chains are HINTS: each one is
+/// realized through the ordinary per-bus template path, which re-applies the
+/// full electrical predicate against actually-placed geometry, so a chain that
+/// negotiation thought was clear and is not still fails safely there.
+///
+/// Deterministic: `route_all` iterates `nets` in the given order and its maps
+/// are `BTreeMap`s. No randomness, seeded or otherwise.
+pub fn negotiate(
+    occ: &OccupancyIndex,
+    specs: &[NetSpec],
+    effort: Effort,
+    opts: &CongestionOpts,
+) -> Option<Vec<Vec<P3>>> {
+    if specs.len() < 2 || specs.iter().any(|s| s.a == s.b || s.a.1 != s.b.1) {
+        return None;
+    }
+    let f = multi_fabric(occ, specs, effort);
+    let reqs: Vec<NetReq> = specs
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            let mut req =
+                RouteRequest::new(Pos::new(s.a.0, s.a.1, s.a.2), Pos::new(s.b.0, s.b.1, s.b.2));
+            req.max_iter = effort.max_iter;
+            NetReq { net: i, req }
+        })
+        .collect();
+
+    // ELECTRICAL CONFLICT between two tentative corridors. Cell-sharing is not
+    // the relation that matters here on either axis:
+    //
+    // - two corridors one column APART short (dust reads its horizontal
+    //   neighbours), so adjacency is a conflict even with no shared cell;
+    // - two corridors on different LEVELS search different y planes, so they
+    //   never share a cell however hard they collide — the overlap has to be
+    //   tested on the stacks' y spans instead.
+    //
+    // Each net's own pinned endpoint columns are exempt: two buses may
+    // legitimately terminate on neighbouring ports of the same cell face, and
+    // flagging that would spin the negotiation to its round limit over
+    // geometry nobody can change.
+    let forms: Vec<NetForm> = specs.iter().map(|s| form_of(*s, effort)).collect();
+    let conflicts = |fp: &BTreeMap<usize, Vec<Pos>>| -> Vec<Pos> {
+        let mut out = Vec::new();
+        let items: Vec<(&usize, &Vec<Pos>)> = fp.iter().collect();
+        for i in 0..items.len() {
+            for j in (i + 1)..items.len() {
+                let (ni, nj) = (*items[i].0, *items[j].0);
+                let ((lo_i, hi_i), (lo_j, hi_j)) = (forms[ni].y_span(), forms[nj].y_span());
+                if hi_i < lo_j || hi_j < lo_i {
+                    continue; // stacks never meet vertically
+                }
+                for a in items[i].1 {
+                    if forms[ni].exempt.contains(&(a.x, a.z)) {
+                        continue;
+                    }
+                    for b in items[j].1 {
+                        if forms[nj].exempt.contains(&(b.x, b.z)) {
+                            continue;
+                        }
+                        if (a.x - b.x).abs() + (a.z - b.z).abs() <= 1 {
+                            out.push(*a);
+                            out.push(*b);
+                        }
+                    }
+                }
+            }
+        }
+        out
+    };
+
+    let paths = match route_all(&f, &reqs, opts, &conflicts) {
+        Ok(p) => p,
+        Err(e) => {
+            if std::env::var("NUCLEATION_NEGOTIATE_DEBUG").is_ok() {
+                eprintln!(
+                    "  negotiate: unrouted={:?} contested={:?}",
+                    e.unrouted, e.contested
+                );
+            }
+            return None;
+        }
+    };
+    let mut chains = Vec::with_capacity(specs.len());
+    for i in 0..specs.len() {
+        let cells: Vec<P3> = paths
+            .get(&i)?
+            .iter()
+            .map(|s| (s.pos.x, s.pos.y, s.pos.z))
+            .collect();
+        let chain = compress(&cells);
+        if chain.len() < 2 || !self_clearance_ok(&chain) {
+            return None;
+        }
+        for w in chain.windows(2) {
+            let (p, q) = (w[0], w[1]);
+            if p == q || (p.0 != q.0 && p.2 != q.2) {
+                return None;
+            }
+        }
+        chains.push(chain);
+    }
+    Some(chains)
+}
+
+/// The negotiation budget for the design-level retry, and the reason it is not
+/// [`CongestionOpts::default`].
+///
+/// Negotiation costs `rounds x nets x A*`, and `route_bus` is an INTERACTIVE
+/// call. The library default (40 rounds) over a five-bus group at rung 2's node
+/// cap is minutes; a bus that cannot be routed has to say so in seconds. Eight
+/// rounds is enough for the history cost on a contested cell to reach 32, which
+/// already dominates any detour the search would otherwise refuse — if a group
+/// has not separated by then, more rounds are unlikely to be what it needed.
+const NEGOTIATION_ROUNDS: usize = 8;
+
+/// Effort rung for negotiation: rung 2's determination on a tighter workspace
+/// and node cap, because the cost is paid once per net per round.
+const NEGOTIATION_EFFORT: Effort = Effort {
+    turn_cost: 4,
+    margin: 48,
+    max_iter: 120_000,
+};
+
+/// Most buses in one negotiation. The cost is superlinear in the group and the
+/// gain is not: `skip4` contests four buses, so a group of six covers the
+/// motivating case with room to spare.
+pub const NEGOTIATION_GROUP_MAX: usize = 6;
+
+/// [`negotiate`] at the design-level budget — the entry point
+/// [`crate::design::Design`] uses, so the budget lives with the search rather
+/// than with the caller.
+pub fn negotiate_default(occ: &OccupancyIndex, specs: &[NetSpec]) -> Option<Vec<Vec<P3>>> {
+    negotiate(occ, specs, NEGOTIATION_EFFORT, &NEGOTIATION_OPTS)
+}
+
+/// Negotiation pressure, IN THIS FABRIC'S COST UNITS — which is the whole point
+/// of not using [`CongestionOpts::default`].
+///
+/// The library defaults (increment 4, penalty 6) are sized for a fabric whose
+/// moves cost 1 and whose detours are a few cells. This fabric's moves cost 1
+/// too, but its detours are TENS of cells: a corridor around a library cell body
+/// is 30-60 cells, so eight rounds at increment 4 reach a history cost of 32 and
+/// a net facing a 40-cell detour rationally keeps the contested cell forever.
+///
+/// Measured on the `skip4` group (five buses across a five-cell row): with the
+/// library defaults, negotiation ended with every net routed and exactly ONE
+/// cell — (19, 2, 5) — still claimed by two of them, so `route_all` reported
+/// failure and the whole solution was thrown away one cell short. The increment
+/// has to dominate a detour in one or two rounds, not in forty.
+const NEGOTIATION_OPTS: CongestionOpts = CongestionOpts {
+    max_rounds: NEGOTIATION_ROUNDS,
+    history_increment: 32,
+    present_penalty: 24,
+};
 
 /// Reject a corridor that comes back within one cell of itself.
 ///
@@ -783,7 +1048,7 @@ pub fn diagnose(occ: &OccupancyIndex, a: P3, b: P3, width: u8, tried: &[String])
         for h in Heading::ALL {
             let (dx, dz) = h.delta();
             let (x, z) = (anchor.0 + dx, anchor.2 + dz);
-            match f.blocker(x, z) {
+            match f.blocker(0, x, z) {
                 None => open = true,
                 Some((p, owner)) => blocked.push(format!("{:?} blocked by {owner}", p)),
             }
@@ -845,7 +1110,7 @@ fn blocking_layers(f: &BusFabric<'_>, a: P3, b: P3) -> Vec<String> {
     for anchor in [a, b] {
         for dx in -2..=2i32 {
             for dz in -2..=2i32 {
-                if let Some((_, owner)) = f.blocker(anchor.0 + dx, anchor.2 + dz) {
+                if let Some((_, owner)) = f.blocker(0, anchor.0 + dx, anchor.2 + dz) {
                     seen.insert(strip_block(&owner));
                 }
             }
@@ -873,14 +1138,14 @@ fn first_blocker_on_line(f: &BusFabric<'_>, a: P3, b: P3) -> Option<(P3, String)
     let mut x = a.0;
     while x != b.0 {
         x += sx;
-        if let Some(hit) = f.blocker(x, a.2) {
+        if let Some(hit) = f.blocker(0, x, a.2) {
             return Some(hit);
         }
     }
     let mut z = a.2;
     while z != b.2 {
         z += sz;
-        if let Some(hit) = f.blocker(b.0, z) {
+        if let Some(hit) = f.blocker(0, b.0, z) {
             return Some(hit);
         }
     }
@@ -892,7 +1157,12 @@ mod tests {
     use super::*;
     use crate::design::Occupant;
 
-    fn wall(occ: &mut OccupancyIndex, x: i32, zs: std::ops::RangeInclusive<i32>, ys: std::ops::RangeInclusive<i32>) {
+    fn wall(
+        occ: &mut OccupancyIndex,
+        x: i32,
+        zs: std::ops::RangeInclusive<i32>,
+        ys: std::ops::RangeInclusive<i32>,
+    ) {
         for z in zs {
             for y in ys.clone() {
                 occ.cells
@@ -914,11 +1184,14 @@ mod tests {
         let f = fabric(&occ, (1, 2, 8), (40, 2, 8), 8, LADDER[0]);
         for w in chain.windows(2) {
             let (p, q) = (w[0], w[1]);
-            assert!(p.0 == q.0 || p.2 == q.2, "leg not axis-aligned: {p:?}->{q:?}");
+            assert!(
+                p.0 == q.0 || p.2 == q.2,
+                "leg not axis-aligned: {p:?}->{q:?}"
+            );
         }
         // Every interior corner column must be legal.
         for c in &chain[1..chain.len() - 1] {
-            assert!(f.column_free(c.0, c.2), "corner {c:?} not free");
+            assert!(f.column_free(0, c.0, c.2), "corner {c:?} not free");
         }
     }
 
@@ -982,9 +1255,15 @@ mod tests {
             }
         }
         let f = fabric(&occ, (1, 2, 4), (40, 2, 4), 8, LADDER[0]);
-        assert!(!f.column_free(20, 8), "z=8 hugs the foreign lane at z=9");
-        assert!(!f.column_free(20, 10), "z=10 hugs it from the other side");
-        assert!(f.column_free(20, 7), "z=7 has a clear cell of separation");
+        assert!(!f.column_free(0, 20, 8), "z=8 hugs the foreign lane at z=9");
+        assert!(
+            !f.column_free(0, 20, 10),
+            "z=10 hugs it from the other side"
+        );
+        assert!(
+            f.column_free(0, 20, 7),
+            "z=7 has a clear cell of separation"
+        );
     }
 
     /// The escape-lane reservation, on the exact geometry that motivated it:
@@ -1007,25 +1286,31 @@ mod tests {
         // A route that has nothing to do with that port.
         let f = fabric(&occ, (1, 2, 8), (60, 2, 8), 8, LADDER[0]);
         // Three neighbours are the body; (23,1) is the only lane.
-        assert!(f.column_reserved(23, 1), "the lane itself must be reserved");
+        assert!(
+            f.column_reserved(0, 23, 1),
+            "the lane itself must be reserved"
+        );
         // ...and its CLEARANCE: a bus running one cell to the side shorts the
         // lane without ever entering it. This is the half that was missing when
         // the first version of this rule measured zero gain.
-        assert!(f.column_reserved(22, 1), "the lane's -X clearance");
-        assert!(f.column_reserved(23, 0), "the lane's -Z clearance");
-        assert!(f.column_reserved(23, 2), "the lane's +Z clearance");
+        assert!(f.column_reserved(0, 22, 1), "the lane's -X clearance");
+        assert!(f.column_reserved(0, 23, 0), "the lane's -Z clearance");
+        assert!(f.column_reserved(0, 23, 2), "the lane's +Z clearance");
         // The port's own column is never charged for: it is the destination.
-        assert!(!f.column_reserved(24, 1), "the port column must stay free");
+        assert!(
+            !f.column_reserved(0, 24, 1),
+            "the port column must stay free"
+        );
         // Nothing far away is reserved.
-        assert!(!f.column_reserved(10, 8));
+        assert!(!f.column_reserved(0, 10, 8));
 
         // A port with TWO ways out is nobody's last lane, so nothing is
         // reserved: taking one still leaves it a way out.
         let mut open = OccupancyIndex::default();
         open.port_lanes.push(((24, 2, 1), (0, 2, 0), 8));
         let g = fabric(&open, (1, 2, 8), (60, 2, 8), 8, LADDER[0]);
-        assert!(!g.column_reserved(23, 1), "open field reserves nothing");
-        assert!(!g.column_reserved(25, 1));
+        assert!(!g.column_reserved(0, 23, 1), "open field reserves nothing");
+        assert!(!g.column_reserved(0, 25, 1));
     }
 
     #[test]

@@ -1,0 +1,110 @@
+{
+ "artifact": null,
+ "blocked_by": "bus_flat -> failed: routed geometry does not conduct: net `bus_flat[1]` does NOT conduct end to end: its terminals fall in 2 separate conduction groups [(1,2,4)] vs [(20,2,4)] \u2014 the route was laid but the signal cannot cross; net `bus_flat[2]` does NOT conduct end to end: its terminals fall in 2 separate conduction groups [(1,2,6)] vs [(20,2,6)] \u2014 the route was laid but the signal cannot cross; net `bus_flat[3]` does NOT conduct end to end: its terminals fall in 2 separate conduction groups [(1,2,8)] vs [(20,2,8)] \u2014 the route was laid but the signal cannot cross; net `bus_flat[5]` does NOT conduct end to end: its terminals fall in 2 separate conduction groups [(1,2,12)] vs [(20,2,12)] \u2014 the route was laid but the signal cannot cross (and 3 more)",
+ "buses": {
+  "bus_flat": {
+   "call": "d.route_bus('bus_flat', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:magenta_concrete', 'transparent_block': 'minecraft:magenta_stained_glass'}))",
+   "error": null,
+   "seconds": 0.0512,
+   "state": "failed: routed geometry does not conduct: net `bus_flat[1]` does NOT conduct end to end: its terminals fall in 2 separate conduction groups [(1,2,4)] vs [(20,2,4)] \u2014 the route was laid but the signal cannot cross; net `bus_flat[2]` does NOT conduct end to end: its terminals fall in 2 separate conduction groups [(1,2,6)] vs [(20,2,6)] \u2014 the route was laid but the signal cannot cross; net `bus_flat[3]` does NOT conduct end to end: its terminals fall in 2 separate conduction groups [(1,2,8)] vs [(20,2,8)] \u2014 the route was laid but the signal cannot cross; net `bus_flat[5]` does NOT conduct end to end: its terminals fall in 2 separate conduction groups [(1,2,12)] vs [(20,2,12)] \u2014 the route was laid but the signal cannot cross (and 3 more)"
+  }
+ },
+ "check": null,
+ "cost_vector": null,
+ "expect": "unsolved",
+ "fixtures": {},
+ "id": "O03_flat_obstacle",
+ "log": [],
+ "loose_blocks": 84,
+ "notes": "Compare with the same bundle on a CLEAR path, which passes 12/12 -- so the defect is in the detour, not the flat form. Vertical-form bundles detour correctly (O01, O02).",
+ "per_bus": {},
+ "question": "A flat 2-pitch 8-bit bundle has to climb a 1-wide wall. Does the reported route actually carry the bits?",
+ "scenario": {
+  "_file": "scenarios/O03_flat_obstacle.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_flat",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:magenta_concrete",
+     "transparent_block": "minecraft:magenta_stained_glass"
+    }
+   }
+  ],
+  "expect": "unsolved",
+  "id": "O03_flat_obstacle",
+  "notes": "Compare with the same bundle on a CLEAR path, which passes 12/12 -- so the defect is in the detour, not the flat form. Vertical-form bundles detour correctly (O01, O02).",
+  "obstacles": [
+   {
+    "block": "minecraft:polished_andesite",
+    "max": [
+     11,
+     1,
+     17
+    ],
+    "min": [
+     11,
+     0,
+     0
+    ]
+   }
+  ],
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     2
+    ],
+    "dir": "in",
+    "feed": [
+     -1,
+     0,
+     0
+    ],
+    "form": "flat_z",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     20,
+     2,
+     2
+    ],
+    "dir": "out",
+    "form": "flat_z",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "A flat 2-pitch 8-bit bundle has to climb a 1-wide wall. Does the reported route actually carry the bits?",
+  "render": {
+   "pitch": 30,
+   "yaw": 140,
+   "zoom": 1.8
+  },
+  "title": "FLAT bundle + obstacle: routed, DRC-clean, does not conduct",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "walking ones through the detour",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0512,
+ "solved": false,
+ "solver_produced": true,
+ "title": "FLAT bundle + obstacle: routed, DRC-clean, does not conduct",
+ "verification": null,
+ "wall_seconds": 0.052
+}

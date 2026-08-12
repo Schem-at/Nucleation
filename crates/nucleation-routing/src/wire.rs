@@ -114,7 +114,8 @@ pub fn caps_climb(block: &str) -> bool {
     if is_see_through(block) {
         return false;
     }
-    let transparent = block.contains("glass") || (block.contains("slab") && block.contains("type=top"));
+    let transparent =
+        block.contains("glass") || (block.contains("slab") && block.contains("type=top"));
     !transparent
 }
 
@@ -287,9 +288,8 @@ pub fn rewire(
     outside: &dyn Fn((i32, i32, i32)) -> Option<String>,
 ) {
     let snapshot = cells.clone();
-    let at = |q: (i32, i32, i32)| -> Option<String> {
-        snapshot.get(&q).cloned().or_else(|| outside(q))
-    };
+    let at =
+        |q: (i32, i32, i32)| -> Option<String> { snapshot.get(&q).cloned().or_else(|| outside(q)) };
     let dust: Vec<(i32, i32, i32)> = snapshot
         .iter()
         .filter(|(_, b)| is_dust(b))
@@ -309,10 +309,8 @@ mod tests {
     use std::collections::BTreeMap;
 
     fn run(cells: &[((i32, i32, i32), &str)]) -> BTreeMap<(i32, i32, i32), String> {
-        let mut m: BTreeMap<(i32, i32, i32), String> = cells
-            .iter()
-            .map(|(p, b)| (*p, b.to_string()))
-            .collect();
+        let mut m: BTreeMap<(i32, i32, i32), String> =
+            cells.iter().map(|(p, b)| (*p, b.to_string())).collect();
         rewire(&mut m, &|_| None);
         m
     }
@@ -378,7 +376,10 @@ mod tests {
         ]);
         let end = &m[&(0, 2, 0)];
         assert!(end.contains("east=side"), "{end}");
-        assert!(end.contains("west=side"), "the dead end did not extend: {end}");
+        assert!(
+            end.contains("west=side"),
+            "the dead end did not extend: {end}"
+        );
     }
 
     /// A repeater is attached only on its own axis.
@@ -395,7 +396,10 @@ mod tests {
         ]);
         assert!(m[&(0, 2, 0)].contains("east=side"), "{}", m[&(0, 2, 0)]);
         let flank = &m[&(1, 2, 1)];
-        assert!(flank.contains("north=none"), "flank attached to a repeater: {flank}");
+        assert!(
+            flank.contains("north=none"),
+            "flank attached to a repeater: {flank}"
+        );
     }
 
     /// A 1y step: the lower dust climbs, and the upper reads the diagonal back.
@@ -411,7 +415,10 @@ mod tests {
         let low = &m[&(0, 2, 0)];
         assert!(low.contains("east=up"), "the climb was not drawn: {low}");
         let high = &m[&(1, 3, 0)];
-        assert!(high.contains("west=side"), "the down diagonal is missing: {high}");
+        assert!(
+            high.contains("west=side"),
+            "the down diagonal is missing: {high}"
+        );
     }
 
     /// A conductor overhead caps the wire: it cannot climb out.
@@ -444,7 +451,10 @@ mod tests {
             ((1, 3, 0), DUST),
         ]);
         let low = &m[&(0, 2, 0)];
-        assert!(low.contains("east=up"), "glass wrongly capped the climb: {low}");
+        assert!(
+            low.contains("east=up"),
+            "glass wrongly capped the climb: {low}"
+        );
     }
 
     #[test]

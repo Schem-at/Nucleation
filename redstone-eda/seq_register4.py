@@ -13,6 +13,7 @@ import random
 
 import nucleation as n
 import nets
+import drc
 import rs
 import seq_cells as sc
 from seq_probe import run_gt, bake_states, reload_sim, ticks_to_quiescent
@@ -73,6 +74,9 @@ def verify(save_baked=None):
     d_levers, clk = harness(b, ports)
     shorts = nets.check(b.cells, labels, aliases)
     assert not shorts, "shorts: %s" % shorts[:4]
+    # A register has no feedback: its state lives in the DFFs' locked repeaters,
+    # not in a conduction ring.  Any ring here is an accident.
+    assert drc.check_rings("register%d" % BITS, b.cells), "diode ring"
     sim = b.sim()          # placement settle of the fresh, unclocked build
     ok = read_q(sim, ports) == 0
     print("register4: init Q=0000 %s" % ("PASS" if ok else "FAIL"))

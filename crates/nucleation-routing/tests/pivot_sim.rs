@@ -22,7 +22,9 @@ fn extra_states() -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for d in DIRS {
         for p in ["true", "false"] {
-            out.push(format!("minecraft:lever[face=floor,facing={d},powered={p}]"));
+            out.push(format!(
+                "minecraft:lever[face=floor,facing={d},powered={p}]"
+            ));
         }
     }
     out.push("minecraft:redstone_torch[lit=true]".into());
@@ -62,7 +64,10 @@ impl Sim {
 
     fn block(&self, p: Pos) -> &str {
         let id = self.sim.world().get(self.p(p));
-        self.sim.registry().descriptor(id).unwrap_or("minecraft:air")
+        self.sim
+            .registry()
+            .descriptor(id)
+            .unwrap_or("minecraft:air")
     }
 
     fn power(&self, p: Pos) -> i32 {

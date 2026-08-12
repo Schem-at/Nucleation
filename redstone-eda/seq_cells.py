@@ -163,9 +163,13 @@ def dff_harness(frag, name="v_dff"):
     x, y, z = ports["clk_in"]
     b.stone(x, 0, z - 1); b.put(x, y, z - 1, rs.DUST)
     b.stone(x, 0, z - 2); b.force(x, y, z - 2, rs.LEVER_OFF)
-    import nets
+    import nets, drc
     shorts = nets.check(b.cells, labels)
     assert not shorts, "shorts: %s" % shorts[:4]
+    # The latch stores state in a LOCKED repeater's side, not in a conduction
+    # ring, so a diode ring here would be an accident, not the mechanism.
+    rings = drc.repeater_cycles(b.cells)
+    assert not rings, "diode ring (latches at 15): %s" % rings[:2]
     return b, ports, (-2, 1, 0), (x, y, z - 2)
 
 

@@ -47,7 +47,13 @@ fn corpus_chain_cost_vector() {
     d.place("u1", "bcd", (60, -2, 40), 0).unwrap();
     d.promote_input("u1", "bin").unwrap();
     let st = d
-        .route_bus("sum_to_bin", "u0.sum", &["u1.bin"], vec![], BusStyle::default())
+        .route_bus(
+            "sum_to_bin",
+            "u0.sum",
+            &["u1.bin"],
+            vec![],
+            BusStyle::default(),
+        )
         .unwrap();
     assert_eq!(st, BusState::Routed, "{:?}", d.bus_state("sum_to_bin"));
     let layer = d.bus("sum_to_bin").unwrap();
@@ -59,5 +65,9 @@ fn corpus_chain_cost_vector() {
     println!("corpus chain cost vector = {}", v.to_json());
     // The route has to be REAL: a zero-length "route" would otherwise report a
     // beautiful cost vector.
-    assert!(v.length > 0 && v.footprint > 0, "empty route: {}", v.to_json());
+    assert!(
+        v.length > 0 && v.footprint > 0,
+        "empty route: {}",
+        v.to_json()
+    );
 }

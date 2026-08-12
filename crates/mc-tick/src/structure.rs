@@ -334,7 +334,10 @@ impl Structure {
 
         for (index, (_, entry)) in structure.blocks.iter().enumerate() {
             if *entry >= structure.palette.len() {
-                return Err(StructureError::BadPaletteRef { index, entry: *entry });
+                return Err(StructureError::BadPaletteRef {
+                    index,
+                    entry: *entry,
+                });
             }
         }
         Ok(structure)
@@ -462,11 +465,17 @@ struct Parser<'a> {
 
 impl<'a> Parser<'a> {
     fn new(text: &'a str) -> Self {
-        Self { text: text.as_bytes(), at: 0 }
+        Self {
+            text: text.as_bytes(),
+            at: 0,
+        }
     }
 
     fn err<T>(&self, reason: impl Into<String>) -> Result<T, StructureError> {
-        Err(StructureError::Malformed { offset: self.at, reason: reason.into() })
+        Err(StructureError::Malformed {
+            offset: self.at,
+            reason: reason.into(),
+        })
     }
 
     fn skip_ws(&mut self) {
@@ -558,7 +567,9 @@ impl<'a> Parser<'a> {
         if self.at < self.text.len() && (self.text[self.at] as char).is_alphabetic() {
             self.at += 1;
         }
-        digits.parse().map_or_else(|_| self.err("integer out of range"), Ok)
+        digits
+            .parse()
+            .map_or_else(|_| self.err("integer out of range"), Ok)
     }
 
     /// Skip any value without interpreting it — used for keys we ignore.
@@ -837,7 +848,11 @@ impl<'a> Parser<'a> {
                 }))
             }
             _ => Err(StructureError::UnsupportedEntity {
-                entity_type: if id.is_empty() { "<no id>".to_string() } else { id },
+                entity_type: if id.is_empty() {
+                    "<no id>".to_string()
+                } else {
+                    id
+                },
                 offset: self.at,
             }),
         }
@@ -974,9 +989,12 @@ impl<'a> Parser<'a> {
         // existing class is a registry row and nothing here.
         match behaviour.map(crate::entity_kind::EntityBehaviour::motion) {
             Some(crate::entity_kind::EntityMotion::Item) => match (pos, item) {
-                (Some(pos), Some(item)) => {
-                    Ok(SpawnedEntity::Item(SpawnedItem { pos, motion, item, pickup_delay }))
-                }
+                (Some(pos), Some(item)) => Ok(SpawnedEntity::Item(SpawnedItem {
+                    pos,
+                    motion,
+                    item,
+                    pickup_delay,
+                })),
                 _ => self.err("item entity needs `pos` and `Item`"),
             },
             Some(crate::entity_kind::EntityMotion::Frozen) => match pos {
@@ -1066,8 +1084,7 @@ impl<'a> Parser<'a> {
             Option<u16>,
         ),
         StructureError,
-    >
-    {
+    > {
         self.eat(b'{')?;
         let mut items = Vec::new();
         let mut output_signal = None;
@@ -1143,7 +1160,12 @@ impl<'a> Parser<'a> {
         if id.is_empty() {
             return self.err("item entry needs an id");
         }
-        Ok(crate::inventory::ItemStack { slot, id, count, contents })
+        Ok(crate::inventory::ItemStack {
+            slot,
+            id,
+            count,
+            contents,
+        })
     }
 
     /// An item's `components` compound. Only `minecraft:container` — a
@@ -1174,9 +1196,7 @@ impl<'a> Parser<'a> {
     }
 
     /// `minecraft:container`: `[{slot: 0, item: {id: "...", count: 2}}, ...]`.
-    fn container_component(
-        &mut self,
-    ) -> Result<Vec<crate::inventory::ItemStack>, StructureError> {
+    fn container_component(&mut self) -> Result<Vec<crate::inventory::ItemStack>, StructureError> {
         self.eat(b'[')?;
         let mut stacks = Vec::new();
         loop {
@@ -1228,7 +1248,12 @@ impl<'a> Parser<'a> {
             if id.is_empty() {
                 return self.err("container component entry needs an item id");
             }
-            stacks.push(crate::inventory::ItemStack { slot, id, count, contents: None });
+            stacks.push(crate::inventory::ItemStack {
+                slot,
+                id,
+                count,
+                contents: None,
+            });
             if self.peek() == Some(b',') {
                 self.at += 1;
             }
@@ -1575,7 +1600,10 @@ mod tests {
     #[test]
     fn a_missing_key_names_itself() {
         let text = r#"{size: [1,1,1], blocks: []}"#;
-        assert_eq!(Structure::parse(text), Err(StructureError::Missing("palette")));
+        assert_eq!(
+            Structure::parse(text),
+            Err(StructureError::Missing("palette"))
+        );
     }
 
     #[test]

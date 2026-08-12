@@ -74,8 +74,8 @@ fn build_pivot(to_horizontal: bool) -> Fragment {
     for bit in 0..i32::from(PIVOT_BITS) {
         let (y, zn) = (yv(bit), lane(bit));
         let fansta = zn + 2 > 15; // port->lane run over budget: bit 7 only
-        // fan column x=0: support layer below doubles as the cap over bit
-        // n-1's fan dust (cap law: straight run)
+                                  // fan column x=0: support layer below doubles as the cap over bit
+                                  // n-1's fan dust (cap law: straight run)
         for z in 0..=zn {
             put(&mut f, 0, y - 1, z, lid);
             if fansta && (FANSTA..=FANSTA + 2).contains(&z) {
@@ -447,7 +447,10 @@ mod tests {
         let hz = port(Axis::Z, InOut::In);
         let hx = port(Axis::X, InOut::In);
         assert_eq!(pivot_for(&v, &hz), Some(PivotKind::V2H));
-        assert_eq!(pivot_for(&hz, &port(Axis::Y, InOut::In)), Some(PivotKind::H2V));
+        assert_eq!(
+            pivot_for(&hz, &port(Axis::Y, InOut::In)),
+            Some(PivotKind::H2V)
+        );
         assert_eq!(pivot_for(&hz, &hx), Some(PivotKind::Flat90));
         assert_eq!(pivot_for(&hz, &port(Axis::Z, InOut::In)), None);
     }

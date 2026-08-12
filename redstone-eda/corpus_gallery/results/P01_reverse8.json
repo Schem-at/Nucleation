@@ -1,0 +1,93 @@
+{
+ "artifact": null,
+ "blocked_by": "bus_rev -> failed: unsupported bus form: this design realizes the verified vertical 2y-pitch stack (step (0,2,0)), and can adapt a HORIZONTAL row onto it; port `a_out` has step (0, -2, 0), which is neither",
+ "buses": {
+  "bus_rev": {
+   "call": "d.route_bus('bus_rev', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:orange_concrete', 'transparent_block': 'minecraft:orange_stained_glass'}))",
+   "error": null,
+   "seconds": 0.0002,
+   "state": "failed: unsupported bus form: this design realizes the verified vertical 2y-pitch stack (step (0,2,0)), and can adapt a HORIZONTAL row onto it; port `a_out` has step (0, -2, 0), which is neither"
+  }
+ },
+ "check": null,
+ "cost_vector": null,
+ "expect": "solved",
+ "fixtures": {},
+ "id": "P01_reverse8",
+ "log": [],
+ "loose_blocks": 48,
+ "notes": "`map` is identity because the check is per DECLARED bit index: the reversal is geometric.  A walking-ones sweep is what proves it -- a bus that shorted two lanes would light two lamps.",
+ "per_bus": {},
+ "question": "`a_in` stacks bit 0 at the bottom, `a_out` stacks bit 0 at the TOP (step -2y).  Can the router route a full reversal, with all eight lanes crossing, and keep them isolated?",
+ "scenario": {
+  "_file": "scenarios/P01_reverse8.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_rev",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:orange_concrete",
+     "transparent_block": "minecraft:orange_stained_glass"
+    }
+   }
+  ],
+  "expect": "solved",
+  "id": "P01_reverse8",
+  "notes": "`map` is identity because the check is per DECLARED bit index: the reversal is geometric.  A walking-ones sweep is what proves it -- a bus that shorted two lanes would light two lamps.",
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     16,
+     16,
+     4
+    ],
+    "dir": "out",
+    "form": "vertical_desc",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "`a_in` stacks bit 0 at the bottom, `a_out` stacks bit 0 at the TOP (step -2y).  Can the router route a full reversal, with all eight lanes crossing, and keep them isolated?",
+  "render": {
+   "pitch": 26,
+   "yaw": 145,
+   "zoom": 1.85
+  },
+  "title": "Bit reversal: an 8-lane butterfly from the port declarations",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "bit i arrives at the sink's bit i (i.e. reversed in y)",
+     "map": {
+      "kind": "identity"
+     },
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0002,
+ "solved": false,
+ "solver_produced": true,
+ "title": "Bit reversal: an 8-lane butterfly from the port declarations",
+ "verification": null,
+ "wall_seconds": 0.0
+}

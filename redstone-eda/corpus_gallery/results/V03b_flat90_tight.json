@@ -1,0 +1,95 @@
+{
+ "artifact": null,
+ "blocked_by": "bus_corner -> failed: form adapter for `a_out`: internal plan conflict at (6, 6, 10): `minecraft:repeater[facing=north,delay=1,locked=false,powered=false]` vs `minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]`",
+ "buses": {
+  "bus_corner": {
+   "call": "d.route_bus('bus_corner', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:red_concrete', 'transparent_block': 'minecraft:red_stained_glass'}))",
+   "error": null,
+   "seconds": 0.0135,
+   "state": "failed: form adapter for `a_out`: internal plan conflict at (6, 6, 10): `minecraft:repeater[facing=north,delay=1,locked=false,powered=false]` vs `minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]`"
+  }
+ },
+ "check": null,
+ "cost_vector": null,
+ "expect": "unsolved",
+ "fixtures": {},
+ "id": "V03b_flat90_tight",
+ "log": [],
+ "loose_blocks": 48,
+ "notes": "The blocking assumption: the pivot tiles are stamped from a fixed plan with no clearance query, so tight geometry fails late, inside the adapter.",
+ "per_bus": {},
+ "question": "How much room does the flat 90-degree corner need, and does the router say so before it fails?",
+ "scenario": {
+  "_file": "scenarios/V03b_flat90_tight.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_corner",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:red_concrete",
+     "transparent_block": "minecraft:red_stained_glass"
+    }
+   }
+  ],
+  "expect": "unsolved",
+  "id": "V03b_flat90_tight",
+  "notes": "The blocking assumption: the pivot tiles are stamped from a fixed plan with no clearance query, so tight geometry fails late, inside the adapter.",
+  "ports": [
+   {
+    "anchor": [
+     2,
+     2,
+     2
+    ],
+    "dir": "in",
+    "feed": [
+     0,
+     0,
+     -1
+    ],
+    "form": "flat_x",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     26,
+     2,
+     6
+    ],
+    "dir": "out",
+    "form": "flat_z",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "How much room does the flat 90-degree corner need, and does the router say so before it fails?",
+  "render": {
+   "pitch": 30,
+   "yaw": 140,
+   "zoom": 1.9
+  },
+  "title": "The same corner, 14 blocks tighter: refused",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "corner turned, lane order preserved",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0135,
+ "solved": false,
+ "solver_produced": true,
+ "title": "The same corner, 14 blocks tighter: refused",
+ "verification": null,
+ "wall_seconds": 0.014
+}

@@ -101,9 +101,48 @@ fn diode_io(p: Pos, block: &str) -> Option<(Pos, Pos)> {
     Some((p.offset(dx, dy, dz), p.offset(-dx, -dy, -dz)))
 }
 
-/// Detect directed cycles through repeaters/comparators over the dust-net
-/// graph: dust components are nodes, each diode is a directed edge from the
-/// component at its input to the component at its output.
+/// A carrier in the conduction graph.
+///
+/// A dust component is one node, as before. What is new is that a solid block
+/// is a node in its own right, because the emitter's stations conduct THROUGH
+/// blocks: `[entry block][repeater][exit block]`. Giving those blocks identity
+/// is what makes both block-mediated paths expressible, and it is also what
+/// makes `diode -> block -> diode` fall out for free — the two diodes name the
+/// same block node.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+enum Carrier {
+    /// A dust component, keyed by its union-find root.
+    Dust(Pos),
+    /// A solid block conducting as a station entry or exit.
+    Block(Pos),
+}
+
+/// The six face neighbours of a cell — the reach of a strongly powered block.
+fn six_neighbours(p: Pos) -> [Pos; 6] {
+    [
+        p.offset(1, 0, 0),
+        p.offset(-1, 0, 0),
+        p.offset(0, 1, 0),
+        p.offset(0, -1, 0),
+        p.offset(0, 0, 1),
+        p.offset(0, 0, -1),
+    ]
+}
+
+/// Which carrier occupies `p`, if any: dust joins its component, a conducting
+/// block stands alone, and everything else carries nothing.
+fn carrier(cells: &BTreeMap<Pos, String>, uf: &mut UnionFind<Pos>, p: Pos) -> Option<Carrier> {
+    match cells.get(&p) {
+        Some(b) if is_dust(b) => Some(Carrier::Dust(uf.find(&p))),
+        Some(b) if blocks::is_solid_block(b) => Some(Carrier::Block(p)),
+        _ => None,
+    }
+}
+
+/// Detect directed cycles through repeaters/comparators over the conduction
+/// graph. Dust components and conducting station blocks are nodes; each diode
+/// is a directed edge from the carrier at its input to the carrier at its
+/// output.
 pub fn repeater_cycles(cells: &BTreeMap<Pos, String>) -> Vec<Violation> {
     // Dust components.
     let mut uf: UnionFind<Pos> = UnionFind::new();
@@ -118,8 +157,12 @@ pub fn repeater_cycles(cells: &BTreeMap<Pos, String>) -> Vec<Violation> {
             uf.union(p, &q);
         }
     }
-    // Directed edges: component -> component, tagged with the diode.
-    let mut edges: BTreeMap<Pos, Vec<(Pos, Pos)>> = BTreeMap::new(); // from-comp -> [(to-comp, diode)]
+    // Directed edges between CARRIERS, tagged with the diode that made them
+    // (untagged for the two block-mediated hops, which are plain conduction).
+    let mut edges: BTreeMap<Carrier, Vec<(Carrier, Option<Pos>)>> = BTreeMap::new();
+    // Station blocks, collected while walking the diodes.
+    let mut entry_blocks: Vec<(Pos, Pos)> = Vec::new(); // (block, its diode)
+    let mut exit_blocks: BTreeSet<Pos> = BTreeSet::new();
     for (p, b) in cells {
         if !(is_repeater(b) || is_comparator(b)) {
             continue;
@@ -127,13 +170,55 @@ pub fn repeater_cycles(cells: &BTreeMap<Pos, String>) -> Vec<Violation> {
         let Some((inp, outp)) = diode_io(*p, b) else {
             continue;
         };
-        let in_dust = cells.get(&inp).is_some_and(|b| is_dust(b));
-        let out_dust = cells.get(&outp).is_some_and(|b| is_dust(b));
-        if in_dust && out_dust {
-            let a = uf.find(&inp);
-            let bcomp = uf.find(&outp);
-            edges.entry(a).or_default().push((bcomp, *p));
+        // A diode's endpoints do NOT have to be dust. Requiring that was the
+        // gap: the emitter's block-sandwich station puts a solid block on BOTH
+        // sides of the repeater, so such a station contributed no edges at all
+        // and a ring made of stations read as a clean design.
+        let (Some(src), Some(dst)) = (carrier(cells, &mut uf, inp), carrier(cells, &mut uf, outp))
+        else {
+            continue;
+        };
+        if let Carrier::Block(bp) = src {
+            entry_blocks.push((bp, *p));
         }
+        if let Carrier::Block(bp) = dst {
+            exit_blocks.insert(bp);
+        }
+        edges.entry(src).or_default().push((dst, Some(*p)));
+    }
+    // A station EXIT block is STRONGLY powered, and a strongly powered block
+    // drives its ENTIRE 6-neighbourhood — not merely the station's own axis.
+    for bp in &exit_blocks {
+        for q in six_neighbours(*bp) {
+            if cells.get(&q).is_some_and(|s| is_dust(s)) {
+                let to = Carrier::Dust(uf.find(&q));
+                edges
+                    .entry(Carrier::Block(*bp))
+                    .or_default()
+                    .push((to, None));
+            }
+        }
+    }
+    // A station ENTRY block is read COLLINEARLY: the dust that weak-powers it
+    // sits directly behind it on the diode's own axis. That is the pointing law
+    // — dust weak-powers only blocks on its connection axes — and it is why this
+    // is one cell rather than the whole neighbourhood.
+    for (bp, diode) in &entry_blocks {
+        let behind = Pos::new(2 * bp.x - diode.x, 2 * bp.y - diode.y, 2 * bp.z - diode.z);
+        if cells.get(&behind).is_some_and(|s| is_dust(s)) {
+            let from = Carrier::Dust(uf.find(&behind));
+            edges
+                .entry(from)
+                .or_default()
+                .push((Carrier::Block(*bp), None));
+        }
+    }
+    // `diode -> block -> diode` needs no rule of its own: when one diode's
+    // output block IS the next diode's input block, both name the same
+    // `Carrier::Block` node, so the chain is already a two-edge path through it.
+    for tos in edges.values_mut() {
+        tos.sort_unstable();
+        tos.dedup();
     }
     // DFS cycle detection over component nodes (deterministic order).
     #[derive(Clone, Copy, PartialEq)]
@@ -142,19 +227,19 @@ pub fn repeater_cycles(cells: &BTreeMap<Pos, String>) -> Vec<Violation> {
         Grey,
         Black,
     }
-    let nodes: BTreeSet<Pos> = edges
+    let nodes: BTreeSet<Carrier> = edges
         .iter()
         .flat_map(|(from, tos)| std::iter::once(*from).chain(tos.iter().map(|(t, _)| *t)))
         .collect();
-    let mut color: BTreeMap<Pos, Color> = nodes.iter().map(|n| (*n, Color::White)).collect();
+    let mut color: BTreeMap<Carrier, Color> = nodes.iter().map(|n| (*n, Color::White)).collect();
     let mut found: Vec<Violation> = Vec::new();
     let mut reported: BTreeSet<Vec<Pos>> = BTreeSet::new();
 
     fn dfs(
-        node: Pos,
-        edges: &BTreeMap<Pos, Vec<(Pos, Pos)>>,
-        color: &mut BTreeMap<Pos, Color>,
-        stack: &mut Vec<(Pos, Pos)>, // (component, diode entered through)
+        node: Carrier,
+        edges: &BTreeMap<Carrier, Vec<(Carrier, Option<Pos>)>>,
+        color: &mut BTreeMap<Carrier, Color>,
+        stack: &mut Vec<(Carrier, Option<Pos>)>, // (carrier, diode entered through)
         found: &mut Vec<Violation>,
         reported: &mut BTreeSet<Vec<Pos>>,
     ) {
@@ -170,10 +255,19 @@ pub fn repeater_cycles(cells: &BTreeMap<Pos, String>) -> Vec<Violation> {
                             .iter()
                             .skip_while(|(c, _)| c != to)
                             .skip(1)
-                            .map(|(_, d)| *d)
+                            .filter_map(|(_, d)| *d)
                             .collect();
-                        diodes.push(*diode);
+                        diodes.extend(*diode);
                         diodes.sort_unstable();
+                        // A LOOP WITH NO DIODE ON IT IS NOT A LATCH, and now
+                        // that plain conduction has its own edges such loops
+                        // exist: a block that is one diode's exit and another's
+                        // entry closes a two-edge ring with the dust beside it
+                        // out of untagged hops alone. Only a directed ring
+                        // through a diode stores anything.
+                        if diodes.is_empty() {
+                            continue;
+                        }
                         if reported.insert(diodes.clone()) {
                             found.push(Violation::RepeaterCycle { diodes });
                         }
@@ -192,10 +286,17 @@ pub fn repeater_cycles(cells: &BTreeMap<Pos, String>) -> Vec<Violation> {
 
     for n in &nodes {
         if color[n] == Color::White {
-            let mut stack = vec![(*n, Pos::new(0, 0, 0))];
-            // The root's entry diode is a placeholder; cycles never include
-            // it because cycle extraction starts at the revisited node.
-            dfs(*n, &edges, &mut color, &mut stack, &mut found, &mut reported);
+            let mut stack = vec![(*n, None)];
+            // The root's entry edge is a placeholder; cycles never include it
+            // because cycle extraction starts at the revisited node.
+            dfs(
+                *n,
+                &edges,
+                &mut color,
+                &mut stack,
+                &mut found,
+                &mut reported,
+            );
         }
     }
     found
@@ -302,6 +403,81 @@ mod tests {
             }
             v => panic!("unexpected: {v:?}"),
         }
+    }
+
+    /// A ring built out of BLOCK-SANDWICH STATIONS, which is the shape the
+    /// emitter actually emits and the shape this check used to miss entirely.
+    ///
+    /// A station is `[entry block][repeater][exit block]`: the repeater's input
+    /// cell is a solid block that dust weak-powers collinearly from behind, and
+    /// its output cell is a solid block that, strongly powered, fans out to its
+    /// whole 6-neighbourhood. Neither of those cells is dust, so a conduction
+    /// graph that only joins dust-in/dust-out diodes sees NO EDGES here at all
+    /// and reports a clean design. This ring latches at 15 and settles
+    /// quiescent, so nothing downstream catches it either.
+    #[test]
+    fn a_block_sandwich_ring_is_detected() {
+        let mut ws = Workspace::new();
+        // Top run, flowing +X, and the left/bottom return path. The two runs
+        // are 2 apart in z, so they only meet through the stations.
+        dust_line(&mut ws, 0, 3, 0, "ring");
+        dust_line(&mut ws, 7, 10, 0, "ring");
+        dust_line(&mut ws, 7, 10, 2, "ring");
+        dust_line(&mut ws, 0, 3, 2, "ring");
+        ws.dust(Pos::new(10, 1, 1), "ring").unwrap();
+        ws.dust(Pos::new(0, 1, 1), "ring").unwrap();
+        // Station A at x=4..6 on z=0: flows +X, so the repeater faces west.
+        ws.stone(Pos::new(4, 1, 0), "entry").unwrap();
+        ws.stone(Pos::new(5, 0, 0), "floor").unwrap();
+        ws.put(Pos::new(5, 1, 0), &repeater("west", 1)).unwrap();
+        ws.stone(Pos::new(6, 1, 0), "exit").unwrap();
+        // Station B at x=6..4 on z=2: flows -X, so the repeater faces east.
+        ws.stone(Pos::new(6, 1, 2), "entry").unwrap();
+        ws.stone(Pos::new(5, 0, 2), "floor").unwrap();
+        ws.put(Pos::new(5, 1, 2), &repeater("east", 1)).unwrap();
+        ws.stone(Pos::new(4, 1, 2), "exit").unwrap();
+        let cycles = repeater_cycles(ws.cells());
+        assert_eq!(
+            cycles.len(),
+            1,
+            "the station ring must be reported: {cycles:?}"
+        );
+        match &cycles[0] {
+            Violation::RepeaterCycle { diodes } => {
+                assert_eq!(diodes, &vec![Pos::new(5, 1, 0), Pos::new(5, 1, 2)]);
+            }
+            v => panic!("unexpected: {v:?}"),
+        }
+    }
+
+    /// `diode -> block -> diode`: one repeater's output block IS the next
+    /// repeater's input block, with no dust between them. The old graph needed
+    /// dust on both sides of every diode, so this chain contributed no edges and
+    /// the ring it closes was invisible.
+    #[test]
+    fn a_diode_block_diode_ring_is_detected() {
+        let mut ws = Workspace::new();
+        // Return path from the second repeater's output back to the first's
+        // input, the long way round.
+        dust_line(&mut ws, 8, 10, 0, "ring");
+        dust_line(&mut ws, 0, 10, 2, "ring");
+        ws.dust(Pos::new(10, 1, 1), "ring").unwrap();
+        ws.dust(Pos::new(0, 1, 1), "ring").unwrap();
+        ws.dust(Pos::new(0, 1, 0), "ring").unwrap();
+        dust_line(&mut ws, 0, 4, 0, "ring");
+        // rep A: dust in at (4,1,0), block out at (6,1,0).
+        ws.stone(Pos::new(5, 0, 0), "floor").unwrap();
+        ws.put(Pos::new(5, 1, 0), &repeater("west", 1)).unwrap();
+        ws.stone(Pos::new(6, 1, 0), "shared").unwrap();
+        // rep B: the SAME block in at (6,1,0), dust out at (8,1,0).
+        ws.stone(Pos::new(7, 0, 0), "floor").unwrap();
+        ws.put(Pos::new(7, 1, 0), &repeater("west", 1)).unwrap();
+        let cycles = repeater_cycles(ws.cells());
+        assert_eq!(
+            cycles.len(),
+            1,
+            "the diode->block->diode ring must be reported: {cycles:?}"
+        );
     }
 
     #[test]

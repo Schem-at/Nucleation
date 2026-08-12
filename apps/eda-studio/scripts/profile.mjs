@@ -108,9 +108,9 @@ try {
   // `dragFrameMs` is the synchronous work per frame (engine move + scene
   // update); `fps` is what the render loop actually achieved alongside it.
   // Both paths the checkbox selects, driven through the real pointer handler:
-  //   preview  — live re-route OFF: pure matrix writes, what the pointer feels
-  //   live     — live re-route ON: also commits the move + re-routes, coalesced
-  //              to at most one commit per animation frame
+  //   preview  — adaptive re-route OFF: pure matrix writes until drop
+  //   adaptive — adaptive re-route ON: cheap known routes may refresh after a
+  //              pause; unknown/slow routes still commit exactly once on drop
   const dragOf = async (liveReroute) => page.evaluate(async (liveReroute) => {
     const e = window.__eda;
     const s = window.__edaStudio();
@@ -124,21 +124,29 @@ try {
     const msBefore = e.sceneMs();
     let sync = 0;
     const t0 = performance.now();
+    let final = at;
     for (let i = 0; i < 30; i++) {
+      final = [at[0] + 1 + (i % 6), at[1], at[2] + 1 + (i % 5)];
       const t = performance.now();
-      window.__edaDragMove("instance", inst.name, [at[0] + (i % 6), at[1], at[2] + (i % 5)]);
+      window.__edaDragMove("instance", inst.name, final);
       sync += performance.now() - t;
       await new Promise((r) => requestAnimationFrame(r));
     }
     const wallMs = performance.now() - t0;
     document.querySelector("#live-reroute").checked = true;
-    window.__edaDrag("instance", inst.name, at);
-    return {
-      wallMs, frames: 30, syncMs: sync / 30, timings: e.timings(), profile: e.profile(),
+    window.__edaDrag("instance", inst.name, final);
+    const result = {
+      wallMs, frames: 30, syncMs: sync / 30,
+      timings: structuredClone(e.timings()), profile: structuredClone(e.profile()),
       meshBuilds: { before: meshBefore, after: e.meshBuilds() },
       reads: { before: readsBefore, after: e.sceneReads() },
       engineMs: { before: msBefore, after: e.sceneMs() },
+      routingPolicy: structuredClone(e.routingPolicy()),
     };
+    // Keep the two profile modes comparable without including cleanup in the
+    // captured numbers.
+    window.__edaDrag("instance", inst.name, at);
+    return result;
   }, liveReroute);
   const shape = (d) => ({
     frames: d.frames,
@@ -158,6 +166,7 @@ try {
       .map((k) => [k, round((d.engineMs.after[k] - d.engineMs.before[k]) / d.frames, 2)])),
     phases: Object.fromEntries(Object.entries(d.timings)
       .map(([k, v]) => [k, { n: v.n, msAvg: round(v.ms / Math.max(v.n, 1), 2) }])),
+    routingPolicy: d.routingPolicy,
   });
   const drag = await dragOf(false);
   out.dragPreview = shape(drag);

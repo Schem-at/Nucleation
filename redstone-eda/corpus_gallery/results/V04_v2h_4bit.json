@@ -1,0 +1,254 @@
+{
+ "artifact": "artifacts/V04_v2h_4bit.schem",
+ "artifact_blocks": 240,
+ "buses": {
+  "bus_pivot4": {
+   "call": "d.route_bus('bus_pivot4', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:pink_concrete'}))",
+   "error": null,
+   "seconds": 0.0096,
+   "state": "routed"
+  }
+ },
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "cost_vector": {
+  "coherence": null,
+  "delay_rt": 6,
+  "footprint": 1920,
+  "length": 93,
+  "skew_rt": 3
+ },
+ "expect": "solved",
+ "fixtures": {},
+ "id": "V04_v2h_4bit",
+ "log": [
+  "verify 16/16 (4-bit stack -> plane, exhaustive 16/16)"
+ ],
+ "loose_blocks": 24,
+ "notes": "PREDICTION DISPROVED. `PIVOT_BITS = 8` is the pivot TILE's own width, not a limit on the bus: a 4-bit bundle pivots and passes all 16 patterns. Recorded because the constant reads like a limit and is not one.",
+ "per_bus": {
+  "bus_pivot4": {
+   "bbox": [
+    [
+     2,
+     1,
+     4
+    ],
+    [
+     16,
+     8,
+     19
+    ]
+   ],
+   "cells": 216,
+   "delay_rt": 6,
+   "devices": 15,
+   "footprint": 1920,
+   "glass": 0,
+   "per_bit_rt": [
+    6,
+    3,
+    3,
+    3
+   ],
+   "skew_rt": 3,
+   "wire": 93
+  }
+ },
+ "question": "V01 at width 4.  Is the v2h pivot parametric in width, or hard-wired to PIVOT_BITS = 8?",
+ "scenario": {
+  "_file": "scenarios/V04_v2h_4bit.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_pivot4",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:pink_concrete"
+    }
+   }
+  ],
+  "expect": "solved",
+  "id": "V04_v2h_4bit",
+  "notes": "PREDICTION DISPROVED. `PIVOT_BITS = 8` is the pivot TILE's own width, not a limit on the bus: a 4-bit bundle pivots and passes all 16 patterns. Recorded because the constant reads like a limit and is not one.",
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 4
+   },
+   {
+    "anchor": [
+     10,
+     2,
+     20
+    ],
+    "dir": "out",
+    "form": "flat_x",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 4
+   }
+  ],
+  "question": "V01 at width 4.  Is the v2h pivot parametric in width, or hard-wired to PIVOT_BITS = 8?",
+  "render": {
+   "pitch": 24,
+   "yaw": 145,
+   "zoom": 2.0
+  },
+  "title": "Vertical -> flat at width 4 (probing the fixed pivot width)",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "4-bit stack -> plane, exhaustive",
+     "out": "a_out",
+     "patterns": "exhaustive"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0096,
+ "solved": true,
+ "solver_produced": true,
+ "title": "Vertical -> flat at width 4 (probing the fixed pivot width)",
+ "verification": {
+  "cases": [
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 0
+   },
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 2
+   },
+   {
+    "got": 3,
+    "in": 3,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 3
+   },
+   {
+    "got": 4,
+    "in": 4,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 4
+   },
+   {
+    "got": 5,
+    "in": 5,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 5
+   },
+   {
+    "got": 6,
+    "in": 6,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 6
+   },
+   {
+    "got": 7,
+    "in": 7,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 7
+   },
+   {
+    "got": 8,
+    "in": 8,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 8
+   },
+   {
+    "got": 9,
+    "in": 9,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 9
+   },
+   {
+    "got": 10,
+    "in": 10,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 10
+   },
+   {
+    "got": 11,
+    "in": 11,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 11
+   },
+   {
+    "got": 12,
+    "in": 12,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 12
+   },
+   {
+    "got": 13,
+    "in": 13,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 13
+   },
+   {
+    "got": 14,
+    "in": 14,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 14
+   },
+   {
+    "got": 15,
+    "in": 15,
+    "ok": true,
+    "section": "4-bit stack -> plane, exhaustive",
+    "want": 15
+   }
+  ],
+  "ok": true,
+  "passed": 16,
+  "sections": {
+   "4-bit stack -> plane, exhaustive": {
+    "passed": 16,
+    "total": 16
+   }
+  },
+  "total": 16
+ },
+ "wall_seconds": 0.063
+}

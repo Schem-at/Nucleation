@@ -649,20 +649,18 @@ pub(crate) fn wire_simulation(
             // rider is spawned by its vehicle's arm above and never appears in
             // this list. Standing alone it is scaffolding like a villager, and a
             // blaze that should fly or fight refuses by name.
-            mc_tick::structure::SpawnedEntity::Body(body) => {
-                match sim.spawn_authored_body(body) {
-                    Ok(vehicle) => {
-                        for rider in &body.passengers {
-                            if let Err(why) = sim.spawn_authored_rider(vehicle, rider) {
-                                refused.push(why);
-                            }
+            mc_tick::structure::SpawnedEntity::Body(body) => match sim.spawn_authored_body(body) {
+                Ok(vehicle) => {
+                    for rider in &body.passengers {
+                        if let Err(why) = sim.spawn_authored_rider(vehicle, rider) {
+                            refused.push(why);
                         }
                     }
-                    Err(why) => {
-                        refused.push(why);
-                    }
                 }
-            }
+                Err(why) => {
+                    refused.push(why);
+                }
+            },
         }
     }
     if !refused.is_empty() {
@@ -1437,7 +1435,10 @@ pub mod ffi {
                 .iter()
                 .map(|&[x, y, z]| {
                     let id = self.sim.world().get(mc_tick::Pos::new(x, y, z));
-                    self.sim.registry().descriptor(id).unwrap_or("minecraft:air")
+                    self.sim
+                        .registry()
+                        .descriptor(id)
+                        .unwrap_or("minecraft:air")
                 })
                 .collect();
             let json = serde_json::to_string(&states).map_err(|_| NucleationError::Serialize)?;
@@ -1886,11 +1887,11 @@ pub mod ffi {
                 }
                 let state = self.sim.registry().descriptor(m.state).unwrap_or("?");
                 let carried = self.sim.registry().descriptor(m.carried).unwrap_or("?");
-                let quoted = |s: Option<mc_tick::StateId>| {
-                    match s.and_then(|s| self.sim.registry().descriptor(s)) {
-                        Some(descriptor) => format!("\"{descriptor}\""),
-                        None => "null".to_string(),
-                    }
+                let quoted = |s: Option<mc_tick::StateId>| match s
+                    .and_then(|s| self.sim.registry().descriptor(s))
+                {
+                    Some(descriptor) => format!("\"{descriptor}\""),
+                    None => "null".to_string(),
                 };
                 let carried_short = quoted(m.carried_short);
                 let remains = quoted(m.remains);
@@ -2840,7 +2841,12 @@ mod tests {
             schem.set_block(x, 0, 0, &BlockState::new("minecraft:smooth_stone"));
         }
         schem
-            .set_block_from_string(0, 1, 0, "minecraft:lever[face=floor,facing=north,powered=true]")
+            .set_block_from_string(
+                0,
+                1,
+                0,
+                "minecraft:lever[face=floor,facing=north,powered=true]",
+            )
             .expect("lever");
         for x in 1..3 {
             schem

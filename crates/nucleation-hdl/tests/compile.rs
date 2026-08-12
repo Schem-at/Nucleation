@@ -189,7 +189,9 @@ fn counter4_model_counts_like_the_blif() {
 #[test]
 fn fsm_model_matches_the_blif_on_a_long_input_tape() {
     // every x pattern of 6 steps — 64 tapes woven into one long run
-    let tape: Vec<u64> = (0..64u64).flat_map(|w| (0..6).map(move |b| (w >> b) & 1)).collect();
+    let tape: Vec<u64> = (0..64u64)
+        .flat_map(|w| (0..6).map(move |b| (w >> b) & 1))
+        .collect();
     check_seq_against_blif("fsm", &tape);
 }
 
@@ -212,8 +214,15 @@ fn seq_geometry_has_a_clock_lever_dff_ports_and_q_rail_probes() {
         let c = compile_blif(&fixture(name), name).unwrap();
         let clock = c.clock.as_ref().expect("clock");
         let (x, y, z) = clock.lever;
-        assert!(c.build.cells[&(x, y, z)].contains("lever"), "{name}: clock lever");
-        assert_eq!(c.levers.len(), c.inputs.len(), "{name}: one lever per real PI");
+        assert!(
+            c.build.cells[&(x, y, z)].contains("lever"),
+            "{name}: clock lever"
+        );
+        assert_eq!(
+            c.levers.len(),
+            c.inputs.len(),
+            "{name}: one lever per real PI"
+        );
         for (k, l) in c.latches.iter().enumerate() {
             assert!(
                 c.probes.contains_key(&l.q_rail),

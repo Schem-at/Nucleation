@@ -115,7 +115,11 @@ fn world(name: &str) -> (Simulation, mc_tick::Structure) {
         mc_tick::register_all(sim.registry_mut(), &mut table);
         *sim.behaviours_mut() = table;
     }
-    assert_eq!(sim.unknown_report(), None, "a partially-simulated world proves nothing");
+    assert_eq!(
+        sim.unknown_report(),
+        None,
+        "a partially-simulated world proves nothing"
+    );
     let (solidity, frictions, heights, webs) = mc_tick::vanilla::physics_tables(sim.registry());
     sim.set_physics_tables(solidity, frictions, heights, webs);
     let (water_kinds, bubble_kinds) = mc_tick::vanilla::fluid_tables(sim.registry());
@@ -155,10 +159,14 @@ fn fall(sim: &mut Simulation, n: usize) -> Vec<Vec<f64>> {
 #[test]
 fn a_cart_rests_on_a_living_body_and_falls_through_a_projectile() {
     let (mut sim, structure) = world("blaze_ride.snbt");
-    sim.spawn_frozen_entity("minecraft:blaze".into(), [2.5, 1.0, 10.5]).unwrap();
-    sim.spawn_frozen_entity("minecraft:villager".into(), [2.5, 1.0, 13.5]).unwrap();
-    sim.spawn_frozen_entity("minecraft:small_fireball".into(), [2.5, 1.0, 16.5]).unwrap();
-    sim.spawn_frozen_entity("minecraft:dragon_fireball".into(), [2.5, 1.0, 19.5]).unwrap();
+    sim.spawn_frozen_entity("minecraft:blaze".into(), [2.5, 1.0, 10.5])
+        .unwrap();
+    sim.spawn_frozen_entity("minecraft:villager".into(), [2.5, 1.0, 13.5])
+        .unwrap();
+    sim.spawn_frozen_entity("minecraft:small_fireball".into(), [2.5, 1.0, 16.5])
+        .unwrap();
+    sim.spawn_frozen_entity("minecraft:dragon_fireball".into(), [2.5, 1.0, 19.5])
+        .unwrap();
     // Spawn order fixes the lane order the assertions below read.
     for z in [10.5, 13.5, 16.5, 19.5, 27.5] {
         sim.spawn_minecart("minecraft:minecart".into(), [2.5, 3.0, z], [0.0; 3]);
@@ -172,17 +180,28 @@ fn a_cart_rests_on_a_living_body_and_falls_through_a_projectile() {
     // Where each one comes to *rest* is exact — that number is the body's top,
     // not a sum of eleven multiplications, so there is nothing for the origin
     // to perturb.
-    assert_eq!(seen[0][10], 2.799999952316284, "the blaze's exact float top");
+    assert_eq!(
+        seen[0][10], 2.799999952316284,
+        "the blaze's exact float top"
+    );
     assert_eq!(seen[1][10], 2.950000047683716, "the villager's");
     assert_eq!(seen[2], seen[4], "a small fireball is not there at all");
-    assert_eq!(seen[3], seen[4], "nor is a dragon fireball, one block tall though it is");
+    assert_eq!(
+        seen[3], seen[4],
+        "nor is a dragon fireball, one block tall though it is"
+    );
 
     // And the bodies feel nothing back. Vanilla's blaze and villager hold
     // (2.5, 1.0, z) to the last digit for all thirty ticks of the capture,
     // whether AI is on or off, while a cart sits on their heads.
     for body in sim.entity_bodies().iter().filter(|b| !b.is_minecart) {
         let centre = [(body.min[0] + body.max[0]) / 2.0, body.min[1]];
-        assert_eq!(centre, [2.5, 1.0], "{} was moved by the cart on it", body.kind);
+        assert_eq!(
+            centre,
+            [2.5, 1.0],
+            "{} was moved by the cart on it",
+            body.kind
+        );
     }
 }
 
@@ -195,8 +214,11 @@ fn a_cart_rests_on_a_living_body_and_falls_through_a_projectile() {
 #[test]
 fn a_cart_rests_on_a_seated_passenger() {
     let (mut sim, structure) = world("cart_body2.snbt");
-    let vehicle =
-        sim.spawn_minecart("minecraft:minecart".into(), [2.5, 1.0, 40.5], [0.0, 0.0, f64::NAN]);
+    let vehicle = sim.spawn_minecart(
+        "minecraft:minecart".into(),
+        [2.5, 1.0, 40.5],
+        [0.0, 0.0, f64::NAN],
+    );
     sim.spawn_authored_rider(
         vehicle,
         &mc_tick::structure::SpawnedEntity::Body(mc_tick::structure::SpawnedBody {
@@ -208,14 +230,21 @@ fn a_cart_rests_on_a_seated_passenger() {
         }),
     )
     .expect("a blaze on a plain minecart is measured");
-    sim.spawn_minecart("minecraft:furnace_minecart".into(), [2.5, 4.0, 40.5], [0.0; 3]);
+    sim.spawn_minecart(
+        "minecraft:furnace_minecart".into(),
+        [2.5, 4.0, 40.5],
+        [0.0; 3],
+    );
     settle(&mut sim, &structure);
 
     for _ in 0..20 {
         sim.step();
     }
     let carts = sim.minecarts();
-    assert_eq!(carts[1].pos[1], 2.987499952316284, "resting on the rider's head");
+    assert_eq!(
+        carts[1].pos[1], 2.987499952316284,
+        "resting on the rider's head"
+    );
     // The vehicle is still a nan cart, and still where it was: nothing about
     // carrying a rider or being stood on makes it finite.
     assert_eq!(carts[0].pos, [2.5, 1.0, 40.5]);
@@ -230,10 +259,12 @@ fn a_cart_rests_on_a_seated_passenger() {
 #[test]
 fn a_cart_beside_a_body_rather_than_over_it_falls() {
     let (mut sim, structure) = world("cart_body.snbt");
-    sim.spawn_frozen_entity("minecraft:blaze".into(), [2.5, 1.0, 43.5]).unwrap();
+    sim.spawn_frozen_entity("minecraft:blaze".into(), [2.5, 1.0, 43.5])
+        .unwrap();
     sim.spawn_minecart("minecraft:minecart".into(), [4.0, 3.0, 43.5], [0.0; 3]);
     // The positive control, same body, cart directly over it.
-    sim.spawn_frozen_entity("minecraft:blaze".into(), [2.5, 1.0, 31.5]).unwrap();
+    sim.spawn_frozen_entity("minecraft:blaze".into(), [2.5, 1.0, 31.5])
+        .unwrap();
     sim.spawn_minecart("minecraft:minecart".into(), [2.5, 3.0, 31.5], [0.0; 3]);
     settle(&mut sim, &structure);
 
@@ -279,9 +310,18 @@ fn a_cart_resting_on_a_body_is_on_the_ground() {
     ];
 
     let (mut sim, structure) = world("cart_body.snbt");
-    sim.spawn_frozen_entity("minecraft:blaze".into(), [2.5, 1.0, 37.5]).unwrap();
-    sim.spawn_minecart("minecraft:minecart".into(), [2.5, 3.0, 37.5], [0.1, 0.0, 0.0]);
-    sim.spawn_minecart("minecraft:minecart".into(), [2.5, 3.0, 40.5], [0.1, 0.0, 0.0]);
+    sim.spawn_frozen_entity("minecraft:blaze".into(), [2.5, 1.0, 37.5])
+        .unwrap();
+    sim.spawn_minecart(
+        "minecraft:minecart".into(),
+        [2.5, 3.0, 37.5],
+        [0.1, 0.0, 0.0],
+    );
+    sim.spawn_minecart(
+        "minecraft:minecart".into(),
+        [2.5, 3.0, 40.5],
+        [0.1, 0.0, 0.0],
+    );
     settle(&mut sim, &structure);
 
     let mut on_blaze = Vec::new();
@@ -291,8 +331,16 @@ fn a_cart_resting_on_a_body_is_on_the_ground() {
         on_blaze.push(sim.minecarts()[0].pos[0]);
         on_stone.push(sim.minecarts()[1].pos[0]);
     }
-    assert_eq!(on_blaze, ON_BLAZE_X.to_vec(), "grounded on the blaze from tick 3");
-    assert_eq!(on_stone, ON_STONE_X.to_vec(), "still falling, so still airborne");
+    assert_eq!(
+        on_blaze,
+        ON_BLAZE_X.to_vec(),
+        "grounded on the blaze from tick 3"
+    );
+    assert_eq!(
+        on_stone,
+        ON_STONE_X.to_vec(),
+        "still falling, so still airborne"
+    );
     assert_eq!(sim.minecarts()[0].pos[1], 2.799999952316284);
     assert!(sim.minecarts()[0].on_ground, "and it says so");
 }
@@ -312,11 +360,25 @@ fn a_cart_resting_on_a_body_is_on_the_ground() {
 #[test]
 fn a_body_stops_a_cart_sideways_at_its_own_face() {
     let (mut sim, structure) = world("cart_body2.snbt");
-    sim.spawn_frozen_entity("minecraft:blaze".into(), [6.5, 1.0, 1.5]).unwrap();
-    sim.spawn_frozen_entity("minecraft:dragon_fireball".into(), [6.5, 1.0, 4.5]).unwrap();
-    sim.spawn_minecart("minecraft:minecart".into(), [1.5, 1.0625, 1.5], [0.3, 0.0, 0.0]);
-    sim.spawn_minecart("minecraft:minecart".into(), [1.5, 1.0625, 4.5], [0.3, 0.0, 0.0]);
-    sim.spawn_minecart("minecraft:minecart".into(), [1.5, 1.0625, 7.5], [0.3, 0.0, 0.0]);
+    sim.spawn_frozen_entity("minecraft:blaze".into(), [6.5, 1.0, 1.5])
+        .unwrap();
+    sim.spawn_frozen_entity("minecraft:dragon_fireball".into(), [6.5, 1.0, 4.5])
+        .unwrap();
+    sim.spawn_minecart(
+        "minecraft:minecart".into(),
+        [1.5, 1.0625, 1.5],
+        [0.3, 0.0, 0.0],
+    );
+    sim.spawn_minecart(
+        "minecraft:minecart".into(),
+        [1.5, 1.0625, 4.5],
+        [0.3, 0.0, 0.0],
+    );
+    sim.spawn_minecart(
+        "minecraft:minecart".into(),
+        [1.5, 1.0625, 7.5],
+        [0.3, 0.0, 0.0],
+    );
     settle(&mut sim, &structure);
 
     for _ in 0..60 {
@@ -336,7 +398,10 @@ fn a_body_stops_a_cart_sideways_at_its_own_face() {
         carts[1].pos[0], carts[2].pos[0],
         "a dragon fireball in the way is indistinguishable from an empty rail"
     );
-    assert!(carts[2].pos[0] > 6.5, "and the control really did run past x=6.5");
+    assert!(
+        carts[2].pos[0] > 6.5,
+        "and the control really did run past x=6.5"
+    );
 }
 
 /// Cart on cart, vertically. `cart_body` lane z=22.5 drops one plain minecart
@@ -353,7 +418,11 @@ fn a_cart_rests_on_a_cart() {
         sim.step();
     }
     assert_eq!(sim.minecarts()[1].pos[1], 1.699999988079071);
-    assert_eq!(sim.minecarts()[0].pos[1], 1.0, "the one underneath is not pressed down");
+    assert_eq!(
+        sim.minecarts()[0].pos[1],
+        1.0,
+        "the one underneath is not pressed down"
+    );
 }
 
 /// A **boat** holds a cart up, and an **armor stand** does not.
@@ -373,9 +442,11 @@ fn a_cart_rests_on_a_cart() {
 #[test]
 fn a_boat_holds_a_cart_up_and_an_armor_stand_does_not() {
     let (mut sim, structure) = world("cart_body.snbt");
-    sim.spawn_frozen_entity("minecraft:oak_boat".into(), [2.5, 1.0, 16.5]).unwrap();
+    sim.spawn_frozen_entity("minecraft:oak_boat".into(), [2.5, 1.0, 16.5])
+        .unwrap();
     sim.spawn_minecart("minecraft:minecart".into(), [2.5, 3.0, 16.5], [0.0; 3]);
-    sim.spawn_frozen_entity("minecraft:armor_stand".into(), [2.5, 1.0, 13.5]).unwrap();
+    sim.spawn_frozen_entity("minecraft:armor_stand".into(), [2.5, 1.0, 13.5])
+        .unwrap();
     sim.spawn_minecart("minecraft:minecart".into(), [2.5, 3.0, 13.5], [0.0; 3]);
     settle(&mut sim, &structure);
 
@@ -408,12 +479,26 @@ fn a_boat_holds_a_cart_up_and_an_armor_stand_does_not() {
 #[test]
 fn a_boat_stops_a_cart_sideways_and_an_armor_stand_is_transparent() {
     let (mut sim, structure) = world("cart_body2.snbt");
-    sim.spawn_frozen_entity("minecraft:oak_boat".into(), [6.5, 1.0, 1.5]).unwrap();
-    sim.spawn_frozen_entity("minecraft:armor_stand".into(), [6.5, 1.0, 4.5]).unwrap();
-    sim.spawn_minecart("minecraft:minecart".into(), [1.5, 1.0625, 1.5], [0.3, 0.0, 0.0]);
-    sim.spawn_minecart("minecraft:minecart".into(), [1.5, 1.0625, 4.5], [0.3, 0.0, 0.0]);
+    sim.spawn_frozen_entity("minecraft:oak_boat".into(), [6.5, 1.0, 1.5])
+        .unwrap();
+    sim.spawn_frozen_entity("minecraft:armor_stand".into(), [6.5, 1.0, 4.5])
+        .unwrap();
+    sim.spawn_minecart(
+        "minecraft:minecart".into(),
+        [1.5, 1.0625, 1.5],
+        [0.3, 0.0, 0.0],
+    );
+    sim.spawn_minecart(
+        "minecraft:minecart".into(),
+        [1.5, 1.0625, 4.5],
+        [0.3, 0.0, 0.0],
+    );
     // The empty control, same rail, nothing on it.
-    sim.spawn_minecart("minecraft:minecart".into(), [1.5, 1.0625, 7.5], [0.3, 0.0, 0.0]);
+    sim.spawn_minecart(
+        "minecraft:minecart".into(),
+        [1.5, 1.0625, 7.5],
+        [0.3, 0.0, 0.0],
+    );
     settle(&mut sim, &structure);
 
     for _ in 0..60 {
@@ -429,5 +514,8 @@ fn a_boat_stops_a_cart_sideways_and_an_armor_stand_is_transparent() {
         carts[1].pos[0], carts[2].pos[0],
         "an armor stand in the way is indistinguishable from an empty rail"
     );
-    assert!(carts[2].pos[0] > 6.5, "and the control really did run past x=6.5");
+    assert!(
+        carts[2].pos[0] > 6.5,
+        "and the control really did run past x=6.5"
+    );
 }

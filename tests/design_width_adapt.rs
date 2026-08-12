@@ -55,7 +55,8 @@ fn mismatched(wd: u8, ws: u8) -> Design {
     let snk = lamp_bank(&mut s, 32, 2, 8, ws);
     let mut d = Design::for_schematic("wa", s);
     d.declare_input("din", drv, (0, 2, 0), wd, ty(wd)).unwrap();
-    d.declare_output("dout", snk, (0, 2, 0), ws, ty(ws)).unwrap();
+    d.declare_output("dout", snk, (0, 2, 0), ws, ty(ws))
+        .unwrap();
     d
 }
 
@@ -137,15 +138,30 @@ fn narrow_to_wide_routes_lsb_aligned_by_default() {
 fn msb_alignment_shifts_the_word_up_by_the_width_difference() {
     let mut d = mismatched(2, 4);
     let st = d
-        .route_bus_adapted("b", "din", &["dout"], vec![], BusStyle::default(), WidthAdapt::msb())
+        .route_bus_adapted(
+            "b",
+            "din",
+            &["dout"],
+            vec![],
+            BusStyle::default(),
+            WidthAdapt::msb(),
+        )
         .unwrap();
     assert_eq!(st, BusState::Routed, "{:?}", d.bus_state("b"));
     let m = map_of(&d, "b");
     assert_eq!(m.shift, 2, "msb alignment of 2 into 4 shifts by 2");
     assert_eq!((m.from_bit, m.bits), (0, 2));
-    assert_eq!(m.tied_zero, vec![0, 1], "the LOW sink bits are the spare ones");
+    assert_eq!(
+        m.tied_zero,
+        vec![0, 1],
+        "the LOW sink bits are the spare ones"
+    );
     // driver bit 0 -> sink bit 2, driver bit 1 -> sink bit 3
-    assert!(m.to_json().contains("[0,2]") && m.to_json().contains("[1,3]"), "{}", m.to_json());
+    assert!(
+        m.to_json().contains("[0,2]") && m.to_json().contains("[1,3]"),
+        "{}",
+        m.to_json()
+    );
     assert_route_lands_on_mapped_bits(&d, "b");
     assert!(d.check().unwrap().clean, "{}", d.check().unwrap().json);
 
@@ -179,7 +195,11 @@ fn an_explicit_shift_places_the_word_where_asked() {
             "every unmapped sink bit must be reported"
         );
         assert_route_lands_on_mapped_bits(&d, "b");
-        assert!(d.check().unwrap().clean, "shift {sh}: {}", d.check().unwrap().json);
+        assert!(
+            d.check().unwrap().clean,
+            "shift {sh}: {}",
+            d.check().unwrap().json
+        );
     }
 }
 
@@ -192,7 +212,10 @@ fn wide_to_narrow_needs_truncate_and_says_which_bits_go() {
         .route_bus("b", "din", &["dout"], vec![], BusStyle::default())
         .unwrap_err();
     assert!(err.contains("drop bits 4..7"), "{err}");
-    assert!(err.contains("truncate"), "the refusal must name the way out: {err}");
+    assert!(
+        err.contains("truncate"),
+        "the refusal must name the way out: {err}"
+    );
     assert!(d.bus("b").is_none(), "the refused bus was created anyway");
 
     // With truncate: the low 4 bits connect and the high 4 are dropped.
@@ -260,19 +283,34 @@ fn fanout_still_requires_one_common_width() {
 #[test]
 fn the_mapping_survives_a_reroute_and_a_round_trip() {
     let mut d = mismatched(2, 4);
-    d.route_bus_adapted("b", "din", &["dout"], vec![], BusStyle::default(), WidthAdapt::msb())
-        .unwrap();
+    d.route_bus_adapted(
+        "b",
+        "din",
+        &["dout"],
+        vec![],
+        BusStyle::default(),
+        WidthAdapt::msb(),
+    )
+    .unwrap();
     let before = map_of(&d, "b");
     let geom = d.bus("b").unwrap().fragment.clone();
 
     d.rip("b").unwrap();
     assert_eq!(d.reroute("b").unwrap(), BusState::Routed);
     assert_eq!(map_of(&d, "b"), before, "the reroute lost the bit mapping");
-    assert_eq!(d.bus("b").unwrap().fragment, geom, "the reroute moved the wiring");
+    assert_eq!(
+        d.bus("b").unwrap().fragment,
+        geom,
+        "the reroute moved the wiring"
+    );
 
     let bytes = d.to_nucm_bytes().unwrap();
     let back = Design::from_nucm_bytes(&bytes).unwrap();
-    assert_eq!(map_of(&back, "b"), before, "the round trip lost the bit mapping");
+    assert_eq!(
+        map_of(&back, "b"),
+        before,
+        "the round trip lost the bit mapping"
+    );
     assert!(back.check().unwrap().clean);
 }
 
@@ -291,7 +329,8 @@ fn an_undriven_promoted_input_reads_zero() {
     // A 4-bit sink whose TOP bit is deliberately left unwired.
     let mut d = mismatched(3, 4);
     assert_eq!(
-        d.route_bus("b", "din", &["dout"], vec![], BusStyle::default()).unwrap(),
+        d.route_bus("b", "din", &["dout"], vec![], BusStyle::default())
+            .unwrap(),
         BusState::Routed
     );
     assert_eq!(map_of(&d, "b").tied_zero, vec![3]);
@@ -329,8 +368,15 @@ fn an_msb_aligned_bus_delivers_the_shifted_word_in_sim() {
 
     let mut d = mismatched(2, 4);
     assert_eq!(
-        d.route_bus_adapted("b", "din", &["dout"], vec![], BusStyle::default(), WidthAdapt::msb())
-            .unwrap(),
+        d.route_bus_adapted(
+            "b",
+            "din",
+            &["dout"],
+            vec![],
+            BusStyle::default(),
+            WidthAdapt::msb()
+        )
+        .unwrap(),
         BusState::Routed
     );
     let baked = d.bake(4000).unwrap();
@@ -362,9 +408,18 @@ fn the_three_alignments_are_distinct() {
     let (wd, ws) = (2u8, 5u8);
     let mut shifts = Vec::new();
     for adapt in [
-        WidthAdapt { align: BusAlign::Lsb, truncate: false },
-        WidthAdapt { align: BusAlign::Msb, truncate: false },
-        WidthAdapt { align: BusAlign::Shift(1), truncate: false },
+        WidthAdapt {
+            align: BusAlign::Lsb,
+            truncate: false,
+        },
+        WidthAdapt {
+            align: BusAlign::Msb,
+            truncate: false,
+        },
+        WidthAdapt {
+            align: BusAlign::Shift(1),
+            truncate: false,
+        },
     ] {
         let mut d = mismatched(wd, ws);
         d.route_bus_adapted("b", "din", &["dout"], vec![], BusStyle::default(), adapt)

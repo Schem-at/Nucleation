@@ -1,0 +1,678 @@
+{
+ "artifact": "artifacts/P02_permute8.schem",
+ "artifact_blocks": 874,
+ "buses": {
+  "net_a0": {
+   "call": "d.route_bus('net_a0', driver='a0', sinks=['b3'])",
+   "error": null,
+   "seconds": 0.0893,
+   "state": "routed"
+  },
+  "net_a1": {
+   "call": "d.route_bus('net_a1', driver='a1', sinks=['b1'])",
+   "error": null,
+   "seconds": 0.1613,
+   "state": "routed"
+  },
+  "net_a2": {
+   "call": "d.route_bus('net_a2', driver='a2', sinks=['b4'])",
+   "error": null,
+   "seconds": 0.0948,
+   "state": "routed"
+  },
+  "net_a3": {
+   "call": "d.route_bus('net_a3', driver='a3', sinks=['b7'])",
+   "error": null,
+   "seconds": 0.0081,
+   "state": "routed"
+  },
+  "net_a4": {
+   "call": "d.route_bus('net_a4', driver='a4', sinks=['b0'])",
+   "error": null,
+   "seconds": 0.0486,
+   "state": "routed"
+  },
+  "net_a5": {
+   "call": "d.route_bus('net_a5', driver='a5', sinks=['b6'])",
+   "error": null,
+   "seconds": 0.1596,
+   "state": "routed"
+  },
+  "net_a6": {
+   "call": "d.route_bus('net_a6', driver='a6', sinks=['b2'])",
+   "error": null,
+   "seconds": 0.0811,
+   "state": "routed"
+  },
+  "net_a7": {
+   "call": "d.route_bus('net_a7', driver='a7', sinks=['b5'])",
+   "error": null,
+   "seconds": 0.1243,
+   "state": "routed"
+  }
+ },
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "cost_vector": {
+  "coherence": null,
+  "delay_rt": 3,
+  "footprint": 19308,
+  "length": 380,
+  "skew_rt": 0
+ },
+ "expect": "solved",
+ "fixtures": {},
+ "id": "P02_permute8",
+ "log": [
+  "verify 12/12 (shuffle a_i -> b_P[i], all 8 lanes isolated 12/12)"
+ ],
+ "loose_blocks": 48,
+ "notes": "Walking ones is the isolation proof: if two nets shorted, one lever would light two lamps and the read word would not match the permutation.  Net order: [3, 4, 6, 0, 2, 7, 5, 1].",
+ "per_bus": {
+  "net_a0": {
+   "bbox": [
+    [
+     1,
+     1,
+     5
+    ],
+    [
+     45,
+     8,
+     10
+    ]
+   ],
+   "cells": 98,
+   "delay_rt": 2,
+   "devices": 3,
+   "footprint": 2160,
+   "glass": 0,
+   "per_bit_rt": [
+    2
+   ],
+   "skew_rt": 0,
+   "wire": 45
+  },
+  "net_a1": {
+   "bbox": [
+    [
+     1,
+     3,
+     5
+    ],
+    [
+     45,
+     4,
+     6
+    ]
+   ],
+   "cells": 92,
+   "delay_rt": 3,
+   "devices": 3,
+   "footprint": 180,
+   "glass": 0,
+   "per_bit_rt": [
+    3
+   ],
+   "skew_rt": 0,
+   "wire": 43
+  },
+  "net_a2": {
+   "bbox": [
+    [
+     1,
+     5,
+     5
+    ],
+    [
+     45,
+     10,
+     12
+    ]
+   ],
+   "cells": 102,
+   "delay_rt": 3,
+   "devices": 3,
+   "footprint": 2160,
+   "glass": 0,
+   "per_bit_rt": [
+    3
+   ],
+   "skew_rt": 0,
+   "wire": 47
+  },
+  "net_a3": {
+   "bbox": [
+    [
+     2,
+     7,
+     4
+    ],
+    [
+     46,
+     16,
+     17
+    ]
+   ],
+   "cells": 114,
+   "delay_rt": 0,
+   "devices": 4,
+   "footprint": 6300,
+   "glass": 0,
+   "per_bit_rt": [
+    0
+   ],
+   "skew_rt": 0,
+   "wire": 52
+  },
+  "net_a4": {
+   "bbox": [
+    [
+     1,
+     1,
+     4
+    ],
+    [
+     45,
+     10,
+     7
+    ]
+   ],
+   "cells": 98,
+   "delay_rt": 1,
+   "devices": 3,
+   "footprint": 1800,
+   "glass": 0,
+   "per_bit_rt": [
+    1
+   ],
+   "skew_rt": 0,
+   "wire": 45
+  },
+  "net_a5": {
+   "bbox": [
+    [
+     1,
+     11,
+     4
+    ],
+    [
+     46,
+     14,
+     15
+    ]
+   ],
+   "cells": 122,
+   "delay_rt": 1,
+   "devices": 4,
+   "footprint": 2208,
+   "glass": 0,
+   "per_bit_rt": [
+    1
+   ],
+   "skew_rt": 0,
+   "wire": 56
+  },
+  "net_a6": {
+   "bbox": [
+    [
+     1,
+     5,
+     5
+    ],
+    [
+     45,
+     14,
+     8
+    ]
+   ],
+   "cells": 92,
+   "delay_rt": 2,
+   "devices": 3,
+   "footprint": 1800,
+   "glass": 0,
+   "per_bit_rt": [
+    2
+   ],
+   "skew_rt": 0,
+   "wire": 41
+  },
+  "net_a7": {
+   "bbox": [
+    [
+     1,
+     11,
+     5
+    ],
+    [
+     45,
+     16,
+     14
+    ]
+   ],
+   "cells": 108,
+   "delay_rt": 3,
+   "devices": 3,
+   "footprint": 2700,
+   "glass": 0,
+   "per_bit_rt": [
+    3
+   ],
+   "skew_rt": 0,
+   "wire": 51
+  }
+ },
+ "question": "Route a_i -> b_[3, 1, 4, 7, 0, 6, 2, 5].  Can eight independent 1-bit buses realize an arbitrary shuffle through one shared volume without shorting?",
+ "scenario": {
+  "_file": "scenarios/P02_permute8.py",
+  "buses": [
+   {
+    "driver": "a3",
+    "name": "net_a3",
+    "sinks": [
+     "b7"
+    ]
+   },
+   {
+    "driver": "a4",
+    "name": "net_a4",
+    "sinks": [
+     "b0"
+    ]
+   },
+   {
+    "driver": "a6",
+    "name": "net_a6",
+    "sinks": [
+     "b2"
+    ]
+   },
+   {
+    "driver": "a0",
+    "name": "net_a0",
+    "sinks": [
+     "b3"
+    ]
+   },
+   {
+    "driver": "a2",
+    "name": "net_a2",
+    "sinks": [
+     "b4"
+    ]
+   },
+   {
+    "driver": "a7",
+    "name": "net_a7",
+    "sinks": [
+     "b5"
+    ]
+   },
+   {
+    "driver": "a5",
+    "name": "net_a5",
+    "sinks": [
+     "b6"
+    ]
+   },
+   {
+    "driver": "a1",
+    "name": "net_a1",
+    "sinks": [
+     "b1"
+    ]
+   }
+  ],
+  "expect": "solved",
+  "id": "P02_permute8",
+  "notes": "Walking ones is the isolation proof: if two nets shorted, one lever would light two lamps and the read word would not match the permutation.  Net order: [3, 4, 6, 0, 2, 7, 5, 1].",
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a0",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     1,
+     4,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a1",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     1,
+     6,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a2",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     1,
+     8,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a3",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     1,
+     10,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a4",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     1,
+     12,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a5",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     1,
+     14,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a6",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     1,
+     16,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a7",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     46,
+     2,
+     4
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "b0",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     46,
+     4,
+     6
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "b1",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     46,
+     6,
+     8
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "b2",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     46,
+     8,
+     10
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "b3",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     46,
+     10,
+     12
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "b4",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     46,
+     12,
+     14
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "b5",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     46,
+     14,
+     16
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "b6",
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     46,
+     16,
+     18
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "b7",
+    "ty": "uint",
+    "width": 1
+   }
+  ],
+  "question": "Route a_i -> b_[3, 1, 4, 7, 0, 6, 2, 5].  Can eight independent 1-bit buses realize an arbitrary shuffle through one shared volume without shorting?",
+  "render": {
+   "pitch": 26,
+   "yaw": 145,
+   "zoom": 1.6
+  },
+  "title": "Arbitrary 8-lane permutation (eight 1-bit buses, hardest first)",
+  "verify": {
+   "words": [
+    {
+     "in": [
+      "a0",
+      "a1",
+      "a2",
+      "a3",
+      "a4",
+      "a5",
+      "a6",
+      "a7"
+     ],
+     "label": "shuffle a_i -> b_P[i], all 8 lanes isolated",
+     "map": {
+      "kind": "permute",
+      "perm": [
+       4,
+       1,
+       6,
+       0,
+       2,
+       7,
+       5,
+       3
+      ]
+     },
+     "out": [
+      "b0",
+      "b1",
+      "b2",
+      "b3",
+      "b4",
+      "b5",
+      "b6",
+      "b7"
+     ],
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.7672,
+ "solved": true,
+ "solver_produced": true,
+ "title": "Arbitrary 8-lane permutation (eight 1-bit buses, hardest first)",
+ "verification": {
+  "cases": [
+   {
+    "got": 8,
+    "in": 1,
+    "ok": true,
+    "section": "shuffle a_i -> b_P[i], all 8 lanes isolated",
+    "want": 8
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "shuffle a_i -> b_P[i], all 8 lanes isolated",
+    "want": 2
+   },
+   {
+    "got": 16,
+    "in": 4,
+    "ok": true,
+    "section": "shuffle a_i -> b_P[i], all 8 lanes isolated",
+    "want": 16
+   },
+   {
+    "got": 128,
+    "in": 8,
+    "ok": true,
+    "section": "shuffle a_i -> b_P[i], all 8 lanes isolated",
+    "want": 128
+   },
+   {
+    "got": 1,
+    "in": 16,
+    "ok": true,
+    "section": "shuffle a_i -> b_P[i], all 8 lanes isolated",
+    "want": 1
+   },
+   {
+    "got": 64,
+    "in": 32,
+    "ok": true,
+    "section": "shuffle a_i -> b_P[i], all 8 lanes isolated",
+    "want": 64
+   },
+   {
+    "got": 4,
+    "in": 64,
+    "ok": true,
+    "section": "shuffle a_i -> b_P[i], all 8 lanes isolated",
+    "want": 4
+   },
+   {
+    "got": 32,
+    "in": 128,
+    "ok": true,
+    "section": "shuffle a_i -> b_P[i], all 8 lanes isolated",
+    "want": 32
+   },
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "shuffle a_i -> b_P[i], all 8 lanes isolated",
+    "want": 0
+   },
+   {
+    "got": 255,
+    "in": 255,
+    "ok": true,
+    "section": "shuffle a_i -> b_P[i], all 8 lanes isolated",
+    "want": 255
+   },
+   {
+    "got": 226,
+    "in": 170,
+    "ok": true,
+    "section": "shuffle a_i -> b_P[i], all 8 lanes isolated",
+    "want": 226
+   },
+   {
+    "got": 29,
+    "in": 85,
+    "ok": true,
+    "section": "shuffle a_i -> b_P[i], all 8 lanes isolated",
+    "want": 29
+   }
+  ],
+  "ok": true,
+  "passed": 12,
+  "sections": {
+   "shuffle a_i -> b_P[i], all 8 lanes isolated": {
+    "passed": 12,
+    "total": 12
+   }
+  },
+  "total": 12
+ },
+ "wall_seconds": 1.323
+}

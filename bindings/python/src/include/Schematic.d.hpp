@@ -15,6 +15,8 @@ namespace capi { struct BlockState; }
 class BlockState;
 namespace capi { struct Schematic; }
 class Schematic;
+namespace capi { struct SchematicSplitResult; }
+class SchematicSplitResult;
 struct BlockPos;
 struct Dimensions;
 class NucleationError;
@@ -42,6 +44,15 @@ public:
    * metadata, or transform changes do not affect the original.
    */
   inline std::unique_ptr<nucleation::Schematic> deep_clone() const;
+
+  /**
+   * Split spatially independent machines while keeping nearby tiny
+   * detached parts with their machine. Components at least
+   * `min_standalone_blocks` large always remain independent; smaller
+   * components attach only directly to a core within `max_air_gap`.
+   * Attachment is non-transitive and the operation is lossless.
+   */
+  inline std::unique_ptr<nucleation::SchematicSplitResult> split_connected_attach_nearby(uint32_t min_standalone_blocks, uint32_t max_air_gap) const;
 
   /**
    * The allocated dimensions (width, height, length) of the schematic's
@@ -640,6 +651,24 @@ public:
    * Set the WorldEdit version.
    */
   inline void set_we_version(int32_t version);
+
+  /**
+   * Standard embedded source provenance as canonical JSON. Returns an
+   * empty string when none is present.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> provenance_json() const;
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> provenance_json_write(W& writeable_output) const;
+
+  /**
+   * Validate and set standard embedded source provenance from JSON.
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> set_provenance_json(std::string_view json);
+
+  /**
+   * Remove embedded source provenance.
+   */
+  inline void clear_provenance();
 
   /**
    * Mirror the default region along the X axis (in place). Block

@@ -1403,6 +1403,7 @@ available depends on the `store-*` Cargo features compiled in.
 |-----|---------|
 | `mem://` | In-memory (volatile) |
 | `file:///abs/path` | Local filesystem rooted at an absolute path |
+| `ssh://user@host/abs/path` | Remote filesystem over system OpenSSH |
 | `s3://bucket/prefix` | S3 / MinIO object store |
 | `redis://host:6379/0` | Redis |
 | `postgres://user:pass@host/db` | Postgres |

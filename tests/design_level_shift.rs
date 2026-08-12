@@ -29,12 +29,21 @@ const GLASS: &str = "minecraft:glass";
 
 /// `width` levers stacked at 2y pitch from `y0`, connection dust one step
 /// toward the field. Returns the bit-0 connection cell.
-fn lever_bank(s: &mut UniversalSchematic, x: i32, y0: i32, z: i32, dx: i32, dz: i32, width: u8) -> P3 {
+fn lever_bank(
+    s: &mut UniversalSchematic,
+    x: i32,
+    y0: i32,
+    z: i32,
+    dx: i32,
+    dz: i32,
+    width: u8,
+) -> P3 {
     for i in 0..width as i32 {
         let y = y0 + 2 * i;
         s.set_block_from_string(x, y - 1, z, STONE).unwrap();
         s.set_block_from_string(x, y, z, LEVER).unwrap();
-        s.set_block_from_string(x + dx, y - 1, z + dz, STONE).unwrap();
+        s.set_block_from_string(x + dx, y - 1, z + dz, STONE)
+            .unwrap();
         s.set_block_from_string(x + dx, y, z + dz, DUST).unwrap();
     }
     (x + dx, y0, z + dz)
@@ -65,8 +74,11 @@ fn leveled_design(a: P3, b: P3, width: u8) -> Design {
     assert_eq!(drv, a, "driver anchor");
     assert_eq!(snk, b, "sink anchor");
     let mut d = Design::for_schematic("lvl", s);
-    let ty = IoType::UnsignedInt { bits: width as usize };
-    d.declare_input("din", drv, (0, 2, 0), width, ty.clone()).unwrap();
+    let ty = IoType::UnsignedInt {
+        bits: width as usize,
+    };
+    d.declare_input("din", drv, (0, 2, 0), width, ty.clone())
+        .unwrap();
     d.declare_output("dout", snk, (0, 2, 0), width, ty).unwrap();
     d
 }
@@ -82,7 +94,9 @@ fn violations(json: &str) -> usize {
 }
 
 fn assert_clean(d: &Design, what: &str) {
-    let c = d.check().unwrap_or_else(|e| panic!("{what}: check() failed: {e}"));
+    let c = d
+        .check()
+        .unwrap_or_else(|e| panic!("{what}: check() failed: {e}"));
     assert!(
         c.clean,
         "{what}: not DRC/LVS clean ({} gating violation(s)): {}",
@@ -130,7 +144,11 @@ fn the_reported_case_routes_automatically() {
     );
     // Bit 0 is unconstrained (nothing below it to protect), so its supports
     // are solid: 3 levels x 7 upper bits.
-    assert_eq!(glass, 3 * 7, "one transparent support per level per bit > 0");
+    assert_eq!(
+        glass,
+        3 * 7,
+        "one transparent support per level per bit > 0"
+    );
 }
 
 /// The failure message must never tell the user to move an instance for
@@ -186,7 +204,8 @@ fn level_shifts_route_for_every_verified_k_both_directions() {
             let frag = &d.bus(&name).unwrap().fragment;
             let glass = frag.values().filter(|b| b.as_str() == GLASS).count();
             assert_eq!(
-                glass, (k as usize) * 7,
+                glass,
+                (k as usize) * 7,
                 "K={k}: one transparent support per level per bit > 0"
             );
         }
@@ -200,7 +219,11 @@ fn level_shifts_work_on_either_axis_and_through_a_dogleg() {
     for (a, b, what) in [
         ((8, 6, 1), (8, 2, 40), "z axis"),
         ((1, 2, 8), (40, 8, 36), "x axis with a dogleg"),
-        ((1, 8, 8), (40, 2, -24), "x axis, descending, negative dogleg"),
+        (
+            (1, 8, 8),
+            (40, 2, -24),
+            "x axis, descending, negative dogleg",
+        ),
     ] {
         let mut d = leveled_design(a, b, 8);
         let state = route(&mut d, "b");
@@ -275,7 +298,12 @@ fn shifts_conduct_in_sim_in_both_directions() {
 
     for (ya, yb, what) in [(6, 2, "down 4"), (2, 7, "up 5")] {
         let mut d = leveled_design((1, ya, 8), (32, yb, 8), 4);
-        assert_eq!(route(&mut d, "b"), BusState::Routed, "{what}: {:?}", d.bus_state("b"));
+        assert_eq!(
+            route(&mut d, "b"),
+            BusState::Routed,
+            "{what}: {:?}",
+            d.bus_state("b")
+        );
         let baked = d.bake(4000).unwrap();
         let contract = baked.embedded_cell_contract().unwrap().unwrap();
         let extra = nucleation::design::executor_extra_states();

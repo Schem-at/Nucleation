@@ -38,7 +38,8 @@ fn lever_bank(s: &mut UniversalSchematic, x: i32, y0: i32, z: i32, dx: i32, dz: 
         let y = y0 + 2 * i;
         s.set_block_from_string(x, y - 1, z, STONE).unwrap();
         s.set_block_from_string(x, y, z, LEVER).unwrap();
-        s.set_block_from_string(x + dx, y - 1, z + dz, STONE).unwrap();
+        s.set_block_from_string(x + dx, y - 1, z + dz, STONE)
+            .unwrap();
         s.set_block_from_string(x + dx, y, z + dz, DUST).unwrap();
     }
     (x + dx, y0, z + dz)
@@ -90,11 +91,13 @@ fn assert_no_dots(d: &Design, bus: &str, what: &str) {
         let lonely = [(1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1)]
             .iter()
             .all(|(dx, dy, dz)| {
-                [(*dx, *dy, *dz), (*dx, 1, *dz), (*dx, -1, *dz)].iter().all(|(ax, ay, az)| {
-                    !frag
-                        .get(&(p.0 + ax, p.1 + ay, p.2 + az))
-                        .is_some_and(is_dust)
-                })
+                [(*dx, *dy, *dz), (*dx, 1, *dz), (*dx, -1, *dz)]
+                    .iter()
+                    .all(|(ax, ay, az)| {
+                        !frag
+                            .get(&(p.0 + ax, p.1 + ay, p.2 + az))
+                            .is_some_and(is_dust)
+                    })
             });
         if !lonely {
             dots.push(*p);
@@ -145,7 +148,9 @@ fn an_l_corner_draws_its_two_sides() {
         .expect("no corner cell found on an L route");
     let sides = ["north", "east", "south", "west"]
         .iter()
-        .filter(|s| corner.1.contains(&format!("{s}=side")) || corner.1.contains(&format!("{s}=up")))
+        .filter(|s| {
+            corner.1.contains(&format!("{s}=side")) || corner.1.contains(&format!("{s}=up"))
+        })
         .count();
     assert_eq!(
         sides, 2,
@@ -172,10 +177,12 @@ fn a_level_shift_draws_its_climbs() {
             .iter()
             .filter(|(p, b)| {
                 b.contains("redstone_wire")
-                    && [(1, 1, 0), (-1, 1, 0), (0, 1, 1), (0, 1, -1)].iter().any(|(dx, dy, dz)| {
-                        frag.get(&(p.0 + dx, p.1 + dy, p.2 + dz))
-                            .is_some_and(|n| n.contains("redstone_wire"))
-                    })
+                    && [(1, 1, 0), (-1, 1, 0), (0, 1, 1), (0, 1, -1)]
+                        .iter()
+                        .any(|(dx, dy, dz)| {
+                            frag.get(&(p.0 + dx, p.1 + dy, p.2 + dz))
+                                .is_some_and(|n| n.contains("redstone_wire"))
+                        })
             })
             .count();
         assert!(
@@ -205,7 +212,9 @@ fn a_crossing_redraws_both_buses() {
     d.declare_input("bin", bin, step, W, ty()).unwrap();
     d.declare_output("bout", bout, step, W, ty()).unwrap();
     for (n, drv, snk) in [("a", "ain", "aout"), ("b", "bin", "bout")] {
-        let st = d.route_bus(n, drv, &[snk], vec![], BusStyle::default()).unwrap();
+        let st = d
+            .route_bus(n, drv, &[snk], vec![], BusStyle::default())
+            .unwrap();
         assert_eq!(st, BusState::Routed, "{n}: {:?}", d.bus_state(n));
     }
     // Bus `a` was AMENDED by `b`'s crossing after it was already drawn.
@@ -247,8 +256,11 @@ fn a_promoted_port_draws_as_wire() {
         )
         .unwrap()
         .build();
-    cell.set_cell_contract(&nucleation::io_contract::CellContract::new("c".to_string(), layout))
-        .unwrap();
+    cell.set_cell_contract(&nucleation::io_contract::CellContract::new(
+        "c".to_string(),
+        layout,
+    ))
+    .unwrap();
 
     let mut d = Design::for_schematic("prom", s);
     d.add_cell("c", cell).unwrap();
@@ -268,7 +280,10 @@ fn a_promoted_port_draws_as_wire() {
         .get_block(anchor.0, anchor.1, anchor.2)
         .map(|b| b.to_string())
         .unwrap_or_default();
-    assert!(at.contains("redstone_wire"), "the promoted port is not dust: {at}");
+    assert!(
+        at.contains("redstone_wire"),
+        "the promoted port is not dust: {at}"
+    );
     assert!(
         !(at.contains("east=none")
             && at.contains("north=none")

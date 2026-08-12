@@ -1,0 +1,300 @@
+{
+  "tag": "adaptive-after",
+  "when": "2026-08-10T07:09:29.548Z",
+  "load": {
+    "engineReadyMs": 1256,
+    "firstRenderMs": 1817
+  },
+  "loadPhases": {
+    "allEndpoints": {
+      "n": 22,
+      "ms": 10.800000190734863
+    },
+    "studio.scene": {
+      "n": 22,
+      "ms": 7.099999904632568
+    },
+    "viewer.setScene": {
+      "n": 22,
+      "ms": 6.700000047683716
+    },
+    "viewer.setMarkers": {
+      "n": 22,
+      "ms": 3.000000238418579
+    },
+    "renderPanels": {
+      "n": 22,
+      "ms": 9.09999966621399
+    },
+    "refresh": {
+      "n": 22,
+      "ms": 39.100000858306885
+    }
+  },
+  "scene10": {
+    "distinctCells": [
+      "REGISTER001_8bit_register",
+      "ADD007_8bit_cca_matt",
+      "BINTOBCD001_8bit_comb_binary_to_bcd"
+    ],
+    "placements": 10,
+    "instances": 12,
+    "drawCalls": 7,
+    "triangles": 46884,
+    "geometries": 8,
+    "sceneObjects": 5,
+    "markerObjects": 15,
+    "meshBuilds": {
+      "before": {
+        "texture": 0,
+        "cells": 1,
+        "instancedGroups": 1,
+        "instanceAllocs": 0,
+        "matrixWrites": 2,
+        "buses": 1,
+        "loose": 1
+      },
+      "after": {
+        "texture": 0,
+        "cells": 3,
+        "instancedGroups": 3,
+        "instanceAllocs": 1,
+        "matrixWrites": 16,
+        "buses": 11,
+        "loose": 1
+      }
+    },
+    "buildMs": {
+      "allEndpoints": 107.5,
+      "studio.scene": 181.4,
+      "viewer.setScene": 21.3,
+      "viewer.setMarkers": 7.9,
+      "renderPanels": 188,
+      "refresh": 507.8
+    }
+  },
+  "dragPreview": {
+    "frames": 30,
+    "pointerSyncMsAvg": 0.053,
+    "engineCommits": 2,
+    "engineCommitMsAvg": 1211.8,
+    "wallMsPerFrame": 26.5,
+    "renderFps": 36.6,
+    "renderFrameMsAvg": 0.26,
+    "drawCalls": 7,
+    "cellRemeshes": 0,
+    "matrixWrites": 30,
+    "wasmReads": {
+      "flatten": 1,
+      "cellDump": 0,
+      "instDump": 0,
+      "busDump": 1,
+      "looseDump": 0
+    },
+    "wasmReadMsPerFrame": {
+      "flatten": 0.83,
+      "cellDump": 0,
+      "instDump": 0,
+      "busDump": 0.05,
+      "looseDump": 0
+    },
+    "phases": {
+      "allEndpoints": {
+        "n": 2,
+        "msAvg": 19.8
+      },
+      "studio.scene": {
+        "n": 2,
+        "msAvg": 26.1
+      },
+      "viewer.setScene": {
+        "n": 2,
+        "msAvg": 0.75
+      },
+      "viewer.setMarkers": {
+        "n": 2,
+        "msAvg": 0.85
+      },
+      "renderPanels": {
+        "n": 2,
+        "msAvg": 34.55
+      },
+      "refresh": {
+        "n": 2,
+        "msAvg": 82.15
+      },
+      "dragFrame": {
+        "n": 2,
+        "msAvg": 1211.8
+      }
+    }
+  },
+  "dragLiveReroute": {
+    "frames": 30,
+    "pointerSyncMsAvg": 0.027,
+    "engineCommits": 2,
+    "engineCommitMsAvg": 1207.05,
+    "wallMsPerFrame": 31,
+    "renderFps": 8.9,
+    "renderFrameMsAvg": 0.47,
+    "drawCalls": 7,
+    "cellRemeshes": 0,
+    "matrixWrites": 30,
+    "wasmReads": {
+      "flatten": 1,
+      "cellDump": 0,
+      "instDump": 0,
+      "busDump": 1,
+      "looseDump": 0
+    },
+    "wasmReadMsPerFrame": {
+      "flatten": 0.86,
+      "cellDump": 0,
+      "instDump": 0,
+      "busDump": 0.06,
+      "looseDump": 0
+    },
+    "phases": {
+      "allEndpoints": {
+        "n": 2,
+        "msAvg": 19.75
+      },
+      "studio.scene": {
+        "n": 2,
+        "msAvg": 26.35
+      },
+      "viewer.setScene": {
+        "n": 2,
+        "msAvg": 0.55
+      },
+      "viewer.setMarkers": {
+        "n": 2,
+        "msAvg": 0.7
+      },
+      "renderPanels": {
+        "n": 2,
+        "msAvg": 35.05
+      },
+      "refresh": {
+        "n": 2,
+        "msAvg": 82.7
+      },
+      "dragFrame": {
+        "n": 2,
+        "msAvg": 1207.05
+      }
+    }
+  },
+  "drag": {
+    "frames": 30,
+    "pointerSyncMsAvg": 0.027,
+    "engineCommits": 2,
+    "engineCommitMsAvg": 1207.05,
+    "wallMsPerFrame": 31,
+    "renderFps": 8.9,
+    "renderFrameMsAvg": 0.47,
+    "drawCalls": 7,
+    "cellRemeshes": 0,
+    "matrixWrites": 30,
+    "wasmReads": {
+      "flatten": 1,
+      "cellDump": 0,
+      "instDump": 0,
+      "busDump": 1,
+      "looseDump": 0
+    },
+    "wasmReadMsPerFrame": {
+      "flatten": 0.86,
+      "cellDump": 0,
+      "instDump": 0,
+      "busDump": 0.06,
+      "looseDump": 0
+    },
+    "phases": {
+      "allEndpoints": {
+        "n": 2,
+        "msAvg": 19.75
+      },
+      "studio.scene": {
+        "n": 2,
+        "msAvg": 26.35
+      },
+      "viewer.setScene": {
+        "n": 2,
+        "msAvg": 0.55
+      },
+      "viewer.setMarkers": {
+        "n": 2,
+        "msAvg": 0.7
+      },
+      "renderPanels": {
+        "n": 2,
+        "msAvg": 35.05
+      },
+      "refresh": {
+        "n": 2,
+        "msAvg": 82.7
+      },
+      "dragFrame": {
+        "n": 2,
+        "msAvg": 1207.05
+      }
+    }
+  },
+  "reroute": {
+    "bus": "bus0",
+    "state": "routed",
+    "msAvg": 1213.1,
+    "msMin": 1207.8,
+    "msMax": 1217.9
+  },
+  "portModeToggle": {
+    "port": "u0.a",
+    "meshBuilds": {
+      "before": {
+        "texture": 0,
+        "cells": 3,
+        "instancedGroups": 3,
+        "instanceAllocs": 1,
+        "matrixWrites": 78,
+        "buses": 20,
+        "loose": 1
+      },
+      "mid": {
+        "texture": 0,
+        "cells": 4,
+        "instancedGroups": 4,
+        "instanceAllocs": 1,
+        "matrixWrites": 83,
+        "buses": 21,
+        "loose": 1
+      },
+      "after": {
+        "texture": 0,
+        "cells": 4,
+        "instancedGroups": 4,
+        "instanceAllocs": 1,
+        "matrixWrites": 88,
+        "buses": 22,
+        "loose": 1
+      }
+    },
+    "ms": {
+      "allEndpoints": 80.6,
+      "studio.scene": 53.2,
+      "viewer.setScene": 2,
+      "viewer.setMarkers": 3.2,
+      "renderPanels": 139.5,
+      "refresh": 278.9
+    }
+  },
+  "memory": {
+    "jsHeapMB": 24.8,
+    "geometries": 4,
+    "textures": 0,
+    "programs": 5,
+    "sceneObjects": 5,
+    "markerObjects": 15,
+    "labels": 54
+  }
+}

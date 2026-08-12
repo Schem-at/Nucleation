@@ -1,0 +1,135 @@
+{
+ "artifact": null,
+ "blocked_by": "bus_bin -> failed: routed geometry has insufficient clearance from live redstone: loose block at (10, 1, 3) couples to this bus at (9, 2, 3): the two dust cells are wire-connected at Pos { x: 10, y: 1, z: 3 }/Pos { x: 9, y: 2, z: 3 }; loose block at (10, 1, 4) couples to this bus at (9, 2, 4): the two dust cells are wire-connected at Pos { x: 10, y: 1, z: 4 }/Pos { x: 9, y: 2, z: 4 }. Move one of them, or give the bus a lane 2 cells clear (dust one cell apart shorts, and a 1-y diagonal conducts unless the cut cell is solid)",
+ "buses": {
+  "bus_bin": {
+   "call": "d.route_bus('bus_bin', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:magenta_concrete', 'transparent_block': 'minecraft:magenta_stained_glass'}))",
+   "error": null,
+   "seconds": 0.259,
+   "state": "failed: routed geometry has insufficient clearance from live redstone: loose block at (10, 1, 3) couples to this bus at (9, 2, 3): the two dust cells are wire-connected at Pos { x: 10, y: 1, z: 3 }/Pos { x: 9, y: 2, z: 3 }; loose block at (10, 1, 4) couples to this bus at (9, 2, 4): the two dust cells are wire-connected at Pos { x: 10, y: 1, z: 4 }/Pos { x: 9, y: 2, z: 4 }. Move one of them, or give the bus a lane 2 cells clear (dust one cell apart shorts, and a 1-y diagonal conducts unless the cut cell is solid)"
+  }
+ },
+ "check": null,
+ "cost_vector": null,
+ "expect": "solved",
+ "fixtures": {
+  "hex0": {
+   "kind": "hex_comb_stage",
+   "provenance": "probe_hex_transmit.py::Rig (66/66) against corpus/TRANSMIT002_hex_transmit_flat.schem"
+  }
+ },
+ "id": "X03_hex_cross_flat8",
+ "log": [],
+ "loose_blocks": 184,
+ "notes": "Same fixture as X02.  If this one fails where X02 passes, the limit is per-lane crossing in the flat form, not the crossing idea.",
+ "per_bus": {},
+ "question": "A flat 2-pitch 8-bit bundle runs +X at y=2; the hex trunk runs -Z through x=10..12.  Every lane has to get past the trunk independently.  Does the router solve all eight, and does the analog value still arrive exact?",
+ "scenario": {
+  "_file": "scenarios/X03_hex_cross_flat8.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_bin",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:magenta_concrete",
+     "transparent_block": "minecraft:magenta_stained_glass"
+    }
+   }
+  ],
+  "expect": "solved",
+  "fixtures": [
+   {
+    "at": [
+     10,
+     0,
+     0
+    ],
+    "kind": "hex_trunk",
+    "name": "hex0",
+    "values": [
+     1,
+     3,
+     7,
+     11,
+     15
+    ]
+   }
+  ],
+  "id": "X03_hex_cross_flat8",
+  "notes": "Same fixture as X02.  If this one fails where X02 passes, the limit is per-lane crossing in the flat form, not the crossing idea.",
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     2
+    ],
+    "dir": "in",
+    "feed": [
+     -1,
+     0,
+     0
+    ],
+    "form": "flat_z",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     20,
+     2,
+     2
+    ],
+    "dir": "out",
+    "form": "flat_z",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "A flat 2-pitch 8-bit bundle runs +X at y=2; the hex trunk runs -Z through x=10..12.  Every lane has to get past the trunk independently.  Does the router solve all eight, and does the analog value still arrive exact?",
+  "render": {
+   "pitch": 32,
+   "yaw": 140,
+   "zoom": 1.75
+  },
+  "title": "Eight flat lanes crossing a hex analog trunk (8 crossings)",
+  "verify": {
+   "analog": [
+    {
+     "also_read": [
+      "a_out"
+     ],
+     "fixture": "hex0",
+     "hold_bits": 85,
+     "hold_ports": [
+      "a_in"
+     ],
+     "label": "hex value exact while the bundle carries 0x55"
+    }
+   ],
+   "hold_analog": {
+    "fixture": "hex0",
+    "level": 7
+   },
+   "words": [
+    {
+     "in": "a_in",
+     "label": "8 flat lanes intact while hex carries 7",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.259,
+ "solved": false,
+ "solver_produced": true,
+ "title": "Eight flat lanes crossing a hex analog trunk (8 crossings)",
+ "verification": null,
+ "wall_seconds": 0.264
+}

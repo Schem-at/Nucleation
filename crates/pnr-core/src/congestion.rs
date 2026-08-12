@@ -106,8 +106,11 @@ pub fn route_all<F: Fabric>(
                 users.entry(*p).or_default().insert(*net);
             }
         }
-        let mut contested: BTreeSet<Pos> =
-            users.iter().filter(|(_, u)| u.len() > 1).map(|(p, _)| *p).collect();
+        let mut contested: BTreeSet<Pos> = users
+            .iter()
+            .filter(|(_, u)| u.len() > 1)
+            .map(|(p, _)| *p)
+            .collect();
         for p in extra_conflicts(&footprints) {
             contested.insert(p);
         }
@@ -145,7 +148,10 @@ pub fn route_all<F: Fabric>(
         .map(|n| n.net)
         .filter(|n| !routed.contains(n))
         .collect();
-    Err(RouteAllError { unrouted, contested })
+    Err(RouteAllError {
+        unrouted,
+        contested,
+    })
 }
 
 #[cfg(test)]
@@ -256,11 +262,18 @@ mod tests {
             }
             out
         };
-        let paths =
-            route_all(&f, &nets, &CongestionOpts::default(), &adjacency).expect("routes");
+        let paths = route_all(&f, &nets, &CongestionOpts::default(), &adjacency).expect("routes");
         // Interior cells of the two paths are never z-adjacent.
-        for a in paths[&0].iter().map(|s| s.pos).filter(|p| p.x > 0 && p.x < 8) {
-            for b in paths[&1].iter().map(|s| s.pos).filter(|p| p.x > 0 && p.x < 8) {
+        for a in paths[&0]
+            .iter()
+            .map(|s| s.pos)
+            .filter(|p| p.x > 0 && p.x < 8)
+        {
+            for b in paths[&1]
+                .iter()
+                .map(|s| s.pos)
+                .filter(|p| p.x > 0 && p.x < 8)
+            {
                 assert!(a.manhattan(b) > 1, "paths {a:?} and {b:?} touch");
             }
         }

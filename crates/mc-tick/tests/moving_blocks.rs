@@ -64,11 +64,7 @@ fn a_stroke_reports_every_block_it_carries_over_one_shared_flight_window() {
         1,
         "blocks dispatched by one stroke set off together: {flying:?}"
     );
-    assert_eq!(
-        lands.len(),
-        1,
-        "and they land together: {flying:?}"
-    );
+    assert_eq!(lands.len(), 1, "and they land together: {flying:?}");
     // `tick_count` counts *completed* ticks, so the tick that just ran — and
     // dispatched this stroke — is the one before it.
     assert_eq!(
@@ -117,7 +113,11 @@ fn a_retracting_piston_walks_its_head_home_and_leaves_its_body_where_it_is() {
 
     assert!(!base.extending, "this is a retraction");
     assert_eq!(base.to, Pos::new(2, 1, 1), "the piston's own cell");
-    assert_eq!(base.from, Pos::new(3, 1, 1), "the head slot it comes home from");
+    assert_eq!(
+        base.from,
+        Pos::new(3, 1, 1),
+        "the head slot it comes home from"
+    );
     assert!(
         d(base.state).contains("sticky_piston") && d(base.state).contains("extended=false"),
         "the retracted base is what lands: {}",
@@ -133,7 +133,9 @@ fn a_retracting_piston_walks_its_head_home_and_leaves_its_body_where_it_is() {
         "pointing the way the piston faces: {}",
         d(base.carried)
     );
-    let remains = base.remains.expect("the body is drawn while the arm returns");
+    let remains = base
+        .remains
+        .expect("the body is drawn while the arm returns");
     assert!(
         d(remains).contains("sticky_piston") && d(remains).contains("extended=true"),
         "and it is drawn extended, as vanilla's `base` slot is: {}",
@@ -195,7 +197,8 @@ fn an_extending_head_offers_one_too() {
         .expect("the flying machine extends a piston");
     let d = |s| sim.registry().descriptor(s).unwrap_or("?").to_string();
     assert!(
-        head.carried_short.is_some_and(|s| d(s).contains("short=true")),
+        head.carried_short
+            .is_some_and(|s| d(s).contains("short=true")),
         "an extending arm is shortened near the base too: {:?}",
         head.carried_short.map(d)
     );

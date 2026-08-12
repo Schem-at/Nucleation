@@ -1,0 +1,246 @@
+{
+ "artifact": "artifacts/O01_wall_gap.schem",
+ "artifact_blocks": 431,
+ "buses": {
+  "bus_a": {
+   "call": "d.route_bus('bus_a', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:lime_concrete', 'transparent_block': 'minecraft:lime_stained_glass'}))",
+   "error": null,
+   "seconds": 0.011,
+   "state": "routed"
+  }
+ },
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "cost_vector": {
+  "coherence": null,
+  "delay_rt": 1,
+  "footprint": 768,
+  "length": 152,
+  "skew_rt": 0
+ },
+ "expect": "solved",
+ "fixtures": {},
+ "id": "O01_wall_gap",
+ "log": [
+  "verify 12/12 (bundle conducts past the pier 12/12)"
+ ],
+ "loose_blocks": 111,
+ "notes": "The pier is loose-layer blocks, not a declared keepout: this tests that the router treats OCCUPIED cells as occupied.",
+ "per_bus": {
+  "bus_a": {
+   "bbox": [
+    [
+     1,
+     1,
+     9
+    ],
+    [
+     16,
+     16,
+     11
+    ]
+   ],
+   "cells": 320,
+   "delay_rt": 1,
+   "devices": 8,
+   "footprint": 768,
+   "glass": 0,
+   "per_bit_rt": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "skew_rt": 0,
+   "wire": 152
+  }
+ },
+ "question": "A 3-deep solid pier blocks x=8, z=7..9, y=0..20 -- the whole straight path including every bit's support.  Does the router detour the whole bundle and keep it coherent?",
+ "scenario": {
+  "_file": "scenarios/O01_wall_gap.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_a",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:lime_concrete",
+     "transparent_block": "minecraft:lime_stained_glass"
+    }
+   }
+  ],
+  "expect": "solved",
+  "id": "O01_wall_gap",
+  "notes": "The pier is loose-layer blocks, not a declared keepout: this tests that the router treats OCCUPIED cells as occupied.",
+  "obstacles": [
+   {
+    "block": "minecraft:polished_andesite",
+    "max": [
+     8,
+     20,
+     9
+    ],
+    "min": [
+     8,
+     0,
+     7
+    ]
+   }
+  ],
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     8
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     16,
+     2,
+     8
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "A 3-deep solid pier blocks x=8, z=7..9, y=0..20 -- the whole straight path including every bit's support.  Does the router detour the whole bundle and keep it coherent?",
+  "render": {
+   "pitch": 28,
+   "yaw": 145,
+   "zoom": 1.8
+  },
+  "title": "Obstacle avoidance: a full-height pier on the direct path",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "bundle conducts past the pier",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.011,
+ "solved": true,
+ "solver_produced": true,
+ "title": "Obstacle avoidance: a full-height pier on the direct path",
+ "verification": {
+  "cases": [
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "bundle conducts past the pier",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "bundle conducts past the pier",
+    "want": 2
+   },
+   {
+    "got": 4,
+    "in": 4,
+    "ok": true,
+    "section": "bundle conducts past the pier",
+    "want": 4
+   },
+   {
+    "got": 8,
+    "in": 8,
+    "ok": true,
+    "section": "bundle conducts past the pier",
+    "want": 8
+   },
+   {
+    "got": 16,
+    "in": 16,
+    "ok": true,
+    "section": "bundle conducts past the pier",
+    "want": 16
+   },
+   {
+    "got": 32,
+    "in": 32,
+    "ok": true,
+    "section": "bundle conducts past the pier",
+    "want": 32
+   },
+   {
+    "got": 64,
+    "in": 64,
+    "ok": true,
+    "section": "bundle conducts past the pier",
+    "want": 64
+   },
+   {
+    "got": 128,
+    "in": 128,
+    "ok": true,
+    "section": "bundle conducts past the pier",
+    "want": 128
+   },
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "bundle conducts past the pier",
+    "want": 0
+   },
+   {
+    "got": 255,
+    "in": 255,
+    "ok": true,
+    "section": "bundle conducts past the pier",
+    "want": 255
+   },
+   {
+    "got": 170,
+    "in": 170,
+    "ok": true,
+    "section": "bundle conducts past the pier",
+    "want": 170
+   },
+   {
+    "got": 85,
+    "in": 85,
+    "ok": true,
+    "section": "bundle conducts past the pier",
+    "want": 85
+   }
+  ],
+  "ok": true,
+  "passed": 12,
+  "sections": {
+   "bundle conducts past the pier": {
+    "passed": 12,
+    "total": 12
+   }
+  },
+  "total": 12
+ },
+ "wall_seconds": 0.081
+}

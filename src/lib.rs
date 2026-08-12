@@ -44,10 +44,6 @@ pub mod world_generation;
 pub mod autostack;
 #[cfg(feature = "bridge")]
 pub mod bridge;
-#[cfg(feature = "meshing")]
-pub mod meshing;
-#[cfg(all(feature = "bridge", not(target_arch = "wasm32")))]
-mod python_callback;
 #[cfg(feature = "routing")]
 pub mod design;
 #[cfg(feature = "routing")]
@@ -58,10 +54,14 @@ pub mod design_decay;
 pub mod design_io;
 #[cfg(feature = "routing")]
 pub mod design_promote;
-#[cfg(feature = "routing")]
-pub mod routing;
+#[cfg(feature = "meshing")]
+pub mod meshing;
+#[cfg(all(feature = "bridge", not(target_arch = "wasm32")))]
+mod python_callback;
 #[cfg(feature = "rendering")]
 pub mod rendering;
+#[cfg(feature = "routing")]
+pub mod routing;
 #[cfg(any(feature = "scripting-lua", feature = "scripting-js"))]
 pub mod scripting;
 #[cfg(feature = "simulation")]
@@ -104,6 +104,7 @@ pub use entity::{ArmorStandEquipment, Entity, NbtValue};
 #[cfg(not(target_arch = "wasm32"))]
 pub use formats::world_pack;
 pub use formats::{litematic, schematic, world_stream};
+pub use metadata::{ProvenanceBounds, SchematicProvenance};
 pub use print_utils::{format_json_schematic, format_schematic};
 pub use region::Region;
 pub use schematic_builder::{

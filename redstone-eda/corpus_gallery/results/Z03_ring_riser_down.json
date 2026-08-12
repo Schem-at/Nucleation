@@ -1,0 +1,128 @@
+{
+ "artifact": "artifacts/Z03_ring_riser_down.schem",
+ "artifact_blocks": 40,
+ "blocked_by": "Verified in simulation here, but unreachable from the solver: `route_bus` has no descending form other than the level-shift tile, and no way to express 'two bits sharing one ring at 180 degrees'.",
+ "buses": {},
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "cost_vector": null,
+ "expect": "unsolved",
+ "fixtures": {
+  "ring": {
+   "bits": 2,
+   "constructor": "vforms.ring_bus(b, sx=3, sz=3, ox=2, oz=2, y0=2, n=9, sep=3)",
+   "drop_y": 8,
+   "kind": "ring_riser_bus",
+   "phases": [
+    0,
+    4
+   ],
+   "provenance": "vforms.py, probed 26/26 in probe_spiral_tiling.py (legal() predictor matched all 17 sims)",
+   "provided_by": "fixture (NOT solver output)",
+   "xz_cells_per_bit": 4.5
+  }
+ },
+ "form_verified": true,
+ "id": "Z03_ring_riser_down",
+ "log": [
+  "verify 4/4 (both bits descend 8 levels, neither dead nor shorted 4/4)"
+ ],
+ "loose_blocks": 40,
+ "notes": "Two bits on one 3x3 ring is 4.5 xz cells per bit; an 11x3 ring carries a byte at 4.125. Separation is the whole legality argument: 1 IS the step so the nets merge, 2 puts a foreign support directly above a dust and SEVERS both, 3 is the first legal value. A severed bit is simply quiet, so this entry checks arrival, not silence.",
+ "per_bus": {},
+ "question": "Descent has no active carrier.  Does the passive ring riser carry two bits down 8 levels with the 180-degree phase offset, and can the solver ask for it?",
+ "scenario": {
+  "_file": "scenarios/Z03_ring_riser_down.py",
+  "blocked_by": "Verified in simulation here, but unreachable from the solver: `route_bus` has no descending form other than the level-shift tile, and no way to express 'two bits sharing one ring at 180 degrees'.",
+  "buses": [],
+  "expect": "unsolved",
+  "fixtures": [
+   {
+    "at": [
+     2,
+     2,
+     2
+    ],
+    "kind": "ring_riser_bus",
+    "levels": 9,
+    "name": "ring",
+    "sep": 3,
+    "size": [
+     3,
+     3
+    ]
+   }
+  ],
+  "id": "Z03_ring_riser_down",
+  "notes": "Two bits on one 3x3 ring is 4.5 xz cells per bit; an 11x3 ring carries a byte at 4.125. Separation is the whole legality argument: 1 IS the step so the nets merge, 2 puts a foreign support directly above a dust and SEVERS both, 3 is the first legal value. A severed bit is simply quiet, so this entry checks arrival, not silence.",
+  "ports": [],
+  "question": "Descent has no active carrier.  Does the passive ring riser carry two bits down 8 levels with the 180-degree phase offset, and can the solver ask for it?",
+  "render": {
+   "pitch": 26,
+   "yaw": 135,
+   "zoom": 2.3
+  },
+  "solver_produced": false,
+  "title": "Descending: a 180-degree tiled ring riser, 2 bits on one 3x3",
+  "verify": {
+   "words": [
+    {
+     "in": "ring_in",
+     "label": "both bits descend 8 levels, neither dead nor shorted",
+     "out": "ring_out",
+     "patterns": "exhaustive"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0,
+ "solved": false,
+ "solver_produced": false,
+ "title": "Descending: a 180-degree tiled ring riser, 2 bits on one 3x3",
+ "verification": {
+  "cases": [
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "both bits descend 8 levels, neither dead nor shorted",
+    "want": 0
+   },
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "both bits descend 8 levels, neither dead nor shorted",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "both bits descend 8 levels, neither dead nor shorted",
+    "want": 2
+   },
+   {
+    "got": 3,
+    "in": 3,
+    "ok": true,
+    "section": "both bits descend 8 levels, neither dead nor shorted",
+    "want": 3
+   }
+  ],
+  "ok": true,
+  "passed": 4,
+  "sections": {
+   "both bits descend 8 levels, neither dead nor shorted": {
+    "passed": 4,
+    "total": 4
+   }
+  },
+  "total": 4
+ },
+ "wall_seconds": 0.02
+}

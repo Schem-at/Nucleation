@@ -1,0 +1,236 @@
+{
+ "artifact": "artifacts/V02_h2v.schem",
+ "artifact_blocks": 592,
+ "buses": {
+  "bus_pivot": {
+   "call": "d.route_bus('bus_pivot', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:purple_concrete', 'transparent_block': 'minecraft:purple_stained_glass'}))",
+   "error": null,
+   "seconds": 0.0182,
+   "state": "routed"
+  }
+ },
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "cost_vector": {
+  "coherence": null,
+  "delay_rt": 5,
+  "footprint": 6720,
+  "length": 230,
+  "skew_rt": 2
+ },
+ "expect": "solved",
+ "fixtures": {},
+ "id": "V02_h2v",
+ "log": [
+  "verify 12/12 (plane -> stack, bit order preserved 12/12)"
+ ],
+ "loose_blocks": 48,
+ "notes": "",
+ "per_bus": {
+  "bus_pivot": {
+   "bbox": [
+    [
+     2,
+     1,
+     3
+    ],
+    [
+     22,
+     16,
+     22
+    ]
+   ],
+   "cells": 544,
+   "delay_rt": 5,
+   "devices": 42,
+   "footprint": 6720,
+   "glass": 0,
+   "per_bit_rt": [
+    3,
+    4,
+    4,
+    4,
+    5,
+    5,
+    5,
+    4
+   ],
+   "skew_rt": 2,
+   "wire": 230
+  }
+ },
+ "question": "A flat 2-pitch row along +X drives a dense 2y stack.  Is the reverse pivot available, or is only one direction implemented?",
+ "scenario": {
+  "_file": "scenarios/V02_h2v.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_pivot",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:purple_concrete",
+     "transparent_block": "minecraft:purple_stained_glass"
+    }
+   }
+  ],
+  "expect": "solved",
+  "id": "V02_h2v",
+  "notes": "",
+  "ports": [
+   {
+    "anchor": [
+     2,
+     2,
+     2
+    ],
+    "dir": "in",
+    "feed": [
+     0,
+     0,
+     -1
+    ],
+    "form": "flat_x",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     22,
+     2,
+     20
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "A flat 2-pitch row along +X drives a dense 2y stack.  Is the reverse pivot available, or is only one direction implemented?",
+  "render": {
+   "pitch": 26,
+   "yaw": 150,
+   "zoom": 1.75
+  },
+  "title": "Flat plane -> vertical stack (the pivot, reversed)",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "plane -> stack, bit order preserved",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0182,
+ "solved": true,
+ "solver_produced": true,
+ "title": "Flat plane -> vertical stack (the pivot, reversed)",
+ "verification": {
+  "cases": [
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "plane -> stack, bit order preserved",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "plane -> stack, bit order preserved",
+    "want": 2
+   },
+   {
+    "got": 4,
+    "in": 4,
+    "ok": true,
+    "section": "plane -> stack, bit order preserved",
+    "want": 4
+   },
+   {
+    "got": 8,
+    "in": 8,
+    "ok": true,
+    "section": "plane -> stack, bit order preserved",
+    "want": 8
+   },
+   {
+    "got": 16,
+    "in": 16,
+    "ok": true,
+    "section": "plane -> stack, bit order preserved",
+    "want": 16
+   },
+   {
+    "got": 32,
+    "in": 32,
+    "ok": true,
+    "section": "plane -> stack, bit order preserved",
+    "want": 32
+   },
+   {
+    "got": 64,
+    "in": 64,
+    "ok": true,
+    "section": "plane -> stack, bit order preserved",
+    "want": 64
+   },
+   {
+    "got": 128,
+    "in": 128,
+    "ok": true,
+    "section": "plane -> stack, bit order preserved",
+    "want": 128
+   },
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "plane -> stack, bit order preserved",
+    "want": 0
+   },
+   {
+    "got": 255,
+    "in": 255,
+    "ok": true,
+    "section": "plane -> stack, bit order preserved",
+    "want": 255
+   },
+   {
+    "got": 170,
+    "in": 170,
+    "ok": true,
+    "section": "plane -> stack, bit order preserved",
+    "want": 170
+   },
+   {
+    "got": 85,
+    "in": 85,
+    "ok": true,
+    "section": "plane -> stack, bit order preserved",
+    "want": 85
+   }
+  ],
+  "ok": true,
+  "passed": 12,
+  "sections": {
+   "plane -> stack, bit order preserved": {
+    "passed": 12,
+    "total": 12
+   }
+  },
+  "total": 12
+ },
+ "wall_seconds": 0.103
+}

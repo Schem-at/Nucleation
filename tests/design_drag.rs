@@ -22,7 +22,8 @@ fn lever_bank(s: &mut UniversalSchematic, x: i32, z: i32, dx: i32, dz: i32) -> (
         let y = 2 + 2 * i;
         s.set_block_from_string(x, y - 1, z, STONE).unwrap();
         s.set_block_from_string(x, y, z, LEVER).unwrap();
-        s.set_block_from_string(x + dx, y - 1, z + dz, STONE).unwrap();
+        s.set_block_from_string(x + dx, y - 1, z + dz, STONE)
+            .unwrap();
         s.set_block_from_string(x + dx, y, z + dz, DUST).unwrap();
     }
     (x + dx, 2, z + dz)
@@ -52,7 +53,8 @@ fn gate_drag_reroutes_exactly_two_segments() {
     let a_out = lamp_bank(&mut s, 24, 8);
     let mut d = Design::for_schematic("drag", s);
     let ty = IoType::UnsignedInt { bits: N as usize };
-    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone()).unwrap();
+    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone())
+        .unwrap();
     d.declare_output("a_out", a_out, (0, 2, 0), N, ty).unwrap();
 
     let gates = vec![
@@ -85,7 +87,10 @@ fn gate_drag_reroutes_exactly_two_segments() {
         .clone();
 
     let report = d.move_gate("bus_a", "g0", (8, 2, 12)).unwrap();
-    assert_eq!(report.rerouted_segments, 2, "exactly the 2 adjacent segments");
+    assert_eq!(
+        report.rerouted_segments, 2,
+        "exactly the 2 adjacent segments"
+    );
     assert_eq!(report.state, BusState::Routed, "{:?}", report.state);
 
     let bus = d.bus("bus_a").unwrap();
@@ -145,7 +150,8 @@ fn unroutable_gate_drag_fails_visibly() {
     let a_out = lamp_bank(&mut s, 24, 8);
     let mut d = Design::for_schematic("dragfail", s);
     let ty = IoType::UnsignedInt { bits: N as usize };
-    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone()).unwrap();
+    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone())
+        .unwrap();
     d.declare_output("a_out", a_out, (0, 2, 0), N, ty).unwrap();
     let gates = vec![Gate {
         name: "g0".to_string(),
@@ -200,7 +206,8 @@ fn component_drag_through_bus_reroutes_then_fails_visibly_when_sealed() {
     let a_out = lamp_bank(&mut s, 16, 8);
     let mut d = Design::for_schematic("blocker", s);
     let ty = IoType::UnsignedInt { bits: N as usize };
-    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone()).unwrap();
+    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone())
+        .unwrap();
     d.declare_output("a_out", a_out, (0, 2, 0), N, ty).unwrap();
 
     // A 3x3x3 solid cell with an (empty) contract; halo derives from the
@@ -267,11 +274,17 @@ fn component_drag_through_bus_reroutes_then_fails_visibly_when_sealed() {
     match d.reroute("bus_a").unwrap() {
         BusState::Failed(reason) => {
             assert!(reason.contains("no corridor"), "{reason}");
-            assert!(reason.contains("(12,"), "names the blocker location: {reason}");
+            assert!(
+                reason.contains("(12,"),
+                "names the blocker location: {reason}"
+            );
         }
         other => panic!("expected Failed, got {other:?}"),
     }
-    assert!(d.bus("bus_a").unwrap().fragment.is_empty(), "never half-routed");
+    assert!(
+        d.bus("bus_a").unwrap().fragment.is_empty(),
+        "never half-routed"
+    );
 }
 
 /// The influence halo (bounds + 1 without declared keepouts) counts as
@@ -284,7 +297,8 @@ fn influence_halo_counts_as_interference() {
     let a_out = lamp_bank(&mut s, 16, 8);
     let mut d = Design::for_schematic("halo", s);
     let ty = IoType::UnsignedInt { bits: N as usize };
-    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone()).unwrap();
+    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone())
+        .unwrap();
     d.declare_output("a_out", a_out, (0, 2, 0), N, ty).unwrap();
     let mut body = UniversalSchematic::new("cube".to_string());
     for x in 0..3 {
@@ -333,12 +347,20 @@ fn fanout_routes_a_shared_trunk_with_a_branch() {
     let c_out = lamp_bank(&mut s, 8, 16);
     let mut d = Design::for_schematic("fanout", s);
     let ty = IoType::UnsignedInt { bits: N as usize };
-    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone()).unwrap();
-    d.declare_output("a_out", a_out, (0, 2, 0), N, ty.clone()).unwrap();
+    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone())
+        .unwrap();
+    d.declare_output("a_out", a_out, (0, 2, 0), N, ty.clone())
+        .unwrap();
     d.declare_output("c_out", c_out, (0, 2, 0), N, ty).unwrap();
 
     let state = d
-        .route_bus("fan", "a_in", &["a_out", "c_out"], vec![], BusStyle::default())
+        .route_bus(
+            "fan",
+            "a_in",
+            &["a_out", "c_out"],
+            vec![],
+            BusStyle::default(),
+        )
         .unwrap();
     assert_eq!(state, BusState::Routed, "{:?}", d.bus_state("fan"));
     let bus = d.bus("fan").unwrap();
@@ -351,7 +373,9 @@ fn fanout_routes_a_shared_trunk_with_a_branch() {
     // The branch joins the trunk at plain dust and is diode-isolated by a
     // repeater right after the junction.
     assert!(
-        bus.fragment.get(&(8, 2, 8)).is_some_and(|b| b.contains("redstone_wire")),
+        bus.fragment
+            .get(&(8, 2, 8))
+            .is_some_and(|b| b.contains("redstone_wire")),
         "junction dust"
     );
     assert!(
@@ -378,12 +402,20 @@ fn wired_or_merges_two_drivers_into_one_net() {
     let a_out = lamp_bank(&mut s, 16, 8);
     let mut d = Design::for_schematic("wor", s);
     let ty = IoType::UnsignedInt { bits: N as usize };
-    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone()).unwrap();
-    d.declare_input("b_in", b_in, (0, 2, 0), N, ty.clone()).unwrap();
+    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone())
+        .unwrap();
+    d.declare_input("b_in", b_in, (0, 2, 0), N, ty.clone())
+        .unwrap();
     d.declare_output("a_out", a_out, (0, 2, 0), N, ty).unwrap();
 
     let state = d
-        .route_bus_or("wor", &["a_in", "b_in"], &["a_out"], vec![], BusStyle::default())
+        .route_bus_or(
+            "wor",
+            &["a_in", "b_in"],
+            &["a_out"],
+            vec![],
+            BusStyle::default(),
+        )
         .unwrap();
     assert_eq!(state, BusState::Routed, "{:?}", d.bus_state("wor"));
     let bus = d.bus("wor").unwrap();

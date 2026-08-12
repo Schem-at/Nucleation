@@ -46,6 +46,7 @@ Every capability, with its own deep-dive doc:
 - [Composition](docs/features/composition.md) — stacking the primitives
 - [Chunk iteration, streaming, worlds](docs/features/streaming-and-worlds.md) — constant-memory pipelines and world I/O
 - [World segmentation](docs/features/world-segmentation.md) — a whole world into individual builds with provenance, deterministically
+- [Embedded schematic provenance](docs/features/schematic-provenance.md) — standardized world, map, dimension, coordinates, and source identity inside each build
 - [Block entities, entities, NBT](docs/features/block-entities-nbt.md) — SNBT round-trips
 - [Redstone simulation](docs/features/redstone-simulation.md) — MCHPRS redpiler, typed circuit executors
 - [Tick simulation](docs/features/tick-simulation.md) — vanilla-accurate tick loop, verified against captures from the game
@@ -58,7 +59,7 @@ Every capability, with its own deep-dive doc:
 - [Versions and translation](docs/features/versions-and-translation.md) — data-version migration, Java <-> Bedrock
 - [The block database](docs/features/block-database.md) — 1,196 blocks, facts and measured colors
 - [Embedded scripting](docs/features/scripting.md) — Lua and JS against the full API
-- [Pluggable storage](docs/features/storage.md) — mem, fs, S3, Redis, Postgres
+- [Pluggable storage](docs/features/storage.md) — mem, fs, SSH, S3, Redis, Postgres
 - [Bindings and languages](docs/features/bindings-and-languages.md) — one generated API, seven languages
 
 ## The gallery

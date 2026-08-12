@@ -34,6 +34,36 @@ use crate::selection::{
 };
 use crate::universal_schematic::UniversalSchematic;
 
+fn component_box_air_gap(a: &Component, b: &Component) -> u32 {
+    let axis_gap = |a0: i32, a1: i32, b0: i32, b1: i32| -> u32 {
+        if a1 < b0 {
+            b0.saturating_sub(a1).saturating_sub(1) as u32
+        } else if b1 < a0 {
+            a0.saturating_sub(b1).saturating_sub(1) as u32
+        } else {
+            0
+        }
+    };
+    axis_gap(
+        a.bounds.min.0,
+        a.bounds.max.0,
+        b.bounds.min.0,
+        b.bounds.max.0,
+    )
+    .max(axis_gap(
+        a.bounds.min.1,
+        a.bounds.max.1,
+        b.bounds.min.1,
+        b.bounds.max.1,
+    ))
+    .max(axis_gap(
+        a.bounds.min.2,
+        a.bounds.max.2,
+        b.bounds.min.2,
+        b.bounds.max.2,
+    ))
+}
+
 impl UniversalSchematic {
     /// Select the connected non-air component containing `seed`, exactly as
     /// RedstoneTools' `//that` does: a BFS flood-fill over non-air blocks using
@@ -254,6 +284,176 @@ impl UniversalSchematic {
             .into_iter()
             .enumerate()
             .map(|(i, positions)| materialize(&positions, format!("{base_name}#{}", i + 1)))
+            .collect()
+    }
+
+    /// Losslessly split disconnected builds while reuniting nearby loose parts.
+    ///
+    /// The initial components use `conn` exactly like [`Self::split_connected`].
+    /// Components whose tight bounding boxes are separated by at most
+    /// `max_air_gap` empty blocks are then grouped (transitively) into one
+    /// output piece. Unlike [`Self::split_connected_attach`], this decision is
+    /// independent of block count: a small machine a long way from a larger
+    /// one remains a standalone schematic, while a detached torch or wire a
+    /// couple of blocks from its machine stays with that machine.
+    ///
+    /// `max_air_gap == 0` still reunites components whose bounding boxes touch
+    /// or overlap on every axis. Output is deterministic, largest source
+    /// component first, and block/block-entity conserving.
+    pub fn split_connected_by_gap(
+        &self,
+        conn: Connectivity,
+        max_air_gap: u32,
+    ) -> Vec<UniversalSchematic> {
+        let base_name = self
+            .metadata
+            .name
+            .clone()
+            .unwrap_or_else(|| "schematic".to_string());
+        let comps = self.connected_components(conn);
+        if comps.is_empty() {
+            return Vec::new();
+        }
+
+        // A tiny deterministic union-find is enough here: this is a cheap
+        // post-pass over component boxes, not over world voxels.
+        let mut parent: Vec<usize> = (0..comps.len()).collect();
+        fn root(parent: &mut [usize], mut i: usize) -> usize {
+            while parent[i] != i {
+                parent[i] = parent[parent[i]];
+                i = parent[i];
+            }
+            i
+        }
+        for i in 0..comps.len() {
+            for j in (i + 1)..comps.len() {
+                if component_box_air_gap(&comps[i], &comps[j]) <= max_air_gap {
+                    let ri = root(&mut parent, i);
+                    let rj = root(&mut parent, j);
+                    if ri != rj {
+                        let keep = ri.min(rj);
+                        parent[ri] = keep;
+                        parent[rj] = keep;
+                    }
+                }
+            }
+        }
+
+        let mut groups = std::collections::BTreeMap::<usize, Vec<usize>>::new();
+        for i in 0..comps.len() {
+            let r = root(&mut parent, i);
+            groups.entry(r).or_default().push(i);
+        }
+        let mut groups = groups.into_values().collect::<Vec<_>>();
+        groups.sort_by_key(|indices| indices[0]);
+
+        groups
+            .into_iter()
+            .enumerate()
+            .map(|(piece_index, component_indices)| {
+                let name = format!("{base_name}#{}", piece_index + 1);
+                let mut piece = UniversalSchematic::new(name.clone());
+                piece.metadata = self.metadata.clone();
+                piece.metadata.name = Some(name);
+                for component_index in component_indices {
+                    for pos in &comps[component_index].blocks {
+                        if let Some(block) = self.get_block(pos.x, pos.y, pos.z) {
+                            piece.set_block(pos.x, pos.y, pos.z, &block.clone());
+                        }
+                        if let Some(entity) = self.get_block_entity_owned(*pos) {
+                            piece.set_block_entity(*pos, entity);
+                        }
+                    }
+                }
+                piece.default_region = piece.default_region.to_compact();
+                piece
+            })
+            .collect()
+    }
+
+    /// Losslessly split independent builds and attach only nearby tiny parts.
+    ///
+    /// Every connected component with at least `min_standalone_blocks` is an
+    /// independent output core, even when another core is spatially nearby.
+    /// A smaller component attaches directly to its nearest core only when the
+    /// two tight bounding boxes are separated by at most `max_air_gap` empty
+    /// blocks. Otherwise the small component remains its own output.
+    ///
+    /// Attachment is deliberately **non-transitive**: a fragment can never
+    /// bridge two cores, and a chain of nearby fragments cannot collapse a
+    /// plot full of disconnected machines into one schematic. With no cores,
+    /// every connected component remains standalone. Output is deterministic,
+    /// largest source component first, and conserves all blocks and block
+    /// entities.
+    pub fn split_connected_attach_nearby(
+        &self,
+        conn: Connectivity,
+        min_standalone_blocks: usize,
+        max_air_gap: u32,
+    ) -> Vec<UniversalSchematic> {
+        let base_name = self
+            .metadata
+            .name
+            .clone()
+            .unwrap_or_else(|| "schematic".to_string());
+        let comps = self.connected_components(conn);
+        if comps.is_empty() {
+            return Vec::new();
+        }
+
+        let core_indices = comps
+            .iter()
+            .enumerate()
+            .filter_map(|(index, component)| {
+                (component.blocks.len() >= min_standalone_blocks).then_some(index)
+            })
+            .collect::<Vec<_>>();
+        let mut groups = core_indices
+            .iter()
+            .map(|&index| (index, vec![index]))
+            .collect::<Vec<_>>();
+
+        for fragment_index in 0..comps.len() {
+            if comps[fragment_index].blocks.len() >= min_standalone_blocks {
+                continue;
+            }
+            let nearest = core_indices
+                .iter()
+                .enumerate()
+                .filter_map(|(group_index, &core_index)| {
+                    let gap = component_box_air_gap(&comps[fragment_index], &comps[core_index]);
+                    (gap <= max_air_gap).then_some((gap, core_index, group_index))
+                })
+                .min();
+            if let Some((_gap, _core_index, group_index)) = nearest {
+                groups[group_index].1.push(fragment_index);
+            } else {
+                groups.push((fragment_index, vec![fragment_index]));
+            }
+        }
+        groups.sort_by_key(|(anchor, _)| *anchor);
+
+        groups
+            .into_iter()
+            .enumerate()
+            .map(|(piece_index, (_anchor, component_indices))| {
+                let name = format!("{base_name}#{}", piece_index + 1);
+                let mut piece = UniversalSchematic::new(name.clone());
+                piece.metadata = self.metadata.clone();
+                piece.metadata.name = Some(name);
+                for component_index in component_indices {
+                    for pos in &comps[component_index].blocks {
+                        if let Some(block) = self.get_block(pos.x, pos.y, pos.z) {
+                            piece.set_block(pos.x, pos.y, pos.z, &block.clone());
+                        }
+                        if let Some(entity) = self.get_block_entity_owned(*pos) {
+                            piece.set_block_entity(*pos, entity);
+                        }
+                    }
+                }
+                piece.default_region = piece.default_region.to_compact();
+                piece
+            })
             .collect()
     }
 }
@@ -575,6 +775,102 @@ mod tests {
             pieces[0].total_blocks(),
             s.total_blocks(),
             "no fragment dropped"
+        );
+    }
+
+    #[test]
+    fn split_connected_by_gap_keeps_small_distant_machines_independent() {
+        let mut s = UniversalSchematic::new("three-machines".into());
+        // Deliberately make only one machine larger than the old 128-block
+        // attachment threshold. Size must not decide whether a distant build
+        // gets its own schematic.
+        for x in 0..6 {
+            for y in 0..5 {
+                for z in 0..5 {
+                    place(&mut s, x, y, z); // 150 blocks
+                }
+            }
+        }
+        for x in 30..33 {
+            for y in 0..3 {
+                place(&mut s, x, y, 0); // 9 blocks
+            }
+        }
+        for x in 60..62 {
+            for y in 0..2 {
+                place(&mut s, x, y, 0); // 4 blocks
+            }
+        }
+
+        let pieces = s.split_connected_by_gap(Connectivity::Corner, 3);
+        assert_eq!(pieces.len(), 3);
+        assert_eq!(pieces[0].total_blocks(), 150);
+        assert_eq!(pieces[1].total_blocks(), 9);
+        assert_eq!(pieces[2].total_blocks(), 4);
+        assert_eq!(
+            pieces
+                .iter()
+                .map(UniversalSchematic::total_blocks)
+                .sum::<i32>(),
+            s.total_blocks(),
+            "the split is lossless"
+        );
+    }
+
+    #[test]
+    fn split_connected_by_gap_reunites_nearby_detached_parts() {
+        let mut s = UniversalSchematic::new("loose-parts".into());
+        for x in 0..4 {
+            place(&mut s, x, 0, 0);
+        }
+        // Two empty blocks between the main run and the loose part.
+        place(&mut s, 6, 0, 0);
+        // A truly separate machine.
+        place(&mut s, 30, 0, 0);
+
+        let pieces = s.split_connected_by_gap(Connectivity::Corner, 2);
+        assert_eq!(pieces.len(), 2);
+        assert_eq!(pieces[0].total_blocks(), 5);
+        assert_eq!(pieces[1].total_blocks(), 1);
+        assert!(pieces[0].get_block(6, 0, 0).is_some());
+    }
+
+    #[test]
+    fn split_connected_attach_nearby_cannot_chain_independent_cores() {
+        let mut s = UniversalSchematic::new("no-chain".into());
+        for base in [0, 24, 48] {
+            for x in base..(base + 20) {
+                place(&mut s, x, 0, 0);
+            }
+        }
+        // Each pair of cores has four empty blocks between their boxes. A
+        // transitive proximity union would collapse all three at gap=4.
+        let pieces = s.split_connected_attach_nearby(Connectivity::Corner, 16, 4);
+        assert_eq!(pieces.len(), 3);
+        assert!(pieces.iter().all(|piece| piece.total_blocks() == 20));
+    }
+
+    #[test]
+    fn split_connected_attach_nearby_attaches_only_direct_tiny_fragments() {
+        let mut s = UniversalSchematic::new("direct-fragments".into());
+        for x in 0..20 {
+            place(&mut s, x, 0, 0);
+        }
+        place(&mut s, 22, 0, 0); // two empty blocks from the core
+        place(&mut s, 25, 0, 0); // two from the fragment, five from the core
+        place(&mut s, 60, 0, 0); // wholly independent tiny build
+
+        let pieces = s.split_connected_attach_nearby(Connectivity::Corner, 16, 2);
+        assert_eq!(pieces.len(), 3);
+        assert_eq!(pieces[0].total_blocks(), 21);
+        assert_eq!(pieces[1].total_blocks(), 1, "fragments do not chain");
+        assert_eq!(pieces[2].total_blocks(), 1, "distant tiny build survives");
+        assert_eq!(
+            pieces
+                .iter()
+                .map(UniversalSchematic::total_blocks)
+                .sum::<i32>(),
+            s.total_blocks()
         );
     }
 

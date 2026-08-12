@@ -547,9 +547,7 @@ pub fn mech_of(block: &str) -> Mechanism {
 pub fn fwd_of(block: &str) -> (i32, i32, i32) {
     let facing = blocks::facing_of(block).and_then(blocks::facing_vec);
     match facing {
-        Some(v) if blocks::is_repeater(block) || blocks::is_comparator(block) => {
-            (-v.0, -v.1, -v.2)
-        }
+        Some(v) if blocks::is_repeater(block) || blocks::is_comparator(block) => (-v.0, -v.1, -v.2),
         Some(v) => v,
         None => (1, 0, 0),
     }
@@ -950,7 +948,10 @@ mod tests {
         assert_eq!(mech_of(&blocks::repeater("west", 1)), Mechanism::Repeater);
         assert_eq!(mech_of(blocks::TORCH), Mechanism::TorchFloor);
         assert_eq!(mech_of(blocks::LEVER_OFF), Mechanism::Lever);
-        assert_eq!(mech_of("minecraft:redstone_block"), Mechanism::RedstoneBlock);
+        assert_eq!(
+            mech_of("minecraft:redstone_block"),
+            Mechanism::RedstoneBlock
+        );
     }
 
     #[test]

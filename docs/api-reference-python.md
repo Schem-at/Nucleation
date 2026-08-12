@@ -186,7 +186,7 @@ The wheel exports ~85 classes. By feature area, with the doc that covers each:
 
 | area | classes | doc |
 |---|---|---|
-| Core | `Schematic`, `BlockState`, `BlockPos`, `Dimensions`, `RegionBounds`, `SchematicRegions`, `DefinitionRegion`, `Nbt`, `NucleationError` | [basics](features/basics.md), [block entities & NBT](features/block-entities-nbt.md) |
+| Core | `Schematic`, `SchematicSplitResult`, `BlockState`, `BlockPos`, `Dimensions`, `RegionBounds`, `SchematicRegions`, `DefinitionRegion`, `Nbt`, `NucleationError` | [basics](features/basics.md), [world segmentation](features/world-segmentation.md), [block entities & NBT](features/block-entities-nbt.md) |
 | Building | `Shape`, `Brush`, `BuildingTool`, `SchematicBuilder`, `Curve3D`, `Geo` | [shapes & brushes](features/shapes-and-brushes.md), [geo](features/geo.md) |
 | SDF / fields | `Sdf`, `SdfBounds`, `DistanceField`, `Field3`, `FieldProgram*`, `CellularSdfConfig` | [SDF & fields](features/sdf-and-fields.md) |
 | Palettes | `Palette`, `PaletteBuilder`, `Blocks`, `InterpolationSpace` | [palettes & color](features/palettes-and-color.md) |

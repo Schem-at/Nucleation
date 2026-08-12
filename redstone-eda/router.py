@@ -60,6 +60,13 @@ class Router:
                                     # before its repeater starts at ss1 and
                                     # a corner dust there is DEAD (found by
                                     # genlib seg7: n32's branch never fired)
+        self.prewired = set(build.cells)
+                                    # every cell that existed BEFORE routing
+                                    # started, i.e. compiled plane geometry.
+                                    # A destination net's prewired cells are
+                                    # its RAIL, which sits downstream of the
+                                    # driver the route is about to feed --
+                                    # see dust_ok's diode-ring rule.
 
     def in_bounds(self, p):
         if self.bounds is None:
@@ -68,11 +75,49 @@ class Router:
         return x0 <= p[0] <= x1 and y0 <= p[1] <= y1 and z0 <= p[2] <= z1
 
     # -- design rules -------------------------------------------------------
+    def dest_blob(self, dsts, label):
+        """The destination cells plus every own-net cell they already conduct to.
+
+        Electrical closure over `nets.neighbours`, so it stops at diodes: a bare
+        dust rail is one blob with its drive cell, while a rail fed THROUGH a
+        repeater is a separate node from the drive cell that feeds it.
+        """
+        seen = {p for p in dsts if p in self.b.cells}
+        stack = list(seen)
+        while stack:
+            for q in nets.neighbours(self.b.cells, stack.pop()):
+                if q not in seen and self.labels.get(q) == label:
+                    seen.add(q)
+                    stack.append(q)
+        return seen
+
+    def downstream_rail(self, q, label):
+        """Is `q` a cell of the DESTINATION net that this route must not touch?
+
+        Own-net reuse is sound only for a DIODE-FREE net.  A cell of the
+        destination net that already existed before routing began and that the
+        endpoint does NOT already conduct to is separated from it by a diode --
+        it is the rail the endpoint DRIVES.  Joining one closes a directed ring
+        (rail driver -> rail cell -> route tail -> drive cell -> rail driver),
+        and a ring holding a repeater LATCHES at 15: the net reads high forever,
+        no input can clear it, and because the world is then quiescent
+        `run_until_quiescent` cannot even see it.
+
+        mult4's m1B2 did exactly this once the refresh pitch moved its path onto
+        its own rail -- output bit 3 stuck at 1, 64/256.  A rail with no diode
+        between it and the endpoint is the same electrical node as the endpoint,
+        so it stays legal (test_router's bare dust rails rely on that).
+        """
+        return (q in self.prewired and self.labels.get(q) == label
+                and q not in getattr(self, "_dst_blob", ()))
+
     def dust_ok(self, p, label, friendly=None):
         x, y, z = p
         ok = friendly or {label}
         if p in self.b.cells:
-            return self.labels.get(p) in ok         # reuse own net only
+            if self.labels.get(p) not in ok:
+                return False                        # reuse own net only
+            return not self.downstream_rail(p, label)
         # a station's exit block strong-powers every adjacent dust cell
         # (probe_station S_exit_*): the electrical model below cannot see
         # that, so keep foreign dust out of its whole 6-neighbourhood
@@ -120,6 +165,13 @@ class Router:
                 # exact-label match only: "sig#13" (a pre-gate collector) is a
                 # DIFFERENT electrical net from "sig", touching it is a short
                 if self.labels.get(q) is not None and self.labels.get(q) not in ok:
+                    return False
+                # ...and merely GRAZING the rail we are about to drive closes
+                # the same latching ring as stepping into it (see
+                # downstream_rail): the driver re-emits 15 into its rail, the
+                # rail joins this cell, and the route carries it back round to
+                # the driver's own input.  One diode in the ring is enough.
+                if self.downstream_rail(q, label):
                     return False
             return True
         finally:
@@ -206,6 +258,13 @@ class Router:
         dsts = {dst} if isinstance(dst, tuple) else set(dst)
         srcs = [src] if isinstance(src, tuple) else list(src)
         self._dsts = dsts           # for move_ok subclass hooks
+        # Own-net cells this route may legally touch: everything the endpoint
+        # already conducts to (same electrical node), plus the source side,
+        # which is upstream by construction and drives the route.  Anything ELSE
+        # carrying the destination label is behind a diode -- it is the rail
+        # this route DRIVES -- see downstream_rail.
+        self._dst_blob = (self.dest_blob(dsts, label)
+                          | self.dest_blob(set(srcs), label))
 
         def h(p):
             # weighted A* (eps=1.3): slightly suboptimal paths, much less

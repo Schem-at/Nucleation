@@ -24,6 +24,7 @@ shorts check before simulation.  Verification is fixed-tick only.
 """
 import nucleation as n
 import nets
+import drc
 import rs
 import cells
 import seq_cells as sc
@@ -182,6 +183,11 @@ def main():
     if shorts:
         for s in shorts[:6]:
             print("   SHORT", s)
+        return False
+    # This build closes the sequential loop ON PURPOSE (Q -> a, sum -> D), so it
+    # holds exactly one diode ring per bit -- the only declared latch count in
+    # the suite.  Any other number means a ring formed that nobody designed.
+    if not drc.check_rings("counter%d" % BITS, b.cells, expect=BITS):
         return False
     sim = b.sim(settle=800)
     q0, d0 = read_q(sim, rp), read_d(sim, rp)

@@ -15,6 +15,7 @@
 #include "BlockState.hpp"
 #include "Dimensions.hpp"
 #include "NucleationError.hpp"
+#include "SchematicSplitResult.hpp"
 #include "diplomat_runtime.hpp"
 
 
@@ -25,6 +26,8 @@ namespace capi {
     nucleation::capi::Schematic* Schematic_create(nucleation::diplomat::capi::DiplomatStringView name);
 
     nucleation::capi::Schematic* Schematic_deep_clone(const nucleation::capi::Schematic* self);
+
+    nucleation::capi::SchematicSplitResult* Schematic_split_connected_attach_nearby(const nucleation::capi::Schematic* self, uint32_t min_standalone_blocks, uint32_t max_air_gap);
 
     nucleation::capi::Dimensions Schematic_dimensions(const nucleation::capi::Schematic* self);
 
@@ -259,6 +262,14 @@ namespace capi {
 
     void Schematic_set_we_version(nucleation::capi::Schematic* self, int32_t version);
 
+    typedef struct Schematic_provenance_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_provenance_json_result;
+    Schematic_provenance_json_result Schematic_provenance_json(const nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Schematic_set_provenance_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_set_provenance_json_result;
+    Schematic_set_provenance_json_result Schematic_set_provenance_json(nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatStringView json);
+
+    void Schematic_clear_provenance(nucleation::capi::Schematic* self);
+
     void Schematic_flip_x(nucleation::capi::Schematic* self);
 
     void Schematic_flip_y(nucleation::capi::Schematic* self);
@@ -410,6 +421,13 @@ inline std::unique_ptr<nucleation::Schematic> nucleation::Schematic::create(std:
 inline std::unique_ptr<nucleation::Schematic> nucleation::Schematic::deep_clone() const {
     auto result = nucleation::capi::Schematic_deep_clone(this->AsFFI());
     return std::unique_ptr<nucleation::Schematic>(nucleation::Schematic::FromFFI(result));
+}
+
+inline std::unique_ptr<nucleation::SchematicSplitResult> nucleation::Schematic::split_connected_attach_nearby(uint32_t min_standalone_blocks, uint32_t max_air_gap) const {
+    auto result = nucleation::capi::Schematic_split_connected_attach_nearby(this->AsFFI(),
+        min_standalone_blocks,
+        max_air_gap);
+    return std::unique_ptr<nucleation::SchematicSplitResult>(nucleation::SchematicSplitResult::FromFFI(result));
 }
 
 inline nucleation::Dimensions nucleation::Schematic::dimensions() const {
@@ -1385,6 +1403,31 @@ inline int32_t nucleation::Schematic::we_version() const {
 inline void nucleation::Schematic::set_we_version(int32_t version) {
     nucleation::capi::Schematic_set_we_version(this->AsFFI(),
         version);
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Schematic::provenance_json() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::Schematic_provenance_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Schematic::provenance_json_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::Schematic_provenance_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Schematic::set_provenance_json(std::string_view json) {
+    auto result = nucleation::capi::Schematic_set_provenance_json(this->AsFFI(),
+        {json.data(), json.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline void nucleation::Schematic::clear_provenance() {
+    nucleation::capi::Schematic_clear_provenance(this->AsFFI());
 }
 
 inline void nucleation::Schematic::flip_x() {

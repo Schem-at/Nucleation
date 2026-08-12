@@ -31,7 +31,11 @@ fn vertical_to_horizontal_stamps_the_pivot_implicitly() {
     )
     .expect("bus routes");
     assert_eq!(report.pivot, Some(PivotKind::V2H));
-    assert_eq!(report.routes.len(), 16, "8 bits x (port->pivot, pivot->rail)");
+    assert_eq!(
+        report.routes.len(),
+        16,
+        "8 bits x (port->pivot, pivot->rail)"
+    );
     // The stamped v-ports sit against the connection dusts; the h-ports at
     // the tile's east face.
     for n in 0..8 {

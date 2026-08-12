@@ -8,7 +8,7 @@ resolver = "2"
 
 [package]
 name = "nucleation"
-version = "0.10.4"
+version = "0.10.5"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -53,7 +53,10 @@ bridge-full = [
     "scripting-js",
     "voxelize",
     "world-segment",
+    "store-ssh",
     "mc-tick",
+    "routing",
+    "hdl",
 ]
 
 # The vanilla-accurate headless tick engine (crates/mc-tick), bridged as
@@ -84,6 +87,7 @@ hdl = ["dep:nucleation-hdl"]
 # are feature-gated so you only pull the deps you enable. Networked backends
 # wrap async SDKs behind an internal `block_on` so the trait stays sync.
 store-fs = []
+store-ssh = []
 store-s3 = ["dep:aws-sdk-s3", "dep:tokio", "dep:futures-util"]
 store-redis = ["dep:redis", "dep:tokio"]
 store-pg = ["dep:tokio-postgres", "dep:tokio"]
@@ -101,7 +105,7 @@ simulation = [
 # Auto-stack: detect repeating structures + resize them (pure-voxel core)
 autostack = []
 # World segmentation: voxel world -> discrete builds (pure, deterministic core)
-world-segment = ["dep:tar"]
+world-segment = ["dep:tar", "dep:zstd"]
 # Mesh voxelization: GLB/OBJ models -> building Shapes + textured schematics
 voxelize = ["dep:gltf", "dep:image"]
 # Meshing support - generate 3D meshes from schematics
@@ -125,6 +129,7 @@ chrono = { version = "0.4", features = ["serde"] }
 quartz_nbt = { version = "0.2.9", features = ["preserve_order"] }
 flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
 tar = { version = "0.4", optional = true }
+zstd = { version = "0.13", optional = true }
 log = "0.4.22"
 console = "0.15.8"
 insign = "0.1.1"
@@ -300,6 +305,10 @@ harness = false
 [[example]]
 name = "wol_extract"
 required-features = ["world-segment"]
+
+[[example]]
+name = "segment_world"
+required-features = ["world-segment", "store-fs"]
 
 [[example]]
 name = "wol_pack"

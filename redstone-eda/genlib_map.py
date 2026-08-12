@@ -37,6 +37,7 @@ import rs
 import cells
 import nets
 import audit
+import drc
 import router as router_mod
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -771,7 +772,10 @@ def verify_design(name, nl, lib, order, b, labels, driver, lever_at):
         if items:
             print("STRUCTURAL %s x%d e.g. %s" % (kind, len(items), items[0]))
     print("net check: %d shorts" % len(shorts))
-    if any(problems.values()) or shorts:
+    # move_ok bans own-net grazing to keep a branch from closing a repeater ring
+    # around its own trunk; this proves no ring survived anyway, by any route.
+    rings_ok = drc.check_rings(name, b.cells)
+    if any(problems.values()) or shorts or not rings_ok:
         for s in shorts[:6]:
             print("   ", s)
         return None

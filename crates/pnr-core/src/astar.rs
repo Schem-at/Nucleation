@@ -210,9 +210,7 @@ mod tests {
                 .collect()
         }
         fn legal(&self, _f: &State<()>, c: &Candidate<(), char>, _ctx: &RouteCtx) -> bool {
-            !self.blocked.contains(&c.to.pos)
-                && c.to.pos.x.abs() <= 20
-                && c.to.pos.z.abs() <= 20
+            !self.blocked.contains(&c.to.pos) && c.to.pos.x.abs() <= 20 && c.to.pos.z.abs() <= 20
         }
         fn budget(&self) -> Budget {
             Budget::default()

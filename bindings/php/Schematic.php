@@ -34,6 +34,11 @@ final class Schematic {
         return new Schematic($ret, true);
     }
 
+    public function splitConnectedAttachNearby( $min_standalone_blocks,  $max_air_gap) {
+        $ret = Lib::ffi()->Schematic_split_connected_attach_nearby($this->ptr, $min_standalone_blocks, $max_air_gap);
+        return new SchematicSplitResult($ret, true);
+    }
+
     public function dimensions() {
         $ret = Lib::ffi()->Schematic_dimensions($this->ptr);
         return Dimensions::fromFFI($ret);
@@ -1103,6 +1108,36 @@ final class Schematic {
 
     public function setWeVersion( $version) {
         Lib::ffi()->Schematic_set_we_version($this->ptr, $version);
+    }
+
+    public function provenanceJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Schematic_provenance_json($this->ptr, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function setProvenanceJson(string $json) {
+        $__n0 = strlen($json);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $json, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Schematic_set_provenance_json($this->ptr, $__view0);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function clearProvenance() {
+        Lib::ffi()->Schematic_clear_provenance($this->ptr);
     }
 
     public function flipX() {

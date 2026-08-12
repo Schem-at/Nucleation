@@ -222,7 +222,8 @@ mod tests {
     #[test]
     fn stone_respects_existing_solids() {
         let mut ws = Workspace::new();
-        ws.put(Pos::new(0, 0, 0), "minecraft:gray_concrete").unwrap();
+        ws.put(Pos::new(0, 0, 0), "minecraft:gray_concrete")
+            .unwrap();
         // A route support over an existing rail floor keeps its colour.
         ws.stone(Pos::new(0, 0, 0), "route").unwrap();
         assert_eq!(ws.get(Pos::new(0, 0, 0)), Some("minecraft:gray_concrete"));

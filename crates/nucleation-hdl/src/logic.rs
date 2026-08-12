@@ -121,10 +121,20 @@ pub struct Compiler {
 fn sanitize(net: &str) -> String {
     let b: String = net
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let b = b.trim_matches('_');
-    let mut b = if b.is_empty() { "n".to_string() } else { b.to_string() };
+    let mut b = if b.is_empty() {
+        "n".to_string()
+    } else {
+        b.to_string()
+    };
     if b.chars().next().is_some_and(|c| c.is_ascii_digit()) {
         b = format!("n{b}");
     }

@@ -151,7 +151,9 @@ pub fn standard_io_extra_states() -> Vec<String> {
     let mut out = Vec::new();
     for d in dirs {
         for p in ["true", "false"] {
-            out.push(format!("minecraft:lever[face=floor,facing={d},powered={p}]"));
+            out.push(format!(
+                "minecraft:lever[face=floor,facing={d},powered={p}]"
+            ));
             out.push(format!("minecraft:lever[face=wall,facing={d},powered={p}]"));
             out.push(format!("minecraft:redstone_wall_torch[facing={d},lit={p}]"));
         }
@@ -240,7 +242,10 @@ impl McTickBackend {
 
     fn descriptor_at(&self, p: mc_tick::Pos) -> &str {
         let id = self.sim.world().get(p);
-        self.sim.registry().descriptor(id).unwrap_or("minecraft:air")
+        self.sim
+            .registry()
+            .descriptor(id)
+            .unwrap_or("minecraft:air")
     }
 
     /// Signal strength a settled block state reports: wire `power=N`,
@@ -285,7 +290,8 @@ impl SimBackend for McTickBackend {
                 // Toggle-to-target: flip only when the state differs, and
                 // settle after every flip so the next read sees the truth.
                 self.sim.use_block(p);
-                self.sim.run_until_quiescent(u64::from(self.per_flip_budget));
+                self.sim
+                    .run_until_quiescent(u64::from(self.per_flip_budget));
             }
         }
         Ok(())

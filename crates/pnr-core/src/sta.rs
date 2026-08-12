@@ -43,7 +43,10 @@ impl DelayGraph {
 
     /// Add a directed edge `from -> to` with the given delay.
     pub fn edge(&mut self, from: usize, to: usize, delay: u32) -> &mut Self {
-        assert!(from < self.n_nodes && to < self.n_nodes, "node out of range");
+        assert!(
+            from < self.n_nodes && to < self.n_nodes,
+            "node out of range"
+        );
         self.edges.push((from, to, delay));
         self
     }
@@ -125,12 +128,7 @@ impl StaResult {
     pub fn slack(&self, required: &[(usize, u64)]) -> Vec<(usize, Option<i64>)> {
         required
             .iter()
-            .map(|(n, req)| {
-                (
-                    *n,
-                    self.arrival[*n].map(|a| *req as i64 - a as i64),
-                )
-            })
+            .map(|(n, req)| (*n, self.arrival[*n].map(|a| *req as i64 - a as i64)))
             .collect()
     }
 }

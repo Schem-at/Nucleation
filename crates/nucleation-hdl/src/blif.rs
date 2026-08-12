@@ -111,7 +111,10 @@ pub fn parse_blif(text: &str) -> Result<Blif, HdlError> {
             ".names" => {
                 let out = tok[tok.len() - 1].to_string();
                 let node = RawNode {
-                    inputs: tok[1..tok.len() - 1].iter().map(|s| s.to_string()).collect(),
+                    inputs: tok[1..tok.len() - 1]
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
                     rows: Vec::new(),
                 };
                 if let Some(&i) = index.get(&out) {
@@ -140,13 +143,21 @@ pub fn parse_blif(text: &str) -> Result<Blif, HdlError> {
                         // 0-input node: row is just the out bit
                         nodes[i].1.rows.push((String::new(), tok[0].to_string()));
                     } else {
-                        nodes[i].1.rows.push((tok[0].to_string(), tok[1].to_string()));
+                        nodes[i]
+                            .1
+                            .rows
+                            .push((tok[0].to_string(), tok[1].to_string()));
                     }
                 }
             }
         }
     }
-    Ok(Blif { inputs, outputs, nodes, latches })
+    Ok(Blif {
+        inputs,
+        outputs,
+        nodes,
+        latches,
+    })
 }
 
 /// Parse one `.latch` token line (rising-edge only).
@@ -164,7 +175,13 @@ fn parse_latch(tok: &[&str]) -> Result<Latch, HdlError> {
         3 => (tok[1], tok[2], None, None, 3),
         4 => (tok[1], tok[2], None, None, parse_init(tok[3])?),
         5 => (tok[1], tok[2], Some(tok[3]), Some(tok[4]), 3),
-        6 => (tok[1], tok[2], Some(tok[3]), Some(tok[4]), parse_init(tok[5])?),
+        6 => (
+            tok[1],
+            tok[2],
+            Some(tok[3]),
+            Some(tok[4]),
+            parse_init(tok[5])?,
+        ),
         n => {
             return Err(HdlError::Parse(format!(
                 ".latch expects 2-5 arguments, got {}",
@@ -210,9 +227,10 @@ pub fn tt_of(ins_len: usize, rows: &[(String, String)]) -> Result<(Vec<bool>, us
     let mut tt = vec![false; size];
     for (m, slot) in tt.iter_mut().enumerate() {
         for (pat, _o) in rows {
-            let ok = pat.chars().enumerate().all(|(i, c)| {
-                c == '-' || (c.to_digit(10).unwrap_or(2) as usize) == ((m >> i) & 1)
-            });
+            let ok = pat
+                .chars()
+                .enumerate()
+                .all(|(i, c)| c == '-' || (c.to_digit(10).unwrap_or(2) as usize) == ((m >> i) & 1));
             if ok {
                 *slot = true;
                 break;
@@ -233,9 +251,7 @@ pub type Node = (Vec<String>, Vec<bool>, usize);
 /// Topo-order nodes, collapse duplicate inputs, propagate constants.
 ///
 /// Returns surviving nodes (in topo order) and the constant nets.
-pub fn fold(
-    blif: &Blif,
-) -> Result<(Vec<(String, Node)>, HashMap<String, u8>), HdlError> {
+pub fn fold(blif: &Blif) -> Result<(Vec<(String, Node)>, HashMap<String, u8>), HdlError> {
     let index = blif.node_index();
     // Topo order over raw nodes, in file order, with cycle detection.
     let mut order: Vec<usize> = Vec::new();

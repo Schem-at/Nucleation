@@ -51,13 +51,15 @@ Each with a verified Python snippet:
   clustering, cross-tile stitching, tiers, partition hints, snapshot identity,
   and a provenance envelope per build — byte-identical on every re-run
   ([snippet](readme-snippets/17-world-generator-python.md))
+- [Embedded schematic provenance](features/schematic-provenance.md) — the
+  shared source, world, map, dimension, and coordinate metadata contract
 - [Block entities, entities & NBT](features/block-entities-nbt.md)
   ([snippet](readme-snippets/14-block-entities-nbt-python.md))
 - [Geodata](features/geo.md) — `Shape.polygon_prism`,
   `Geo.extrude_footprints`, `Geo.heightmap_terrain`, then out to a playable
   world ([snippet](readme-snippets/16-geo-osm-python.md))
 - [Pluggable storage](features/storage.md) — `StoreIo` / `Store`
-  over one URI (memory / filesystem / S3 / Redis / Postgres)
+  over one URI (memory / filesystem / SSH / S3 / Redis / Postgres)
   ([snippet](readme-snippets/15-storage-python.md))
 
 ## Per-language references

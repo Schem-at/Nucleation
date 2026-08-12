@@ -1,0 +1,400 @@
+{
+ "artifact": "artifacts/P03_slice_hi_lo.schem",
+ "artifact_blocks": 240,
+ "buses": {
+  "bus_hi": {
+   "call": "d.raw.route_bus_adapted('bus_hi', 'a_in', 'hi_out', '[]', '{\"bus_block\": \"minecraft:yellow_concrete\"}', align=2, shift=-4, truncate=True)",
+   "error": null,
+   "seconds": 0.0029,
+   "state": "routed"
+  },
+  "bus_lo": {
+   "call": "d.raw.route_bus_adapted('bus_lo', 'a_in', 'lo_out', '[]', '{\"bus_block\": \"minecraft:light_blue_concrete\"}', align=0, shift=0, truncate=True)",
+   "error": null,
+   "seconds": 0.0019,
+   "state": "routed"
+  }
+ },
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "cost_vector": {
+  "coherence": null,
+  "delay_rt": 0,
+  "footprint": 216,
+  "length": 96,
+  "skew_rt": 0
+ },
+ "expect": "solved",
+ "fixtures": {},
+ "id": "P03_slice_hi_lo",
+ "log": [
+  "verify 24/24 (low nibble = word & 0xF 12/12, high nibble = word >> 4 12/12)"
+ ],
+ "loose_blocks": 48,
+ "notes": "`truncate=True` is required: without it the router REFUSES a lossy connection, which is the right default -- losing a word's high bits is not the router's call.",
+ "per_bus": {
+  "bus_hi": {
+   "bbox": [
+    [
+     2,
+     9,
+     4
+    ],
+    [
+     13,
+     18,
+     4
+    ]
+   ],
+   "cells": 96,
+   "delay_rt": 0,
+   "devices": 0,
+   "footprint": 120,
+   "glass": 6,
+   "per_bit_rt": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "skew_rt": 0,
+   "wire": 48
+  },
+  "bus_lo": {
+   "bbox": [
+    [
+     2,
+     1,
+     4
+    ],
+    [
+     13,
+     8,
+     4
+    ]
+   ],
+   "cells": 96,
+   "delay_rt": 0,
+   "devices": 0,
+   "footprint": 96,
+   "glass": 0,
+   "per_bit_rt": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "skew_rt": 0,
+   "wire": 48
+  }
+ },
+ "question": "Split one 8-bit driver into two 4-bit sinks: `lo` takes bits 0-3 (lsb-aligned), `hi` takes bits 4-7 (shift -4). Both need `truncate`, since each drops half the word.",
+ "scenario": {
+  "_file": "scenarios/P03_slice_hi_lo.py",
+  "buses": [
+   {
+    "adapted": {
+     "align": 0,
+     "shift": 0,
+     "truncate": true
+    },
+    "driver": "a_in",
+    "name": "bus_lo",
+    "sinks": [
+     "lo_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:light_blue_concrete"
+    }
+   },
+   {
+    "adapted": {
+     "align": 2,
+     "shift": -4,
+     "truncate": true
+    },
+    "driver": "a_in",
+    "name": "bus_hi",
+    "sinks": [
+     "hi_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:yellow_concrete"
+    }
+   }
+  ],
+  "expect": "solved",
+  "id": "P03_slice_hi_lo",
+  "notes": "`truncate=True` is required: without it the router REFUSES a lossy connection, which is the right default -- losing a word's high bits is not the router's call.",
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     14,
+     2,
+     4
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "lo_out",
+    "ty": "uint",
+    "width": 4
+   },
+   {
+    "anchor": [
+     14,
+     12,
+     4
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "hi_out",
+    "ty": "uint",
+    "width": 4
+   }
+  ],
+  "question": "Split one 8-bit driver into two 4-bit sinks: `lo` takes bits 0-3 (lsb-aligned), `hi` takes bits 4-7 (shift -4). Both need `truncate`, since each drops half the word.",
+  "render": {
+   "pitch": 28,
+   "yaw": 145,
+   "zoom": 1.85
+  },
+  "title": "Bit-slicing: 8-bit word -> low nibble + high nibble",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "low nibble = word & 0xF",
+     "map": {
+      "kind": "identity"
+     },
+     "out": "lo_out",
+     "patterns": "walking+extremes"
+    },
+    {
+     "in": "a_in",
+     "label": "high nibble = word >> 4",
+     "map": {
+      "by": -4,
+      "kind": "shift"
+     },
+     "out": "hi_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0048,
+ "solved": true,
+ "solver_produced": true,
+ "title": "Bit-slicing: 8-bit word -> low nibble + high nibble",
+ "verification": {
+  "cases": [
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "low nibble = word & 0xF",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "low nibble = word & 0xF",
+    "want": 2
+   },
+   {
+    "got": 4,
+    "in": 4,
+    "ok": true,
+    "section": "low nibble = word & 0xF",
+    "want": 4
+   },
+   {
+    "got": 8,
+    "in": 8,
+    "ok": true,
+    "section": "low nibble = word & 0xF",
+    "want": 8
+   },
+   {
+    "got": 0,
+    "in": 16,
+    "ok": true,
+    "section": "low nibble = word & 0xF",
+    "want": 0
+   },
+   {
+    "got": 0,
+    "in": 32,
+    "ok": true,
+    "section": "low nibble = word & 0xF",
+    "want": 0
+   },
+   {
+    "got": 0,
+    "in": 64,
+    "ok": true,
+    "section": "low nibble = word & 0xF",
+    "want": 0
+   },
+   {
+    "got": 0,
+    "in": 128,
+    "ok": true,
+    "section": "low nibble = word & 0xF",
+    "want": 0
+   },
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "low nibble = word & 0xF",
+    "want": 0
+   },
+   {
+    "got": 15,
+    "in": 255,
+    "ok": true,
+    "section": "low nibble = word & 0xF",
+    "want": 15
+   },
+   {
+    "got": 10,
+    "in": 170,
+    "ok": true,
+    "section": "low nibble = word & 0xF",
+    "want": 10
+   },
+   {
+    "got": 5,
+    "in": 85,
+    "ok": true,
+    "section": "low nibble = word & 0xF",
+    "want": 5
+   },
+   {
+    "got": 0,
+    "in": 1,
+    "ok": true,
+    "section": "high nibble = word >> 4",
+    "want": 0
+   },
+   {
+    "got": 0,
+    "in": 2,
+    "ok": true,
+    "section": "high nibble = word >> 4",
+    "want": 0
+   },
+   {
+    "got": 0,
+    "in": 4,
+    "ok": true,
+    "section": "high nibble = word >> 4",
+    "want": 0
+   },
+   {
+    "got": 0,
+    "in": 8,
+    "ok": true,
+    "section": "high nibble = word >> 4",
+    "want": 0
+   },
+   {
+    "got": 1,
+    "in": 16,
+    "ok": true,
+    "section": "high nibble = word >> 4",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 32,
+    "ok": true,
+    "section": "high nibble = word >> 4",
+    "want": 2
+   },
+   {
+    "got": 4,
+    "in": 64,
+    "ok": true,
+    "section": "high nibble = word >> 4",
+    "want": 4
+   },
+   {
+    "got": 8,
+    "in": 128,
+    "ok": true,
+    "section": "high nibble = word >> 4",
+    "want": 8
+   },
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "high nibble = word >> 4",
+    "want": 0
+   },
+   {
+    "got": 15,
+    "in": 255,
+    "ok": true,
+    "section": "high nibble = word >> 4",
+    "want": 15
+   },
+   {
+    "got": 10,
+    "in": 170,
+    "ok": true,
+    "section": "high nibble = word >> 4",
+    "want": 10
+   },
+   {
+    "got": 5,
+    "in": 85,
+    "ok": true,
+    "section": "high nibble = word >> 4",
+    "want": 5
+   }
+  ],
+  "ok": true,
+  "passed": 24,
+  "sections": {
+   "high nibble = word >> 4": {
+    "passed": 12,
+    "total": 12
+   },
+   "low nibble = word & 0xF": {
+    "passed": 12,
+    "total": 12
+   }
+  },
+  "total": 24
+ },
+ "wall_seconds": 0.063
+}

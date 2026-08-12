@@ -100,6 +100,8 @@ export { BlockState } from "./BlockState.mjs"
 
 export { Schematic } from "./Schematic.mjs"
 
+export { SchematicSplitResult } from "./SchematicSplitResult.mjs"
+
 export { SchematicBuilder } from "./SchematicBuilder.mjs"
 
 export { Scripting } from "./Scripting.mjs"

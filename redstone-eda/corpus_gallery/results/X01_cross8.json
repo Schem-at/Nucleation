@@ -1,0 +1,401 @@
+{
+ "artifact": "artifacts/X01_cross8.schem",
+ "artifact_blocks": 512,
+ "buses": {
+  "bus_a": {
+   "call": "d.route_bus('bus_a', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:lime_concrete'}))",
+   "error": null,
+   "seconds": 0.0106,
+   "state": "routed"
+  },
+  "bus_b": {
+   "call": "d.route_bus('bus_b', driver='b_in', sinks=['b_out'], style=n.Style(**{'bus_block': 'minecraft:cyan_concrete', 'transparent_block': 'minecraft:cyan_stained_glass'}))",
+   "error": null,
+   "seconds": 0.0161,
+   "state": "routed"
+  }
+ },
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "cost_vector": {
+  "coherence": null,
+  "delay_rt": 2,
+  "footprint": 462,
+  "length": 168,
+  "skew_rt": 0
+ },
+ "expect": "solved",
+ "fixtures": {},
+ "id": "X01_cross8",
+ "log": [
+  "verify 24/24 (bus_a conducts 12/12, bus_b conducts 12/12)"
+ ],
+ "loose_blocks": 96,
+ "notes": "The reference case: `showcase/bus_cross8_design.schem` in the README is the same design, so a regression here means the harness is wrong, not the router.",
+ "per_bus": {
+  "bus_a": {
+   "bbox": [
+    [
+     2,
+     1,
+     8
+    ],
+    [
+     15,
+     16,
+     8
+    ]
+   ],
+   "cells": 208,
+   "delay_rt": 2,
+   "devices": 16,
+   "footprint": 224,
+   "glass": 0,
+   "per_bit_rt": [
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2
+   ],
+   "skew_rt": 0,
+   "wire": 80
+  },
+  "bus_b": {
+   "bbox": [
+    [
+     8,
+     0,
+     2
+    ],
+    [
+     8,
+     16,
+     15
+    ]
+   ],
+   "cells": 208,
+   "delay_rt": 1,
+   "devices": 8,
+   "footprint": 238,
+   "glass": 14,
+   "per_bit_rt": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "skew_rt": 0,
+   "wire": 88
+  }
+ },
+ "question": "Bus A runs +X at z=8, bus B runs +Z at x=8, both in the dense 2y vertical form.  They cannot both go straight. Does the router find the crossing without being told?",
+ "scenario": {
+  "_file": "scenarios/X01_cross8.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_a",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:lime_concrete"
+    }
+   },
+   {
+    "driver": "b_in",
+    "name": "bus_b",
+    "sinks": [
+     "b_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:cyan_concrete",
+     "transparent_block": "minecraft:cyan_stained_glass"
+    }
+   }
+  ],
+  "expect": "solved",
+  "id": "X01_cross8",
+  "notes": "The reference case: `showcase/bus_cross8_design.schem` in the README is the same design, so a regression here means the harness is wrong, not the router.",
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     8
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     16,
+     2,
+     8
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     8,
+     2,
+     1
+    ],
+    "dir": "in",
+    "feed": [
+     0,
+     0,
+     -1
+    ],
+    "form": "vertical",
+    "name": "b_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     8,
+     2,
+     16
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "b_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "Bus A runs +X at z=8, bus B runs +Z at x=8, both in the dense 2y vertical form.  They cannot both go straight. Does the router find the crossing without being told?",
+  "render": {
+   "pitch": 30,
+   "yaw": 145,
+   "zoom": 1.8
+  },
+  "title": "Two 8-bit buses crossing at 90 degrees",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "bus_a conducts",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    },
+    {
+     "in": "b_in",
+     "label": "bus_b conducts",
+     "out": "b_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0268,
+ "solved": true,
+ "solver_produced": true,
+ "title": "Two 8-bit buses crossing at 90 degrees",
+ "verification": {
+  "cases": [
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "bus_a conducts",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "bus_a conducts",
+    "want": 2
+   },
+   {
+    "got": 4,
+    "in": 4,
+    "ok": true,
+    "section": "bus_a conducts",
+    "want": 4
+   },
+   {
+    "got": 8,
+    "in": 8,
+    "ok": true,
+    "section": "bus_a conducts",
+    "want": 8
+   },
+   {
+    "got": 16,
+    "in": 16,
+    "ok": true,
+    "section": "bus_a conducts",
+    "want": 16
+   },
+   {
+    "got": 32,
+    "in": 32,
+    "ok": true,
+    "section": "bus_a conducts",
+    "want": 32
+   },
+   {
+    "got": 64,
+    "in": 64,
+    "ok": true,
+    "section": "bus_a conducts",
+    "want": 64
+   },
+   {
+    "got": 128,
+    "in": 128,
+    "ok": true,
+    "section": "bus_a conducts",
+    "want": 128
+   },
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "bus_a conducts",
+    "want": 0
+   },
+   {
+    "got": 255,
+    "in": 255,
+    "ok": true,
+    "section": "bus_a conducts",
+    "want": 255
+   },
+   {
+    "got": 170,
+    "in": 170,
+    "ok": true,
+    "section": "bus_a conducts",
+    "want": 170
+   },
+   {
+    "got": 85,
+    "in": 85,
+    "ok": true,
+    "section": "bus_a conducts",
+    "want": 85
+   },
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "bus_b conducts",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "bus_b conducts",
+    "want": 2
+   },
+   {
+    "got": 4,
+    "in": 4,
+    "ok": true,
+    "section": "bus_b conducts",
+    "want": 4
+   },
+   {
+    "got": 8,
+    "in": 8,
+    "ok": true,
+    "section": "bus_b conducts",
+    "want": 8
+   },
+   {
+    "got": 16,
+    "in": 16,
+    "ok": true,
+    "section": "bus_b conducts",
+    "want": 16
+   },
+   {
+    "got": 32,
+    "in": 32,
+    "ok": true,
+    "section": "bus_b conducts",
+    "want": 32
+   },
+   {
+    "got": 64,
+    "in": 64,
+    "ok": true,
+    "section": "bus_b conducts",
+    "want": 64
+   },
+   {
+    "got": 128,
+    "in": 128,
+    "ok": true,
+    "section": "bus_b conducts",
+    "want": 128
+   },
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "bus_b conducts",
+    "want": 0
+   },
+   {
+    "got": 255,
+    "in": 255,
+    "ok": true,
+    "section": "bus_b conducts",
+    "want": 255
+   },
+   {
+    "got": 170,
+    "in": 170,
+    "ok": true,
+    "section": "bus_b conducts",
+    "want": 170
+   },
+   {
+    "got": 85,
+    "in": 85,
+    "ok": true,
+    "section": "bus_b conducts",
+    "want": 85
+   }
+  ],
+  "ok": true,
+  "passed": 24,
+  "sections": {
+   "bus_a conducts": {
+    "passed": 12,
+    "total": 12
+   },
+   "bus_b conducts": {
+    "passed": 12,
+    "total": 12
+   }
+  },
+  "total": 24
+ },
+ "wall_seconds": 0.108
+}

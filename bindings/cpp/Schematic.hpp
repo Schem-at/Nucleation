@@ -15,6 +15,7 @@
 #include "BlockState.hpp"
 #include "Dimensions.hpp"
 #include "NucleationError.hpp"
+#include "SchematicSplitResult.hpp"
 #include "diplomat_runtime.hpp"
 
 
@@ -25,6 +26,8 @@ namespace capi {
     diplomat::capi::Schematic* Schematic_create(diplomat::capi::DiplomatStringView name);
 
     diplomat::capi::Schematic* Schematic_deep_clone(const diplomat::capi::Schematic* self);
+
+    diplomat::capi::SchematicSplitResult* Schematic_split_connected_attach_nearby(const diplomat::capi::Schematic* self, uint32_t min_standalone_blocks, uint32_t max_air_gap);
 
     diplomat::capi::Dimensions Schematic_dimensions(const diplomat::capi::Schematic* self);
 
@@ -259,6 +262,14 @@ namespace capi {
 
     void Schematic_set_we_version(diplomat::capi::Schematic* self, int32_t version);
 
+    typedef struct Schematic_provenance_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_provenance_json_result;
+    Schematic_provenance_json_result Schematic_provenance_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Schematic_set_provenance_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_set_provenance_json_result;
+    Schematic_set_provenance_json_result Schematic_set_provenance_json(diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView json);
+
+    void Schematic_clear_provenance(diplomat::capi::Schematic* self);
+
     void Schematic_flip_x(diplomat::capi::Schematic* self);
 
     void Schematic_flip_y(diplomat::capi::Schematic* self);
@@ -410,6 +421,13 @@ inline std::unique_ptr<Schematic> Schematic::create(std::string_view name) {
 inline std::unique_ptr<Schematic> Schematic::deep_clone() const {
     auto result = diplomat::capi::Schematic_deep_clone(this->AsFFI());
     return std::unique_ptr<Schematic>(Schematic::FromFFI(result));
+}
+
+inline std::unique_ptr<SchematicSplitResult> Schematic::split_connected_attach_nearby(uint32_t min_standalone_blocks, uint32_t max_air_gap) const {
+    auto result = diplomat::capi::Schematic_split_connected_attach_nearby(this->AsFFI(),
+        min_standalone_blocks,
+        max_air_gap);
+    return std::unique_ptr<SchematicSplitResult>(SchematicSplitResult::FromFFI(result));
 }
 
 inline Dimensions Schematic::dimensions() const {
@@ -1385,6 +1403,31 @@ inline int32_t Schematic::we_version() const {
 inline void Schematic::set_we_version(int32_t version) {
     diplomat::capi::Schematic_set_we_version(this->AsFFI(),
         version);
+}
+
+inline diplomat::result<std::string, NucleationError> Schematic::provenance_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Schematic_provenance_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Schematic::provenance_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Schematic_provenance_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::set_provenance_json(std::string_view json) {
+    auto result = diplomat::capi::Schematic_set_provenance_json(this->AsFFI(),
+        {json.data(), json.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline void Schematic::clear_provenance() {
+    diplomat::capi::Schematic_clear_provenance(this->AsFFI());
 }
 
 inline void Schematic::flip_x() {

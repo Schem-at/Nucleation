@@ -65,7 +65,9 @@ fn a_named_layer_is_visible_through_the_default_regions_envelope() {
     );
     // And the default region's own block still wins where it has one.
     assert_eq!(
-        s.get_block(80, 40, 80).map(|b| b.name.to_string()).as_deref(),
+        s.get_block(80, 40, 80)
+            .map(|b| b.name.to_string())
+            .as_deref(),
         Some("minecraft:stone")
     );
     // A cell nobody wrote is still empty, not a phantom.
@@ -92,7 +94,10 @@ fn masking_follows_tight_bounds_not_the_allocated_envelope() {
     air_masks.set_block_from_string(9, 0, 0, STONE).unwrap();
     air_masks.set_block_from_string(11, 0, 0, STONE).unwrap();
     assert_eq!(
-        air_masks.get_block(10, 0, 0).map(|b| b.name.to_string()).as_deref(),
+        air_masks
+            .get_block(10, 0, 0)
+            .map(|b| b.name.to_string())
+            .as_deref(),
         Some("minecraft:air"),
         "air a region surrounds must still mask the layer below it"
     );
@@ -113,12 +118,18 @@ fn masking_follows_tight_bounds_not_the_allocated_envelope() {
         STONE
     ));
     assert!(
-        phantom.default_region.get_bounding_box().contains(phantom_cell),
+        phantom
+            .default_region
+            .get_bounding_box()
+            .contains(phantom_cell),
         "precondition: the allocated envelope must cover the queried cell, or \
          this test is not exercising the defect"
     );
     assert_eq!(
-        phantom.default_region.get_tight_bounds().map(|bb| bb.contains(phantom_cell)),
+        phantom
+            .default_region
+            .get_tight_bounds()
+            .map(|bb| bb.contains(phantom_cell)),
         Some(false),
         "precondition: tight bounds must NOT cover it"
     );
@@ -135,7 +146,10 @@ fn masking_follows_tight_bounds_not_the_allocated_envelope() {
     let mut empty_main = UniversalSchematic::new("empty-main".to_string());
     assert!(empty_main.set_block_in_region_str("inst:u0", 0, 0, 0, STONE));
     assert_eq!(
-        empty_main.get_block(0, 0, 0).map(|b| b.name.to_string()).as_deref(),
+        empty_main
+            .get_block(0, 0, 0)
+            .map(|b| b.name.to_string())
+            .as_deref(),
         Some("minecraft:stone")
     );
 }
@@ -184,10 +198,12 @@ fn a_routed_design_is_point_queryable_through_its_bus_layer() {
     let mut d = Design::for_schematic("d", s);
     let step = (0, 2, 0);
     let ty = IoType::UnsignedInt { bits: 8 };
-    d.declare_input("din", (1, 2, 8), step, 8, ty.clone()).unwrap();
+    d.declare_input("din", (1, 2, 8), step, 8, ty.clone())
+        .unwrap();
     d.declare_output("dout", (24, 2, 8), step, 8, ty).unwrap();
     assert_eq!(
-        d.route_bus("net", "din", &["dout"], vec![], BusStyle::default()).unwrap(),
+        d.route_bus("net", "din", &["dout"], vec![], BusStyle::default())
+            .unwrap(),
         BusState::Routed
     );
 
@@ -203,8 +219,9 @@ fn a_routed_design_is_point_queryable_through_its_bus_layer() {
         .unwrap();
     let got = flat.get_block(p.0, p.1, p.2).map(|b| b.to_string());
     assert!(
-        got.as_deref().is_some_and(|g| want.starts_with(g.split('[').next().unwrap_or(g))
-            || g.starts_with(want.split('[').next().unwrap_or(&want))),
+        got.as_deref()
+            .is_some_and(|g| want.starts_with(g.split('[').next().unwrap_or(g))
+                || g.starts_with(want.split('[').next().unwrap_or(&want))),
         "bus cell {p:?} should read back as `{want}`, got {got:?}"
     );
 }
@@ -223,8 +240,10 @@ fn messy_cell() -> (UniversalSchematic, CellContract) {
     }
     // Floating dust inside the body: supported by nothing (air below).
     for k in 0..6i32 {
-        s.set_block_from_string(3, 6 + k, 2, "minecraft:air").unwrap();
-        s.set_block_from_string(4, 6 + k, 2, "minecraft:air").unwrap();
+        s.set_block_from_string(3, 6 + k, 2, "minecraft:air")
+            .unwrap();
+        s.set_block_from_string(4, 6 + k, 2, "minecraft:air")
+            .unwrap();
     }
     s.set_block_from_string(4, 8, 2, DUST).unwrap();
     s.set_block_from_string(4, 10, 2, DUST).unwrap();
@@ -276,8 +295,8 @@ fn a_library_cells_interior_does_not_make_the_design_dirty() {
 /// `check()` could never come back green once a real cell was on the canvas.
 #[test]
 fn real_community_cells_placed_with_no_buses_check_clean() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("computational_schematics/enhanced");
+    let dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("computational_schematics/enhanced");
     let files = [
         "ADD005_8bit_cle_enhanced.schem",
         "REGISTER001_8bit_register_enhanced.schem",
@@ -286,7 +305,9 @@ fn real_community_cells_placed_with_no_buses_check_clean() {
     let mut placed = 0;
     let mut x = 0i32;
     for (i, f) in files.iter().enumerate() {
-        let Ok(bytes) = std::fs::read(dir.join(f)) else { continue };
+        let Ok(bytes) = std::fs::read(dir.join(f)) else {
+            continue;
+        };
         let Ok(sch) = nucleation::formats::schematic::from_schematic(&bytes) else {
             continue;
         };
@@ -324,6 +345,10 @@ fn a_violation_the_design_itself_owns_still_gates() {
     s.set_block_from_string(40, 30, 40, DUST).unwrap();
     let d = Design::for_schematic("d", s);
     let check = d.check().unwrap();
-    assert!(!check.clean, "the design's own floating dust must gate: {}", check.json);
+    assert!(
+        !check.clean,
+        "the design's own floating dust must gate: {}",
+        check.json
+    );
     assert!(check.json.contains("floating"), "{}", check.json);
 }

@@ -6,6 +6,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::block_entity::BlockEntity;
 use crate::block_state::BlockState;
 use crate::world_segment::ids::TileId;
 
@@ -38,6 +39,8 @@ pub struct VoxelTile {
     palette: Vec<BlockState>,
     /// Sorted by position. `(x, y, z, palette_index)`.
     cells: Vec<((i32, i32, i32), u32)>,
+    /// Block entities keyed by their world-space block position.
+    block_entities: Vec<BlockEntity>,
 }
 
 impl VoxelTile {
@@ -67,6 +70,18 @@ impl VoxelTile {
         id: TileId,
         bounds: TileBounds,
         blocks: impl Iterator<Item = ((i32, i32, i32), BlockState)>,
+    ) -> Self {
+        Self::from_blocks_and_block_entities(id, bounds, blocks, std::iter::empty())
+    }
+
+    /// Build a tile while retaining block entities whose positions lie within
+    /// its bounds. The simpler [`Self::from_blocks`] remains available for
+    /// sources that do not expose NBT-bearing blocks.
+    pub fn from_blocks_and_block_entities(
+        id: TileId,
+        bounds: TileBounds,
+        blocks: impl Iterator<Item = ((i32, i32, i32), BlockState)>,
+        block_entities: impl Iterator<Item = BlockEntity>,
     ) -> Self {
         let mut seen: Vec<BlockState> = Vec::new();
         // Canonical key of `seen[i]`, kept alongside so a duplicate can be
@@ -128,11 +143,32 @@ impl VoxelTile {
             .map(|(pos, old)| (pos, remap[old as usize]))
             .collect();
 
+        let mut block_entities_by_pos: BTreeMap<(i32, i32, i32), BlockEntity> = BTreeMap::new();
+        for block_entity in block_entities {
+            let pos = block_entity.position;
+            if !bounds.contains(pos.0, pos.1, pos.2) {
+                continue;
+            }
+            match block_entities_by_pos.entry(pos) {
+                std::collections::btree_map::Entry::Vacant(entry) => {
+                    entry.insert(block_entity);
+                }
+                std::collections::btree_map::Entry::Occupied(entry) => {
+                    debug_assert_eq!(
+                        entry.get(),
+                        &block_entity,
+                        "one world position yielded conflicting block entities"
+                    );
+                }
+            }
+        }
+
         VoxelTile {
             id,
             bounds,
             palette,
             cells,
+            block_entities: block_entities_by_pos.into_values().collect(),
         }
     }
 
@@ -161,6 +197,11 @@ impl VoxelTile {
         self.cells
             .iter()
             .map(move |(pos, idx)| (*pos, &self.palette[*idx as usize]))
+    }
+
+    /// NBT-bearing blocks in ascending world-position order.
+    pub fn block_entities(&self) -> &[BlockEntity] {
+        &self.block_entities
     }
 }
 
@@ -233,6 +274,22 @@ mod tests {
             .into_iter(),
         );
         assert_eq!(tile.len(), 1, "out-of-bounds blocks are rejected");
+    }
+
+    #[test]
+    fn tile_retains_only_in_bounds_block_entities() {
+        let tile = VoxelTile::from_blocks_and_block_entities(
+            TileId { x: 0, z: 0 },
+            bounds(),
+            vec![((1, 2, 3), bs("minecraft:chest"))].into_iter(),
+            vec![
+                BlockEntity::new("minecraft:chest".to_string(), (1, 2, 3)),
+                BlockEntity::new("minecraft:chest".to_string(), (99, 2, 3)),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(tile.block_entities().len(), 1);
+        assert_eq!(tile.block_entities()[0].position, (1, 2, 3));
     }
 
     /// Names and their canonical `palette_key`s, so the expected winner below

@@ -136,11 +136,18 @@ impl PortPatch {
     ///   "added":n,"pivoted":bool,"note":".."}`
     pub fn to_json(&self) -> String {
         let pos = |ps: &[P3]| {
-            let v: Vec<String> = ps.iter().map(|p| format!("[{},{},{}]", p.0, p.1, p.2)).collect();
+            let v: Vec<String> = ps
+                .iter()
+                .map(|p| format!("[{},{},{}]", p.0, p.1, p.2))
+                .collect();
             format!("[{}]", v.join(","))
         };
         let removed = self.writes.values().filter(|v| v.is_none()).count()
-            + self.saved.iter().filter(|(p, v)| v.is_some() && self.writes.get(*p).is_some_and(|w| w.is_some())).count();
+            + self
+                .saved
+                .iter()
+                .filter(|(p, v)| v.is_some() && self.writes.get(*p).is_some_and(|w| w.is_some()))
+                .count();
         format!(
             "{{\"wires\":{},\"hardware\":{},\"step\":[{},{},{}],\"removed\":{},\"added\":{},\
              \"pivoted\":{},\"note\":{:?}}}",
@@ -199,10 +206,7 @@ impl<'a> Patcher<'a> {
     }
 
     fn write(&mut self, p: P3, block: Option<&str>) {
-        self.patch
-            .saved
-            .entry(p)
-            .or_insert_with(|| self.body.at(p));
+        self.patch.saved.entry(p).or_insert_with(|| self.body.at(p));
         self.patch.writes.insert(p, block.map(|s| s.to_string()));
     }
 
@@ -385,7 +389,9 @@ fn uniform_step(wires: &[P3]) -> Result<P3, String> {
     {
         Ok(s)
     } else {
-        Err(format!("connection cells {wires:?} do not lie on a uniform step"))
+        Err(format!(
+            "connection cells {wires:?} do not lie on a uniform step"
+        ))
     }
 }
 
@@ -534,6 +540,10 @@ impl PivotSink<'_> {
 /// Both perpendicular directions are tried; the one whose whole volume is free
 /// wins, and if both are, the one pointing AWAY from `prefer_away_from` (the
 /// cell's centre) is preferred, so the adapter grows out of the component.
+/// `gather_end` constrains the common column to bit 0 (`Some(false)`) or the
+/// last bit (`Some(true)`). `None` lets this adapter choose locally; a caller
+/// coordinating two adapters can force opposite ends to equalise their summed
+/// gather distance.
 pub fn plan_pivot(
     wires: &[P3],
     step: P3,
@@ -541,6 +551,7 @@ pub fn plan_pivot(
     flow_out: bool,
     at: &dyn Fn(P3) -> Option<String>,
     toward: Option<P3>,
+    gather_end: Option<bool>,
 ) -> Result<PivotPlan, String> {
     if wires.is_empty() {
         return Err("form adapter needs at least one connection cell".to_string());
@@ -574,37 +585,70 @@ pub fn plan_pivot(
     cands.sort_by_key(|d| -outward(d));
     let mut errs = Vec::new();
     let mut best: Option<(i64, PivotPlan)> = None;
-    for out in cands {
-        let mut sink = PivotSink {
-            at,
-            cells: std::collections::BTreeMap::new(),
-        };
-        match lay_pivot(&mut sink, wires, step, along, out, flow_out) {
-            Ok(column) => {
-                let cells = sink.cells.len() as i64;
-                // Distance from the column head to whatever the bus must reach.
-                let reach = toward.map_or(0, |t| {
-                    ((column[0].0 - t.0).abs() + (column[0].2 - t.2).abs()) as i64
-                });
-                // Tie-break toward the outside (the old, structural preference).
-                let cost = cells + reach - i64::from(outward(&out) > 0);
-                let plan = PivotPlan {
-                    cells: sink.cells,
-                    column,
-                    note: format!(
-                        "form adapter: pivoted the {:?}-pitch row onto a vertical 2y stack via a \
-                         staircase growing {} block(s) toward {:?} ({cells} cells; the cheaper of \
-                         the two sides)",
-                        step,
-                        2 * wires.len(),
-                        out
-                    ),
-                };
-                if best.as_ref().is_none_or(|(c, _)| cost < *c) {
-                    best = Some((cost, plan));
+    // WHICH END OF THE ROW the column lands on is the second free choice, and
+    // leaving it fixed at bit 0's lane is what made a flat-to-flat bus ride its
+    // own bundle twice. Measured on `V03_flat90` (a flat_x row 8 bits wide
+    // turning into a flat_z row): the per-bit Manhattan bound is 42 cells for
+    // EVERY bit — an equal-length route exists — while the old geometry had 28
+    // cells of per-bit spread. The spread was not the corner and not the cost
+    // weights: both
+    // adapters gathered toward bit 0's lane, so their two `pitch * i` gather
+    // legs ADDED instead of cancelling. Gathering one end toward bit 0 and the
+    // other toward bit n-1 costs exactly the same cells (sum of `pitch*i` ==
+    // sum of `pitch*(n-1-i)`) and cancels the spread.
+    //
+    // A lone adapter chooses by cost. A coordinated flat turn passes an
+    // explicit end because the equal-length property belongs to the PAIR and
+    // cannot be recovered by two independent local choices.
+    let ends: &[bool] = match gather_end {
+        Some(false) => &[false],
+        Some(true) => &[true],
+        None => &[false, true],
+    };
+    let reach_weight = wires.len() as i64;
+    for &gather_to_last in ends {
+        for out in &cands {
+            let out = *out;
+            let mut sink = PivotSink {
+                at,
+                cells: std::collections::BTreeMap::new(),
+            };
+            match lay_pivot(&mut sink, wires, step, along, out, flow_out, gather_to_last) {
+                Ok(column) => {
+                    let cells = sink.cells.len() as i64;
+                    // Distance from the column head to whatever the bus must
+                    // reach, WEIGHTED BY THE BIT COUNT. Unweighted it was a
+                    // rounding error next to `cells` (16 against ~200) even
+                    // though every one of the n bits pays it: moving the column
+                    // one cell nearer the partner shortens the transport leg n
+                    // times, so that is the exchange rate.
+                    let reach = toward.map_or(0, |t| {
+                        ((column[0].0 - t.0).abs() + (column[0].2 - t.2).abs()) as i64
+                    }) * reach_weight;
+                    // Tie-break toward the outside (the old, structural
+                    // preference) and toward bit 0's lane (the old gather end),
+                    // so the previous behaviour is what a tie resolves to.
+                    let cost =
+                        cells + reach - i64::from(outward(&out) > 0) + i64::from(gather_to_last);
+                    let plan = PivotPlan {
+                        cells: sink.cells,
+                        column,
+                        note: format!(
+                            "form adapter: pivoted the {:?}-pitch row onto a vertical 2y stack via \
+                             a staircase growing {} block(s) toward {:?}, gathering to bit {}'s \
+                             lane ({cells} cells; the selected side/end combination)",
+                            step,
+                            2 * wires.len(),
+                            out,
+                            if gather_to_last { wires.len() - 1 } else { 0 }
+                        ),
+                    };
+                    if best.as_ref().is_none_or(|(c, _)| cost < *c) {
+                        best = Some((cost, plan));
+                    }
                 }
+                Err(e) => errs.push(format!("toward {out:?} gather_last={gather_to_last}: {e}")),
             }
-            Err(e) => errs.push(format!("toward {out:?}: {e}")),
         }
     }
     if let Some((_, plan)) = best {
@@ -626,14 +670,23 @@ fn lay_pivot(
     along: P3,
     out: P3,
     flow_out: bool,
+    // Gather to bit `n-1`'s lane instead of bit 0's. Same cell count, mirrored
+    // per-bit lengths — see `plan_pivot` for why that matters.
+    gather_to_last: bool,
 ) -> Result<Vec<P3>, String> {
     let n = wires.len() as i32;
     let pitch = step.0.abs().max(step.2.abs()); // 2 for a 2-pitch row
     if pitch < 2 {
         return Err(format!("row pitch {pitch} leaves no lane between bits"));
     }
-    // The direction from bit i's lane back toward bit 0's lane.
-    let back = mul(along, -(step.0 + step.2).signum());
+    // The direction from bit i's lane toward the lane the column lands on —
+    // bit 0's by default, bit n-1's when the planner asked for the mirror.
+    let to_first = mul(along, -(step.0 + step.2).signum());
+    let back = if gather_to_last {
+        mul(to_first, -1)
+    } else {
+        to_first
+    };
     // Depth every bit runs out to, from the deepest climb any bit needs.
     let depth = 2 + 2 * (n - 1) + 2 * refresh_pauses(2 * (n - 1) as usize) as i32;
     let mut column = Vec::new();
@@ -714,7 +767,7 @@ fn lay_pivot(
         // an output, and the other way on an input.
         let gsgn = if flow_out { -1 } else { 1 };
         let gather_in = rblocks::facing_name(gsgn * back.0, gsgn * back.2).ok_or("gather axis")?;
-        let hops = pitch * i;
+        let hops = pitch * if gather_to_last { n - 1 - i } else { i };
         let mut since_g = 0usize;
         for k in 1..=hops {
             let c = add(corner, mul(back, k));
@@ -772,12 +825,22 @@ mod tests {
     fn a_wall_lever_is_promoted_through_a_repeater() {
         let mut s = slab(4, 8, 1);
         // Lever on the -x face of the slab, pointing west.
-        s.set_block_from_string(-1, 3, 0, "minecraft:lever[face=wall,facing=west,powered=false]")
-            .unwrap();
+        s.set_block_from_string(
+            -1,
+            3,
+            0,
+            "minecraft:lever[face=wall,facing=west,powered=false]",
+        )
+        .unwrap();
         let patch = plan_input(&s, &[(-1, 3, 0)]).unwrap();
         assert_eq!(patch.wires, vec![(-2, 3, 0)]);
-        assert!(patch.writes[&(-1, 3, 0)].as_deref().unwrap().contains("repeater"));
-        assert!(rblocks::is_dust(patch.writes[&(-2, 3, 0)].as_deref().unwrap()));
+        assert!(patch.writes[&(-1, 3, 0)]
+            .as_deref()
+            .unwrap()
+            .contains("repeater"));
+        assert!(rblocks::is_dust(
+            patch.writes[&(-2, 3, 0)].as_deref().unwrap()
+        ));
         // The saved state restores the lever byte-for-byte.
         assert_eq!(
             patch.saved[&(-1, 3, 0)].as_deref(),
@@ -788,11 +851,18 @@ mod tests {
     #[test]
     fn a_floor_lever_is_promoted_in_place() {
         let mut s = slab(4, 4, 1);
-        s.set_block_from_string(1, 4, 0, "minecraft:lever[face=floor,facing=north,powered=false]")
-            .unwrap();
+        s.set_block_from_string(
+            1,
+            4,
+            0,
+            "minecraft:lever[face=floor,facing=north,powered=false]",
+        )
+        .unwrap();
         let patch = plan_input(&s, &[(1, 4, 0)]).unwrap();
         assert_eq!(patch.wires, vec![(1, 4, 0)]);
-        assert!(rblocks::is_dust(patch.writes[&(1, 4, 0)].as_deref().unwrap()));
+        assert!(rblocks::is_dust(
+            patch.writes[&(1, 4, 0)].as_deref().unwrap()
+        ));
     }
 
     #[test]
@@ -825,7 +895,11 @@ mod tests {
         );
         for w in &hw {
             assert!(
-                patch.writes.get(w).and_then(|o| o.as_deref()).is_some_and(rblocks::is_dust),
+                patch
+                    .writes
+                    .get(w)
+                    .and_then(|o| o.as_deref())
+                    .is_some_and(rblocks::is_dust),
                 "bit at {w:?} is not dust in place"
             );
         }
@@ -838,7 +912,7 @@ mod tests {
                 .filter(|b| !b.contains("minecraft:air"))
                 .filter(|_| !hw.contains(&q))
         };
-        let plan = plan_pivot(&patch.wires, patch.step, (4, 4, 0), false, &at, None)
+        let plan = plan_pivot(&patch.wires, patch.step, (4, 4, 0), false, &at, None, None)
             .expect("the row must be adaptable onto the stack");
         // A vertical 2y-pitch column, bit order preserved.
         for (k, w) in plan.column.iter().enumerate() {
@@ -864,10 +938,26 @@ mod tests {
     }
 
     #[test]
+    fn a_pivot_can_gather_to_either_end_without_changing_its_size() {
+        let wires: Vec<P3> = (0..8).map(|i| (2 + 2 * i, 2, 2)).collect();
+        let at = |_q: P3| None;
+        let first = plan_pivot(&wires, (2, 0, 0), (8, 2, 2), true, &at, None, Some(false)).unwrap();
+        let last = plan_pivot(&wires, (2, 0, 0), (8, 2, 2), true, &at, None, Some(true)).unwrap();
+        assert_eq!(first.column[0].0, wires[0].0);
+        assert_eq!(last.column[0].0, wires[7].0);
+        assert_eq!(first.cells.len(), last.cells.len());
+    }
+
+    #[test]
     fn a_ceiling_lever_is_refused_with_a_reason() {
         let mut s = slab(4, 8, 1);
-        s.set_block_from_string(1, 2, 0, "minecraft:lever[face=ceiling,facing=north,powered=false]")
-            .unwrap();
+        s.set_block_from_string(
+            1,
+            2,
+            0,
+            "minecraft:lever[face=ceiling,facing=north,powered=false]",
+        )
+        .unwrap();
         let e = plan_input(&s, &[(1, 2, 0)]).unwrap_err();
         assert!(e.contains("CEILING"), "{e}");
     }

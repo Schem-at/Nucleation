@@ -3,6 +3,7 @@ import type { BlockPos } from "./BlockPos.mjs"
 import type { BlockState } from "./BlockState.mjs"
 import type { Dimensions } from "./Dimensions.mjs"
 import type { NucleationError } from "./NucleationError.mjs"
+import type { SchematicSplitResult } from "./SchematicSplitResult.mjs"
 import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
 
@@ -24,6 +25,15 @@ export class Schematic {
      * metadata, or transform changes do not affect the original.
      */
     deepClone(): Schematic;
+
+    /**
+     * Split spatially independent machines while keeping nearby tiny
+     * detached parts with their machine. Components at least
+     * `min_standalone_blocks` large always remain independent; smaller
+     * components attach only directly to a core within `max_air_gap`.
+     * Attachment is non-transitive and the operation is lossless.
+     */
+    splitConnectedAttachNearby(minStandaloneBlocks: number, maxAirGap: number): SchematicSplitResult;
 
     /**
      * The allocated dimensions (width, height, length) of the schematic's
@@ -522,6 +532,22 @@ export class Schematic {
      * Set the WorldEdit version.
      */
     setWeVersion(version: number): void;
+
+    /**
+     * Standard embedded source provenance as canonical JSON. Returns an
+     * empty string when none is present.
+     */
+    provenanceJson(): string;
+
+    /**
+     * Validate and set standard embedded source provenance from JSON.
+     */
+    setProvenanceJson(json: string): void;
+
+    /**
+     * Remove embedded source provenance.
+     */
+    clearProvenance(): void;
 
     /**
      * Mirror the default region along the X axis (in place). Block

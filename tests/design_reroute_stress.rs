@@ -40,7 +40,8 @@ fn lever_bank(s: &mut UniversalSchematic, x: i32, y0: i32, z: i32, dx: i32, dz: 
         let y = y0 + 2 * i;
         s.set_block_from_string(x, y - 1, z, STONE).unwrap();
         s.set_block_from_string(x, y, z, LEVER).unwrap();
-        s.set_block_from_string(x + dx, y - 1, z + dz, STONE).unwrap();
+        s.set_block_from_string(x + dx, y - 1, z + dz, STONE)
+            .unwrap();
         s.set_block_from_string(x + dx, y, z + dz, DUST).unwrap();
     }
     (x + dx, y0, z + dz)
@@ -116,7 +117,9 @@ fn violations(json: &str) -> usize {
 /// (a) DRC + LVS clean.
 fn assert_clean(d: &Design, what: &str) {
     assert_every_routed_bus_built_something(d, what);
-    let c = d.check().unwrap_or_else(|e| panic!("{what}: check() failed: {e}"));
+    let c = d
+        .check()
+        .unwrap_or_else(|e| panic!("{what}: check() failed: {e}"));
     assert!(
         c.clean,
         "{what}: NOT DRC/LVS clean ({} gating violation(s)): {}",
@@ -213,9 +216,16 @@ fn assert_fragments_meet_their_ports(d: &Design, what: &str) {
             // gate column landed there).
             let a = port.anchor;
             let touches = frag.contains_key(&a)
-                || [(1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1), (0, 1, 0), (0, -1, 0)]
-                    .iter()
-                    .any(|(dx, dy, dz)| frag.contains_key(&(a.0 + dx, a.1 + dy, a.2 + dz)));
+                || [
+                    (1, 0, 0),
+                    (-1, 0, 0),
+                    (0, 0, 1),
+                    (0, 0, -1),
+                    (0, 1, 0),
+                    (0, -1, 0),
+                ]
+                .iter()
+                .any(|(dx, dy, dz)| frag.contains_key(&(a.0 + dx, a.1 + dy, a.2 + dz)));
             assert!(
                 touches,
                 "{what}: bus `{name}` is STALE — it does not reach its port `{ep}`, whose \
@@ -344,20 +354,29 @@ fn removing_an_instance_reports_every_layer_it_touched() {
     assert_eq!(
         d.changed_layers_since(rev),
         {
-            let mut all: Vec<String> = reported.iter().cloned().collect::<BTreeSet<_>>().into_iter().collect();
+            let mut all: Vec<String> = reported
+                .iter()
+                .cloned()
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect();
             all.sort();
             all
         },
         "the removal's reported set disagrees with changed_layers_since"
     );
     assert!(
-        rep.removed_buses.contains(&"a".to_string()) && rep.removed_buses.contains(&"b".to_string()),
+        rep.removed_buses.contains(&"a".to_string())
+            && rep.removed_buses.contains(&"b".to_string()),
         "buses wired to u0 were not reported as removed: {:?}",
         rep.removed_buses
     );
     assert_all(&d, &reported, &before, "remove u0");
     for n in &rep.removed_buses {
-        assert!(d.bus(n).is_none(), "removed bus `{n}` is still in the document");
+        assert!(
+            d.bus(n).is_none(),
+            "removed bus `{n}` is still in the document"
+        );
     }
 }
 
@@ -410,10 +429,20 @@ fn moving_a_gate_keeps_every_invariant() {
     d.declare_input("din", din, step, W, ty()).unwrap();
     d.declare_output("dout", dout, step, W, ty()).unwrap();
     let gates = vec![
-        Gate { name: "g0".into(), anchor: (16, 2, 8), step },
-        Gate { name: "g1".into(), anchor: (32, 2, 8), step },
+        Gate {
+            name: "g0".into(),
+            anchor: (16, 2, 8),
+            step,
+        },
+        Gate {
+            name: "g1".into(),
+            anchor: (32, 2, 8),
+            step,
+        },
     ];
-    let st = d.route_bus("g", "din", &["dout"], gates, BusStyle::default()).unwrap();
+    let st = d
+        .route_bus("g", "din", &["dout"], gates, BusStyle::default())
+        .unwrap();
     assert_eq!(st, BusState::Routed, "{:?}", d.bus_state("g"));
 
     for anchor in [(16, 2, 14), (20, 2, 8), (16, 2, 8)] {
@@ -421,7 +450,12 @@ fn moving_a_gate_keeps_every_invariant() {
         let rev = d.layer_revision();
         let rep = d.move_gate("g", "g0", anchor).unwrap();
         assert_eq!(rep.changed, d.changed_layers_since(rev));
-        assert_all(&d, &rep.changed, &before, &format!("move gate to {anchor:?}"));
+        assert_all(
+            &d,
+            &rep.changed,
+            &before,
+            &format!("move gate to {anchor:?}"),
+        );
     }
 }
 
@@ -456,11 +490,13 @@ fn ten_rip_and_reroute_cycles_are_byte_identical() {
             assert_eq!(st, BusState::Routed, "cycle {cycle}: `{n}` -> {st:?}");
         }
         assert_eq!(
-            total_bus_cells(&d), baseline_cells,
+            total_bus_cells(&d),
+            baseline_cells,
             "cycle {cycle}: block count drifted (orphans or a lost cell)"
         );
         assert_eq!(
-            geometry(&d), baseline,
+            geometry(&d),
+            baseline,
             "cycle {cycle}: rip+reroute is NOT deterministic"
         );
         assert_clean(&d, &format!("cycle {cycle}"));
@@ -479,7 +515,11 @@ fn a_reloaded_document_reroutes_to_the_same_geometry() {
 
     let bytes = d.to_nucm_bytes().expect("nucm export");
     let mut back = Design::from_nucm_bytes(&bytes).expect("nucm import");
-    assert_eq!(geometry(&back), before, "the reload lost or altered geometry");
+    assert_eq!(
+        geometry(&back),
+        before,
+        "the reload lost or altered geometry"
+    );
 
     // A fresh reader has drawn nothing, so it starts at revision 0 and the
     // first edit reports everything it touches.
@@ -489,12 +529,17 @@ fn a_reloaded_document_reroutes_to_the_same_geometry() {
         back.rip(n).unwrap();
     }
     for n in &names {
-        assert_eq!(back.reroute(n).unwrap(), BusState::Routed, "`{n}` after reload");
+        assert_eq!(
+            back.reroute(n).unwrap(),
+            BusState::Routed,
+            "`{n}` after reload"
+        );
     }
     let changed = back.changed_layers_since(rev);
     assert_changed_set_complete(&changed, &before, &geometry(&back), "reload + reroute");
     assert_eq!(
-        geometry(&back), before,
+        geometry(&back),
+        before,
         "re-routing a reloaded document produced different geometry"
     );
     assert_clean(&back, "after reload");
@@ -618,7 +663,8 @@ fn ripping_a_bus_removes_the_form_adapter_it_grew() {
     d.rip("a").unwrap();
     let after = d.flatten().unwrap().total_blocks();
     assert_eq!(
-        after, before,
+        after,
+        before,
         "ripping the bus left {} orphaned cell(s) behind — geometry that existed only to serve \
          that bus and that the user cannot remove",
         after as i64 - before as i64
@@ -651,9 +697,14 @@ fn removing_a_gate_merges_its_spans_into_a_more_direct_route() {
     d.declare_input("din", din, step, W, ty()).unwrap();
     d.declare_output("dout", dout, step, W, ty()).unwrap();
     // A gate dragged well off the straight line forces a dogleg.
-    let gates = vec![Gate { name: "g0".into(), anchor: (24, 2, 24), step }];
+    let gates = vec![Gate {
+        name: "g0".into(),
+        anchor: (24, 2, 24),
+        step,
+    }];
     assert_eq!(
-        d.route_bus("g", "din", &["dout"], gates, BusStyle::default()).unwrap(),
+        d.route_bus("g", "din", &["dout"], gates, BusStyle::default())
+            .unwrap(),
         BusState::Routed
     );
     let with_gate = d.bus("g").unwrap().fragment.len();
@@ -685,7 +736,10 @@ fn removing_a_gate_merges_its_spans_into_a_more_direct_route() {
 
     // Out-of-range says what there is.
     let err = d.remove_gate("g", 0).unwrap_err();
-    assert!(err.contains("no gate at index 0") && err.contains("none"), "{err}");
+    assert!(
+        err.contains("no gate at index 0") && err.contains("none"),
+        "{err}"
+    );
 }
 
 /// Removing an ENDPOINT changes the netlist: the bus loses a terminal, so it is
@@ -704,10 +758,15 @@ fn removing_a_port_is_refused_before_it_deletes_a_bus() {
     // Unconfirmed: refused, and it names what would go.
     let err = d.remove_port("dout", false).unwrap_err();
     assert!(
-        err.contains("ENDPOINT") && err.contains("\"a\"") || err.contains("a)") || err.contains(" a"),
+        err.contains("ENDPOINT") && err.contains("\"a\"")
+            || err.contains("a)")
+            || err.contains(" a"),
         "{err}"
     );
-    assert!(d.bus("a").is_some(), "the bus was deleted despite the refusal");
+    assert!(
+        d.bus("a").is_some(),
+        "the bus was deleted despite the refusal"
+    );
 
     // Confirmed: the bus goes, and it is reported.
     let rev = d.layer_revision();
@@ -715,15 +774,26 @@ fn removing_a_port_is_refused_before_it_deletes_a_bus() {
     assert_eq!(removed, vec!["a".to_string()]);
     assert!(d.bus("a").is_none(), "the bus outlived its endpoint");
     assert!(d.port("dout").is_none(), "the port declaration survived");
-    let mut reported: Vec<String> = removed.iter().chain(moves.changed.iter()).cloned().collect();
+    let mut reported: Vec<String> = removed
+        .iter()
+        .chain(moves.changed.iter())
+        .cloned()
+        .collect();
     reported.sort();
     reported.dedup();
-    assert_eq!(reported, d.changed_layers_since(rev), "removal under-reported");
+    assert_eq!(
+        reported,
+        d.changed_layers_since(rev),
+        "removal under-reported"
+    );
 
     // An instance port is derived, not declared: say so instead of no-op.
     let mut d2 = layout_instances();
     let err = d2.remove_port("u0.d", true).unwrap_err();
-    assert!(err.contains("INSTANCE port") && err.contains("set_port_mode"), "{err}");
+    assert!(
+        err.contains("INSTANCE port") && err.contains("set_port_mode"),
+        "{err}"
+    );
 }
 
 /// BUG: `add_gate` resolved its endpoints through the DECLARED port table, so
@@ -859,7 +929,13 @@ fn gates_on_the_real_corpus_chain_realize() {
     base.place("u1", "bcd", (60, -2, 40), 0).unwrap();
     base.promote_input("u1", "bin").unwrap();
     let st = base
-        .route_bus("sum_to_bin", "u0.sum", &["u1.bin"], vec![], BusStyle::default())
+        .route_bus(
+            "sum_to_bin",
+            "u0.sum",
+            &["u1.bin"],
+            vec![],
+            BusStyle::default(),
+        )
         .unwrap();
     assert_eq!(st, BusState::Routed, "{:?}", base.bus_state("sum_to_bin"));
     let ungated = base.bus("sum_to_bin").unwrap().fragment.len();
@@ -873,7 +949,10 @@ fn gates_on_the_real_corpus_chain_realize() {
             continue; // a refusal is a legitimate answer; emptiness is not
         }
         let gated = d.bus("sum_to_bin").unwrap().fragment.len();
-        assert!(gated > 0, "{what}: routed with ZERO cells (ungated was {ungated})");
+        assert!(
+            gated > 0,
+            "{what}: routed with ZERO cells (ungated was {ungated})"
+        );
         // The 8-bit chain's gate column is 8 bits, not W.
         let layer = d.bus("sum_to_bin").unwrap();
         for g in &layer.gates {
@@ -891,6 +970,9 @@ fn gates_on_the_real_corpus_chain_realize() {
         let rep = d.remove_gate("sum_to_bin", 0).unwrap();
         assert_eq!(rep.state, BusState::Routed, "{what}: ungating failed");
         let merged = d.bus("sum_to_bin").unwrap().fragment.len();
-        assert!(merged > 0 && merged <= gated, "{what}: merged {merged}, gated {gated}");
+        assert!(
+            merged > 0 && merged <= gated,
+            "{what}: merged {merged}, gated {gated}"
+        );
     }
 }

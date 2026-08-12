@@ -451,9 +451,7 @@ impl RunTimeline {
     /// `the_change_log_is_sorted_by_tick`), so the first change at or after
     /// `start` is one `partition_point` away.
     fn changed_between(&self, start: u64, end: u64) -> bool {
-        let first_at_or_after = self
-            .changes
-            .partition_point(|change| change.tick < start);
+        let first_at_or_after = self.changes.partition_point(|change| change.tick < start);
         self.changes
             .get(first_at_or_after)
             .is_some_and(|change| change.tick < end)
@@ -635,7 +633,11 @@ impl TimelineRecorder {
         }
     }
 
-    pub(crate) fn view<'a>(&'a self, changes: &'a [BlockChange], end_tick: u64) -> TimelineView<'a> {
+    pub(crate) fn view<'a>(
+        &'a self,
+        changes: &'a [BlockChange],
+        end_tick: u64,
+    ) -> TimelineView<'a> {
         TimelineView {
             start_tick: self.start_tick,
             end_tick,

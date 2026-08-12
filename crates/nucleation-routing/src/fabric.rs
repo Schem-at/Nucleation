@@ -95,8 +95,7 @@ pub struct RedstoneFabric<'a> {
 
 impl<'a> RedstoneFabric<'a> {
     fn in_bounds(&self, p: Pos) -> bool {
-        self.bounds.map_or(true, |b| b.contains(p))
-            && self.region.map_or(true, |r| r.contains(p))
+        self.bounds.map_or(true, |b| b.contains(p)) && self.region.map_or(true, |r| r.contains(p))
     }
 
     /// Design rules for placing (or reusing) a dust cell at `p` for a net

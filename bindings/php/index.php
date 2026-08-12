@@ -51,6 +51,7 @@ require_once __DIR__ . '/Renderer.php';
 require_once __DIR__ . '/Routing.php';
 require_once __DIR__ . '/BlockState.php';
 require_once __DIR__ . '/Schematic.php';
+require_once __DIR__ . '/SchematicSplitResult.php';
 require_once __DIR__ . '/SchematicBuilder.php';
 require_once __DIR__ . '/Scripting.php';
 require_once __DIR__ . '/FieldProgram.php';

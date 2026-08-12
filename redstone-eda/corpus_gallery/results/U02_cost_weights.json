@@ -1,0 +1,346 @@
+{
+ "artifact": "artifacts/U02_cost_weights.schem",
+ "artifact_blocks": 968,
+ "blocked_by": "the bus routes and verifies, but the CONFIGURATION was ignored: geometry is identical to C01_cfg_default",
+ "buses": {
+  "bus_a": {
+   "call": "d.route_bus('bus_a', driver='a_in', sinks=['a_out'])\nd.set_bus_rule('bus_a', **{'y_band': [0, 20], 'cost': {'length': 0.5, 'delay': 16.0, 'skew': 24.0, 'coherence': 3.0, 'footprint': 0.25}})",
+   "error": null,
+   "seconds": 0.0962,
+   "state": "routed"
+  }
+ },
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "config_effect": {
+  "baseline": "C01_cfg_default",
+  "baseline_geometry": {
+   "bus_a": {
+    "bbox": [
+     [
+      1,
+      1,
+      -1
+     ],
+     [
+      18,
+      16,
+      3
+     ]
+    ],
+    "cells": 416,
+    "delay_rt": 1,
+    "devices": 8,
+    "footprint": 1440,
+    "glass": 0,
+    "per_bit_rt": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "skew_rt": 0,
+    "wire": 200
+   }
+  },
+  "expect_change": true,
+  "geometry_identical": true,
+  "mine": {
+   "bus_a": {
+    "bbox": [
+     [
+      1,
+      1,
+      -1
+     ],
+     [
+      18,
+      16,
+      3
+     ]
+    ],
+    "cells": 416,
+    "delay_rt": 1,
+    "devices": 8,
+    "footprint": 1440,
+    "glass": 0,
+    "per_bit_rt": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "skew_rt": 0,
+    "wire": 200
+   }
+  },
+  "verdict": "ignored"
+ },
+ "cost_vector": {
+  "coherence": null,
+  "delay_rt": 1,
+  "footprint": 1440,
+  "length": 200,
+  "skew_rt": 0
+ },
+ "expect": "unsolved",
+ "fixtures": {},
+ "id": "U02_cost_weights",
+ "log": [
+  "verify 12/12 (bundle conducts under this config 12/12)"
+ ],
+ "loose_blocks": 552,
+ "notes": "If the cell count, delay and footprint equal C01 exactly, the weights were ignored -- the router is not tunable from any binding.",
+ "per_bus": {
+  "bus_a": {
+   "bbox": [
+    [
+     1,
+     1,
+     -1
+    ],
+    [
+     18,
+     16,
+     3
+    ]
+   ],
+   "cells": 416,
+   "delay_rt": 1,
+   "devices": 8,
+   "footprint": 1440,
+   "glass": 0,
+   "per_bit_rt": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "skew_rt": 0,
+   "wire": 200
+  }
+ },
+ "question": "Ask for the latency-optimised weights (delay 16, skew 24, length 0.5). Does anything change against C01?",
+ "scenario": {
+  "_family": "configurability",
+  "_file": "scenarios/U02_cost_weights.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_a",
+    "rule": {
+     "cost": {
+      "coherence": 3.0,
+      "delay": 16.0,
+      "footprint": 0.25,
+      "length": 0.5,
+      "skew": 24.0
+     },
+     "y_band": [
+      0,
+      20
+     ]
+    },
+    "sinks": [
+     "a_out"
+    ]
+   }
+  ],
+  "config_probe": {
+   "baseline": "C01_cfg_default",
+   "expect_change": true
+  },
+  "expect": "unsolved",
+  "id": "U02_cost_weights",
+  "notes": "If the cell count, delay and footprint equal C01 exactly, the weights were ignored -- the router is not tunable from any binding.",
+  "obstacles": [
+   {
+    "block": "minecraft:polished_andesite",
+    "max": [
+     6,
+     20,
+     10
+    ],
+    "min": [
+     6,
+     0,
+     0
+    ]
+   },
+   {
+    "block": "minecraft:polished_diorite",
+    "max": [
+     12,
+     20,
+     20
+    ],
+    "min": [
+     12,
+     0,
+     8
+    ]
+   }
+  ],
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     18,
+     2,
+     4
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "Ask for the latency-optimised weights (delay 16, skew 24, length 0.5). Does anything change against C01?",
+  "render": {
+   "pitch": 30,
+   "yaw": 150,
+   "zoom": 1.75
+  },
+  "title": "Choosing cost weights: length vs delay vs footprint",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "bundle conducts under this config",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0962,
+ "solved": false,
+ "solver_produced": true,
+ "title": "Choosing cost weights: length vs delay vs footprint",
+ "verification": {
+  "cases": [
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 2
+   },
+   {
+    "got": 4,
+    "in": 4,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 4
+   },
+   {
+    "got": 8,
+    "in": 8,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 8
+   },
+   {
+    "got": 16,
+    "in": 16,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 16
+   },
+   {
+    "got": 32,
+    "in": 32,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 32
+   },
+   {
+    "got": 64,
+    "in": 64,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 64
+   },
+   {
+    "got": 128,
+    "in": 128,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 128
+   },
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 0
+   },
+   {
+    "got": 255,
+    "in": 255,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 255
+   },
+   {
+    "got": 170,
+    "in": 170,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 170
+   },
+   {
+    "got": 85,
+    "in": 85,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 85
+   }
+  ],
+  "ok": true,
+  "passed": 12,
+  "sections": {
+   "bundle conducts under this config": {
+    "passed": 12,
+    "total": 12
+   }
+  },
+  "total": 12
+ },
+ "wall_seconds": 0.2
+}

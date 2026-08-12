@@ -314,7 +314,7 @@ non-zero unless its verification is perfect.
 |---|---|---|---|
 | [`kogge_stone_32bit`](docs/img/kogge_stone_32bit.png) | 154,152 | Flagship: 32-bit prefix adder from the PLA compiler | 54/54 (47 random + 7 corners) |
 | [`alu8`](docs/img/alu8.png) | 30,052 | 8-bit 4-op ALU (ADD/SUB/AND/XOR) | 144/144 |
-| [`mult4x4_stacked`](docs/img/mult_4x4.png) | 27,222 | 4 stacked planes, 3D maze-routed inter-plane nets | exhaustive 256/256 |
+| [`mult4x4_stacked`](docs/img/mult_4x4.png) | 27,038 | 4 stacked planes, 3D maze-routed inter-plane nets | exhaustive 256/256; 256/256 word-parallel at 272 gt |
 | [`genlib_seg7`](docs/img/genlib_seg7.png) | 6,880 | Cell-mapped seg7: −20% blocks vs the PLA fabric | 16/16 exhaustive |
 | [`genlib_cmp4`](docs/img/genlib_cmp4.png) | 3,560 | Cell-mapped cmp4: **3.9× smaller**, 43 → 28 rt | 256/256 exhaustive |
 | [`ripple_carry_adder_4bit`](docs/img/ripple_carry_adder_4bit.png) | 3,362 | The routed 4-bit RCA | exhaustive |

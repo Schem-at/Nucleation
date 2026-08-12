@@ -1,0 +1,1885 @@
+{
+ "artifact": "artifacts/Z02_torch_ladder_up.schem",
+ "artifact_blocks": 120,
+ "blocked_by": "The form is verified in simulation on this very build, but no `route_bus` call can produce it: the router has one level-change mechanism (the 2-cells-per-y level-shift tile) and no way to select the torch ladder.",
+ "buses": {},
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "cost_vector": null,
+ "expect": "unsolved",
+ "fixtures": {
+  "ladder": {
+   "constructor": "vforms.ladder_bus(b, x0=2, z=6, y0=1, nbits=8, torches=4, axis='x')",
+   "inverting": false,
+   "kind": "torch_ladder_bus",
+   "provenance": "vforms.py, probed 33/33 in probe_vertical_forms.py (8 towers x all 256 patterns)",
+   "provided_by": "fixture (NOT solver output)",
+   "rise_y": 8,
+   "xz_cells_per_bit": 1
+  }
+ },
+ "form_verified": true,
+ "id": "Z02_torch_ladder_up",
+ "log": [
+  "verify 256/256 (all 256 patterns climb 8 levels, no bit lost or shorted 256/256)"
+ ],
+ "loose_blocks": 120,
+ "notes": "Density: 1.000 xz cell per bit per level, vs the level-shift tile's 2 horizontal cells per y for the whole bundle. The constraint that makes it work is at the PORTS, not the towers -- entries must alternate +z/-z sides or the pitch-1 dusts merge into a T that stops pointing into the torch bases and the whole array reads a constant.",
+ "per_bus": {},
+ "question": "The climb Z01 refused, in the form that is already measured. Does it carry all eight bits, and can the solver ask for it?",
+ "scenario": {
+  "_file": "scenarios/Z02_torch_ladder_up.py",
+  "blocked_by": "The form is verified in simulation on this very build, but no `route_bus` call can produce it: the router has one level-change mechanism (the 2-cells-per-y level-shift tile) and no way to select the torch ladder.",
+  "buses": [],
+  "expect": "unsolved",
+  "fixtures": [
+   {
+    "at": [
+     2,
+     1,
+     6
+    ],
+    "axis": "x",
+    "kind": "torch_ladder_bus",
+    "name": "ladder",
+    "nbits": 8,
+    "torches": 4
+   }
+  ],
+  "id": "Z02_torch_ladder_up",
+  "notes": "Density: 1.000 xz cell per bit per level, vs the level-shift tile's 2 horizontal cells per y for the whole bundle. The constraint that makes it work is at the PORTS, not the towers -- entries must alternate +z/-z sides or the pitch-1 dusts merge into a T that stops pointing into the torch bases and the whole array reads a constant.",
+  "ports": [],
+  "question": "The climb Z01 refused, in the form that is already measured. Does it carry all eight bits, and can the solver ask for it?",
+  "render": {
+   "pitch": 22,
+   "yaw": 140,
+   "zoom": 2.2
+  },
+  "solver_produced": false,
+  "title": "Dense vertical UP: 8 bits, 8 levels, one xz cell per bit",
+  "verify": {
+   "words": [
+    {
+     "in": "ladder_in",
+     "label": "all 256 patterns climb 8 levels, no bit lost or shorted",
+     "out": "ladder_out",
+     "patterns": "exhaustive"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0,
+ "solved": false,
+ "solver_produced": false,
+ "title": "Dense vertical UP: 8 bits, 8 levels, one xz cell per bit",
+ "verification": {
+  "cases": [
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 0
+   },
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 2
+   },
+   {
+    "got": 3,
+    "in": 3,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 3
+   },
+   {
+    "got": 4,
+    "in": 4,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 4
+   },
+   {
+    "got": 5,
+    "in": 5,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 5
+   },
+   {
+    "got": 6,
+    "in": 6,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 6
+   },
+   {
+    "got": 7,
+    "in": 7,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 7
+   },
+   {
+    "got": 8,
+    "in": 8,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 8
+   },
+   {
+    "got": 9,
+    "in": 9,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 9
+   },
+   {
+    "got": 10,
+    "in": 10,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 10
+   },
+   {
+    "got": 11,
+    "in": 11,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 11
+   },
+   {
+    "got": 12,
+    "in": 12,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 12
+   },
+   {
+    "got": 13,
+    "in": 13,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 13
+   },
+   {
+    "got": 14,
+    "in": 14,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 14
+   },
+   {
+    "got": 15,
+    "in": 15,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 15
+   },
+   {
+    "got": 16,
+    "in": 16,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 16
+   },
+   {
+    "got": 17,
+    "in": 17,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 17
+   },
+   {
+    "got": 18,
+    "in": 18,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 18
+   },
+   {
+    "got": 19,
+    "in": 19,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 19
+   },
+   {
+    "got": 20,
+    "in": 20,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 20
+   },
+   {
+    "got": 21,
+    "in": 21,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 21
+   },
+   {
+    "got": 22,
+    "in": 22,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 22
+   },
+   {
+    "got": 23,
+    "in": 23,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 23
+   },
+   {
+    "got": 24,
+    "in": 24,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 24
+   },
+   {
+    "got": 25,
+    "in": 25,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 25
+   },
+   {
+    "got": 26,
+    "in": 26,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 26
+   },
+   {
+    "got": 27,
+    "in": 27,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 27
+   },
+   {
+    "got": 28,
+    "in": 28,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 28
+   },
+   {
+    "got": 29,
+    "in": 29,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 29
+   },
+   {
+    "got": 30,
+    "in": 30,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 30
+   },
+   {
+    "got": 31,
+    "in": 31,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 31
+   },
+   {
+    "got": 32,
+    "in": 32,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 32
+   },
+   {
+    "got": 33,
+    "in": 33,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 33
+   },
+   {
+    "got": 34,
+    "in": 34,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 34
+   },
+   {
+    "got": 35,
+    "in": 35,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 35
+   },
+   {
+    "got": 36,
+    "in": 36,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 36
+   },
+   {
+    "got": 37,
+    "in": 37,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 37
+   },
+   {
+    "got": 38,
+    "in": 38,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 38
+   },
+   {
+    "got": 39,
+    "in": 39,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 39
+   },
+   {
+    "got": 40,
+    "in": 40,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 40
+   },
+   {
+    "got": 41,
+    "in": 41,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 41
+   },
+   {
+    "got": 42,
+    "in": 42,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 42
+   },
+   {
+    "got": 43,
+    "in": 43,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 43
+   },
+   {
+    "got": 44,
+    "in": 44,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 44
+   },
+   {
+    "got": 45,
+    "in": 45,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 45
+   },
+   {
+    "got": 46,
+    "in": 46,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 46
+   },
+   {
+    "got": 47,
+    "in": 47,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 47
+   },
+   {
+    "got": 48,
+    "in": 48,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 48
+   },
+   {
+    "got": 49,
+    "in": 49,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 49
+   },
+   {
+    "got": 50,
+    "in": 50,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 50
+   },
+   {
+    "got": 51,
+    "in": 51,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 51
+   },
+   {
+    "got": 52,
+    "in": 52,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 52
+   },
+   {
+    "got": 53,
+    "in": 53,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 53
+   },
+   {
+    "got": 54,
+    "in": 54,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 54
+   },
+   {
+    "got": 55,
+    "in": 55,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 55
+   },
+   {
+    "got": 56,
+    "in": 56,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 56
+   },
+   {
+    "got": 57,
+    "in": 57,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 57
+   },
+   {
+    "got": 58,
+    "in": 58,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 58
+   },
+   {
+    "got": 59,
+    "in": 59,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 59
+   },
+   {
+    "got": 60,
+    "in": 60,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 60
+   },
+   {
+    "got": 61,
+    "in": 61,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 61
+   },
+   {
+    "got": 62,
+    "in": 62,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 62
+   },
+   {
+    "got": 63,
+    "in": 63,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 63
+   },
+   {
+    "got": 64,
+    "in": 64,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 64
+   },
+   {
+    "got": 65,
+    "in": 65,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 65
+   },
+   {
+    "got": 66,
+    "in": 66,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 66
+   },
+   {
+    "got": 67,
+    "in": 67,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 67
+   },
+   {
+    "got": 68,
+    "in": 68,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 68
+   },
+   {
+    "got": 69,
+    "in": 69,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 69
+   },
+   {
+    "got": 70,
+    "in": 70,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 70
+   },
+   {
+    "got": 71,
+    "in": 71,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 71
+   },
+   {
+    "got": 72,
+    "in": 72,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 72
+   },
+   {
+    "got": 73,
+    "in": 73,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 73
+   },
+   {
+    "got": 74,
+    "in": 74,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 74
+   },
+   {
+    "got": 75,
+    "in": 75,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 75
+   },
+   {
+    "got": 76,
+    "in": 76,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 76
+   },
+   {
+    "got": 77,
+    "in": 77,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 77
+   },
+   {
+    "got": 78,
+    "in": 78,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 78
+   },
+   {
+    "got": 79,
+    "in": 79,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 79
+   },
+   {
+    "got": 80,
+    "in": 80,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 80
+   },
+   {
+    "got": 81,
+    "in": 81,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 81
+   },
+   {
+    "got": 82,
+    "in": 82,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 82
+   },
+   {
+    "got": 83,
+    "in": 83,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 83
+   },
+   {
+    "got": 84,
+    "in": 84,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 84
+   },
+   {
+    "got": 85,
+    "in": 85,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 85
+   },
+   {
+    "got": 86,
+    "in": 86,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 86
+   },
+   {
+    "got": 87,
+    "in": 87,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 87
+   },
+   {
+    "got": 88,
+    "in": 88,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 88
+   },
+   {
+    "got": 89,
+    "in": 89,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 89
+   },
+   {
+    "got": 90,
+    "in": 90,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 90
+   },
+   {
+    "got": 91,
+    "in": 91,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 91
+   },
+   {
+    "got": 92,
+    "in": 92,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 92
+   },
+   {
+    "got": 93,
+    "in": 93,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 93
+   },
+   {
+    "got": 94,
+    "in": 94,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 94
+   },
+   {
+    "got": 95,
+    "in": 95,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 95
+   },
+   {
+    "got": 96,
+    "in": 96,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 96
+   },
+   {
+    "got": 97,
+    "in": 97,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 97
+   },
+   {
+    "got": 98,
+    "in": 98,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 98
+   },
+   {
+    "got": 99,
+    "in": 99,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 99
+   },
+   {
+    "got": 100,
+    "in": 100,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 100
+   },
+   {
+    "got": 101,
+    "in": 101,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 101
+   },
+   {
+    "got": 102,
+    "in": 102,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 102
+   },
+   {
+    "got": 103,
+    "in": 103,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 103
+   },
+   {
+    "got": 104,
+    "in": 104,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 104
+   },
+   {
+    "got": 105,
+    "in": 105,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 105
+   },
+   {
+    "got": 106,
+    "in": 106,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 106
+   },
+   {
+    "got": 107,
+    "in": 107,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 107
+   },
+   {
+    "got": 108,
+    "in": 108,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 108
+   },
+   {
+    "got": 109,
+    "in": 109,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 109
+   },
+   {
+    "got": 110,
+    "in": 110,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 110
+   },
+   {
+    "got": 111,
+    "in": 111,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 111
+   },
+   {
+    "got": 112,
+    "in": 112,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 112
+   },
+   {
+    "got": 113,
+    "in": 113,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 113
+   },
+   {
+    "got": 114,
+    "in": 114,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 114
+   },
+   {
+    "got": 115,
+    "in": 115,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 115
+   },
+   {
+    "got": 116,
+    "in": 116,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 116
+   },
+   {
+    "got": 117,
+    "in": 117,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 117
+   },
+   {
+    "got": 118,
+    "in": 118,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 118
+   },
+   {
+    "got": 119,
+    "in": 119,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 119
+   },
+   {
+    "got": 120,
+    "in": 120,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 120
+   },
+   {
+    "got": 121,
+    "in": 121,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 121
+   },
+   {
+    "got": 122,
+    "in": 122,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 122
+   },
+   {
+    "got": 123,
+    "in": 123,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 123
+   },
+   {
+    "got": 124,
+    "in": 124,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 124
+   },
+   {
+    "got": 125,
+    "in": 125,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 125
+   },
+   {
+    "got": 126,
+    "in": 126,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 126
+   },
+   {
+    "got": 127,
+    "in": 127,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 127
+   },
+   {
+    "got": 128,
+    "in": 128,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 128
+   },
+   {
+    "got": 129,
+    "in": 129,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 129
+   },
+   {
+    "got": 130,
+    "in": 130,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 130
+   },
+   {
+    "got": 131,
+    "in": 131,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 131
+   },
+   {
+    "got": 132,
+    "in": 132,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 132
+   },
+   {
+    "got": 133,
+    "in": 133,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 133
+   },
+   {
+    "got": 134,
+    "in": 134,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 134
+   },
+   {
+    "got": 135,
+    "in": 135,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 135
+   },
+   {
+    "got": 136,
+    "in": 136,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 136
+   },
+   {
+    "got": 137,
+    "in": 137,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 137
+   },
+   {
+    "got": 138,
+    "in": 138,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 138
+   },
+   {
+    "got": 139,
+    "in": 139,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 139
+   },
+   {
+    "got": 140,
+    "in": 140,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 140
+   },
+   {
+    "got": 141,
+    "in": 141,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 141
+   },
+   {
+    "got": 142,
+    "in": 142,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 142
+   },
+   {
+    "got": 143,
+    "in": 143,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 143
+   },
+   {
+    "got": 144,
+    "in": 144,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 144
+   },
+   {
+    "got": 145,
+    "in": 145,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 145
+   },
+   {
+    "got": 146,
+    "in": 146,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 146
+   },
+   {
+    "got": 147,
+    "in": 147,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 147
+   },
+   {
+    "got": 148,
+    "in": 148,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 148
+   },
+   {
+    "got": 149,
+    "in": 149,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 149
+   },
+   {
+    "got": 150,
+    "in": 150,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 150
+   },
+   {
+    "got": 151,
+    "in": 151,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 151
+   },
+   {
+    "got": 152,
+    "in": 152,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 152
+   },
+   {
+    "got": 153,
+    "in": 153,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 153
+   },
+   {
+    "got": 154,
+    "in": 154,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 154
+   },
+   {
+    "got": 155,
+    "in": 155,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 155
+   },
+   {
+    "got": 156,
+    "in": 156,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 156
+   },
+   {
+    "got": 157,
+    "in": 157,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 157
+   },
+   {
+    "got": 158,
+    "in": 158,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 158
+   },
+   {
+    "got": 159,
+    "in": 159,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 159
+   },
+   {
+    "got": 160,
+    "in": 160,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 160
+   },
+   {
+    "got": 161,
+    "in": 161,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 161
+   },
+   {
+    "got": 162,
+    "in": 162,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 162
+   },
+   {
+    "got": 163,
+    "in": 163,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 163
+   },
+   {
+    "got": 164,
+    "in": 164,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 164
+   },
+   {
+    "got": 165,
+    "in": 165,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 165
+   },
+   {
+    "got": 166,
+    "in": 166,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 166
+   },
+   {
+    "got": 167,
+    "in": 167,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 167
+   },
+   {
+    "got": 168,
+    "in": 168,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 168
+   },
+   {
+    "got": 169,
+    "in": 169,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 169
+   },
+   {
+    "got": 170,
+    "in": 170,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 170
+   },
+   {
+    "got": 171,
+    "in": 171,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 171
+   },
+   {
+    "got": 172,
+    "in": 172,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 172
+   },
+   {
+    "got": 173,
+    "in": 173,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 173
+   },
+   {
+    "got": 174,
+    "in": 174,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 174
+   },
+   {
+    "got": 175,
+    "in": 175,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 175
+   },
+   {
+    "got": 176,
+    "in": 176,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 176
+   },
+   {
+    "got": 177,
+    "in": 177,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 177
+   },
+   {
+    "got": 178,
+    "in": 178,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 178
+   },
+   {
+    "got": 179,
+    "in": 179,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 179
+   },
+   {
+    "got": 180,
+    "in": 180,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 180
+   },
+   {
+    "got": 181,
+    "in": 181,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 181
+   },
+   {
+    "got": 182,
+    "in": 182,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 182
+   },
+   {
+    "got": 183,
+    "in": 183,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 183
+   },
+   {
+    "got": 184,
+    "in": 184,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 184
+   },
+   {
+    "got": 185,
+    "in": 185,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 185
+   },
+   {
+    "got": 186,
+    "in": 186,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 186
+   },
+   {
+    "got": 187,
+    "in": 187,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 187
+   },
+   {
+    "got": 188,
+    "in": 188,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 188
+   },
+   {
+    "got": 189,
+    "in": 189,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 189
+   },
+   {
+    "got": 190,
+    "in": 190,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 190
+   },
+   {
+    "got": 191,
+    "in": 191,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 191
+   },
+   {
+    "got": 192,
+    "in": 192,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 192
+   },
+   {
+    "got": 193,
+    "in": 193,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 193
+   },
+   {
+    "got": 194,
+    "in": 194,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 194
+   },
+   {
+    "got": 195,
+    "in": 195,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 195
+   },
+   {
+    "got": 196,
+    "in": 196,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 196
+   },
+   {
+    "got": 197,
+    "in": 197,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 197
+   },
+   {
+    "got": 198,
+    "in": 198,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 198
+   },
+   {
+    "got": 199,
+    "in": 199,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 199
+   },
+   {
+    "got": 200,
+    "in": 200,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 200
+   },
+   {
+    "got": 201,
+    "in": 201,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 201
+   },
+   {
+    "got": 202,
+    "in": 202,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 202
+   },
+   {
+    "got": 203,
+    "in": 203,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 203
+   },
+   {
+    "got": 204,
+    "in": 204,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 204
+   },
+   {
+    "got": 205,
+    "in": 205,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 205
+   },
+   {
+    "got": 206,
+    "in": 206,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 206
+   },
+   {
+    "got": 207,
+    "in": 207,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 207
+   },
+   {
+    "got": 208,
+    "in": 208,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 208
+   },
+   {
+    "got": 209,
+    "in": 209,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 209
+   },
+   {
+    "got": 210,
+    "in": 210,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 210
+   },
+   {
+    "got": 211,
+    "in": 211,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 211
+   },
+   {
+    "got": 212,
+    "in": 212,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 212
+   },
+   {
+    "got": 213,
+    "in": 213,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 213
+   },
+   {
+    "got": 214,
+    "in": 214,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 214
+   },
+   {
+    "got": 215,
+    "in": 215,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 215
+   },
+   {
+    "got": 216,
+    "in": 216,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 216
+   },
+   {
+    "got": 217,
+    "in": 217,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 217
+   },
+   {
+    "got": 218,
+    "in": 218,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 218
+   },
+   {
+    "got": 219,
+    "in": 219,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 219
+   },
+   {
+    "got": 220,
+    "in": 220,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 220
+   },
+   {
+    "got": 221,
+    "in": 221,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 221
+   },
+   {
+    "got": 222,
+    "in": 222,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 222
+   },
+   {
+    "got": 223,
+    "in": 223,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 223
+   },
+   {
+    "got": 224,
+    "in": 224,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 224
+   },
+   {
+    "got": 225,
+    "in": 225,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 225
+   },
+   {
+    "got": 226,
+    "in": 226,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 226
+   },
+   {
+    "got": 227,
+    "in": 227,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 227
+   },
+   {
+    "got": 228,
+    "in": 228,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 228
+   },
+   {
+    "got": 229,
+    "in": 229,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 229
+   },
+   {
+    "got": 230,
+    "in": 230,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 230
+   },
+   {
+    "got": 231,
+    "in": 231,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 231
+   },
+   {
+    "got": 232,
+    "in": 232,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 232
+   },
+   {
+    "got": 233,
+    "in": 233,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 233
+   },
+   {
+    "got": 234,
+    "in": 234,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 234
+   },
+   {
+    "got": 235,
+    "in": 235,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 235
+   },
+   {
+    "got": 236,
+    "in": 236,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 236
+   },
+   {
+    "got": 237,
+    "in": 237,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 237
+   },
+   {
+    "got": 238,
+    "in": 238,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 238
+   },
+   {
+    "got": 239,
+    "in": 239,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 239
+   },
+   {
+    "got": 240,
+    "in": 240,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 240
+   },
+   {
+    "got": 241,
+    "in": 241,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 241
+   },
+   {
+    "got": 242,
+    "in": 242,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 242
+   },
+   {
+    "got": 243,
+    "in": 243,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 243
+   },
+   {
+    "got": 244,
+    "in": 244,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 244
+   },
+   {
+    "got": 245,
+    "in": 245,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 245
+   },
+   {
+    "got": 246,
+    "in": 246,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 246
+   },
+   {
+    "got": 247,
+    "in": 247,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 247
+   },
+   {
+    "got": 248,
+    "in": 248,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 248
+   },
+   {
+    "got": 249,
+    "in": 249,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 249
+   },
+   {
+    "got": 250,
+    "in": 250,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 250
+   },
+   {
+    "got": 251,
+    "in": 251,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 251
+   },
+   {
+    "got": 252,
+    "in": 252,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 252
+   },
+   {
+    "got": 253,
+    "in": 253,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 253
+   },
+   {
+    "got": 254,
+    "in": 254,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 254
+   },
+   {
+    "got": 255,
+    "in": 255,
+    "ok": true,
+    "section": "all 256 patterns climb 8 levels, no bit lost or shorted",
+    "want": 255
+   }
+  ],
+  "ok": true,
+  "passed": 256,
+  "sections": {
+   "all 256 patterns climb 8 levels, no bit lost or shorted": {
+    "passed": 256,
+    "total": 256
+   }
+  },
+  "total": 256
+ },
+ "wall_seconds": 0.063
+}

@@ -132,3 +132,16 @@ tests/corpus/lithium/
 # Input stamps written by tools/package-npm.sh so an unchanged wasm/npm package
 # is skipped instead of rebuilt.
 .build-stamp
+
+# Local integration probes and generated experiment workspaces. The source,
+# reports and compact problem/gallery corpora are tracked; rerunnable working
+# directories and downloaded resource packs are not release artifacts.
+/nucleation-pipe-list-test/
+/nucleation-pipe-test/
+/pack.zip
+/build.png
+/redstone-eda/adversarial/work/
+/redstone-eda/adversarial/work2/
+/redstone-eda/adversarial/work3/
+/redstone-eda/adversarial/codex_log.jsonl
+**/__pycache__/

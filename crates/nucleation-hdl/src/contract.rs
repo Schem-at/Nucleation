@@ -144,11 +144,9 @@ fn nearest_face(
 ) -> &'static str {
     let ((x0, _, z0), (x1, _, z1)) = bounds;
     let n = positions.len().max(1) as i64;
-    let (sx, sz) = positions
-        .iter()
-        .fold((0i64, 0i64), |(ax, az), &(x, _, z)| {
-            (ax + i64::from(x), az + i64::from(z))
-        });
+    let (sx, sz) = positions.iter().fold((0i64, 0i64), |(ax, az), &(x, _, z)| {
+        (ax + i64::from(x), az + i64::from(z))
+    });
     let (mx, mz) = (sx / n, sz / n);
     // (distance to plane, tie-break order, face name)
     let faces = [
@@ -211,11 +209,7 @@ struct ResolvedPort {
 }
 
 impl ResolvedPort {
-    fn mapping_json(
-        &self,
-        direction: &str,
-        bounds: ((i32, i32, i32), (i32, i32, i32)),
-    ) -> String {
+    fn mapping_json(&self, direction: &str, bounds: ((i32, i32, i32), (i32, i32, i32))) -> String {
         let positions: Vec<String> = self.positions.iter().map(|&p| pos_json(p)).collect();
         format!(
             "{{\"io_type\":{},\"layout\":\"OneToOne\",\"positions\":[{}],\"face\":\"{}\",\"direction\":\"{}\"}}",
@@ -335,7 +329,11 @@ impl Compiled {
         let mut in_entries = Vec::new();
         let mut bus_entries = Vec::new();
         for p in &inputs {
-            in_entries.push(format!("\"{}\":{}", esc(&p.name), p.mapping_json("input", bounds)));
+            in_entries.push(format!(
+                "\"{}\":{}",
+                esc(&p.name),
+                p.mapping_json("input", bounds)
+            ));
             if let Some(b) = p.bus_json("input", bounds) {
                 bus_entries.push(format!("\"{}\":{}", esc(&p.name), b));
             }
@@ -495,7 +493,10 @@ mod tests {
 
     #[test]
     fn pitch_detection_needs_one_constant_axis() {
-        assert_eq!(uniform_pitch(&[(0, 1, 0), (2, 1, 0), (4, 1, 0)]), Some(("X", 2)));
+        assert_eq!(
+            uniform_pitch(&[(0, 1, 0), (2, 1, 0), (4, 1, 0)]),
+            Some(("X", 2))
+        );
         assert_eq!(uniform_pitch(&[(0, 1, 0), (0, 1, 3)]), Some(("Z", 3)));
         assert_eq!(uniform_pitch(&[(0, 1, 0), (2, 1, 1)]), None);
         assert_eq!(uniform_pitch(&[(0, 1, 0), (2, 1, 0), (5, 1, 0)]), None);
@@ -512,8 +513,14 @@ mod tests {
         let c = crate::compile_blif(&fixture("cmp4"), "cmp4").unwrap();
         let json = c.cell_contract_json();
         // a and b group to 4-bit unsigned input words; eq/lt/gt stay boolean.
-        assert!(json.contains("\"a\":{\"io_type\":{\"UnsignedInt\":{\"bits\":4}}"), "{json}");
-        assert!(json.contains("\"b\":{\"io_type\":{\"UnsignedInt\":{\"bits\":4}}"), "{json}");
+        assert!(
+            json.contains("\"a\":{\"io_type\":{\"UnsignedInt\":{\"bits\":4}}"),
+            "{json}"
+        );
+        assert!(
+            json.contains("\"b\":{\"io_type\":{\"UnsignedInt\":{\"bits\":4}}"),
+            "{json}"
+        );
         assert!(json.contains("\"eq\":{\"io_type\":\"Boolean\""), "{json}");
         assert!(json.contains("\"direction\":\"output\""), "{json}");
         // physical sidecar: bounds keepout, estimated delays, paste_safe.
@@ -540,16 +547,28 @@ mod tests {
         assert!(json.contains("\"clk_to_q_gt\":10"), "{json}");
         assert!(json.contains("\"est_min_period_gt\":"), "{json}");
         // init-by-construction: the baked state ships in the contract
-        assert!(json.contains("\"initial_state\":{\"q[0]\":0,\"q[1]\":0"), "{json}");
+        assert!(
+            json.contains("\"initial_state\":{\"q[0]\":0,\"q[1]\":0"),
+            "{json}"
+        );
         // the state word still groups into a typed output bus
-        assert!(json.contains("\"q\":{\"io_type\":{\"UnsignedInt\":{\"bits\":4}}"), "{json}");
+        assert!(
+            json.contains("\"q\":{\"io_type\":{\"UnsignedInt\":{\"bits\":4}}"),
+            "{json}"
+        );
     }
 
     #[test]
     fn seg7_groups_the_display_word() {
         let c = crate::compile_blif(&fixture("seg7"), "seg7").unwrap();
         let json = c.cell_contract_json();
-        assert!(json.contains("\"d\":{\"io_type\":{\"UnsignedInt\":{\"bits\":4}}"), "{json}");
-        assert!(json.contains("\"seg\":{\"io_type\":{\"UnsignedInt\":{\"bits\":7}}"), "{json}");
+        assert!(
+            json.contains("\"d\":{\"io_type\":{\"UnsignedInt\":{\"bits\":4}}"),
+            "{json}"
+        );
+        assert!(
+            json.contains("\"seg\":{\"io_type\":{\"UnsignedInt\":{\"bits\":7}}"),
+            "{json}"
+        );
     }
 }

@@ -273,7 +273,7 @@ def main():
 
     # The simulator will happily tick a floating wire, so check support statically
     # before trusting anything the simulation says.
-    import audit
+    import audit, drc
     problems = audit.audit(b.cells)
     if any(problems.values()):
         for kind, items in problems.items():
@@ -281,6 +281,10 @@ def main():
                 print("STRUCTURAL: %s x%d, e.g. %s" % (kind, len(items), items[0]))
         return 1
     print("structural audit: clean (nothing floating or unattached)")
+    # A diode ring latches at 15 and leaves the world quiescent, so neither the
+    # audit nor the simulation below can see it (drc.py).
+    if not drc.check_rings("build_adder", b.cells):
+        return 1
 
     sim = b.sim()
     print("placed; quiescent:", sim.sim.is_quiescent(), "non-air:", sim.sim.non_air_count())

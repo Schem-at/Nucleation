@@ -11,6 +11,7 @@
 #include "BlockState.d.h"
 #include "Dimensions.d.h"
 #include "NucleationError.d.h"
+#include "SchematicSplitResult.d.h"
 
 #include "Schematic.d.h"
 
@@ -22,6 +23,8 @@
 Schematic* Schematic_create(DiplomatStringView name);
 
 Schematic* Schematic_deep_clone(const Schematic* self);
+
+SchematicSplitResult* Schematic_split_connected_attach_nearby(const Schematic* self, uint32_t min_standalone_blocks, uint32_t max_air_gap);
 
 Dimensions Schematic_dimensions(const Schematic* self);
 
@@ -255,6 +258,14 @@ void Schematic_set_mc_version(Schematic* self, int32_t version);
 int32_t Schematic_we_version(const Schematic* self);
 
 void Schematic_set_we_version(Schematic* self, int32_t version);
+
+typedef struct Schematic_provenance_json_result {union { NucleationError err;}; bool is_ok;} Schematic_provenance_json_result;
+Schematic_provenance_json_result Schematic_provenance_json(const Schematic* self, DiplomatWrite* write);
+
+typedef struct Schematic_set_provenance_json_result {union { NucleationError err;}; bool is_ok;} Schematic_set_provenance_json_result;
+Schematic_set_provenance_json_result Schematic_set_provenance_json(Schematic* self, DiplomatStringView json);
+
+void Schematic_clear_provenance(Schematic* self);
 
 void Schematic_flip_x(Schematic* self);
 

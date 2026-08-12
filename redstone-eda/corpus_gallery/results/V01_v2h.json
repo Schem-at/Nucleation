@@ -1,0 +1,231 @@
+{
+ "artifact": "artifacts/V01_v2h.schem",
+ "artifact_blocks": 640,
+ "buses": {
+  "bus_pivot": {
+   "call": "d.route_bus('bus_pivot', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:pink_concrete', 'transparent_block': 'minecraft:pink_stained_glass'}))",
+   "error": null,
+   "seconds": 0.0161,
+   "state": "routed"
+  }
+ },
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "cost_vector": {
+  "coherence": null,
+  "delay_rt": 11,
+  "footprint": 7680,
+  "length": 254,
+  "skew_rt": 8
+ },
+ "expect": "solved",
+ "fixtures": {},
+ "id": "V01_v2h",
+ "log": [
+  "verify 12/12 (stack -> plane, bit order preserved 12/12)"
+ ],
+ "loose_blocks": 48,
+ "notes": "`pivot_for()` in crates/nucleation-routing/src/pivot.rs picks V2H.",
+ "per_bus": {
+  "bus_pivot": {
+   "bbox": [
+    [
+     1,
+     1,
+     2
+    ],
+    [
+     24,
+     16,
+     21
+    ]
+   ],
+   "cells": 592,
+   "delay_rt": 11,
+   "devices": 42,
+   "footprint": 7680,
+   "glass": 0,
+   "per_bit_rt": [
+    11,
+    4,
+    4,
+    8,
+    3,
+    6,
+    3,
+    3
+   ],
+   "skew_rt": 8,
+   "wire": 254
+  }
+ },
+ "question": "`a_in` is a dense 2y stack, `a_out` is a flat 2-pitch row along +X.  Does the router detect the form mismatch and insert a v2h pivot on its own?",
+ "scenario": {
+  "_file": "scenarios/V01_v2h.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_pivot",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:pink_concrete",
+     "transparent_block": "minecraft:pink_stained_glass"
+    }
+   }
+  ],
+  "expect": "solved",
+  "id": "V01_v2h",
+  "notes": "`pivot_for()` in crates/nucleation-routing/src/pivot.rs picks V2H.",
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     10,
+     2,
+     22
+    ],
+    "dir": "out",
+    "form": "flat_x",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "`a_in` is a dense 2y stack, `a_out` is a flat 2-pitch row along +X.  Does the router detect the form mismatch and insert a v2h pivot on its own?",
+  "render": {
+   "pitch": 24,
+   "yaw": 145,
+   "zoom": 1.75
+  },
+  "title": "Vertical stack -> flat plane (the router stamps the pivot)",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "stack -> plane, bit order preserved",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0161,
+ "solved": true,
+ "solver_produced": true,
+ "title": "Vertical stack -> flat plane (the router stamps the pivot)",
+ "verification": {
+  "cases": [
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "stack -> plane, bit order preserved",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "stack -> plane, bit order preserved",
+    "want": 2
+   },
+   {
+    "got": 4,
+    "in": 4,
+    "ok": true,
+    "section": "stack -> plane, bit order preserved",
+    "want": 4
+   },
+   {
+    "got": 8,
+    "in": 8,
+    "ok": true,
+    "section": "stack -> plane, bit order preserved",
+    "want": 8
+   },
+   {
+    "got": 16,
+    "in": 16,
+    "ok": true,
+    "section": "stack -> plane, bit order preserved",
+    "want": 16
+   },
+   {
+    "got": 32,
+    "in": 32,
+    "ok": true,
+    "section": "stack -> plane, bit order preserved",
+    "want": 32
+   },
+   {
+    "got": 64,
+    "in": 64,
+    "ok": true,
+    "section": "stack -> plane, bit order preserved",
+    "want": 64
+   },
+   {
+    "got": 128,
+    "in": 128,
+    "ok": true,
+    "section": "stack -> plane, bit order preserved",
+    "want": 128
+   },
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "stack -> plane, bit order preserved",
+    "want": 0
+   },
+   {
+    "got": 255,
+    "in": 255,
+    "ok": true,
+    "section": "stack -> plane, bit order preserved",
+    "want": 255
+   },
+   {
+    "got": 170,
+    "in": 170,
+    "ok": true,
+    "section": "stack -> plane, bit order preserved",
+    "want": 170
+   },
+   {
+    "got": 85,
+    "in": 85,
+    "ok": true,
+    "section": "stack -> plane, bit order preserved",
+    "want": 85
+   }
+  ],
+  "ok": true,
+  "passed": 12,
+  "sections": {
+   "stack -> plane, bit order preserved": {
+    "passed": 12,
+    "total": 12
+   }
+  },
+  "total": 12
+ },
+ "wall_seconds": 0.107
+}

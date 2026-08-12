@@ -41,8 +41,7 @@ pub fn neighbours(cells: &BTreeMap<Pos, String>, pos: Pos) -> Vec<Pos> {
         }
         // Dust one step UP: blocked if the cell above THIS dust is solid.
         let high = Pos::new(x + dx, y + 1, z + dz);
-        if cells.get(&high).is_some_and(|b| is_dust(b)) && !is_solid(cells, Pos::new(x, y + 1, z))
-        {
+        if cells.get(&high).is_some_and(|b| is_dust(b)) && !is_solid(cells, Pos::new(x, y + 1, z)) {
             out.push(high);
         }
     }

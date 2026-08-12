@@ -239,6 +239,15 @@ fn create_metadata(schematic: &UniversalSchematic, version: i32) -> NbtCompound 
         }
     }
 
+    if let Some(provenance) = &schematic.metadata.provenance {
+        if let Ok(json) = provenance.to_json() {
+            metadata.insert(
+                crate::metadata::SCHEMATIC_PROVENANCE_NBT_KEY,
+                NbtTag::String(json),
+            );
+        }
+    }
+
     metadata
 }
 fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
@@ -449,6 +458,11 @@ fn parse_metadata(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Res
         .get::<_, i64>("TimeModified")
         .ok()
         .map(|t| t as u64);
+
+    schematic.metadata.provenance = metadata
+        .get::<_, &str>(crate::metadata::SCHEMATIC_PROVENANCE_NBT_KEY)
+        .ok()
+        .and_then(|json| crate::SchematicProvenance::from_json(json).ok());
 
     // We don't need to parse EnclosingSize, TotalVolume, TotalBlocks as they will be recalculated
 

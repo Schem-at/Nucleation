@@ -32,12 +32,21 @@ const DUST: &str = "minecraft:redstone_wire[east=none,north=none,power=0,south=n
 
 /// `width` levers stacked at 2y pitch, each with its connection dust one step
 /// toward the field. Returns the bit-0 connection cell.
-fn lever_bank(s: &mut UniversalSchematic, x: i32, y0: i32, z: i32, dx: i32, dz: i32, width: u8) -> P3 {
+fn lever_bank(
+    s: &mut UniversalSchematic,
+    x: i32,
+    y0: i32,
+    z: i32,
+    dx: i32,
+    dz: i32,
+    width: u8,
+) -> P3 {
     for i in 0..width as i32 {
         let y = y0 + 2 * i;
         s.set_block_from_string(x, y - 1, z, STONE).unwrap();
         s.set_block_from_string(x, y, z, LEVER).unwrap();
-        s.set_block_from_string(x + dx, y - 1, z + dz, STONE).unwrap();
+        s.set_block_from_string(x + dx, y - 1, z + dz, STONE)
+            .unwrap();
         s.set_block_from_string(x + dx, y, z + dz, DUST).unwrap();
     }
     (x + dx, y0, z + dz)
@@ -88,7 +97,11 @@ impl Report {
                 if n > baseline {
                     self.dirty.push((
                         scenario,
-                        format!("{} new violation(s) over baseline {baseline}: {}", n - baseline, one_line(&c.json)),
+                        format!(
+                            "{} new violation(s) over baseline {baseline}: {}",
+                            n - baseline,
+                            one_line(&c.json)
+                        ),
                     ));
                 }
             }
@@ -166,12 +179,7 @@ impl Report {
         println!("RR|routability|{ok}/{total}");
         for a in &self.attempts {
             if let Some(r) = &a.reason {
-                println!(
-                    "RR|fail|{}::{}|{}",
-                    a.scenario,
-                    a.bus,
-                    category(r)
-                );
+                println!("RR|fail|{}::{}|{}", a.scenario, a.bus, category(r));
             }
         }
         println!("RR|dirty|{}", self.dirty.len());
@@ -231,7 +239,10 @@ fn one_line(s: &str) -> String {
 /// that does not yet tell the user what to do.
 fn category(r: &str) -> &'static str {
     const RULES: &[(&str, &str)] = &[
-        ("endpoint approach blocked", "endpoint escape: port has no free lane"),
+        (
+            "endpoint approach blocked",
+            "endpoint escape: port has no free lane",
+        ),
         ("no corridor", "no corridor (blocked after search)"),
         ("collision", "collision: obstacle in the corridor"),
         ("influence halo", "halo/keepout rejection"),
@@ -239,8 +250,14 @@ fn category(r: &str) -> &'static str {
         // planner inserts the verified level-shift tile. What CAN still fail
         // is a pair with too little run to host the tile, and that reason
         // names the tile's cost and the span available.
-        ("level-shift tile needs", "level shift: not enough run for the tile"),
-        ("level-shift tile was blocked", "level shift: every placement blocked"),
+        (
+            "level-shift tile needs",
+            "level shift: not enough run for the tile",
+        ),
+        (
+            "level-shift tile was blocked",
+            "level shift: every placement blocked",
+        ),
         ("levels/widths differ", "crossing level/width mismatch"),
         ("crossing windows", "crossing windows too close"),
         ("no trunk run aligns", "branch: no perpendicular shot"),
@@ -275,9 +292,17 @@ fn ty8() -> IoType {
 /// Straight and dogleg pairs over assorted spans on one level — the
 /// baseline "it should obviously work" set.
 fn scenario_open_field(rep: &mut Report) {
-    for (i, (span, dz)) in [(8i32, 0i32), (24, 0), (64, 0), (120, 0), (24, 12), (64, -20), (16, 40)]
-        .iter()
-        .enumerate()
+    for (i, (span, dz)) in [
+        (8i32, 0i32),
+        (24, 0),
+        (64, 0),
+        (120, 0),
+        (24, 12),
+        (64, -20),
+        (16, 40),
+    ]
+    .iter()
+    .enumerate()
     {
         let mut s = UniversalSchematic::new("open".to_string());
         let drv = lever_bank(&mut s, 0, 2, 8, 1, 0, 8);
@@ -286,7 +311,13 @@ fn scenario_open_field(rep: &mut Report) {
         let step = (0, 2, 0);
         d.declare_input("din", drv, step, 8, ty8()).unwrap();
         d.declare_output("dout", snk, step, 8, ty8()).unwrap();
-        rep.bus(&mut d, "open field (straight + dogleg spans)", &format!("open{i}"), "din", &["dout"]);
+        rep.bus(
+            &mut d,
+            "open field (straight + dogleg spans)",
+            &format!("open{i}"),
+            "din",
+            &["dout"],
+        );
     }
 }
 
@@ -310,7 +341,13 @@ fn scenario_walled(rep: &mut Report) {
         let step = (0, 2, 0);
         d.declare_input("din", drv, step, 8, ty8()).unwrap();
         d.declare_output("dout", snk, step, 8, ty8()).unwrap();
-        rep.bus(&mut d, "wall with a gap (detour required)", &format!("wall{i}"), "din", &["dout"]);
+        rep.bus(
+            &mut d,
+            "wall with a gap (detour required)",
+            &format!("wall{i}"),
+            "din",
+            &["dout"],
+        );
         rep.verify(&d, "wall with a gap (detour required)", 0);
     }
 }
@@ -334,13 +371,21 @@ fn scenario_crossings(rep: &mut Report) {
     let mut d = Design::for_schematic("cross", s);
     let step = (0, 2, 0);
     for (n, i, o) in &names {
-        d.declare_input(format!("{n}_in"), *i, step, 8, ty8()).unwrap();
-        d.declare_output(format!("{n}_out"), *o, step, 8, ty8()).unwrap();
+        d.declare_input(format!("{n}_in"), *i, step, 8, ty8())
+            .unwrap();
+        d.declare_output(format!("{n}_out"), *o, step, 8, ty8())
+            .unwrap();
     }
     for (n, _, _) in &names {
         let din = format!("{n}_in");
         let dout = format!("{n}_out");
-        rep.bus(&mut d, "3x3 orthogonal crossings", n, &din, &[dout.as_str()]);
+        rep.bus(
+            &mut d,
+            "3x3 orthogonal crossings",
+            n,
+            &din,
+            &[dout.as_str()],
+        );
     }
     rep.verify(&d, "3x3 orthogonal crossings", 0);
 }
@@ -358,7 +403,13 @@ fn scenario_fanout(rep: &mut Report) {
     d.declare_output("o1", s1, step, 8, ty8()).unwrap();
     d.declare_output("o2", s2, step, 8, ty8()).unwrap();
     d.declare_output("o3", s3, step, 8, ty8()).unwrap();
-    rep.bus(&mut d, "fanout (2 and 3 sinks)", "fan2", "din", &["o1", "o2"]);
+    rep.bus(
+        &mut d,
+        "fanout (2 and 3 sinks)",
+        "fan2",
+        "din",
+        &["o1", "o2"],
+    );
     let mut d2 = {
         let mut s = UniversalSchematic::new("fan".to_string());
         let drv = lever_bank(&mut s, 0, 2, 8, 1, 0, 8);
@@ -372,7 +423,13 @@ fn scenario_fanout(rep: &mut Report) {
         d.declare_output("o3", s3, step, 8, ty8()).unwrap();
         d
     };
-    rep.bus(&mut d2, "fanout (2 and 3 sinks)", "fan3", "din", &["o1", "o2", "o3"]);
+    rep.bus(
+        &mut d2,
+        "fanout (2 and 3 sinks)",
+        "fan3",
+        "din",
+        &["o1", "o2", "o3"],
+    );
 }
 
 /// Endpoints on different bit-0 levels — the studio hits this whenever two
@@ -386,7 +443,13 @@ fn scenario_levels(rep: &mut Report) {
         let step = (0, 2, 0);
         d.declare_input("din", drv, step, 8, ty8()).unwrap();
         d.declare_output("dout", snk, step, 8, ty8()).unwrap();
-        rep.bus(&mut d, "endpoints on different levels", &format!("lvl{i}"), "din", &["dout"]);
+        rep.bus(
+            &mut d,
+            "endpoints on different levels",
+            &format!("lvl{i}"),
+            "din",
+            &["dout"],
+        );
     }
 }
 
@@ -411,13 +474,21 @@ fn scenario_congested(rep: &mut Report) {
     let ty = IoType::UnsignedInt { bits: 4 };
     for k in 0..n {
         let z = 4 + 3 * k;
-        d.declare_input(format!("i{k}"), (1, 2, z), step, 4, ty.clone()).unwrap();
-        d.declare_output(format!("o{k}"), (40, 2, z), step, 4, ty.clone()).unwrap();
+        d.declare_input(format!("i{k}"), (1, 2, z), step, 4, ty.clone())
+            .unwrap();
+        d.declare_output(format!("o{k}"), (40, 2, z), step, 4, ty.clone())
+            .unwrap();
     }
     for k in 0..n {
         let din = format!("i{k}");
         let dout = format!("o{k}");
-        rep.bus(&mut d, "congested parallel channel", &format!("cong{k}"), &din, &[dout.as_str()]);
+        rep.bus(
+            &mut d,
+            "congested parallel channel",
+            &format!("cong{k}"),
+            &din,
+            &[dout.as_str()],
+        );
     }
 }
 
@@ -456,7 +527,11 @@ fn probe_enhanced_cell_ports() {
             Ok(Some((c, w))) => {
                 println!(" contract `{}` warnings={}", c.name, w.len());
                 for (n, m) in c.io.inputs.iter().chain(c.io.outputs.iter()) {
-                    println!("    port {n}: {} bits, pos[0]={:?}", m.positions.len(), m.positions.first());
+                    println!(
+                        "    port {n}: {} bits, pos[0]={:?}",
+                        m.positions.len(),
+                        m.positions.first()
+                    );
                 }
             }
             Ok(None) => println!(" NO CONTRACT"),
@@ -483,7 +558,9 @@ fn probe_corpus_routability() {
     let mut d = Design::new("corpus");
     let mut x = 0i32;
     for (i, f) in files.iter().enumerate() {
-        let Some(sch) = load_enhanced(f) else { continue };
+        let Some(sch) = load_enhanced(f) else {
+            continue;
+        };
         let w = sch.get_bounding_box().max.0 + 8;
         let cellname = format!("c{i}");
         if d.add_cell(&cellname, sch).is_err() {
@@ -508,7 +585,11 @@ fn probe_corpus_routability() {
 /// input port on its -X face and an 8-bit output port on its +X face, both on
 /// the verified 2y-pitch stack. This is the shape a router-friendly cell has
 /// — the `nucleation-hdl` PLA cells and the studio's own composites.
-fn dust_cell(name: &str, sx: i32, sz: i32) -> (UniversalSchematic, nucleation::io_contract::CellContract) {
+fn dust_cell(
+    name: &str,
+    sx: i32,
+    sz: i32,
+) -> (UniversalSchematic, nucleation::io_contract::CellContract) {
     use nucleation::io_contract::{CellContract, IoLayoutBuilder, LayoutFunction};
     let mut s = UniversalSchematic::new(name.to_string());
     for x in 0..sx {
@@ -551,7 +632,13 @@ fn scenario_cell_row(rep: &mut Report) {
     for k in 0..n - 1 {
         let dr = format!("u{k}.q");
         let sk = format!("u{}.d", k + 1);
-        rep.bus(&mut d, "cell row: adjacent hops", &format!("hop{k}"), &dr, &[sk.as_str()]);
+        rep.bus(
+            &mut d,
+            "cell row: adjacent hops",
+            &format!("hop{k}"),
+            &dr,
+            &[sk.as_str()],
+        );
     }
     // Skip hops: the corridor crosses intervening cells. Every port is used
     // by exactly ONE net, as in a real netlist — a port's escape lane is one
@@ -566,7 +653,13 @@ fn scenario_cell_row(rep: &mut Report) {
     for (i, (a, b)) in [(0, 2), (1, 3), (2, 4), (3, 0), (4, 1)].iter().enumerate() {
         let dr = format!("u{a}.q");
         let sk = format!("u{b}.d");
-        rep.bus(&mut d2, "cell row: skip hops (detour required)", &format!("skip{i}"), &dr, &[sk.as_str()]);
+        rep.bus(
+            &mut d2,
+            "cell row: skip hops (detour required)",
+            &format!("skip{i}"),
+            &dr,
+            &[sk.as_str()],
+        );
     }
     rep.verify(&d, "cell row: adjacent hops", 0);
     rep.verify(&d2, "cell row: skip hops (detour required)", 0);
@@ -590,7 +683,13 @@ fn scenario_fanout_detour(rep: &mut Report) {
     d.declare_input("din", drv, step, 8, ty8()).unwrap();
     d.declare_output("o1", s1, step, 8, ty8()).unwrap();
     d.declare_output("o2", s2, step, 8, ty8()).unwrap();
-    rep.bus(&mut d, "fanout over a detoured trunk", "fand", "din", &["o1", "o2"]);
+    rep.bus(
+        &mut d,
+        "fanout over a detoured trunk",
+        "fand",
+        "din",
+        &["o1", "o2"],
+    );
     rep.verify(&d, "fanout over a detoured trunk", 0);
 }
 
@@ -630,7 +729,13 @@ fn scenario_cell_grid(rep: &mut Report) {
     for (i, (a, b)) in pairs.iter().enumerate() {
         let dr = format!("u{a}.q");
         let sk = format!("u{b}.d");
-        rep.bus(&mut d, "cell grid, assorted rotations", &format!("g{i}"), &dr, &[sk.as_str()]);
+        rep.bus(
+            &mut d,
+            "cell grid, assorted rotations",
+            &format!("g{i}"),
+            &dr,
+            &[sk.as_str()],
+        );
     }
     rep.verify(&d, "cell grid, assorted rotations", 0);
 }
@@ -657,13 +762,17 @@ fn scenario_real_cell_field(rep: &mut Report) {
     let mut d = Design::for_schematic("field", s);
     let step = (0, 2, 0);
     for (k, (i, o)) in lanes.iter().enumerate() {
-        d.declare_input(format!("i{k}"), *i, step, 8, ty8()).unwrap();
-        d.declare_output(format!("o{k}"), *o, step, 8, ty8()).unwrap();
+        d.declare_input(format!("i{k}"), *i, step, 8, ty8())
+            .unwrap();
+        d.declare_output(format!("o{k}"), *o, step, 8, ty8())
+            .unwrap();
     }
     // Real cells dropped into the middle of the field.
     let spots: [(P3, i32); 3] = [((10, 0, 2), 0), ((36, 0, 18), 90), ((54, 0, 4), 180)];
     for (j, f) in files.iter().enumerate() {
-        let Some(sch) = load_enhanced(f) else { continue };
+        let Some(sch) = load_enhanced(f) else {
+            continue;
+        };
         let cellname = format!("c{j}");
         if d.add_cell(&cellname, sch).is_err() {
             continue;
@@ -743,7 +852,11 @@ fn routability_rate_holds_the_line() {
         .collect();
     assert!(vague.is_empty(), "unactionable failure reasons: {vague:#?}");
     // Routing more buses is only progress if the geometry is still legal.
-    assert!(rep.dirty.is_empty(), "routed designs failed DRC/LVS: {:#?}", rep.dirty);
+    assert!(
+        rep.dirty.is_empty(),
+        "routed designs failed DRC/LVS: {:#?}",
+        rep.dirty
+    );
 }
 
 /// Measured 2026-08-09. Baseline before the corridor router and the instance

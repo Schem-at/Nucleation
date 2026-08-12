@@ -182,4 +182,4 @@ cargo test --test structure_snbt_tests lithium_fixture_corpus -- --ignored
 - [Basics](basics.md) for editing the loaded schematic
 - [Versions and translation](versions-and-translation.md) for Java/Bedrock and data-version changes
 - [Chunk iteration, streaming, and worlds](streaming-and-worlds.md) for large-world I/O
-- [Pluggable storage](storage.md) for memory, filesystem, S3, Redis, and Postgres URIs
+- [Pluggable storage](storage.md) for memory, filesystem, SSH, S3, Redis, and Postgres URIs

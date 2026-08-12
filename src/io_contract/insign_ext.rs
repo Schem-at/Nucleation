@@ -193,22 +193,22 @@ pub fn parse_bus_annotations_from_map(
 
         let face = match meta_str(&entry.metadata, "bus.face") {
             None => None,
-            Some(s) => Some(Face::parse(s).ok_or_else(|| InsignContractError::InvalidValue {
-                region: region_name.clone(),
-                key: "bus.face".to_string(),
-                reason: format!("expected a direction name, got '{}'", s),
-            })?),
+            Some(s) => Some(
+                Face::parse(s).ok_or_else(|| InsignContractError::InvalidValue {
+                    region: region_name.clone(),
+                    key: "bus.face".to_string(),
+                    reason: format!("expected a direction name, got '{}'", s),
+                })?,
+            ),
         };
 
         let encoding = match meta_str(&entry.metadata, "bus.encoding") {
             None => BusEncoding::Binary1PerWire,
-            Some(s) => {
-                BusEncoding::parse(s).ok_or_else(|| InsignContractError::InvalidValue {
-                    region: region_name.clone(),
-                    key: "bus.encoding".to_string(),
-                    reason: format!("expected binary|hex_analog, got '{}'", s),
-                })?
-            }
+            Some(s) => BusEncoding::parse(s).ok_or_else(|| InsignContractError::InvalidValue {
+                region: region_name.clone(),
+                key: "bus.encoding".to_string(),
+                reason: format!("expected binary|hex_analog, got '{}'", s),
+            })?,
         };
 
         buses.push(BusAnnotation {
@@ -250,14 +250,13 @@ pub fn parse_route_zones_from_map(
                     reason: format!("expected \"<name> include|exclude\", got {}", compact),
                 })?;
             let mut parts = s.split_whitespace();
-            let name = parts
-                .next()
-                .filter(|n| !n.is_empty())
-                .ok_or_else(|| InsignContractError::InvalidValue {
+            let name = parts.next().filter(|n| !n.is_empty()).ok_or_else(|| {
+                InsignContractError::InvalidValue {
                     region: region_name.clone(),
                     key: "route_zone".to_string(),
                     reason: "missing zone name".to_string(),
-                })?;
+                }
+            })?;
             let mode = match parts.next() {
                 None => RouteZoneMode::Include,
                 Some(m) => {
@@ -339,9 +338,7 @@ mod tests {
 
     #[test]
     fn cell_header_parses_name_and_version() {
-        let input = signs(&[
-            "#$global:cell.name=\"full_adder\"\n#$global:cell.version=\"1.2.0\"",
-        ]);
+        let input = signs(&["#$global:cell.name=\"full_adder\"\n#$global:cell.version=\"1.2.0\""]);
         let header = parse_cell_header(&input).unwrap().unwrap();
         assert_eq!(header.name, "full_adder");
         assert_eq!(header.version.as_deref(), Some("1.2.0"));

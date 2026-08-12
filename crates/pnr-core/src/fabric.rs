@@ -83,8 +83,11 @@ pub trait Fabric {
 
     /// Enumerate candidate moves out of `from`. Candidates need not be
     /// legal; the core filters through [`Fabric::legal`].
-    fn moves(&self, from: &State<Self::Memory>, ctx: &RouteCtx)
-        -> Vec<Candidate<Self::Memory, Self::Tag>>;
+    fn moves(
+        &self,
+        from: &State<Self::Memory>,
+        ctx: &RouteCtx,
+    ) -> Vec<Candidate<Self::Memory, Self::Tag>>;
 
     /// Whether the candidate is legal for this net in the current fabric
     /// state (design rules, occupancy, bounds, clearances).

@@ -1,0 +1,9 @@
+# Generated, regenerable, and large. The EVIDENCE (the *.jsonl records and
+# REPORT.md) is small and stays tracked; the artifacts they point at do not.
+harness/target/
+harness/Cargo.lock
+work/
+work2/
+work3/
+problems/
+__pycache__/

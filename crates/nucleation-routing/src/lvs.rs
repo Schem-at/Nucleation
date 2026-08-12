@@ -258,7 +258,10 @@ mod tests {
     fn net(name: &str, terminals: &[(i32, i32, i32)]) -> IntentNet {
         IntentNet {
             name: name.to_string(),
-            terminals: terminals.iter().map(|&(x, y, z)| Pos::new(x, y, z)).collect(),
+            terminals: terminals
+                .iter()
+                .map(|&(x, y, z)| Pos::new(x, y, z))
+                .collect(),
         }
     }
 

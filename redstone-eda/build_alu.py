@@ -168,7 +168,7 @@ def main():
     print("ALU width %d: %d blocks, extent x %d..%d y %d..%d z %d..%d (%.2fM cells)"
           % (N, len(b.cells), x0, x1, y0, y1, z0, z1, vol / 1e6))
 
-    import audit, nets
+    import audit, nets, drc
     problems = audit.audit(b.cells)
     shorts = nets.check(b.cells, ppa.labels)
     for kind, items in problems.items():
@@ -177,7 +177,8 @@ def main():
     print("net check: %d shorted nets" % len(shorts))
     for la, lb, pa, pb in shorts[:8]:
         print("   SHORT %s <-> %s  at %s / %s" % (la, lb, pa, pb))
-    if any(problems.values()) or shorts:
+    rings_ok = drc.check_rings("build_alu", b.cells)
+    if any(problems.values()) or shorts or not rings_ok:
         return 1
     if args.no_sim:
         return 0

@@ -1,0 +1,327 @@
+{
+ "artifact": "artifacts/X02_hex_cross_vertical.schem",
+ "artifact_blocks": 664,
+ "buses": {
+  "bus_bin": {
+   "call": "d.route_bus('bus_bin', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:lime_concrete', 'transparent_block': 'minecraft:lime_stained_glass'}))",
+   "error": null,
+   "seconds": 0.1703,
+   "state": "routed"
+  }
+ },
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "cost_vector": {
+  "coherence": null,
+  "delay_rt": 3,
+  "footprint": 2016,
+  "length": 216,
+  "skew_rt": 0
+ },
+ "expect": "unsolved",
+ "fixtures": {
+  "hex0": {
+   "kind": "hex_comb_stage",
+   "provenance": "probe_hex_transmit.py::Rig (66/66) against corpus/TRANSMIT002_hex_transmit_flat.schem"
+  }
+ },
+ "id": "X02_hex_cross_vertical",
+ "log": [
+  "verify 17/17 (binary lanes intact while hex carries 11 12/12, hex value exact while the bundle carries 0xAA 5/5)"
+ ],
+ "loose_blocks": 184,
+ "notes": "The hex trunk is a FIXTURE (probe_hex_transmit.py::Rig, 66/66), not router output; only the binary bundle is solved.\n\nMEASURED OUTCOME: the router routes it, `check()` is clean, and bit 0 comes out stuck HIGH whenever the trunk carries a value. The mechanism is exact and reproducible: the router detoured bit 0 to z=-1 and put its dust at (7,2,-1), (8,2,-1), (9,2,-1), which are DIAGONALLY adjacent to the trunk's live readout dust at (8,1,0) -- one down, one over, which is a conducting dust diagonal.  The router avoided the trunk's OCCUPIED cells correctly and then ran its own wire alongside a live one.\n\nX02b is the control: with the trunk unpowered the identical route passes 12/12.  So the defect is clearance, not geometry, and `NetClassRule.spacing` -- the field that exists for exactly this -- never reaches the router (see U03).",
+ "per_bus": {
+  "bus_bin": {
+   "bbox": [
+    [
+     1,
+     1,
+     -1
+    ],
+    [
+     14,
+     16,
+     7
+    ]
+   ],
+   "cells": 480,
+   "delay_rt": 3,
+   "devices": 24,
+   "footprint": 2016,
+   "glass": 0,
+   "per_bit_rt": [
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3
+   ],
+   "skew_rt": 0,
+   "wire": 216
+  }
+ },
+ "question": "The hex analog stage occupies y=0..1 at x=6..8.  Can the router take an 8-bit vertical bundle straight through that corridor with the analog value still exact at the tap?",
+ "scenario": {
+  "_file": "scenarios/X02_hex_cross_vertical.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_bin",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:lime_concrete",
+     "transparent_block": "minecraft:lime_stained_glass"
+    }
+   }
+  ],
+  "expect": "unsolved",
+  "fixtures": [
+   {
+    "at": [
+     6,
+     0,
+     0
+    ],
+    "kind": "hex_trunk",
+    "name": "hex0",
+    "values": [
+     1,
+     3,
+     7,
+     11,
+     15
+    ]
+   }
+  ],
+  "id": "X02_hex_cross_vertical",
+  "notes": "The hex trunk is a FIXTURE (probe_hex_transmit.py::Rig, 66/66), not router output; only the binary bundle is solved.\n\nMEASURED OUTCOME: the router routes it, `check()` is clean, and bit 0 comes out stuck HIGH whenever the trunk carries a value. The mechanism is exact and reproducible: the router detoured bit 0 to z=-1 and put its dust at (7,2,-1), (8,2,-1), (9,2,-1), which are DIAGONALLY adjacent to the trunk's live readout dust at (8,1,0) -- one down, one over, which is a conducting dust diagonal.  The router avoided the trunk's OCCUPIED cells correctly and then ran its own wire alongside a live one.\n\nX02b is the control: with the trunk unpowered the identical route passes 12/12.  So the defect is clearance, not geometry, and `NetClassRule.spacing` -- the field that exists for exactly this -- never reaches the router (see U03).",
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     8
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     14,
+     2,
+     8
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "The hex analog stage occupies y=0..1 at x=6..8.  Can the router take an 8-bit vertical bundle straight through that corridor with the analog value still exact at the tap?",
+  "render": {
+   "pitch": 28,
+   "yaw": 150,
+   "zoom": 1.8
+  },
+  "title": "8-bit binary bundle crossing a hex analog trunk (vertical form)",
+  "verify": {
+   "analog": [
+    {
+     "also_read": [
+      "a_out"
+     ],
+     "fixture": "hex0",
+     "hold_bits": 170,
+     "hold_ports": [
+      "a_in"
+     ],
+     "label": "hex value exact while the bundle carries 0xAA"
+    }
+   ],
+   "hold_analog": {
+    "fixture": "hex0",
+    "level": 11
+   },
+   "words": [
+    {
+     "in": "a_in",
+     "label": "binary lanes intact while hex carries 11",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.1703,
+ "solved": true,
+ "solver_produced": true,
+ "title": "8-bit binary bundle crossing a hex analog trunk (vertical form)",
+ "verification": {
+  "cases": [
+   {
+    "got": 1,
+    "hex_out": 11,
+    "in": 1,
+    "ok": true,
+    "section": "binary lanes intact while hex carries 11",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "hex_out": 11,
+    "in": 2,
+    "ok": true,
+    "section": "binary lanes intact while hex carries 11",
+    "want": 2
+   },
+   {
+    "got": 4,
+    "hex_out": 11,
+    "in": 4,
+    "ok": true,
+    "section": "binary lanes intact while hex carries 11",
+    "want": 4
+   },
+   {
+    "got": 8,
+    "hex_out": 11,
+    "in": 8,
+    "ok": true,
+    "section": "binary lanes intact while hex carries 11",
+    "want": 8
+   },
+   {
+    "got": 16,
+    "hex_out": 11,
+    "in": 16,
+    "ok": true,
+    "section": "binary lanes intact while hex carries 11",
+    "want": 16
+   },
+   {
+    "got": 32,
+    "hex_out": 11,
+    "in": 32,
+    "ok": true,
+    "section": "binary lanes intact while hex carries 11",
+    "want": 32
+   },
+   {
+    "got": 64,
+    "hex_out": 11,
+    "in": 64,
+    "ok": true,
+    "section": "binary lanes intact while hex carries 11",
+    "want": 64
+   },
+   {
+    "got": 128,
+    "hex_out": 11,
+    "in": 128,
+    "ok": true,
+    "section": "binary lanes intact while hex carries 11",
+    "want": 128
+   },
+   {
+    "got": 0,
+    "hex_out": 11,
+    "in": 0,
+    "ok": true,
+    "section": "binary lanes intact while hex carries 11",
+    "want": 0
+   },
+   {
+    "got": 255,
+    "hex_out": 11,
+    "in": 255,
+    "ok": true,
+    "section": "binary lanes intact while hex carries 11",
+    "want": 255
+   },
+   {
+    "got": 170,
+    "hex_out": 11,
+    "in": 170,
+    "ok": true,
+    "section": "binary lanes intact while hex carries 11",
+    "want": 170
+   },
+   {
+    "got": 85,
+    "hex_out": 11,
+    "in": 85,
+    "ok": true,
+    "section": "binary lanes intact while hex carries 11",
+    "want": 85
+   },
+   {
+    "bits": 170,
+    "hex_out": 1,
+    "injected": 1,
+    "level": 1,
+    "ok": true,
+    "section": "hex value exact while the bundle carries 0xAA"
+   },
+   {
+    "bits": 170,
+    "hex_out": 3,
+    "injected": 3,
+    "level": 3,
+    "ok": true,
+    "section": "hex value exact while the bundle carries 0xAA"
+   },
+   {
+    "bits": 170,
+    "hex_out": 7,
+    "injected": 7,
+    "level": 7,
+    "ok": true,
+    "section": "hex value exact while the bundle carries 0xAA"
+   },
+   {
+    "bits": 170,
+    "hex_out": 11,
+    "injected": 11,
+    "level": 11,
+    "ok": true,
+    "section": "hex value exact while the bundle carries 0xAA"
+   },
+   {
+    "bits": 170,
+    "hex_out": 15,
+    "injected": 15,
+    "level": 15,
+    "ok": true,
+    "section": "hex value exact while the bundle carries 0xAA"
+   }
+  ],
+  "ok": true,
+  "passed": 17,
+  "sections": {
+   "binary lanes intact while hex carries 11": {
+    "passed": 12,
+    "total": 12
+   },
+   "hex value exact while the bundle carries 0xAA": {
+    "passed": 5,
+    "total": 5
+   }
+  },
+  "total": 17
+ },
+ "wall_seconds": 0.343
+}

@@ -29,7 +29,8 @@
 
 use crate::design::{
     BitHardware, BusLayer, BusState, BusStyle, CellDef, Design, DesignPort, Gate, Instance,
-    RunInfo, Segment, SegmentKind, P3, WidthMap,};
+    RunInfo, Segment, SegmentKind, WidthMap, P3,
+};
 use crate::io_contract::{CellContract, IoType, NetClassRule, PortDirection};
 use crate::UniversalSchematic;
 use serde::{Deserialize, Serialize};
@@ -559,8 +560,7 @@ fn read_litematic_root(data: &[u8]) -> Result<quartz_nbt::NbtCompound, String> {
 }
 
 fn write_litematic_root(root: &quartz_nbt::NbtCompound) -> Result<Vec<u8>, String> {
-    let mut enc =
-        flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::new(3));
+    let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::new(3));
     quartz_nbt::io::write_nbt(&mut enc, None, root, quartz_nbt::io::Flavor::Uncompressed)
         .map_err(|e| e.to_string())?;
     enc.finish().map_err(|e| e.to_string())
@@ -616,7 +616,10 @@ impl Design {
                         .collect(),
                 })
                 .collect(),
-            ports: ports.iter().map(|(n, p)| (n.clone(), port_doc(p))).collect(),
+            ports: ports
+                .iter()
+                .map(|(n, p)| (n.clone(), port_doc(p)))
+                .collect(),
             buses: buses
                 .iter()
                 .map(|(n, b)| {
@@ -648,12 +651,13 @@ impl Design {
         }
         let version = u32::from_le_bytes(data[4..8].try_into().map_err(|_| "short header")?);
         if version != NUCM_VERSION {
-            return Err(format!("unsupported .nucm version {version} (this build reads {NUCM_VERSION})"));
+            return Err(format!(
+                "unsupported .nucm version {version} (this build reads {NUCM_VERSION})"
+            ));
         }
         let doc: NucmDoc = bincode::deserialize(&data[8..]).map_err(|e| e.to_string())?;
 
-        let base =
-            crate::formats::snapshot::from_snapshot(&doc.base).map_err(|e| e.to_string())?;
+        let base = crate::formats::snapshot::from_snapshot(&doc.base).map_err(|e| e.to_string())?;
         let mut cells = BTreeMap::new();
         for (cname, c) in doc.cells {
             let blob = doc
@@ -662,8 +666,8 @@ impl Design {
                 .ok_or_else(|| format!("cell `{cname}`: missing blob {:#x}", c.blob))?;
             let schematic =
                 crate::formats::snapshot::from_snapshot(blob).map_err(|e| e.to_string())?;
-            let contract = CellContract::from_json(&c.contract)
-                .map_err(|e| format!("cell `{cname}`: {e}"))?;
+            let contract =
+                CellContract::from_json(&c.contract).map_err(|e| format!("cell `{cname}`: {e}"))?;
             cells.insert(
                 cname,
                 CellDef {
@@ -744,8 +748,14 @@ impl Design {
             version: MANIFEST_VERSION,
             name: name.to_string(),
             instances: manifest_instances,
-            ports: ports.iter().map(|(n, p)| (n.clone(), port_doc(p))).collect(),
-            buses: buses.iter().map(|(n, b)| (n.clone(), bus_meta(b))).collect(),
+            ports: ports
+                .iter()
+                .map(|(n, p)| (n.clone(), port_doc(p)))
+                .collect(),
+            buses: buses
+                .iter()
+                .map(|(n, b)| (n.clone(), bus_meta(b)))
+                .collect(),
             merged_contract: self.merged_contract().ok().and_then(|c| c.to_json().ok()),
         };
         serde_json::to_string(&doc).map_err(|e| e.to_string())
@@ -759,8 +769,7 @@ impl Design {
     /// embedded copies.
     pub fn to_litematic_layered_bytes(&self) -> Result<Vec<u8>, String> {
         let flat = self.flatten()?;
-        let bytes =
-            crate::formats::litematic::to_litematic(&flat).map_err(|e| e.to_string())?;
+        let bytes = crate::formats::litematic::to_litematic(&flat).map_err(|e| e.to_string())?;
         let mut root = read_litematic_root(&bytes)?;
         root.insert(
             DESIGN_MANIFEST_TAG,
@@ -805,8 +814,7 @@ impl Design {
                 m.version
             ));
         }
-        let flat =
-            crate::formats::litematic::from_litematic(data).map_err(|e| e.to_string())?;
+        let flat = crate::formats::litematic::from_litematic(data).map_err(|e| e.to_string())?;
 
         // Loose base: every region that is not an instance/bus layer.
         let mut base = UniversalSchematic::new(m.name.clone());
@@ -923,8 +931,10 @@ mod tests {
             let y = 2 + 2 * i;
             s.set_block_from_string(x, y - 1, z, STONE).unwrap();
             s.set_block_from_string(x, y, z, LEVER).unwrap();
-            s.set_block_from_string(x + dx, y - 1, z + dz, STONE).unwrap();
-            s.set_block_from_string(x + dx, y, z + dz, rblocks::DUST).unwrap();
+            s.set_block_from_string(x + dx, y - 1, z + dz, STONE)
+                .unwrap();
+            s.set_block_from_string(x + dx, y, z + dz, rblocks::DUST)
+                .unwrap();
         }
         (x + dx, 2, z + dz)
     }
@@ -967,7 +977,8 @@ mod tests {
         let step = (0, 2, 0);
         let ty = IoType::UnsignedInt { bits: 8 };
         d.declare_input("a_in", a_in, step, 8, ty.clone()).unwrap();
-        d.declare_output("a_out", a_out, step, 8, ty.clone()).unwrap();
+        d.declare_output("a_out", a_out, step, 8, ty.clone())
+            .unwrap();
         d.declare_input("b_in", b_in, step, 8, ty.clone()).unwrap();
         d.declare_output("b_out", b_out, step, 8, ty).unwrap();
 
@@ -1065,10 +1076,7 @@ mod tests {
         let (bn, bb, bc, bi, bp, bbus) = b.io_parts();
         assert_eq!(an, bn);
         assert_eq!(blocks_of(ab), blocks_of(bb), "base layers differ");
-        assert_eq!(
-            ac.keys().collect::<Vec<_>>(),
-            bc.keys().collect::<Vec<_>>()
-        );
+        assert_eq!(ac.keys().collect::<Vec<_>>(), bc.keys().collect::<Vec<_>>());
         for (name, cell) in ac {
             let other = &bc[name];
             assert_eq!(
@@ -1076,7 +1084,10 @@ mod tests {
                 blocks_of(&other.schematic),
                 "cell `{name}` bodies differ"
             );
-            assert_eq!(cell.contract, other.contract, "cell `{name}` contracts differ");
+            assert_eq!(
+                cell.contract, other.contract,
+                "cell `{name}` contracts differ"
+            );
         }
         assert_eq!(ai.len(), bi.len());
         for (x, y) in ai.iter().zip(bi.iter()) {

@@ -466,8 +466,7 @@ mod tests {
     #[test]
     fn debt_climbs_a_staircase() {
         // A diagonal staircase: dust conducts up it, so the debt must too.
-        let dust: std::collections::BTreeSet<(i32, i32, i32)> =
-            (0..5).map(|i| (i, i, 0)).collect();
+        let dust: std::collections::BTreeSet<(i32, i32, i32)> = (0..5).map(|i| (i, i, 0)).collect();
         assert_eq!(tile_dust_debt((4, 4, 0), |p| dust.contains(&p)), 5);
     }
 }

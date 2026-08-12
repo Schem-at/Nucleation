@@ -31,9 +31,7 @@
 //! (they are the document's truth); buses fail into a visible
 //! `BusState::Failed`, never a half-routed fragment.
 
-use crate::design_decay::{
-    tile_dust_debt, Carrier, DecayLedger, CROSSING_ALLOWANCE, DUST_BUDGET,
-};
+use crate::design_decay::{tile_dust_debt, Carrier, DecayLedger, CROSSING_ALLOWANCE, DUST_BUDGET};
 use crate::io_contract::{CellContract, IoType, LayoutFunction, NetClassRule, PortDirection};
 use crate::routing::engine::blocks as rblocks;
 use crate::UniversalSchematic;
@@ -677,11 +675,7 @@ fn ranges(bits: &[u8]) -> String {
 }
 
 /// Resolve a width mismatch into a bit mapping, or say why it cannot be.
-fn plan_width_map(
-    driver_width: u8,
-    sink_width: u8,
-    adapt: WidthAdapt,
-) -> Result<WidthMap, String> {
+fn plan_width_map(driver_width: u8, sink_width: u8, adapt: WidthAdapt) -> Result<WidthMap, String> {
     let (wd, ws) = (driver_width as i32, sink_width as i32);
     let shift = match adapt.align {
         BusAlign::Lsb => 0,
@@ -760,12 +754,24 @@ impl Default for BusCost {
 impl BusCost {
     /// Minimise cells and volume; tolerate delay.
     pub fn compact() -> Self {
-        BusCost { length: 2.0, delay: 1.0, skew: 4.0, coherence: 6.0, footprint: 2.0 }
+        BusCost {
+            length: 2.0,
+            delay: 1.0,
+            skew: 4.0,
+            coherence: 6.0,
+            footprint: 2.0,
+        }
     }
 
     /// Minimise arrival and skew; tolerate sprawl.
     pub fn fast() -> Self {
-        BusCost { length: 0.5, delay: 16.0, skew: 24.0, coherence: 3.0, footprint: 0.25 }
+        BusCost {
+            length: 0.5,
+            delay: 16.0,
+            skew: 24.0,
+            coherence: 3.0,
+            footprint: 0.25,
+        }
     }
 
     /// Weighted total of a measured vector.
@@ -1036,6 +1042,32 @@ impl crate::routing::transport::BlockView for FragmentView<'_> {
     }
 }
 
+/// A [`FragmentView`] with one prospective dust/support pair overlaid. Run
+/// planning asks about many candidate cells, so this avoids cloning the whole
+/// fragment for every bit and offset merely to make the diagonal law see the
+/// support that will be stamped with the dust.
+struct PlannedDustView<'a> {
+    occ: &'a OccupancyIndex,
+    frag: &'a BTreeMap<P3, String>,
+    dust: P3,
+    support: P3,
+    support_block: &'a str,
+}
+
+impl crate::routing::transport::BlockView for PlannedDustView<'_> {
+    fn block_at(&self, p: crate::routing::Pos) -> Option<&str> {
+        let k = (p.x, p.y, p.z);
+        if k == self.dust {
+            return Some(rblocks::DUST);
+        }
+        self.frag
+            .get(&k)
+            .map(|s| s.as_str())
+            .or_else(|| (k == self.support).then_some(self.support_block))
+            .or_else(|| self.occ.cells.get(&k).map(|(b, _)| b.as_str()))
+    }
+}
+
 /// Can this mechanism carry or read a signal? An inert flank couples to
 /// nothing, which is exactly why a bus may lay dust flush against a cell body.
 fn is_live_mech(m: crate::routing::transport::Mechanism) -> bool {
@@ -1055,7 +1087,10 @@ fn short_key(a: &str, b: &str) -> (String, String) {
 
 /// Chebyshev distance in cells — the natural metric for "n cells of clearance".
 fn chebyshev(a: P3, b: P3) -> i32 {
-    (a.0 - b.0).abs().max((a.1 - b.1).abs()).max((a.2 - b.2).abs())
+    (a.0 - b.0)
+        .abs()
+        .max((a.1 - b.1).abs())
+        .max((a.2 - b.2).abs())
 }
 
 /// The cells whose contents could couple to `p`, out to `extra` cells of
@@ -1133,12 +1168,21 @@ impl PortModeReport {
                     c.at.0,
                     c.at.1,
                     c.at.2,
-                    c.from.as_ref().map(|s| format!("{s:?}")).unwrap_or("null".into()),
-                    c.to.as_ref().map(|s| format!("{s:?}")).unwrap_or("null".into()),
+                    c.from
+                        .as_ref()
+                        .map(|s| format!("{s:?}"))
+                        .unwrap_or("null".into()),
+                    c.to.as_ref()
+                        .map(|s| format!("{s:?}"))
+                        .unwrap_or("null".into()),
                 )
             })
             .collect();
-        let removed: Vec<String> = self.removed_buses.iter().map(|n| format!("{n:?}")).collect();
+        let removed: Vec<String> = self
+            .removed_buses
+            .iter()
+            .map(|n| format!("{n:?}"))
+            .collect();
         format!(
             "{{\"port\":{:?},\"mode\":{:?},\"note\":{:?},\"changed\":[{}],\
              \"removed_buses\":[{}],\"moves\":{},\"patch\":{}}}",
@@ -1412,7 +1456,10 @@ impl Design {
             Some(m) => format!(
                 "{{\"map\":{},\"note\":{:?}}}",
                 m.to_json(),
-                m.note(&bus.driver, bus.sinks.first().map(String::as_str).unwrap_or("?"))
+                m.note(
+                    &bus.driver,
+                    bus.sinks.first().map(String::as_str).unwrap_or("?")
+                )
             ),
         })
     }
@@ -1627,7 +1674,11 @@ impl Design {
             PortMode::Bus => format!(
                 "`{full}` is now a BUS input: {} — bit 0 lands on dust at {:?}",
                 over.patch.note,
-                over.patch.wires.first().map(|w| map(*w)).unwrap_or((0, 0, 0))
+                over.patch
+                    .wires
+                    .first()
+                    .map(|w| map(*w))
+                    .unwrap_or((0, 0, 0))
             ),
             PortMode::Executor => format!(
                 "`{full}` is back to EXECUTOR hardware: {} cell(s) restored exactly as shipped",
@@ -1800,7 +1851,6 @@ impl Design {
         }
         out
     }
-
 
     /// The transformed contract an instance exposes: port cells and step
     /// vectors mapped through the instance transform; types, delays and
@@ -2051,7 +2101,9 @@ impl Design {
             )
         })?;
         if let Some(why) = &ip.blocked {
-            return Err(format!("instance port `{name}` cannot terminate a bus: {why}"));
+            return Err(format!(
+                "instance port `{name}` cannot terminate a bus: {why}"
+            ));
         }
         let wires = ip.wires.clone().expect("a routable port has wires");
         let overlay = self.instance_blocks();
@@ -2221,10 +2273,10 @@ impl Design {
         {
             return Some(hardware);
         }
-        AROUND
-            .iter()
-            .map(|d| add(hardware, *d))
-            .find(|q| self.block_at(*q, overlay).is_some_and(|b| rblocks::is_dust(&b)))
+        AROUND.iter().map(|d| add(hardware, *d)).find(|q| {
+            self.block_at(*q, overlay)
+                .is_some_and(|b| rblocks::is_dust(&b))
+        })
     }
 
     /// Hardware scan of one connection cell, seeing `overlay` (instance
@@ -2440,8 +2492,7 @@ impl Design {
             // construction, so the type check has to look past the width once
             // an adaptation has resolved it; everything else still has to match.
             if sp.ty != driver_ports[0].ty
-                && !(width_map.is_some()
-                    && same_type_family(&driver_ports[0].ty, &sp.ty))
+                && !(width_map.is_some() && same_type_family(&driver_ports[0].ty, &sp.ty))
             {
                 return Err(format!(
                     "bus `{name}`: sink `{s}` type {:?} != driver `{}` type {:?}",
@@ -2504,7 +2555,11 @@ impl Design {
         // neighbour is exactly the kind of thing reordering can cure.
         //
         // Least invasive repair first: STAGE the bus's own detour (touches
-        // nobody), then reorder against the neighbours.
+        // nobody), then reorder against the neighbours. Multi-net negotiation
+        // is deliberately not an automatic third rung: the measured five-bus
+        // residue is a two-page odd cycle, so it cannot route without adding a
+        // real crossing or another level, while PathFinder adds minutes to this
+        // interactive failure path.
         let state = if matches!(state, BusState::Failed(_)) {
             match self.self_stage(&name) {
                 BusState::Routed => BusState::Routed,
@@ -2554,7 +2609,9 @@ impl Design {
             pts.iter().map(|p| p.2).max().unwrap() + m,
         );
         let inside = |p: &P3| {
-            (lo.0..=hi.0).contains(&p.0) && (lo.1..=hi.1).contains(&p.1) && (lo.2..=hi.2).contains(&p.2)
+            (lo.0..=hi.0).contains(&p.0)
+                && (lo.1..=hi.1).contains(&p.1)
+                && (lo.2..=hi.2).contains(&p.2)
         };
         self.buses
             .values()
@@ -2653,10 +2710,13 @@ impl Design {
         }
         // Nothing staged: leave the bus exactly as it failed, with its original
         // reason rather than the last candidate's.
-        self.set_failed(name, match &failed {
-            BusState::Failed(r) => r.clone(),
-            _ => "unroutable".to_string(),
-        })
+        self.set_failed(
+            name,
+            match &failed {
+                BusState::Failed(r) => r.clone(),
+                _ => "unroutable".to_string(),
+            },
+        )
     }
 
     /// RIP-UP-AND-RETRY for a bus that could not be routed: rip the buses in its
@@ -2682,10 +2742,7 @@ impl Design {
     /// Cost: one `Design` clone on the failure path only. A bus that routes
     /// never pays it.
     fn rip_up_and_retry(&mut self, name: &str) -> BusState {
-        let failed_state = self
-            .bus_state(name)
-            .cloned()
-            .unwrap_or(BusState::Intended);
+        let failed_state = self.bus_state(name).cloned().unwrap_or(BusState::Intended);
         let contesting = self.contesting_buses(name);
         if contesting.is_empty() {
             return failed_state;
@@ -3017,7 +3074,13 @@ impl Design {
 
     /// Add a gate to an existing bus (splitting the segment it lands in)
     /// and re-realize the bus. Returns the resulting state.
-    pub fn add_gate(&mut self, bus: &str, name: &str, anchor: P3, step: P3) -> Result<BusState, String> {
+    pub fn add_gate(
+        &mut self,
+        bus: &str,
+        name: &str,
+        anchor: P3,
+        step: P3,
+    ) -> Result<BusState, String> {
         let layer = self
             .buses
             .get(bus)
@@ -3118,7 +3181,10 @@ impl Design {
             .buses
             .values()
             .filter(|b| {
-                b.driver_names().iter().chain(b.sinks.iter()).any(|p| p == name)
+                b.driver_names()
+                    .iter()
+                    .chain(b.sinks.iter())
+                    .any(|p| p == name)
             })
             .map(|b| b.name.clone())
             .collect();
@@ -3225,7 +3291,12 @@ impl Design {
     /// ripped and rerouted atomically against the design-wide occupancy.
     /// An unroutable move leaves the bus `FAILED(reason)` with the
     /// fragment cleared — visible, never half-routed.
-    pub fn move_gate(&mut self, bus: &str, gate: &str, anchor: P3) -> Result<GateMoveReport, String> {
+    pub fn move_gate(
+        &mut self,
+        bus: &str,
+        gate: &str,
+        anchor: P3,
+    ) -> Result<GateMoveReport, String> {
         let rev0 = self.layer_revision();
         let layer = self
             .buses
@@ -3239,7 +3310,10 @@ impl Design {
         let was_routed = layer.state == BusState::Routed && !layer.segments.is_empty();
         // Trunk waypoints BEFORE the move (gate gi is waypoint gi+1).
         let old_wps: Option<(P3, P3)> = if was_routed {
-            let seg_a = layer.segments.iter().find(|s| s.kind == SegmentKind::Trunk(gi));
+            let seg_a = layer
+                .segments
+                .iter()
+                .find(|s| s.kind == SegmentKind::Trunk(gi));
             let seg_b = layer
                 .segments
                 .iter()
@@ -3283,9 +3357,14 @@ impl Design {
             matches!(s.kind, SegmentKind::Branch(_))
                 && [seg_a_idx, seg_b_idx].iter().any(|&i| {
                     let t = &layer.segments[i];
-                    t.cells.contains(&s.a) || t.cells.contains(&s.b)
+                    t.cells.contains(&s.a)
+                        || t.cells.contains(&s.b)
                         || t.runs.iter().any(|r| {
-                            let (jx, jz) = if r.along_x { (s.a.0, s.a.2) } else { (s.a.2, s.a.0) };
+                            let (jx, jz) = if r.along_x {
+                                (s.a.0, s.a.2)
+                            } else {
+                                (s.a.2, s.a.0)
+                            };
                             jz == r.fixed && r.strictly_inside(jx, 0)
                         })
                 })
@@ -3332,7 +3411,13 @@ impl Design {
                 planner.plan_pair(wp_before, anchor, width, &BTreeSet::new(), UNKNOWN_ARRIVAL)?;
             planner.end_segment();
             planner.begin_segment(SegmentKind::Trunk(gi + 1), anchor, wp_after);
-            planner.plan_pair(anchor, wp_after, width, &BTreeSet::new(), since.saturating_add(1))?;
+            planner.plan_pair(
+                anchor,
+                wp_after,
+                width,
+                &BTreeSet::new(),
+                since.saturating_add(1),
+            )?;
             planner.end_segment();
             planner.plan_column(gate, anchor, width)
         })();
@@ -3349,9 +3434,10 @@ impl Design {
                 let mut new_segments = real.segments;
                 layer.segments[seg_a_idx] = new_segments.remove(0);
                 layer.segments[seg_b_idx] = new_segments.remove(0);
-                layer
-                    .gate_cells
-                    .insert(gate.to_string(), real.gate_cells.get(gate).cloned().unwrap_or_default());
+                layer.gate_cells.insert(
+                    gate.to_string(),
+                    real.gate_cells.get(gate).cloned().unwrap_or_default(),
+                );
                 layer.runs = layer.segments.iter().flat_map(|s| s.runs.clone()).collect();
                 self.apply_amendments(real.amendments);
                 Ok(GateMoveReport {
@@ -3468,7 +3554,8 @@ impl Design {
                 if skip.contains(&p) {
                     continue;
                 }
-                idx.cells.insert(p, (s, Occupant::Instance(inst.name.clone())));
+                idx.cells
+                    .insert(p, (s, Occupant::Instance(inst.name.clone())));
             }
         }
         for bus in self.buses.values() {
@@ -3476,7 +3563,8 @@ impl Design {
                 if skip.contains(p) {
                     continue;
                 }
-                idx.cells.insert(*p, (b.clone(), Occupant::Bus(bus.name.clone())));
+                idx.cells
+                    .insert(*p, (b.clone(), Occupant::Bus(bus.name.clone())));
             }
         }
         // Influence halos never shadow hard cells.
@@ -3603,6 +3691,12 @@ impl Design {
             }
         };
         let (drivers, sinks) = (&drivers[..], &sinks[..]);
+        let x_row = |s: P3| s.0 != 0 && s.1 == 0 && s.2 == 0;
+        let z_row = |s: P3| s.0 == 0 && s.1 == 0 && s.2 != 0;
+        let balanced_flat_turn = drivers.len() == 1
+            && sinks.len() == 1
+            && ((x_row(drivers[0].step) && z_row(sinks[0].step))
+                || (z_row(drivers[0].step) && x_row(sinks[0].step)));
         for p in drivers.iter().chain(sinks.iter()) {
             if p.step != step && p.step.1 != 0 {
                 return Err(format!(
@@ -3693,7 +3787,15 @@ impl Design {
             } else {
                 drivers.first().map(|q| q.anchor)
             };
-            let plan = self.plan_form_adapter(p, &occ, partner)?;
+            // A flat 90-degree turn uses two row-to-stack adapters. Gathering
+            // both rows toward the same numbered bit makes their per-bit
+            // gather distances ADD, so the early bits ride the shared trunk
+            // and loop back while the late bits take a short path. Opposite
+            // gather ends make those distances cancel: 2*i + 2*(n-1-i) is
+            // constant. Coordinate the pair here; choosing each adapter in
+            // isolation cannot see that end-to-end invariant.
+            let gather_end = balanced_flat_turn.then(|| !std::ptr::eq(p, &drivers[0]));
+            let plan = self.plan_form_adapter(p, &occ, partner, gather_end)?;
             anchor_of.insert(p.name.clone(), plan.column[0]);
             adapters.push((p.name.clone(), p.anchor, plan));
         }
@@ -3706,7 +3808,10 @@ impl Design {
                 adapter_cells.insert(*q);
                 occ.cells.insert(
                     *q,
-                    (blk.clone(), Occupant::Bus(exclude.unwrap_or(name).to_string())),
+                    (
+                        blk.clone(),
+                        Occupant::Bus(exclude.unwrap_or(name).to_string()),
+                    ),
                 );
             }
         }
@@ -3808,7 +3913,11 @@ impl Design {
         // (which is what makes the other legs route around them).
         planner.vacated.extend(adapter_cells.iter().copied());
         for (port, row_anchor, plan) in &adapters {
-            planner.begin_segment(SegmentKind::Adapter(port.clone()), *row_anchor, plan.column[0]);
+            planner.begin_segment(
+                SegmentKind::Adapter(port.clone()),
+                *row_anchor,
+                plan.column[0],
+            );
             for (q, blk) in &plan.cells {
                 planner
                     .put(*q, blk)
@@ -3991,6 +4100,7 @@ impl Design {
         port: &DesignPort,
         occ: &OccupancyIndex,
         toward: Option<P3>,
+        gather_end: Option<bool>,
     ) -> Result<crate::design_promote::PivotPlan, String> {
         let row: Vec<P3> = (0..port.width as i32)
             .map(|i| {
@@ -4005,10 +4115,11 @@ impl Design {
         // not exempt from (`occ` already has the endpoint instances' halos
         // suppressed, so pin access still works).
         let at = |q: P3| -> Option<String> {
-            occ.cells
-                .get(&q)
-                .map(|(b, _)| b.clone())
-                .or_else(|| occ.halos.get(&q).map(|i| format!("the influence halo of `{i}`")))
+            occ.cells.get(&q).map(|(b, _)| b.clone()).or_else(|| {
+                occ.halos
+                    .get(&q)
+                    .map(|i| format!("the influence halo of `{i}`"))
+            })
         };
         // Grow AWAY from the owning instance's body, so the adapter leaves the
         // component instead of burrowing into it.
@@ -4032,7 +4143,7 @@ impl Design {
         // land on the side facing its partner, or the transport leg pays for
         // the detour. This is the end-to-end half of the cost — a cheap gather
         // that forces an expensive run is not cheap.
-        crate::design_promote::plan_pivot(&row, port.step, away, flow_out, &at, toward)
+        crate::design_promote::plan_pivot(&row, port.step, away, flow_out, &at, toward, gather_end)
             .map_err(|e| format!("port `{}`: {e}", port.name))
     }
 
@@ -4063,7 +4174,12 @@ impl Design {
             probe.end_segment();
             since = since.saturating_add(1);
         }
-        Ok(probe.finish().segments.iter().flat_map(|s| s.runs.clone()).collect())
+        Ok(probe
+            .finish()
+            .segments
+            .iter()
+            .flat_map(|s| s.runs.clone())
+            .collect())
     }
 
     /// The trunk's straight runs from its waypoint chain, choosing the
@@ -4207,9 +4323,10 @@ impl Design {
             .map(|(p, _)| *p)
             .collect();
         if !dust.is_empty() {
-            let mine: BTreeMap<P3, String> =
-                out.iter().map(|(p, b)| (*p, b.to_string())).collect();
-            let at = |q: P3| -> Option<String> { mine.get(&q).cloned().or_else(|| self.neighbour_block(q)) };
+            let mine: BTreeMap<P3, String> = out.iter().map(|(p, b)| (*p, b.to_string())).collect();
+            let at = |q: P3| -> Option<String> {
+                mine.get(&q).cloned().or_else(|| self.neighbour_block(q))
+            };
             for p in dust {
                 let power = crate::routing::engine::wire::power_of(&mine[&p]);
                 let derived = crate::routing::engine::wire::derive(p, power, &at);
@@ -4253,7 +4370,9 @@ impl Design {
             .buses
             .get(name)
             .ok_or_else(|| format!("unknown bus `{name}`"))?;
-        Ok(Self::cells_json(bus.fragment.iter().map(|(p, b)| (*p, b.as_str()))))
+        Ok(Self::cells_json(
+            bus.fragment.iter().map(|(p, b)| (*p, b.as_str())),
+        ))
     }
 
     /// `[[x,y,z,"block"],..]` for ONE instance's placed blocks, transform
@@ -4320,6 +4439,86 @@ impl Design {
 
         let contract = self.merged_contract()?;
         flat.set_cell_contract(&contract)?;
+        Ok(flat)
+    }
+
+    /// The electrical artifact needed to validate one freshly routed bus.
+    ///
+    /// Unrelated placed instances are verified black boxes behind keepouts: the
+    /// acceptance checks below explicitly discard findings inside them, and the
+    /// clearance pass has already proved that this bus does not couple to them.
+    /// Materialising every block of every unrelated cell here made validation
+    /// scale with the whole canvas (1.8 s for one route beside ten idle cells).
+    /// Keep the loose layer, every routed bus, and only the instances that own
+    /// this bus's endpoints. That preserves pin-access electrical context while
+    /// making validation scale with the route being accepted.
+    fn validation_flat(&self, name: &str) -> Result<UniversalSchematic, String> {
+        let layer = self
+            .buses
+            .get(name)
+            .ok_or_else(|| format!("unknown bus `{name}`"))?;
+        let endpoints: Vec<String> = layer
+            .driver_names()
+            .into_iter()
+            .chain(layer.sinks.iter().cloned())
+            .collect();
+        // Only the pin-access neighbourhood participates electrically in the
+        // design fabric. The rest of an endpoint instance is the black box we
+        // deliberately exempt below, so feeding its thousands of internal
+        // cells through LVS/DRC buys no coverage. One-cell context includes the
+        // terminal dust, its support/cut cells, and directional diode inputs.
+        let mut pin_context: BTreeMap<String, BTreeSet<P3>> = BTreeMap::new();
+        for endpoint in &endpoints {
+            let Some((instance, _)) = endpoint.split_once('.') else {
+                continue;
+            };
+            let Ok(port) = self.resolve_port(endpoint) else {
+                continue;
+            };
+            let mut pins = port.wires();
+            for bit in &port.bits {
+                pins.extend(bit.lever);
+                pins.extend(bit.lamp);
+            }
+            let context = pin_context.entry(instance.to_string()).or_default();
+            for p in pins {
+                for dx in -1..=1 {
+                    for dy in -1..=1 {
+                        for dz in -1..=1 {
+                            context.insert((p.0 + dx, p.1 + dy, p.2 + dz));
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut flat = self.base.clone();
+        flat.metadata.name = Some(format!("{}:{name}:validation", self.name));
+        for inst in &self.instances {
+            let Some(context) = pin_context.get(&inst.name) else {
+                continue;
+            };
+            let region = format!("inst:{}", inst.name);
+            for (p, state) in self.placed_instance_blocks(inst) {
+                if !context.contains(&p) {
+                    continue;
+                }
+                if !flat.set_block_in_region(&region, p.0, p.1, p.2, &state) {
+                    return Err(format!(
+                        "validation: could not place {state} at {p:?} in region {region}"
+                    ));
+                }
+            }
+        }
+        for bus in self.buses.values() {
+            if bus.state != BusState::Routed {
+                continue;
+            }
+            let region = format!("bus:{}", bus.name);
+            for (p, block) in &bus.fragment {
+                flat.try_set_block_in_region_str(&region, p.0, p.1, p.2, block)?;
+            }
+        }
         Ok(flat)
     }
 
@@ -4437,6 +4636,18 @@ impl Design {
         nets
     }
 
+    /// Intent nets for one bus only. Completed-route acceptance has already run
+    /// mechanism-aware clearance against foreign geometry, so LVS here needs to
+    /// prove this bus's lanes end-to-end and against one another—not re-extract
+    /// every unrelated net on the canvas.
+    fn intent_nets_for_bus(&self, name: &str) -> Vec<crate::routing::IntentNet> {
+        let prefix = format!("{name}[");
+        self.intent_nets()
+            .into_iter()
+            .filter(|net| net.name.starts_with(&prefix))
+            .collect()
+    }
+
     /// Why this bus's realized geometry must NOT be reported as a success, if
     /// there is a reason.
     ///
@@ -4462,12 +4673,12 @@ impl Design {
     /// Deliberately NOT a simulation: this is symbolic reachability over placed
     /// blocks, the same cost as `check`, so it can run on every accepted route.
     fn conduction_reason(&self, name: &str) -> Option<String> {
-        let flat = match self.flatten() {
+        let flat = match self.validation_flat(name) {
             Ok(f) => f,
             Err(e) => return Some(format!("the realized geometry could not be flattened: {e}")),
         };
         let ws = crate::routing::workspace_from_schematic(&flat);
-        let lvs = crate::routing::lvs(ws.cells(), &self.intent_nets());
+        let lvs = crate::routing::lvs(ws.cells(), &self.intent_nets_for_bus(name));
         let prefix = format!("{name}[");
         let mine = |n: &String| n.starts_with(&prefix);
         let mut why: Vec<String> = Vec::new();
@@ -4496,8 +4707,7 @@ impl Design {
         // gate was built for.
         let interior = |cells: &[crate::routing::Pos]| -> bool {
             in_a_cell(cells)
-                || (!cells.is_empty()
-                    && cells.iter().all(|q| port_hw.contains(&(q.x, q.y, q.z))))
+                || (!cells.is_empty() && cells.iter().all(|q| port_hw.contains(&(q.x, q.y, q.z))))
         };
 
         for o in &lvs.opens {
@@ -4508,7 +4718,10 @@ impl Design {
                 .fragments
                 .iter()
                 .map(|f| {
-                    let ps: Vec<String> = f.iter().map(|p| format!("({},{},{})", p.x, p.y, p.z)).collect();
+                    let ps: Vec<String> = f
+                        .iter()
+                        .map(|p| format!("({},{},{})", p.x, p.y, p.z))
+                        .collect();
                     format!("[{}]", ps.join(" "))
                 })
                 .collect();
@@ -4539,7 +4752,18 @@ impl Design {
         // of this bus is trivially open — that is the whole point of the route —
         // so baselining them would mask exactly the dead lanes this gate exists
         // to catch.
-        let pre_shorts = self.shorts_without_fragment(name);
+        // Differential short baselining is expensive: it rebuilds the flattened
+        // design and extracts every conduction component a second time.  The
+        // baseline is only consulted for a short involving THIS bus, so do not
+        // pay for it on the overwhelmingly common clean path.  Cell-interior and
+        // port-hardware shorts are already exempt and need no baseline either.
+        let needs_short_baseline = lvs
+            .shorts
+            .iter()
+            .any(|s| (mine(&s.net_a) || mine(&s.net_b)) && !interior(&[s.at_a, s.at_b]));
+        let pre_shorts = needs_short_baseline
+            .then(|| self.shorts_without_fragment(name))
+            .unwrap_or_default();
         for s in &lvs.shorts {
             if !mine(&s.net_a) && !mine(&s.net_b) {
                 continue;
@@ -4583,7 +4807,10 @@ impl Design {
             aliases: vec![],
             skip_decay: true,
         };
-        for v in crate::routing::drc_schematic(&flat, &opts) {
+        // `ws` was built from this exact flattened artifact for LVS above.
+        // Reuse it instead of walking the schematic and allocating the same
+        // workspace again for DRC.
+        for v in crate::routing::drc(&ws, &opts) {
             if self.is_inside_an_instance(&v) {
                 continue; // a placed cell's interior is its own business
             }
@@ -4661,7 +4888,7 @@ impl Design {
             let _ = flat.set_block_from_string(p.0, p.1, p.2, "minecraft:air");
         }
         let ws = crate::routing::workspace_from_schematic(&flat);
-        crate::routing::lvs(ws.cells(), &self.intent_nets())
+        crate::routing::lvs(ws.cells(), &self.intent_nets_for_bus(name))
             .shorts
             .iter()
             .map(|s| short_key(&s.net_a, &s.net_b))
@@ -4777,9 +5004,7 @@ impl Design {
                 if !is_live_mech(theirs.mech) {
                     continue;
                 }
-                if let Some(rel) =
-                    crate::routing::transport::interferes(&theirs, &ours, &view)
-                {
+                if let Some(rel) = crate::routing::transport::interferes(&theirs, &ours, &view) {
                     why.push(format!(
                         "{fowner} at {q:?} couples to this bus at {p:?}: {rel}"
                     ));
@@ -4866,8 +5091,9 @@ impl Design {
         // and the whole report becomes noise. Interior findings are reported
         // under `cells` for information; only what the DESIGN itself owns —
         // the loose layer and the routed bus fragments — gates `clean`.
-        let (violations, cell_violations): (Vec<_>, Vec<_>) =
-            all.into_iter().partition(|v| !self.is_inside_an_instance(v));
+        let (violations, cell_violations): (Vec<_>, Vec<_>) = all
+            .into_iter()
+            .partition(|v| !self.is_inside_an_instance(v));
         let ws = crate::routing::workspace_from_schematic(&flat);
         let lvs = crate::routing::lvs(ws.cells(), &self.intent_nets());
         let (sta_json, rule_violations) = self.sta_and_rules(&flat);
@@ -4894,8 +5120,7 @@ impl Design {
         // dead net in the design.
         let interior = |cells: &[crate::routing::Pos]| -> bool {
             in_a_cell(cells)
-                || (!cells.is_empty()
-                    && cells.iter().all(|q| port_hw.contains(&(q.x, q.y, q.z))))
+                || (!cells.is_empty() && cells.iter().all(|q| port_hw.contains(&(q.x, q.y, q.z))))
         };
         let design_cycles = lvs.cycles.iter().filter(|ring| !interior(ring)).count();
         let design_shorts = lvs
@@ -4985,7 +5210,9 @@ impl Design {
 
     /// Every placed instance's occupied cells, one set per instance.
     fn instance_bodies(&self) -> Vec<BTreeSet<P3>> {
-        (0..self.instances.len()).map(|i| self.instance_region(i)).collect()
+        (0..self.instances.len())
+            .map(|i| self.instance_region(i))
+            .collect()
     }
 
     /// The cells a DRC violation implicates.
@@ -5031,7 +5258,10 @@ impl Design {
         };
 
         // Principal axis: the one the route spans furthest.
-        let (mut lo, mut hi) = ((i32::MAX, i32::MAX, i32::MAX), (i32::MIN, i32::MIN, i32::MIN));
+        let (mut lo, mut hi) = (
+            (i32::MAX, i32::MAX, i32::MAX),
+            (i32::MIN, i32::MIN, i32::MIN),
+        );
         for p in f.keys() {
             lo = (lo.0.min(p.0), lo.1.min(p.1), lo.2.min(p.2));
             hi = (hi.0.max(p.0), hi.1.max(p.1), hi.2.max(p.2));
@@ -5052,7 +5282,11 @@ impl Design {
         let mut coherence = 0u32;
         let mut slices: BTreeMap<i32, ((i32, i32), (i32, i32))> = BTreeMap::new();
         for p in f.keys() {
-            let (key, a, b) = if along_x { (p.0, p.1, p.2) } else { (p.2, p.1, p.0) };
+            let (key, a, b) = if along_x {
+                (p.0, p.1, p.2)
+            } else {
+                (p.2, p.1, p.0)
+            };
             let e = slices.entry(key).or_insert(((a, b), (a, b)));
             e.0 = (e.0 .0.min(a), e.0 .1.min(b));
             e.1 = (e.1 .0.max(a), e.1 .1.max(b));
@@ -5223,8 +5457,7 @@ impl Design {
                         .iter()
                         .map(|(k, v)| format!("{k:?}:{v}"))
                         .collect();
-                    let crit: Vec<String> =
-                        rep.critical.iter().map(|s| format!("{s:?}")).collect();
+                    let crit: Vec<String> = rep.critical.iter().map(|s| format!("{s:?}")).collect();
                     format!(
                         "{{\"arrival_rt\":{{{}}},\"critical\":[{}]}}",
                         arr.join(","),
@@ -5435,6 +5668,64 @@ impl<'a> Planner<'a> {
         self.reserves.get(&anchor).copied().unwrap_or(0)
     }
 
+    /// Would plain dust at `p` join or energise foreign live redstone?
+    ///
+    /// The completed-route clearance check remains the authority, but a run
+    /// has one cheap repair available before it gets that far: keep this cell
+    /// as a directional repeater. This is how the old dense refresh pitch
+    /// happened to protect X02; the per-segment strength ledger must preserve
+    /// the electrical isolation deliberately rather than by accident.
+    fn dust_would_interfere(&self, p: P3) -> bool {
+        const OURS: &str = "\0planned-dust";
+        // The diagonal law reads the candidate dust's SUPPORT cell. Model the
+        // pair together; checking dust against today's fragment (before this
+        // run is stamped) would see air underneath it and miss the exact
+        // downhill connection we are trying to prevent.
+        let view = PlannedDustView {
+            occ: self.occ,
+            frag: &self.real.fragment,
+            dust: p,
+            support: (p.0, p.1 - 1, p.2),
+            support_block: &self.style.bus_block,
+        };
+        let ours = crate::routing::transport::Placement {
+            mech: crate::routing::transport::Mechanism::Dust,
+            cell: crate::routing::Pos::new(p.0, p.1, p.2),
+            fwd: (1, 0, 0),
+            net: OURS,
+        };
+        for q in clearance_scan(p, 0) {
+            if self.real.fragment.contains_key(&q) || self.vacated.contains(&q) {
+                continue;
+            }
+            let Some((block, owner)) = self.occ.cells.get(&q) else {
+                continue;
+            };
+            let foreign_net = match owner {
+                Occupant::Loose => "\0loose",
+                Occupant::Instance(name) => name.as_str(),
+                Occupant::Bus(name) => {
+                    if self.exclude == Some(name.as_str()) {
+                        continue;
+                    }
+                    name.as_str()
+                }
+            };
+            let theirs = crate::routing::transport::Placement {
+                mech: crate::routing::transport::mech_of(block),
+                cell: crate::routing::Pos::new(q.0, q.1, q.2),
+                fwd: crate::routing::transport::fwd_of(block),
+                net: foreign_net,
+            };
+            if is_live_mech(theirs.mech)
+                && crate::routing::transport::interferes(&theirs, &ours, &view).is_some()
+            {
+                return true;
+            }
+        }
+        false
+    }
+
     fn begin_segment(&mut self, kind: SegmentKind, a: P3, b: P3) {
         self.cur_seg = Some(Segment {
             kind,
@@ -5457,7 +5748,11 @@ impl<'a> Planner<'a> {
 
     #[allow(clippy::type_complexity)]
     fn snapshot(&self) -> (Realization, Option<Segment>, BTreeSet<P3>) {
-        (self.real.clone(), self.cur_seg.clone(), self.vacated.clone())
+        (
+            self.real.clone(),
+            self.cur_seg.clone(),
+            self.vacated.clone(),
+        )
     }
 
     fn restore(&mut self, s: (Realization, Option<Segment>, BTreeSet<P3>)) {
@@ -5632,15 +5927,9 @@ impl<'a> Planner<'a> {
                     continue;
                 }
                 let (m1, m2) = if along_x {
-                    (
-                        (a.0 + sign * leg, y2, a.2),
-                        (b.0 - sign * leg, y2, b.2),
-                    )
+                    ((a.0 + sign * leg, y2, a.2), (b.0 - sign * leg, y2, b.2))
                 } else {
-                    (
-                        (a.0, y2, a.2 + sign * leg),
-                        (b.0, y2, b.2 - sign * leg),
-                    )
+                    ((a.0, y2, a.2 + sign * leg), (b.0, y2, b.2 - sign * leg))
                 };
                 self.hops += 1;
                 let hop = (|| -> Result<u32, String> {
@@ -5659,7 +5948,9 @@ impl<'a> Planner<'a> {
             }
         }
 
-        Err(crate::design_corridor::diagnose(self.occ, a, b, width, &tried))
+        Err(crate::design_corridor::diagnose(
+            self.occ, a, b, width, &tried,
+        ))
     }
 
     /// Plan a waypoint pair whose anchors sit on DIFFERENT levels: two FLAT
@@ -6175,10 +6466,14 @@ impl<'a> Planner<'a> {
         }
 
         // Cell coordinates strictly between the anchors.
-        let in_dip =
-            |c: i32| dips.iter().any(|&cc| ((c - cc) * sign) >= -2 && ((c - cc) * sign) <= 4);
-        let near_dip =
-            |c: i32| dips.iter().any(|&cc| ((c - cc) * sign) >= -4 && ((c - cc) * sign) <= 6);
+        let in_dip = |c: i32| {
+            dips.iter()
+                .any(|&cc| ((c - cc) * sign) >= -2 && ((c - cc) * sign) <= 4)
+        };
+        let near_dip = |c: i32| {
+            dips.iter()
+                .any(|&cc| ((c - cc) * sign) >= -4 && ((c - cc) * sign) <= 6)
+        };
         let in_station = |c: i32| {
             stations
                 .iter()
@@ -6290,11 +6585,21 @@ impl<'a> Planner<'a> {
                         let room = steps_from_ends >= 2
                             || (reserve > 0 && is_last)
                             || (arrives_broke && is_first);
-                        Slot::Dust {
-                            station_ok: room
-                                && !keep.contains(&pos_at(c, run.y0))
-                                && !near_dip(c)
-                                && !near_station(c),
+                        let station_ok = room
+                            && !keep.contains(&pos_at(c, run.y0))
+                            && !near_dip(c)
+                            && !near_station(c);
+                        // Decide for the whole matched bundle. If dust on ANY
+                        // bit would couple to foreign live redstone, every bit
+                        // keeps a diode here so latency remains matched.
+                        let isolation_diode = station_ok
+                            && (0..run.width).any(|bit| {
+                                self.dust_would_interfere(pos_at(c, run.y0 + 2 * bit as i32))
+                            });
+                        if isolation_diode {
+                            Slot::Rep
+                        } else {
+                            Slot::Dust { station_ok }
                         }
                     }
                 };
@@ -6532,8 +6837,10 @@ mod tests {
             let y = 2 + 2 * i;
             s.set_block_from_string(x, y - 1, z, STONE).unwrap();
             s.set_block_from_string(x, y, z, LEVER).unwrap();
-            s.set_block_from_string(x + dx, y - 1, z + dz, STONE).unwrap();
-            s.set_block_from_string(x + dx, y, z + dz, rblocks::DUST).unwrap();
+            s.set_block_from_string(x + dx, y - 1, z + dz, STONE)
+                .unwrap();
+            s.set_block_from_string(x + dx, y, z + dz, rblocks::DUST)
+                .unwrap();
         }
         (x + dx, 2, z + dz)
     }
@@ -6592,7 +6899,11 @@ mod tests {
         d.declare_output("b", b, step, 8, ty).unwrap();
         d.route_bus("w", "a", &["b"], vec![], BusStyle::default())
             .unwrap();
-        assert_eq!(d.bus_state("w"), Some(&BusState::Routed), "the bus must route");
+        assert_eq!(
+            d.bus_state("w"),
+            Some(&BusState::Routed),
+            "the bus must route"
+        );
         let pitches = station_pitches(&d, "w", true);
         assert!(!pitches.is_empty(), "a 79-cell run must refresh at all");
         for p in &pitches {
@@ -6617,6 +6928,43 @@ mod tests {
         );
     }
 
+    /// Sparse refresh placement must not turn a diode back into dust when that
+    /// dust would join a foreign diagonal. Before the clearance-aware choice,
+    /// this exact shape routed and was then rejected by the completed-route
+    /// check: (8,2,-1) connected downhill to the loose wire at (8,1,0).
+    #[test]
+    fn a_run_keeps_a_diode_beside_a_foreign_dust_diagonal() {
+        let mut s = UniversalSchematic::new("clearance-diode".to_string());
+        s.set_block_from_string(0, 1, -1, STONE).unwrap();
+        s.set_block_from_string(0, 2, -1, LEVER).unwrap();
+        s.set_block_from_string(1, 1, -1, STONE).unwrap();
+        s.set_block_from_string(1, 2, -1, rblocks::DUST).unwrap();
+        s.set_block_from_string(14, 1, -1, LAMP).unwrap();
+        s.set_block_from_string(14, 2, -1, rblocks::DUST).unwrap();
+        // Foreign live wire, one down and one across from the planned run.
+        s.set_block_from_string(8, 0, 0, STONE).unwrap();
+        s.set_block_from_string(8, 1, 0, rblocks::DUST).unwrap();
+
+        let mut d = Design::for_schematic("clearance-diode", s);
+        let ty = IoType::Boolean;
+        d.declare_input("a", (1, 2, -1), (0, 2, 0), 1, ty.clone())
+            .unwrap();
+        d.declare_output("b", (14, 2, -1), (0, 2, 0), 1, ty)
+            .unwrap();
+        let state = d
+            .route_bus("w", "a", &["b"], vec![], BusStyle::default())
+            .unwrap();
+        assert_eq!(state, BusState::Routed, "{state:?}");
+        assert!(
+            d.bus("w")
+                .unwrap()
+                .fragment
+                .get(&(8, 2, -1))
+                .is_some_and(|b| rblocks::is_repeater(b)),
+            "the unsafe dust cell must remain a directional diode"
+        );
+    }
+
     /// A FORM CONVERSION KEEPS ITS APPROACH TIGHT.
     ///
     /// The adversarial sweep's nine failures are all runs into or out of a form
@@ -6634,7 +6982,11 @@ mod tests {
         d.declare_output("b", b, (0, 0, 2), 8, ty).unwrap();
         d.route_bus("w", "a", &["b"], vec![], BusStyle::default())
             .unwrap();
-        assert_eq!(d.bus_state("w"), Some(&BusState::Routed), "the bus must route");
+        assert_eq!(
+            d.bus_state("w"),
+            Some(&BusState::Routed),
+            "the bus must route"
+        );
         let layer = d.buses.get("w").expect("bus");
         // The adapter owes something: it is a row->stack gather with a diode at
         // the mouth and one per gather leg, so its column is not a fresh 15.
@@ -6666,7 +7018,8 @@ mod tests {
         let step = (0, 2, 0);
         let ty = IoType::UnsignedInt { bits: 8 };
         d.declare_input("a_in", a_in, step, 8, ty.clone()).unwrap();
-        d.declare_output("a_out", a_out, step, 8, ty.clone()).unwrap();
+        d.declare_output("a_out", a_out, step, 8, ty.clone())
+            .unwrap();
         d.declare_input("b_in", b_in, step, 8, ty.clone()).unwrap();
         d.declare_output("b_out", b_out, step, 8, ty).unwrap();
         d
@@ -6679,17 +7032,35 @@ mod tests {
         let mut d = Design::for_schematic("caps", s);
         // Anchor on the lever's support (not dust): refused, names the block.
         let err = d
-            .declare_input("bad", (0, 1, 8), (0, 2, 0), 8, IoType::UnsignedInt { bits: 8 })
+            .declare_input(
+                "bad",
+                (0, 1, 8),
+                (0, 2, 0),
+                8,
+                IoType::UnsignedInt { bits: 8 },
+            )
             .unwrap_err();
         assert!(err.contains("not dust"), "{err}");
         // Output on lever hardware: not readable.
         let err = d
-            .declare_output("bad", (1, 2, 8), (0, 2, 0), 8, IoType::UnsignedInt { bits: 8 })
+            .declare_output(
+                "bad",
+                (1, 2, 8),
+                (0, 2, 0),
+                8,
+                IoType::UnsignedInt { bits: 8 },
+            )
             .unwrap_err();
         assert!(err.contains("no adjacent lamp"), "{err}");
         // Input over the same cells: drivable, fine.
-        d.declare_input("good", (1, 2, 8), (0, 2, 0), 8, IoType::UnsignedInt { bits: 8 })
-            .unwrap();
+        d.declare_input(
+            "good",
+            (1, 2, 8),
+            (0, 2, 0),
+            8,
+            IoType::UnsignedInt { bits: 8 },
+        )
+        .unwrap();
     }
 
     /// A library cell shaped like the community ones: its contract names
@@ -6773,7 +7144,10 @@ mod tests {
         let dead = ports.iter().find(|p| p.name == "u0.dead").unwrap();
         assert!(!dead.routable());
         assert!(
-            dead.blocked.as_ref().unwrap().contains("no dust connection cell"),
+            dead.blocked
+                .as_ref()
+                .unwrap()
+                .contains("no dust connection cell"),
             "{:?}",
             dead.blocked
         );
@@ -6782,7 +7156,10 @@ mod tests {
         // output drives the fabric.
         let rq = d.resolve_port("u0.q").unwrap();
         assert_eq!(rq.direction, PortDirection::Input);
-        assert_eq!(d.resolve_port("u0.d").unwrap().direction, PortDirection::Output);
+        assert_eq!(
+            d.resolve_port("u0.d").unwrap().direction,
+            PortDirection::Output
+        );
         let err = d.resolve_port("u0.nope").unwrap_err();
         assert!(err.contains("no contract port `nope`"), "{err}");
 
@@ -6826,10 +7203,7 @@ mod tests {
         assert!(bus_b.fragment.contains_key(&(8, 1, 7)), "dip dust");
         let bus_a = d.bus("bus_a").unwrap();
         assert!(
-            bus_a
-                .fragment
-                .values()
-                .any(|b| rblocks::is_repeater(b)),
+            bus_a.fragment.values().any(|b| rblocks::is_repeater(b)),
             "station repeater in the through bus"
         );
 
@@ -6865,7 +7239,10 @@ mod tests {
         match state {
             BusState::Failed(reason) => {
                 assert!(reason.contains("no corridor"), "{reason}");
-                assert!(reason.contains("(12,"), "names the blocker location: {reason}");
+                assert!(
+                    reason.contains("(12,"),
+                    "names the blocker location: {reason}"
+                );
                 assert!(reason.contains("loose block"), "names the owner: {reason}");
                 // And it must say whether the LEVEL is the problem or the
                 // workspace is genuinely full — the two need opposite fixes, and

@@ -41,6 +41,10 @@ pub struct Provenance {
     pub snapshot_id: String,
     pub world_bbox: ((i32, i32, i32), (i32, i32, i32)),
     pub origin_offset: (i32, i32, i32),
+    /// Source partition (plot, parcel, claim, or caller-defined area) that
+    /// constrained this build, when partition hints were supplied.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub partition_id: Option<String>,
     pub block_count: u64,
     pub cluster_count: u32,
     pub fingerprint: u128,
@@ -83,6 +87,7 @@ mod tests {
             snapshot_id: "2026-05-19".into(),
             world_bbox: ((0, 0, 0), (9, 9, 9)),
             origin_offset: (0, 0, 0),
+            partition_id: Some("plot:0:0".into()),
             block_count: 100,
             cluster_count: 1,
             fingerprint: 42,

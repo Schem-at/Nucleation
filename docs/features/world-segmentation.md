@@ -6,7 +6,7 @@ individually addressable builds — each one a normal `UniversalSchematic` plus 
 built for doing this *repeatably*: the same world bytes and the same configuration
 produce byte-identical output, on any machine, in any order, every time.
 
-Feature flag: `world-segment` (pulls in `tar` for the archive source).
+Feature flag: `world-segment` (pulls in `tar` and `zstd` for archive sources).
 
 ```toml
 nucleation = { version = "0.5", features = ["world-segment"] }
@@ -47,14 +47,16 @@ reproducible and shardable.
 use nucleation::world_segment::{
     ProfileParams, WorldProfile, PartitionIndex, PartitionPolicy,
     SegConfig, SegmentJob, ScoreConfig, WorldSegmenter, TileSource,
-    TarGzSource, WorldSourceTiles,
+    TarArchiveSource, WorldSourceTiles,
 };
 use nucleation::formats::world_stream::WorldSource;
 
 // 1. A tile source. A world directory gives random access…
 let source = WorldSourceTiles::new(WorldSource::open_dir("world/".as_ref())?, -64, 320);
-// …a .tar.gz backup streams forward-only:
-// let source = TarGzSource::open("backup.tar.gz", -64, 320)?.with_world_border(8192);
+// …a .tar, .tar.gz, or .tar.zst backup streams forward-only. Compression is
+// detected from magic bytes, and a rectangle clips blocks before tile storage:
+// let source = TarArchiveSource::open("backup.tar.zst", -64, 320)?
+//     .with_world_rect(-1024, -1024, 1024, 1024);
 
 // 2. Derive (or load a pinned) profile of the world's natural ground.
 let mut samples = Vec::new();
@@ -106,6 +108,53 @@ let mut stats = WorldSegmenter::run_streaming(
 prefer `run_streaming` for whole worlds so you never hold every output schematic
 at once.
 
+## Python API
+
+The wheel exposes the same native Rust pipeline; Python only marshals arguments.
+For a local world directory, the complete call is:
+
+```python
+from pathlib import Path
+import nucleation
+
+world = "/srv/minecraft/world"
+out = Path("builds")
+out.mkdir(exist_ok=True)
+
+profile = nucleation.WsProfile.derive_from_dir(
+    world, -64, 320, 24, 0.75,
+)
+hints = nucleation.WsPartitionHints.create()
+job = nucleation.WsSegmentJob.create(
+    4, 2, 1,                 # cell size, closing radius, minimum tile cluster
+    "map:creative", "save-2026-08-12",
+    -64, 320, 1_786_453_837, # Y range and caller-supplied timestamp
+    0.5, False,              # snapshot IoU and hard-cut partitions
+)
+result = nucleation.WsRunResult.run_dir(job, hints, profile, world)
+
+for index in range(result.build_count()):
+    result.write_schem_to(index, str(out / f"{result.stable_id_hex(index)}.schem"))
+```
+
+An already-extracted schematic can use the separation-aware final splitter
+directly from Python. It is lossless and does not treat small machines as
+accessories:
+
+```python
+schematic = nucleation.Schematic.open("combined.schem")
+pieces = schematic.split_connected_attach_nearby(16, 3)
+
+for index in range(pieces.len()):
+    pieces.piece(index).save(f"machine-{index + 1}.schem")
+```
+
+`WsRunResult` holds a bounded/local run's outputs for convenient inspection.
+For a whole remote world, use `examples/distributed_world_extract.py`: Python
+schedules resumable centre-out shards while the compiled `segment_world` worker
+reads only intersecting MCA files from the input `Store` and streams outputs to
+the output `Store`. Neither layer copies or loads the complete map.
+
 ---
 
 ## The pieces
@@ -115,7 +164,8 @@ at once.
 | Implementation | Access | Notes |
 |---|---|---|
 | `WorldSourceTiles` (dir / zip / mca bytes) | `Random` | tiles addressable by id, pull-scheduling friendly |
-| `TarGzSource` | `Forward` | streams a `.tar.gz` backup once; cannot seek |
+| `StoreRegionTiles` (`region/` keys in any Store) | `Random` | remote compute reads only intersecting MCA files; one region buffered at a time |
+| `TarArchiveSource` (`TarGzSource` compatibility alias) | `Forward` | streams `.tar`, `.tar.gz`, or `.tar.zst`; cannot seek |
 
 The one entry point every source supports is
 `for_each_tile(&mut FnMut(VoxelTile) -> Result<(), TileError>)`. Returning
@@ -123,11 +173,14 @@ The one entry point every source supports is
 (`for_each_tile` returns `Ok`): this is how you sample N tiles from a 1.6 GB
 archive without paying for the rest of it.
 
-`TarGzSource` filters junk aggressively and *reports* every skip on stderr rather
+`TarArchiveSource` filters junk aggressively and *reports* every skip on stderr rather
 than silently dropping it: backup files (`*.mca.bak`, `r.X.Z.mca.<digits>.backup`),
 entries outside `region/`, empty entries, region coordinates beyond ±120 000
 (sign-extension artifacts in some server backups), and — if you call
-`.with_world_border(n)` — regions entirely outside the border. A malformed region
+`.with_world_border(n)` — regions entirely outside the border. An inclusive
+`.with_world_rect(min_x, min_z, max_x, max_z)` also clips blocks before they are
+stored, and `quiet_filtered_entries()` suppresses benign out-of-scope messages.
+A malformed region
 or a corrupt chunk skips *that region* and keeps streaming; a callback error
 aborts the run (that one is yours).
 
@@ -172,6 +225,9 @@ Calibration guidance, learned on real worlds:
 | `min_cluster_blocks` | 1 | clusters smaller than this are dropped **per tile, before stitching** |
 | `partition_policy` | `Off` | see partition hints below |
 | `partition_floor_share` | `None` | see partition floors below |
+| `partition_dense_layer_coverage` | `None` | subtract a nearly full partition layer even when it uses many materials |
+| `split_disconnected` | `None` | optionally undo a closing that fused substantial disconnected builds |
+| `drop_unpartitioned` | `false` | with `HardCut`, omit roads/gutters outside all hints |
 
 Two structures end up in the same build iff their occupied cells are within
 Chebyshev **2R+1 cells** — with defaults, gaps up to roughly 20 blocks bridge,
@@ -214,6 +270,118 @@ bridges everything on the parcel into one giant cluster.
 `partition_floor_share: Some(0.3)` fixes this generically: per partition, any
 material holding ≥30% of that partition's blocks *inside the substrate band* is
 subtracted as its floor.
+
+Patterned or deliberately mixed-material floors may have no single dominant
+material. `partition_dense_layer_coverage: Some(0.8)` subtracts an exact Y layer
+when at least 80% of the partition footprint is occupied, regardless of its
+palette. Only the dense layer is removed; sparse machinery above it is kept.
+
+`PartitionIndex` spatially indexes arbitrary boxes by world region. A global
+uniform grid with tens of thousands of cells therefore remains practical, and
+every distributed shard can receive the same complete hint set. This matters
+for identity: the complete hint geometry is part of `config_hash`, so workers
+must share it even when each worker reads only a small world rectangle.
+
+The compiled worker also accepts `--partition-hints FILE.json`. The file is an
+array of inclusive rectangles with an opaque `id`; optional `y0`/`y1` bounds
+limit a partition vertically. Additional scalar fields are attribution data:
+
+```json
+[
+  {
+    "id": "plot:12,-3",
+    "x0": 2817, "x1": 3071,
+    "z0": -1023, "z1": -769,
+    "owner": "ExamplePlayer",
+    "trusted": "BuilderOne,BuilderTwo",
+    "members": "*",
+    "alias": "decoder-lab"
+  }
+]
+```
+
+The worker normalizes those fields and embeds them in each matching
+schematic's standard `SchematicProvenance.attributes` as
+`nucleation:partition_<field>`. It also records
+`nucleation:partition_catalog_hash`, the content hash of the exact JSON bytes.
+Thus ownership is an auditable snapshot rather than an unversioned assertion.
+If one logical partition is represented by multiple rectangles, repeat its
+`id`; scalar values are combined deterministically. Geometry-only fields are
+not duplicated into every output.
+
+### Compiled worker and Python control plane
+
+`examples/segment_world.rs` is a compiled extraction worker. It accepts a world
+directory or tar archive, an inclusive rectangle, either uniform-grid or
+arbitrary partition hints, pinned-substrate settings, a detached-component
+attachment policy, and an output Store URL. It writes:
+
+```text
+schematics/<stable-build-id>.schem
+provenance/<stable-build-id>.json
+catalog/x<min>_<max>_z<min>_<max>.jsonl
+```
+
+Inputs can also be a Store URL plus `--world-prefix`: `StoreRegionTiles` lists
+the remote `region/` directory, intersects it with the shard before transfer,
+and buffers only one MCA file. The compute node never downloads or loads the
+whole world. All `.schem` writes go through `Store`, so the same binary targets a local
+folder, `ssh://` host, S3/MinIO, Redis, Postgres, or a callback-backed host.
+The schematic and the sidecar both carry the standard provenance contract.
+Catalog JSONL also exposes `partition_metadata` and `partition_catalog_hash`
+for querying without opening a schematic.
+
+After materialization the worker can use either `nearby` or `nearest`
+component attachment. In `nearby` mode, every 26-neighbour component with at
+least `--component-min-blocks` blocks (default 16) remains an independent
+schematic; smaller fragments attach directly only within
+`--component-join-gap` blocks. In `nearest` mode, components below the threshold
+attach to the closest substantial component, matching the validated ORE
+extraction profile. Both operations are lossless. The worker folds the selected
+mode and thresholds into the output `config_hash`, records them as namespaced
+provenance attributes, and derives split identities from world bounds rather
+than component ordering.
+
+For orchestration, `examples/distributed_world_extract.py` divides a global
+grid into deterministic rectangular shards, runs one or more compiled workers,
+logs each shard, and records local completion markers for restart. Its optional
+`--work-bounds` assigns a subset to one machine while `--grid-bounds` stays
+identical on every machine. Shards are scheduled centre-out so populated map
+areas produce useful output before empty world-border catalogs. The state
+directory also pins the semantic job
+configuration and worker-binary SHA-256, so a changed splitter or setting cannot
+silently reuse stale completion markers. Python is the control plane; Rust
+remains the hot Anvil parsing and segmentation path.
+
+For non-uniform claims or merged plots, use
+`examples/distributed_rect_extract.py`. Each compute host receives the same
+partition catalogue plus its own list of pairwise-disjoint work rectangles.
+The state manifest pins the binary, catalogue, and rectangle-list SHA-256s.
+Choose work boundaries that do not cross a logical partition; the compute host
+then reads only intersecting MCA files through `StoreRegionTiles`, one region at
+a time, while output streams directly to the configured Store.
+
+### Analysing an extracted corpus
+
+`examples/analyze_schematic_corpus.rs` profiles an existing collection without
+copying it to the compute machine or loading it all into memory. Feed it an
+uncompressed tar stream (local or over SSH); it parses one schematic at a time
+and writes JSONL with compressed size, tight dimensions, non-air block count,
+bounding-box density, palette name/state counts, palette entropy, dominant
+material share, a redstone/mechanism share, and both 6- and 26-neighbour
+connectivity metrics:
+
+```bash
+ssh storage-host 'tar -C /data/extraction -cf - schematics' \
+  | cargo run --release --features world-segment \
+      --example analyze_schematic_corpus -- metrics.jsonl run-summary.json
+```
+
+`run-summary.json` records the processed and failed counts, total compressed
+bytes and blocks, and the 50 most common block names. The stream keeps network
+and memory behaviour bounded: only the current `.schem` payload and its occupied
+coordinate set are resident. Since an extractor may still be writing, the run
+is a point-in-time corpus sample rather than a transactionally frozen snapshot.
 
 ### Stitching and its algebra
 
@@ -271,17 +439,17 @@ config_hash · profile_hash · extracted_at
 
 `block_count` describes the schematic actually produced. `extracted_at` is a
 caller-supplied timestamp — the library never reads the clock, so identical
-inputs give byte-identical envelopes. Store envelopes outside the schematic
-binary; they are the queryable index (which box, which snapshot, which
-partition) that later attribution or cataloguing can join against without
-parsing blocks.
+inputs give byte-identical envelopes. Materialization also embeds the common
+[`SchematicProvenance`](schematic-provenance.md) record in every schematic.
+Keep the JSONL envelopes as a queryable index (which box, snapshot, and
+partition) that attribution or cataloguing can join without opening every file.
 
 ---
 
 ## Gotchas
 
 - **Forward-only sources can't rewind.** Deriving a profile and then running
-  means opening a `TarGzSource` twice. Pin the profile to pay the sampling pass
+  means opening a `TarArchiveSource` twice. Pin the profile to pay the sampling pass
   once, ever.
 - **`TileError::Stop` is the only early exit.** Without it, "give me 3 tiles"
   still streams the whole archive.

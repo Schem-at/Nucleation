@@ -11,11 +11,12 @@
 
 use std::collections::BTreeMap;
 
+use crate::block_entity::BlockEntity;
 use crate::block_state::BlockState;
 use crate::universal_schematic::UniversalSchematic;
 use crate::world_segment::identity::{match_snapshots, PriorBuild};
 use crate::world_segment::ids::ClusterId;
-use crate::world_segment::materialize::{materialize, MaterializeCtx};
+use crate::world_segment::materialize::{materialize_with_block_entities, MaterializeCtx};
 use crate::world_segment::partition::PartitionIndex;
 use crate::world_segment::profile::WorldProfile;
 use crate::world_segment::provenance::Provenance;
@@ -99,6 +100,10 @@ impl WorldSegmenter {
         // final block set is the union of its `cluster_ids`' entries here.
         let mut blocks_by_cluster: BTreeMap<ClusterId, BTreeMap<(i32, i32, i32), BlockState>> =
             BTreeMap::new();
+        let mut block_entities_by_cluster: BTreeMap<
+            ClusterId,
+            BTreeMap<(i32, i32, i32), BlockEntity>,
+        > = BTreeMap::new();
 
         source
             .for_each_tile(&mut |tile| {
@@ -113,12 +118,22 @@ impl WorldSegmenter {
                 // Built once per tile, not once per membership entry.
                 let tile_blocks: BTreeMap<(i32, i32, i32), BlockState> =
                     tile.blocks().map(|(p, b)| (p, b.clone())).collect();
+                let membership_by_pos: BTreeMap<(i32, i32, i32), ClusterId> =
+                    membership.iter().map(|(pos, cid)| (*pos, *cid)).collect();
                 for (pos, cid) in membership {
                     if let Some(block) = tile_blocks.get(&pos) {
                         blocks_by_cluster
                             .entry(cid)
                             .or_default()
                             .insert(pos, block.clone());
+                    }
+                }
+                for block_entity in tile.block_entities() {
+                    if let Some(cid) = membership_by_pos.get(&block_entity.position) {
+                        block_entities_by_cluster
+                            .entry(*cid)
+                            .or_default()
+                            .insert(block_entity.position, block_entity.clone());
                     }
                 }
 
@@ -153,10 +168,16 @@ impl WorldSegmenter {
         for build in ordered_builds {
             // Union the blocks of every cluster this build absorbed.
             let mut blocks: BTreeMap<(i32, i32, i32), BlockState> = BTreeMap::new();
+            let mut block_entities: BTreeMap<(i32, i32, i32), BlockEntity> = BTreeMap::new();
             for cid in &build.cluster_ids {
                 if let Some(cluster_blocks) = blocks_by_cluster.get(cid) {
                     for (pos, b) in cluster_blocks {
                         blocks.insert(*pos, b.clone());
+                    }
+                }
+                if let Some(cluster_entities) = block_entities_by_cluster.get(cid) {
+                    for (pos, block_entity) in cluster_entities {
+                        block_entities.insert(*pos, block_entity.clone());
                     }
                 }
             }
@@ -173,7 +194,14 @@ impl WorldSegmenter {
                 profile_hash,
                 extracted_at: job.extracted_at,
             };
-            let (schematic, provenance) = materialize(build, &blocks, scored.tier, stable_id, &ctx);
+            let (schematic, provenance) = materialize_with_block_entities(
+                build,
+                &blocks,
+                &block_entities,
+                scored.tier,
+                stable_id,
+                &ctx,
+            );
 
             stats.builds += 1;
             match scored.tier {

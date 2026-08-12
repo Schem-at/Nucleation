@@ -156,7 +156,9 @@ impl NetClassRule {
     pub fn from_region(region: &DefinitionRegion) -> Result<Option<Self>, String> {
         match region.get_metadata(NET_CLASS_KEY) {
             None => Ok(None),
-            Some(json) => serde_json::from_str(json).map(Some).map_err(|e| e.to_string()),
+            Some(json) => serde_json::from_str(json)
+                .map(Some)
+                .map_err(|e| e.to_string()),
         }
     }
 }
@@ -185,7 +187,7 @@ mod tests {
         assert!(zone.contains(1, 1, 1));
         assert!(!zone.contains(5, 1, 5)); // excluded hole
         assert!(!zone.contains(11, 1, 1)); // outside include
-        // no include boxes = everywhere except excludes
+                                           // no include boxes = everywhere except excludes
         let open = RoutingRegion {
             name: "open".into(),
             include: vec![],
@@ -232,7 +234,10 @@ mod tests {
         let back = NetClassRule::from_region(&dr).unwrap().unwrap();
         assert_eq!(back, rule);
         // untouched region carries no rule
-        assert_eq!(NetClassRule::from_region(&region((0, 0, 0), (1, 1, 1))).unwrap(), None);
+        assert_eq!(
+            NetClassRule::from_region(&region((0, 0, 0), (1, 1, 1))).unwrap(),
+            None
+        );
     }
 
     #[test]

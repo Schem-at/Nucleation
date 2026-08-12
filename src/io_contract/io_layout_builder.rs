@@ -683,6 +683,8 @@ mod tests {
             layout.get_input("a").unwrap().face,
             Some(crate::io_contract::physical::Face::North)
         );
-        assert!(IoLayoutBuilder::new().port_face("ghost", crate::io_contract::physical::Face::Up).is_err());
+        assert!(IoLayoutBuilder::new()
+            .port_face("ghost", crate::io_contract::physical::Face::Up)
+            .is_err());
     }
 }

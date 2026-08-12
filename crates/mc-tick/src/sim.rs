@@ -67,30 +67,50 @@ struct SimCollision<'a> {
 impl crate::entity::CollisionWorld for SimCollision<'_> {
     fn is_solid(&self, pos: Pos) -> bool {
         let state = self.world.get(pos);
-        self.solidity.get(state.raw() as usize).copied().unwrap_or(false)
+        self.solidity
+            .get(state.raw() as usize)
+            .copied()
+            .unwrap_or(false)
     }
     fn friction(&self, pos: Pos) -> f32 {
         let state = self.world.get(pos);
-        self.frictions.get(state.raw() as usize).copied().unwrap_or(0.6)
+        self.frictions
+            .get(state.raw() as usize)
+            .copied()
+            .unwrap_or(0.6)
     }
     fn water(&self, pos: Pos) -> Option<crate::fluid::WaterKind> {
         let state = self.world.get(pos);
-        self.water_kinds.get(state.raw() as usize).copied().flatten()
+        self.water_kinds
+            .get(state.raw() as usize)
+            .copied()
+            .flatten()
     }
     fn bubble(&self, pos: Pos) -> Option<bool> {
         let state = self.world.get(pos);
-        self.bubble_kinds.get(state.raw() as usize).copied().flatten()
+        self.bubble_kinds
+            .get(state.raw() as usize)
+            .copied()
+            .flatten()
     }
     fn is_air(&self, pos: Pos) -> bool {
         self.world.get(pos) == StateId::AIR
     }
     fn solid_height(&self, pos: Pos) -> f64 {
         let state = self.world.get(pos);
-        f64::from(self.heights.get(state.raw() as usize).copied().unwrap_or(1.0))
+        f64::from(
+            self.heights
+                .get(state.raw() as usize)
+                .copied()
+                .unwrap_or(1.0),
+        )
     }
     fn is_web(&self, pos: Pos) -> bool {
         let state = self.world.get(pos);
-        self.webs.get(state.raw() as usize).copied().unwrap_or(false)
+        self.webs
+            .get(state.raw() as usize)
+            .copied()
+            .unwrap_or(false)
     }
     fn rail(&self, pos: Pos) -> Option<crate::minecart::Rail> {
         let state = self.world.get(pos);
@@ -98,7 +118,10 @@ impl crate::entity::CollisionWorld for SimCollision<'_> {
     }
     fn is_conductor(&self, pos: Pos) -> bool {
         let state = self.world.get(pos);
-        self.conductors.get(state.raw() as usize).copied().unwrap_or(false)
+        self.conductors
+            .get(state.raw() as usize)
+            .copied()
+            .unwrap_or(false)
     }
 }
 
@@ -607,8 +630,7 @@ impl Simulation {
     /// (replay, cycle detection, cutting a selection); use
     /// [`Simulation::timeline_view`] for anything that just reads the events.
     pub fn recorded_timeline(&self) -> Option<crate::timeline::RunTimeline> {
-        self.timeline_view()
-            .map(|view| view.to_timeline())
+        self.timeline_view().map(|view| view.to_timeline())
     }
 
     /// The entity events recorded since [`Simulation::record`].
@@ -626,7 +648,8 @@ impl Simulation {
         vel: [f64; 3],
         pickup_delay: u32,
     ) -> u32 {
-        self.item_entities.spawn_with_id(id, item, pos, vel, pickup_delay)
+        self.item_entities
+            .spawn_with_id(id, item, pos, vel, pickup_delay)
     }
 
     /// Spawn an item entity, as loading a structure's entity list does.
@@ -939,7 +962,10 @@ impl Simulation {
         self.bodies.push(crate::entity::EntityInstance {
             id,
             kind: rider_kind,
-            physics: crate::entity::BodyPhysics::Rider { vehicle: vehicle_id, seat },
+            physics: crate::entity::BodyPhysics::Rider {
+                vehicle: vehicle_id,
+                seat,
+            },
             // A passenger is held by its seat, not by a rope.
             leashed: false,
         });
@@ -986,7 +1012,12 @@ impl Simulation {
                 id
             }
         };
-        self.push_minecart(id, "minecraft:furnace_minecart".to_string(), cart.pos, motion);
+        self.push_minecart(
+            id,
+            "minecraft:furnace_minecart".to_string(),
+            cart.pos,
+            motion,
+        );
         // Same reason as `spawn_authored_minecart`: yaw is the push gate, and a
         // furnace cart is an `AbstractMinecart` like any other. Leaving it at
         // the spawn default here is what made the record door's top row shove
@@ -1090,8 +1121,12 @@ impl Simulation {
             // then move, then a uniform 0.5 drag and a quarter of gravity.
             for body in &mut self.bodies {
                 let kind = body.kind.clone();
-                let crate::entity::BodyPhysics::Ballistic { pos, vel, on_ground, .. } =
-                    &mut body.physics
+                let crate::entity::BodyPhysics::Ballistic {
+                    pos,
+                    vel,
+                    on_ground,
+                    ..
+                } = &mut body.physics
                 else {
                     continue;
                 };
@@ -1145,8 +1180,7 @@ impl Simulation {
                     }
                 }
                 if in_lava {
-                    let norm =
-                        (flow[0] * flow[0] + flow[1] * flow[1] + flow[2] * flow[2]).sqrt();
+                    let norm = (flow[0] * flow[0] + flow[1] * flow[1] + flow[2] * flow[2]).sqrt();
                     if norm > 0.0 {
                         let scale = 0.002_333_333_333_333_333_5;
                         for axis in 0..3 {
@@ -1193,8 +1227,10 @@ impl Simulation {
                     .find(|p| crate::entity::CollisionWorld::rail(&collision, *p).is_some());
                 if cart.fuse.is_none() {
                     if let Some(rail_cell) = on_rail {
-                        let descriptor =
-                            self.registry.descriptor(self.world.get(rail_cell)).unwrap_or("");
+                        let descriptor = self
+                            .registry
+                            .descriptor(self.world.get(rail_cell))
+                            .unwrap_or("");
                         // `ActivatorRailBlock` → `activateMinecart(powered)`
                         // → `MinecartTNT.primeFuse`: 80 ticks.
                         if descriptor.starts_with("minecraft:activator_rail")
@@ -1247,7 +1283,11 @@ impl Simulation {
         let rng = &mut self.item_entities.rng;
         let rails = &self.rails;
         let is_rail = |pos: Pos| {
-            rails.get(world.get(pos).raw() as usize).copied().flatten().is_some()
+            rails
+                .get(world.get(pos).raw() as usize)
+                .copied()
+                .flatten()
+                .is_some()
         };
         let shielded = |pos: Pos| {
             rail_shielded && (is_rail(pos) || is_rail(Pos::new(pos.x, pos.y + 1, pos.z)))
@@ -1284,36 +1324,34 @@ impl Simulation {
         }
         let mut hits: Vec<(Hit, [f64; 3], f32)> = Vec::new();
         {
-            let mut consider =
-                |slot: Hit, feet: [f64; 3], eye_y: f64, bb: ([f64; 3], [f64; 3])| {
-                    let d = ((feet[0] - center[0]).powi(2)
-                        + (feet[1] - center[1]).powi(2)
-                        + (feet[2] - center[2]).powi(2))
-                    .sqrt()
-                        / reach;
-                    if d > 1.0 {
-                        return;
-                    }
-                    let dir = [feet[0] - center[0], eye_y - center[1], feet[2] - center[2]];
-                    let norm = (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt();
-                    if norm == 0.0 {
-                        return;
-                    }
-                    let seen = crate::explosion::seen_percent(center, bb.0, bb.1, &collision);
-                    let impact = (1.0 - d) * seen;
-                    if impact <= 0.0 {
-                        return;
-                    }
-                    let push = [
-                        dir[0] / norm * impact,
-                        dir[1] / norm * impact,
-                        dir[2] / norm * impact,
-                    ];
-                    // `((impact² + impact) / 2) * 7 * diameter + 1`.
-                    let damage =
-                        ((impact * impact + impact) / 2.0 * 7.0 * reach + 1.0) as f32;
-                    hits.push((slot, push, damage));
-                };
+            let mut consider = |slot: Hit, feet: [f64; 3], eye_y: f64, bb: ([f64; 3], [f64; 3])| {
+                let d = ((feet[0] - center[0]).powi(2)
+                    + (feet[1] - center[1]).powi(2)
+                    + (feet[2] - center[2]).powi(2))
+                .sqrt()
+                    / reach;
+                if d > 1.0 {
+                    return;
+                }
+                let dir = [feet[0] - center[0], eye_y - center[1], feet[2] - center[2]];
+                let norm = (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt();
+                if norm == 0.0 {
+                    return;
+                }
+                let seen = crate::explosion::seen_percent(center, bb.0, bb.1, &collision);
+                let impact = (1.0 - d) * seen;
+                if impact <= 0.0 {
+                    return;
+                }
+                let push = [
+                    dir[0] / norm * impact,
+                    dir[1] / norm * impact,
+                    dir[2] / norm * impact,
+                ];
+                // `((impact² + impact) / 2) * 7 * diameter + 1`.
+                let damage = ((impact * impact + impact) / 2.0 * 7.0 * reach + 1.0) as f32;
+                hits.push((slot, push, damage));
+            };
             for (index, item) in self.item_entities.items.iter().enumerate() {
                 if item.removed {
                     continue;
@@ -1343,7 +1381,9 @@ impl Simulation {
                     // around; nothing measured explodes near one.
                     continue;
                 };
-                let Some(bb) = crate::entity::body_aabb(&body.kind, pos) else { continue };
+                let Some(bb) = crate::entity::body_aabb(&body.kind, pos) else {
+                    continue;
+                };
                 let eye = pos[1] + (bb.1[1] - bb.0[1]) * 0.85;
                 consider(Hit::Body(index), pos, eye, bb);
             }
@@ -1483,10 +1523,7 @@ impl Simulation {
                     let hit = (0..3).all(|axis| {
                         emin[axis] < center[axis] + 0.5 && emax[axis] > center[axis] - 0.5
                     });
-                    if hit
-                        && found
-                            .is_none_or(|prev: usize| cart.id < self.minecarts[prev].id)
-                    {
+                    if hit && found.is_none_or(|prev: usize| cart.id < self.minecarts[prev].id) {
                         found = Some(other);
                     }
                 }
@@ -1497,7 +1534,10 @@ impl Simulation {
             };
             // First occupied source slot, in slot order.
             let source_stacks = match source_cart {
-                Some(other) => self.minecarts[other].inventory.as_ref().map(|inv| &inv.stacks),
+                Some(other) => self.minecarts[other]
+                    .inventory
+                    .as_ref()
+                    .map(|inv| &inv.stacks),
                 None => self.inventories.get(&above).map(|inv| &inv.stacks),
             };
             let Some((source_slot, id, count)) = source_stacks.and_then(|stacks| {
@@ -1524,8 +1564,7 @@ impl Simulation {
                             break;
                         }
                         Some(stack)
-                            if stack.id == id
-                                && stack.count < crate::vanilla::max_stack(&id) =>
+                            if stack.id == id && stack.count < crate::vanilla::max_stack(&id) =>
                         {
                             found = Some((slot, stack.count + 1));
                             break;
@@ -1535,7 +1574,9 @@ impl Simulation {
                 }
                 found
             };
-            let Some((target_slot, new_count)) = target_slot else { continue };
+            let Some((target_slot, new_count)) = target_slot else {
+                continue;
+            };
             let mut ctx = TickCtx {
                 drain: Some(crate::behaviour::Drain {
                     pending: &mut self.pending,
@@ -1724,8 +1765,10 @@ impl Simulation {
                 }
             }
             for index in 0..self.bodies.len() {
-                if matches!(self.bodies[index].physics, crate::entity::BodyPhysics::Frozen { .. })
-                {
+                if matches!(
+                    self.bodies[index].physics,
+                    crate::entity::BodyPhysics::Frozen { .. }
+                ) {
                     slots.push(Slot::Body(index));
                 }
             }
@@ -1857,8 +1900,10 @@ impl Simulation {
         let sign = f64::from([dx, dy, dz][axis]);
         let acc = self.piston_deltas.entry(id).or_insert([0.0; 3]);
         let requested = sign * distance;
-        let clamped = (requested + acc[axis])
-            .clamp(-crate::piston::PISTON_MAX_STEP, crate::piston::PISTON_MAX_STEP);
+        let clamped = (requested + acc[axis]).clamp(
+            -crate::piston::PISTON_MAX_STEP,
+            crate::piston::PISTON_MAX_STEP,
+        );
         let amount = clamped - acc[axis];
         acc[axis] = clamped;
         if amount.abs() <= f64::from(1.0e-5f32) {
@@ -1897,7 +1942,10 @@ impl Simulation {
             let Some(slot) = self.item_entities.others.iter().position(|b| b.id == id) else {
                 continue;
             };
-            let settled = (self.item_entities.others[slot].min, self.item_entities.others[slot].max);
+            let settled = (
+                self.item_entities.others[slot].min,
+                self.item_entities.others[slot].max,
+            );
             self.item_entities.others[slot].min = min;
             self.item_entities.others[slot].max = max;
             self.notify_entity_inside(min, max);
@@ -1924,7 +1972,9 @@ impl Simulation {
             if state == StateId::AIR {
                 continue;
             }
-            let Some(behaviour) = self.behaviours.get(state) else { continue };
+            let Some(behaviour) = self.behaviours.get(state) else {
+                continue;
+            };
             let mut ctx = TickCtx {
                 drain: Some(crate::behaviour::Drain {
                     pending: &mut self.pending,
@@ -2035,7 +2085,12 @@ impl Simulation {
                 continue;
             }
             if steps_left == 1 && index < shover {
-                if self.solidity.get(m.state.raw() as usize).copied().unwrap_or(false) {
+                if self
+                    .solidity
+                    .get(m.state.raw() as usize)
+                    .copied()
+                    .unwrap_or(false)
+                {
                     let lo = [f64::from(m.pos.x), f64::from(m.pos.y), f64::from(m.pos.z)];
                     obstacles.push((lo, [lo[0] + 1.0, lo[1] + 1.0, lo[2] + 1.0]));
                 }
@@ -2054,7 +2109,8 @@ impl Simulation {
             rails: &self.rails,
             conductors: &self.conductors,
         };
-        let (clipped, _) = crate::entity::collide_move_among(&collision, min, max, movement, &obstacles);
+        let (clipped, _) =
+            crate::entity::collide_move_among(&collision, min, max, movement, &obstacles);
         clipped
     }
 
@@ -2087,7 +2143,12 @@ impl Simulation {
         self.moves
             .iter()
             .filter(|m| m.sweep.is_some())
-            .filter(|m| self.solidity.get(m.state.raw() as usize).copied().unwrap_or(false))
+            .filter(|m| {
+                self.solidity
+                    .get(m.state.raw() as usize)
+                    .copied()
+                    .unwrap_or(false)
+            })
             .map(|m| {
                 let lo = [f64::from(m.pos.x), f64::from(m.pos.y), f64::from(m.pos.z)];
                 (lo, [lo[0] + 1.0, lo[1] + 1.0, lo[2] + 1.0])
@@ -2124,7 +2185,9 @@ impl Simulation {
                 if crate::entity::blocks_a_cart(&body.kind) != Some(true) {
                     continue;
                 }
-                let Some(pos) = self.body_position(body) else { continue };
+                let Some(pos) = self.body_position(body) else {
+                    continue;
+                };
                 // `None` is unreachable: spawn refuses a kind with no dimensions.
                 if let Some(aabb) = crate::entity::body_aabb(&body.kind, pos) {
                     out.push(aabb);
@@ -2213,10 +2276,14 @@ impl Simulation {
                 if matches!(body.physics, crate::entity::BodyPhysics::Frozen { .. }) != standing {
                     continue;
                 }
-                let Some(pos) = self.body_position(body) else { continue };
+                let Some(pos) = self.body_position(body) else {
+                    continue;
+                };
                 // Refused at spawn if the kind had no dimensions, so this cannot
                 // fall back to a guessed box.
-                let Some((min, max)) = crate::entity::body_aabb(&body.kind, pos) else { continue };
+                let Some((min, max)) = crate::entity::body_aabb(&body.kind, pos) else {
+                    continue;
+                };
                 self.item_entities.others.push(crate::entity::EntityBody {
                     id: body.id,
                     kind: body.kind.clone(),
@@ -2295,7 +2362,9 @@ impl Simulation {
         }
         for pos in picks {
             let state = self.world.get(pos);
-            let Some(behaviour) = self.behaviours.get(state) else { continue };
+            let Some(behaviour) = self.behaviours.get(state) else {
+                continue;
+            };
             let mut ctx = TickCtx {
                 drain: Some(crate::behaviour::Drain {
                     pending: &mut self.pending,
@@ -2585,7 +2654,9 @@ impl Simulation {
         self.phase = None;
         self.tick += 1;
         // Burnout only looks back a fixed window, so anything older is dead weight.
-        let horizon = self.tick.saturating_sub(crate::components::TORCH_BURNOUT_WINDOW);
+        let horizon = self
+            .tick
+            .saturating_sub(crate::components::TORCH_BURNOUT_WINDOW);
         self.toggles.retain(|(_, t)| *t >= horizon);
         StopReason::Completed
     }
@@ -2654,7 +2725,12 @@ impl Simulation {
             if moved {
                 events.push((
                     self.tick,
-                    EntityEvent::Moved { id, entity_type, pos, velocity },
+                    EntityEvent::Moved {
+                        id,
+                        entity_type,
+                        pos,
+                        velocity,
+                    },
                 ));
                 self.entity_snapshot.insert(id, pos);
             }
@@ -2827,8 +2903,8 @@ impl Simulation {
             command_powered: &mut self.command_powered,
             tickers: &mut self.tickers,
             item_entities: &mut self.item_entities,
-                minecarts: &mut self.minecarts,
-                conductors: &self.conductors,
+            minecarts: &mut self.minecarts,
+            conductors: &self.conductors,
             inv_log: self.inv_log.as_mut(),
             log: self.log.as_mut(),
         }
@@ -2875,11 +2951,7 @@ impl Simulation {
     /// and `manual_engine_quiet_click.json` pins it: a quietly placed engine
     /// sits completely still until its note block is clicked.
     pub fn settle(&mut self) {
-        let occupied: Vec<Pos> = self
-            .world
-            .iter_non_air()
-            .map(|(pos, _)| pos)
-            .collect();
+        let occupied: Vec<Pos> = self.world.iter_non_air().map(|(pos, _)| pos).collect();
         self.settle_with_order(&occupied);
     }
 
@@ -3038,7 +3110,12 @@ impl Simulation {
         self.world.set(pos, state);
         self.inventories.remove(&pos);
         if let Some(log) = self.log.as_mut() {
-            log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
+            log.push(BlockChange {
+                tick: self.tick,
+                pos,
+                from: previous,
+                to: state,
+            });
         }
 
         // 1. The placement derivation: the placed block hears a shape update
@@ -3080,8 +3157,8 @@ impl Simulation {
                     command_powered: &mut self.command_powered,
                     tickers: &mut self.tickers,
                     item_entities: &mut self.item_entities,
-                minecarts: &mut self.minecarts,
-                conductors: &self.conductors,
+                    minecarts: &mut self.minecarts,
+                    conductors: &self.conductors,
                     inv_log: self.inv_log.as_mut(),
                     log: self.log.as_mut(),
                 };
@@ -3106,8 +3183,10 @@ impl Simulation {
         self.propagate();
 
         // 3. markAndNotifyBlock, flag 3: neighbours and the observer pass.
-        self.updates.push(crate::behaviour::UpdateEntry::neighbors_at(pos));
-        self.updates.push(crate::behaviour::UpdateEntry::neighbor_shapes(pos));
+        self.updates
+            .push(crate::behaviour::UpdateEntry::neighbors_at(pos));
+        self.updates
+            .push(crate::behaviour::UpdateEntry::neighbor_shapes(pos));
         self.propagate();
     }
 
@@ -3157,7 +3236,6 @@ impl Simulation {
         }
     }
 
-
     /// [`Simulation::settle`] with an explicit placement order — the structure
     /// file's block list, which is the order `StructureTemplate.placeInWorld`
     /// walks.
@@ -3206,8 +3284,14 @@ impl Simulation {
     fn update_shape_at_edge(&mut self, order: &[Pos]) {
         let filled: std::collections::HashSet<Pos> = order.iter().copied().collect();
         let (Some(min), Some(max)) = (
-            order.iter().copied().reduce(|a, b| Pos::new(a.x.min(b.x), a.y.min(b.y), a.z.min(b.z))),
-            order.iter().copied().reduce(|a, b| Pos::new(a.x.max(b.x), a.y.max(b.y), a.z.max(b.z))),
+            order
+                .iter()
+                .copied()
+                .reduce(|a, b| Pos::new(a.x.min(b.x), a.y.min(b.y), a.z.min(b.z))),
+            order
+                .iter()
+                .copied()
+                .reduce(|a, b| Pos::new(a.x.max(b.x), a.y.max(b.y), a.z.max(b.z))),
         ) else {
             return;
         };
@@ -3273,11 +3357,13 @@ impl Simulation {
     /// is placing air.
     pub fn place_block(&mut self, pos: Pos, state: StateId) {
         if let Some(timeline) = self.timeline.as_mut() {
-            timeline.inputs.push(crate::timeline::InputAction::PlaceBlock {
-                tick: self.tick,
-                pos,
-                state,
-            });
+            timeline
+                .inputs
+                .push(crate::timeline::InputAction::PlaceBlock {
+                    tick: self.tick,
+                    pos,
+                    state,
+                });
         }
         let previous = self.world.get(pos);
         if previous == state {
@@ -3287,7 +3373,12 @@ impl Simulation {
         // Breaking a container takes its contents with it.
         self.inventories.remove(&pos);
         if let Some(log) = self.log.as_mut() {
-            log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
+            log.push(BlockChange {
+                tick: self.tick,
+                pos,
+                from: previous,
+                to: state,
+            });
         }
         // `LevelChunk.setBlockState` runs `onPlace` before `markAndNotifyBlock`
         // reaches the neighbours — same as `TickCtx::set`, at the boundary.
@@ -3350,10 +3441,12 @@ impl Simulation {
     /// note cycles on the click's tick, the observer pulses one tick later.
     pub fn use_block(&mut self, pos: Pos) {
         if let Some(timeline) = self.timeline.as_mut() {
-            timeline.inputs.push(crate::timeline::InputAction::UseBlock {
-                tick: self.tick,
-                pos,
-            });
+            timeline
+                .inputs
+                .push(crate::timeline::InputAction::UseBlock {
+                    tick: self.tick,
+                    pos,
+                });
         }
         let state = self.world.get(pos);
         let Some(behaviour) = self.behaviours.get(state) else {
@@ -3372,7 +3465,7 @@ impl Simulation {
             behaviours: Some(&self.behaviours),
             world: &mut self.world,
             ticks: &mut self.ticks,
-                fluids: &mut self.fluids,
+            fluids: &mut self.fluids,
             events: &mut self.events,
             states: &self.registry,
             tick: self.tick,
@@ -3381,15 +3474,15 @@ impl Simulation {
             moves: &mut self.moves,
             toggles: &mut self.toggles,
             comparator_out: &mut self.comparator_out,
-                inventories: &mut self.inventories,
-                hopper_state: &mut self.hopper_state,
-                commands: &self.commands,
-                command_powered: &mut self.command_powered,
-                tickers: &mut self.tickers,
-                item_entities: &mut self.item_entities,
-                minecarts: &mut self.minecarts,
-                conductors: &self.conductors,
-                inv_log: self.inv_log.as_mut(),
+            inventories: &mut self.inventories,
+            hopper_state: &mut self.hopper_state,
+            commands: &self.commands,
+            command_powered: &mut self.command_powered,
+            tickers: &mut self.tickers,
+            item_entities: &mut self.item_entities,
+            minecarts: &mut self.minecarts,
+            conductors: &self.conductors,
+            inv_log: self.inv_log.as_mut(),
             log: self.log.as_mut(),
         };
         behaviour.on_used(&mut ctx, pos);
@@ -3426,8 +3519,15 @@ impl Simulation {
                     let names: Vec<String> = due
                         .iter()
                         .map(|e| {
-                            let d = self.registry.descriptor(self.world.get(e.pos)).unwrap_or("?");
-                            format!("{:?}{}", (e.pos.x, e.pos.y, e.pos.z), &d[10..d.len().min(28)])
+                            let d = self
+                                .registry
+                                .descriptor(self.world.get(e.pos))
+                                .unwrap_or("?");
+                            format!(
+                                "{:?}{}",
+                                (e.pos.x, e.pos.y, e.pos.z),
+                                &d[10..d.len().min(28)]
+                            )
                         })
                         .collect();
                     eprintln!("[t{}] block ticks: {}", self.tick, names.join(" | "));
@@ -3450,24 +3550,24 @@ impl Simulation {
                         behaviours: Some(&self.behaviours),
                         world: &mut self.world,
                         ticks: &mut self.ticks,
-                fluids: &mut self.fluids,
+                        fluids: &mut self.fluids,
                         events: &mut self.events,
                         states: &self.registry,
                         tick: self.tick,
-            boundary: false,
+                        boundary: false,
                         updates: &mut self.updates,
-                moves: &mut self.moves,
+                        moves: &mut self.moves,
                         toggles: &mut self.toggles,
                         comparator_out: &mut self.comparator_out,
-                inventories: &mut self.inventories,
-                hopper_state: &mut self.hopper_state,
-                commands: &self.commands,
-                command_powered: &mut self.command_powered,
-                tickers: &mut self.tickers,
-                item_entities: &mut self.item_entities,
-                minecarts: &mut self.minecarts,
-                conductors: &self.conductors,
-                inv_log: self.inv_log.as_mut(),
+                        inventories: &mut self.inventories,
+                        hopper_state: &mut self.hopper_state,
+                        commands: &self.commands,
+                        command_powered: &mut self.command_powered,
+                        tickers: &mut self.tickers,
+                        item_entities: &mut self.item_entities,
+                        minecarts: &mut self.minecarts,
+                        conductors: &self.conductors,
+                        inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
                     behaviour.on_scheduled_tick(&mut ctx, entry.pos);
@@ -3515,8 +3615,8 @@ impl Simulation {
                         command_powered: &mut self.command_powered,
                         tickers: &mut self.tickers,
                         item_entities: &mut self.item_entities,
-                minecarts: &mut self.minecarts,
-                conductors: &self.conductors,
+                        minecarts: &mut self.minecarts,
+                        conductors: &self.conductors,
                         inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
@@ -3551,7 +3651,7 @@ impl Simulation {
                         behaviours: Some(&self.behaviours),
                         world: &mut self.world,
                         ticks: &mut self.ticks,
-                fluids: &mut self.fluids,
+                        fluids: &mut self.fluids,
                         events: &mut self.events,
                         states: &self.registry,
                         tick: self.tick,
@@ -3565,9 +3665,9 @@ impl Simulation {
                         commands: &self.commands,
                         command_powered: &mut self.command_powered,
                         tickers: &mut self.tickers,
-                item_entities: &mut self.item_entities,
-                minecarts: &mut self.minecarts,
-                conductors: &self.conductors,
+                        item_entities: &mut self.item_entities,
+                        minecarts: &mut self.minecarts,
+                        conductors: &self.conductors,
                         inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
@@ -3664,65 +3764,65 @@ impl Simulation {
                     // vanilla leaves shut.
                     self.propagate();
                     landed.push(entry.pos);
-                // `onPlace` for each landed block, *after* that block's own
-                // landing updates have run but still inside its own landing.
-                //
-                // Ordering matters twice over. Within one landing it comes
-                // last: vanilla's shape update reaches a moved observer while
-                // it still carries its mid-pulse powered state, so it does not
-                // re-schedule, and only then does onPlace clear the flag.
-                // Dispatching it first would start a pulse vanilla never
-                // starts.
-                //
-                // Across landings it must not be batched to the end. `onPlace`
-                // is where a landed piston runs `checkIfExtend`, and that only
-                // queues a block event if the push actually resolves — so a
-                // piston must see the column above it as vanilla does, still
-                // holding `moving_piston` placeholders that have not landed
-                // yet. Immovable, so the push fails and no event is queued.
-                // Running every onPlace after every landing showed it a solid
-                // column instead, and the 6x6 door fired a piston vanilla
-                // leaves alone.
-                for pos in std::mem::take(&mut landed) {
-                    let state = self.world.get(pos);
-                    let Some(behaviour) = self.behaviours.get(state) else {
-                        if state != StateId::AIR {
-                            self.unknown_seen.push(state);
-                        }
-                        continue;
-                    };
-                    let mut ctx = TickCtx {
-                        drain: Some(crate::behaviour::Drain {
-                            pending: &mut self.pending,
-                            unknown_seen: &mut self.unknown_seen,
-                            upd_log: self.upd_log.as_mut(),
-                            phase: self.phase,
-                        }),
-                        behaviours: Some(&self.behaviours),
-                        world: &mut self.world,
-                        ticks: &mut self.ticks,
-                fluids: &mut self.fluids,
-                        events: &mut self.events,
-                        states: &self.registry,
-                        tick: self.tick,
-                        boundary: false,
-                        updates: &mut self.updates,
-                        moves: &mut self.moves,
-                        toggles: &mut self.toggles,
-                        comparator_out: &mut self.comparator_out,
-                inventories: &mut self.inventories,
-                hopper_state: &mut self.hopper_state,
-                commands: &self.commands,
-                command_powered: &mut self.command_powered,
-                tickers: &mut self.tickers,
-                item_entities: &mut self.item_entities,
-                minecarts: &mut self.minecarts,
-                conductors: &self.conductors,
-                inv_log: self.inv_log.as_mut(),
-                        log: self.log.as_mut(),
-                    };
-                    behaviour.on_placed(&mut ctx, pos);
-                    self.propagate();
+                    // `onPlace` for each landed block, *after* that block's own
+                    // landing updates have run but still inside its own landing.
+                    //
+                    // Ordering matters twice over. Within one landing it comes
+                    // last: vanilla's shape update reaches a moved observer while
+                    // it still carries its mid-pulse powered state, so it does not
+                    // re-schedule, and only then does onPlace clear the flag.
+                    // Dispatching it first would start a pulse vanilla never
+                    // starts.
+                    //
+                    // Across landings it must not be batched to the end. `onPlace`
+                    // is where a landed piston runs `checkIfExtend`, and that only
+                    // queues a block event if the push actually resolves — so a
+                    // piston must see the column above it as vanilla does, still
+                    // holding `moving_piston` placeholders that have not landed
+                    // yet. Immovable, so the push fails and no event is queued.
+                    // Running every onPlace after every landing showed it a solid
+                    // column instead, and the 6x6 door fired a piston vanilla
+                    // leaves alone.
+                    for pos in std::mem::take(&mut landed) {
+                        let state = self.world.get(pos);
+                        let Some(behaviour) = self.behaviours.get(state) else {
+                            if state != StateId::AIR {
+                                self.unknown_seen.push(state);
+                            }
+                            continue;
+                        };
+                        let mut ctx = TickCtx {
+                            drain: Some(crate::behaviour::Drain {
+                                pending: &mut self.pending,
+                                unknown_seen: &mut self.unknown_seen,
+                                upd_log: self.upd_log.as_mut(),
+                                phase: self.phase,
+                            }),
+                            behaviours: Some(&self.behaviours),
+                            world: &mut self.world,
+                            ticks: &mut self.ticks,
+                            fluids: &mut self.fluids,
+                            events: &mut self.events,
+                            states: &self.registry,
+                            tick: self.tick,
+                            boundary: false,
+                            updates: &mut self.updates,
+                            moves: &mut self.moves,
+                            toggles: &mut self.toggles,
+                            comparator_out: &mut self.comparator_out,
+                            inventories: &mut self.inventories,
+                            hopper_state: &mut self.hopper_state,
+                            commands: &self.commands,
+                            command_powered: &mut self.command_powered,
+                            tickers: &mut self.tickers,
+                            item_entities: &mut self.item_entities,
+                            minecarts: &mut self.minecarts,
+                            conductors: &self.conductors,
+                            inv_log: self.inv_log.as_mut(),
+                            log: self.log.as_mut(),
+                        };
+                        behaviour.on_placed(&mut ctx, pos);
+                        self.propagate();
                     }
                     // Only now `markAndNotifyBlock`. The write is
                     // `setBlock(pos, state, 3)`, and flag 3 leaves
@@ -3871,7 +3971,9 @@ impl Simulation {
                     if state == StateId::AIR {
                         continue;
                     }
-                    let Some(behaviour) = self.behaviours.get(state) else { continue };
+                    let Some(behaviour) = self.behaviours.get(state) else {
+                        continue;
+                    };
                     let mut ctx = TickCtx {
                         drain: Some(crate::behaviour::Drain {
                             pending: &mut self.pending,
@@ -3882,7 +3984,7 @@ impl Simulation {
                         behaviours: Some(&self.behaviours),
                         world: &mut self.world,
                         ticks: &mut self.ticks,
-                fluids: &mut self.fluids,
+                        fluids: &mut self.fluids,
                         events: &mut self.events,
                         states: &self.registry,
                         tick: self.tick,
@@ -3897,8 +3999,8 @@ impl Simulation {
                         command_powered: &mut self.command_powered,
                         tickers: &mut self.tickers,
                         item_entities: &mut self.item_entities,
-                minecarts: &mut self.minecarts,
-                conductors: &self.conductors,
+                        minecarts: &mut self.minecarts,
+                        conductors: &self.conductors,
                         inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
@@ -3983,25 +4085,25 @@ impl Simulation {
                     behaviours: Some(&self.behaviours),
                     world: &mut self.world,
                     ticks: &mut self.ticks,
-                fluids: &mut self.fluids,
+                    fluids: &mut self.fluids,
                     events: &mut self.events,
                     states: &self.registry,
                     tick: self.tick,
-            boundary: false,
+                    boundary: false,
                     updates: &mut self.updates,
-                moves: &mut self.moves,
-                        toggles: &mut self.toggles,
-                        comparator_out: &mut self.comparator_out,
-                inventories: &mut self.inventories,
-                hopper_state: &mut self.hopper_state,
-                commands: &self.commands,
-                command_powered: &mut self.command_powered,
-                tickers: &mut self.tickers,
-                item_entities: &mut self.item_entities,
-                minecarts: &mut self.minecarts,
-                conductors: &self.conductors,
-                inv_log: self.inv_log.as_mut(),
-                        log: self.log.as_mut(),
+                    moves: &mut self.moves,
+                    toggles: &mut self.toggles,
+                    comparator_out: &mut self.comparator_out,
+                    inventories: &mut self.inventories,
+                    hopper_state: &mut self.hopper_state,
+                    commands: &self.commands,
+                    command_powered: &mut self.command_powered,
+                    tickers: &mut self.tickers,
+                    item_entities: &mut self.item_entities,
+                    minecarts: &mut self.minecarts,
+                    conductors: &self.conductors,
+                    inv_log: self.inv_log.as_mut(),
+                    log: self.log.as_mut(),
                 };
                 // Logged *before* dispatch, because the game logs its own at
                 // `removeFirst` — before `doBlockEvent` runs. Logging after
@@ -4089,7 +4191,10 @@ mod tests {
         s.place_block(Pos::new(1, 1, 1), stone);
         s.run(2);
         let recorded = s.recorded_updates().len();
-        assert!(recorded > 0, "nothing was recorded, so the test proves nothing");
+        assert!(
+            recorded > 0,
+            "nothing was recorded, so the test proves nothing"
+        );
 
         s.record_updates(false);
         assert_eq!(s.recorded_updates().len(), recorded, "the log was dropped");
@@ -4114,7 +4219,10 @@ mod tests {
 
         s.record_updates(false);
         s.record_updates(true);
-        assert!(s.recorded_updates().is_empty(), "a stale log survived a restart");
+        assert!(
+            s.recorded_updates().is_empty(),
+            "a stale log survived a restart"
+        );
     }
 
     #[test]
@@ -4149,7 +4257,11 @@ mod tests {
         s.reset();
 
         assert_eq!(s.tick_count(), 0);
-        assert_eq!(s.world().get(Pos::new(3, 3, 3)), stone, "reset is 'as loaded'");
+        assert_eq!(
+            s.world().get(Pos::new(3, 3, 3)),
+            stone,
+            "reset is 'as loaded'"
+        );
     }
 
     #[test]
@@ -4273,7 +4385,11 @@ mod tests {
 
         s.run_until_quiescent(50);
         assert_eq!(s.world().get(pos), after, "behaviour must have run");
-        assert_eq!(s.unknown_report(), None, "everything present was registered");
+        assert_eq!(
+            s.unknown_report(),
+            None,
+            "everything present was registered"
+        );
     }
 
     #[test]
@@ -4306,7 +4422,10 @@ mod tests {
         // component silently behaving as air and yielding a plausible, wrong
         // answer.
         let mut s = sim();
-        let observer = s.registry_mut().intern("minecraft:observer[facing=up]").unwrap();
+        let observer = s
+            .registry_mut()
+            .intern("minecraft:observer[facing=up]")
+            .unwrap();
         let pos = Pos::new(1, 1, 1);
         s.world_mut().set(pos, observer);
         s.schedule_tick(pos, 1, TickPriority::Normal);
@@ -4326,7 +4445,11 @@ mod tests {
         let mut s = sim();
         let fixture = crate::structure::SpawnedBody {
             kind: "minecraft:oak_boat".to_string(),
-            pos: [1.488_202_109_234_411, 0.045_043_285_781_332_54, 2.812_601_257_115_602_5],
+            pos: [
+                1.488_202_109_234_411,
+                0.045_043_285_781_332_54,
+                2.812_601_257_115_602_5,
+            ],
             motion: [
                 -4.323_888_315_084_626_6e-16,
                 0.011_681_267_954_871_115,
@@ -4339,29 +4462,35 @@ mod tests {
         let id = s
             .spawn_authored_body(&fixture)
             .expect("the supplied tether-rest boat is supported");
-        let boat = s.entity_bodies().iter().find(|body| body.id == id).expect("spawned body");
+        let boat = s
+            .entity_bodies()
+            .iter()
+            .find(|body| body.id == id)
+            .expect("spawned body");
         assert_eq!(boat.kind, "minecraft:oak_boat");
         assert_eq!(
-            [(boat.min[0] + boat.max[0]) / 2.0, boat.min[1], (boat.min[2] + boat.max[2]) / 2.0],
+            [
+                (boat.min[0] + boat.max[0]) / 2.0,
+                boat.min[1],
+                (boat.min[2] + boat.max[2]) / 2.0
+            ],
             fixture.pos,
             "the authored tether-rest pose is the frozen collision pose"
         );
 
         let mut free = fixture.clone();
         free.leashed = false;
-        assert!(
-            s.spawn_authored_body(&free).expect_err("a free moving boat has no physics").contains(
-                "has Motion"
-            )
-        );
+        assert!(s
+            .spawn_authored_body(&free)
+            .expect_err("a free moving boat has no physics")
+            .contains("has Motion"));
 
         let mut swinging = fixture;
         swinging.motion[0] = 0.001;
-        assert!(
-            s.spawn_authored_body(&swinging)
-                .expect_err("horizontal boat travel is not a tether-rest residue")
-                .contains("has Motion")
-        );
+        assert!(s
+            .spawn_authored_body(&swinging)
+            .expect_err("horizontal boat travel is not a tether-rest residue")
+            .contains("has Motion"));
     }
 
     /// The tether survives into the public entity view.
@@ -4386,14 +4515,28 @@ mod tests {
         grounded.pos = [4.5, 0.0, 2.5];
         grounded.leashed = false;
 
-        let tethered_id = s.spawn_authored_body(&tethered).expect("a still boat is supported");
-        let grounded_id = s.spawn_authored_body(&grounded).expect("a still boat is supported");
+        let tethered_id = s
+            .spawn_authored_body(&tethered)
+            .expect("a still boat is supported");
+        let grounded_id = s
+            .spawn_authored_body(&grounded)
+            .expect("a still boat is supported");
 
         let leashed_of = |s: &Simulation, id: u32| {
-            s.entity_bodies().iter().find(|body| body.id == id).expect("spawned body").leashed
+            s.entity_bodies()
+                .iter()
+                .find(|body| body.id == id)
+                .expect("spawned body")
+                .leashed
         };
-        assert!(leashed_of(&s, tethered_id), "the leash tag was dropped on the way out");
-        assert!(!leashed_of(&s, grounded_id), "an unleashed boat must not claim a tether");
+        assert!(
+            leashed_of(&s, tethered_id),
+            "the leash tag was dropped on the way out"
+        );
+        assert!(
+            !leashed_of(&s, grounded_id),
+            "an unleashed boat must not claim a tether"
+        );
 
         // A rider is held by its seat; the flag must not leak from the vehicle.
         let passenger = crate::structure::SpawnedEntity::Body(crate::structure::SpawnedBody {
@@ -4403,10 +4546,17 @@ mod tests {
             leashed: false,
             passengers: Vec::new(),
         });
-        let rider =
-            s.spawn_authored_rider(tethered_id, &passenger).expect("a boat seats a passenger");
-        assert!(!leashed_of(&s, rider), "a passenger is not itself on a leash");
-        assert!(leashed_of(&s, tethered_id), "seating a rider dropped the vehicle's tether");
+        let rider = s
+            .spawn_authored_rider(tethered_id, &passenger)
+            .expect("a boat seats a passenger");
+        assert!(
+            !leashed_of(&s, rider),
+            "a passenger is not itself on a leash"
+        );
+        assert!(
+            leashed_of(&s, tethered_id),
+            "seating a rider dropped the vehicle's tether"
+        );
     }
 
     /// The decorated elevator's vehicle/rider pair is admitted only in the
@@ -4434,7 +4584,9 @@ mod tests {
             passengers: vec![rider.clone()],
         };
 
-        let boat = s.spawn_authored_body(&fixture).expect("the tether-rest boat is supported");
+        let boat = s
+            .spawn_authored_body(&fixture)
+            .expect("the tether-rest boat is supported");
         let silverfish = s
             .spawn_authored_rider(boat, &rider)
             .expect("the vanilla-measured pale-oak boat seat is supported");
@@ -4444,7 +4596,11 @@ mod tests {
             .find(|body| body.id == silverfish)
             .expect("silverfish body");
         assert_eq!(
-            [(body.min[0] + body.max[0]) / 2.0, body.min[1], (body.min[2] + body.max[2]) / 2.0],
+            [
+                (body.min[0] + body.max[0]) / 2.0,
+                body.min[1],
+                (body.min[2] + body.max[2]) / 2.0
+            ],
             [fixture.pos[0], fixture.pos[1] + 0.1875, fixture.pos[2]]
         );
 
@@ -4456,19 +4612,17 @@ mod tests {
 
         let mut riderless = fixture.clone();
         riderless.passengers.clear();
-        assert!(
-            s.spawn_authored_body(&riderless)
-                .expect_err("the passenger relationship identifies the elevator fixture")
-                .contains("has Motion")
-        );
+        assert!(s
+            .spawn_authored_body(&riderless)
+            .expect_err("the passenger relationship identifies the elevator fixture")
+            .contains("has Motion"));
 
         let mut drifting = fixture;
         drifting.motion[2] = 1.0 / 2048.0;
-        assert!(
-            s.spawn_authored_body(&drifting)
-                .expect_err("a boat outside the captured tether-rest envelope must refuse")
-                .contains("has Motion")
-        );
+        assert!(s
+            .spawn_authored_body(&drifting)
+            .expect_err("a boat outside the captured tether-rest envelope must refuse")
+            .contains("has Motion"));
     }
 
     /// A rider's box is its vehicle's position plus the seat, always.
@@ -4502,7 +4656,11 @@ mod tests {
             .expect("a free-standing blaze is a hitbox");
 
         let seat_of = |s: &Simulation, id: u32| {
-            s.entity_bodies().iter().find(|b| b.id == id).expect("in the box view").min
+            s.entity_bodies()
+                .iter()
+                .find(|b| b.id == id)
+                .expect("in the box view")
+                .min
         };
         // Half the *float* width the registry holds, which is not 0.3.
         let half = (0.6_f32 as f64) / 2.0;
@@ -4534,8 +4692,11 @@ mod tests {
     #[test]
     fn a_rider_with_no_measured_seat_refuses_by_name() {
         let mut s = sim();
-        let cart =
-            s.spawn_minecart("minecraft:furnace_minecart".into(), [4.0, 2.0, 8.0], [0.0; 3]);
+        let cart = s.spawn_minecart(
+            "minecraft:furnace_minecart".into(),
+            [4.0, 2.0, 8.0],
+            [0.0; 3],
+        );
         let why = s
             .spawn_authored_rider(
                 cart,
@@ -4549,7 +4710,10 @@ mod tests {
             )
             .expect_err("no furnace-cart seat has been measured");
         assert!(why.contains("minecraft:furnace_minecart"), "{why}");
-        assert!(why.contains("0.1875"), "the refusal cites what was measured: {why}");
+        assert!(
+            why.contains("0.1875"),
+            "the refusal cites what was measured: {why}"
+        );
     }
 
     #[test]

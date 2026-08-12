@@ -192,13 +192,32 @@ impl WorldProfile {
         }
 
         let min_share = params.palette_min_share as f64;
-        let palette: BTreeSet<String> = counts
+        let mut palette: BTreeSet<String> = counts
             .into_iter()
             .filter(|(_, count)| {
                 total_band_blocks == 0 || (*count as f64 / total_band_blocks as f64) >= min_share
             })
             .map(|(name, _)| name)
             .collect();
+
+        // Preserve materials that dominate the bottom few slab levels even
+        // when a much thicker material makes them globally rare across the
+        // full band. A one-block bedrock or plot-floor layer under 64 layers
+        // of quartz is substrate by geometry despite contributing only ~1.5%
+        // of all band blocks. Limiting this to the slab base is important: a
+        // large hopper machine near the top of the band may dominate its own
+        // Y level but is still a build, not terrain.
+        for y in lo..=hi.min(lo.saturating_add(3)) {
+            let Some(names) = counts_at_y.get(&y) else {
+                continue;
+            };
+            let level_total: u64 = names.values().sum();
+            if let Some((name, count)) = names.iter().max_by_key(|(_, count)| *count) {
+                if level_total > 0 && (*count as f64 / level_total as f64) >= 0.5 {
+                    palette.insert(name.clone());
+                }
+            }
+        }
 
         WorldProfile::new(palette, (lo, hi))
     }
@@ -413,5 +432,38 @@ mod derive_tests {
         assert!(unfiltered
             .substrate_palette
             .contains("minecraft:redstone_wire"));
+    }
+
+    #[test]
+    fn thin_majority_layer_survives_aggregate_palette_filter() {
+        let mut blocks = vec![];
+        for x in 0..10 {
+            for z in 0..10 {
+                blocks.push(((x, -64, z), BlockState::new("minecraft:bedrock")));
+                for y in -63..=0 {
+                    blocks.push(((x, y, z), BlockState::new("minecraft:quartz_block")));
+                }
+            }
+        }
+        let tile = VoxelTile::from_blocks(
+            TileId { x: 0, z: 0 },
+            TileBounds {
+                min: (0, -64, 0),
+                max: (9, 0, 9),
+            },
+            blocks.into_iter(),
+        );
+        let profile = WorldProfile::derive(
+            &[tile],
+            &ProfileParams {
+                palette_min_share: 0.02,
+                ..ProfileParams::default()
+            },
+        );
+        assert!(profile.substrate_palette.contains("minecraft:quartz_block"));
+        assert!(
+            profile.substrate_palette.contains("minecraft:bedrock"),
+            "a thin but complete substrate layer must not be lost to aggregate share"
+        );
     }
 }

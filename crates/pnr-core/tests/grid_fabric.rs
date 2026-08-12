@@ -266,9 +266,16 @@ fn bounds_confine_the_route() {
     let req = RouteRequest::new(Pos::new(0, 0, 0), Pos::new(10, 0, 0));
     let path = route(&f, &req, &ctx(), &|_| 0).expect("path");
     for s in &path {
-        assert!(bounds.contains(s.pos), "route escaped bounds at {:?}", s.pos);
+        assert!(
+            bounds.contains(s.pos),
+            "route escaped bounds at {:?}",
+            s.pos
+        );
     }
-    assert!(path.iter().any(|s| s.pos == Pos::new(5, 0, 2)), "used the in-bounds gap");
+    assert!(
+        path.iter().any(|s| s.pos == Pos::new(5, 0, 2)),
+        "used the in-bounds gap"
+    );
 
     // Fully sealed inside the bounds -> unroutable, even though free space
     // exists just outside.

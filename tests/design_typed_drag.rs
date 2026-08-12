@@ -26,7 +26,8 @@ fn lever_bank(s: &mut UniversalSchematic, x: i32, z: i32, dx: i32, dz: i32) -> (
         let y = 2 + 2 * i;
         s.set_block_from_string(x, y - 1, z, STONE).unwrap();
         s.set_block_from_string(x, y, z, LEVER).unwrap();
-        s.set_block_from_string(x + dx, y - 1, z + dz, STONE).unwrap();
+        s.set_block_from_string(x + dx, y - 1, z + dz, STONE)
+            .unwrap();
         s.set_block_from_string(x + dx, y, z + dz, DUST).unwrap();
     }
     (x + dx, 2, z + dz)
@@ -67,11 +68,19 @@ fn fanout_delivers_to_both_sinks_in_sim() {
     let c_out = lamp_bank(&mut s, 8, 16);
     let mut d = Design::for_schematic("fanout", s);
     let ty = IoType::UnsignedInt { bits: N as usize };
-    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone()).unwrap();
-    d.declare_output("a_out", a_out, (0, 2, 0), N, ty.clone()).unwrap();
+    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone())
+        .unwrap();
+    d.declare_output("a_out", a_out, (0, 2, 0), N, ty.clone())
+        .unwrap();
     d.declare_output("c_out", c_out, (0, 2, 0), N, ty).unwrap();
     let state = d
-        .route_bus("fan", "a_in", &["a_out", "c_out"], vec![], BusStyle::default())
+        .route_bus(
+            "fan",
+            "a_in",
+            &["a_out", "c_out"],
+            vec![],
+            BusStyle::default(),
+        )
         .unwrap();
     assert_eq!(state, BusState::Routed, "{:?}", d.bus_state("fan"));
 
@@ -80,7 +89,11 @@ fn fanout_delivers_to_both_sinks_in_sim() {
         cell.set_input("a_in", &Value::U32(1 << i)).unwrap();
         cell.settle(400);
         assert_eq!(read_u32(&mut cell, "a_out"), 1 << i, "trunk sink, walk {i}");
-        assert_eq!(read_u32(&mut cell, "c_out"), 1 << i, "branch sink, walk {i}");
+        assert_eq!(
+            read_u32(&mut cell, "c_out"),
+            1 << i,
+            "branch sink, walk {i}"
+        );
     }
     cell.set_input("a_in", &Value::U32(0)).unwrap();
     cell.settle(400);
@@ -97,16 +110,31 @@ fn wired_or_reads_the_or_of_both_drivers_in_sim() {
     let a_out = lamp_bank(&mut s, 16, 8);
     let mut d = Design::for_schematic("wor", s);
     let ty = IoType::UnsignedInt { bits: N as usize };
-    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone()).unwrap();
-    d.declare_input("b_in", b_in, (0, 2, 0), N, ty.clone()).unwrap();
+    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone())
+        .unwrap();
+    d.declare_input("b_in", b_in, (0, 2, 0), N, ty.clone())
+        .unwrap();
     d.declare_output("a_out", a_out, (0, 2, 0), N, ty).unwrap();
     let state = d
-        .route_bus_or("wor", &["a_in", "b_in"], &["a_out"], vec![], BusStyle::default())
+        .route_bus_or(
+            "wor",
+            &["a_in", "b_in"],
+            &["a_out"],
+            vec![],
+            BusStyle::default(),
+        )
         .unwrap();
     assert_eq!(state, BusState::Routed, "{:?}", d.bus_state("wor"));
 
     let mut cell = executor_for(&d);
-    for (a, b) in [(0u32, 0u32), (0x5, 0x2), (0x2, 0x5), (0xF, 0x0), (0x0, 0xF), (0x9, 0x6)] {
+    for (a, b) in [
+        (0u32, 0u32),
+        (0x5, 0x2),
+        (0x2, 0x5),
+        (0xF, 0x0),
+        (0x0, 0xF),
+        (0x9, 0x6),
+    ] {
         cell.set_input("a_in", &Value::U32(a)).unwrap();
         cell.set_input("b_in", &Value::U32(b)).unwrap();
         cell.settle(400);
@@ -122,7 +150,8 @@ fn gate_drag_conducts_in_sim() {
     let a_out = lamp_bank(&mut s, 24, 8);
     let mut d = Design::for_schematic("drag", s);
     let ty = IoType::UnsignedInt { bits: N as usize };
-    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone()).unwrap();
+    d.declare_input("a_in", a_in, (0, 2, 0), N, ty.clone())
+        .unwrap();
     d.declare_output("a_out", a_out, (0, 2, 0), N, ty).unwrap();
     let gates = vec![
         nucleation::design::Gate {

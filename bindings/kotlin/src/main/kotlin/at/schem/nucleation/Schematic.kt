@@ -9,6 +9,7 @@ internal interface SchematicLib: Library {
     fun Schematic_destroy(handle: Pointer)
     fun Schematic_create(name: Slice): Pointer
     fun Schematic_deep_clone(handle: Pointer): Pointer
+    fun Schematic_split_connected_attach_nearby(handle: Pointer, minStandaloneBlocks: FFIUint32, maxAirGap: FFIUint32): Pointer
     fun Schematic_dimensions(handle: Pointer): DimensionsNative
     fun Schematic_set_block(handle: Pointer, x: Int, y: Int, z: Int, blockName: Slice): ResultByteInt
     fun Schematic_get_block_name(handle: Pointer, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
@@ -98,6 +99,9 @@ internal interface SchematicLib: Library {
     fun Schematic_set_mc_version(handle: Pointer, version: Int): Unit
     fun Schematic_we_version(handle: Pointer): Int
     fun Schematic_set_we_version(handle: Pointer, version: Int): Unit
+    fun Schematic_provenance_json(handle: Pointer, write: Pointer): ResultUnitInt
+    fun Schematic_set_provenance_json(handle: Pointer, json: Slice): ResultUnitInt
+    fun Schematic_clear_provenance(handle: Pointer): Unit
     fun Schematic_flip_x(handle: Pointer): Unit
     fun Schematic_flip_y(handle: Pointer): Unit
     fun Schematic_flip_z(handle: Pointer): Unit
@@ -522,6 +526,21 @@ class Schematic internal constructor (
         val selfEdges: List<Any> = listOf()
         val handle = returnVal
         val returnOpaque = Schematic(handle, selfEdges, true)
+        return returnOpaque
+    }
+
+    /** Split spatially independent machines while keeping nearby tiny
+    *detached parts with their machine. Components at least
+    *`min_standalone_blocks` large always remain independent; smaller
+    *components attach only directly to a core within `max_air_gap`.
+    *Attachment is non-transitive and the operation is lossless.
+    */
+    fun splitConnectedAttachNearby(minStandaloneBlocks: UInt, maxAirGap: UInt): SchematicSplitResult {
+
+        val returnVal = lib.Schematic_split_connected_attach_nearby(handle, FFIUint32(minStandaloneBlocks), FFIUint32(maxAirGap));
+        val selfEdges: List<Any> = listOf()
+        val handle = returnVal
+        val returnOpaque = SchematicSplitResult(handle, selfEdges, true)
         return returnOpaque
     }
 
@@ -1630,6 +1649,48 @@ class Schematic internal constructor (
     fun setWeVersion(version: Int): Unit {
 
         val returnVal = lib.Schematic_set_we_version(handle, version);
+
+    }
+
+    /** Standard embedded source provenance as canonical JSON. Returns an
+    *empty string when none is present.
+    */
+    fun provenanceJson(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_provenance_json(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Validate and set standard embedded source provenance from JSON.
+    */
+    fun setProvenanceJson(json: String): Result<Unit> {
+        val jsonSliceMemory = PrimitiveArrayTools.borrowUtf8(json)
+
+        val returnVal = lib.Schematic_set_provenance_json(handle, jsonSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            jsonSliceMemory.close()
+        }
+    }
+
+    /** Remove embedded source provenance.
+    */
+    fun clearProvenance(): Unit {
+
+        val returnVal = lib.Schematic_clear_provenance(handle);
 
     }
 

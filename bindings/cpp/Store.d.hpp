@@ -26,7 +26,7 @@ namespace capi {
 
 /**
  * A key/value store opened from a URL (e.g. `mem://`, `file:///path`,
- * `s3://bucket/prefix`, `redis://…`, `postgres://…`).
+ * `ssh://user@host/path`, `s3://bucket/prefix`, `redis://…`, `postgres://…`).
  */
 class Store {
 public:

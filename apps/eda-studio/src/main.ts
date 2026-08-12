@@ -466,7 +466,7 @@ async function boot() {
       dragMove(kind, id, ground);
     },
     onDragEnd(kind, id, ground) {
-      applyMove(kind, id, ground, "drop");
+      commitDrop(kind, id, ground);
     },
     onGroundClick(ground) {
       handleGroundClick(ground);
@@ -555,7 +555,7 @@ async function boot() {
     if (mode.kind === "grabbing") {
       const inst = mode.instance;
       setMode({ kind: "idle" });
-      applyMove("instance", inst, ground, "drop");
+      commitDrop("instance", inst, ground);
       return;
     }
     if (mode.kind === "connecting") { setMode({ kind: "idle" }); return; }
@@ -582,21 +582,26 @@ async function boot() {
 
   /** One drag frame.
    *
-   *  The instance moves on the GPU FIRST — one matrix per (cell, colour) group,
-   *  no engine call — so the gesture tracks the cursor at frame rate whatever
-   *  the router is doing. The document is then committed at most once per
-   *  animation frame. That replaces the old fixed 250 ms live-reroute throttle:
-   *  there is no idle wait any more, the engine simply runs as often as it can
-   *  finish, and the drag never waits for it.
+   *  The instance moves on the GPU immediately — one matrix write, no wasm and
+   *  no routing. Routing is synchronous today, so running a 60 ms–2 s route on
+   *  every pointer frame does not make rerouting "live"; it makes the pointer
+   *  update at 0.5–15 fps. Instead, every drag is lazy by default and commits
+   *  once on drop. If this exact object has previously routed within a frame
+   *  budget, the checked adaptive option also refreshes after a short pointer
+   *  pause. A slow refresh disables further mid-gesture work automatically.
    */
   let pendingLive: { kind: "instance" | "gate"; id: string; ground: Vec3; seq: number } | null = null;
-  let liveScheduled = false;
+  let liveTimer: number | null = null;
+  const LIVE_IDLE_MS = 160;
+  const LIVE_BUDGET_MS = 32;
+  const liveCostMs = new Map<string, number>();
+  let deferredLiveMoves = 0;
   /** SEQUENCE NUMBERS, and the reason they are here.
    *
-   *  A live re-route commit is deferred to the next animation frame, so a drop
-   *  can happen while one is still queued: the drop lands the final position,
-   *  then the queued frame lands the position from BEFORE it — and the router
-   *  re-routes every affected bus for a component that is no longer there. That
+   *  An adaptive re-route commit is deferred until a pointer pause, so a drop
+   *  can happen while one is queued. Without cancellation/order checks, the
+   *  queued callback could land a position from BEFORE the drop and the router
+   *  would re-route every affected bus for stale geometry. That
    *  is the "sometimes when I move a component the bus doesn't update right"
    *  race, and it is invisible in a screenshot because the document really does
    *  say what is drawn; it is just one frame out of date.
@@ -607,22 +612,50 @@ async function boot() {
    *  newer. */
   let commitSeq = 0;
   let committedSeq = 0;
-  /** How many out-of-order commits were refused — a number the verify asserts
-   *  the race by, rather than hoping it does not reproduce. */
+  /** How many out-of-order commits were refused. Cancellation should normally
+   *  keep this at zero; the sequence check is the final safety net. */
   let staleCommits = 0;
   const nextSeq = () => ++commitSeq;
+  const liveKey = (kind: "instance" | "gate", id: string) => `${kind}:${id}`;
+  function cancelPendingLive() {
+    pendingLive = null;
+    if (liveTimer != null) window.clearTimeout(liveTimer);
+    liveTimer = null;
+  }
   function dragMove(kind: "instance" | "gate", id: string, ground: Vec3) {
     if (kind === "instance") viewer.previewInstance(id, ground);
     if (!($("#live-reroute") as HTMLInputElement).checked) return;
     pendingLive = { kind, id, ground, seq: nextSeq() };
-    if (liveScheduled) return;
-    liveScheduled = true;
-    requestAnimationFrame(() => {
-      liveScheduled = false;
+    const knownCost = liveCostMs.get(liveKey(kind, id));
+    if (knownCost == null || knownCost > LIVE_BUDGET_MS) {
+      deferredLiveMoves++;
+      return;
+    }
+    if (liveTimer != null) window.clearTimeout(liveTimer);
+    liveTimer = window.setTimeout(() => {
+      liveTimer = null;
       const p = pendingLive;
       pendingLive = null;
       if (p) applyMove(p.kind, p.id, p.ground, "live", p.seq);
-    });
+    }, LIVE_IDLE_MS);
+  }
+
+  /** Finalize a drag. A pending preview is discarded and the newest position is
+   *  committed exactly once. If an adaptive pause already landed at this exact
+   *  position, there is nothing to route again. */
+  function commitDrop(kind: "instance" | "gate", id: string, ground: Vec3) {
+    cancelPendingLive();
+    const seq = nextSeq();
+    if (kind === "instance") {
+      const at = studio.instances.get(id)?.at;
+      if (at && at[0] === ground[0] && at[1] === ground[1] && at[2] === ground[2]) {
+        committedSeq = seq;
+        viewer.previewInstance(id, ground);
+        studio.endGesture();
+        return;
+      }
+    }
+    applyMove(kind, id, ground, "drop", seq);
   }
 
   function applyMove(
@@ -636,6 +669,7 @@ async function boot() {
     }
     committedSeq = seq;
     refreshPhase = phase;
+    const started = performance.now();
     try {
       if (kind === "instance") {
         // Includes the refresh() the document's onChange fires: this IS the
@@ -645,7 +679,9 @@ async function boot() {
         // sixty committed moves collapse into "where the gesture started" ->
         // "where it ended".
         const report = timed("dragFrame", () =>
-          studio.moveInstance(id, ground, undefined, phase === "live"));
+          // Drop participates in the same coalescing group as any adaptive
+          // pause commits. `endGesture` below seals it as one undo step.
+          studio.moveInstance(id, ground, undefined, true));
         if (phase === "drop") {
           studio.endGesture();
           reportBuses(`move ${id} -> ${ground.join(",")}`, report);
@@ -668,6 +704,12 @@ async function boot() {
         log(`move failed: ${err}`);
       }
     } finally {
+      const elapsed = performance.now() - started;
+      const key = liveKey(kind, id);
+      const previous = liveCostMs.get(key);
+      // A small EMA lets a temporarily cheap/slow route recover without one
+      // anomalous frame causing permanent oscillation.
+      liveCostMs.set(key, previous == null ? elapsed : previous * 0.75 + elapsed * 0.25);
       refreshPhase = "drop";
     }
   }
@@ -1332,7 +1374,7 @@ async function boot() {
     // from every other editor).
     if (mode.kind !== "idle") {
       const was = mode.kind;
-      if (mode.kind === "grabbing") applyMove("instance", mode.instance, mode.origin, "drop");
+      if (mode.kind === "grabbing") commitDrop("instance", mode.instance, mode.origin);
       setMode({ kind: "idle" });
       toast(`cancelled ${was === "placing" ? "placement" : was === "connecting" ? "the bus" : "the move"}`);
       return;
@@ -1485,7 +1527,7 @@ async function boot() {
       if (shortcutsOpen()) { setShortcuts(false); return; }
       if (coachOpen) { coachDismiss(); return; }
       if (mode.kind === "grabbing") {
-        applyMove("instance", mode.instance, mode.origin, "drop");
+        commitDrop("instance", mode.instance, mode.origin);
       }
       setMode({ kind: "idle" });
       select(null);
@@ -2501,7 +2543,7 @@ async function boot() {
   (window as any).__edaStudio = () => studio;
   (window as any).__edaShot = () => viewer.screenshotDataUrl();
   (window as any).__edaDrag = (kind: "instance" | "gate", id: string, ground: Vec3) =>
-    applyMove(kind, id, ground, "drop");
+    commitDrop(kind, id, ground);
   /** One drag FRAME, exactly as the pointer handler drives it. */
   (window as any).__edaDragMove = (kind: "instance" | "gate", id: string, ground: Vec3) =>
     dragMove(kind, id, ground);
@@ -2627,6 +2669,13 @@ async function boot() {
     profileReset: () => viewer.profileReset(),
     timings: () => ({ ...timings }),
     timingsReset: () => { for (const k of Object.keys(timings)) delete timings[k]; },
+    routingPolicy: () => ({
+      idleMs: LIVE_IDLE_MS,
+      budgetMs: LIVE_BUDGET_MS,
+      pending: pendingLive && { ...pendingLive, ground: [...pendingLive.ground] },
+      costs: Object.fromEntries(liveCostMs),
+      deferredMoves: deferredLiveMoves,
+    }),
     /** Rebuild the scene from scratch, as a state change would. */
     refresh,
 
@@ -2689,7 +2738,7 @@ async function boot() {
     removeGate: (bus: string, index: number) => removeGate(bus, index),
     /** Drag a gate exactly as the pointer does (kind `"gate"`). */
     dragGate: (bus: string, gate: string, to: Vec3) =>
-      applyMove("gate", `${bus} ${gate}`, to, "drop"),
+      commitDrop("gate", `${bus} ${gate}`, to),
     closeContext: closeContextMenu,
     busStyle: () => ({
       global: viewer.globalBusStyle(),

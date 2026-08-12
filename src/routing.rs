@@ -262,7 +262,10 @@ pub fn route_all_schematic(
     // Base router configuration.
     let mut base = RedstoneRouter::new();
     if let Some(b) = parsed.get("bounds").filter(|v| !v.is_null()) {
-        let arr = b.as_array().filter(|a| a.len() == 2).ok_or("bounds must be [[x,y,z],[x,y,z]]")?;
+        let arr = b
+            .as_array()
+            .filter(|a| a.len() == 2)
+            .ok_or("bounds must be [[x,y,z],[x,y,z]]")?;
         base.bounds = Some(Aabb::new(
             parse_pos(&arr[0], "bounds min")?,
             parse_pos(&arr[1], "bounds max")?,
@@ -323,8 +326,9 @@ pub fn route_all_schematic(
                 const FAR: i32 = 1 << 24;
                 let band = Aabb::new(Pos::new(-FAR, y0, -FAR), Pos::new(FAR, y1, FAR));
                 router.bounds = Some(match router.bounds {
-                    Some(b) => intersect_aabb(b, band)
-                        .map_err(|e| format!("class `{class_name}`: {e}"))?,
+                    Some(b) => {
+                        intersect_aabb(b, band).map_err(|e| format!("class `{class_name}`: {e}"))?
+                    }
                     None => band,
                 });
             }
@@ -351,7 +355,10 @@ pub fn route_all_schematic(
         let results = router
             .route_all(&mut ws, &group_nets)
             .map_err(|e| match e {
-                RouteError::Congestion { unrouted, contested } => format!(
+                RouteError::Congestion {
+                    unrouted,
+                    contested,
+                } => format!(
                     "congestion did not converge: unrouted {unrouted:?}, contested {} cells",
                     contested.len()
                 ),
@@ -421,16 +428,16 @@ pub fn parse_intent_nets(json: &str) -> Result<Vec<IntentNet>, String> {
         .ok_or("intent netlist needs a `nets` array")?;
     nets.iter()
         .map(|n| {
-            let name = n["name"]
-                .as_str()
-                .ok_or("net needs a `name`")?
-                .to_string();
+            let name = n["name"].as_str().ok_or("net needs a `name`")?.to_string();
             let terminals = n["terminals"]
                 .as_array()
                 .ok_or("net needs a `terminals` array")?
                 .iter()
                 .map(|t| {
-                    let c = t.as_array().filter(|c| c.len() == 3).ok_or("terminal must be [x, y, z]")?;
+                    let c = t
+                        .as_array()
+                        .filter(|c| c.len() == 3)
+                        .ok_or("terminal must be [x, y, z]")?;
                     let g = |i: usize| -> Result<i32, String> {
                         c[i].as_i64()
                             .map(|v| v as i32)
@@ -626,12 +633,11 @@ mod tests {
         }
         // Tag a keepout zone over the whole south side (z >= 2), so the
         // detour is forced north, and confine the class to y = 1.
-        let mut dr = crate::definition_region::DefinitionRegion::from_bounds(
-            (-2, 0, 2),
-            (9, 3, 9),
-        );
+        let mut dr = crate::definition_region::DefinitionRegion::from_bounds((-2, 0, 2), (9, 3, 9));
         ContractRegion::tag(&mut dr, "north_only", RouteZoneMode::Exclude);
-        schem.definition_regions.insert("north_only".to_string(), dr);
+        schem
+            .definition_regions
+            .insert("north_only".to_string(), dr);
 
         let req = r#"{
             "nets": [{"label": "n", "src": [0, 1, 0], "dsts": [[6, 1, 0]],
@@ -648,7 +654,10 @@ mod tests {
             assert_eq!(y, 1, "y_band violated: {report}");
             assert!(z < 2, "excluded region entered: {report}");
         }
-        assert!(parsed["violations"].as_array().unwrap().is_empty(), "{report}");
+        assert!(
+            parsed["violations"].as_array().unwrap().is_empty(),
+            "{report}"
+        );
         // An unknown region name is an error, not a silent no-op.
         let bad = r#"{
             "nets": [{"label": "n2", "src": [0, 1, -4], "dsts": [[6, 1, -4]],

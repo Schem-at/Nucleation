@@ -48,11 +48,17 @@ use nucleation::formats::gametest::to_gametest_snbt;
 use mc_test as scenario;
 
 fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
-    args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).map(String::as_str)
+    args.iter()
+        .position(|a| a == name)
+        .and_then(|i| args.get(i + 1))
+        .map(String::as_str)
 }
 
 fn pos_arg(text: &str) -> Pos {
-    let c: Vec<i32> = text.split(',').map(|p| p.trim().parse().expect("x,y,z")).collect();
+    let c: Vec<i32> = text
+        .split(',')
+        .map(|p| p.trim().parse().expect("x,y,z"))
+        .collect();
     assert_eq!(c.len(), 3, "expected x,y,z, got {text:?}");
     Pos::new(c[0], c[1], c[2])
 }
@@ -78,8 +84,10 @@ fn fill(sim: &mc_tick::Simulation, cells: &[Pos]) -> (usize, String) {
     let mut picture = String::new();
     for pos in cells {
         let id = sim.world().get(*pos);
-        let solid =
-            sim.registry().descriptor(id).is_some_and(|d| d != "minecraft:air");
+        let solid = sim
+            .registry()
+            .descriptor(id)
+            .is_some_and(|d| d != "minecraft:air");
         if solid {
             filled += 1;
         }
@@ -107,7 +115,11 @@ fn main() {
         }
     };
     let at: Vec<u64> = flag(&args, "--at")
-        .map(|v| v.split(',').map(|t| t.trim().parse().expect("--at T,T")).collect())
+        .map(|v| {
+            v.split(',')
+                .map(|t| t.trim().parse().expect("--at T,T"))
+                .collect()
+        })
         .unwrap_or_else(|| vec![5]);
     let ticks: u64 = flag(&args, "--ticks").map_or(400, |v| v.parse().expect("--ticks N"));
     let every: u64 = flag(&args, "--every").map_or(0, |v| v.parse().expect("--every N"));
@@ -115,7 +127,11 @@ fn main() {
 
     let bytes = std::fs::read(&path).expect("read the build");
     let manager = nucleation::formats::manager::get_manager();
-    let mut schematic = manager.lock().unwrap().read(&bytes).expect("parse the build");
+    let mut schematic = manager
+        .lock()
+        .unwrap()
+        .read(&bytes)
+        .expect("parse the build");
 
     if args.iter().any(|a| a == "--dump-test") {
         match &schematic.metadata.embedded_test {
@@ -142,7 +158,10 @@ fn main() {
     }
 
     println!("# {path}");
-    println!("source_data_version: {:?}", schematic.metadata.source_data_version);
+    println!(
+        "source_data_version: {:?}",
+        schematic.metadata.source_data_version
+    );
     println!(
         "embedded test: {}",
         match &schematic.metadata.embedded_test {
@@ -165,14 +184,24 @@ fn main() {
 
     // Everything a scenario can assert about entities, before anything runs.
     println!("entities: {}", sim.entity_bodies().len());
-    let mut seats: Vec<(String, f64)> =
-        sim.riders().into_iter().map(|(_, kind, pos)| (kind, pos[1])).collect();
+    let mut seats: Vec<(String, f64)> = sim
+        .riders()
+        .into_iter()
+        .map(|(_, kind, pos)| (kind, pos[1]))
+        .collect();
     seats.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
     for (kind, y) in &seats {
         println!("  rider {kind} seated at y={y:.4}");
     }
-    let non_finite = sim.minecarts().iter().filter(|c| c.vel.iter().any(|v| !v.is_finite())).count();
-    println!("  carts with a non-finite velocity: {non_finite} of {}", sim.minecarts().len());
+    let non_finite = sim
+        .minecarts()
+        .iter()
+        .filter(|c| c.vel.iter().any(|v| !v.is_finite()))
+        .count();
+    println!(
+        "  carts with a non-finite velocity: {non_finite} of {}",
+        sim.minecarts().len()
+    );
 
     // The actuator is searched for rather than assumed: two extractions of the
     // same build can land it in different places.
@@ -180,7 +209,9 @@ fn main() {
         sim.world()
             .iter_non_air()
             .find(|(_, id)| {
-                sim.registry().descriptor(*id).is_some_and(|d| d.contains("_button"))
+                sim.registry()
+                    .descriptor(*id)
+                    .is_some_and(|d| d.contains("_button"))
             })
             .map(|(pos, _)| pos)
     });
@@ -228,7 +259,12 @@ fn main() {
         .entity_bodies()
         .iter()
         .map(|b| b.min[1])
-        .chain(sim.item_entities().iter().filter(|e| !e.removed).map(|e| e.pos[1]))
+        .chain(
+            sim.item_entities()
+                .iter()
+                .filter(|e| !e.removed)
+                .map(|e| e.pos[1]),
+        )
         .fold(f64::INFINITY, f64::min);
     println!("  lowest entity y: {low}");
     if !cells.is_empty() {
@@ -268,8 +304,10 @@ fn main() {
             }
         }
         if let Some((tick, events)) = current.take() {
-            ticks_out
-                .push(format!("{{\"tick\": {tick}, \"events\": [{}]}}", events.join(", ")));
+            ticks_out.push(format!(
+                "{{\"tick\": {tick}, \"events\": [{}]}}",
+                events.join(", ")
+            ));
         }
         let json = format!(
             "{{\"format_version\": 1, \"mc_version\": \"mc-tick\", \"structure\": \"inspect\", \"detail\": \"normal\", \"ticks\": [{}]}}",

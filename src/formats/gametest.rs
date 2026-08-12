@@ -30,7 +30,10 @@ const FLATTENING_DATA_VERSION: i32 = 1519;
 /// Returns `None` when the build is already modern — callers then use their
 /// borrow and clone nothing.
 fn modernized(schematic: &crate::UniversalSchematic) -> Option<crate::UniversalSchematic> {
-    let from = schematic.metadata.source_data_version.or(schematic.metadata.mc_version)?;
+    let from = schematic
+        .metadata
+        .source_data_version
+        .or(schematic.metadata.mc_version)?;
     if from >= FLATTENING_DATA_VERSION {
         return None;
     }
@@ -85,7 +88,9 @@ fn compound_snbt(map: &crate::utils::NbtMap) -> String {
             out.push_str(", ");
         }
         let bare = !key.is_empty()
-            && key.chars().all(|c| c.is_ascii_alphanumeric() || "_-.+".contains(c));
+            && key
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "_-.+".contains(c));
         if bare {
             out.push_str(key);
         } else {
@@ -203,7 +208,12 @@ fn snbt_double(value: f64) -> String {
         return "NaN".to_string();
     }
     if value.is_infinite() {
-        return if value.is_sign_positive() { "Infinity" } else { "-Infinity" }.to_string();
+        return if value.is_sign_positive() {
+            "Infinity"
+        } else {
+            "-Infinity"
+        }
+        .to_string();
     }
     let mut text = format!("{value}");
     if !text.contains('.') {
@@ -311,7 +321,11 @@ fn entities_snbt(schematic: &crate::UniversalSchematic, min: (i32, i32, i32)) ->
                     .or_else(|| stack.get("Count"))
                     .and_then(nbt_number)
                     .unwrap_or(1.0);
-                let _ = write!(out, ", Item: {{id: \"{item_id}\", count: {}b}}", count as i64);
+                let _ = write!(
+                    out,
+                    ", Item: {{id: \"{item_id}\", count: {}b}}",
+                    count as i64
+                );
             }
         }
         if let Some(delay) = entity.nbt.get("PickupDelay").and_then(nbt_number) {
@@ -375,7 +389,9 @@ fn entities_snbt(schematic: &crate::UniversalSchematic, min: (i32, i32, i32)) ->
             let mut body = String::new();
             for item in items {
                 let V::Compound(fields) = item else { continue };
-                let Some(V::String(id)) = fields.get("id") else { continue };
+                let Some(V::String(id)) = fields.get("id") else {
+                    continue;
+                };
                 let slot = match fields.get("Slot") {
                     Some(V::Byte(v)) => i64::from(*v),
                     Some(V::Int(v)) => i64::from(*v),
@@ -410,7 +426,9 @@ fn entities_snbt(schematic: &crate::UniversalSchematic, min: (i32, i32, i32)) ->
             let mut riders = String::new();
             for rider in passengers {
                 let V::Compound(fields) = rider else { continue };
-                let Some(V::String(rider_id)) = fields.get("id") else { continue };
+                let Some(V::String(rider_id)) = fields.get("id") else {
+                    continue;
+                };
                 let rider_id = if rider_id.contains(':') {
                     rider_id.clone()
                 } else {
@@ -419,9 +437,10 @@ fn entities_snbt(schematic: &crate::UniversalSchematic, min: (i32, i32, i32)) ->
                 // The engine refuses a passenger with no `Pos`, which is the
                 // right outcome — leave the tag off rather than invent one.
                 let seat: Vec<f64> = match fields.get("Pos") {
-                    Some(V::List(values)) if values.len() == 3 => {
-                        values.iter().map(|v| nbt_number(v).unwrap_or(0.0)).collect()
-                    }
+                    Some(V::List(values)) if values.len() == 3 => values
+                        .iter()
+                        .map(|v| nbt_number(v).unwrap_or(0.0))
+                        .collect(),
                     _ => Vec::new(),
                 };
                 let motion = nbt_vec3(fields.get("Motion"));
@@ -518,8 +537,11 @@ fn render(schematic: &crate::UniversalSchematic, data_version: i32) -> String {
         if state.name == "minecraft:air" {
             continue;
         }
-        let mut props: Vec<(&str, &str)> =
-            state.properties.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+        let mut props: Vec<(&str, &str)> = state
+            .properties
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
         props.sort();
         let mut entry = format!("{{Name:\"{}\"", state.name);
         if !props.is_empty() {
@@ -545,8 +567,9 @@ fn render(schematic: &crate::UniversalSchematic, data_version: i32) -> String {
             "{{pos: [{}, {}, {}], state: {}",
             pos.x - mx,
             pos.y - my,
-            pos.z - mz
-        , index);
+            pos.z - mz,
+            index
+        );
         if let Some(nbt) = nbt_at.get(&(pos.x, pos.y, pos.z)) {
             let _ = write!(blocks, ", nbt: {nbt}");
         }
@@ -580,7 +603,11 @@ mod tests {
         );
         let mut boat = crate::Entity::new(
             "minecraft:oak_boat".to_string(),
-            (1.488_202_109_234_411, 0.045_043_285_781_332_54, 2.812_601_257_115_602_5),
+            (
+                1.488_202_109_234_411,
+                0.045_043_285_781_332_54,
+                2.812_601_257_115_602_5,
+            ),
         );
         boat.nbt.insert(
             "Motion".to_string(),
@@ -611,8 +638,7 @@ mod tests {
             0,
             &crate::BlockState::new("minecraft:stone".to_string()),
         );
-        let mut boat =
-            crate::Entity::new("minecraft:pale_oak_boat".to_string(), (0.5, 1.0, 0.5));
+        let mut boat = crate::Entity::new("minecraft:pale_oak_boat".to_string(), (0.5, 1.0, 0.5));
         boat.nbt.insert(
             "Motion".to_string(),
             crate::NbtValue::List(vec![

@@ -164,9 +164,13 @@ fn toggling_a_port_that_carries_a_bus_rips_it_and_says_so() {
     for k in 0..8i32 {
         let y = a.1 + 2 * k;
         d.set_block((a.0, y - 1, a.2), "minecraft:stone").unwrap();
-        d.set_block((a.0, y, a.2), "minecraft:lever[face=floor,facing=north,powered=false]")
+        d.set_block(
+            (a.0, y, a.2),
+            "minecraft:lever[face=floor,facing=north,powered=false]",
+        )
+        .unwrap();
+        d.set_block((a.0 + 1, y - 1, a.2), "minecraft:stone")
             .unwrap();
-        d.set_block((a.0 + 1, y - 1, a.2), "minecraft:stone").unwrap();
         d.set_block(
             (a.0 + 1, y, a.2),
             "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]",
@@ -211,7 +215,11 @@ fn promotion_makes_a_lever_port_routable_and_says_what_it_did() {
         .find(|p| p.name == "u3.bin")
         .unwrap();
     assert!(!blocked.routable());
-    assert!(blocked.blocked.as_deref().unwrap().contains("executor-only"));
+    assert!(blocked
+        .blocked
+        .as_deref()
+        .unwrap()
+        .contains("executor-only"));
 
     let rep = d.promote_input("u3", "bin").unwrap();
     println!("[promote] {}", rep.note);
@@ -231,7 +239,11 @@ fn promotion_makes_a_lever_port_routable_and_says_what_it_did() {
     // Promotion must NOT convert the form: a horizontal row of 8 stays a
     // horizontal row of 8 at its native pitch, and the patch stays inside the
     // cell's own footprint. The row->stack adapter belongs to the bus.
-    assert_eq!(now.step, Some((2, 0, 0)), "promotion must keep the native form");
+    assert_eq!(
+        now.step,
+        Some((2, 0, 0)),
+        "promotion must keep the native form"
+    );
     assert_eq!(now.width, 8);
     assert!(
         rep.patch_json.contains("\"pivoted\":false"),
@@ -282,9 +294,13 @@ fn route_bus_auto_promotes_a_lever_input_and_reports_it() {
         for k in 0..8i32 {
             let y = a.1 + 2 * k;
             d.set_block((a.0, y - 1, a.2), "minecraft:stone").unwrap();
-            d.set_block((a.0, y, a.2), "minecraft:lever[face=floor,facing=north,powered=false]")
+            d.set_block(
+                (a.0, y, a.2),
+                "minecraft:lever[face=floor,facing=north,powered=false]",
+            )
+            .unwrap();
+            d.set_block((a.0 + 1, y - 1, a.2), "minecraft:stone")
                 .unwrap();
-            d.set_block((a.0 + 1, y - 1, a.2), "minecraft:stone").unwrap();
             d.set_block(
                 (a.0 + 1, y, a.2),
                 "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]",
@@ -319,7 +335,11 @@ fn route_bus_auto_promotes_a_lever_input_and_reports_it() {
 
     // It has to SAY it changed hardware.
     let promotions = &d.bus("net").unwrap().promotions;
-    assert_eq!(promotions.len(), 1, "expected one promotion, got {promotions:?}");
+    assert_eq!(
+        promotions.len(),
+        1,
+        "expected one promotion, got {promotions:?}"
+    );
     assert!(
         promotions[0].contains("u0.bin"),
         "the promotion note must name the port: {}",
@@ -327,7 +347,10 @@ fn route_bus_auto_promotes_a_lever_input_and_reports_it() {
     );
     println!("[auto] {}", promotions[0]);
     assert_eq!(d.port_mode("u0", "bin"), PortMode::Bus);
-    assert!(d.check().unwrap().clean, "auto-promoted route must be DRC/LVS clean");
+    assert!(
+        d.check().unwrap().clean,
+        "auto-promoted route must be DRC/LVS clean"
+    );
 
     // And it has to stay reversible: demoting rips the bus and restores the
     // shipped hardware byte-exactly.
@@ -368,8 +391,11 @@ fn auto_promotion_does_not_mask_an_unrelated_failure() {
     for k in 0..4i32 {
         let y = 2 + 2 * k;
         d.set_block((-30, y - 1, 0), "minecraft:stone").unwrap();
-        d.set_block((-30, y, 0), "minecraft:lever[face=floor,facing=north,powered=false]")
-            .unwrap();
+        d.set_block(
+            (-30, y, 0),
+            "minecraft:lever[face=floor,facing=north,powered=false]",
+        )
+        .unwrap();
         d.set_block((-29, y - 1, 0), "minecraft:stone").unwrap();
         d.set_block(
             (-29, y, 0),
@@ -401,7 +427,13 @@ fn auto_promotion_does_not_mask_an_unrelated_failure() {
     // The unrelated failure: an endpoint that does not exist. Auto-promotion
     // must not turn that into a promotion story.
     let err = d
-        .route_bus("nope", "din4", &["u0.not_a_port"], vec![], BusStyle::default())
+        .route_bus(
+            "nope",
+            "din4",
+            &["u0.not_a_port"],
+            vec![],
+            BusStyle::default(),
+        )
         .expect_err("an unknown port must still be an error");
     assert!(
         err.contains("no contract port") || err.contains("unknown port"),
@@ -442,13 +474,15 @@ fn a_promoted_port_computes_the_same_function() {
         // A lever one cell away on the design's own layer, PERPENDICULAR to the
         // port's native row: the bits are 2 apart along the row itself, so a
         // stub in the row's own axis would land on the next bit's cell.
-        b.set_block((w.0, w.1 - 1, w.2 - 1), "minecraft:stone").unwrap();
+        b.set_block((w.0, w.1 - 1, w.2 - 1), "minecraft:stone")
+            .unwrap();
         b.set_block(
             (w.0, w.1, w.2 - 1),
             "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]",
         )
         .unwrap();
-        b.set_block((w.0, w.1 - 1, w.2 - 2), "minecraft:stone").unwrap();
+        b.set_block((w.0, w.1 - 1, w.2 - 2), "minecraft:stone")
+            .unwrap();
         b.set_block(
             (w.0, w.1, w.2 - 2),
             "minecraft:lever[face=floor,facing=north,powered=false]",
@@ -514,14 +548,16 @@ const SEVEN_SEG: [&str; 10] = [
 ];
 
 fn read_segments(e: &mut BackendCircuitExecutor, inst: &str) -> String {
-    ["seg_a", "seg_b", "seg_c", "seg_d", "seg_e", "seg_f", "seg_g"]
-        .iter()
-        .map(|n| match e.read_output(&format!("{inst}.{n}")) {
-            Ok(Value::Bool(true)) => '1',
-            Ok(Value::Bool(false)) => '0',
-            _ => '?',
-        })
-        .collect()
+    [
+        "seg_a", "seg_b", "seg_c", "seg_d", "seg_e", "seg_f", "seg_g",
+    ]
+    .iter()
+    .map(|n| match e.read_output(&format!("{inst}.{n}")) {
+        Ok(Value::Bool(true)) => '1',
+        Ok(Value::Bool(false)) => '0',
+        _ => '?',
+    })
+    .collect()
 }
 
 /// Build the pipeline: `add.sum -> bcd.bin`, and if it routes,
@@ -544,7 +580,13 @@ fn build_chain(with_display: bool) -> Option<(Design, Vec<String>)> {
 
     let mut log = Vec::new();
     let s1 = d
-        .route_bus("sum_to_bin", "u0.sum", &["u1.bin"], vec![], BusStyle::default())
+        .route_bus(
+            "sum_to_bin",
+            "u0.sum",
+            &["u1.bin"],
+            vec![],
+            BusStyle::default(),
+        )
         .ok()?;
     log.push(format!("sum_to_bin: {s1:?}"));
     if s1 != BusState::Routed {
@@ -565,7 +607,13 @@ fn build_chain(with_display: bool) -> Option<(Design, Vec<String>)> {
     let r3 = d.promote_input("u2", "bcd").ok()?;
     println!("[chain] u2.bcd: {}", r3.note);
     let s2 = d
-        .route_bus("ones_to_seg", "u1.bcd_ones", &["u2.bcd"], vec![], BusStyle::default())
+        .route_bus(
+            "ones_to_seg",
+            "u1.bcd_ones",
+            &["u2.bcd"],
+            vec![],
+            BusStyle::default(),
+        )
         .ok()?;
     log.push(format!("ones_to_seg: {s2:?}"));
     Some((d, log))
@@ -648,7 +696,11 @@ fn the_adder_feeds_the_bcd_converter() {
     // on every routing change, not a routability metric. A routability gain
     // that breaks this chain is not a gain.
     println!("RR|bcd_arith|{ok}/{}", cases.len());
-    assert_eq!(ok, cases.len(), "the chained adder->BCD arithmetic is wrong");
+    assert_eq!(
+        ok,
+        cases.len(),
+        "the chained adder->BCD arithmetic is wrong"
+    );
 }
 
 #[test]

@@ -52,6 +52,7 @@ void add_Renderer_binding(nb::module_);
 void add_Routing_binding(nb::module_);
 void add_BlockState_binding(nb::module_);
 void add_Schematic_binding(nb::module_);
+void add_SchematicSplitResult_binding(nb::module_);
 void add_SchematicBuilder_binding(nb::module_);
 void add_Scripting_binding(nb::module_);
 void add_FieldProgram_binding(nb::module_);
@@ -208,6 +209,7 @@ NB_MODULE(nucleation, mod)
     add_Routing_binding(mod);
     add_BlockState_binding(mod);
     add_Schematic_binding(mod);
+    add_SchematicSplitResult_binding(mod);
     add_SchematicBuilder_binding(mod);
     add_Scripting_binding(mod);
     add_FieldProgram_binding(mod);

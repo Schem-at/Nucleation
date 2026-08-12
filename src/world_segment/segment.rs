@@ -78,6 +78,12 @@ pub struct SegConfig {
     /// global-palette-only classification, since it belongs to no partition
     /// whose local floor could be defined.
     pub partition_floor_share: Option<f32>,
+    /// If set, a partition/Y layer inside the substrate band whose occupied
+    /// XZ coverage reaches this share is subtracted in full. Unlike
+    /// `partition_floor_share`, this handles patterned or multi-material floors
+    /// where no one block name dominates. `None` disables it (default).
+    #[serde(default)]
+    pub partition_dense_layer_coverage: Option<f32>,
     /// When `Some`, undo the morphological closing where it has fused two
     /// genuinely disconnected builds.
     ///
@@ -104,6 +110,14 @@ pub struct SegConfig {
     /// extraction opts in by setting this; already-extracted builds stay as
     /// they were until re-extracted.
     pub split_disconnected: Option<DisconnectedSplit>,
+    /// Ignore blocks that do not fall inside any hard-cut partition hint.
+    ///
+    /// This is useful for regular plot/cell layouts: the hints describe the
+    /// build-bearing interiors and roads or gutters between them never become
+    /// schematics. It is only effective with [`PartitionPolicy::HardCut`] and
+    /// non-empty hints. The default is `false` for backward compatibility.
+    #[serde(default)]
+    pub drop_unpartitioned: bool,
 }
 
 /// Thresholds governing [`SegConfig::split_disconnected`].
@@ -159,10 +173,10 @@ impl SegConfig {
     /// Folded into every [`ClusterId`], so an id identifies a cluster *under a
     /// stated configuration* rather than merely a position. Two runs that
     /// disagree on `cell_size`, `closing_radius`, `min_cluster_blocks`,
-    /// `partition_policy`, `algorithm_version`, `partition_floor_share`, the
-    /// world profile, or — under [`PartitionPolicy::HardCut`] — the partition
-    /// hints, can never mint the same id, which is what makes the ids safe to
-    /// use as cache keys.
+    /// `partition_policy`, `algorithm_version`, either partition-floor rule,
+    /// the disconnected split/drop rules, the world profile, or — under
+    /// [`PartitionPolicy::HardCut`] — the partition hints, can never mint the
+    /// same id, which is what makes the ids safe to use as cache keys.
     ///
     /// # What is covered
     ///
@@ -235,6 +249,14 @@ impl SegConfig {
             v[13..17].copy_from_slice(&s.min_gap_cells.to_le_bytes());
             v
         });
+        // `drop_unpartitioned` is a third backward-compatible extension. It
+        // appends nothing while false, preserving every pre-feature id.
+        let drop_unpartitioned = self.drop_unpartitioned.then_some([1u8]);
+        let dense_layer: Option<[u8; 5]> = self.partition_dense_layer_coverage.map(|coverage| {
+            let mut value = [2u8; 5];
+            value[1..].copy_from_slice(&coverage.to_le_bytes());
+            value
+        });
         // Bound to locals so the `to_le_bytes` temporaries outlive the
         // `ContentId::of` call rather than being dropped at the end of a `let`.
         let cell = self.cell_size.to_le_bytes();
@@ -268,6 +290,12 @@ impl SegConfig {
         if let Some(bytes) = split.as_ref() {
             parts.push(bytes);
         }
+        if let Some(bytes) = drop_unpartitioned.as_ref() {
+            parts.push(bytes);
+        }
+        if let Some(bytes) = dense_layer.as_ref() {
+            parts.push(bytes);
+        }
         ContentId::of(&parts)
     }
 }
@@ -281,7 +309,9 @@ impl Default for SegConfig {
             partition_policy: PartitionPolicy::Off,
             algorithm_version: 1,
             partition_floor_share: None,
+            partition_dense_layer_coverage: None,
             split_disconnected: None,
+            drop_unpartitioned: false,
         }
     }
 }
@@ -429,6 +459,10 @@ fn segment_tile_inner(
             (true, Some(share)) => partition_floor_materials(tile, profile, partitions, share),
             _ => BTreeMap::new(),
         };
+    let dense_floor_layers = match (use_partitions, config.partition_dense_layer_coverage) {
+        (true, Some(coverage)) => partition_dense_floor_layers(tile, profile, partitions, coverage),
+        _ => std::collections::BTreeSet::new(),
+    };
 
     let mut artificial: Vec<((i32, i32, i32), Option<u32>)> = Vec::new();
     let mut grids: BTreeMap<Option<u32>, OccupancyGrid> = BTreeMap::new();
@@ -443,6 +477,12 @@ fn segment_tile_inner(
         } else {
             None
         };
+        if use_partitions && config.drop_unpartitioned && pidx.is_none() {
+            continue;
+        }
+        if pidx.is_some_and(|partition| dense_floor_layers.contains(&(partition, pos.1))) {
+            continue;
+        }
         // Partition-scoped floor subtraction: a block in the substrate band
         // whose name locally dominates its own partition's band layer is that
         // partition's floor, and is dropped exactly like global substrate. This
@@ -1021,6 +1061,49 @@ fn partition_floor_materials(
         }
     }
     floors
+}
+
+/// Dense floor detection by partition and exact Y layer. Counting occupancy
+/// rather than block names is what makes patterned/multi-material floors one
+/// substrate surface instead of several individually-minority materials.
+fn partition_dense_floor_layers(
+    tile: &VoxelTile,
+    profile: &WorldProfile,
+    partitions: &PartitionIndex,
+    coverage: f32,
+) -> std::collections::BTreeSet<(u32, i32)> {
+    let (lo, hi) = profile.substrate_y_band;
+    let mut occupied: BTreeMap<(u32, i32), u64> = BTreeMap::new();
+    for (pos, _state) in tile.blocks() {
+        if pos.1 < lo || pos.1 > hi {
+            continue;
+        }
+        if let Some(partition) = partitions.id_index_at(pos.0, pos.1, pos.2) {
+            *occupied.entry((partition, pos.1)).or_default() += 1;
+        }
+    }
+
+    let bounds = tile.bounds();
+    let coverage = coverage.clamp(0.0, 1.0) as f64;
+    occupied
+        .into_iter()
+        .filter_map(|((partition, y), count)| {
+            let hint = partitions.hint_of_index(partition);
+            if hint.y_range.is_some_and(|(y0, y1)| y < y0 || y > y1) {
+                return None;
+            }
+            let (x0, x1, z0, z1) = hint.bbox_xz;
+            let x0 = x0.max(bounds.min.0);
+            let x1 = x1.min(bounds.max.0);
+            let z0 = z0.max(bounds.min.2);
+            let z1 = z1.min(bounds.max.2);
+            if x0 > x1 || z0 > z1 {
+                return None;
+            }
+            let area = (i64::from(x1) - i64::from(x0) + 1) * (i64::from(z1) - i64::from(z0) + 1);
+            ((count as f64) / (area as f64) >= coverage).then_some((partition, y))
+        })
+        .collect()
 }
 
 /// Number of cells spanning the inclusive range `[lo, hi]`.
@@ -2247,6 +2330,41 @@ mod tests {
     }
 
     #[test]
+    fn dense_layer_subtracts_a_patterned_multi_material_floor() {
+        let hints = PartitionIndex::new(vec![PartitionHint {
+            id: "plot".into(),
+            bbox_xz: (0, 31, 0, 31),
+            y_range: None,
+        }]);
+        let mut blocks = Vec::new();
+        for x in 0..32 {
+            for z in 0..32 {
+                let material = if (x + z) % 2 == 0 {
+                    "minecraft:petrified_oak_slab"
+                } else {
+                    "minecraft:sandstone_slab"
+                };
+                blocks.push(((x, -60, z), material));
+            }
+        }
+        blocks.push(((4, -59, 4), "minecraft:redstone_wire"));
+        blocks.push(((28, -59, 4), "minecraft:redstone_wire"));
+
+        let config = SegConfig {
+            partition_policy: PartitionPolicy::HardCut,
+            partition_floor_share: None,
+            partition_dense_layer_coverage: Some(0.80),
+            ..cfg()
+        };
+        let result = segment_tile(&tile(blocks), &floor_profile(), &config, &hints);
+        assert_eq!(result.clusters.len(), 2);
+        assert!(result
+            .clusters
+            .iter()
+            .all(|cluster| cluster.block_count == 1));
+    }
+
+    #[test]
     fn floor_share_none_is_behavior_preserving() {
         // The default disables the feature entirely.
         assert!(SegConfig::default().partition_floor_share.is_none());
@@ -2508,6 +2626,54 @@ mod tests {
             base.config_hash(&profile(), &no_hints()),
             with_split.config_hash(&profile(), &no_hints()),
             "split_disconnected must be folded into config_hash"
+        );
+    }
+
+    #[test]
+    fn drop_unpartitioned_keeps_only_declared_hard_cut_interiors() {
+        let hints = PartitionIndex::new(vec![PartitionHint {
+            id: "interior".into(),
+            bbox_xz: (0, 31, 0, 31),
+            y_range: None,
+        }]);
+        let input = tile(vec![
+            ((8, 10, 8), "minecraft:redstone_wire"),
+            ((80, 10, 80), "minecraft:redstone_wire"),
+        ]);
+        let config = SegConfig {
+            partition_policy: PartitionPolicy::HardCut,
+            drop_unpartitioned: true,
+            ..cfg()
+        };
+        let result = segment_tile(&input, &profile(), &config, &hints);
+        assert_eq!(result.clusters.len(), 1);
+        assert_eq!(result.clusters[0].block_count, 1);
+        assert_eq!(result.clusters[0].partition_id.as_deref(), Some("interior"));
+    }
+
+    #[test]
+    fn drop_unpartitioned_is_folded_into_config_hash() {
+        let base = cfg();
+        let enabled = SegConfig {
+            drop_unpartitioned: true,
+            ..cfg()
+        };
+        assert_ne!(
+            base.config_hash(&profile(), &no_hints()),
+            enabled.config_hash(&profile(), &no_hints())
+        );
+    }
+
+    #[test]
+    fn dense_layer_coverage_is_folded_into_config_hash() {
+        let base = cfg();
+        let enabled = SegConfig {
+            partition_dense_layer_coverage: Some(0.80),
+            ..cfg()
+        };
+        assert_ne!(
+            base.config_hash(&profile(), &no_hints()),
+            enabled.config_hash(&profile(), &no_hints())
         );
     }
 }

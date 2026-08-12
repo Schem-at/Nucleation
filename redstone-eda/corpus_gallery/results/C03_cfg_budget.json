@@ -1,0 +1,336 @@
+{
+ "artifact": "artifacts/C03_cfg_budget.schem",
+ "artifact_blocks": 968,
+ "blocked_by": "the bus routes and verifies, but the CONFIGURATION was ignored: geometry is identical to C01_cfg_default",
+ "buses": {
+  "bus_a": {
+   "call": "d.route_bus('bus_a', driver='a_in', sinks=['a_out'])\nd.set_bus_rule('bus_a', **{'max_len_rt': 2})",
+   "error": null,
+   "seconds": 0.0931,
+   "state": "routed"
+  }
+ },
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "config_effect": {
+  "baseline": "C01_cfg_default",
+  "baseline_geometry": {
+   "bus_a": {
+    "bbox": [
+     [
+      1,
+      1,
+      -1
+     ],
+     [
+      18,
+      16,
+      3
+     ]
+    ],
+    "cells": 416,
+    "delay_rt": 1,
+    "devices": 8,
+    "footprint": 1440,
+    "glass": 0,
+    "per_bit_rt": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "skew_rt": 0,
+    "wire": 200
+   }
+  },
+  "expect_change": true,
+  "geometry_identical": true,
+  "mine": {
+   "bus_a": {
+    "bbox": [
+     [
+      1,
+      1,
+      -1
+     ],
+     [
+      18,
+      16,
+      3
+     ]
+    ],
+    "cells": 416,
+    "delay_rt": 1,
+    "devices": 8,
+    "footprint": 1440,
+    "glass": 0,
+    "per_bit_rt": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "skew_rt": 0,
+    "wire": 200
+   }
+  },
+  "verdict": "ignored"
+ },
+ "cost_vector": {
+  "coherence": null,
+  "delay_rt": 1,
+  "footprint": 1440,
+  "length": 200,
+  "skew_rt": 0
+ },
+ "expect": "solved",
+ "fixtures": {},
+ "id": "C03_cfg_budget",
+ "log": [
+  "verify 12/12 (bundle conducts under this config 12/12)"
+ ],
+ "loose_blocks": 552,
+ "notes": "MEASURED ANSWER: it routes exactly as C01 -- byte-identical geometry, 3 rt -- and then REPORTS the violation: check() comes back clean=False with `bus `bus_a`: max bit delay 3rt exceeds max_len_rt 2rt`. So the budget is a post-hoc assertion, not a routing objective. That is a defensible design (fail loudly rather than silently), but it means a caller cannot ask for a faster route -- only be told the one they got is too slow.",
+ "per_bus": {
+  "bus_a": {
+   "bbox": [
+    [
+     1,
+     1,
+     -1
+    ],
+    [
+     18,
+     16,
+     3
+    ]
+   ],
+   "cells": 416,
+   "delay_rt": 1,
+   "devices": 8,
+   "footprint": 1440,
+   "glass": 0,
+   "per_bit_rt": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "skew_rt": 0,
+   "wire": 200
+  }
+ },
+ "question": "Same problem with a deliberately tight 2 rt budget (the default route needs 3). Does the router route SHORTER to fit the budget, or route as before and report the violation?",
+ "scenario": {
+  "_family": "configurability",
+  "_file": "scenarios/C03_cfg_budget.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_a",
+    "rule": {
+     "max_len_rt": 2
+    },
+    "sinks": [
+     "a_out"
+    ]
+   }
+  ],
+  "config_probe": {
+   "baseline": "C01_cfg_default",
+   "expect_change": true
+  },
+  "expect": "solved",
+  "id": "C03_cfg_budget",
+  "notes": "MEASURED ANSWER: it routes exactly as C01 -- byte-identical geometry, 3 rt -- and then REPORTS the violation: check() comes back clean=False with `bus `bus_a`: max bit delay 3rt exceeds max_len_rt 2rt`. So the budget is a post-hoc assertion, not a routing objective. That is a defensible design (fail loudly rather than silently), but it means a caller cannot ask for a faster route -- only be told the one they got is too slow.",
+  "obstacles": [
+   {
+    "block": "minecraft:polished_andesite",
+    "max": [
+     6,
+     20,
+     10
+    ],
+    "min": [
+     6,
+     0,
+     0
+    ]
+   },
+   {
+    "block": "minecraft:polished_diorite",
+    "max": [
+     12,
+     20,
+     20
+    ],
+    "min": [
+     12,
+     0,
+     8
+    ]
+   }
+  ],
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     18,
+     2,
+     4
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "Same problem with a deliberately tight 2 rt budget (the default route needs 3). Does the router route SHORTER to fit the budget, or route as before and report the violation?",
+  "render": {
+   "pitch": 30,
+   "yaw": 150,
+   "zoom": 1.75
+  },
+  "title": "Config C: max_len_rt delay budget of 2 rt",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "bundle conducts under this config",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0931,
+ "solved": false,
+ "solver_produced": true,
+ "title": "Config C: max_len_rt delay budget of 2 rt",
+ "verification": {
+  "cases": [
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 2
+   },
+   {
+    "got": 4,
+    "in": 4,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 4
+   },
+   {
+    "got": 8,
+    "in": 8,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 8
+   },
+   {
+    "got": 16,
+    "in": 16,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 16
+   },
+   {
+    "got": 32,
+    "in": 32,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 32
+   },
+   {
+    "got": 64,
+    "in": 64,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 64
+   },
+   {
+    "got": 128,
+    "in": 128,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 128
+   },
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 0
+   },
+   {
+    "got": 255,
+    "in": 255,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 255
+   },
+   {
+    "got": 170,
+    "in": 170,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 170
+   },
+   {
+    "got": 85,
+    "in": 85,
+    "ok": true,
+    "section": "bundle conducts under this config",
+    "want": 85
+   }
+  ],
+  "ok": true,
+  "passed": 12,
+  "sections": {
+   "bundle conducts under this config": {
+    "passed": 12,
+    "total": 12
+   }
+  },
+  "total": 12
+ },
+ "wall_seconds": 0.194
+}

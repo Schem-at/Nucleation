@@ -3,6 +3,7 @@ import { BlockPos } from "./BlockPos.mjs"
 import { BlockState } from "./BlockState.mjs"
 import { Dimensions } from "./Dimensions.mjs"
 import { NucleationError } from "./NucleationError.mjs"
+import { SchematicSplitResult } from "./SchematicSplitResult.mjs"
 import wasm from "./diplomat-wasm.mjs";
 import * as diplomatRuntime from "./diplomat-runtime.mjs";
 
@@ -70,6 +71,26 @@ export class Schematic {
 
         try {
             return new Schematic(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * Split spatially independent machines while keeping nearby tiny
+     * detached parts with their machine. Components at least
+     * `min_standalone_blocks` large always remain independent; smaller
+     * components attach only directly to a core within `max_air_gap`.
+     * Attachment is non-transitive and the operation is lossless.
+     */
+    splitConnectedAttachNearby(minStandaloneBlocks, maxAirGap) {
+
+        const result = wasm.Schematic_split_connected_attach_nearby(this.ffiValue, minStandaloneBlocks, maxAirGap);
+
+        try {
+            return new SchematicSplitResult(diplomatRuntime.internalConstructor, result, []);
         }
 
         finally {
@@ -2097,6 +2118,73 @@ export class Schematic {
      */
     setWeVersion(version) {
     wasm.Schematic_set_we_version(this.ffiValue, version);
+
+        try {}
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * Standard embedded source provenance as canonical JSON. Returns an
+     * empty string when none is present.
+     */
+    provenanceJson() {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Schematic_provenance_json(diplomatReceive.buffer, this.ffiValue, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Validate and set standard embedded source provenance from JSON.
+     */
+    setProvenanceJson(json) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const jsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, json)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_set_provenance_json(diplomatReceive.buffer, this.ffiValue, jsonSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Remove embedded source provenance.
+     */
+    clearProvenance() {
+    wasm.Schematic_clear_provenance(this.ffiValue);
 
         try {}
 

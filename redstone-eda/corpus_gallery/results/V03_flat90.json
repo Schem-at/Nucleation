@@ -1,0 +1,236 @@
+{
+ "artifact": "artifacts/V03_flat90.schem",
+ "artifact_blocks": 1312,
+ "buses": {
+  "bus_corner": {
+   "call": "d.route_bus('bus_corner', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:red_concrete', 'transparent_block': 'minecraft:red_stained_glass'}))",
+   "error": null,
+   "seconds": 0.0427,
+   "state": "routed"
+  }
+ },
+ "check": {
+  "clean": true,
+  "drc": [],
+  "repr": "CheckReport(clean=True, drc=0, rules=0)",
+  "rules": []
+ },
+ "cost_vector": {
+  "coherence": null,
+  "delay_rt": 13,
+  "footprint": 13984,
+  "length": 548,
+  "skew_rt": 10
+ },
+ "expect": "solved",
+ "fixtures": {},
+ "id": "V03_flat90",
+ "log": [
+  "verify 12/12 (corner turned, lane order preserved 12/12)"
+ ],
+ "loose_blocks": 48,
+ "notes": "The corner needs room: with the sink 24 blocks out the same call fails with an internal plan conflict inside the form adapter -- see V03b.",
+ "per_bus": {
+  "bus_corner": {
+   "bbox": [
+    [
+     2,
+     1,
+     3
+    ],
+    [
+     39,
+     16,
+     25
+    ]
+   ],
+   "cells": 1264,
+   "delay_rt": 13,
+   "devices": 84,
+   "footprint": 13984,
+   "glass": 0,
+   "per_bit_rt": [
+    3,
+    5,
+    13,
+    5,
+    4,
+    4,
+    4,
+    4
+   ],
+   "skew_rt": 10,
+   "wire": 548
+  }
+ },
+ "question": "Both ends are flat 2-pitch, but one spreads its bits along X and the other along Z.  Does the router take the corner without swapping lane order?",
+ "scenario": {
+  "_file": "scenarios/V03_flat90.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_corner",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:red_concrete",
+     "transparent_block": "minecraft:red_stained_glass"
+    }
+   }
+  ],
+  "expect": "solved",
+  "id": "V03_flat90",
+  "notes": "The corner needs room: with the sink 24 blocks out the same call fails with an internal plan conflict inside the form adapter -- see V03b.",
+  "ports": [
+   {
+    "anchor": [
+     2,
+     2,
+     2
+    ],
+    "dir": "in",
+    "feed": [
+     0,
+     0,
+     -1
+    ],
+    "form": "flat_x",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     40,
+     2,
+     6
+    ],
+    "dir": "out",
+    "form": "flat_z",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "Both ends are flat 2-pitch, but one spreads its bits along X and the other along Z.  Does the router take the corner without swapping lane order?",
+  "render": {
+   "pitch": 30,
+   "yaw": 140,
+   "zoom": 1.8
+  },
+  "title": "Flat X -> flat Z: the in-plane 90-degree corner",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "corner turned, lane order preserved",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0427,
+ "solved": true,
+ "solver_produced": true,
+ "title": "Flat X -> flat Z: the in-plane 90-degree corner",
+ "verification": {
+  "cases": [
+   {
+    "got": 1,
+    "in": 1,
+    "ok": true,
+    "section": "corner turned, lane order preserved",
+    "want": 1
+   },
+   {
+    "got": 2,
+    "in": 2,
+    "ok": true,
+    "section": "corner turned, lane order preserved",
+    "want": 2
+   },
+   {
+    "got": 4,
+    "in": 4,
+    "ok": true,
+    "section": "corner turned, lane order preserved",
+    "want": 4
+   },
+   {
+    "got": 8,
+    "in": 8,
+    "ok": true,
+    "section": "corner turned, lane order preserved",
+    "want": 8
+   },
+   {
+    "got": 16,
+    "in": 16,
+    "ok": true,
+    "section": "corner turned, lane order preserved",
+    "want": 16
+   },
+   {
+    "got": 32,
+    "in": 32,
+    "ok": true,
+    "section": "corner turned, lane order preserved",
+    "want": 32
+   },
+   {
+    "got": 64,
+    "in": 64,
+    "ok": true,
+    "section": "corner turned, lane order preserved",
+    "want": 64
+   },
+   {
+    "got": 128,
+    "in": 128,
+    "ok": true,
+    "section": "corner turned, lane order preserved",
+    "want": 128
+   },
+   {
+    "got": 0,
+    "in": 0,
+    "ok": true,
+    "section": "corner turned, lane order preserved",
+    "want": 0
+   },
+   {
+    "got": 255,
+    "in": 255,
+    "ok": true,
+    "section": "corner turned, lane order preserved",
+    "want": 255
+   },
+   {
+    "got": 170,
+    "in": 170,
+    "ok": true,
+    "section": "corner turned, lane order preserved",
+    "want": 170
+   },
+   {
+    "got": 85,
+    "in": 85,
+    "ok": true,
+    "section": "corner turned, lane order preserved",
+    "want": 85
+   }
+  ],
+  "ok": true,
+  "passed": 12,
+  "sections": {
+   "corner turned, lane order preserved": {
+    "passed": 12,
+    "total": 12
+   }
+  },
+  "total": 12
+ },
+ "wall_seconds": 0.224
+}

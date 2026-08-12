@@ -1,0 +1,89 @@
+{
+ "artifact": null,
+ "blocked_by": "bus_climb -> failed: segment (1, 2, 4) -> (6, 10, 4): the anchors are 8 level(s) apart, so the bus must change level: the verified level-shift tile needs 23 cells of straight run (plus 1 to clear the port) on one horizontal axis, but the pair only spans 5 in x and 0 in z between (1, 2, 4) and (6, 10, 4). Lengthen the run, or split it with a gate so one leg has room",
+ "buses": {
+  "bus_climb": {
+   "call": "d.route_bus('bus_climb', driver='a_in', sinks=['a_out'], style=n.Style(**{'bus_block': 'minecraft:light_gray_concrete'}))",
+   "error": null,
+   "seconds": 0.0007,
+   "state": "failed: segment (1, 2, 4) -> (6, 10, 4): the anchors are 8 level(s) apart, so the bus must change level: the verified level-shift tile needs 23 cells of straight run (plus 1 to clear the port) on one horizontal axis, but the pair only spans 5 in x and 0 in z between (1, 2, 4) and (6, 10, 4). Lengthen the run, or split it with a gate so one leg has room"
+  }
+ },
+ "check": null,
+ "cost_vector": null,
+ "expect": "unsolved",
+ "fixtures": {},
+ "id": "Z01_level_change_tight",
+ "log": [],
+ "loose_blocks": 48,
+ "notes": "The blocking assumption: ONE level-change mechanism, priced at 2 horizontal cells per y.  The router's error is exemplary -- it names the tile, the run it needs, the run available, and two ways out -- but there is no denser form for it to fall back to.",
+ "per_bus": {},
+ "question": "The ports are 5 apart in x and 8 apart in y.  What does the solver do when a level change has nowhere to spread out?",
+ "scenario": {
+  "_file": "scenarios/Z01_level_change_tight.py",
+  "buses": [
+   {
+    "driver": "a_in",
+    "name": "bus_climb",
+    "sinks": [
+     "a_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:light_gray_concrete"
+    }
+   }
+  ],
+  "expect": "unsolved",
+  "id": "Z01_level_change_tight",
+  "notes": "The blocking assumption: ONE level-change mechanism, priced at 2 horizontal cells per y.  The router's error is exemplary -- it names the tile, the run it needs, the run available, and two ways out -- but there is no denser form for it to fall back to.",
+  "ports": [
+   {
+    "anchor": [
+     1,
+     2,
+     4
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "a_in",
+    "ty": "uint",
+    "width": 8
+   },
+   {
+    "anchor": [
+     6,
+     10,
+     4
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "a_out",
+    "ty": "uint",
+    "width": 8
+   }
+  ],
+  "question": "The ports are 5 apart in x and 8 apart in y.  What does the solver do when a level change has nowhere to spread out?",
+  "render": {
+   "pitch": 24,
+   "yaw": 145,
+   "zoom": 2.0
+  },
+  "title": "Climb 8 levels with 5 blocks of horizontal room",
+  "verify": {
+   "words": [
+    {
+     "in": "a_in",
+     "label": "bundle arrives 8 levels up",
+     "out": "a_out",
+     "patterns": "walking+extremes"
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0007,
+ "solved": false,
+ "solver_produced": true,
+ "title": "Climb 8 levels with 5 blocks of horizontal room",
+ "verification": null,
+ "wall_seconds": 0.001
+}

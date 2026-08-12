@@ -821,9 +821,11 @@ fn run_inner(
                             .map_err(|e| format!("{label}: interning {descriptor}: {e:?}"))?;
                         sim.place_block(Pos::new(p[0], p[1], p[2]), state);
                     }
-                    _ => return Err(format!(
+                    _ => {
+                        return Err(format!(
                         "{label}: tick {tick}: an action is either \"use\" or \"place\"+\"state\""
-                    )),
+                    ))
+                    }
                 }
             }
             if failures.len() > failures_before {

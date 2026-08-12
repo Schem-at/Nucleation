@@ -1,5 +1,119 @@
 use quartz_nbt::{NbtCompound, NbtTag};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
+/// Current version of Nucleation's embedded schematic provenance contract.
+pub const SCHEMATIC_PROVENANCE_VERSION: u32 = 1;
+/// On-disk NBT key used by every format that can carry custom metadata.
+pub const SCHEMATIC_PROVENANCE_NBT_KEY: &str = "NucleationProvenance";
+
+/// Inclusive world-space bounds for extracted schematic content.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct ProvenanceBounds {
+    pub min: [i32; 3],
+    pub max: [i32; 3],
+}
+
+impl ProvenanceBounds {
+    pub fn new(min: [i32; 3], max: [i32; 3]) -> Result<Self, String> {
+        if min.iter().zip(max.iter()).any(|(lo, hi)| lo > hi) {
+            return Err("provenance bounds must be inclusive min <= max on every axis".into());
+        }
+        Ok(Self { min, max })
+    }
+}
+
+/// Standard source metadata carried by a schematic independently of its file
+/// format. Coordinates are absolute Minecraft world coordinates; `origin` is
+/// the world position corresponding to schematic-local `(0, 0, 0)`.
+///
+/// The typed common fields make catalogs interoperable. `attributes` is the
+/// namespaced extension point for source-specific identifiers without changing
+/// the schema (for example `example.org:claim_id`).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct SchematicProvenance {
+    pub schema_version: u32,
+    pub source_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub world_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub map_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dimension: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub world_bbox: Option<ProvenanceBounds>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<[i32; 3]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub partition_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stable_build_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extracted_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub attributes: BTreeMap<String, String>,
+}
+
+impl SchematicProvenance {
+    pub fn new(source_id: impl Into<String>) -> Result<Self, String> {
+        let source_id = source_id.into();
+        if source_id.trim().is_empty() {
+            return Err("provenance source_id must not be empty".into());
+        }
+        Ok(Self {
+            schema_version: SCHEMATIC_PROVENANCE_VERSION,
+            source_id,
+            world_name: None,
+            map_name: None,
+            dimension: None,
+            snapshot_id: None,
+            world_bbox: None,
+            origin: None,
+            partition_id: None,
+            stable_build_id: None,
+            extracted_at: None,
+            config_hash: None,
+            profile_hash: None,
+            attributes: BTreeMap::new(),
+        })
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != SCHEMATIC_PROVENANCE_VERSION {
+            return Err(format!(
+                "unsupported schematic provenance schema version {}",
+                self.schema_version
+            ));
+        }
+        if self.source_id.trim().is_empty() {
+            return Err("provenance source_id must not be empty".into());
+        }
+        if let Some(bounds) = &self.world_bbox {
+            ProvenanceBounds::new(bounds.min, bounds.max)?;
+        }
+        if self.attributes.keys().any(|key| !key.contains(':')) {
+            return Err("provenance attribute keys must be namespaced (contain ':')".into());
+        }
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, String> {
+        self.validate()?;
+        serde_json::to_string(self).map_err(|error| error.to_string())
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, String> {
+        let provenance: Self = serde_json::from_str(json).map_err(|error| error.to_string())?;
+        provenance.validate()?;
+        Ok(provenance)
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct Metadata {
@@ -11,6 +125,11 @@ pub struct Metadata {
     pub lm_version: Option<i32>,
     pub mc_version: Option<i32>,
     pub we_version: Option<i32>,
+    /// Standard origin/source metadata. Native Nucleation serialization keeps
+    /// the typed value; `.schem` and `.litematic` store its canonical JSON at
+    /// `NucleationProvenance` in their Metadata compound.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<SchematicProvenance>,
     /// The Minecraft data version of the *file this schematic was loaded from*,
     /// captured by importers. Distinct from `mc_version` (which doubles as the
     /// export fallback). Drives forward-conversion to canonical on load and is
@@ -67,6 +186,7 @@ impl Metadata {
             lm_version,
             mc_version,
             we_version,
+            provenance: None,
             source_data_version: None,
             embedded_test: None,
             cell_contract: None,
@@ -99,6 +219,11 @@ impl Metadata {
         }
         if let Some(we_version) = self.we_version {
             compound.insert("we_version", NbtTag::Int(we_version));
+        }
+        if let Some(provenance) = &self.provenance {
+            if let Ok(json) = provenance.to_json() {
+                compound.insert(SCHEMATIC_PROVENANCE_NBT_KEY, NbtTag::String(json));
+            }
         }
 
         NbtTag::Compound(compound)
@@ -134,7 +259,12 @@ impl Metadata {
         let mc_version = nbt.get::<_, i32>("mc_version").map_err(|_| 0).ok();
         let we_version = nbt.get::<_, i32>("we_version").map_err(|_| 0).ok();
 
-        Ok(Metadata::new(
+        let provenance = nbt
+            .get::<_, &str>(SCHEMATIC_PROVENANCE_NBT_KEY)
+            .ok()
+            .and_then(|json| SchematicProvenance::from_json(json).ok());
+
+        let mut metadata = Metadata::new(
             name,
             author,
             description,
@@ -143,6 +273,8 @@ impl Metadata {
             lm_version,
             mc_version,
             we_version,
-        ))
+        );
+        metadata.provenance = provenance;
+        Ok(metadata)
     }
 }

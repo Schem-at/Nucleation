@@ -1,10 +1,13 @@
-//! Forward-only tile source over a streaming `.tar.gz` world archive.
+//! Forward-only tile source over a streaming tar world archive.
 //!
-//! A gzipped tar cannot be seeked, so this is `Access::Forward`: it walks the
-//! archive once, parses each `region/*.mca` entry into a tile, and streams it.
+//! Plain `.tar`, gzip, and Zstandard compression are detected from their magic
+//! bytes rather than the filename. Compressed tar streams cannot be seeked, so
+//! this is `Access::Forward`: it walks the archive once, parses each
+//! `region/*.mca` entry into a tile, and streams it.
 //! Everything rejected (backups, stray level files, junk coordinates) is
 //! reported, never silently dropped.
 
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -50,29 +53,89 @@ pub fn region_outside_border(rx: i32, rz: i32, border: i32) -> bool {
     x1 < -border || x0 > border || z1 < -border || z0 > border
 }
 
-pub struct TarGzSource {
+/// Inclusive world-space XZ rectangle used to scope archive ingestion.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct WorldRect {
+    pub min_x: i32,
+    pub min_z: i32,
+    pub max_x: i32,
+    pub max_z: i32,
+}
+
+impl WorldRect {
+    pub fn new(min_x: i32, min_z: i32, max_x: i32, max_z: i32) -> Self {
+        Self {
+            min_x: min_x.min(max_x),
+            min_z: min_z.min(max_z),
+            max_x: min_x.max(max_x),
+            max_z: min_z.max(max_z),
+        }
+    }
+
+    pub fn intersects_region(&self, rx: i32, rz: i32) -> bool {
+        let x0 = rx * 512;
+        let z0 = rz * 512;
+        let x1 = x0 + 511;
+        let z1 = z0 + 511;
+        x1 >= self.min_x && x0 <= self.max_x && z1 >= self.min_z && z0 <= self.max_z
+    }
+
+    fn region_coords(&self) -> BTreeSet<(i32, i32)> {
+        let min_rx = self.min_x.div_euclid(512);
+        let max_rx = self.max_x.div_euclid(512);
+        let min_rz = self.min_z.div_euclid(512);
+        let max_rz = self.max_z.div_euclid(512);
+        (min_rx..=max_rx)
+            .flat_map(|rx| (min_rz..=max_rz).map(move |rz| (rx, rz)))
+            .collect()
+    }
+}
+
+/// Streaming source for uncompressed, gzip-compressed, or Zstandard-compressed
+/// tar archives containing Minecraft `region/*.mca` entries.
+pub struct TarArchiveSource {
     path: PathBuf,
     min_y: i32,
     max_y: i32,
     world_border: Option<i32>,
+    world_rect: Option<WorldRect>,
+    report_filtered_entries: bool,
 }
 
-impl TarGzSource {
+impl TarArchiveSource {
     pub fn open(path: impl AsRef<Path>, min_y: i32, max_y: i32) -> Result<Self, TileError> {
         let path = path.as_ref().to_path_buf();
         if !path.exists() {
             return Err(TileError::Io(format!("{} does not exist", path.display())));
         }
-        Ok(TarGzSource {
+        Ok(TarArchiveSource {
             path,
             min_y,
             max_y,
             world_border: None,
+            world_rect: None,
+            report_filtered_entries: true,
         })
     }
 
     pub fn with_world_border(mut self, border_abs: i32) -> Self {
         self.world_border = Some(border_abs.abs());
+        self
+    }
+
+    /// Only decode regions whose 512x512 footprint intersects this inclusive
+    /// world-space rectangle. This filter is applied before an MCA entry is
+    /// read into memory, which makes it safe to sample large pregenerated
+    /// worlds and Distant-Horizons backups.
+    pub fn with_world_rect(mut self, min_x: i32, min_z: i32, max_x: i32, max_z: i32) -> Self {
+        self.world_rect = Some(WorldRect::new(min_x, min_z, max_x, max_z));
+        self
+    }
+
+    /// Suppress diagnostics for ordinary non-region and out-of-scope archive
+    /// entries. Malformed matching regions are still always reported.
+    pub fn quiet_filtered_entries(mut self) -> Self {
+        self.report_filtered_entries = false;
         self
     }
 
@@ -88,11 +151,36 @@ impl TarGzSource {
                 return Err(format!("outside world border ({x},{z})"));
             }
         }
+        if let Some(rect) = self.world_rect {
+            if !rect.intersects_region(x, z) {
+                return Err(format!("outside world rectangle ({x},{z})"));
+            }
+        }
         Ok((x, z))
+    }
+
+    fn archive_reader(&self) -> Result<Box<dyn Read>, TileError> {
+        let mut file = File::open(&self.path).map_err(|e| TileError::Io(e.to_string()))?;
+        let mut magic = [0u8; 4];
+        let read = file
+            .read(&mut magic)
+            .map_err(|e| TileError::Io(e.to_string()))?;
+        drop(file);
+
+        let file = File::open(&self.path).map_err(|e| TileError::Io(e.to_string()))?;
+        if read >= 2 && magic[..2] == [0x1f, 0x8b] {
+            Ok(Box::new(flate2::read::GzDecoder::new(BufReader::new(file))))
+        } else if read == 4 && magic == [0x28, 0xb5, 0x2f, 0xfd] {
+            let decoder =
+                zstd::stream::read::Decoder::new(file).map_err(|e| TileError::Io(e.to_string()))?;
+            Ok(Box::new(decoder))
+        } else {
+            Ok(Box::new(BufReader::new(file)))
+        }
     }
 }
 
-impl TileSource for TarGzSource {
+impl TileSource for TarArchiveSource {
     fn access(&self) -> Access {
         Access::Forward
     }
@@ -110,14 +198,16 @@ impl TileSource for TarGzSource {
         &self,
         f: &mut dyn FnMut(VoxelTile) -> Result<(), TileError>,
     ) -> Result<(), TileError> {
-        use flate2::read::GzDecoder;
-        let file = File::open(&self.path).map_err(|e| TileError::Io(e.to_string()))?;
-        let gz = GzDecoder::new(BufReader::new(file));
-        let mut archive = tar::Archive::new(gz);
+        let mut archive = tar::Archive::new(self.archive_reader()?);
         let entries = archive
             .entries()
             .map_err(|e| TileError::Io(e.to_string()))?;
         let mut buf: Vec<u8> = Vec::new();
+        // Once every region intersecting an explicit rectangle has been seen,
+        // no later archive entry can contribute content. Ending the compressed
+        // stream here makes small-area previews proportional to their area,
+        // not to the size of a multi-gigabyte backup.
+        let mut remaining_rect_regions = self.world_rect.map(|rect| rect.region_coords());
         for entry in entries {
             let mut entry = entry.map_err(|e| TileError::Io(e.to_string()))?;
             let name = entry
@@ -130,7 +220,9 @@ impl TileSource for TarGzSource {
                 Err(reason) => {
                     // Report, do not silently drop. eprintln keeps the core
                     // free of a logging dependency; callers can capture stderr.
-                    eprintln!("world_segment: skipping {name}: {reason}");
+                    if self.report_filtered_entries {
+                        eprintln!("world_segment: skipping {name}: {reason}");
+                    }
                     continue;
                 }
             };
@@ -176,9 +268,12 @@ impl TileSource for TarGzSource {
                 }
             };
             let _ = (rx, rz); // filename coords already served their filtering purpose
-            let tiles = crate::world_segment::world_source::WorldSourceTiles::new(
+            let mut tiles = crate::world_segment::world_source::WorldSourceTiles::new(
                 source, self.min_y, self.max_y,
             );
+            if let Some(rect) = self.world_rect {
+                tiles = tiles.with_world_rect(rect.min_x, rect.min_z, rect.max_x, rect.max_z);
+            }
             // A corrupt chunk inside an otherwise valid region header surfaces
             // here as TileError::Malformed from collect_tile(); report and
             // skip this region, same as the decode failures above, rather
@@ -202,10 +297,21 @@ impl TileSource for TarGzSource {
                     continue;
                 }
             }
+            if let Some(remaining) = &mut remaining_rect_regions {
+                remaining.remove(&(rx, rz));
+                if remaining.is_empty() {
+                    return Ok(());
+                }
+            }
         }
         Ok(())
     }
 }
+
+/// Backwards-compatible name retained for callers that used the original
+/// gzip-only source. It now supports every compression handled by
+/// [`TarArchiveSource`].
+pub type TarGzSource = TarArchiveSource;
 
 #[cfg(test)]
 mod tests {
@@ -257,6 +363,47 @@ mod tests {
         );
         assert!(!region_outside_border(15, 0, 8192), "inside");
         assert!(!region_outside_border(0, 0, 8192), "inside");
+    }
+
+    #[test]
+    fn world_rect_normalizes_and_intersects_region_footprints() {
+        let rect = WorldRect::new(600, 700, -10, -20);
+        assert_eq!(rect, WorldRect::new(-10, -20, 600, 700));
+        assert!(rect.intersects_region(0, 0));
+        assert!(rect.intersects_region(1, 1));
+        assert!(!rect.intersects_region(2, 0));
+        assert!(!rect.intersects_region(-2, -2));
+    }
+
+    #[test]
+    fn accepts_plain_and_zstandard_tar_streams() {
+        let mut tar_bytes = Vec::new();
+        {
+            let mut builder = tar::Builder::new(&mut tar_bytes);
+            let tiny = b"not a real region, but enough to exercise archive decoding";
+            let mut header = tar::Header::new_gnu();
+            header.set_size(tiny.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, "world/region/r.0.0.mca", &tiny[..])
+                .unwrap();
+            builder.finish().unwrap();
+        }
+
+        let zstd_bytes = zstd::stream::encode_all(&tar_bytes[..], 1).unwrap();
+        for (suffix, bytes) in [("tar", tar_bytes), ("tar.zst", zstd_bytes)] {
+            let path = std::env::temp_dir().join(format!(
+                "nucleation_world_segment_archive_source_test.{suffix}"
+            ));
+            std::fs::write(&path, bytes).unwrap();
+            let source = TarArchiveSource::open(&path, -64, 320)
+                .unwrap()
+                .quiet_filtered_entries();
+            let result = source.for_each_tile(&mut |_tile| Ok(()));
+            std::fs::remove_file(path).ok();
+            assert!(result.is_ok(), "{suffix} stream must decode: {result:?}");
+        }
     }
 
     /// Builds a gzipped tar (in memory) containing several entries that each

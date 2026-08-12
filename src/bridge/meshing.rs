@@ -428,8 +428,8 @@ pub mod ffi {
             timeline_json: &DiplomatStr,
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
-            let json = std::str::from_utf8(timeline_json)
-                .map_err(|_| NucleationError::InvalidArgument)?;
+            let json =
+                std::str::from_utf8(timeline_json).map_err(|_| NucleationError::InvalidArgument)?;
             let data = schematic
                 .0
                 .to_animated_glb(&pack.0, json)

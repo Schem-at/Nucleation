@@ -239,7 +239,10 @@ mod tests {
             let i = (t.intersection.x, t.intersection.y, t.intersection.z);
             assert!(!all.contains(&i), "X line claims the intersection at y={y}");
             assert!(!z.contains(&i), "Z line claims the intersection at y={y}");
-            assert!(!sup.contains(&i), "a support claims the intersection at y={y}");
+            assert!(
+                !sup.contains(&i),
+                "a support claims the intersection at y={y}"
+            );
         }
     }
 
@@ -295,15 +298,17 @@ mod tests {
     fn the_lid_cells_are_deliberately_not_ported() {
         let t = xw_updown(3);
         assert!(
-            t.supports.iter().all(|c| c.y < 3 || c.z == 12 || c.z == 13 || c.z == 14),
+            t.supports
+                .iter()
+                .all(|c| c.y < 3 || c.z == 12 || c.z == 13 || c.z == 14),
             "`supports` must only ever be the cell under a dust cell, never a lid"
         );
     }
 
     #[test]
     fn every_dust_cell_stands_on_a_conductor() {
-        use crate::transport::conducts;
         use crate::blocks;
+        use crate::transport::conducts;
         for y in [3, 5, 7, 9] {
             let t = xw_updown(y);
             let sup = as_tuples(&t.supports);

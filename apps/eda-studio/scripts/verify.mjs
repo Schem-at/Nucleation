@@ -884,10 +884,9 @@ try {
     `a ${meshes.budgetFps > 999 ? ">999" : meshes.budgetFps.toFixed(0)} fps budget, target >= 30 fps ` +
     `(<= 33 ms)`);
 
-  // The same gesture with LIVE RE-ROUTE on: every frame also commits the move
-  // to the document and re-routes the affected buses. This is the router's
-  // floor, not the renderer's, and it is why the fixed 250 ms throttle is gone
-  // — the drag previews at frame rate and the engine runs as often as it can.
+  // The same gesture with ADAPTIVE RE-ROUTE on. A route that cannot meet the
+  // frame budget stays a GPU-only preview and commits once on drop; it must not
+  // turn every pointer frame into synchronous router work.
   const live = await page.evaluate(async (N) => {
     const e = window.__eda;
     const s = window.__edaStudio();
@@ -896,24 +895,29 @@ try {
     document.querySelector("#live-reroute").checked = true;
     e.timingsReset();
     const t0 = performance.now();
+    let final = at;
     for (let i = 0; i < N; i++) {
-      window.__edaDragMove("instance", inst.name, [at[0] + (i % 7), at[1], at[2] + (i % 5)]);
+      final = [at[0] + 1 + (i % 7), at[1], at[2] + 1 + (i % 5)];
+      window.__edaDragMove("instance", inst.name, final);
       await new Promise((r) => requestAnimationFrame(r));
     }
     const wall = performance.now() - t0;
-    window.__edaDrag("instance", inst.name, at);
+    window.__edaDrag("instance", inst.name, final);
     const t = e.timings();
-    return {
+    const result = {
       wallPerFrame: wall / N,
       commits: t.dragFrame?.n ?? 0,
       commitMs: t.dragFrame ? t.dragFrame.ms / t.dragFrame.n : 0,
       scene: t["studio.scene"] ? t["studio.scene"].ms / t["studio.scene"].n : 0,
+      policy: e.routingPolicy(),
     };
+    window.__edaDrag("instance", inst.name, at);
+    return result;
   }, N);
-  check(live.commits > 0 && live.commits <= N + 1, // +1: the drop that follows
-    `live re-route commits at most one engine move per animation frame ` +
-    `(${live.commits} commits over ${N} frames, ${live.commitMs.toFixed(0)} ms each, ` +
-    `scene update ${live.scene.toFixed(1)} ms) — no fixed throttle`,
+  check(live.commits === 1 && live.wallPerFrame <= 33,
+    `adaptive re-route keeps a slow ${N}-frame drag lazy and commits once on drop ` +
+    `(${live.commits} commit, ${live.wallPerFrame.toFixed(1)} ms pointer frames, ` +
+    `${live.commitMs.toFixed(0)} ms final route)`,
     JSON.stringify(live));
 
   const toggleMesh = await page.evaluate(async () => {
@@ -1017,7 +1021,7 @@ try {
     e.undo();
     await after("undo it");
     return {
-      steps, staleDropped: staleAfter - staleBefore,
+      steps, staleDropped: staleAfter - staleBefore, policy: e.routingPolicy(),
       racePos, wanted: [home[0] + 12, home[1], home[2]],
     };
   });
@@ -1028,10 +1032,9 @@ try {
     `${consistency.steps[0].layers} layers compared cell-for-cell against a fresh, ` +
     `cache-bypassing read`,
     JSON.stringify(badSteps.slice(0, 2)));
-  check(consistency.staleDropped >= 1 &&
+  check(consistency.policy.pending == null &&
         consistency.racePos.join() === consistency.wanted.join(),
-    `the drag race is closed: a live re-route frame queued BEFORE a drop is refused ` +
-    `when it fires (${consistency.staleDropped} stale commit dropped), and the instance ` +
+    `the drag race is closed: drop cancels pending adaptive work and the instance ` +
     `stays where the drop put it (${consistency.racePos.join(",")})`,
     JSON.stringify(consistency));
 

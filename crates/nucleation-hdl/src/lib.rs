@@ -209,7 +209,11 @@ impl Compiled {
             .iter()
             .map(|(s, p)| format!("{{\"signal\":\"{}\",\"pos\":{}}}", esc(s), pos(*p)))
             .collect();
-        let inputs: Vec<String> = self.inputs.iter().map(|s| format!("\"{}\"", esc(s))).collect();
+        let inputs: Vec<String> = self
+            .inputs
+            .iter()
+            .map(|s| format!("\"{}\"", esc(s)))
+            .collect();
         let outputs: Vec<String> = self
             .outputs
             .iter()
@@ -281,9 +285,10 @@ fn seq_checks(parsed: &blif::Blif) -> Result<Option<String>, HdlError> {
     let mut clock: Option<&str> = None;
     let mut q_seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
     for l in &parsed.latches {
-        let c = l.control.as_deref().ok_or_else(|| {
-            HdlError::Unsupported(".latch without a clock control net".into())
-        })?;
+        let c = l
+            .control
+            .as_deref()
+            .ok_or_else(|| HdlError::Unsupported(".latch without a clock control net".into()))?;
         match clock {
             None => clock = Some(c),
             Some(k) if k != c => {

@@ -155,10 +155,13 @@ fn the_canonical_stack_is_not_split_into_lanes() {
         s.set_block_from_string(32, y, 8, DUST).unwrap();
     }
     let mut d = Design::for_schematic("st", s);
-    d.declare_input("din", (0, 2, 8), (0, 2, 0), W, ty()).unwrap();
-    d.declare_output("dout", (32, 2, 8), (0, 2, 0), W, ty()).unwrap();
+    d.declare_input("din", (0, 2, 8), (0, 2, 0), W, ty())
+        .unwrap();
+    d.declare_output("dout", (32, 2, 8), (0, 2, 0), W, ty())
+        .unwrap();
     assert_eq!(
-        d.route_bus("b", "din", &["dout"], vec![], BusStyle::default()).unwrap(),
+        d.route_bus("b", "din", &["dout"], vec![], BusStyle::default())
+            .unwrap(),
         BusState::Routed
     );
     let layer = d.bus("b").unwrap();
@@ -189,7 +192,8 @@ fn a_form_converting_route_stays_inside_its_endpoints_span() {
     let mut d = Design::for_schematic("mix", s);
     d.add_cell("row", cell).unwrap();
     d.place("u1", "row", (60, 1, 40), 0).unwrap();
-    d.declare_input("din", (15, 3, 1), (0, 2, 0), W, ty()).unwrap();
+    d.declare_input("din", (15, 3, 1), (0, 2, 0), W, ty())
+        .unwrap();
     let st = d
         .route_bus("b", "din", &["u1.d"], vec![], BusStyle::default())
         .unwrap();
@@ -231,7 +235,9 @@ fn the_gather_bar_topology_scores_worse_than_parallel_lanes() {
     lanes.place("u0", "row", (0, 0, 0), 0).unwrap();
     lanes.place("u1", "row", (0, 0, 30), 0).unwrap();
     assert_eq!(
-        lanes.route_bus("b", "u0.q", &["u1.d"], vec![], BusStyle::default()).unwrap(),
+        lanes
+            .route_bus("b", "u0.q", &["u1.d"], vec![], BusStyle::default())
+            .unwrap(),
         BusState::Routed
     );
     let v_lanes = lanes.bus_cost(lanes.bus("b").unwrap());
@@ -246,7 +252,10 @@ fn the_gather_bar_topology_scores_worse_than_parallel_lanes() {
     let Ok(BusState::Routed) = st else {
         // A conversion route that will not even realize is worse than "worse".
         println!("[cost] converting route did not realize ({st:?}) — parallel lanes win outright");
-        assert_eq!(v_lanes.coherence, 0, "the parallel bundle must be perfectly coherent");
+        assert_eq!(
+            v_lanes.coherence, 0,
+            "the parallel bundle must be perfectly coherent"
+        );
         return;
     };
     let v_bar = bar.bus_cost(bar.bus("b").unwrap());
@@ -277,10 +286,14 @@ fn a_congruent_bundle_has_no_coherence_penalty() {
     d.add_cell("row", row_cell()).unwrap();
     d.place("u0", "row", (0, 0, 0), 0).unwrap();
     d.place("u1", "row", (0, 0, 30), 0).unwrap();
-    d.route_bus("b", "u0.q", &["u1.d"], vec![], BusStyle::default()).unwrap();
+    d.route_bus("b", "u0.q", &["u1.d"], vec![], BusStyle::default())
+        .unwrap();
     let v = d.bus_cost(d.bus("b").unwrap());
     println!("[cost] congruent bundle {v:?}");
-    assert_eq!(v.coherence, 0, "a bundle travelling together must score 0 coherence");
+    assert_eq!(
+        v.coherence, 0,
+        "a bundle travelling together must score 0 coherence"
+    );
     // The lanes are congruent and equal-length, so the true skew is 0.
     //
     // This used to report a phantom skew: `bus_bit_delays` keyed per-bit
@@ -296,6 +309,9 @@ fn a_congruent_bundle_has_no_coherence_penalty() {
     );
     // And the vector reaches the report.
     let json = d.check().unwrap().json;
-    assert!(json.contains("\"coherence\""), "the cost vector is not in check(): {json}");
+    assert!(
+        json.contains("\"coherence\""),
+        "the cost vector is not in check(): {json}"
+    );
     assert!(json.contains("\"footprint\""), "{json}");
 }

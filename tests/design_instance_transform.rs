@@ -90,7 +90,10 @@ fn derived_ports_land_inside_the_instance_footprint_at_every_rotation() {
         // Every derived port wire must sit inside that footprint.
         for p in d.instance_ports().unwrap() {
             let wires = p.wires.unwrap_or_else(|| {
-                panic!("rot {rot}: port {} lost its dust taps: {:?}", p.name, p.blocked)
+                panic!(
+                    "rot {rot}: port {} lost its dust taps: {:?}",
+                    p.name, p.blocked
+                )
             });
             for w in wires {
                 assert!(
@@ -115,7 +118,13 @@ fn a_bus_between_two_rotated_instances_routes() {
     d.place("a", "blk", (0, 0, 0), 0).unwrap();
     d.place("b", "blk", (40, 0, 0), 180).unwrap();
     let state = d
-        .route_bus("net", "a.q", &["b.d"], vec![], nucleation::design::BusStyle::default())
+        .route_bus(
+            "net",
+            "a.q",
+            &["b.d"],
+            vec![],
+            nucleation::design::BusStyle::default(),
+        )
         .unwrap();
     assert_eq!(
         state,

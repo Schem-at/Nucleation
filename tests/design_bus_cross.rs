@@ -30,7 +30,8 @@ fn lever_bank(s: &mut UniversalSchematic, x: i32, z: i32, dx: i32, dz: i32) -> (
         let y = 2 + 2 * i;
         s.set_block_from_string(x, y - 1, z, STONE).unwrap();
         s.set_block_from_string(x, y, z, LEVER).unwrap();
-        s.set_block_from_string(x + dx, y - 1, z + dz, STONE).unwrap();
+        s.set_block_from_string(x + dx, y - 1, z + dz, STONE)
+            .unwrap();
         s.set_block_from_string(x + dx, y, z + dz, DUST).unwrap();
     }
     (x + dx, 2, z + dz)
@@ -60,7 +61,8 @@ fn crossing_buses_pass_typed_walking_ones_through_the_embedded_contract() {
     let step = (0, 2, 0);
     let ty = IoType::UnsignedInt { bits: 8 };
     d.declare_input("a_in", a_in, step, 8, ty.clone()).unwrap();
-    d.declare_output("a_out", a_out, step, 8, ty.clone()).unwrap();
+    d.declare_output("a_out", a_out, step, 8, ty.clone())
+        .unwrap();
     d.declare_input("b_in", b_in, step, 8, ty.clone()).unwrap();
     d.declare_output("b_out", b_out, step, 8, ty).unwrap();
 

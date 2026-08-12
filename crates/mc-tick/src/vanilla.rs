@@ -451,8 +451,7 @@ impl VanillaRules {
             from: Pos,
             power: u8,
         }
-        let wire_power_at =
-            |p: Pos| self.wires.get(&world.get(p)).map(|(power, _)| *power);
+        let wire_power_at = |p: Pos| self.wires.get(&world.get(p)).map(|(power, _)| *power);
         let conductor_at = |p: Pos| self.conductors.contains(&world.get(p));
         let mut inputs: Vec<Input> = Vec::new();
         let kind;
@@ -1533,8 +1532,7 @@ const MINECART_SEATS: &[(&str, [f64; 3])] = &[
 /// 3/16 block on Y and remains there. The fixture's 192 saved pairs carry the
 /// same offset once their source-world passenger positions are translated back
 /// from the litematic region origin.
-const PALE_OAK_BOAT_SEATS: &[(&str, [f64; 3])] =
-    &[("minecraft:silverfish", [0.0, 0.1875, 0.0])];
+const PALE_OAK_BOAT_SEATS: &[(&str, [f64; 3])] = &[("minecraft:silverfish", [0.0, 0.1875, 0.0])];
 
 /// Every entity kind this engine models, in one place.
 ///
@@ -4344,9 +4342,7 @@ mod tests {
     fn the_elevators_idle_crafter_is_a_disabled_slot_analog_container() {
         let mut registry = StateRegistry::new();
         let idle = registry
-            .intern(
-                "minecraft:crafter[crafting=false,orientation=west_up,triggered=false]",
-            )
+            .intern("minecraft:crafter[crafting=false,orientation=west_up,triggered=false]")
             .unwrap();
         let active = registry
             .intern("minecraft:crafter[crafting=true,orientation=west_up,triggered=true]")
@@ -4369,22 +4365,18 @@ mod tests {
         inventory.blocked_slots = 1;
         let mut inventories = crate::inventory::InventoryMap::new();
         inventories.insert(pos, inventory);
-        assert_eq!(
-            rules.analog_signal(&world, &inventories, &[], pos),
-            Some(1)
-        );
-        inventories.get_mut(&pos).unwrap().stacks.push(
-            crate::inventory::ItemStack {
+        assert_eq!(rules.analog_signal(&world, &inventories, &[], pos), Some(1));
+        inventories
+            .get_mut(&pos)
+            .unwrap()
+            .stacks
+            .push(crate::inventory::ItemStack {
                 slot: 1,
                 id: "minecraft:stone".to_string(),
                 count: 1,
                 contents: None,
-            },
-        );
-        assert_eq!(
-            rules.analog_signal(&world, &inventories, &[], pos),
-            Some(2)
-        );
+            });
+        assert_eq!(rules.analog_signal(&world, &inventories, &[], pos), Some(2));
         assert_eq!(rules.container_slots_at(&world, pos), Some(9));
     }
 
@@ -4392,10 +4384,8 @@ mod tests {
     fn a_hopper_inserts_after_the_crafters_disabled_slot() {
         let hopper_pos = Pos::new(0, 0, 0);
         let crafter_pos = Pos::new(1, 0, 0);
-        let mut sim = crate::Simulation::new(crate::Bounds::new(
-            Pos::new(-1, -1, -1),
-            Pos::new(2, 1, 1),
-        ));
+        let mut sim =
+            crate::Simulation::new(crate::Bounds::new(Pos::new(-1, -1, -1), Pos::new(2, 1, 1)));
         let hopper = sim
             .registry_mut()
             .intern("minecraft:hopper[enabled=true,facing=east]")
@@ -4431,9 +4421,10 @@ mod tests {
             target.stacks.iter().all(|stack| stack.slot != 0),
             "the disabled slot must reject insertion"
         );
-        assert!(target.stacks.iter().any(|stack| {
-            stack.slot == 1 && stack.id == "minecraft:stone" && stack.count == 1
-        }));
+        assert!(target
+            .stacks
+            .iter()
+            .any(|stack| { stack.slot == 1 && stack.id == "minecraft:stone" && stack.count == 1 }));
     }
 
     /// The blocks that rejected twenty of twenty-eight community doors, each
@@ -4547,10 +4538,7 @@ mod tests {
         assert!(!rules.logs.contains(&mushroom));
         assert!(rules.logs.contains(&crimson));
 
-        let mut world = World::new(crate::Bounds::new(
-            Pos::new(0, 0, 0),
-            Pos::new(1, 0, 0),
-        ));
+        let mut world = World::new(crate::Bounds::new(Pos::new(0, 0, 0), Pos::new(1, 0, 0)));
         world.set(Pos::new(0, 0, 0), pumpkin);
         world.set(Pos::new(1, 0, 0), lichen);
         assert!(rules.destroys(&world, Pos::new(0, 0, 0)));

@@ -107,9 +107,9 @@ pub fn sta(ws: &Workspace, inputs: &[String], gates: &[Gate]) -> Result<TimingRe
         }
     }
     let sources: Vec<(usize, u64)> = inputs.iter().map(|s| (ids[s.as_str()], 0)).collect();
-    let res = graph
-        .analyze(&sources)
-        .map_err(|e| StaError::CombinationalLoop(e.nodes.iter().map(|n| names[n].to_string()).collect()))?;
+    let res = graph.analyze(&sources).map_err(|e| {
+        StaError::CombinationalLoop(e.nodes.iter().map(|n| names[n].to_string()).collect())
+    })?;
 
     let mut arrival_rt = BTreeMap::new();
     for (name, id) in &ids {
@@ -130,7 +130,10 @@ pub fn sta(ws: &Workspace, inputs: &[String], gates: &[Gate]) -> Result<TimingRe
             .collect(),
         None => Vec::new(),
     };
-    Ok(TimingReport { arrival_rt, critical })
+    Ok(TimingReport {
+        arrival_rt,
+        critical,
+    })
 }
 
 #[cfg(test)]

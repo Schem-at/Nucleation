@@ -469,8 +469,7 @@ pub mod ffi {
                     crate::bridge::set_last_error_detail(e);
                     NucleationError::InvalidArgument
                 })?;
-            let changed: Vec<String> =
-                report.changed.iter().map(|n| format!("{n:?}")).collect();
+            let changed: Vec<String> = report.changed.iter().map(|n| format!("{n:?}")).collect();
             let _ = write!(
                 out,
                 "{{\"state\":{:?},\"rerouted_segments\":{},\"changed\":[{}]}}",
@@ -496,8 +495,7 @@ pub mod ffi {
                 crate::bridge::set_last_error_detail(e);
                 NucleationError::InvalidArgument
             })?;
-            let changed: Vec<String> =
-                report.changed.iter().map(|n| format!("{n:?}")).collect();
+            let changed: Vec<String> = report.changed.iter().map(|n| format!("{n:?}")).collect();
             let _ = write!(
                 out,
                 "{{\"state\":{:?},\"rerouted_segments\":{},\"changed\":[{}]}}",
@@ -873,14 +871,25 @@ pub mod ffi {
     }
 
     fn parse_gates(json: &str) -> Result<Vec<crate::design::Gate>, NucleationError> {
-        let v: serde_json::Value = serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
+        let v: serde_json::Value =
+            serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
         let arr = v.as_array().ok_or(NucleationError::Parse)?;
         let mut gates = Vec::new();
         for g in arr {
-            let name = g["name"].as_str().ok_or(NucleationError::Parse)?.to_string();
+            let name = g["name"]
+                .as_str()
+                .ok_or(NucleationError::Parse)?
+                .to_string();
             let p3 = |key: &str| -> Result<(i32, i32, i32), NucleationError> {
-                let a = g[key].as_array().filter(|a| a.len() == 3).ok_or(NucleationError::Parse)?;
-                let c = |i: usize| a[i].as_i64().map(|v| v as i32).ok_or(NucleationError::Parse);
+                let a = g[key]
+                    .as_array()
+                    .filter(|a| a.len() == 3)
+                    .ok_or(NucleationError::Parse)?;
+                let c = |i: usize| {
+                    a[i].as_i64()
+                        .map(|v| v as i32)
+                        .ok_or(NucleationError::Parse)
+                };
                 Ok((c(0)?, c(1)?, c(2)?))
             };
             gates.push(crate::design::Gate {
@@ -897,7 +906,8 @@ pub mod ffi {
         if json.trim().is_empty() {
             return Ok(style);
         }
-        let v: serde_json::Value = serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
+        let v: serde_json::Value =
+            serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
         if let Some(b) = v.get("bus_block").and_then(|b| b.as_str()) {
             style.bus_block = b.to_string();
         }

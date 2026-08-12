@@ -539,7 +539,7 @@ def main():
           % (N, len(b.cells), x0, x1, y0, y1, z0, z1))
     print("volume %.2fM cells (engine cap %.1fM)" % (vol / 1e6, 8.0))
 
-    import audit, nets
+    import audit, nets, drc
     problems = audit.audit(b.cells)
     for kind, items in problems.items():
         if items:
@@ -549,7 +549,8 @@ def main():
     print("net check: %d shorted nets" % len(shorts))
     for la, lb, pa, pb in shorts[:10]:
         print("   SHORT %s <-> %s  at %s / %s" % (la, lb, pa, pb))
-    if any(problems.values()) or shorts:
+    rings_ok = drc.check_rings("build_ppa", b.cells)
+    if any(problems.values()) or shorts or not rings_ok:
         return 1
     if args.no_sim:
         return 0

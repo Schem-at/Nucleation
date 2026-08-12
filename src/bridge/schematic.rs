@@ -77,6 +77,27 @@ pub mod ffi {
     #[diplomat::opaque_mut]
     pub struct Schematic(pub(crate) crate::UniversalSchematic);
 
+    /// Deterministic, lossless pieces returned by
+    /// [`Schematic::split_connected_attach_nearby`]. Pieces are ordered by their
+    /// largest connected component, largest first.
+    #[diplomat::opaque]
+    pub struct SchematicSplitResult(pub(crate) Vec<crate::UniversalSchematic>);
+
+    impl SchematicSplitResult {
+        pub fn len(&self) -> u32 {
+            self.0.len() as u32
+        }
+
+        /// Return an independently owned piece by zero-based index.
+        pub fn piece(&self, index: u32) -> Result<Box<Schematic>, NucleationError> {
+            self.0
+                .get(index as usize)
+                .cloned()
+                .map(|schematic| Box::new(Schematic(schematic)))
+                .ok_or(NucleationError::NotFound)
+        }
+    }
+
     impl Schematic {
         /// Create a new, empty schematic with the given name.
         pub fn create(name: &DiplomatStr) -> Box<Schematic> {
@@ -89,6 +110,23 @@ pub mod ffi {
         /// metadata, or transform changes do not affect the original.
         pub fn deep_clone(&self) -> Box<Schematic> {
             Box::new(Schematic(self.0.clone()))
+        }
+
+        /// Split spatially independent machines while keeping nearby tiny
+        /// detached parts with their machine. Components at least
+        /// `min_standalone_blocks` large always remain independent; smaller
+        /// components attach only directly to a core within `max_air_gap`.
+        /// Attachment is non-transitive and the operation is lossless.
+        pub fn split_connected_attach_nearby(
+            &self,
+            min_standalone_blocks: u32,
+            max_air_gap: u32,
+        ) -> Box<SchematicSplitResult> {
+            Box::new(SchematicSplitResult(self.0.split_connected_attach_nearby(
+                crate::selection::Connectivity::Corner,
+                min_standalone_blocks as usize,
+                max_air_gap,
+            )))
         }
 
         /// The allocated dimensions (width, height, length) of the schematic's
@@ -1049,9 +1087,7 @@ pub mod ffi {
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
             let region = self.0.get_region(region_name).ok_or_else(|| {
-                crate::bridge::set_last_error_detail(format!(
-                    "no region named `{region_name}`"
-                ));
+                crate::bridge::set_last_error_detail(format!("no region named `{region_name}`"));
                 NucleationError::NotFound
             })?;
             let items: Vec<serde_json::Value> = region
@@ -1366,6 +1402,34 @@ pub mod ffi {
         /// Set the WorldEdit version.
         pub fn set_we_version(&mut self, version: i32) {
             self.0.metadata.we_version = Some(version);
+        }
+
+        /// Standard embedded source provenance as canonical JSON. Returns an
+        /// empty string when none is present.
+        pub fn provenance_json(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
+            if let Some(provenance) = &self.0.metadata.provenance {
+                let json = provenance
+                    .to_json()
+                    .map_err(|_| NucleationError::Serialize)?;
+                let _ = write!(out, "{json}");
+            }
+            Ok(())
+        }
+
+        /// Validate and set standard embedded source provenance from JSON.
+        pub fn set_provenance_json(&mut self, json: &DiplomatStr) -> Result<(), NucleationError> {
+            let json = utf8(json)?;
+            let provenance = crate::SchematicProvenance::from_json(json).map_err(|error| {
+                crate::bridge::set_last_error_detail(error);
+                NucleationError::Parse
+            })?;
+            self.0.metadata.provenance = Some(provenance);
+            Ok(())
+        }
+
+        /// Remove embedded source provenance.
+        pub fn clear_provenance(&mut self) {
+            self.0.metadata.provenance = None;
         }
 
         // --- Transformations ---
@@ -1889,8 +1953,7 @@ pub mod ffi {
             &mut self,
             json: &DiplomatStr,
         ) -> Result<(), NucleationError> {
-            let json =
-                core::str::from_utf8(json).map_err(|_| NucleationError::InvalidArgument)?;
+            let json = core::str::from_utf8(json).map_err(|_| NucleationError::InvalidArgument)?;
             self.0.set_cell_contract_json(json).map_err(|e| {
                 crate::bridge::set_last_error_detail(e);
                 NucleationError::Parse
@@ -1900,10 +1963,7 @@ pub mod ffi {
         /// The contract embedded in the schematic's metadata, as JSON.
         /// Errors with `NotFound` when none is embedded, `Parse` when an
         /// embedded string exists but is corrupt (loud, never silent).
-        pub fn cell_contract_json(
-            &self,
-            out: &mut DiplomatWrite,
-        ) -> Result<(), NucleationError> {
+        pub fn cell_contract_json(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
             let contract = self
                 .0
                 .embedded_cell_contract()
@@ -1935,7 +1995,11 @@ pub mod ffi {
                 .ok_or(NucleationError::NotFound)?;
             let json = contract.to_json().map_err(|_| NucleationError::Serialize)?;
             let ws: Vec<String> = warnings.iter().map(|w| format!("{w:?}")).collect();
-            let _ = write!(out, "{{\"contract\":{json},\"warnings\":[{}]}}", ws.join(","));
+            let _ = write!(
+                out,
+                "{{\"contract\":{json},\"warnings\":[{}]}}",
+                ws.join(",")
+            );
             Ok(())
         }
 

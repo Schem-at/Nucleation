@@ -68,9 +68,7 @@ pub fn audit(cells: &BTreeMap<Pos, String>) -> AuditReport {
                 .is_some_and(|b| crate::blocks::is_sturdy_support(b));
             if !sturdy {
                 let name = block.split('[').next().unwrap_or(block).to_string();
-                report
-                    .floating
-                    .push((*p, name, cells.get(&below).cloned()));
+                report.floating.push((*p, name, cells.get(&below).cloned()));
             }
         }
     }
@@ -115,7 +113,7 @@ mod tests {
     fn standing_torch_needs_floor_but_wall_torch_needs_anchor() {
         let mut cells = BTreeMap::new();
         cells.insert(Pos::new(0, 1, 0), TORCH.to_string()); // floating standing torch
-        // Wall torch facing south hangs off the block one step north.
+                                                            // Wall torch facing south hangs off the block one step north.
         cells.insert(Pos::new(5, 1, 5), wall_torch("south", true));
         let r = audit(&cells);
         assert_eq!(r.floating.len(), 1);

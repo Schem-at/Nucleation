@@ -62,12 +62,14 @@ def drive_cell(ppa, sig, dy):
     raise KeyError(sig)
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--no-sim", action="store_true")
-    ap.add_argument("--out", default="")
-    args = ap.parse_args()
+def build():
+    """Compile the four planes, stack them at PITCH and globally route.
 
+    Returns everything a checker needs, so a DRC or a regression test can
+    inspect the real design instead of re-deriving it: `prewired` is the cell
+    set BEFORE any routing (the compiled plane geometry), which is what tells a
+    rail cell apart from a routed one.
+    """
     planes = [bp.PPA(4, make=pp_netlist, name="pp_plane")]
     for k in (1, 2, 3):
         planes.append(bp.PPA(4, make=renamed_adder("m%d" % k), name="row%d" % k))
@@ -85,6 +87,7 @@ def main():
         for sig, (x, y, z) in p.probe.items():
             probe[sig] = (x, y + dy, z)
     levers = [(sig, pos) for sig, pos in planes[0].levers]
+    prewired = set(b.cells)
 
     # ---- global routing -----------------------------------------------------
     r = router.Router(b, labels)
@@ -100,7 +103,7 @@ def main():
         hops.append(("m%dcout" % k, k, "m%dA3" % (k + 1)))
     # route the longest nets first, while space is uncongested
     hops.sort(key=lambda h_: -abs(int(h_[2][1]) - h_[1]))
-    total, aliases = 0, []
+    total, aliases, routed = 0, [], []
     for sig, src_k, dst_sig in hops:
         src = probe[sig]
         dst_k = int(dst_sig[1])
@@ -109,15 +112,31 @@ def main():
         # (clearance) and the net checker (deliberate alias, not a short)
         n = r.route(src, dst, dst_sig, friendly={sig, dst_sig})
         aliases.append((sig, dst_sig))
+        routed.append((sig, dst_sig, src, dst))
         total += n
-    print("routed %d inter-plane nets, %d cells" % (len(hops), total))
+    return dict(planes=planes, b=b, labels=labels, probe=probe, levers=levers,
+                aliases=aliases, routed=routed, prewired=prewired,
+                routed_cells=total, hops=hops)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--no-sim", action="store_true")
+    ap.add_argument("--out", default="")
+    args = ap.parse_args()
+
+    d = build()
+    b, labels, probe = d["b"], d["labels"], d["probe"]
+    planes, levers, aliases = d["planes"], d["levers"], d["aliases"]
+    print("routed %d inter-plane nets, %d cells"
+          % (len(d["hops"]), d["routed_cells"]))
 
     (x0, y0, z0), (x1, y1, z1) = b.bounds()
     vol = (x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1)
     print("mult4: %d blocks, extent x %d..%d y %d..%d z %d..%d, fill %.1f%%"
           % (len(b.cells), x0, x1, y0, y1, z0, z1, 100 * len(b.cells) / vol))
 
-    import audit, nets
+    import audit, nets, drc
     problems = audit.audit(b.cells)
     shorts = nets.check(b.cells, labels, aliases)
     for kind, items in problems.items():
@@ -126,7 +145,10 @@ def main():
     print("net check: %d shorts" % len(shorts))
     for s in shorts[:6]:
         print("   ", s)
-    if any(problems.values()) or shorts:
+    # This is the build the ring rule was written for: m1B2's route once joined
+    # the rail it drives and latched at 15 (64/256, everything else green).
+    rings_ok = drc.check_rings("mult4", b.cells)
+    if any(problems.values()) or shorts or not rings_ok:
         return 1
     if args.no_sim:
         return 0

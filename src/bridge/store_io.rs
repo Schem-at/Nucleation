@@ -17,7 +17,7 @@ pub mod ffi {
     use std::fmt::Write;
 
     /// A key/value store opened from a URL (e.g. `mem://`, `file:///path`,
-    /// `s3://bucket/prefix`, `redis://…`, `postgres://…`).
+    /// `ssh://user@host/path`, `s3://bucket/prefix`, `redis://…`, `postgres://…`).
     #[diplomat::opaque]
     pub struct Store(pub(crate) Box<dyn crate::store::Store>);
 

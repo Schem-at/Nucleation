@@ -228,7 +228,10 @@ fn cell_executor_for(
 fn cell_executor_for(
     _schem: &crate::UniversalSchematic,
 ) -> Result<crate::simulation::typed_executor::BackendCircuitExecutor, String> {
-    Err("CellExecutor needs the vanilla tick engine: rebuild with the `mc-tick` feature".to_string())
+    Err(
+        "CellExecutor needs the vanilla tick engine: rebuild with the `mc-tick` feature"
+            .to_string(),
+    )
 }
 
 #[diplomat::bridge]
@@ -1483,18 +1486,14 @@ pub mod ffi {
     /// supplies the physics. Wraps
     /// [`crate::simulation::typed_executor::BackendCircuitExecutor`].
     #[diplomat::opaque_mut]
-    pub struct CellExecutor(
-        pub(crate) crate::simulation::typed_executor::BackendCircuitExecutor,
-    );
+    pub struct CellExecutor(pub(crate) crate::simulation::typed_executor::BackendCircuitExecutor);
 
     impl CellExecutor {
         /// Bind the schematic's embedded cell contract to the mc-tick
         /// engine (needs the `mc-tick` feature, else errors). Cells deploy
         /// BAKED: the backend trusts saved block states; an unbaked build
         /// sits inert until the first input flip.
-        pub fn for_schematic(
-            schematic: &Schematic,
-        ) -> Result<Box<CellExecutor>, NucleationError> {
+        pub fn for_schematic(schematic: &Schematic) -> Result<Box<CellExecutor>, NucleationError> {
             super::cell_executor_for(&schematic.0)
                 .map(|e| Box::new(CellExecutor(e)))
                 .map_err(|e| {
@@ -1524,10 +1523,13 @@ pub mod ffi {
         /// Read an output port by name.
         pub fn read_output(&mut self, name: &DiplomatStr) -> Result<Box<Value>, NucleationError> {
             let name = std::str::from_utf8(name).map_err(|_| NucleationError::InvalidArgument)?;
-            self.0.read_output(name).map(|v| Box::new(Value(v))).map_err(|e| {
-                crate::bridge::set_last_error_detail(e);
-                NucleationError::Simulation
-            })
+            self.0
+                .read_output(name)
+                .map(|v| Box::new(Value(v)))
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e);
+                    NucleationError::Simulation
+                })
         }
 
         /// Rebuild the engine from the original schematic (all inputs back

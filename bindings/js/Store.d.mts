@@ -7,7 +7,7 @@ import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
 /**
  * A key/value store opened from a URL (e.g. `mem://`, `file:///path`,
- * `s3://bucket/prefix`, `redis://…`, `postgres://…`).
+ * `ssh://user@host/path`, `s3://bucket/prefix`, `redis://…`, `postgres://…`).
  */
 export class Store {
     /** @internal */

@@ -9,7 +9,7 @@
 //!
 //! Backends are batteries-included but feature-gated: [`MemStore`] is always
 //! available (and the WASM default), [`FsStore`] ships by default on native
-//! targets, and networked backends (S3 / Redis / Postgres) live behind their
+//! targets, and networked backends (SSH / S3 / Redis / Postgres) live behind their
 //! own Cargo features so you only pull the dependencies you enable.
 //!
 //! The trait is **synchronous** and its implementors are `Send + Sync` cheap
@@ -28,6 +28,11 @@ pub use mem::MemStore;
 pub mod fs;
 #[cfg(all(feature = "store-fs", not(target_arch = "wasm32")))]
 pub use fs::FsStore;
+
+#[cfg(all(feature = "store-ssh", not(target_arch = "wasm32")))]
+pub mod ssh;
+#[cfg(all(feature = "store-ssh", not(target_arch = "wasm32")))]
+pub use ssh::SshStore;
 
 #[cfg(feature = "store-callback")]
 pub mod callback;
@@ -243,7 +248,7 @@ mod block_on_tests {
 ///
 /// Supported schemes depend on enabled features:
 /// `mem://`, `file:///abs/path` (with `store-fs`), and — once their features
-/// are enabled — `s3://`, `redis://`, `postgres://`.
+/// are enabled — `ssh://`, `s3://`, `redis://`, `postgres://`.
 pub fn open(url: &str) -> Result<Box<dyn Store>> {
     if url == "mem://" || url.starts_with("mem://") {
         return Ok(Box::new(MemStore::new()));
@@ -252,6 +257,14 @@ pub fn open(url: &str) -> Result<Box<dyn Store>> {
     #[cfg(all(feature = "store-fs", not(target_arch = "wasm32")))]
     if let Some(path) = url.strip_prefix("file://") {
         return Ok(Box::new(FsStore::new(path)));
+    }
+
+    #[cfg(all(feature = "store-ssh", not(target_arch = "wasm32")))]
+    if let Some(rest) = url.strip_prefix("ssh://") {
+        let (target, path) = rest.split_once('/').ok_or_else(|| {
+            StoreError::Unsupported("ssh store URL must be ssh://[user@]host/absolute/path".into())
+        })?;
+        return Ok(Box::new(SshStore::new(target, format!("/{path}"))?));
     }
 
     #[cfg(feature = "store-s3")]

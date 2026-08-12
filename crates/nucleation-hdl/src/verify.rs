@@ -23,7 +23,9 @@ pub fn extra_states() -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for d in DIRS {
         for p in ["true", "false"] {
-            out.push(format!("minecraft:lever[face=floor,facing={d},powered={p}]"));
+            out.push(format!(
+                "minecraft:lever[face=floor,facing={d},powered={p}]"
+            ));
         }
     }
     out.push("minecraft:redstone_torch[lit=true]".into());
@@ -67,15 +69,20 @@ impl Sim {
     /// The block-state descriptor at a build-coordinate cell.
     pub fn block(&self, x: i32, y: i32, z: i32) -> &str {
         let id = self.sim.world().get(self.p(x, y, z));
-        self.sim.registry().descriptor(id).unwrap_or("minecraft:air")
+        self.sim
+            .registry()
+            .descriptor(id)
+            .unwrap_or("minecraft:air")
     }
 
     /// The `power=` level at a cell, or -1 if the state has none.
     pub fn power(&self, x: i32, y: i32, z: i32) -> i32 {
-        let digits: Option<String> = prop(self.block(x, y, z), "power=").map(|v| {
-            v.chars().take_while(char::is_ascii_digit).collect()
-        });
-        digits.filter(|d| !d.is_empty()).and_then(|d| d.parse().ok()).unwrap_or(-1)
+        let digits: Option<String> = prop(self.block(x, y, z), "power=")
+            .map(|v| v.chars().take_while(char::is_ascii_digit).collect());
+        digits
+            .filter(|d| !d.is_empty())
+            .and_then(|d| d.parse().ok())
+            .unwrap_or(-1)
     }
 
     /// Whether a dust cell reads powered.
@@ -269,7 +276,10 @@ pub fn verify(c: &Compiled, cases: &[u64], settle: u64) -> Result<VerifyReport, 
                 crate::Value::Const(_) => {}
                 crate::Value::Vid(vid) => {
                     let w = want[vid];
-                    let p = c.probes.get(vid).ok_or_else(|| format!("no probe for {vid}"))?;
+                    let p = c
+                        .probes
+                        .get(vid)
+                        .ok_or_else(|| format!("no probe for {vid}"))?;
                     let g = u8::from(sim.on(p.0, p.1, p.2));
                     if g != w {
                         wrong_po = true;
@@ -377,7 +387,10 @@ pub fn verify_clocked(
         let p = c.probes[&l.q_rail];
         if u8::from(sim.on(p.0, p.1, p.2)) != state[k] {
             init_ok = false;
-            note(format!("init: {} rail != {}", l.q, state[k]), &mut mismatches);
+            note(
+                format!("init: {} rail != {}", l.q, state[k]),
+                &mut mismatches,
+            );
         }
     }
     let val0 = c.seq_eval(&pi_bits, &state);
@@ -506,11 +519,8 @@ pub fn verify_clocked(
 /// Returns how many cells changed.
 pub fn bake(build: &mut Build, sim: &Sim) -> usize {
     let mut changed = 0;
-    let cells: Vec<((i32, i32, i32), String)> = build
-        .cells
-        .iter()
-        .map(|(p, s)| (*p, s.clone()))
-        .collect();
+    let cells: Vec<((i32, i32, i32), String)> =
+        build.cells.iter().map(|(p, s)| (*p, s.clone())).collect();
     for ((x, y, z), authored) in cells {
         let state = sim.block(x, y, z).to_string();
         if state != authored && !state.contains("air") {

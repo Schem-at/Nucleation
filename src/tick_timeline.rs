@@ -24,7 +24,8 @@ pub fn selection_schematic(
     let frame = timeline.initial_frame(selection, registry);
     let mut schematic = crate::UniversalSchematic::new(format!(
         "mc-tick {}..{}",
-        selection.start_tick(), selection.end_tick()
+        selection.start_tick(),
+        selection.end_tick()
     ));
     for (pos, state) in &frame.blocks {
         let descriptor = registry

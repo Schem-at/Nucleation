@@ -33,7 +33,10 @@ fn build_scene() -> (Workspace, Vec<(Pos, Pos)>) {
             ws.stone(Pos::new(x, 12, z), "plain").unwrap();
             ws.dust(Pos::new(x, 13, z), &format!("net{i}")).unwrap();
         }
-        endpoints.push((Pos::new(1, 1, if i == 0 { 0 } else { 4 }), Pos::new(8, 13, z)));
+        endpoints.push((
+            Pos::new(1, 1, if i == 0 { 0 } else { 4 }),
+            Pos::new(8, 13, z),
+        ));
     }
     (ws, endpoints)
 }
@@ -54,7 +57,9 @@ fn routes_two_nets_across_planes_without_shorts() {
             friendly: vec![],
         })
         .collect();
-    let results = router.route_all(&mut ws, &nets_req).expect("both nets route");
+    let results = router
+        .route_all(&mut ws, &nets_req)
+        .expect("both nets route");
     for (i, r) in results.iter().enumerate() {
         // Climbs compress +5 y into a single path step, so the +12y route
         // legitimately needs only a handful of steps.

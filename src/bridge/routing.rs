@@ -42,13 +42,9 @@ pub mod ffi {
         ) -> Result<(), NucleationError> {
             let label =
                 core::str::from_utf8(label).map_err(|_| NucleationError::InvalidArgument)?;
-            let res = crate::routing::route_net(
-                &mut schematic.0,
-                (sx, sy, sz),
-                (dx, dy, dz),
-                label,
-            )
-            .map_err(|_| NucleationError::InvalidArgument)?;
+            let res =
+                crate::routing::route_net(&mut schematic.0, (sx, sy, sz), (dx, dy, dz), label)
+                    .map_err(|_| NucleationError::InvalidArgument)?;
             let cells: Vec<String> = res
                 .path
                 .iter()
@@ -166,8 +162,8 @@ pub mod ffi {
             netlist_json: &DiplomatStr,
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
-            let json = core::str::from_utf8(netlist_json)
-                .map_err(|_| NucleationError::InvalidArgument)?;
+            let json =
+                core::str::from_utf8(netlist_json).map_err(|_| NucleationError::InvalidArgument)?;
             let parsed: serde_json::Value =
                 serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
             let inputs: Vec<String> = parsed["inputs"]
@@ -200,8 +196,7 @@ pub mod ffi {
                 .iter()
                 .map(|(k, v)| format!("{k:?}:{v}"))
                 .collect();
-            let critical: Vec<String> =
-                report.critical.iter().map(|s| format!("{s:?}")).collect();
+            let critical: Vec<String> = report.critical.iter().map(|s| format!("{s:?}")).collect();
             let _ = write!(
                 out,
                 "{{\"arrival_rt\":{{{}}},\"critical\":[{}]}}",

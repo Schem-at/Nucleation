@@ -1,0 +1,114 @@
+{
+ "artifact": null,
+ "blocked_by": "bus_analog -> not attempted: declare_in('hex_tap', anchor=(2, 1, 0), step=(0, 2, 0), width=1, ty='uint') refused: Exception: NucleationError.InvalidArgument",
+ "buses": {
+  "bus_analog": {
+   "call": "port declaration failed first",
+   "error": "declare_in('hex_tap', anchor=(2, 1, 0), step=(0, 2, 0), width=1, ty='uint') refused: Exception: NucleationError.InvalidArgument",
+   "seconds": 0.0,
+   "state": "not attempted"
+  }
+ },
+ "check": null,
+ "cost_vector": null,
+ "expect": "unsolved",
+ "fixtures": {
+  "hex0": {
+   "kind": "hex_comb_stage",
+   "provenance": "probe_hex_transmit.py::Rig (66/66) against corpus/TRANSMIT002_hex_transmit_flat.schem"
+  }
+ },
+ "id": "U01_analog_route",
+ "log": [],
+ "loose_blocks": 138,
+ "notes": "TWO blocking assumptions, and the second one bites first.\n\n1. PORTS MUST BE BACKED BY HARDWARE THE ROUTER RECOGNISES. `declare_input` over the tap is refused with InvalidArgument before any routing happens.  Measured: a dust cell with a LEVER beside it declares as an input; a dust cell on a LAMP declares as an output; a bare dust tap on stone is refused in both directions.  So the router cannot be connected to another mechanism's output at all -- only to lever/lamp banks it understands.  For a tool meant to route between real builds, this is the sharpest edge in the whole corpus.\n\n2. NO ANALOG TYPE, NO ANALOG CARRIER.  Even given a port, every bus is bits-on-lanes: `IoType` has no signal-strength variant, and the router has no form that emits the value-preserving hex stage (mechanism 12 of notes-hex-transport.md), which is measured, verified and sitting in the corpus unused.",
+ "per_bus": {},
+ "question": "The hex tap carries 1..15 on one wire.  Can the router move that VALUE 14 blocks, the way it moves a bit?",
+ "scenario": {
+  "_file": "scenarios/U01_analog_route.py",
+  "buses": [
+   {
+    "driver": "hex_tap",
+    "name": "bus_analog",
+    "sinks": [
+     "far_out"
+    ],
+    "style": {
+     "bus_block": "minecraft:brown_concrete"
+    }
+   }
+  ],
+  "expect": "unsolved",
+  "fixtures": [
+   {
+    "at": [
+     0,
+     0,
+     0
+    ],
+    "kind": "hex_trunk",
+    "name": "hex0",
+    "values": [
+     1,
+     3,
+     7,
+     11,
+     15
+    ]
+   }
+  ],
+  "id": "U01_analog_route",
+  "notes": "TWO blocking assumptions, and the second one bites first.\n\n1. PORTS MUST BE BACKED BY HARDWARE THE ROUTER RECOGNISES. `declare_input` over the tap is refused with InvalidArgument before any routing happens.  Measured: a dust cell with a LEVER beside it declares as an input; a dust cell on a LAMP declares as an output; a bare dust tap on stone is refused in both directions.  So the router cannot be connected to another mechanism's output at all -- only to lever/lamp banks it understands.  For a tool meant to route between real builds, this is the sharpest edge in the whole corpus.\n\n2. NO ANALOG TYPE, NO ANALOG CARRIER.  Even given a port, every bus is bits-on-lanes: `IoType` has no signal-strength variant, and the router has no form that emits the value-preserving hex stage (mechanism 12 of notes-hex-transport.md), which is measured, verified and sitting in the corpus unused.",
+  "ports": [
+   {
+    "anchor": [
+     2,
+     1,
+     0
+    ],
+    "dir": "in",
+    "form": "vertical",
+    "name": "hex_tap",
+    "stamp": false,
+    "ty": "uint",
+    "width": 1
+   },
+   {
+    "anchor": [
+     16,
+     1,
+     0
+    ],
+    "dir": "out",
+    "form": "vertical",
+    "name": "far_out",
+    "ty": "uint",
+    "width": 1
+   }
+  ],
+  "question": "The hex tap carries 1..15 on one wire.  Can the router move that VALUE 14 blocks, the way it moves a bit?",
+  "render": {
+   "pitch": 26,
+   "yaw": 145,
+   "zoom": 1.9
+  },
+  "title": "Routing an ANALOG value (signal strength) between two ports",
+  "verify": {
+   "analog": [
+    {
+     "fixture": "hex0",
+     "label": "does the analog VALUE survive the routed lane?",
+     "read_power": [
+      "far_out"
+     ]
+    }
+   ]
+  }
+ },
+ "solve_seconds": 0.0,
+ "solved": false,
+ "solver_produced": true,
+ "title": "Routing an ANALOG value (signal strength) between two ports",
+ "verification": null,
+ "wall_seconds": 0.001
+}

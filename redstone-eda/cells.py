@@ -132,11 +132,19 @@ def verify_fragment(frag, inputs, outputs, truth, name):
         b.stone(x + dx, y - 1, z + dz)
         b.put(x + dx, y, z + dz, rs.DUST)
         lever_at[sig] = (x + 2 * dx, y, z + 2 * dz)
-    import nets
+    import nets, drc
     shorts = nets.check(b.cells, labels)
     if shorts:
         for s in shorts[:4]:
             print("   SHORT", s)
+        return False
+    # A fragment is a cell's whole geometry plus its port stubs: the ring the
+    # rca_cells session hit was formed by exactly such port approaches.  Kept
+    # silent on success -- the library verifies dozens of fragments.
+    rings = drc.repeater_cycles(b.cells)
+    if rings:
+        print("   DIODE RING x%d in %s (latches at 15): %s"
+              % (len(rings), name, rings[:2]))
         return False
     sim = b.sim()
     lv = rs.Levers(sim, [lever_at[s] for s in inputs])

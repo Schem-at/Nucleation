@@ -81,10 +81,7 @@ fn design() -> Design {
 /// swallowed serializer message.
 fn export_all(d: &Design) -> Vec<(&'static str, Result<usize, String>)> {
     vec![
-        (
-            "litematic",
-            d.to_litematic_layered_bytes().map(|b| b.len()),
-        ),
+        ("litematic", d.to_litematic_layered_bytes().map(|b| b.len())),
         ("nucm", d.to_nucm_bytes().map(|b| b.len())),
         (
             "schem",
@@ -193,18 +190,19 @@ fn per_layer_block_json_agrees_with_flatten() {
 
     // What the fast path says.
     let json = d.instance_blocks_json("u0").unwrap();
-    let parsed: Vec<(i32, i32, i32, String)> = serde_json::from_str::<Vec<serde_json::Value>>(&json)
-        .expect("valid JSON")
-        .into_iter()
-        .map(|v| {
-            (
-                v[0].as_i64().unwrap() as i32,
-                v[1].as_i64().unwrap() as i32,
-                v[2].as_i64().unwrap() as i32,
-                v[3].as_str().unwrap().to_string(),
-            )
-        })
-        .collect();
+    let parsed: Vec<(i32, i32, i32, String)> =
+        serde_json::from_str::<Vec<serde_json::Value>>(&json)
+            .expect("valid JSON")
+            .into_iter()
+            .map(|v| {
+                (
+                    v[0].as_i64().unwrap() as i32,
+                    v[1].as_i64().unwrap() as i32,
+                    v[2].as_i64().unwrap() as i32,
+                    v[3].as_str().unwrap().to_string(),
+                )
+            })
+            .collect();
     let mut parsed = parsed;
     parsed.sort();
 
