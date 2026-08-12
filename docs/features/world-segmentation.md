@@ -331,16 +331,25 @@ The schematic and the sidecar both carry the standard provenance contract.
 Catalog JSONL also exposes `partition_metadata` and `partition_catalog_hash`
 for querying without opening a schematic.
 
-After materialization the worker can use either `nearby` or `nearest`
-component attachment. In `nearby` mode, every 26-neighbour component with at
-least `--component-min-blocks` blocks (default 16) remains an independent
-schematic; smaller fragments attach directly only within
-`--component-join-gap` blocks. In `nearest` mode, components below the threshold
-attach to the closest substantial component, matching the validated ORE
-extraction profile. Both operations are lossless. The worker folds the selected
-mode and thresholds into the output `config_hash`, records them as namespaced
-provenance attributes, and derives split identities from world bounds rather
-than component ordering.
+After materialization the worker supports three lossless component policies:
+
+- `exact` emits every disconnected 26-neighbour component as an independent
+  schematic. Size and gap thresholds do not apply.
+- `nearby` (the default) keeps every component with at least
+  `--component-min-blocks` blocks (default 16) independent. A smaller fragment
+  attaches directly only to a substantial component within
+  `--component-join-gap` blocks; attachment is non-transitive, so fragments
+  cannot chain independent builds back together.
+- `nearest` is the conservative legacy policy: every component below the
+  threshold attaches to its closest substantial component, regardless of
+  distance. It is useful when disconnected fixtures are known to belong to one
+  assembly, but a high threshold can under-count a plot containing many builds.
+
+The worker folds the selected mode and thresholds into the output `config_hash`,
+records them as namespaced provenance attributes, and derives split identities
+from world bounds plus the exact piece fingerprint rather than component
+ordering. The uniform-grid and arbitrary-partition Python schedulers both
+default to `nearby`, 16 blocks, and a three-block direct attachment gap.
 
 For orchestration, `examples/distributed_world_extract.py` divides a global
 grid into deterministic rectangular shards, runs one or more compiled workers,
@@ -360,6 +369,11 @@ The state manifest pins the binary, catalogue, and rectangle-list SHA-256s.
 Choose work boundaries that do not cross a logical partition; the compute host
 then reads only intersecting MCA files through `StoreRegionTiles`, one region at
 a time, while output streams directly to the configured Store.
+
+For literal component-per-schematic extraction, pass
+`--component-attach-mode exact`. This is intentionally explicit: redstone
+assemblies can contain detached lamps, piston heads, or other loose parts, so
+the default `nearby` policy is usually the better definition of a logical build.
 
 ### Analysing an extracted corpus
 

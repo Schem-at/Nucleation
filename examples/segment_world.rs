@@ -49,6 +49,7 @@ struct Cli {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ComponentAttachMode {
+    Exact,
     Nearby,
     Nearest,
 }
@@ -76,7 +77,7 @@ fn parse_args() -> Cli {
              [--partition-floor-share FRACTION] \
              [--partition-dense-layer-coverage FRACTION] \
              [--split-min-blocks COUNT] \
-             [--component-attach-mode nearby|nearest] \
+             [--component-attach-mode exact|nearby|nearest] \
              [--component-join-gap BLOCKS] \
              [--component-min-blocks COUNT] \
              [--world-prefix STORE_KEY_TO_REGION_DIR]"
@@ -233,9 +234,10 @@ fn parse_args() -> Cli {
             }
             "--component-attach-mode" => {
                 cli.component_attach_mode = match value.as_str() {
+                    "exact" => ComponentAttachMode::Exact,
                     "nearby" => ComponentAttachMode::Nearby,
                     "nearest" => ComponentAttachMode::Nearest,
-                    _ => panic!("--component-attach-mode must be nearby or nearest"),
+                    _ => panic!("--component-attach-mode must be exact, nearby, or nearest"),
                 }
             }
             "--component-join-gap" => {
@@ -586,6 +588,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut written = 0u64;
     let mut emit = |build: MaterializedBuild| {
         let (pieces, attach_mode): (Vec<_>, &str) = match cli.component_attach_mode {
+            ComponentAttachMode::Exact => (
+                build.schematic.split_connected(Connectivity::Corner),
+                "exact",
+            ),
             ComponentAttachMode::Nearby => (
                 build.schematic.split_connected_attach_nearby(
                     Connectivity::Corner,
@@ -638,17 +644,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .iter()
                     .flat_map(|value| value.to_le_bytes())
                     .collect::<Vec<_>>();
-                provenance.stable_build_id = StableBuildId(ContentId::of(&[
-                    b"segment.component.v2",
-                    build.provenance.stable_build_id.0.as_bytes(),
-                    &bbox_bytes,
-                ]));
-                provenance.block_count = piece.total_blocks().max(0) as u64;
-                provenance.fingerprint = nucleation::fingerprint::fingerprint(
+                let piece_fingerprint = nucleation::fingerprint::fingerprint(
                     &piece,
                     &nucleation::fingerprint::FingerprintSpec::exact(),
                 )
                 .0;
+                provenance.stable_build_id = StableBuildId(ContentId::of(&[
+                    b"segment.component.v3",
+                    build.provenance.stable_build_id.0.as_bytes(),
+                    &bbox_bytes,
+                    &piece_fingerprint.to_le_bytes(),
+                ]));
+                provenance.block_count = piece.total_blocks().max(0) as u64;
+                provenance.fingerprint = piece_fingerprint;
                 if provenance.block_count <= job.score_config.debris_max_blocks {
                     provenance.tier = Tier::Debris;
                 }

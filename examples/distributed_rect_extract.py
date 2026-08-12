@@ -60,9 +60,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--partition-floor-share", type=float, default=0.30)
     parser.add_argument("--partition-dense-layer-coverage", type=float, default=0.80)
     parser.add_argument("--split-min-blocks", type=int, default=4096)
-    parser.add_argument("--component-attach-mode", choices=("nearby", "nearest"), default="nearest")
+    parser.add_argument(
+        "--component-attach-mode",
+        choices=("exact", "nearby", "nearest"),
+        default="nearby",
+        help=(
+            "final materialized-build split: exact emits every disconnected component; "
+            "nearby keeps tiny nearby fixtures with a core; nearest is the legacy "
+            "all-fragments-to-core policy"
+        ),
+    )
     parser.add_argument("--component-join-gap", type=int, default=3)
-    parser.add_argument("--component-min-blocks", type=int, default=4096)
+    parser.add_argument(
+        "--component-min-blocks",
+        type=int,
+        default=16,
+        help="nearby/nearest core threshold; ignored by exact mode (default: 16)",
+    )
     parser.add_argument("--drop-unpartitioned", type=parse_bool, default=True)
     parser.add_argument("--source-id", required=True)
     parser.add_argument("--world-name", required=True)

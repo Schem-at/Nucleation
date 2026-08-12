@@ -59,6 +59,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--shard-size", type=int, default=16)
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument(
+        "--component-attach-mode",
+        choices=("exact", "nearby", "nearest"),
+        default="nearby",
+        help=(
+            "final materialized-build split: exact emits every disconnected component; "
+            "nearby keeps tiny nearby fixtures with a core; nearest is the legacy "
+            "all-fragments-to-core policy"
+        ),
+    )
+    parser.add_argument(
         "--component-join-gap",
         type=int,
         default=3,
@@ -68,7 +78,7 @@ def parse_args() -> argparse.Namespace:
         "--component-min-blocks",
         type=int,
         default=16,
-        help="connected components at least this large always remain independent",
+        help="nearby/nearest core threshold; ignored by exact mode (default: 16)",
     )
     parser.add_argument("--substrate", required=True)
     parser.add_argument("--substrate-band", required=True)
@@ -136,6 +146,7 @@ def main() -> None:
         "extracted_at": args.extracted_at,
         "component_join_gap": args.component_join_gap,
         "component_min_blocks": args.component_min_blocks,
+        "component_attach_mode": args.component_attach_mode,
     }
     job_path = args.state / "job.json"
     if job_path.exists():
@@ -194,6 +205,7 @@ def main() -> None:
             "--grid-offset-x", str(args.offset_x),
             "--grid-offset-z", str(args.offset_z),
             "--grid-index-bounds", args.grid_bounds,
+            "--component-attach-mode", args.component_attach_mode,
             "--component-join-gap", str(args.component_join_gap),
             "--component-min-blocks", str(args.component_min_blocks),
         ]

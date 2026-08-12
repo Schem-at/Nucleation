@@ -45,6 +45,13 @@ recombines otherwise independent builds. Whole-world extraction, including the
 Python control plane and remote Store worker, is documented in the
 [world-segmentation guide](../../docs/features/world-segmentation.md).
 
+To emit every disconnected component literally, use a zero standalone
+threshold. Every component then becomes a core and the gap is ignored:
+
+```python
+pieces = schematic.split_connected_attach_nearby(0, 0)
+```
+
 ## What is included
 
 The published wheel contains the core feature set: schematic editing, all schematic formats,

@@ -385,6 +385,10 @@ impl UniversalSchematic {
     /// every connected component remains standalone. Output is deterministic,
     /// largest source component first, and conserves all blocks and block
     /// entities.
+    ///
+    /// A `min_standalone_blocks` value of `0` makes every component a core, so
+    /// this is exactly equivalent to [`Self::split_connected`] and
+    /// `max_air_gap` has no effect.
     pub fn split_connected_attach_nearby(
         &self,
         conn: Connectivity,
@@ -871,6 +875,38 @@ mod tests {
                 .map(UniversalSchematic::total_blocks)
                 .sum::<i32>(),
             s.total_blocks()
+        );
+    }
+
+    #[test]
+    fn split_connected_attach_nearby_zero_threshold_is_exact() {
+        let mut s = UniversalSchematic::new("literal-components".into());
+        for base in [0, 10, 20] {
+            place(&mut s, base, 0, 0);
+            place(&mut s, base + 1, 0, 0);
+        }
+
+        let exact = s.split_connected(Connectivity::Corner);
+        let nearby = s.split_connected_attach_nearby(Connectivity::Corner, 0, u32::MAX);
+
+        assert_eq!(nearby.len(), 3, "every disconnected component is emitted");
+        assert_eq!(
+            nearby
+                .iter()
+                .map(UniversalSchematic::total_blocks)
+                .collect::<Vec<_>>(),
+            exact
+                .iter()
+                .map(UniversalSchematic::total_blocks)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            nearby
+                .iter()
+                .map(UniversalSchematic::total_blocks)
+                .sum::<i32>(),
+            s.total_blocks(),
+            "exact splitting remains lossless"
         );
     }
 
