@@ -473,10 +473,11 @@ jobs:
           name: nucleation-jvm-jar-v${{ needs.check-version.outputs.version }}
           path: release-artifacts
 
-      - name: Publish to crates.io (git-only features stripped)
-        # crates.io can't take the MCHPRS git deps, so the published crate
-        # ships without simulation; use the git dependency to get it.
-        # strip-git-deps.py rewrites Cargo.toml accordingly. meshing and
+      - name: Publish to crates.io (registry-incompatible features stripped)
+        # crates.io can't take the MCHPRS git deps or unpublished workspace
+        # crates, so the published crate ships without simulation, mc-tick,
+        # routing, and hdl; use the git dependency to get them.
+        # strip-git-deps.py rewrites Cargo.toml accordingly. Meshing and
         # rendering survive: schematic-mesher is published to crates.io
         # (via publish-mesher.yml) and its dep is dual version+git, which
         # cargo publish resolves to the version side on its own.
@@ -484,7 +485,6 @@ jobs:
           python3 tools/strip-git-deps.py
           cargo publish --allow-dirty --token ${{ secrets.CRATES_IO_TOKEN }}
           git checkout Cargo.toml
-        continue-on-error: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Prepare Cargo.toml for crates.io publishing.
 
-crates.io rejects git dependencies without versions and wildcard version
-requirements, so the published crate ships WITHOUT the features whose
-deps are git-only: `simulation` (MCHPRS). `meshing`/`rendering` survive:
+crates.io rejects git dependencies without versions and cannot resolve local
+workspace crates that have not themselves been published. The published crate
+therefore ships WITHOUT `simulation` (MCHPRS) and the local-only `mc-tick`,
+`routing`, and `hdl` features. `meshing`/`rendering` survive:
 schematic-mesher is on crates.io and its dep is dual version+git, which
 cargo publish handles itself (keeps the version, drops the git side).
 Simulation stays available from the git repo:
@@ -42,12 +43,41 @@ text = re.sub(r"(?ms)^# Redstone simulation support\nsimulation = \[.*?\]\n", ""
 # Drop its entry from bridge-full.
 text = re.sub(r'(?m)^\s*"simulation",\n', "", text)
 
+# These optional dependencies point at workspace crates which are not on
+# crates.io. A version next to a path does not make them publishable: Cargo
+# still requires that version to exist in the registry while preparing the
+# root package. Remove their feature declarations, dependency/dev-dependency
+# entries, and bridge-full members together.
+local_only = ("mc-tick", "nucleation-routing", "pnr-core", "nucleation-hdl")
+for dependency in local_only:
+    text = re.sub(
+        rf"(?m)^{re.escape(dependency)} = \{{[^}}]*\}}\n",
+        "",
+        text,
+    )
+for feature in ("mc-tick", "routing", "hdl"):
+    text = re.sub(rf"(?m)^{re.escape(feature)} = \[[^\n]*\]\n", "", text)
+    text = re.sub(rf'(?m)^\s*"{re.escape(feature)}",\n', "", text)
+# Dev-only helpers are local workspace crates too.
+for dependency in ("mc-tick-trace", "mc-test"):
+    text = re.sub(
+        rf"(?m)^{re.escape(dependency)} = \{{[^}}]*\}}\n",
+        "",
+        text,
+    )
+
 for marker in (
     "mchprs",
     'hematite-nbt = "*"',
     "simulation = [",
     '"simulation"',
     "[patch.crates-io]",
+    'mc-tick = { path =',
+    'nucleation-routing = { path =',
+    'pnr-core = { path =',
+    'nucleation-hdl = { path =',
+    'mc-tick-trace = { path =',
+    'mc-test = { path =',
 ):
     if marker in text:
         sys.exit(f"strip-git-deps: marker still present after rewrite: {marker!r}")
@@ -63,4 +93,4 @@ if text == original:
     sys.exit("strip-git-deps: no changes made — manifest layout drifted, update the patterns")
 
 manifest.write_text(text)
-print("Cargo.toml stripped for crates.io publish (simulation is git-only)")
+print("Cargo.toml stripped for crates.io publish (git/local-only features removed)")
