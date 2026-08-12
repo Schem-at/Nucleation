@@ -2,7 +2,7 @@ use nucleation::block_entity::BlockEntity;
 use nucleation::formats::manager::get_manager;
 use nucleation::formats::snapshot::{from_snapshot, to_snapshot};
 use nucleation::utils::NbtValue;
-use nucleation::{BlockState, Region, UniversalSchematic};
+use nucleation::{BlockState, Region, SchematicProvenance, UniversalSchematic};
 
 /// Basic round-trip: serialize then deserialize, verify metadata and blocks match.
 #[test]
@@ -304,7 +304,7 @@ fn snapshot_invalid_data() {
     // Valid header but truncated payload
     let mut truncated = Vec::new();
     truncated.extend_from_slice(b"NUSN");
-    truncated.extend_from_slice(&1u32.to_le_bytes());
+    truncated.extend_from_slice(&2u32.to_le_bytes());
     truncated.extend_from_slice(&[0, 1, 2]); // garbage payload
     assert!(from_snapshot(&truncated).is_err());
 }
@@ -319,7 +319,7 @@ fn snapshot_header_format() {
     assert_eq!(&bytes[0..4], b"NUSN", "magic mismatch");
     assert_eq!(
         u32::from_le_bytes(bytes[4..8].try_into().unwrap()),
-        1,
+        2,
         "version mismatch"
     );
 }
@@ -335,6 +335,10 @@ fn snapshot_roundtrip_all_metadata() {
     schematic.metadata.mc_version = Some(3578);
     schematic.metadata.we_version = Some(7);
     schematic.metadata.lm_version = Some(6);
+    let mut provenance = SchematicProvenance::new("openredstone.org").unwrap();
+    provenance.world_name = Some("build".to_string());
+    provenance.origin = Some([100, 64, -200]);
+    schematic.metadata.provenance = Some(provenance);
 
     let bytes = to_snapshot(&schematic).unwrap();
     let restored = from_snapshot(&bytes).unwrap();
@@ -350,4 +354,5 @@ fn snapshot_roundtrip_all_metadata() {
     assert_eq!(restored.metadata.mc_version, schematic.metadata.mc_version);
     assert_eq!(restored.metadata.we_version, schematic.metadata.we_version);
     assert_eq!(restored.metadata.lm_version, schematic.metadata.lm_version);
+    assert_eq!(restored.metadata.provenance, schematic.metadata.provenance);
 }
