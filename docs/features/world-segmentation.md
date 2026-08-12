@@ -397,6 +397,38 @@ and memory behaviour bounded: only the current `.schem` payload and its occupied
 coordinate set are resident. Since an extractor may still be writing, the run
 is a point-in-time corpus sample rather than a transactionally frozen snapshot.
 
+### Curating registry and ranking views
+
+Do not make extraction lossy merely to improve a catalogue. A barrel, lamp, or
+wire fragment may be a legitimate part of a disconnected assembly even when it
+is not independently useful. Keep raw `schematics/`, `provenance/`, and
+`catalog/` intact, then use the Python `CurationPolicy` layer to make a derived
+view before registry batching, owner ranking, or other publication:
+
+```python
+from pathlib import Path
+from nucleation import CurationPolicy, curate_corpus
+
+policy = CurationPolicy.minima(
+    min_blocks=2,
+    min_palette_names=2,
+    name="ore-sanity-v1",
+)
+curated = curate_corpus(
+    Path("/data/ore-builds"),
+    Path("/data/ore-builds/curation/ore-sanity-v1"),
+    policy,
+)
+```
+
+The output contains `accepted-ids.txt`, `rejected.jsonl`, `policy.json`, and
+`summary.json`. Rejections include all matching reasons; policies have stable
+content IDs. `write_registry_archives` and `write_top_owner_archives` consume
+the accepted view and embed that policy ID in their indexes. Raw schematics are
+never moved or deleted. Add `MetricRule` entries for analyser/catalogue fields,
+or named Python predicates for project-specific sanity checks. Predicate names
+enter the content ID; keep predicate source under version control with the run.
+
 ### Stitching and its algebra
 
 Tiles are segmented independently; `StitchState` reunites builds that cross tile

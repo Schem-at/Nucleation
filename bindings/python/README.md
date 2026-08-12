@@ -52,6 +52,35 @@ threshold. Every component then becomes a core and the gap is ignored:
 pieces = schematic.split_connected_attach_nearby(0, 0)
 ```
 
+### Curate a lossless corpus
+
+Keep raw extraction lossless, then build registry and ranking views with an
+auditable policy. Every rejected ID and reason is retained:
+
+```python
+from pathlib import Path
+from nucleation import (
+    CurationPolicy,
+    curate_corpus,
+    write_registry_archives,
+    write_top_owner_archives,
+)
+
+policy = CurationPolicy.minima(
+    min_blocks=2,          # reject standalone blocks
+    min_palette_names=2,   # reject one-material schematics
+    name="ore-sanity-v1",
+)
+corpus = curate_corpus(Path("/data/ore"), Path("/data/ore/curation/ore-sanity-v1"), policy)
+write_registry_archives(corpus, Path("/data/ore/registry-import"))
+write_top_owner_archives(corpus, Path("/data/ore/top-20-owner-archives"))
+```
+
+`CurationPolicy` also accepts declarative `MetricRule` entries over analyser or
+catalogue fields and named Python predicates. The policy receives a stable
+SHA-256 content ID which is embedded into package indexes and owner manifests.
+Changing a filter therefore cannot silently reuse an older curated result.
+
 ## What is included
 
 The published wheel contains the core feature set: schematic editing, all schematic formats,

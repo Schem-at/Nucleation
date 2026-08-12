@@ -28,3 +28,12 @@ from .design import (  # noqa: F401 — veneer overlays shadow core names
     Gate,
     Style,
 )
+from .curation import (  # noqa: F401 — pure-Python corpus curation layer
+    CuratedCorpus,
+    CurationDecision,
+    CurationPolicy,
+    MetricRule,
+    curate_corpus,
+    write_registry_archives,
+    write_top_owner_archives,
+)
