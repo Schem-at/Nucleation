@@ -239,12 +239,11 @@ def _sha256(path: Path) -> str:
 
 
 def _suffix(index: int) -> str:
-    number = index + 26
-    chars = []
-    while number:
-        number, remainder = divmod(number - 1, 26)
-        chars.append(chr(97 + remainder))
-    return "".join(reversed(chars))
+    """A fixed-width sequence token whose lexical order is numeric order."""
+
+    if index < 0:
+        raise ValueError("archive part index cannot be negative")
+    return "{:04d}".format(index + 1)
 
 
 def write_registry_archives(

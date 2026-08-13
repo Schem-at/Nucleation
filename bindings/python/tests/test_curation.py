@@ -15,6 +15,12 @@ SPEC.loader.exec_module(curation)
 
 
 class CurationPolicyTests(unittest.TestCase):
+    def test_archive_suffixes_sort_in_sequence_order(self):
+        suffixes = [curation._suffix(index) for index in range(689)]
+        self.assertEqual(suffixes[0], "0001")
+        self.assertEqual(suffixes[-1], "0689")
+        self.assertEqual(sorted(suffixes), suffixes)
+
     def test_minimum_policy_reports_every_failed_rule(self):
         policy = curation.CurationPolicy.minima(min_blocks=2, min_palette_names=2)
         decision = policy.evaluate({"block_count": 1, "palette_names": 1})
