@@ -221,6 +221,7 @@ impl Region {
             self.non_air_count += 1;
         } else if !old_is_air && new_is_air {
             self.non_air_count -= 1;
+            self.shrink_tight_bounds_after_removal(x, y, z);
         }
 
         // Update tight bounds if this is a non-air block
@@ -305,6 +306,32 @@ impl Region {
             }
         } else {
             self.tight_bounds = Some(BoundingBox::new((x, y, z), (x, y, z)));
+        }
+    }
+
+    /// Repair tight bounds after clearing an occupied cell.
+    ///
+    /// Additions can update the cached box in O(1), but a removal only changes
+    /// the box when it touches one of its six faces. Scan in that case; interior
+    /// removals retain the existing box without any extra work. Clearing the
+    /// final block is handled directly so an empty region never reports stale
+    /// content bounds.
+    fn shrink_tight_bounds_after_removal(&mut self, x: i32, y: i32, z: i32) {
+        if self.non_air_count == 0 {
+            self.tight_bounds = None;
+            return;
+        }
+
+        let touches_boundary = self.tight_bounds.as_ref().is_some_and(|bounds| {
+            x == bounds.min.0
+                || x == bounds.max.0
+                || y == bounds.min.1
+                || y == bounds.max.1
+                || z == bounds.min.2
+                || z == bounds.max.2
+        });
+        if touches_boundary {
+            self.rebuild_tight_bounds();
         }
     }
 
@@ -1723,6 +1750,7 @@ impl Region {
             self.non_air_count += 1;
         } else if !old_is_air && new_is_air {
             self.non_air_count -= 1;
+            self.shrink_tight_bounds_after_removal(x, y, z);
         }
 
         if !new_is_air {
@@ -1810,10 +1838,14 @@ impl Region {
         // Batch update non_air_count
         self.non_air_count = (self.non_air_count as i64 + air_delta) as usize;
 
-        // Update tight bounds once for the entire fill
+        // Update tight bounds once for the entire fill. A bulk clear may remove
+        // several faces at once, so one post-write scan is both simpler and far
+        // cheaper than repairing the cache for every cleared cell.
         if !new_is_air {
             self.update_tight_bounds(min.0, min.1, min.2);
             self.update_tight_bounds(max.0, max.1, max.2);
+        } else if air_delta < 0 {
+            self.rebuild_tight_bounds();
         }
     }
 }
@@ -2504,6 +2536,49 @@ mod tests {
         assert_eq!(bounds.min, (1, 1, 1));
         assert_eq!(bounds.max, (3, 3, 3));
         assert_eq!(region.get_tight_dimensions(), (3, 3, 3));
+    }
+
+    #[test]
+    fn test_tight_bounds_shrink_when_blocks_are_cleared() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (10, 10, 10));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let air = BlockState::new("minecraft:air".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(2, 2, 2, &stone);
+        assert_eq!(region.get_tight_dimensions(), (3, 3, 3));
+
+        region.set_block(2, 2, 2, &air);
+        let bounds = region.get_tight_bounds().unwrap();
+        assert_eq!(bounds.min, (0, 0, 0));
+        assert_eq!(bounds.max, (0, 0, 0));
+        assert_eq!(region.get_tight_dimensions(), (1, 1, 1));
+
+        region.set_block(0, 0, 0, &air);
+        assert_eq!(region.count_non_air_blocks(), 0);
+        assert_eq!(region.get_tight_bounds(), None);
+        assert_eq!(region.get_tight_dimensions(), (0, 0, 0));
+    }
+
+    #[test]
+    fn test_tight_bounds_shrink_for_unchecked_and_bulk_clears() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (5, 5, 5));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let stone_index = region.get_or_insert_palette_by_state(&stone);
+        let air_index = region.cached_air_index;
+
+        region.set_block_at_index_unchecked(stone_index, 0, 0, 0);
+        region.set_block_at_index_unchecked(stone_index, 2, 2, 2);
+        region.set_block_at_index_unchecked(air_index, 2, 2, 2);
+        assert_eq!(region.get_tight_dimensions(), (1, 1, 1));
+
+        region.fill_uniform((0, 0, 0), (2, 2, 2), stone_index);
+        assert_eq!(region.get_tight_dimensions(), (3, 3, 3));
+        region.fill_uniform((2, 0, 0), (2, 2, 2), air_index);
+        assert_eq!(region.get_tight_dimensions(), (2, 3, 3));
+        region.fill_uniform((0, 0, 0), (1, 2, 2), air_index);
+        assert_eq!(region.get_tight_bounds(), None);
+        assert_eq!(region.get_tight_dimensions(), (0, 0, 0));
     }
 
     #[test]

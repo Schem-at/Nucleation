@@ -50,7 +50,7 @@ public:
    * `x`, `y`, `z`, `rotateX`, `rotateY`, `rotateZ`, `scale`, `opacity`,
    * `tintR/G/B/A`, and `emissiveR/G/B`.
    */
-  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> add_tween(std::string_view property_name, float from, float to, std::string_view easing_name);
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> add_tween(std::string_view property_name, float start, float end, std::string_view easing_name);
 
   /**
    * Add a normalised keyframe (`at` in `0..=1`) to a property track.

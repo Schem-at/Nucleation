@@ -49,7 +49,7 @@ final class AnimationEffect {
         return new AnimationEffect($ret, true);
     }
 
-    public function addTween(string $property_name,  $from,  $to, string $easing_name) {
+    public function addTween(string $property_name,  $start,  $end, string $easing_name) {
         $__n0 = strlen($property_name);
         $__view0 = Lib::ffi()->new('DiplomatStringView');
         if ($__n0 > 0) {
@@ -70,7 +70,7 @@ final class AnimationEffect {
             $__view3->data = null;
         }
         $__view3->len = $__n3;
-        $result = Lib::ffi()->AnimationEffect_add_tween($this->ptr, $__view0, $from, $to, $__view3);
+        $result = Lib::ffi()->AnimationEffect_add_tween($this->ptr, $__view0, $start, $end, $__view3);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }

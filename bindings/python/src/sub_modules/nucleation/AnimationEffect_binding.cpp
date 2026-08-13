@@ -13,7 +13,7 @@ void add_AnimationEffect_binding(nb::module_ mod) {
     nb::class_<nucleation::AnimationEffect> opaque(mod, "AnimationEffect", nb::type_slots(nucleation_AnimationEffect_slots));
     opaque
         .def("add_keyframe", &nucleation::AnimationEffect::add_keyframe, "property_name"_a, "at"_a, "value"_a, "easing_name"_a)
-        .def("add_tween", &nucleation::AnimationEffect::add_tween, "property_name"_a, "from"_a, "to"_a, "easing_name"_a)
+        .def("add_tween", &nucleation::AnimationEffect::add_tween, "property_name"_a, "start"_a, "end"_a, "easing_name"_a)
         .def_static("create", std::move(maybe_op_unwrap(&nucleation::AnimationEffect::create)), "duration_ms"_a)
         .def_static("drop_and_pop", std::move(maybe_op_unwrap(&nucleation::AnimationEffect::drop_and_pop)), "duration_ms"_a, "height"_a)
         .def_static("drop_in", std::move(maybe_op_unwrap(&nucleation::AnimationEffect::drop_in)), "duration_ms"_a, "height"_a)

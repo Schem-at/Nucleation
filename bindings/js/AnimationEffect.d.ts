@@ -33,7 +33,7 @@ export class AnimationEffect {
      * `x`, `y`, `z`, `rotateX`, `rotateY`, `rotateZ`, `scale`, `opacity`,
      * `tintR/G/B/A`, and `emissiveR/G/B`.
      */
-    addTween(propertyName: string, from: number, to: number, easingName: string): void;
+    addTween(propertyName: string, start: number, end: number, easingName: string): void;
 
     /**
      * Add a normalised keyframe (`at` in `0..=1`) to a property track.

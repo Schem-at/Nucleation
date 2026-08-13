@@ -111,7 +111,7 @@ namespace nanobind::detail
         Py_ssize_t size;
         using Caster = make_caster<U>;
         using ErrCaster = make_caster<V>;
-        static constexpr auto Name = const_name("result");
+        static constexpr auto Name = Caster::Name;
 
         static handle from_cpp(nucleation::diplomat::result<T, E> value, rv_policy p, cleanup_list *cl) noexcept
         {

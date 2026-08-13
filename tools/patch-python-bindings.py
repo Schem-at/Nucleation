@@ -8,6 +8,7 @@ SCHEMATIC_BINDING = Path("bindings/python/src/sub_modules/nucleation/Schematic_b
 BUILDING_TOOL_BINDING = Path(
     "bindings/python/src/sub_modules/nucleation/BuildingTool_binding.cpp"
 )
+NANOBIND_COMMON = Path("bindings/python/src/include/diplomat_nanobind_common.hpp")
 
 
 def replace_once(source: str, old: str, new: str) -> str:
@@ -52,6 +53,18 @@ def main() -> None:
         '"normal"_a = nb::none(), "epsilon"_a = 0.5)\n',
     )
     BUILDING_TOOL_BINDING.write_text(source)
+
+    # Diplomat Result<T, E> is unwrapped at the Python boundary: callers get T
+    # or an exception, never a Python-visible `result` object. Teach nanobind's
+    # signature metadata the same fact so help(), stubgen, mypy, and Pyright all
+    # see the actual success type instead of an undefined `result` annotation.
+    source = NANOBIND_COMMON.read_text()
+    source = replace_once(
+        source,
+        '        static constexpr auto Name = const_name("result");\n',
+        "        static constexpr auto Name = Caster::Name;\n",
+    )
+    NANOBIND_COMMON.write_text(source)
 
     for path in sorted(Path("bindings/python/src").rglob("*")):
         if path.suffix not in {".cpp", ".hpp"}:

@@ -111,13 +111,13 @@ pub mod ffi {
         pub fn add_tween(
             &mut self,
             property_name: &DiplomatStr,
-            from: f32,
-            to: f32,
+            start: f32,
+            end: f32,
             easing_name: &DiplomatStr,
         ) -> Result<(), NucleationError> {
             let p = property(utf8(property_name)?)?;
             let e = easing(utf8(easing_name)?)?;
-            self.0 = self.0.clone().tween(p, from, to, e);
+            self.0 = self.0.clone().tween(p, start, end, e);
             Ok(())
         }
 

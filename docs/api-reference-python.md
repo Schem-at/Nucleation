@@ -121,6 +121,9 @@ t = s.tight_dimensions()    # content extent
 storage grows in chunks, so this can exceed the content extent by a wide
 margin. **For "how big is this build", use `tight_dimensions()`** (issue #5).
 `volume()` is the allocated volume; `block_count()` counts non-air blocks.
+Tight bounds follow current content, not mutation history: replacing a boundary
+block with air shrinks them, and `tight_bounds_min()` / `tight_bounds_max()`
+raise `NucleationError.NotFound` once the final non-air block is removed.
 
 ## Analysis: fingerprints, diff, auto-stack
 
@@ -208,3 +211,8 @@ import nucleation
 [m for m in dir(nucleation.Schematic) if not m.startswith('_')]
 print(nucleation.Schematic.copy_region.__doc__)
 ```
+
+The wheel also ships `py.typed` plus generated stubs for the complete compiled
+surface. Mypy, Pyright, IDE completion, and API-diff tooling therefore see the
+same signatures as runtime `help()`, including the hand-written `design` and
+`curation` veneers re-exported by the package.

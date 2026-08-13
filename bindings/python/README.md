@@ -4,6 +4,8 @@ A high-performance Minecraft schematic engine, powered by a native Rust core. Pa
 diff, fingerprint, and generate schematics from Python.
 
 Wheels are published for CPython 3.12+ (stable ABI) on Linux, macOS, and Windows.
+They include a `py.typed` marker and generated `.pyi` stubs for Mypy, Pyright,
+and editor completion.
 
 ## Install
 

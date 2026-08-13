@@ -344,13 +344,21 @@ jobs:
         run: |
           PY=/opt/python/cp312-cp312/bin/python
           "$PY" -m venv wheel-test-venv
-          wheel-test-venv/bin/python -m pip install wheels/*.whl
+          wheel-test-venv/bin/python -m pip install wheels/*.whl mypy pyright
           wheel-test-venv/bin/python - <<'EOF'
+          import importlib.metadata as metadata
           import nucleation
+          packaged = {str(path) for path in metadata.files("nucleation") or []}
+          assert "nucleation/nucleation.pyi" in packaged
+          assert "nucleation/py.typed" in packaged
           assert nucleation.Schematic.create("linux-wheel")
           assert nucleation.BuildAnimation.create("animation")
           print("manylinux wheel functional check OK")
           EOF
+          wheel-test-venv/bin/python -m mypy --strict bindings/python/tests/typecheck_api.py
+          wheel-test-venv/bin/python -m pyright bindings/python/tests/typecheck_api.py
+          wheel-test-venv/bin/python -m pyright \
+            wheel-test-venv/lib/python3.12/site-packages/nucleation/nucleation.pyi
       - uses: actions/upload-artifact@v4
         with:
           name: python-wheels-linux-x86_64

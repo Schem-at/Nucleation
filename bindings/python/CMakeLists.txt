@@ -84,8 +84,36 @@ target_include_directories(nucleation PRIVATE "${NB_PKG_DIR}/ext/robin_map/inclu
 target_compile_features(nucleation PUBLIC cxx_std_20)
 target_link_libraries(nucleation PUBLIC nucleation_rust ${Python3_SABI_LIBRARY})
 
+# Generate type information from nanobind's structured signatures. The
+# extension is a top-level module in the build tree and becomes the
+# `nucleation.nucleation` submodule when installed below, so the generated
+# `nucleation.pyi` is installed beside it inside the veneer package.
+nanobind_add_stub(
+  nucleation_stub
+  MODULE nucleation
+  OUTPUT nucleation.pyi
+  PYTHON_PATH $<TARGET_FILE_DIR:nucleation>
+  DEPENDS nucleation
+  MARKER_FILE py.typed
+)
+add_custom_target(
+  nucleation_stub_normalized ALL
+  COMMAND
+    "${Python_EXECUTABLE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/normalize_stub.py"
+    "${CMAKE_CURRENT_BINARY_DIR}/nucleation.pyi"
+  DEPENDS nucleation_stub
+  VERBATIM
+)
+
 # The extension lands INSIDE the veneer package (nucleation/) so that
 # `import nucleation` resolves to the hand-written Python layer, which
 # re-exports the compiled core as its `nucleation.nucleation` submodule
 # (the PyInit_nucleation symbol matches the last dotted component).
 install(TARGETS nucleation LIBRARY DESTINATION nucleation)
+install(
+  FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/nucleation.pyi"
+    "${CMAKE_CURRENT_BINARY_DIR}/py.typed"
+  DESTINATION nucleation
+)

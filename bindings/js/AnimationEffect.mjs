@@ -135,7 +135,7 @@ export class AnimationEffect {
      * `x`, `y`, `z`, `rotateX`, `rotateY`, `rotateZ`, `scale`, `opacity`,
      * `tintR/G/B/A`, and `emissiveR/G/B`.
      */
-    addTween(propertyName, from, to, easingName) {
+    addTween(propertyName, start, end, easingName) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
         const propertyNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, propertyName)));
@@ -143,7 +143,7 @@ export class AnimationEffect {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
 
-        const result = wasm.AnimationEffect_add_tween(diplomatReceive.buffer, this.ffiValue, propertyNameSlice.ptr, from, to, easingNameSlice.ptr);
+        const result = wasm.AnimationEffect_add_tween(diplomatReceive.buffer, this.ffiValue, propertyNameSlice.ptr, start, end, easingNameSlice.ptr);
 
         try {
             if (!diplomatReceive.resultFlag) {

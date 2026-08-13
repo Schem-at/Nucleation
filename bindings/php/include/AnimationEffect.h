@@ -31,7 +31,7 @@ AnimationEffect* AnimationEffect_spin_in(float duration_ms, float turns);
 AnimationEffect* AnimationEffect_turntable(float duration_ms);
 
 typedef struct AnimationEffect_add_tween_result {union { NucleationError err;}; bool is_ok;} AnimationEffect_add_tween_result;
-AnimationEffect_add_tween_result AnimationEffect_add_tween(AnimationEffect* self, DiplomatStringView property_name, float from, float to, DiplomatStringView easing_name);
+AnimationEffect_add_tween_result AnimationEffect_add_tween(AnimationEffect* self, DiplomatStringView property_name, float start, float end, DiplomatStringView easing_name);
 
 typedef struct AnimationEffect_add_keyframe_result {union { NucleationError err;}; bool is_ok;} AnimationEffect_add_keyframe_result;
 AnimationEffect_add_keyframe_result AnimationEffect_add_keyframe(AnimationEffect* self, DiplomatStringView property_name, float at, float value, DiplomatStringView easing_name);

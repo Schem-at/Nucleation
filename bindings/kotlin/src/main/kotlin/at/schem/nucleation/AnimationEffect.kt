@@ -14,7 +14,7 @@ internal interface AnimationEffectLib: Library {
     fun AnimationEffect_drop_and_pop(durationMs: Float, height: Float): Pointer
     fun AnimationEffect_spin_in(durationMs: Float, turns: Float): Pointer
     fun AnimationEffect_turntable(durationMs: Float): Pointer
-    fun AnimationEffect_add_tween(handle: Pointer, propertyName: Slice, from: Float, to: Float, easingName: Slice): ResultUnitInt
+    fun AnimationEffect_add_tween(handle: Pointer, propertyName: Slice, start: Float, end: Float, easingName: Slice): ResultUnitInt
     fun AnimationEffect_add_keyframe(handle: Pointer, propertyName: Slice, at: Float, value: Float, easingName: Slice): ResultUnitInt
     fun AnimationEffect_set_repeat_forever(handle: Pointer): Unit
 }
@@ -122,11 +122,11 @@ class AnimationEffect internal constructor (
     *`x`, `y`, `z`, `rotateX`, `rotateY`, `rotateZ`, `scale`, `opacity`,
     *`tintR/G/B/A`, and `emissiveR/G/B`.
     */
-    fun addTween(propertyName: String, from: Float, to: Float, easingName: String): Result<Unit> {
+    fun addTween(propertyName: String, start: Float, end: Float, easingName: String): Result<Unit> {
         val propertyNameSliceMemory = PrimitiveArrayTools.borrowUtf8(propertyName)
         val easingNameSliceMemory = PrimitiveArrayTools.borrowUtf8(easingName)
 
-        val returnVal = lib.AnimationEffect_add_tween(handle, propertyNameSliceMemory.slice, from, to, easingNameSliceMemory.slice);
+        val returnVal = lib.AnimationEffect_add_tween(handle, propertyNameSliceMemory.slice, start, end, easingNameSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {

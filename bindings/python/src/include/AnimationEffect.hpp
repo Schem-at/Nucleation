@@ -34,7 +34,7 @@ namespace capi {
     nucleation::capi::AnimationEffect* AnimationEffect_turntable(float duration_ms);
 
     typedef struct AnimationEffect_add_tween_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} AnimationEffect_add_tween_result;
-    AnimationEffect_add_tween_result AnimationEffect_add_tween(nucleation::capi::AnimationEffect* self, nucleation::diplomat::capi::DiplomatStringView property_name, float from, float to, nucleation::diplomat::capi::DiplomatStringView easing_name);
+    AnimationEffect_add_tween_result AnimationEffect_add_tween(nucleation::capi::AnimationEffect* self, nucleation::diplomat::capi::DiplomatStringView property_name, float start, float end, nucleation::diplomat::capi::DiplomatStringView easing_name);
 
     typedef struct AnimationEffect_add_keyframe_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} AnimationEffect_add_keyframe_result;
     AnimationEffect_add_keyframe_result AnimationEffect_add_keyframe(nucleation::capi::AnimationEffect* self, nucleation::diplomat::capi::DiplomatStringView property_name, float at, float value, nucleation::diplomat::capi::DiplomatStringView easing_name);
@@ -85,11 +85,11 @@ inline std::unique_ptr<nucleation::AnimationEffect> nucleation::AnimationEffect:
     return std::unique_ptr<nucleation::AnimationEffect>(nucleation::AnimationEffect::FromFFI(result));
 }
 
-inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::AnimationEffect::add_tween(std::string_view property_name, float from, float to, std::string_view easing_name) {
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::AnimationEffect::add_tween(std::string_view property_name, float start, float end, std::string_view easing_name) {
     auto result = nucleation::capi::AnimationEffect_add_tween(this->AsFFI(),
         {property_name.data(), property_name.size()},
-        from,
-        to,
+        start,
+        end,
         {easing_name.data(), easing_name.size()});
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
