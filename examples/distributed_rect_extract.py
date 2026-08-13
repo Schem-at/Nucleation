@@ -59,6 +59,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--substrate-band", required=True)
     parser.add_argument("--partition-floor-share", type=float, default=0.30)
     parser.add_argument("--partition-dense-layer-coverage", type=float, default=0.80)
+    parser.add_argument("--preserve-support-blocks", type=parse_bool, default=True)
     parser.add_argument("--split-min-blocks", type=int, default=4096)
     parser.add_argument(
         "--component-attach-mode",
@@ -153,6 +154,7 @@ def main() -> None:
         "substrate_band": args.substrate_band,
         "partition_floor_share": args.partition_floor_share,
         "partition_dense_layer_coverage": args.partition_dense_layer_coverage,
+        "preserve_support_blocks": args.preserve_support_blocks,
         "split_min_blocks": args.split_min_blocks,
         "component_attach_mode": args.component_attach_mode,
         "component_join_gap": args.component_join_gap,
@@ -203,6 +205,8 @@ def main() -> None:
             str(args.partition_floor_share),
             "--partition-dense-layer-coverage",
             str(args.partition_dense_layer_coverage),
+            "--preserve-support-blocks",
+            str(args.preserve_support_blocks).lower(),
             "--split-min-blocks",
             str(args.split_min_blocks),
             "--component-attach-mode",

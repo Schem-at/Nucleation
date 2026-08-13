@@ -86,6 +86,7 @@ pub mod ffi {
                 algorithm_version: SegConfig::default().algorithm_version,
                 partition_floor_share: SegConfig::default().partition_floor_share,
                 partition_dense_layer_coverage: SegConfig::default().partition_dense_layer_coverage,
+                preserve_support_blocks: SegConfig::default().preserve_support_blocks,
                 split_disconnected: SegConfig::default().split_disconnected,
                 drop_unpartitioned: SegConfig::default().drop_unpartitioned,
             };

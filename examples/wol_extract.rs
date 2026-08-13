@@ -514,23 +514,30 @@ fn main() {
     // one).
     let split_min = cli.split_min_blocks as usize;
     let mut emit = |mb: MaterializedBuild| {
-        let MaterializedBuild {
-            schematic,
-            provenance,
-        } = mb;
-
         if split_min == 0 {
+            let MaterializedBuild {
+                schematic,
+                provenance,
+                ..
+            } = mb;
             emit_one(schematic, provenance);
             return;
         }
 
-        let pieces = schematic.split_connected_attach(Connectivity::Corner, split_min);
+        let pieces = mb.split_connected_attach_support_aware(Connectivity::Corner, split_min);
         if pieces.len() <= 1 {
             // Clean / single-core build: emit the ORIGINAL untouched so its
             // stable id, name and bytes are preserved exactly (harmless refine).
+            let MaterializedBuild {
+                schematic,
+                provenance,
+                ..
+            } = mb;
             emit_one(schematic, provenance);
             return;
         }
+
+        let provenance = mb.provenance;
 
         // Genuine multi-core split: emit each piece as its own build with an
         // extended, still-valid provenance envelope (a per-piece stable id

@@ -41,6 +41,7 @@ struct Cli {
     drop_unpartitioned: Option<bool>,
     partition_floor_share: f32,
     partition_dense_layer_coverage: f32,
+    preserve_support_blocks: bool,
     split_min_blocks: u64,
     component_attach_mode: ComponentAttachMode,
     component_join_gap: u32,
@@ -76,6 +77,7 @@ fn parse_args() -> Cli {
              [--partition-hints FILE.json] [--drop-unpartitioned true|false] \
              [--partition-floor-share FRACTION] \
              [--partition-dense-layer-coverage FRACTION] \
+             [--preserve-support-blocks true|false] \
              [--split-min-blocks COUNT] \
              [--component-attach-mode exact|nearby|nearest] \
              [--component-join-gap BLOCKS] \
@@ -122,6 +124,7 @@ fn parse_args() -> Cli {
         drop_unpartitioned: None,
         partition_floor_share: 0.30,
         partition_dense_layer_coverage: 0.80,
+        preserve_support_blocks: true,
         split_min_blocks: 256,
         component_attach_mode: ComponentAttachMode::Nearby,
         component_join_gap: 3,
@@ -226,6 +229,11 @@ fn parse_args() -> Cli {
                 cli.partition_dense_layer_coverage = value
                     .parse::<f32>()
                     .expect("partition dense-layer coverage must be a number")
+            }
+            "--preserve-support-blocks" => {
+                cli.preserve_support_blocks = value
+                    .parse::<bool>()
+                    .expect("--preserve-support-blocks must be true or false")
             }
             "--split-min-blocks" => {
                 cli.split_min_blocks = value
@@ -571,6 +579,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             partition_policy: PartitionPolicy::HardCut,
             partition_floor_share,
             partition_dense_layer_coverage,
+            preserve_support_blocks: cli.preserve_support_blocks,
             split_disconnected,
             drop_unpartitioned,
             ..SegConfig::default()
@@ -589,11 +598,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut emit = |build: MaterializedBuild| {
         let (pieces, attach_mode): (Vec<_>, &str) = match cli.component_attach_mode {
             ComponentAttachMode::Exact => (
-                build.schematic.split_connected(Connectivity::Corner),
+                build.split_connected_support_aware(Connectivity::Corner),
                 "exact",
             ),
             ComponentAttachMode::Nearby => (
-                build.schematic.split_connected_attach_nearby(
+                build.split_connected_attach_nearby_support_aware(
                     Connectivity::Corner,
                     cli.component_min_blocks,
                     cli.component_join_gap,
@@ -601,14 +610,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "nearby",
             ),
             ComponentAttachMode::Nearest => (
-                build
-                    .schematic
-                    .split_connected_attach(Connectivity::Corner, cli.component_min_blocks),
+                build.split_connected_attach_support_aware(
+                    Connectivity::Corner,
+                    cli.component_min_blocks,
+                ),
                 "nearest",
             ),
         };
         let split = pieces.len() > 1;
         for mut piece in pieces {
+            let piece_support_count = build
+                .support_positions
+                .iter()
+                .filter(|pos| {
+                    piece
+                        .get_block(pos.x, pos.y, pos.z)
+                        .is_some_and(|state| state.get_name() != "minecraft:air")
+                })
+                .count();
             let mut provenance = build.provenance.clone();
             provenance.config_hash = ContentId::of(&[
                 b"segment.output.v2",
@@ -730,6 +749,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             embedded.attributes.insert(
                 "nucleation:partition_dense_layer_coverage".to_string(),
                 cli.partition_dense_layer_coverage.to_string(),
+            );
+            embedded.attributes.insert(
+                "nucleation:preserve_support_blocks".to_string(),
+                cli.preserve_support_blocks.to_string(),
+            );
+            embedded.attributes.insert(
+                "nucleation:support_block_count".to_string(),
+                piece_support_count.to_string(),
             );
             embedded.attributes.insert(
                 "nucleation:split_min_blocks".to_string(),

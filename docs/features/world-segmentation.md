@@ -226,6 +226,7 @@ Calibration guidance, learned on real worlds:
 | `partition_policy` | `Off` | see partition hints below |
 | `partition_floor_share` | `None` | see partition floors below |
 | `partition_dense_layer_coverage` | `None` | subtract a nearly full partition layer even when it uses many materials |
+| `preserve_support_blocks` | `false` | retain one existing block directly below every surviving build block |
 | `split_disconnected` | `None` | optionally undo a closing that fused substantial disconnected builds |
 | `drop_unpartitioned` | `false` | with `HardCut`, omit roads/gutters outside all hints |
 
@@ -275,6 +276,21 @@ Patterned or deliberately mixed-material floors may have no single dominant
 material. `partition_dense_layer_coverage: Some(0.8)` subtracts an exact Y layer
 when at least 80% of the partition footprint is occupied, regardless of its
 palette. Only the dense layer is removed; sparse machinery above it is kept.
+
+Floor subtraction can otherwise remove a floor-matching block that is part of
+the extracted build's base. With `preserve_support_blocks: true`, Nucleation
+expands the post-subtraction keep-mask down by exactly one existing block. The
+rule is unconditional: it does not try to decide whether Minecraft physics
+requires that support. Expansion is deliberately non-recursive, so retaining a
+support does not pull the complete substrate column beneath it into the build.
+Supports are enrichment rather than segmentation evidence: Nucleation decides
+component identity with the supports absent and adds them to their owning
+component afterwards, preventing remnants of the old floor from reconnecting
+otherwise independent builds. Use the support-aware component-split methods on
+`MaterializedBuild` when refining library output.
+The generic `segment_world` worker enables this conservative policy by default
+and records both `nucleation:preserve_support_blocks` and the per-output
+`nucleation:support_block_count` in schematic provenance.
 
 `PartitionIndex` spatially indexes arbitrary boxes by world region. A global
 uniform grid with tens of thousands of cells therefore remains practical, and

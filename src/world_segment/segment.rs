@@ -84,6 +84,21 @@ pub struct SegConfig {
     /// where no one block name dominates. `None` disables it (default).
     #[serde(default)]
     pub partition_dense_layer_coverage: Option<f32>,
+    /// Preserve one existing block directly below every block that survives
+    /// substrate/floor subtraction.
+    ///
+    /// This is deliberately unconditional and exactly one block deep: no
+    /// Minecraft-physics or "is this support necessary?" inference is made.
+    /// A floor block beneath retained build content is part of the emitted
+    /// build even when that block would otherwise be classified as substrate
+    /// or partition floor. Support enrichment happens after segmentation and
+    /// support-aware component splitting ignores it, so support footprints do
+    /// not reconnect independent builds. Newly retained supports do not
+    /// recursively retain the blocks beneath them.
+    ///
+    /// `false` by default for backward compatibility.
+    #[serde(default)]
+    pub preserve_support_blocks: bool,
     /// When `Some`, undo the morphological closing where it has fused two
     /// genuinely disconnected builds.
     ///
@@ -257,6 +272,9 @@ impl SegConfig {
             value[1..].copy_from_slice(&coverage.to_le_bytes());
             value
         });
+        // Another backward-compatible extension. False appends nothing; true
+        // is domain-separated from the other one-byte extension.
+        let preserve_support_blocks = self.preserve_support_blocks.then_some([3u8]);
         // Bound to locals so the `to_le_bytes` temporaries outlive the
         // `ContentId::of` call rather than being dropped at the end of a `let`.
         let cell = self.cell_size.to_le_bytes();
@@ -296,6 +314,9 @@ impl SegConfig {
         if let Some(bytes) = dense_layer.as_ref() {
             parts.push(bytes);
         }
+        if let Some(bytes) = preserve_support_blocks.as_ref() {
+            parts.push(bytes);
+        }
         ContentId::of(&parts)
     }
 }
@@ -310,6 +331,7 @@ impl Default for SegConfig {
             algorithm_version: 1,
             partition_floor_share: None,
             partition_dense_layer_coverage: None,
+            preserve_support_blocks: false,
             split_disconnected: None,
             drop_unpartitioned: false,
         }
@@ -2669,6 +2691,19 @@ mod tests {
         let base = cfg();
         let enabled = SegConfig {
             partition_dense_layer_coverage: Some(0.80),
+            ..cfg()
+        };
+        assert_ne!(
+            base.config_hash(&profile(), &no_hints()),
+            enabled.config_hash(&profile(), &no_hints())
+        );
+    }
+
+    #[test]
+    fn preserve_support_blocks_is_folded_into_config_hash() {
+        let base = cfg();
+        let enabled = SegConfig {
+            preserve_support_blocks: true,
             ..cfg()
         };
         assert_ne!(
