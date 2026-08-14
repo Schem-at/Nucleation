@@ -118,6 +118,12 @@ namespace capi {
     typedef struct Schematic_set_blocks_result {union {int32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_set_blocks_result;
     Schematic_set_blocks_result Schematic_set_blocks(diplomat::capi::Schematic* self, diplomat::capi::DiplomatI32View positions, diplomat::capi::DiplomatStringView block_name);
 
+    typedef struct Schematic_set_blocks_simulated_result {union {int32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_set_blocks_simulated_result;
+    Schematic_set_blocks_simulated_result Schematic_set_blocks_simulated(diplomat::capi::Schematic* self, diplomat::capi::DiplomatI32View positions, diplomat::capi::DiplomatStringView block_name);
+
+    typedef struct Schematic_set_blocks_simulated_full_world_result {union {int32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_set_blocks_simulated_full_world_result;
+    Schematic_set_blocks_simulated_full_world_result Schematic_set_blocks_simulated_full_world(diplomat::capi::Schematic* self, diplomat::capi::DiplomatI32View positions, diplomat::capi::DiplomatStringView block_name);
+
     typedef struct Schematic_get_blocks_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_get_blocks_json_result;
     Schematic_get_blocks_json_result Schematic_get_blocks_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatI32View positions, diplomat::capi::DiplomatWrite* write);
 
@@ -697,6 +703,20 @@ inline diplomat::result<std::monostate, NucleationError> Schematic::place(int32_
 
 inline diplomat::result<int32_t, NucleationError> Schematic::set_blocks(diplomat::span<const int32_t> positions, std::string_view block_name) {
     auto result = diplomat::capi::Schematic_set_blocks(this->AsFFI(),
+        {positions.data(), positions.size()},
+        {block_name.data(), block_name.size()});
+    return result.is_ok ? diplomat::result<int32_t, NucleationError>(diplomat::Ok<int32_t>(result.ok)) : diplomat::result<int32_t, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<int32_t, NucleationError> Schematic::set_blocks_simulated(diplomat::span<const int32_t> positions, std::string_view block_name) {
+    auto result = diplomat::capi::Schematic_set_blocks_simulated(this->AsFFI(),
+        {positions.data(), positions.size()},
+        {block_name.data(), block_name.size()});
+    return result.is_ok ? diplomat::result<int32_t, NucleationError>(diplomat::Ok<int32_t>(result.ok)) : diplomat::result<int32_t, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<int32_t, NucleationError> Schematic::set_blocks_simulated_full_world(diplomat::span<const int32_t> positions, std::string_view block_name) {
+    auto result = diplomat::capi::Schematic_set_blocks_simulated_full_world(this->AsFFI(),
         {positions.data(), positions.size()},
         {block_name.data(), block_name.size()});
     return result.is_ok ? diplomat::result<int32_t, NucleationError>(diplomat::Ok<int32_t>(result.ok)) : diplomat::result<int32_t, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));

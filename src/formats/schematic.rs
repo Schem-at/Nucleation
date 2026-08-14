@@ -122,9 +122,22 @@ fn to_schematic_v3(schematic: &UniversalSchematic, compression: Compression) -> 
         NbtTag::Int(schematic.metadata.mc_version.unwrap_or(1343)),
     );
 
-    // Use compact region with tight bounds for export to avoid huge empty space
-    let merged_region = schematic.get_merged_region();
-    let compact_region = merged_region.to_compact();
+    // Borrow the common single, already-compact region. Only allocate for
+    // actual multi-region merging or when empty padding must be removed.
+    let merged_region_storage;
+    let merged_region = if schematic.other_regions.is_empty() {
+        &schematic.default_region
+    } else {
+        merged_region_storage = schematic.get_merged_region();
+        &merged_region_storage
+    };
+    let compact_region_storage;
+    let compact_region = if merged_region.is_content_compact() {
+        merged_region
+    } else {
+        compact_region_storage = merged_region.to_compact();
+        &compact_region_storage
+    };
 
     let (width, height, length) = compact_region.get_dimensions();
     let offset_pos = compact_region.position;
@@ -147,23 +160,11 @@ fn to_schematic_v3(schematic: &UniversalSchematic, compression: Compression) -> 
     let _palette_size = palette_nbt.len();
     blocks_container.insert("Palette", palette_nbt);
 
-    // Remap block data using the new palette mapping
-    let remapped_blocks: Vec<u32> = compact_region
-        .blocks
-        .iter()
-        .map(|&original_id| {
-            if original_id < palette_mapping.len() {
-                palette_mapping[original_id] as u32
-            } else {
-                // Out of bounds — map to air
-                0
-            }
-        })
-        .collect();
-
-    // Encode remapped block data — preallocated to avoid per-block Vec allocations
-    let mut block_data: Vec<u8> = Vec::with_capacity(remapped_blocks.len() * 2);
-    for &block_id in &remapped_blocks {
+    // Remap directly into the encoded stream instead of materializing a
+    // second u32 buffer proportional to the schematic volume.
+    let mut block_data: Vec<u8> = Vec::with_capacity(compact_region.blocks.len() * 2);
+    for &original_id in &compact_region.blocks {
+        let block_id = palette_mapping.get(original_id).copied().unwrap_or(0) as u32;
         encode_varint_into(block_id, &mut block_data);
     }
 
@@ -240,9 +241,20 @@ fn to_schematic_v2(schematic: &UniversalSchematic, compression: Compression) -> 
         NbtTag::Int(schematic.metadata.mc_version.unwrap_or(1343)),
     );
 
-    // Use compact region with tight bounds for export
-    let merged_region = schematic.get_merged_region();
-    let compact_region = merged_region.to_compact();
+    let merged_region_storage;
+    let merged_region = if schematic.other_regions.is_empty() {
+        &schematic.default_region
+    } else {
+        merged_region_storage = schematic.get_merged_region();
+        &merged_region_storage
+    };
+    let compact_region_storage;
+    let compact_region = if merged_region.is_content_compact() {
+        merged_region
+    } else {
+        compact_region_storage = merged_region.to_compact();
+        &compact_region_storage
+    };
 
     let (width, height, length) = compact_region.get_dimensions();
     let offset_pos = compact_region.position;
@@ -915,6 +927,21 @@ mod tests {
     use crate::{BlockState, UniversalSchematic};
 
     use super::*;
+
+    #[test]
+    fn already_compact_single_region_round_trips_in_both_versions() {
+        let mut original = UniversalSchematic::new("compact-export".into());
+        original.fill_cuboid_str((0, 0, 0), (7, 5, 3), "minecraft:stone");
+        assert!(original.default_region.is_content_compact());
+
+        for version in [SchematicVersion::V2, SchematicVersion::V3] {
+            let bytes = to_schematic_version(&original, version).unwrap();
+            let decoded = from_schematic(&bytes).unwrap();
+            assert_eq!(decoded.get_dimensions(), (8, 6, 4));
+            assert_eq!(decoded.default_region.count_non_air_blocks(), 8 * 6 * 4);
+            assert_eq!(decoded.get_block(7, 5, 3).unwrap().name, "minecraft:stone");
+        }
+    }
 
     /// A `.schem` that carries its own test keeps it across resaves, exactly
     /// as a `.litematic` does — one embedding, every carrier. Root-level and

@@ -26,12 +26,6 @@ pub struct UniversalSchematic {
     pub default_region_name: String,
     #[serde(default = "HashMap::new")]
     pub definition_regions: HashMap<String, DefinitionRegion>,
-    /// String-keyed cache used by `set_block_str` to skip BlockState
-    /// allocation on repeated placements of the same plain id. FxHashMap is
-    /// the right hasher here — keys are short ASCII strings and we hit this
-    /// on every set_block call.
-    #[serde(skip, default = "FxHashMap::default")]
-    block_state_cache: FxHashMap<String, BlockState>,
     /// Full-block-string cache used by `set_block_from_string` to skip
     /// property and NBT parsing on repeated placements of the same string
     /// (e.g. filling 100k identical chests). The NbtMap is Arc-shared with
@@ -77,7 +71,6 @@ impl UniversalSchematic {
             other_regions: HashMap::new(),
             default_region_name,
             definition_regions: HashMap::new(),
-            block_state_cache: FxHashMap::default(),
             block_string_cache: FxHashMap::default(),
         }
     }
@@ -169,21 +162,27 @@ impl UniversalSchematic {
         {
             self.set_block_from_string(x, y, z, block_name)
         } else {
-            let block_state = match self.block_state_cache.get(block_name) {
-                Some(cached) => cached.clone(),
-                None => {
-                    let new_block = BlockState::new(block_name.to_string());
-                    self.block_state_cache
-                        .insert(block_name.to_string(), new_block.clone());
-                    new_block
-                }
-            };
-
-            let placed = self.set_block(x, y, z, &block_state);
-            if placed {
-                self.remove_block_entity((x, y, z));
+            // Plain ids need neither BlockState parsing nor an owned clone on
+            // every call. Resolve the region palette directly, then use the
+            // indexed write path. This is the dominant Python `set_block`
+            // workload and keeps complex property/NBT strings on the strict
+            // parser above.
+            if self.default_region.size == (1, 1, 1) && self.default_region.is_empty() {
+                self.default_region =
+                    Region::new(self.default_region_name.clone(), (x, y, z), (1, 1, 1));
             }
-            Ok(placed)
+            if !self.default_region.is_in_region(x, y, z) {
+                self.default_region.expand_to_fit(x, y, z);
+            }
+            let palette_index = self
+                .default_region
+                .get_or_insert_palette_by_name(block_name);
+            self.default_region
+                .set_block_at_index_unchecked(palette_index, x, y, z);
+            if !self.default_region.block_entities.is_empty() {
+                self.default_region.remove_block_entity((x, y, z));
+            }
+            Ok(true)
         }
     }
 
@@ -228,6 +227,20 @@ impl UniversalSchematic {
         }
     }
 
+    /// Fill an axis-aligned cuboid with a plain block id using the region's
+    /// contiguous row layout. Unlike the generic shape/brush engine, this
+    /// performs one palette lookup and one bounds expansion for the complete
+    /// operation.
+    pub fn fill_cuboid_str(&mut self, p1: (i32, i32, i32), p2: (i32, i32, i32), block_name: &str) {
+        let min = (p1.0.min(p2.0), p1.1.min(p2.1), p1.2.min(p2.2));
+        let max = (p1.0.max(p2.0), p1.1.max(p2.1), p1.2.max(p2.2));
+        self.ensure_bounds(min, max);
+        let palette_index = self
+            .default_region
+            .get_or_insert_palette_by_name(block_name);
+        self.default_region.fill_uniform(min, max, palette_index);
+    }
+
     pub fn get_palette_from_region(&self, region_name: &str) -> Option<Vec<BlockState>> {
         if region_name == self.default_region_name {
             Some(self.default_region.get_palette())
@@ -254,6 +267,32 @@ impl UniversalSchematic {
     ) -> Result<bool, String> {
         if region_name.is_empty() {
             return Err("Region name cannot be empty".to_string());
+        }
+
+        if region_name == self.default_region_name {
+            return self.try_set_block_str(x, y, z, block_name);
+        }
+
+        if !block_name
+            .chars()
+            .any(|c| matches!(c, '[' | ']' | '{' | '}'))
+        {
+            let region = self
+                .other_regions
+                .entry(region_name.to_string())
+                .or_insert_with(|| Region::new(region_name.to_string(), (x, y, z), (1, 1, 1)));
+            if region.size == (1, 1, 1) && region.is_empty() {
+                *region = Region::new(region_name.to_string(), (x, y, z), (1, 1, 1));
+            }
+            if !region.is_in_region(x, y, z) {
+                region.expand_to_fit(x, y, z);
+            }
+            let palette_index = region.get_or_insert_palette_by_name(block_name);
+            region.set_block_at_index_unchecked(palette_index, x, y, z);
+            if !region.block_entities.is_empty() {
+                region.remove_block_entity((x, y, z));
+            }
+            return Ok(true);
         }
 
         let (block_state, nbt) = self.parse_block_string_cached(block_name)?;
@@ -1176,7 +1215,6 @@ impl UniversalSchematic {
             other_regions,
             default_region_name,
             definition_regions,
-            block_state_cache: FxHashMap::default(),
             block_string_cache: FxHashMap::default(),
         })
     }
@@ -2277,24 +2315,30 @@ impl UniversalSchematic {
         z: i32,
         block_string: &str,
     ) -> Result<bool, String> {
-        // `{simulate=true}`: place this block into the schematic-as-world and
-        // let the tick engine react — the wire arrives with its real
-        // connections and power, the repeater with its lock, and anything the
-        // placement genuinely triggers (a piston that ends up powered
-        // extends) is written back too. Needs the `simulation` feature; the
-        // tag is an instruction, so without the engine it is an error rather
-        // than a silent plain write.
-        if let Some(descriptor) = Self::strip_simulate_tag(block_string)? {
+        // `{simulate=true}` runs the active local component relative to a
+        // read-only environment halo. `{simulate=world}` is the explicit
+        // opt-in that lets resulting changes update the entire schematic.
+        if let Some((descriptor, full_world)) = Self::strip_simulate_tag(block_string)? {
             #[cfg(all(feature = "bridge", feature = "mc-tick"))]
             {
-                return crate::bridge::mc_tick::simulate_placement_into(self, x, y, z, &descriptor)
-                    .map(|written| written > 0);
+                let written = if full_world {
+                    crate::bridge::mc_tick::simulate_placement_into_world(
+                        self,
+                        x,
+                        y,
+                        z,
+                        &descriptor,
+                    )
+                } else {
+                    crate::bridge::mc_tick::simulate_placement_into(self, x, y, z, &descriptor)
+                }?;
+                return Ok(written > 0);
             }
             #[cfg(not(all(feature = "bridge", feature = "mc-tick")))]
             {
-                let _ = descriptor;
+                let _ = (descriptor, full_world);
                 return Err(
-                    "{simulate=true} needs the tick engine — build with the `bridge` and \
+                    "simulation tags need the tick engine — build with the `bridge` and \
                      `mc-tick` features (both part of `bridge-full`)"
                         .to_string(),
                 );
@@ -2325,14 +2369,14 @@ impl UniversalSchematic {
         Ok(true)
     }
 
-    /// Detects and strips the `{simulate=true}` tag from a block string.
+    /// Detects and strips `{simulate=true}` (local) or `{simulate=world}`.
     ///
     /// Returns the block string without the tag when present, `None` when
     /// absent. The tag must stand alone in the braces — combining it with the
     /// other brace shorthands (`signal=`, `items=`) would need the engine to
     /// know about inventories mid-placement, and half-honouring a string is
     /// worse than refusing it.
-    fn strip_simulate_tag(block_string: &str) -> Result<Option<String>, String> {
+    fn strip_simulate_tag(block_string: &str) -> Result<Option<(String, bool)>, String> {
         let Some((head, tag)) = block_string.split_once('{') else {
             return Ok(None);
         };
@@ -2340,16 +2384,20 @@ impl UniversalSchematic {
             return Ok(None); // malformed braces are the ordinary parser's error to report
         };
         let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
-        if !parts.iter().any(|p| *p == "simulate=true") {
+        let full_world = if parts.iter().any(|p| *p == "simulate=true") {
+            false
+        } else if parts.iter().any(|p| *p == "simulate=world") {
+            true
+        } else {
             return Ok(None);
-        }
+        };
         if parts.len() > 1 {
             return Err(
-                "simulate=true must be the only tag in the braces — set other NBT in a separate call"
+                "simulate must be the only tag in the braces — set other NBT in a separate call"
                     .to_string(),
             );
         }
-        Ok(Some(head.trim().to_string()))
+        Ok(Some((head.trim().to_string(), full_world)))
     }
 
     /// Parses a block string into its components (block state and optional NBT data)
@@ -2597,15 +2645,14 @@ impl UniversalSchematic {
     }
 
     pub fn clear_block_state_cache(&mut self) {
-        self.block_state_cache.clear();
         self.block_string_cache.clear();
     }
 
-    /// Get cache statistics for debugging
+    /// Get complex block-string cache statistics for debugging.
     pub fn cache_stats(&self) -> (usize, usize) {
         (
-            self.block_state_cache.len(),
-            self.block_state_cache.capacity(),
+            self.block_string_cache.len(),
+            self.block_string_cache.capacity(),
         )
     }
 
@@ -2971,6 +3018,50 @@ mod tests {
     use crate::item::ItemStack;
     use quartz_nbt::io::{read_nbt, write_nbt};
     use std::io::Cursor;
+
+    #[test]
+    fn plain_set_fast_path_replaces_block_entities() {
+        let mut schematic = UniversalSchematic::new("plain-fast-path".to_string());
+        schematic
+            .try_set_block_str(4, 5, 6, "minecraft:chest[facing=north]{CustomName:'fast'}")
+            .unwrap();
+        assert!(schematic
+            .get_block_entity(BlockPosition { x: 4, y: 5, z: 6 })
+            .is_some());
+
+        schematic
+            .try_set_block_str(4, 5, 6, "minecraft:stone")
+            .unwrap();
+        assert_eq!(
+            schematic.get_block(4, 5, 6).unwrap().name,
+            "minecraft:stone"
+        );
+        assert!(schematic
+            .get_block_entity(BlockPosition { x: 4, y: 5, z: 6 })
+            .is_none());
+    }
+
+    #[test]
+    fn cuboid_fast_path_normalizes_bounds_and_clears() {
+        let mut schematic = UniversalSchematic::new("cuboid-fast-path".to_string());
+        schematic.fill_cuboid_str((2, 1, 3), (0, -1, 1), "minecraft:stone");
+
+        assert_eq!(schematic.default_region.get_dimensions(), (3, 3, 3));
+        assert_eq!(schematic.default_region.count_non_air_blocks(), 27);
+        assert_eq!(schematic.default_region.get_tight_dimensions(), (3, 3, 3));
+        assert_eq!(
+            schematic.get_block(0, -1, 1).unwrap().name,
+            "minecraft:stone"
+        );
+        assert_eq!(
+            schematic.get_block(2, 1, 3).unwrap().name,
+            "minecraft:stone"
+        );
+
+        schematic.fill_cuboid_str((2, 1, 3), (0, -1, 1), "minecraft:air");
+        assert_eq!(schematic.default_region.count_non_air_blocks(), 0);
+        assert_eq!(schematic.default_region.get_tight_bounds(), None);
+    }
 
     #[test]
     fn named_region_block_strings_parse_and_replace_block_entities() {

@@ -3602,6 +3602,77 @@ pub(crate) fn decor_kind(name: &str) -> Option<Decor> {
     None
 }
 
+/// Whether a block belongs to the active component that should be simulated
+/// around a local edit.
+///
+/// Ordinary building material is deliberately excluded: a continuous stone
+/// floor must not turn two otherwise independent circuits into one enormous
+/// component. Unknown blocks are included conservatively, as are blocks with
+/// implemented behaviour, signal sources, piston structure, and inventories.
+/// The local-simulation caller adds passive blocks back as read-only spatial
+/// context after it has found the active component.
+pub fn is_simulation_component(descriptor: &str) -> bool {
+    use crate::machine_graph::PartKind;
+
+    let name = descriptor
+        .split_once('[')
+        .map_or(descriptor, |(name, _)| name);
+    if matches!(
+        name,
+        "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air"
+    ) {
+        return false;
+    }
+    if !matches!(crate::machine_graph::classify(descriptor), PartKind::Solid) {
+        return true;
+    }
+
+    // These participate in simulation even when their current state emits no
+    // power. Several are intentionally inert under neighbour updates but own
+    // inventory/ticker/movement state read by another active block.
+    let short = name.strip_prefix("minecraft:").unwrap_or(name);
+    if matches!(
+        short,
+        "piston_head"
+            | "moving_piston"
+            | "redstone_lamp"
+            | "note_block"
+            | "lectern"
+            | "jukebox"
+            | "hopper"
+            | "dropper"
+            | "dispenser"
+            | "crafter"
+            | "barrel"
+            | "chest"
+            | "trapped_chest"
+            | "furnace"
+            | "blast_furnace"
+            | "smoker"
+            | "brewing_stand"
+            | "chiseled_bookshelf"
+            | "decorated_pot"
+            | "tripwire"
+            | "tripwire_hook"
+            | "powered_rail"
+            | "activator_rail"
+            | "test_block"
+    ) || short.ends_with("shulker_box")
+        || short.ends_with("_door")
+        || short.ends_with("_trapdoor")
+        || short.ends_with("_fence_gate")
+        || short.contains("copper_bulb")
+    {
+        return true;
+    }
+
+    // `decor_kind` is the engine's conservative catalogue of blocks known to
+    // do nothing. Anything it refuses to call decoration remains part of the
+    // component so a newly supported or modded block is never silently cut
+    // out of local simulation.
+    decor_kind(name).is_none()
+}
+
 /// The instrument a block gives a note block sitting on it.
 ///
 /// Vanilla reads this from each block's `BlockBehaviour.Properties.instrument`,

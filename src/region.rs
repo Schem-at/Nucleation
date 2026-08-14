@@ -350,6 +350,13 @@ impl Region {
             .unwrap_or((0, 0, 0))
     }
 
+    /// Whether the allocated region is already the minimal box containing all
+    /// blocks and entities. Exporters use this to borrow the region directly
+    /// instead of cloning and compacting an already-compact input.
+    pub(crate) fn is_content_compact(&self) -> bool {
+        self.get_content_bounds().as_ref() == Some(&self.bbox)
+    }
+
     /// Create a compacted region sized to cover all content: non-air blocks,
     /// entities, and block entities. This is used for exporting schematics so
     /// that Litematica (which filters entities outside the region bbox) keeps
@@ -1780,6 +1787,22 @@ impl Region {
         palette_index: usize,
     ) {
         let new_is_air = palette_index == self.cached_air_index;
+
+        // Whole-region fills know the final count and bounds without reading
+        // the previous contents. This is the common path for newly-created
+        // cuboids and turns the operation into one contiguous slice fill.
+        if min == self.bbox.min && max == self.bbox.max {
+            self.blocks.fill(palette_index);
+            if new_is_air {
+                self.non_air_count = 0;
+                self.tight_bounds = None;
+            } else {
+                self.non_air_count = self.blocks.len();
+                self.tight_bounds = Some(self.bbox.clone());
+            }
+            return;
+        }
+
         let w = self.cached_width;
         let wl = self.cached_width_x_length;
         let base_x = self.bbox.min.0;
@@ -2579,6 +2602,25 @@ mod tests {
         region.fill_uniform((0, 0, 0), (1, 2, 2), air_index);
         assert_eq!(region.get_tight_bounds(), None);
         assert_eq!(region.get_tight_dimensions(), (0, 0, 0));
+    }
+
+    #[test]
+    fn test_fill_uniform_whole_region_replaces_count_and_bounds() {
+        let mut region = Region::new("Test".to_string(), (-2, 3, 5), (4, 3, 2));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let stone_index = region.get_or_insert_palette_by_state(&stone);
+        let air_index = region.cached_air_index;
+        let bounds = region.get_bounding_box();
+
+        region.fill_uniform(bounds.min, bounds.max, stone_index);
+        assert_eq!(region.count_non_air_blocks(), 24);
+        assert_eq!(region.get_tight_bounds(), Some(bounds.clone()));
+        assert!(region.blocks.iter().all(|&index| index == stone_index));
+
+        region.fill_uniform(bounds.min, bounds.max, air_index);
+        assert_eq!(region.count_non_air_blocks(), 0);
+        assert_eq!(region.get_tight_bounds(), None);
+        assert!(region.blocks.iter().all(|&index| index == air_index));
     }
 
     #[test]

@@ -113,10 +113,68 @@ so anything the placement sets off — a repeater's delay, a piston stroke —
 lands before the write-back.
 
 Details worth knowing: the tag must stand alone in the braces (combine it with
-`signal=` and the call is refused rather than half-honoured); a placement more
-than three blocks from all other content skips the engine, since nothing is in
-range to interact; and every block already in the schematic must be one the
-engine can simulate, or the call errors by name.
+`signal=` and the call is refused rather than half-honoured). By default the
+engine selects the active component around the edit, loads a four-block halo
+as environmental context, and confines the write-back to that component's
+effect window. A continuous stone floor does not join independent circuits,
+and unrelated parts of a large map do not add simulation cost.
+
+Use `{simulate=world}` when the edit must deliberately participate in the
+entire loaded schematic. The batch equivalent is explicit too:
+
+```python
+scene.set_blocks_simulated_full_world(positions, "minecraft:redstone_wire")
+```
+
+Full-world mode requires every block in the schematic to be supported and its
+setup cost scales with the complete bounding volume.
+
+### Many simulated placements
+
+Repeated `{simulate=true}` calls are convenient but each call has to convert
+and wire the schematic as a new simulated world. When placing the same state at
+many positions, use the sequential batch form instead:
+
+```python
+positions = []
+for x in range(1, 10):
+    positions.extend((x, 1, 0))
+
+scene.set_blocks_simulated(positions, "minecraft:redstone_wire")
+```
+
+The positions are still hand-placed in order and the selected component
+settles after each one, so later placements see the states produced by earlier
+ones. The final wire connections, power, piston changes, and broken blocks are
+written back at the end. Structure conversion, state interning, behaviour
+registration, and physics tables are built once for the whole sequence.
+
+Simulation is not constant-time in the size of the affected circuit. For a
+selected local component/context volume of `C` cells and placements that
+dispatch `U₁ … Uₙ` updates, the default batch has approximately
+`O(C + ΣUᵢ)` work and is constant with respect to unrelated map volume.
+Separate convenience calls repeat setup, approximately `O(nC + ΣUᵢ)`.
+Full-world mode substitutes the complete bounding volume `V` for `C`. A long
+dust line or piston cascade can therefore take longer than an isolated button:
+the observable propagation is the work the simulator exists to preserve.
+
+### Placement resolvers
+
+The local API first asks a deterministic placement resolver whether the final
+state can be proven without constructing a tick engine. This is one generic
+pipeline behind `simulate`, not a separate wire API:
+
+1. Passive blocks with no active neighbour resolve as their plain write.
+2. A simple planar dust/redstone-block component resolves connection shapes and
+   power with a direct graph relaxation.
+3. If the component contains a lamp, observer, diode, piston, inventory,
+   vertical dust, scheduled work, or any unrecognised interaction, resolution
+   declines and the normal local event engine runs.
+
+The third rule is important: a shortcut is an optimization only when it can
+prove equivalence. It must never silently discard a neighbour side effect.
+Additional block families can add resolvers to the same internal dispatch
+without changing Python or the other bindings.
 
 ## Loading a real build
 

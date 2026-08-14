@@ -12,6 +12,23 @@ use nucleation::UniversalSchematic;
 
 const N: usize = 100_000;
 
+/// A deterministic permutation of a 64-cubed volume. This has random-looking
+/// locality without putting entropy generation inside the timed section, and
+/// the odd multiplier guarantees that the first 2^18 indices are unique.
+fn sparse_positions(count: usize) -> Vec<(i32, i32, i32)> {
+    assert!(count <= 64 * 64 * 64);
+    (0..count)
+        .map(|i| {
+            let shuffled = (i * 73 + 19) & ((64 * 64 * 64) - 1);
+            (
+                (shuffled & 63) as i32,
+                ((shuffled >> 12) & 63) as i32,
+                ((shuffled >> 6) & 63) as i32,
+            )
+        })
+        .collect()
+}
+
 fn bench_set_block_plain(c: &mut Criterion) {
     let mut group = c.benchmark_group("set_block_plain");
     group.throughput(Throughput::Elements(N as u64));
@@ -61,6 +78,171 @@ fn bench_set_block_chest_per_call(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_realistic_sparse_placement(c: &mut Criterion) {
+    const COUNT: usize = 10_000;
+    const REGION_COUNT: usize = 32;
+    let positions = sparse_positions(COUNT);
+    let palette = [
+        "minecraft:stone",
+        "minecraft:oak_planks",
+        "minecraft:redstone_wire[power=0,north=none,east=none,south=none,west=none]",
+        "minecraft:repeater[delay=2,facing=east,locked=false,powered=false]",
+        "minecraft:comparator[facing=north,mode=compare,powered=false]",
+    ];
+
+    // Smoke the workload before Criterion can report a plausible number for
+    // an accidentally empty or duplicate-heavy scenario.
+    let mut validation = UniversalSchematic::new("validation".into());
+    for (i, &(x, y, z)) in positions.iter().enumerate() {
+        assert!(validation.set_block_str(x, y, z, palette[i % palette.len()]));
+    }
+    assert_eq!(validation.total_blocks(), COUNT as i32);
+
+    let mut group = c.benchmark_group("realistic_sparse_placement");
+    group.throughput(Throughput::Elements(COUNT as u64));
+    group.bench_function("mixed_palette_default_region_10k", |b| {
+        b.iter(|| {
+            let mut schematic = UniversalSchematic::new("bench".into());
+            for (i, &(x, y, z)) in positions.iter().enumerate() {
+                assert!(schematic.set_block_str(
+                    black_box(x),
+                    black_box(y),
+                    black_box(z),
+                    palette[i % palette.len()],
+                ));
+            }
+            black_box(schematic);
+        })
+    });
+
+    // Region names and coordinates are prepared outside the timer, but region
+    // creation and all individual writes are included. Each region receives a
+    // random-looking 16-cubed working set, like a multi-build editor session.
+    let region_names: Vec<String> = (0..REGION_COUNT).map(|i| format!("build_{i:02}")).collect();
+    let region_positions: Vec<(i32, i32, i32)> = (0..COUNT)
+        .map(|i| {
+            let local_i = i / REGION_COUNT;
+            let shuffled = (local_i * 73 + 19) & ((16 * 16 * 16) - 1);
+            (
+                (shuffled & 15) as i32,
+                ((shuffled >> 8) & 15) as i32,
+                ((shuffled >> 4) & 15) as i32,
+            )
+        })
+        .collect();
+
+    group.bench_function("mixed_palette_32_named_regions_10k", |b| {
+        b.iter(|| {
+            let mut schematic = UniversalSchematic::new("bench".into());
+            for name in &region_names {
+                schematic
+                    .create_schematic_region(name)
+                    .expect("unique benchmark region");
+            }
+            for (i, &(x, y, z)) in region_positions.iter().enumerate() {
+                assert!(schematic.set_block_in_region_str(
+                    &region_names[i % REGION_COUNT],
+                    black_box(x),
+                    black_box(y),
+                    black_box(z),
+                    palette[i % palette.len()],
+                ));
+            }
+            black_box(schematic);
+        })
+    });
+    group.finish();
+}
+
+fn bench_content_shorthands(c: &mut Criterion) {
+    const COUNT: usize = 5_000;
+    let positions = sparse_positions(COUNT);
+    let barrels: Vec<String> = (1..=15)
+        .map(|signal| format!("minecraft:barrel[facing=up]{{signal={signal}}}"))
+        .collect();
+    let jukeboxes = [
+        "minecraft:jukebox{record=pigstep}",
+        "minecraft:jukebox{record=cat}",
+        "minecraft:jukebox{record=blocks}",
+        "minecraft:jukebox{record=chirp}",
+    ];
+
+    let mut validation = UniversalSchematic::new("validation".into());
+    assert!(validation
+        .set_block_from_string(0, 0, 0, &barrels[12])
+        .expect("barrel signal shorthand parses"));
+    assert!(validation
+        .set_block_from_string(1, 0, 0, jukeboxes[0])
+        .expect("jukebox record shorthand parses"));
+    assert_eq!(validation.total_blocks(), 2);
+    assert_eq!(validation.default_region.block_entities.len(), 2);
+
+    let mut group = c.benchmark_group("content_shorthands");
+    group.throughput(Throughput::Elements(COUNT as u64));
+    group.bench_function("barrel_signal_5k", |b| {
+        b.iter(|| {
+            let mut schematic = UniversalSchematic::new("bench".into());
+            for (i, &(x, y, z)) in positions.iter().enumerate() {
+                assert!(schematic
+                    .set_block_from_string(
+                        black_box(x),
+                        black_box(y),
+                        black_box(z),
+                        &barrels[i % barrels.len()],
+                    )
+                    .expect("validated barrel descriptor"));
+            }
+            black_box(schematic);
+        })
+    });
+
+    group.bench_function("jukebox_record_5k", |b| {
+        b.iter(|| {
+            let mut schematic = UniversalSchematic::new("bench".into());
+            for (i, &(x, y, z)) in positions.iter().enumerate() {
+                assert!(schematic
+                    .set_block_from_string(
+                        black_box(x),
+                        black_box(y),
+                        black_box(z),
+                        jukeboxes[i % jukeboxes.len()],
+                    )
+                    .expect("validated jukebox descriptor"));
+            }
+            black_box(schematic);
+        })
+    });
+
+    // A common editor action: replace content-bearing blocks with ordinary
+    // blocks. This must pay for block-entity removal and must not leave stale
+    // inventory or RecordItem data behind.
+    group.throughput(Throughput::Elements((COUNT * 2) as u64));
+    group.bench_function(
+        "barrel_then_plain_replacement_5k_positions_10k_writes",
+        |b| {
+            b.iter(|| {
+                let mut schematic = UniversalSchematic::new("bench".into());
+                for (i, &(x, y, z)) in positions.iter().enumerate() {
+                    assert!(schematic
+                        .set_block_from_string(x, y, z, &barrels[i % barrels.len()])
+                        .expect("validated barrel descriptor"));
+                }
+                for &(x, y, z) in &positions {
+                    assert!(schematic.set_block_str(
+                        black_box(x),
+                        black_box(y),
+                        black_box(z),
+                        "minecraft:stone",
+                    ));
+                }
+                assert!(schematic.default_region.block_entities.is_empty());
+                black_box(schematic);
+            })
+        },
+    );
+    group.finish();
+}
+
 fn bench_axis_aligned_run(c: &mut Criterion) {
     // Manual `fill` analog at the core API level — placing the same plain
     // block across N positions to set the engine's per-block ceiling.
@@ -75,6 +257,34 @@ fn bench_axis_aligned_run(c: &mut Criterion) {
         })
     });
     group.finish();
+}
+
+fn bench_cuboid_fill_and_export(c: &mut Criterion) {
+    const EDGE: i32 = 64;
+    let volume = (EDGE as u64).pow(3);
+
+    let mut fill = c.benchmark_group("cuboid_fill");
+    fill.throughput(Throughput::Elements(volume));
+    fill.bench_function("fill_uniform_64cubed", |b| {
+        b.iter(|| {
+            let mut schematic = UniversalSchematic::new("bench".into());
+            schematic.fill_cuboid_str((0, 0, 0), (EDGE - 1, EDGE - 1, EDGE - 1), "minecraft:stone");
+            black_box(schematic);
+        })
+    });
+    fill.finish();
+
+    let mut schematic = UniversalSchematic::new("bench".into());
+    schematic.fill_cuboid_str((0, 0, 0), (31, 31, 31), "minecraft:stone");
+    let mut export = c.benchmark_group("schematic_export");
+    export.throughput(Throughput::Elements(32_u64.pow(3)));
+    export.bench_function("compact_32cubed", |b| {
+        b.iter(|| {
+            let bytes = nucleation::schematic::to_schematic(black_box(&schematic)).unwrap();
+            black_box(bytes);
+        })
+    });
+    export.finish();
 }
 
 fn bench_clone_block_entity(c: &mut Criterion) {
@@ -293,7 +503,10 @@ criterion_group!(
     bench_set_block_plain,
     bench_set_block_complex_state,
     bench_set_block_chest_per_call,
+    bench_realistic_sparse_placement,
+    bench_content_shorthands,
     bench_axis_aligned_run,
+    bench_cuboid_fill_and_export,
     bench_clone_block_entity,
     bench_transform_with_block_entities,
     bench_clone_schematic_with_chests,

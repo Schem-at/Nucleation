@@ -127,6 +127,8 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("set_block_with_nbt", &nucleation::Schematic::set_block_with_nbt, "x"_a, "y"_a, "z"_a, "block_name"_a, "nbt_json"_a)
         .def("set_block_with_properties", &nucleation::Schematic::set_block_with_properties, "x"_a, "y"_a, "z"_a, "block_name"_a, "properties_json"_a)
         .def("set_blocks", &nucleation::Schematic::set_blocks, "positions"_a, "block_name"_a)
+        .def("set_blocks_simulated", &nucleation::Schematic::set_blocks_simulated, "positions"_a, "block_name"_a)
+        .def("set_blocks_simulated_full_world", &nucleation::Schematic::set_blocks_simulated_full_world, "positions"_a, "block_name"_a)
         .def("set_cell_contract_json", &nucleation::Schematic::set_cell_contract_json, "json"_a)
         .def("set_created", &nucleation::Schematic::set_created, "created"_a)
         .def("set_description", &nucleation::Schematic::set_description, "description"_a)

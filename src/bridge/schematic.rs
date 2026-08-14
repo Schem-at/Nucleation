@@ -548,6 +548,98 @@ pub mod ffi {
             Ok(count_i32)
         }
 
+        /// Sequentially hand-place the same block at many positions in one
+        /// local simulated component. `positions` is flat
+        /// `[x0,y0,z0, x1,y1,z1, ...]`; placements run in that order and each
+        /// settles before the next. Returns the number of final cells written
+        /// back, including neighbours changed by redstone or pistons.
+        ///
+        /// Nearby passive blocks are loaded as environmental context, but the
+        /// write-back is confined to the active component's effect window. Its
+        /// runtime is therefore independent of unrelated schematic volume.
+        /// Use `set_blocks_simulated_full_world` to opt into global updates.
+        ///
+        /// This is the efficient bulk form of repeated `{simulate=true}`:
+        /// structure conversion and simulator wiring happen once for the
+        /// complete sequence. Propagation is not constant-time—a placement can
+        /// affect an arbitrarily large circuit—but fixed setup is amortized.
+        pub fn set_blocks_simulated(
+            &mut self,
+            positions: &[i32],
+            block_name: &DiplomatStr,
+        ) -> Result<i32, NucleationError> {
+            if positions.len() % 3 != 0 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            let descriptor = utf8(block_name)?;
+            let placements: Vec<(i32, i32, i32)> = positions
+                .chunks_exact(3)
+                .map(|p| (p[0], p[1], p[2]))
+                .collect();
+
+            #[cfg(feature = "mc-tick")]
+            {
+                let written = crate::bridge::mc_tick::simulate_placements_into(
+                    &mut self.0,
+                    &placements,
+                    descriptor,
+                )
+                .map_err(|detail| {
+                    crate::bridge::set_last_error_detail(detail);
+                    NucleationError::Simulation
+                })?;
+                i32::try_from(written).map_err(|_| NucleationError::InvalidArgument)
+            }
+            #[cfg(not(feature = "mc-tick"))]
+            {
+                let _ = (placements, descriptor);
+                crate::bridge::set_last_error_detail(
+                    "set_blocks_simulated needs the mc-tick feature (included in bridge-full)",
+                );
+                Err(NucleationError::Simulation)
+            }
+        }
+
+        /// Explicit full-world counterpart to `set_blocks_simulated`.
+        /// Unrelated schematic volume participates in setup and any resulting
+        /// changes anywhere in the loaded world are written back.
+        pub fn set_blocks_simulated_full_world(
+            &mut self,
+            positions: &[i32],
+            block_name: &DiplomatStr,
+        ) -> Result<i32, NucleationError> {
+            if positions.len() % 3 != 0 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            let descriptor = utf8(block_name)?;
+            let placements: Vec<(i32, i32, i32)> = positions
+                .chunks_exact(3)
+                .map(|p| (p[0], p[1], p[2]))
+                .collect();
+
+            #[cfg(feature = "mc-tick")]
+            {
+                let written = crate::bridge::mc_tick::simulate_placements_into_world(
+                    &mut self.0,
+                    &placements,
+                    descriptor,
+                )
+                .map_err(|detail| {
+                    crate::bridge::set_last_error_detail(detail);
+                    NucleationError::Simulation
+                })?;
+                i32::try_from(written).map_err(|_| NucleationError::InvalidArgument)
+            }
+            #[cfg(not(feature = "mc-tick"))]
+            {
+                let _ = (placements, descriptor);
+                crate::bridge::set_last_error_detail(
+                    "set_blocks_simulated_full_world needs the mc-tick feature (included in bridge-full)",
+                );
+                Err(NucleationError::Simulation)
+            }
+        }
+
         /// Batch-get block names at multiple positions. `positions` is flat
         /// `[x0,y0,z0, ...]` (length must be a multiple of 3). Writes a JSON array,
         /// one entry per position: the block name string, or `null` for
@@ -1647,15 +1739,9 @@ pub mod ffi {
             max_z: i32,
             block_name: &DiplomatStr,
         ) -> Result<(), NucleationError> {
-            let name = utf8(block_name)?.to_string();
-            let block = crate::BlockState::new(name);
-            let shape = crate::building::ShapeEnum::Cuboid(crate::building::Cuboid::new(
-                (min_x, min_y, min_z),
-                (max_x, max_y, max_z),
-            ));
-            let brush = crate::building::SolidBrush::new(block);
-            let mut tool = crate::building::BuildingTool::new(&mut self.0);
-            tool.fill(&shape, &brush);
+            let name = utf8(block_name)?;
+            self.0
+                .fill_cuboid_str((min_x, min_y, min_z), (max_x, max_y, max_z), name);
             Ok(())
         }
 

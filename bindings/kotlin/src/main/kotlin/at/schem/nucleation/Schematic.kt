@@ -40,6 +40,8 @@ internal interface SchematicLib: Library {
     fun Schematic_prepare_block(handle: Pointer, blockName: Slice): ResultIntInt
     fun Schematic_place(handle: Pointer, x: Int, y: Int, z: Int, paletteIndex: Int): ResultUnitInt
     fun Schematic_set_blocks(handle: Pointer, positions: Slice, blockName: Slice): ResultIntInt
+    fun Schematic_set_blocks_simulated(handle: Pointer, positions: Slice, blockName: Slice): ResultIntInt
+    fun Schematic_set_blocks_simulated_full_world(handle: Pointer, positions: Slice, blockName: Slice): ResultIntInt
     fun Schematic_get_blocks_json(handle: Pointer, positions: Slice, write: Pointer): ResultUnitInt
     fun Schematic_stamp_box(handle: Pointer, source: Pointer, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int, targetX: Int, targetY: Int, targetZ: Int, excludedBlocksJson: Slice): ResultUnitInt
     fun Schematic_stamp_region(handle: Pointer, source: Pointer, sourceRegionName: Slice, targetX: Int, targetY: Int, targetZ: Int, excludedBlocksJson: Slice): ResultUnitInt
@@ -837,6 +839,62 @@ class Schematic internal constructor (
         val blockNameSliceMemory = PrimitiveArrayTools.borrowUtf8(blockName)
 
         val returnVal = lib.Schematic_set_blocks(handle, positionsSliceMemory.slice, blockNameSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return (nativeOkVal).ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            positionsSliceMemory.close()
+            blockNameSliceMemory.close()
+        }
+    }
+
+    /** Sequentially hand-place the same block at many positions in one
+    *local simulated component. `positions` is flat
+    *`[x0,y0,z0, x1,y1,z1, ...]`; placements run in that order and each
+    *settles before the next. Returns the number of final cells written
+    *back, including neighbours changed by redstone or pistons.
+    *
+    *Nearby passive blocks are loaded as environmental context, but the
+    *write-back is confined to the active component's effect window. Its
+    *runtime is therefore independent of unrelated schematic volume.
+    *Use `set_blocks_simulated_full_world` to opt into global updates.
+    *
+    *This is the efficient bulk form of repeated `{simulate=true}`:
+    *structure conversion and simulator wiring happen once for the
+    *complete sequence. Propagation is not constant-time—a placement can
+    *affect an arbitrarily large circuit—but fixed setup is amortized.
+    */
+    fun setBlocksSimulated(positions: IntArray, blockName: String): Result<Int> {
+        val positionsSliceMemory = PrimitiveArrayTools.borrow(positions)
+        val blockNameSliceMemory = PrimitiveArrayTools.borrowUtf8(blockName)
+
+        val returnVal = lib.Schematic_set_blocks_simulated(handle, positionsSliceMemory.slice, blockNameSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return (nativeOkVal).ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            positionsSliceMemory.close()
+            blockNameSliceMemory.close()
+        }
+    }
+
+    /** Explicit full-world counterpart to `set_blocks_simulated`.
+    *Unrelated schematic volume participates in setup and any resulting
+    *changes anywhere in the loaded world are written back.
+    */
+    fun setBlocksSimulatedFullWorld(positions: IntArray, blockName: String): Result<Int> {
+        val positionsSliceMemory = PrimitiveArrayTools.borrow(positions)
+        val blockNameSliceMemory = PrimitiveArrayTools.borrowUtf8(blockName)
+
+        val returnVal = lib.Schematic_set_blocks_simulated_full_world(handle, positionsSliceMemory.slice, blockNameSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {

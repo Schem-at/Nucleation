@@ -18,9 +18,518 @@
 
 use crate::formats::gametest::to_gametest_snbt;
 
-/// `{simulate=true}`: place a block into the schematic *as a world* and let
-/// the engine react — connectivity, power, scheduled ticks, all of it — then
-/// write every resulting block change back into the schematic.
+/// `{simulate=true}`: simulate only the active component around this edit,
+/// using nearby blocks as environmental context without allowing unrelated
+/// parts of a large schematic to become part of the update.
+pub(crate) fn simulate_placement_into(
+    schematic: &mut crate::UniversalSchematic,
+    x: i32,
+    y: i32,
+    z: i32,
+    descriptor: &str,
+) -> Result<usize, String> {
+    simulate_placements_into(schematic, &[(x, y, z)], descriptor)
+}
+
+const LOCAL_COMPONENT_LINK: i32 = 2;
+const LOCAL_EFFECT_MARGIN: i32 = 2;
+const LOCAL_PISTON_EFFECT_MARGIN: i32 = 12;
+const LOCAL_CONTEXT_MARGIN: i32 = 4;
+
+fn block_is_air(block: Option<&crate::BlockState>) -> bool {
+    block.is_none_or(|block| {
+        matches!(
+            block.get_name(),
+            "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air"
+        )
+    })
+}
+
+fn active_near_placements(
+    schematic: &crate::UniversalSchematic,
+    positions: &[(i32, i32, i32)],
+) -> bool {
+    positions.iter().any(|&(x, y, z)| {
+        for dx in -LOCAL_COMPONENT_LINK..=LOCAL_COMPONENT_LINK {
+            for dy in -LOCAL_COMPONENT_LINK..=LOCAL_COMPONENT_LINK {
+                for dz in -LOCAL_COMPONENT_LINK..=LOCAL_COMPONENT_LINK {
+                    if dx.abs() + dy.abs() + dz.abs() > LOCAL_COMPONENT_LINK {
+                        continue;
+                    }
+                    let Some(candidate) = x
+                        .checked_add(dx)
+                        .zip(y.checked_add(dy))
+                        .zip(z.checked_add(dz))
+                        .map(|((x, y), z)| (x, y, z))
+                    else {
+                        continue;
+                    };
+                    if schematic
+                        .get_block(candidate.0, candidate.1, candidate.2)
+                        .is_some_and(|block| {
+                            mc_tick::vanilla::is_simulation_component(&block.to_string())
+                        })
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    })
+}
+
+/// Resolve a placement without constructing a tick engine when its complete
+/// result is a pure function of local block states.
+///
+/// `Some` means the resolver proved the shortcut safe and applied it; `None`
+/// means a component with observable events was present and the caller must
+/// use the normal simulator. This is deliberately a generic dispatch point:
+/// inert blocks use the identity resolver today and simple dust/source
+/// networks use the static wire resolver below. More block families can add a
+/// resolver without changing the public `simulate` API.
+fn try_resolve_placements(
+    schematic: &mut crate::UniversalSchematic,
+    positions: &[(i32, i32, i32)],
+    descriptor: &str,
+    core: Option<&crate::BoundingBox>,
+    requested_cells: usize,
+) -> Result<Option<usize>, String> {
+    let name = descriptor
+        .split_once('[')
+        .map_or(descriptor, |(name, _)| name);
+
+    // A block the engine itself classifies as passive has no on-place or tick
+    // behaviour. With no active neighbour in update range, simulation is
+    // exactly the plain write regardless of how large or sparse the rest of
+    // the schematic is.
+    if !mc_tick::vanilla::is_simulation_component(descriptor)
+        && !active_near_placements(schematic, positions)
+    {
+        for &(x, y, z) in positions {
+            schematic.set_block_from_string(x, y, z, descriptor)?;
+        }
+        return Ok(Some(requested_cells));
+    }
+
+    if !matches!(name, "minecraft:redstone_wire" | "minecraft:redstone_block") {
+        return Ok(None);
+    }
+    let Some(core) = core else {
+        return Ok(None);
+    };
+    try_resolve_simple_wire_network(schematic, positions, descriptor, core, requested_cells)
+}
+
+fn try_resolve_simple_wire_network(
+    schematic: &mut crate::UniversalSchematic,
+    positions: &[(i32, i32, i32)],
+    descriptor: &str,
+    core: &crate::BoundingBox,
+    requested_cells: usize,
+) -> Result<Option<usize>, String> {
+    use std::collections::{HashMap, HashSet, VecDeque};
+
+    const WIRE: &str = "minecraft:redstone_wire";
+    const SOURCE: &str = "minecraft:redstone_block";
+    const HORIZONTAL: [(i32, i32, i32); 4] = [(0, 0, -1), (0, 0, 1), (-1, 0, 0), (1, 0, 0)];
+    const ALL_FACES: [(i32, i32, i32); 6] = [
+        (0, -1, 0),
+        (0, 1, 0),
+        (0, 0, -1),
+        (0, 0, 1),
+        (-1, 0, 0),
+        (1, 0, 0),
+    ];
+
+    let placed_name = descriptor
+        .split_once('[')
+        .map_or(descriptor, |(name, _)| name);
+    let mut wires = HashSet::new();
+    let mut sources = HashSet::new();
+    let mut wire_y = None;
+
+    for x in core.min.0..=core.max.0 {
+        for y in core.min.1..=core.max.1 {
+            for z in core.min.2..=core.max.2 {
+                let Some(block) = schematic.get_block(x, y, z) else {
+                    continue;
+                };
+                let name = block.get_name();
+                if mc_tick::vanilla::is_simulation_component(&block.to_string())
+                    && !matches!(name, WIRE | SOURCE)
+                {
+                    return Ok(None);
+                }
+                if name == WIRE {
+                    if wire_y.is_some_and(|level| level != y) {
+                        return Ok(None); // stairs/vertical dust need vanilla shape updates
+                    }
+                    wire_y = Some(y);
+                    wires.insert((x, y, z));
+                } else if name == SOURCE {
+                    sources.insert((x, y, z));
+                }
+            }
+        }
+    }
+
+    for &position in positions {
+        wires.remove(&position);
+        sources.remove(&position);
+        if placed_name == WIRE {
+            if wire_y.is_some_and(|level| level != position.1) {
+                return Ok(None);
+            }
+            wire_y = Some(position.1);
+            wires.insert(position);
+        } else {
+            sources.insert(position);
+        }
+    }
+
+    // Keep this resolver strictly planar. Covered dust, unsupported dust and
+    // a wire climbing a neighbouring block all have observable shape rules;
+    // those cases fall through to the event engine.
+    for &(x, y, z) in &wires {
+        if !block_is_air(schematic.get_block(x, y + 1, z)) {
+            return Ok(None);
+        }
+        if block_is_air(schematic.get_block(x, y - 1, z)) && !sources.contains(&(x, y - 1, z)) {
+            return Ok(None);
+        }
+        for &(dx, _, dz) in &HORIZONTAL {
+            if wires.contains(&(x + dx, y + 1, z + dz)) || wires.contains(&(x + dx, y - 1, z + dz))
+            {
+                return Ok(None);
+            }
+        }
+    }
+
+    let mut power: HashMap<(i32, i32, i32), u8> = wires
+        .iter()
+        .copied()
+        .map(|position| (position, 0))
+        .collect();
+    let mut queue = VecDeque::new();
+    for &wire in &wires {
+        if ALL_FACES
+            .iter()
+            .any(|&(dx, dy, dz)| sources.contains(&(wire.0 + dx, wire.1 + dy, wire.2 + dz)))
+        {
+            power.insert(wire, 15);
+            queue.push_back(wire);
+        }
+    }
+    while let Some(position) = queue.pop_front() {
+        let next_power = power[&position].saturating_sub(1);
+        if next_power == 0 {
+            continue;
+        }
+        for &(dx, _, dz) in &HORIZONTAL {
+            let next = (position.0 + dx, position.1, position.2 + dz);
+            if wires.contains(&next) && power[&next] < next_power {
+                power.insert(next, next_power);
+                queue.push_back(next);
+            }
+        }
+    }
+
+    let mut written = 0;
+    for &position in positions {
+        if placed_name == SOURCE {
+            let before = schematic
+                .get_block(position.0, position.1, position.2)
+                .map(ToString::to_string);
+            if before.as_deref() != Some(descriptor) {
+                schematic.set_block_from_string(position.0, position.1, position.2, descriptor)?;
+                written += 1;
+            }
+        }
+    }
+    for &(x, y, z) in &wires {
+        let mut sides = [false; 4]; // north, south, west, east
+        for (index, &(dx, _, dz)) in HORIZONTAL.iter().enumerate() {
+            sides[index] =
+                wires.contains(&(x + dx, y, z + dz)) || sources.contains(&(x + dx, y, z + dz));
+        }
+        let no_north_south = !sides[0] && !sides[1];
+        let no_west_east = !sides[2] && !sides[3];
+        if !sides[2] && no_north_south {
+            sides[2] = true;
+        }
+        if !sides[3] && no_north_south {
+            sides[3] = true;
+        }
+        if !sides[0] && no_west_east {
+            sides[0] = true;
+        }
+        if !sides[1] && no_west_east {
+            sides[1] = true;
+        }
+        let side = |connected| if connected { "side" } else { "none" };
+        let resolved = format!(
+            "{WIRE}[east={},north={},power={},south={},west={}]",
+            side(sides[3]),
+            side(sides[0]),
+            power[&(x, y, z)],
+            side(sides[1]),
+            side(sides[2])
+        );
+        let before = schematic.get_block(x, y, z).map(ToString::to_string);
+        if before.as_deref() != Some(resolved.as_str()) {
+            schematic.set_block_from_string(x, y, z, &resolved)?;
+            written += 1;
+        }
+    }
+    Ok(Some(written.max(requested_cells)))
+}
+
+fn checked_local_bounds(
+    schematic: &crate::UniversalSchematic,
+    positions: &[(i32, i32, i32)],
+    descriptor: &str,
+) -> Result<Option<(crate::BoundingBox, crate::BoundingBox)>, String> {
+    use std::collections::{HashSet, VecDeque};
+
+    if positions.is_empty() {
+        return Ok(None);
+    }
+
+    let is_active = |position: (i32, i32, i32)| {
+        schematic
+            .get_block(position.0, position.1, position.2)
+            .is_some_and(|block| mc_tick::vanilla::is_simulation_component(&block.to_string()))
+    };
+    let mut active = HashSet::new();
+    let mut queue = VecDeque::new();
+
+    // A placement into air is not itself available to the selector yet. Seed
+    // from active neighbours within the maximum two-cell static interaction
+    // link, and treat an active descriptor as a synthetic seed of its own.
+    for &position in positions {
+        if mc_tick::vanilla::is_simulation_component(descriptor) {
+            active.insert(position);
+            queue.push_back(position);
+        }
+        for dx in -LOCAL_COMPONENT_LINK..=LOCAL_COMPONENT_LINK {
+            for dy in -LOCAL_COMPONENT_LINK..=LOCAL_COMPONENT_LINK {
+                for dz in -LOCAL_COMPONENT_LINK..=LOCAL_COMPONENT_LINK {
+                    if dx.abs() + dy.abs() + dz.abs() > LOCAL_COMPONENT_LINK {
+                        continue;
+                    }
+                    let Some(candidate) = position
+                        .0
+                        .checked_add(dx)
+                        .zip(position.1.checked_add(dy))
+                        .zip(position.2.checked_add(dz))
+                        .map(|((x, y), z)| (x, y, z))
+                    else {
+                        continue;
+                    };
+                    if is_active(candidate) && active.insert(candidate) {
+                        queue.push_back(candidate);
+                    }
+                }
+            }
+        }
+    }
+
+    while let Some(position) = queue.pop_front() {
+        for dx in -LOCAL_COMPONENT_LINK..=LOCAL_COMPONENT_LINK {
+            for dy in -LOCAL_COMPONENT_LINK..=LOCAL_COMPONENT_LINK {
+                for dz in -LOCAL_COMPONENT_LINK..=LOCAL_COMPONENT_LINK {
+                    if dx.abs() + dy.abs() + dz.abs() > LOCAL_COMPONENT_LINK {
+                        continue;
+                    }
+                    let Some(candidate) = position
+                        .0
+                        .checked_add(dx)
+                        .zip(position.1.checked_add(dy))
+                        .zip(position.2.checked_add(dz))
+                        .map(|((x, y), z)| (x, y, z))
+                    else {
+                        continue;
+                    };
+                    if is_active(candidate) && active.insert(candidate) {
+                        queue.push_back(candidate);
+                    }
+                }
+            }
+        }
+    }
+
+    let is_motion = |descriptor: &str| {
+        matches!(
+            mc_tick::machine_graph::classify(descriptor),
+            mc_tick::machine_graph::PartKind::Piston { .. }
+                | mc_tick::machine_graph::PartKind::Slime
+                | mc_tick::machine_graph::PartKind::Honey
+        ) || descriptor.starts_with("minecraft:moving_piston")
+            || descriptor.starts_with("minecraft:piston_head")
+    };
+    let motion_component = is_motion(descriptor)
+        || active.iter().any(|&(x, y, z)| {
+            schematic
+                .get_block(x, y, z)
+                .is_some_and(|block| is_motion(&block.to_string()))
+        });
+    let effect_margin = if motion_component {
+        LOCAL_PISTON_EFFECT_MARGIN
+    } else {
+        LOCAL_EFFECT_MARGIN
+    };
+
+    let mut min = positions[0];
+    let mut max = positions[0];
+    for &(x, y, z) in positions.iter().chain(active.iter()) {
+        min.0 = min.0.min(x);
+        min.1 = min.1.min(y);
+        min.2 = min.2.min(z);
+        max.0 = max.0.max(x);
+        max.1 = max.1.max(y);
+        max.2 = max.2.max(z);
+    }
+    let expand = |value: i32, amount: i32, lower: bool| {
+        if lower {
+            value.saturating_sub(amount)
+        } else {
+            value.saturating_add(amount)
+        }
+    };
+    let core = crate::BoundingBox::new(
+        (
+            expand(min.0, effect_margin, true),
+            expand(min.1, effect_margin, true),
+            expand(min.2, effect_margin, true),
+        ),
+        (
+            expand(max.0, effect_margin, false),
+            expand(max.1, effect_margin, false),
+            expand(max.2, effect_margin, false),
+        ),
+    );
+    let context = crate::BoundingBox::new(
+        (
+            expand(core.min.0, LOCAL_CONTEXT_MARGIN, true),
+            expand(core.min.1, LOCAL_CONTEXT_MARGIN, true),
+            expand(core.min.2, LOCAL_CONTEXT_MARGIN, true),
+        ),
+        (
+            expand(core.max.0, LOCAL_CONTEXT_MARGIN, false),
+            expand(core.max.1, LOCAL_CONTEXT_MARGIN, false),
+            expand(core.max.2, LOCAL_CONTEXT_MARGIN, false),
+        ),
+    );
+    let dimensions = (
+        i64::from(context.max.0) - i64::from(context.min.0) + 1,
+        i64::from(context.max.1) - i64::from(context.min.1) + 1,
+        i64::from(context.max.2) - i64::from(context.min.2) + 1,
+    );
+    let volume = dimensions
+        .0
+        .checked_mul(dimensions.1)
+        .and_then(|xy| xy.checked_mul(dimensions.2))
+        .unwrap_or(i64::MAX);
+    if volume > MAX_VOLUME as i64 {
+        return Err(format!(
+            "local simulated component is {} x {} x {} = {volume} cells, over the \
+             {MAX_VOLUME}-cell limit; split the placement batch by component",
+            dimensions.0, dimensions.1, dimensions.2
+        ));
+    }
+    Ok(Some((core, context)))
+}
+
+/// Sequentially place blocks in a local simulated component. Runtime depends
+/// on the selected component and its propagation, not on unrelated schematic
+/// volume. A four-cell context halo is loaded but treated as read-only.
+pub(crate) fn simulate_placements_into(
+    schematic: &mut crate::UniversalSchematic,
+    positions: &[(i32, i32, i32)],
+    descriptor: &str,
+) -> Result<usize, String> {
+    if positions.is_empty() {
+        return Ok(0);
+    }
+    let requested_cells = positions
+        .iter()
+        .copied()
+        .collect::<std::collections::HashSet<_>>()
+        .len();
+    if schematic.total_blocks() == 0 {
+        for &(x, y, z) in positions {
+            schematic.set_block_from_string(x, y, z, descriptor)?;
+        }
+        return Ok(requested_cells);
+    }
+
+    // Identity resolvers do not need component bounds at all, which matters
+    // for sparse batches whose positions are millions of cells apart.
+    if let Some(written) =
+        try_resolve_placements(schematic, positions, descriptor, None, requested_cells)?
+    {
+        return Ok(written);
+    }
+
+    let Some((core, context)) = checked_local_bounds(schematic, positions, descriptor)? else {
+        return Ok(0);
+    };
+    if let Some(written) = try_resolve_placements(
+        schematic,
+        positions,
+        descriptor,
+        Some(&core),
+        requested_cells,
+    )? {
+        return Ok(written);
+    }
+    let mut local = schematic.create_schematic_from_region(&context);
+    local.metadata = schematic.metadata.clone();
+    let local_positions: Vec<(i32, i32, i32)> = positions
+        .iter()
+        .map(|&(x, y, z)| {
+            (
+                x.saturating_sub(context.min.0),
+                y.saturating_sub(context.min.1),
+                z.saturating_sub(context.min.2),
+            )
+        })
+        .collect();
+    simulate_placements_into_world(&mut local, &local_positions, descriptor)?;
+
+    let mut written = 0;
+    for x in core.min.0..=core.max.0 {
+        for y in core.min.1..=core.max.1 {
+            for z in core.min.2..=core.max.2 {
+                let local_pos = (
+                    x.saturating_sub(context.min.0),
+                    y.saturating_sub(context.min.1),
+                    z.saturating_sub(context.min.2),
+                );
+                let after = local
+                    .get_block(local_pos.0, local_pos.1, local_pos.2)
+                    .map(ToString::to_string)
+                    .unwrap_or_else(|| "minecraft:air".to_string());
+                let before = schematic
+                    .get_block(x, y, z)
+                    .map(ToString::to_string)
+                    .unwrap_or_else(|| "minecraft:air".to_string());
+                if before != after {
+                    schematic.set_block_from_string(x, y, z, &after)?;
+                    written += 1;
+                }
+            }
+        }
+    }
+    // An explicit hand placement is a touched cell even when its final state
+    // equals the one already stored, matching the full-world API's contract.
+    Ok(written.max(requested_cells))
+}
+
+/// Full-world opt-in: place a block into the entire schematic and let the
+/// engine react — connectivity, power, scheduled ticks, all of it — then write
+/// every resulting block change back into the schematic.
 ///
 /// The semantics are "a hand placed this block in a loaded world": the rest
 /// of the schematic is trusted exactly as saved (`InWorld`), the new block
@@ -36,7 +545,7 @@ use crate::formats::gametest::to_gametest_snbt;
 ///
 /// Returns the number of blocks the write-back touched (at least one: the
 /// placed block itself).
-pub(crate) fn simulate_placement_into(
+pub(crate) fn simulate_placement_into_world(
     schematic: &mut crate::UniversalSchematic,
     x: i32,
     y: i32,
@@ -130,6 +639,131 @@ pub(crate) fn simulate_placement_into(
             descriptor,
         )?;
         written += 1;
+    }
+    Ok(written)
+}
+
+/// Sequentially hand-place one descriptor at many positions in a single live
+/// simulated world, settling after every placement and baking the final block
+/// states back once.
+///
+/// This is the amortized counterpart to repeated `{simulate=true}` calls.
+/// Repeated calls rebuild the structure, registry, behaviour tables, physics
+/// tables, and world every time; this pays that O(world volume) setup once.
+/// The update work itself cannot be constant-time because a placement may
+/// propagate through an arbitrarily large redstone network or move structures.
+pub(crate) fn simulate_placements_into_world(
+    schematic: &mut crate::UniversalSchematic,
+    positions: &[(i32, i32, i32)],
+    descriptor: &str,
+) -> Result<usize, String> {
+    use mc_tick::Pos;
+    use std::collections::HashMap;
+
+    if positions.is_empty() {
+        return Ok(0);
+    }
+    if positions.len() == 1 {
+        let (x, y, z) = positions[0];
+        return simulate_placement_into_world(schematic, x, y, z, descriptor);
+    }
+
+    let bb = schematic.get_bounding_box();
+    let mut min = bb.min;
+    let mut max = bb.max;
+    for &(x, y, z) in positions {
+        min.0 = min.0.min(x);
+        min.1 = min.1.min(y);
+        min.2 = min.2.min(z);
+        max.0 = max.0.max(x);
+        max.1 = max.1.max(y);
+        max.2 = max.2.max(z);
+    }
+    let dimensions = (
+        i64::from(max.0) - i64::from(min.0) + 1,
+        i64::from(max.1) - i64::from(min.1) + 1,
+        i64::from(max.2) - i64::from(min.2) + 1,
+    );
+    let volume = dimensions
+        .0
+        .checked_mul(dimensions.1)
+        .and_then(|xy| xy.checked_mul(dimensions.2))
+        .unwrap_or(i64::MAX);
+    if volume > MAX_VOLUME as i64 {
+        return Err(format!(
+            "simulated placement span is {} x {} x {} = {volume} cells, over the \
+             {MAX_VOLUME}-cell limit",
+            dimensions.0, dimensions.1, dimensions.2
+        ));
+    }
+
+    // The structure renderer rebases the schematic's current minimum to zero.
+    // Keep that stable while the live world grows around sequential placements.
+    let offset = bb.min;
+    let snbt = to_gametest_snbt(schematic);
+    let structure = mc_tick::Structure::parse(&snbt)
+        .map_err(|e| format!("simulated batch could not load this schematic: {e:?}"))?;
+    let mut sim = wire_simulation(
+        &structure,
+        Pos::new(0, 0, 0),
+        ffi::TickSettleMode::InWorld,
+        &[descriptor],
+        schematic.metadata.source_data_version,
+    )
+    .map_err(|e| format!("simulated batch could not simulate this schematic: {e}"))?;
+    let state = sim
+        .registry()
+        .get(descriptor)
+        .ok_or_else(|| format!("simulated batch did not intern `{descriptor}`"))?;
+
+    // wire_simulation records construction/settle changes for other callers.
+    // This operation wants only changes caused by the requested placements.
+    sim.clear_recorded();
+    let mut placed = Vec::with_capacity(positions.len());
+    for &(x, y, z) in positions {
+        let pos = Pos::new(
+            x.checked_sub(offset.0)
+                .ok_or("simulated x coordinate overflow")?,
+            y.checked_sub(offset.1)
+                .ok_or("simulated y coordinate overflow")?,
+            z.checked_sub(offset.2)
+                .ok_or("simulated z coordinate overflow")?,
+        );
+        sim.place_block_by_hand(pos, state);
+        sim.run_until_quiescent(255);
+        placed.push(pos);
+    }
+
+    // Last write wins at each changed cell. Explicitly include each requested
+    // cell as well: a placement whose final state equals its prior state may
+    // legitimately produce no change record, but it was still requested.
+    let mut finals: HashMap<Pos, mc_tick::StateId> = HashMap::new();
+    for change in sim.recorded() {
+        finals.insert(change.pos, change.to);
+    }
+    for pos in placed {
+        finals.insert(pos, sim.world().get(pos));
+    }
+
+    let written = finals.len();
+    for (cell, state) in finals {
+        let block = sim
+            .registry()
+            .descriptor(state)
+            .ok_or_else(|| "simulated batch produced a state with no descriptor".to_string())?;
+        let x = cell
+            .x
+            .checked_add(offset.0)
+            .ok_or("simulated write-back x overflow")?;
+        let y = cell
+            .y
+            .checked_add(offset.1)
+            .ok_or("simulated write-back y overflow")?;
+        let z = cell
+            .z
+            .checked_add(offset.2)
+            .ok_or("simulated write-back z overflow")?;
+        schematic.set_block_from_string(x, y, z, block)?;
     }
     Ok(written)
 }
@@ -2410,7 +3044,11 @@ pub(crate) fn bake_into(sim: &mc_tick::Simulation, schem: &mut crate::UniversalS
 
 #[cfg(test)]
 mod tests {
-    use super::{block_entity_audit, machine_graph_batch, needs_block_entity, to_gametest_snbt};
+    use super::{
+        block_entity_audit, machine_graph_batch, needs_block_entity, simulate_placement_into,
+        simulate_placement_into_world, simulate_placements_into, simulate_placements_into_world,
+        to_gametest_snbt,
+    };
     use crate::{BlockState, UniversalSchematic};
 
     /// `{simulate=true}` places through the engine: a wire set next to a
@@ -2435,6 +3073,205 @@ mod tests {
         assert!(
             wire.contains("west=side"),
             "wire connects toward the block powering it, got {wire}"
+        );
+    }
+
+    #[test]
+    fn simulate_world_tag_is_an_explicit_full_world_opt_in() {
+        let mut schem = UniversalSchematic::new("wired world".into());
+        for x in 0..4 {
+            schem.set_block(x, 0, 0, &BlockState::new("minecraft:smooth_stone"));
+        }
+        schem.set_block(0, 1, 0, &BlockState::new("minecraft:redstone_block"));
+        schem
+            .set_block_from_string(1, 1, 0, "minecraft:redstone_wire{simulate=world}")
+            .expect("full-world simulated placement");
+        let wire = schem.get_block(1, 1, 0).expect("wire exists").to_string();
+        assert!(
+            wire.contains("power=15"),
+            "unexpected full-world result: {wire}"
+        );
+    }
+
+    #[test]
+    fn simulated_batch_matches_sequential_convenience_placements() {
+        fn base() -> UniversalSchematic {
+            let mut schematic = UniversalSchematic::new("wired".into());
+            for x in 0..7 {
+                schematic.set_block(x, 0, 0, &BlockState::new("minecraft:smooth_stone"));
+            }
+            schematic.set_block(0, 1, 0, &BlockState::new("minecraft:redstone_block"));
+            schematic
+        }
+
+        let positions = [(1, 1, 0), (2, 1, 0), (3, 1, 0), (4, 1, 0)];
+        let mut sequential = base();
+        for &(x, y, z) in &positions {
+            sequential
+                .set_block_from_string(x, y, z, "minecraft:redstone_wire{simulate=true}")
+                .expect("sequential simulated placement");
+        }
+
+        let mut batched = base();
+        let written = simulate_placements_into(&mut batched, &positions, "minecraft:redstone_wire")
+            .expect("batched simulated placements");
+        assert!(written >= positions.len());
+
+        for x in 0..7 {
+            for y in 0..=1 {
+                assert_eq!(
+                    batched.get_block(x, y, 0).map(ToString::to_string),
+                    sequential.get_block(x, y, 0).map(ToString::to_string),
+                    "different final state at ({x},{y},0)"
+                );
+            }
+        }
+        let last = batched
+            .get_block(4, 1, 0)
+            .expect("last wire exists")
+            .to_string();
+        assert!(last.contains("power=12"), "unexpected final wire: {last}");
+    }
+
+    #[test]
+    fn simple_wire_resolver_matches_the_event_engine() {
+        fn base() -> UniversalSchematic {
+            let mut schematic = UniversalSchematic::new("wired".into());
+            for x in 0..7 {
+                schematic.set_block(x, 0, 0, &BlockState::new("minecraft:smooth_stone"));
+            }
+            schematic.set_block(0, 1, 0, &BlockState::new("minecraft:redstone_block"));
+            schematic
+        }
+
+        let positions = [(1, 1, 0), (2, 1, 0), (3, 1, 0), (4, 1, 0)];
+        let mut resolved = base();
+        simulate_placements_into(&mut resolved, &positions, "minecraft:redstone_wire")
+            .expect("static resolver");
+
+        let mut simulated = base();
+        simulate_placements_into_world(&mut simulated, &positions, "minecraft:redstone_wire")
+            .expect("event engine");
+
+        for x in 0..7 {
+            for y in 0..=1 {
+                assert_eq!(
+                    resolved.get_block(x, y, 0).map(ToString::to_string),
+                    simulated.get_block(x, y, 0).map(ToString::to_string),
+                    "different final state at ({x},{y},0)"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn source_placement_resolver_matches_the_event_engine() {
+        fn base() -> UniversalSchematic {
+            let mut schematic = UniversalSchematic::new("unpowered line".into());
+            for x in 0..7 {
+                schematic.set_block(x, 0, 0, &BlockState::new("minecraft:smooth_stone"));
+            }
+            for x in 1..=4 {
+                schematic
+                    .set_block_from_string(
+                        x,
+                        1,
+                        0,
+                        "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]",
+                    )
+                    .unwrap();
+            }
+            schematic
+        }
+
+        let positions = [(0, 1, 0)];
+        let mut resolved = base();
+        simulate_placements_into(&mut resolved, &positions, "minecraft:redstone_block")
+            .expect("static source resolver");
+        let mut simulated = base();
+        simulate_placements_into_world(&mut simulated, &positions, "minecraft:redstone_block")
+            .expect("event engine");
+        for x in 0..7 {
+            for y in 0..=1 {
+                assert_eq!(
+                    resolved.get_block(x, y, 0).map(ToString::to_string),
+                    simulated.get_block(x, y, 0).map(ToString::to_string),
+                    "different final state at ({x},{y},0)"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn active_neighbour_forces_the_event_engine_fallback() {
+        let mut schematic = UniversalSchematic::new("lamp".into());
+        for x in 0..4 {
+            schematic.set_block(x, 0, 0, &BlockState::new("minecraft:smooth_stone"));
+        }
+        schematic.set_block(0, 1, 0, &BlockState::new("minecraft:redstone_block"));
+        schematic.set_block(
+            2,
+            1,
+            0,
+            &BlockState::from_block_string("minecraft:redstone_lamp[lit=false]").unwrap(),
+        );
+        simulate_placement_into(&mut schematic, 1, 1, 0, "minecraft:redstone_wire")
+            .expect("wire placement beside a lamp");
+        let lamp = schematic
+            .get_block(2, 1, 0)
+            .expect("lamp exists")
+            .to_string();
+        assert!(
+            lamp.contains("lit=true"),
+            "event side effect was lost: {lamp}"
+        );
+    }
+
+    #[test]
+    fn passive_resolver_skips_simulation_even_for_a_sparse_batch() {
+        let mut schematic = UniversalSchematic::new("sparse passive edits".into());
+        schematic.set_block(0, 0, 0, &BlockState::new("minecraft:smooth_stone"));
+        let positions = [(10, 0, 0), (10_000_000, 0, 0)];
+        let written =
+            simulate_placements_into(&mut schematic, &positions, "minecraft:quartz_block")
+                .expect("passive writes need no bounded simulated world");
+        assert_eq!(written, 2);
+        for &(x, y, z) in &positions {
+            assert_eq!(
+                schematic
+                    .get_block(x, y, z)
+                    .expect("block exists")
+                    .get_name(),
+                "minecraft:quartz_block"
+            );
+        }
+    }
+
+    #[test]
+    fn local_simulation_cost_ignores_unrelated_world_span() {
+        let mut local = UniversalSchematic::new("sparse world".into());
+        for x in 0..4 {
+            local.set_block(x, 0, 0, &BlockState::new("minecraft:smooth_stone"));
+        }
+        local.set_block(0, 1, 0, &BlockState::new("minecraft:redstone_block"));
+        local.set_block(10_000_000, 0, 0, &BlockState::new("minecraft:smooth_stone"));
+
+        let mut whole_world = local.clone();
+        let full_error =
+            simulate_placement_into_world(&mut whole_world, 1, 1, 0, "minecraft:redstone_wire")
+                .expect_err("the complete sparse span is intentionally over the world limit");
+        assert!(full_error.contains("over the 8000000-cell limit"));
+
+        simulate_placement_into(&mut local, 1, 1, 0, "minecraft:redstone_wire")
+            .expect("local component remains small");
+        let wire = local.get_block(1, 1, 0).expect("wire exists").to_string();
+        assert!(wire.contains("power=15"), "unexpected local result: {wire}");
+        assert_eq!(
+            local
+                .get_block(10_000_000, 0, 0)
+                .expect("unrelated environment survives")
+                .get_name(),
+            "minecraft:smooth_stone"
         );
     }
 

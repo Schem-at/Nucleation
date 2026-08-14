@@ -824,6 +824,80 @@ export class Schematic {
     }
 
     /**
+     * Sequentially hand-place the same block at many positions in one
+     * local simulated component. `positions` is flat
+     * `[x0,y0,z0, x1,y1,z1, ...]`; placements run in that order and each
+     * settles before the next. Returns the number of final cells written
+     * back, including neighbours changed by redstone or pistons.
+     *
+     * Nearby passive blocks are loaded as environmental context, but the
+     * write-back is confined to the active component's effect window. Its
+     * runtime is therefore independent of unrelated schematic volume.
+     * Use `set_blocks_simulated_full_world` to opt into global updates.
+     *
+     * This is the efficient bulk form of repeated `{simulate=true}`:
+     * structure conversion and simulator wiring happen once for the
+     * complete sequence. Propagation is not constant-time—a placement can
+     * affect an arbitrarily large circuit—but fixed setup is amortized.
+     */
+    setBlocksSimulated(positions, blockName) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const positionsSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, positions, "i32")));
+        const blockNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, blockName)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_set_blocks_simulated(diplomatReceive.buffer, this.ffiValue, positionsSlice.ptr, blockNameSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return (new Int32Array(wasm.memory.buffer, diplomatReceive.buffer, 1))[0];
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Explicit full-world counterpart to `set_blocks_simulated`.
+     * Unrelated schematic volume participates in setup and any resulting
+     * changes anywhere in the loaded world are written back.
+     */
+    setBlocksSimulatedFullWorld(positions, blockName) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const positionsSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, positions, "i32")));
+        const blockNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, blockName)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_set_blocks_simulated_full_world(diplomatReceive.buffer, this.ffiValue, positionsSlice.ptr, blockNameSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return (new Int32Array(wasm.memory.buffer, diplomatReceive.buffer, 1))[0];
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
      * Batch-get block names at multiple positions. `positions` is flat
      * `[x0,y0,z0, ...]` (length must be a multiple of 3). Writes a JSON array,
      * one entry per position: the block name string, or `null` for

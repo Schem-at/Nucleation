@@ -1,133 +1,286 @@
-"""
-Benchmark: nucleation (Python bindings) vs mcschematic
-Run from project root:
+#!/usr/bin/env python3
+"""Compare the public Python APIs of nucleation and mcschematic.
+
+Run from the repository root after installing both packages::
+
     python benches/bench_python.py
+
+The benchmark reports medians and a paired speed ratio. It is intentionally a
+Python end-to-end benchmark: object creation and Python/extension crossings are
+part of the measured work. It is not a substitute for the Rust Criterion
+benchmarks when profiling Nucleation internals.
 """
 
-import time
+from __future__ import annotations
+
+import argparse
+import gc
+import importlib.metadata
+import json
+import platform
 import statistics
-import sys
+import tempfile
+import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Callable
 
-# ── helpers ──────────────────────────────────────────────────────────
+import mcschematic
+import nucleation
 
-def bench(fn, label, warmup=2, iters=10):
-    """Run fn() iters times after warmup, print median/min/max."""
-    for _ in range(warmup):
+
+Workload = Callable[[], object]
+
+
+@dataclass(frozen=True)
+class Timing:
+    median_seconds: float
+    min_seconds: float
+    max_seconds: float
+
+
+@dataclass(frozen=True)
+class Result:
+    workload: str
+    size: int
+    unit: str
+    nucleation: Timing
+    mcschematic: Timing
+    nucleation_speedup: float
+
+
+def measure(fn: Workload, *, warmups: int, iterations: int) -> Timing:
+    for _ in range(warmups):
         fn()
-    times = []
-    for _ in range(iters):
-        t0 = time.perf_counter()
+
+    samples: list[float] = []
+    for _ in range(iterations):
+        gc.collect()
+        start = time.perf_counter_ns()
         fn()
-        times.append(time.perf_counter() - t0)
-    med = statistics.median(times)
-    lo, hi = min(times), max(times)
-    print(f"  {label:40s}  median {fmt(med)}   [{fmt(lo)} .. {fmt(hi)}]")
-    return med
+        samples.append((time.perf_counter_ns() - start) / 1_000_000_000)
 
-def fmt(sec):
-    if sec < 1e-3:
-        return f"{sec*1e6:8.1f} µs"
-    elif sec < 1:
-        return f"{sec*1e3:8.2f} ms"
-    else:
-        return f"{sec:8.3f} s "
+    return Timing(
+        median_seconds=statistics.median(samples),
+        min_seconds=min(samples),
+        max_seconds=max(samples),
+    )
 
-# ── nucleation benchmarks ───────────────────────────────────────────
 
-def nucleation_available():
-    try:
-        import nucleation
-        return True
-    except ImportError:
-        return False
+def format_duration(seconds: float) -> str:
+    if seconds < 1e-3:
+        return f"{seconds * 1e6:.1f} us"
+    if seconds < 1:
+        return f"{seconds * 1e3:.2f} ms"
+    return f"{seconds:.3f} s"
 
-def bench_nucleation_set_blocks(n):
-    import nucleation
-    s = nucleation.Schematic("bench")
-    for i in range(n):
-        s.set_block(i, 0, 0, "minecraft:stone")
 
-def bench_nucleation_fill_cuboid(n):
-    import nucleation
-    s = nucleation.Schematic("bench")
-    s.fill_cuboid(0, 0, 0, n - 1, n - 1, n - 1, "minecraft:stone")
+def nucleation_set_blocks(count: int) -> Workload:
+    def workload() -> int:
+        schematic = nucleation.Schematic.create("benchmark")
+        for x in range(count):
+            schematic.set_block(x, 0, 0, "minecraft:stone")
+        return schematic.block_count()
 
-def bench_nucleation_fill_and_export(n):
-    import nucleation
-    s = nucleation.Schematic("bench")
-    s.fill_cuboid(0, 0, 0, n - 1, n - 1, n - 1, "minecraft:stone")
-    _ = s.save_as("schematic")
+    return workload
 
-# ── mcschematic benchmarks ──────────────────────────────────────────
 
-def mcschematic_available():
-    try:
-        import mcschematic
-        return True
-    except ImportError:
-        return False
+def mcschematic_set_blocks(count: int) -> Workload:
+    def workload() -> object:
+        schematic = mcschematic.MCSchematic()
+        for x in range(count):
+            schematic.setBlock((x, 0, 0), "minecraft:stone")
+        return schematic
 
-def bench_mcschematic_set_blocks(n):
-    import mcschematic
-    s = mcschematic.MCSchematic()
-    for i in range(n):
-        s.setBlock((i, 0, 0), "minecraft:stone")
+    return workload
 
-def bench_mcschematic_fill_cuboid(n):
-    import mcschematic
-    s = mcschematic.MCSchematic()
-    # cuboidFilled is on the internal MCStructure, not MCSchematic
-    s.getStructure().cuboidFilled("minecraft:stone", (0, 0, 0), (n - 1, n - 1, n - 1))
 
-def bench_mcschematic_fill_and_export(n):
-    import mcschematic, tempfile, os
-    s = mcschematic.MCSchematic()
-    s.getStructure().cuboidFilled("minecraft:stone", (0, 0, 0), (n - 1, n - 1, n - 1))
-    tmp = tempfile.mkdtemp()
-    s.save(tmp, "bench", mcschematic.Version.JE_1_18_2)
-    # clean up
-    p = os.path.join(tmp, "bench.schem")
-    if os.path.exists(p):
-        os.remove(p)
-    os.rmdir(tmp)
+def nucleation_fill(edge: int) -> Workload:
+    def workload() -> int:
+        schematic = nucleation.Schematic.create("benchmark")
+        schematic.fill_cuboid(
+            0, 0, 0, edge - 1, edge - 1, edge - 1, "minecraft:stone"
+        )
+        return schematic.block_count()
 
-# ── main ────────────────────────────────────────────────────────────
+    return workload
+
+
+def mcschematic_fill(edge: int) -> Workload:
+    def workload() -> object:
+        schematic = mcschematic.MCSchematic()
+        schematic.getStructure().cuboidFilled(
+            "minecraft:stone", (0, 0, 0), (edge - 1, edge - 1, edge - 1)
+        )
+        return schematic
+
+    return workload
+
+
+def nucleation_fill_and_export(edge: int) -> Workload:
+    def workload() -> int:
+        schematic = nucleation.Schematic.create("benchmark")
+        schematic.fill_cuboid(
+            0, 0, 0, edge - 1, edge - 1, edge - 1, "minecraft:stone"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "benchmark.schem"
+            schematic.save(output, format="schematic")
+            return output.stat().st_size
+
+    return workload
+
+
+def mcschematic_fill_and_export(edge: int) -> Workload:
+    def workload() -> int:
+        schematic = mcschematic.MCSchematic()
+        schematic.getStructure().cuboidFilled(
+            "minecraft:stone", (0, 0, 0), (edge - 1, edge - 1, edge - 1)
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            schematic.save(
+                directory,
+                "benchmark",
+                mcschematic.Version.JE_1_21_5,
+            )
+            return (Path(directory) / "benchmark.schem").stat().st_size
+
+    return workload
+
+
+def compare(
+    workload: str,
+    size: int,
+    unit: str,
+    nucleation_fn: Workload,
+    mcschematic_fn: Workload,
+    *,
+    warmups: int,
+    iterations: int,
+) -> Result:
+    # Smoke each workload before timing it. This catches API drift and prevents
+    # a fast exception path from ever being reported as a benchmark result.
+    assert nucleation_fn()
+    assert mcschematic_fn()
+
+    nucleation_timing = measure(
+        nucleation_fn, warmups=warmups, iterations=iterations
+    )
+    mcschematic_timing = measure(
+        mcschematic_fn, warmups=warmups, iterations=iterations
+    )
+    speedup = (
+        mcschematic_timing.median_seconds / nucleation_timing.median_seconds
+    )
+    result = Result(
+        workload=workload,
+        size=size,
+        unit=unit,
+        nucleation=nucleation_timing,
+        mcschematic=mcschematic_timing,
+        nucleation_speedup=speedup,
+    )
+
+    label = f"{workload} ({size:,} {unit})"
+    print(f"\n{label}")
+    print(
+        f"  nucleation:  {format_duration(nucleation_timing.median_seconds):>12} "
+        f"[{format_duration(nucleation_timing.min_seconds)} .. "
+        f"{format_duration(nucleation_timing.max_seconds)}]"
+    )
+    print(
+        f"  mcschematic: {format_duration(mcschematic_timing.median_seconds):>12} "
+        f"[{format_duration(mcschematic_timing.min_seconds)} .. "
+        f"{format_duration(mcschematic_timing.max_seconds)}]"
+    )
+    print(f"  nucleation speedup: {speedup:.2f}x")
+    return result
+
+
+def package_version(name: str) -> str:
+    return importlib.metadata.version(name)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--warmups", type=int, default=2)
+    parser.add_argument("--iterations", type=int, default=7)
+    parser.add_argument(
+        "--json",
+        type=Path,
+        help="also write machine-readable environment and timing results",
+    )
+    args = parser.parse_args()
+    if args.warmups < 0 or args.iterations < 1:
+        parser.error("--warmups must be >= 0 and --iterations must be >= 1")
+    return args
+
+
+def main() -> None:
+    args = parse_args()
+    environment = {
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "nucleation": package_version("nucleation"),
+        "mcschematic": package_version("mcschematic"),
+        "warmups": args.warmups,
+        "iterations": args.iterations,
+    }
+    print("Nucleation vs mcschematic Python benchmark")
+    print(
+        f"Python {environment['python']} | nucleation {environment['nucleation']} | "
+        f"mcschematic {environment['mcschematic']}"
+    )
+    print(f"{args.warmups} warmups, {args.iterations} measured iterations")
+    print("Speedup is mcschematic median / nucleation median; higher favors Nucleation.")
+
+    results: list[Result] = []
+    for count in (100, 1_000, 10_000):
+        results.append(
+            compare(
+                "set_blocks",
+                count,
+                "blocks",
+                nucleation_set_blocks(count),
+                mcschematic_set_blocks(count),
+                warmups=args.warmups,
+                iterations=args.iterations,
+            )
+        )
+    for edge in (10, 32, 64):
+        results.append(
+            compare(
+                "fill_cuboid",
+                edge,
+                "edge length",
+                nucleation_fill(edge),
+                mcschematic_fill(edge),
+                warmups=args.warmups,
+                iterations=args.iterations,
+            )
+        )
+    for edge in (10, 32):
+        results.append(
+            compare(
+                "fill_and_export",
+                edge,
+                "edge length",
+                nucleation_fill_and_export(edge),
+                mcschematic_fill_and_export(edge),
+                warmups=args.warmups,
+                iterations=args.iterations,
+            )
+        )
+
+    if args.json:
+        payload = {
+            "environment": environment,
+            "results": [asdict(result) for result in results],
+        }
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(json.dumps(payload, indent=2) + "\n")
+        print(f"\nWrote {args.json}")
+
 
 if __name__ == "__main__":
-    print("=" * 72)
-    print("Python Schematic Library Benchmark")
-    print("=" * 72)
-
-    has_nuc = nucleation_available()
-    has_mc  = mcschematic_available()
-
-    if not has_nuc and not has_mc:
-        print("Neither nucleation nor mcschematic installed. Nothing to benchmark.")
-        sys.exit(1)
-
-    # --- set_blocks ---
-    for n in [100, 1000, 10000]:
-        print(f"\n── set_blocks  n={n} ──")
-        if has_nuc:
-            bench(lambda: bench_nucleation_set_blocks(n), f"nucleation  (n={n})")
-        if has_mc:
-            bench(lambda: bench_mcschematic_set_blocks(n), f"mcschematic (n={n})")
-
-    # --- fill_cuboid ---
-    for n in [10, 32, 64]:
-        print(f"\n── fill_cuboid  {n}x{n}x{n} ──")
-        if has_nuc:
-            bench(lambda: bench_nucleation_fill_cuboid(n), f"nucleation  ({n}³)")
-        if has_mc:
-            bench(lambda: bench_mcschematic_fill_cuboid(n), f"mcschematic ({n}³)")
-
-    # --- fill + export ---
-    for n in [10, 32]:
-        print(f"\n── fill_and_export  {n}x{n}x{n} ──")
-        if has_nuc:
-            bench(lambda: bench_nucleation_fill_and_export(n), f"nucleation  ({n}³)")
-        if has_mc:
-            bench(lambda: bench_mcschematic_fill_and_export(n), f"mcschematic ({n}³)")
-
-    print("\n" + "=" * 72)
-    print("Done.")
+    main()
