@@ -45,6 +45,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install Yosys for HDL simulation checks
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes yosys
       - name: Build and install the Python bridge used by simulation checks
         run: python -m pip install ./bindings/python
       - run: tools/dev.sh fast
@@ -101,6 +105,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install Yosys for HDL simulation checks
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes yosys
       - name: Install diplomat-tool (fork with PHP backend)
         run: cargo install --git https://github.com/Nano112/diplomat --branch nanobind-public-api diplomat-tool
       - name: maturin (wheel build in the full tier)
