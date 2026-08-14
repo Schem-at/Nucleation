@@ -1,3 +1,25 @@
+# Nucleation v0.10.13
+
+**Policy-driven normalization and registry ingestion.** Schematics can now be
+processed through versioned, ordered transform plans with lossless palette
+canonicalization, named material profiles, recursive content policies, and
+fine-grained deterministic or random UUID rewriting. Inspection runs the exact
+plan on a clone; application is atomic and appends deterministic transformation
+history without altering source provenance.
+
+**Untrusted-input boundaries.** Bounded readers enforce compressed and
+decompressed byte ceilings, dimensions, volume, region/palette/entity counts,
+and recursive NBT budgets. The storage-backed `RegistryPipeline` streams from
+any `Store`, routes accepted/quarantined/rejected objects, persists stable audit
+reports, and exposes declarative hooks that may only escalate a decision.
+
+**One contract across seven languages.** The generated bindings expose the
+shared versioned JSON plan and report surface, with an idiomatic typed Python
+facade for plans, reports, limits, material profiles, content rules, UUID
+policies, and registry configuration. The README and feature guide now include
+an end-to-end quick start, complete field/default reference, action semantics,
+registry output behavior, and an operational deployment checklist.
+
 # Nucleation v0.7.0
 
 **Generated worlds.** A new `world_generation` module turns chunk sources into

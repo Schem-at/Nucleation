@@ -63,6 +63,31 @@ Every capability, with its own deep-dive doc:
 - [Pluggable storage](docs/features/storage.md) — mem, fs, SSH, S3, Redis, Postgres
 - [Bindings and languages](docs/features/bindings-and-languages.md) — one generated API, seven languages
 
+## Normalize imported schematics
+
+Normalization is an explicit, versioned pipeline rather than an implicit part
+of loading or saving. Dry-run the exact plan first, inspect its stable audit
+report, then apply it atomically:
+
+```python
+from nucleation import Schematic, TransformPlan, inspect_transform, apply_transform
+
+schematic = Schematic.open("incoming.schem")
+plan = TransformPlan.registry_safe()
+
+preview = inspect_transform(schematic, plan)  # never mutates schematic
+if not preview.rejected and not preview.quarantined:
+    report = apply_transform(schematic, plan)  # all passes commit, or none do
+    schematic.save("normalized.schem")
+```
+
+Use `TransformPlan.canonical()` for lossless deterministic palette cleanup.
+Use a custom plan for material conventions, text/NBT/item/entity rules, limits,
+or UUID standardization. The complete [transformation-policy
+guide](docs/features/transformation-policies.md) documents every field, default,
+action, report, safety guarantee, Python helper, shared JSON contract, and the
+storage-backed registry pipeline.
+
 ## The gallery
 
 Ten more builds, each a short recipe that leans on the same handful of
