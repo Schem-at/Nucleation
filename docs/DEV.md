@@ -37,7 +37,7 @@ merge gate. Nothing is given up, it is just moved off the inner loop.
 |---|---|---|---|
 | **fast** | `tools/dev.sh fast [crate]` | **3.6–4.9s** | `cargo check` on the canonical set, `--all-targets` (1s); unit tests — the named crate's `--lib`, else every workspace crate except the root (1s); three **sampled** sim cases (~1-2s each) |
 | **pre-land** | `tools/dev.sh pre-land` | minutes | full `cargo test` on the canonical set (includes the root crate's ~3 min `--lib` suite) + `cargo test --workspace` (all integration suites); wasm32 checks ×3 (pnr-core, nucleation-routing, browser engine); eda-studio headless `npm run verify`; Python bridge smoke |
-| **full** | `tools/dev.sh full` | the merge gate | everything above **unsampled** + all 8 feature permutations + `tools/check_routing.sh` + exhaustive sim suites (`EDA_EXHAUSTIVE=1`: adder, rca, alu, ppa, genlib ×4, hdl ×3) + npm/wasm + Python wheel + `tools/prepush.py` (bindings freshness/determinism, bridge coverage, all five language smokes) |
+| **full** | `tools/dev.sh full` | the merge gate | everything above **unsampled** + all 8 feature permutations + `tools/check_routing.sh` + complete four-bit truth tables for the scalable ALU/PPA, production-size structural audits (8-bit ALU, 32-bit PPA), exhaustive adder/rca/genlib/hdl suites + npm/wasm + Python wheel + `tools/prepush.py` (bindings freshness/determinism, bridge coverage, all five language smokes) |
 
 Two things are deliberately kept out of `fast`, both for **runtime**, not build
 time — and both are still run by `pre-land` and `full`:
@@ -50,11 +50,14 @@ time — and both are still run by `pre-land` and `full`:
   artefact). `fast` with no crate argument runs
   `cargo test --workspace --exclude nucleation --lib` instead.
 
-`fast` and `pre-land` **sample** the exhaustive sim suites. Those are 256-case
-and 3040-check loops — a merge gate, not an iteration cost. `full` sets
-`EDA_EXHAUSTIVE=1` and passes no `--cases`, so it runs them whole. **Do not
-weaken `full`.** If you need a sampled run bigger or smaller, set
-`EDA_SAMPLE_CASES=N`.
+`fast` and `pre-land` **sample** the simulation suites. `full` checks complete
+four-bit truth tables (2,048 physical ALU cases and 512 PPA cases), then audits
+the production-size 8-bit ALU and 32-bit PPA geometry without attempting an
+intractable truth table. An unbounded 8-bit ALU invocation is already 524,288
+slow physical cases; the 32-bit PPA default is vastly larger. The explicit
+widths in `tools/dev.sh` are therefore part of the gate contract, not sampling.
+**Do not weaken `full`.** If you need a sampled local run bigger or smaller,
+set `EDA_SAMPLE_CASES=N`.
 
 ## Why the loop was slow (measured 2026-08-09)
 
