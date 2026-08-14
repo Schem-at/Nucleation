@@ -13,6 +13,10 @@ ROOT = Path(__file__).resolve().parent.parent
 
 CHECKS: list[tuple[str, list[str]]] = [
     ("cargo test", ["cargo", "test"]),
+    (
+        "Python processing contract",
+        ["python3", "bindings/python/tests/test_processing.py"],
+    ),
     ("bridge builds", ["cargo", "build", "--lib", "--features", "bridge"]),
     # Every prior gate here built the union of features. `mc_tick.rs` once
     # reached into the meshing bridge module for its base64 helper, which

@@ -39,6 +39,11 @@ fn cmp4_is_exhaustively_correct_in_sim() {
     run("cmp4", (0..256).collect());
 }
 
+#[test]
+fn cmp4_yosys_0_33_is_exhaustively_correct_in_sim() {
+    run("cmp4_yosys_0_33", (0..256).collect());
+}
+
 // ---- sequential: fixed-tick clocked protocol vs the stepped model --------
 
 fn run_clocked(name: &str, cases: Vec<u64>) -> nucleation_hdl::verify::ClockedReport {

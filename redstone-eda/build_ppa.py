@@ -285,8 +285,20 @@ def layout(N, make=None):
     for (si, sl), rs_ in per_slice.items():
         st = stages[si]
         base = max(g["lane"] for g in st["geom"].values() if g["slice"] == sl) + 2
-        for idx, r in enumerate(sorted(rs_, key=lambda r: r["riser"])):
-            r["t"] = base + 4 * idx
+        order = sorted(rs_, key=lambda r: r["riser"])
+        # A recycled channel can otherwise put the first stair support of an
+        # outgoing route directly above (and cap) an incoming route's final
+        # y=4 dust cell. Move the whole slice bundle past every landing tail.
+        start = base
+        for idx, r in enumerate(order):
+            incoming = [3 * stages[si]["slot"][q["sig"]] - 4
+                        for q in routes
+                        if q["dst"] == si and q["slice"] == r["slice"]
+                        and q["ch"] == r["ch"]]
+            if incoming:
+                start = max(start, max(incoming) - 4 * idx)
+        for idx, r in enumerate(order):
+            r["t"] = start + 4 * idx
 
     z = [0]
     for k in range(len(stages) - 1):
@@ -444,6 +456,10 @@ class PPA:
                                          % (label, self.labels.get((x, y, z)), (x, y, z)))
                 since = repeat_every
                 continue
+            below = self.b.cells.get((x, y - 2, z), "")
+            if y >= 5 and "redstone_wire" in below:
+                raise AssertionError("route %s support would cap dust at %s"
+                                     % (label, (x, y - 2, z)))
             self.b.stone(x, y - 1, z, "route")
             prev = cells[i - 1] if i else None
             nxt = cells[i + 1] if i + 1 < len(cells) else None

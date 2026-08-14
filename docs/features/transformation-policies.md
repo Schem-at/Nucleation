@@ -12,6 +12,19 @@ only if no rule rejects it, so rejection leaves the source unchanged. Inspection
 executes the same plan on a clone and returns the proposed findings without
 committing it.
 
+## Choose the smallest policy that fits
+
+| Goal | Plan | Changes content? | Deterministic? |
+|---|---|---:|---:|
+| Stable palette/order only | `TransformPlan.canonical()` | No | Yes |
+| Convert one building convention to another | `remap_materials` with a named profile | Yes | Yes |
+| Screen an imported build for a public registry | `TransformPlan.registry_safe()` | Yes | Yes |
+| Enforce project-specific content or identity rules | Custom ordered passes | Depends on actions | Yes, except random UUID regeneration |
+
+Loading and saving never normalize implicitly. A caller must choose a plan,
+which makes policy changes reviewable and prevents a format conversion from
+silently changing authored content.
+
 ## Python
 
 ```python
@@ -50,6 +63,77 @@ Policy rejection is represented by `report.rejected`; malformed plan JSON is an
 API error. Reports use stable codes, paths, actions, and counts and never include
 the removed or redacted value.
 
+`TransformReport` contains `schema_version`, `plan`, `dry_run`, `rejected`,
+`quarantined`, a stable code-to-count `summary`, and ordered `findings`. Each
+finding contains `code`, `severity`, `action`, a schematic `path`, and an
+optional non-sensitive `rule` label. Route on the booleans or stable codes,
+never on prose.
+
+The bridge surface is intentionally small and identical in every generated
+language binding (with the normal casing convention):
+
+| Operation | Purpose |
+|---|---|
+| `inspect_transform_plan_json(plan_json)` | Execute the exact plan on a clone and return report JSON |
+| `apply_transform_plan_json(plan_json)` | Apply atomically and return report JSON, including policy rejection |
+| `canonicalize_json()` | Apply the built-in lossless canonical plan |
+| `inspect_registry_safe_json()` | Preview the built-in registry policy |
+| `from_data_bounded(bytes, limits_json)` | Decode untrusted bytes with allocation limits |
+
+The Python facade wraps these with typed dataclasses and `inspect_transform`,
+`apply_transform`, and `decode_bounded`.
+
+## Shared JSON contract
+
+Plans use `schema_version: 1`, a non-empty stable name, a history switch, and an
+ordered pass list. This complete example is valid in Rust and every binding:
+
+```json
+{
+  "schema_version": 1,
+  "name": "community-import-v1",
+  "record_history": true,
+  "passes": [
+    { "type": "canonicalize_palette" },
+    {
+      "type": "remap_materials",
+      "profile": {
+        "name": "concrete-standard-v1",
+        "version": 1,
+        "mappings": { "minecraft:stone": "minecraft:gray_concrete" },
+        "family_mappings": [],
+        "preserve_unmentioned_properties": false,
+        "safety": "profile"
+      }
+    },
+    {
+      "type": "content_policy",
+      "policy": {
+        "allowed_namespaces": ["minecraft"],
+        "namespace_action": "quarantine",
+        "text": {
+          "strip_keys": ["CustomName"],
+          "suspicious_patterns": ["ignore previous instructions"],
+          "suspicious_action": "warn",
+          "max_string_bytes": 32768,
+          "oversize_action": "reject"
+        },
+        "entities": { "max_total": 512, "excess_action": "quarantine" },
+        "uuids": {
+          "mode": "regenerate_deterministic",
+          "representation": "int_array",
+          "salt": "example:community:v1"
+        }
+      }
+    }
+  ]
+}
+```
+
+Omitted policy sections and fields receive their documented defaults. Always
+bump the plan name when changing its meaning so audit history and downstream
+registries can distinguish revisions.
+
 ## Plan passes
 
 Version 1 includes three core passes:
@@ -63,6 +147,38 @@ Version 1 includes three core passes:
   nested items, text, NBT, identifiers, and UUID references.
 
 Passes run in listed order.
+
+## Actions and policy field reference
+
+Actions are shared by all applicable policy sections:
+
+| Action | Result |
+|---|---|
+| `allow` | Keep content and emit no finding |
+| `warn` | Keep content and add a warning finding |
+| `redact` | Replace matching text with the configured redaction string |
+| `remove` | Remove the matched value/entity/item, or replace a denied block with air |
+| `quarantine` | Keep processing, mark the report for quarantine |
+| `reject` | Mark the plan rejected; atomic apply leaves the source unchanged |
+
+`ContentPolicy` contains the following sections. Empty allowlists mean “not
+configured”; empty denylists match nothing.
+
+| Section | Fields | Defaults and notes |
+|---|---|---|
+| Root | `allowed_namespaces`, `namespace_action` | All namespaces; `warn` |
+| `text` | `strip_keys`, `redact_words`, `redaction`, `suspicious_patterns`, `suspicious_action`, `max_string_bytes`, `oversize_action` | Empty rules; replacement `[redacted]`; actions `warn`; no size cap |
+| `nbt` | `max_depth`, `max_nodes`, `max_collection_items`, `limit_action`, `remove_keys`, `executable_keys`/`_action`, `profile_keys`/`_action`, `volatile_keys`/`_action` | Depth 64; other limits unset; actions `warn`. Aggregate limits cannot use `remove`/`redact` |
+| `items` | `allowed_ids`, `denied_ids`, `denied_action`, `clear_inventories`, `max_inventory_items`, `excess_action` | No ID rules or cap; inventories retained |
+| `blocks` | `allowed_ids`, `denied_ids`, `denied_action` | No ID rules; `warn` |
+| `entities` | `allowed_ids`, `denied_ids`, `denied_action`, `max_total`, `max_per_region`, `max_per_1000_blocks`, `excess_action`, `remove_players` | No ID rules or caps; actions `warn`; players retained |
+| `block_entities` | `allowed_ids`, `denied_ids`, `denied_action`, `max_total`, `max_per_region`, `max_per_1000_blocks`, `excess_action` | No ID rules or caps; actions `warn` |
+| `uuids` | `mode`, `representation`, `scope`, `salt`, `identity_basis`, `assign_missing`, `collision`, `dangling`, `definition_keys`, `reference_keys` | Preserve values/shape; definitions and references; stable path; warn on collisions/dangling references |
+
+Allow/deny ID rules are exact namespaced IDs. Namespace rules apply recursively
+to recognized blocks, entities, block entities, and items. Text and NBT rules
+also traverse nested item stacks and passengers rather than inspecting only the
+top level.
 
 ## Transformation history
 
@@ -164,6 +280,13 @@ implement this contract. Whole MCA and world-ZIP containers are deliberately
 refused by the generic bounded reader; use the world-segment streaming API with
 explicit world bounds so a complete world is never materialized implicitly.
 
+`DecodeLimits` fields are `max_input_bytes`, `max_decompressed_bytes`,
+`max_dimension`, `max_volume`, `max_regions`, `max_palette_entries`,
+`max_entities`, `max_block_entities`, `max_nbt_depth`,
+`max_nbt_string_bytes`, `max_nbt_collection_items`, and `max_nbt_nodes`. All
+must be positive. Defaults are deliberately generous library ceilings; public
+services should lower them to the largest object they intentionally accept.
+
 ## Material standards
 
 Material profiles support exact mappings and family templates:
@@ -186,6 +309,15 @@ plan = TransformPlan.from_passes("concrete-standard-v1", [{
     "profile": profile.as_dict(),
 }])
 ```
+
+| Profile field | Meaning |
+|---|---|
+| `name`, `version` | Stable profile identity; change it when mappings or semantics change |
+| `target_data_version` | Optional Minecraft data version expected by the target convention |
+| `mappings` | Exact source block state/ID to target block state mapping |
+| `family_mappings` | `{color}` templates with optional explicit `values` (all dye colors by default) |
+| `preserve_unmentioned_properties` | Copy source properties absent from the target state |
+| `safety` | `exact`, `behavior_preserving`, `profile`, or `aggressive` |
 
 Safety modes are `exact`, `behavior_preserving`, `profile`, and `aggressive`.
 `exact` accepts only identical states. `behavior_preserving` classifies both
@@ -219,6 +351,14 @@ never override a rejection. Python and compiled extensions can emit this JSON
 or consume the report out of process. Nucleation deliberately does not import
 arbitrary callback code into the registry process.
 
+The serializable pipeline configuration contains `decode_limits`, `plan`, the
+four relative logical key prefixes (`accept_prefix`, `quarantine_prefix`,
+`reject_prefix`, `report_prefix`), and `hooks`. Each hook has `summary_code`,
+`minimum` (default 1), and a target `route`. An ingest report contains
+`schema_version`, `source_key`, the input BLAKE3 `object_id`, selected `route`,
+detected format, output/route/report keys, an optional stable `error_code`, and
+the optional transform report.
+
 ```rust
 use nucleation::{MemStore, RegistryPipeline, Store};
 
@@ -232,6 +372,24 @@ println!("{:?}: {}", result.route, result.report_key);
 
 All policy, limit, hook, and report contracts remain serializable so Rust,
 Python, JavaScript/WASM, Kotlin/JVM, PHP, and C/C++ share the same semantics.
+
+Registry outputs are content-addressed by BLAKE3. Accepted and quarantined
+schematics are deterministic `.nusn` snapshots; every attempt writes a JSON
+report, while rejects additionally write their route record and never write a
+schematic. Hooks read only stable summary counters and can only escalate the
+route (`accept` -> `quarantine` -> `reject`).
+
+## Operational checklist
+
+1. Bounded-decode before inspecting untrusted input.
+2. Give each policy revision a new stable plan/profile name and salt namespace.
+3. Dry-run and retain the report before applying destructive actions.
+4. Treat quarantine as requiring an explicit review decision.
+5. Preserve source provenance; transformation history records processing and is
+   intentionally separate.
+6. Store the normalized object and its audit report together.
+7. Test custom policies for rejection atomicity, determinism, idempotence, and
+   format round trips before deploying them.
 
 ## Required conformance tests
 

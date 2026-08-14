@@ -3,9 +3,9 @@
 A high-performance Minecraft schematic engine, powered by a native Rust core. Parse, edit,
 diff, fingerprint, and generate schematics from Python.
 
-Policy-driven normalization, material profiles, content inspection, and UUID
-standardization are documented in
-[`transformation-policies.md`](../../docs/features/transformation-policies.md).
+Policy-driven normalization, material profiles, content inspection, UUID
+standardization, bounded decoding, and registry routing are documented in the
+complete [transformation-policy guide](../../docs/features/transformation-policies.md).
 
 Wheels are published for CPython 3.12+ (stable ABI) on Linux, macOS, and Windows.
 They include a `py.typed` marker and generated `.pyi` stubs for Mypy, Pyright,
@@ -32,6 +32,27 @@ print(schematic.get_block_name(1, 2, 3))  # "minecraft:stone"
 schematic.save_to_file("demo.litematic")
 loaded = nucleation.Schematic.load_from_file("demo.litematic")
 ```
+
+### Normalize imported content
+
+Preview and apply the same versioned policy contract used by every language
+binding:
+
+```python
+from nucleation import Schematic, TransformPlan, inspect_transform, apply_transform
+
+schematic = Schematic.open("incoming.schem")
+plan = TransformPlan.registry_safe()
+preview = inspect_transform(schematic, plan)
+
+if not preview.rejected and not preview.quarantined:
+    report = apply_transform(schematic, plan)
+    schematic.save("normalized.schem")
+```
+
+Inspection never mutates the schematic. Apply is atomic: a rejecting rule
+returns `report.rejected == True` and leaves the original unchanged. For only
+lossless palette cleanup, use `TransformPlan.canonical()`.
 
 ### Split disconnected builds
 
@@ -113,7 +134,7 @@ for example `NUCLEATION_FEATURES=bridge,simulation`.
 ## Documentation
 
 - [Python API reference](https://github.com/Schem-at/Nucleation/blob/master/docs/python/README.md)
-- [Feature guides](https://github.com/Schem-at/Nucleation/tree/master/docs/guides)
+- [Feature guides](https://github.com/Schem-at/Nucleation/tree/master/docs/features)
 
 ## License
 

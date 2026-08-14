@@ -80,6 +80,14 @@ fn cmp4_model_matches_blif_exhaustively() {
     check_against_blif("cmp4");
 }
 
+/// Ubuntu 24.04 packages Yosys 0.33, whose ABC pass emits four-term equality
+/// nodes for this comparator. Keep that output as a fixture so the physical
+/// compiler remains compatible with the oldest Yosys used by CI.
+#[test]
+fn cmp4_yosys_0_33_model_matches_blif_exhaustively() {
+    check_against_blif("cmp4_yosys_0_33");
+}
+
 #[test]
 fn geometry_is_placed_probed_and_levered() {
     for name in ["seg7", "popcnt4", "cmp4"] {
