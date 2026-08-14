@@ -175,7 +175,8 @@ tier_full() {
   # Wheel + npm rebuild. Only the bridge surface affects these; the guards in
   # package-npm.sh make a no-op rebuild cheap.
   step "npm package (wasm)"       ./tools/package-npm.sh dist/npm || true
-  step "python wheel"             bash -c 'cd bindings/python && maturin build --release' || true
+  step "python wheel"             python3 -m build --wheel bindings/python \
+    --outdir target/python-wheels || true
 
   # Everything CI gates on: bindings freshness/determinism, coverage, smokes.
   step "prepush gates"            python3 tools/prepush.py || true

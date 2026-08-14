@@ -111,8 +111,8 @@ jobs:
           sudo apt-get install --yes yosys
       - name: Install diplomat-tool (fork with PHP backend)
         run: cargo install --git https://github.com/Nano112/diplomat --branch nanobind-public-api diplomat-tool
-      - name: maturin (wheel build in the full tier)
-        run: pipx install maturin
+      - name: Install the Python wheel frontend
+        run: python -m pip install build
       - name: Build and install the Python bridge used by simulation checks
         run: python -m pip install ./bindings/python
       - run: tools/dev.sh full
