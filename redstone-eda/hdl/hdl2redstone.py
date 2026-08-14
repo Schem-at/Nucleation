@@ -49,6 +49,9 @@ import nets
 
 # ---- yosys ----------------------------------------------------------------
 def run_yosys(verilog, top, blif):
+    # Fresh checkouts do not have the ignored hdl/build directory yet.  Yosys
+    # will create the BLIF file, but it will not create missing parent dirs.
+    os.makedirs(os.path.dirname(os.path.abspath(blif)), exist_ok=True)
     # dffunmap legalises enable/reset DFF cells ($_DFFE_PP_ ...) into plain
     # $_DFF_P_ + muxes (write_blif only emits .latch for plain DFFs); the
     # second abc maps those muxes back into LUTs.  No-ops combinationally.
