@@ -500,8 +500,25 @@ pub fn layout(
             + 2;
         let mut order: Vec<usize> = ris.clone();
         order.sort_by_key(|&ri| routes[ri].riser); // stable: ties keep tap order
+                                                   // A next-stage hop may recycle the same channel as a route landing in
+                                                   // this stage. Its first stair support sits one block above the lower
+                                                   // route's y=4 trunk; without this clearance it can silently cap the
+                                                   // trunk's final dust cell. Shift the whole slice's corridor bundle so
+                                                   // every recycled channel begins beyond its incoming landing tail.
+        let mut start = base;
         for (idx, &ri) in order.iter().enumerate() {
-            routes[ri].t = base + 4 * idx as i32;
+            let r = &routes[ri];
+            let incoming_end = routes
+                .iter()
+                .filter(|q| q.dst == *si && q.slice == r.slice && q.ch == r.ch)
+                .map(|q| 3 * planned[*si].slot[&q.sig] - 4)
+                .max();
+            if let Some(clearance) = incoming_end {
+                start = start.max(clearance - 4 * idx as i32);
+            }
+        }
+        for (idx, &ri) in order.iter().enumerate() {
+            routes[ri].t = start + 4 * idx as i32;
         }
     }
 
@@ -877,6 +894,18 @@ impl Pla {
                 }
                 since = repeat_every;
                 continue;
+            }
+            if y >= 5
+                && self
+                    .b
+                    .cells
+                    .get(&(x, y - 2, z))
+                    .is_some_and(|c| c.contains("redstone_wire"))
+            {
+                return Err(HdlError::Layout(format!(
+                    "route {label} support would cap dust at ({x},{},{z})",
+                    y - 2
+                )));
             }
             self.b.stone(x, y - 1, z, "route")?;
             let prev = if i > 0 { Some(cells[i - 1]) } else { None };

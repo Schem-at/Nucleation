@@ -20,6 +20,11 @@ policies, and registry configuration. The README and feature guide now include
 an end-to-end quick start, complete field/default reference, action semantics,
 registry output behavior, and an operational deployment checklist.
 
+**HDL compatibility.** PLA route scheduling now keeps recycled channels clear
+of incoming landing tails, preventing a support block from silently capping an
+older route at a stage boundary. The Ubuntu-packaged Yosys 0.33 comparator is a
+checked-in regression and passes all 256 input combinations in both compilers.
+
 # Nucleation v0.7.0
 
 **Generated worlds.** A new `world_generation` module turns chunk sources into
