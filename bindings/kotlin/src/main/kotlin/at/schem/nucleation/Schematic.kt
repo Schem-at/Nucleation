@@ -9,6 +9,10 @@ internal interface SchematicLib: Library {
     fun Schematic_destroy(handle: Pointer)
     fun Schematic_create(name: Slice): Pointer
     fun Schematic_deep_clone(handle: Pointer): Pointer
+    fun Schematic_inspect_transform_plan_json(handle: Pointer, planJson: Slice, write: Pointer): ResultUnitInt
+    fun Schematic_apply_transform_plan_json(handle: Pointer, planJson: Slice, write: Pointer): ResultUnitInt
+    fun Schematic_canonicalize_json(handle: Pointer, write: Pointer): Unit
+    fun Schematic_inspect_registry_safe_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_split_connected_attach_nearby(handle: Pointer, minStandaloneBlocks: FFIUint32, maxAirGap: FFIUint32): Pointer
     fun Schematic_dimensions(handle: Pointer): DimensionsNative
     fun Schematic_set_block(handle: Pointer, x: Int, y: Int, z: Int, blockName: Slice): ResultByteInt
@@ -18,6 +22,7 @@ internal interface SchematicLib: Library {
     fun Schematic_load_from_file(path: Slice): ResultPointerInt
     fun Schematic_open(path: Slice): ResultPointerInt
     fun Schematic_from_data(data: Slice): ResultPointerInt
+    fun Schematic_from_data_bounded(data: Slice, limitsJson: Slice): ResultPointerInt
     fun Schematic_from_litematic(data: Slice): ResultPointerInt
     fun Schematic_to_litematic_b64(handle: Pointer, write: Pointer): ResultUnitInt
     fun Schematic_from_schematic(data: Slice): ResultPointerInt
@@ -104,6 +109,8 @@ internal interface SchematicLib: Library {
     fun Schematic_provenance_json(handle: Pointer, write: Pointer): ResultUnitInt
     fun Schematic_set_provenance_json(handle: Pointer, json: Slice): ResultUnitInt
     fun Schematic_clear_provenance(handle: Pointer): Unit
+    fun Schematic_transformation_history_json(handle: Pointer, write: Pointer): Unit
+    fun Schematic_clear_transformation_history(handle: Pointer): Unit
     fun Schematic_flip_x(handle: Pointer): Unit
     fun Schematic_flip_y(handle: Pointer): Unit
     fun Schematic_flip_z(handle: Pointer): Unit
@@ -269,6 +276,33 @@ class Schematic internal constructor (
                 }
             } finally {
                 dataSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Decode untrusted bytes using a serialized `DecodeLimits` object.
+        *Empty JSON selects the conservative library defaults. Limits are
+        *enforced while decompressing/parsing and again before region
+        *allocations are accepted.
+        */
+        fun fromDataBounded(data: UByteArray, limitsJson: String): Result<Schematic> {
+            val dataSliceMemory = PrimitiveArrayTools.borrow(data)
+            val limitsJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(limitsJson)
+
+            val returnVal = lib.Schematic_from_data_bounded(dataSliceMemory.slice, limitsJsonSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = Schematic(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                dataSliceMemory.close()
+                limitsJsonSliceMemory.close()
             }
         }
         @JvmStatic
@@ -529,6 +563,71 @@ class Schematic internal constructor (
         val handle = returnVal
         val returnOpaque = Schematic(handle, selfEdges, true)
         return returnOpaque
+    }
+
+    /** Inspect a versioned transform-plan JSON document without modifying
+    *this schematic. Writes a deterministic audit-report JSON document.
+    */
+    fun inspectTransformPlanJson(planJson: String): Result<String> {
+        val planJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(planJson)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_inspect_transform_plan_json(handle, planJsonSliceMemory.slice, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            planJsonSliceMemory.close()
+        }
+    }
+
+    /** Atomically apply a versioned transform-plan JSON document. Policy
+    *rejection is represented by `report.rejected == true` and leaves the
+    *schematic unchanged; malformed plans raise `InvalidArgument`.
+    */
+    fun applyTransformPlanJson(planJson: String): Result<String> {
+        val planJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(planJson)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_apply_transform_plan_json(handle, planJsonSliceMemory.slice, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            planJsonSliceMemory.close()
+        }
+    }
+
+    /** Apply the bundled deterministic, lossless canonicalization preset.
+    */
+    fun canonicalizeJson(): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_canonicalize_json(handle, write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
+    }
+
+    /** Inspect the bundled public-registry policy without modifying this
+    *schematic. Applications should review `rejected` and `quarantined`
+    *before choosing whether to call `apply_transform_plan_json`.
+    */
+    fun inspectRegistrySafeJson(): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_inspect_registry_safe_json(handle, write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
     }
 
     /** Split spatially independent machines while keeping nearby tiny
@@ -1749,6 +1848,27 @@ class Schematic internal constructor (
     fun clearProvenance(): Unit {
 
         val returnVal = lib.Schematic_clear_provenance(handle);
+
+    }
+
+    /** Content-addressed processing history as a JSON array. This audit
+    *trail is deliberately separate from immutable source provenance.
+    */
+    fun transformationHistoryJson(): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_transformation_history_json(handle, write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
+    }
+
+    /** Clear processing history without changing source provenance or
+    *schematic content. Intended for callers constructing a new artifact
+    *lineage, not for hiding registry audit records.
+    */
+    fun clearTransformationHistory(): Unit {
+
+        val returnVal = lib.Schematic_clear_transformation_history(handle);
 
     }
 

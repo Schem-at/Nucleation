@@ -3,16 +3,18 @@ use crate::entity::Entity;
 use crate::formats::error::Result;
 use crate::region::Region;
 use crate::{BlockState, UniversalSchematic};
+#[cfg(test)]
 use flate2::read::GzDecoder;
+#[cfg(test)]
 use quartz_nbt::io::Flavor;
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn is_litematic(data: &[u8]) -> bool {
-    // Stream-decompress directly into NBT parser (no intermediate buffer)
-    let reader = std::io::BufReader::with_capacity(1 << 20, data);
-    let mut gz = GzDecoder::new(reader);
-    let (root, _) = match quartz_nbt::io::read_nbt(&mut gz, Flavor::Uncompressed) {
+    let root = match crate::formats::limits::parse_gzip_nbt(
+        data,
+        &crate::formats::limits::DecodeLimits::default(),
+    ) {
         Ok(result) => result,
         Err(_) => return false,
     };
@@ -140,10 +142,15 @@ pub fn to_litematic_with_compression(
 }
 
 pub fn from_litematic(data: &[u8]) -> Result<UniversalSchematic> {
-    // Stream-decompress directly into NBT parser (no intermediate buffer)
-    let reader = std::io::BufReader::with_capacity(1 << 20, data);
-    let mut gz = flate2::read::GzDecoder::new(reader);
-    let (root, _) = quartz_nbt::io::read_nbt(&mut gz, quartz_nbt::io::Flavor::Uncompressed)?;
+    from_litematic_bounded(data, &crate::formats::limits::DecodeLimits::default())
+}
+
+pub fn from_litematic_bounded(
+    data: &[u8],
+    limits: &crate::formats::limits::DecodeLimits,
+) -> Result<UniversalSchematic> {
+    let root = crate::formats::limits::parse_gzip_nbt(data, limits)?;
+    preflight_litematic(&root, limits)?;
 
     let mut schematic = UniversalSchematic::new("Unnamed".to_string());
 
@@ -153,7 +160,59 @@ pub fn from_litematic(data: &[u8]) -> Result<UniversalSchematic> {
     // Parse Regions
     parse_regions(&root, &mut schematic)?;
 
+    limits.validate_schematic(&schematic)?;
     Ok(schematic)
+}
+
+fn preflight_litematic(
+    root: &NbtCompound,
+    limits: &crate::formats::limits::DecodeLimits,
+) -> Result<()> {
+    let regions = root.get::<_, &NbtCompound>("Regions")?;
+    if regions.len() > limits.max_regions {
+        return Err("region limit exceeded".into());
+    }
+    let mut total_volume = 0usize;
+    let mut total_entities = 0usize;
+    let mut total_block_entities = 0usize;
+    for value in regions.inner().values() {
+        let NbtTag::Compound(region) = value else {
+            continue;
+        };
+        let size = region.get::<_, &NbtCompound>("Size")?;
+        let volume = limits.check_dimensions((
+            i64::from(size.get::<_, i32>("x")?).abs(),
+            i64::from(size.get::<_, i32>("y")?).abs(),
+            i64::from(size.get::<_, i32>("z")?).abs(),
+        ))?;
+        total_volume = total_volume
+            .checked_add(volume)
+            .ok_or("total volume overflow")?;
+        if total_volume > limits.max_volume {
+            return Err("total volume limit exceeded".into());
+        }
+        let palette = region.get::<_, &NbtList>("BlockStatePalette")?;
+        if palette.len() > limits.max_palette_entries {
+            return Err("palette limit exceeded".into());
+        }
+        total_entities = total_entities.saturating_add(
+            region
+                .get::<_, &NbtList>("Entities")
+                .map_or(0, NbtList::len),
+        );
+        total_block_entities = total_block_entities.saturating_add(
+            region
+                .get::<_, &NbtList>("TileEntities")
+                .map_or(0, NbtList::len),
+        );
+    }
+    if total_entities > limits.max_entities {
+        return Err("entity limit exceeded".into());
+    }
+    if total_block_entities > limits.max_block_entities {
+        return Err("block-entity limit exceeded".into());
+    }
+    Ok(())
 }
 
 fn create_metadata(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
@@ -243,6 +302,14 @@ fn create_metadata(schematic: &UniversalSchematic, version: i32) -> NbtCompound 
         if let Ok(json) = provenance.to_json() {
             metadata.insert(
                 crate::metadata::SCHEMATIC_PROVENANCE_NBT_KEY,
+                NbtTag::String(json),
+            );
+        }
+    }
+    if !schematic.metadata.transformation_history.is_empty() {
+        if let Ok(json) = serde_json::to_string(&schematic.metadata.transformation_history) {
+            metadata.insert(
+                crate::metadata::TRANSFORMATION_HISTORY_NBT_KEY,
                 NbtTag::String(json),
             );
         }
@@ -463,6 +530,11 @@ fn parse_metadata(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Res
         .get::<_, &str>(crate::metadata::SCHEMATIC_PROVENANCE_NBT_KEY)
         .ok()
         .and_then(|json| crate::SchematicProvenance::from_json(json).ok());
+    schematic.metadata.transformation_history = metadata
+        .get::<_, &str>(crate::metadata::TRANSFORMATION_HISTORY_NBT_KEY)
+        .ok()
+        .and_then(|json| serde_json::from_str(json).ok())
+        .unwrap_or_default();
 
     // We don't need to parse EnclosingSize, TotalVolume, TotalBlocks as they will be recalculated
 
@@ -595,8 +667,20 @@ impl SchematicImporter for LitematicFormat {
         is_litematic(data)
     }
 
+    fn detect_bounded(&self, data: &[u8], limits: &crate::formats::limits::DecodeLimits) -> bool {
+        from_litematic_bounded(data, limits).is_ok()
+    }
+
     fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_litematic(data)
+    }
+
+    fn read_bounded(
+        &self,
+        data: &[u8],
+        limits: &crate::formats::limits::DecodeLimits,
+    ) -> Result<UniversalSchematic> {
+        from_litematic_bounded(data, limits)
     }
 }
 

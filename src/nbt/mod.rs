@@ -299,14 +299,90 @@ pub mod io {
         }
     }
 
-    fn read_string<R: Read>(r: &mut R, endian: Endian) -> IoResult<String> {
-        let len = read_i16(r, endian)? as usize;
-        let mut buf = vec![0; len];
+    #[derive(Clone, Copy, Debug)]
+    pub struct NbtReadLimits {
+        pub max_depth: usize,
+        pub max_string_bytes: usize,
+        pub max_collection_items: usize,
+        pub max_nodes: usize,
+    }
+
+    impl Default for NbtReadLimits {
+        fn default() -> Self {
+            Self {
+                max_depth: 64,
+                max_string_bytes: 1 << 20,
+                max_collection_items: 16_777_216,
+                max_nodes: 32_000_000,
+            }
+        }
+    }
+
+    struct ReadBudget {
+        limits: NbtReadLimits,
+        nodes: usize,
+    }
+
+    impl ReadBudget {
+        fn node(&mut self, depth: usize) -> IoResult<()> {
+            if depth > self.limits.max_depth {
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "NBT depth limit exceeded",
+                ));
+            }
+            self.nodes = self
+                .nodes
+                .checked_add(1)
+                .ok_or_else(|| Error::new(ErrorKind::InvalidData, "NBT node count overflow"))?;
+            if self.nodes > self.limits.max_nodes {
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "NBT node limit exceeded",
+                ));
+            }
+            Ok(())
+        }
+
+        fn collection_len(&self, value: i32) -> IoResult<usize> {
+            let value = usize::try_from(value).map_err(|_| {
+                Error::new(ErrorKind::InvalidData, "negative NBT collection length")
+            })?;
+            if value > self.limits.max_collection_items {
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "NBT collection limit exceeded",
+                ));
+            }
+            Ok(value)
+        }
+    }
+
+    fn read_string<R: Read>(r: &mut R, endian: Endian, budget: &ReadBudget) -> IoResult<String> {
+        let raw = read_i16(r, endian)?;
+        let len = u16::from_ne_bytes(raw.to_ne_bytes()) as usize;
+        if len > budget.limits.max_string_bytes {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "NBT string limit exceeded",
+            ));
+        }
+        let mut buf = Vec::new();
+        buf.try_reserve_exact(len)
+            .map_err(|error| Error::other(error.to_string()))?;
+        buf.resize(len, 0);
         r.read_exact(&mut buf)?;
         String::from_utf8(buf).map_err(|e| Error::new(ErrorKind::InvalidData, e))
     }
 
-    fn read_payload<R: Read>(r: &mut R, type_id: u8, endian: Endian) -> IoResult<NbtValue> {
+    fn read_payload<R: Read>(
+        r: &mut R,
+        type_id: u8,
+        endian: Endian,
+        depth: usize,
+        budget: &mut ReadBudget,
+    ) -> IoResult<NbtValue> {
+        budget.node(depth)?;
         match type_id {
             1 => Ok(NbtValue::Byte(read_u8(r)? as i8)),
             2 => Ok(NbtValue::Short(read_i16(r, endian)?)),
@@ -316,19 +392,24 @@ pub mod io {
             6 => Ok(NbtValue::Double(read_f64(r, endian)?)),
             7 => {
                 // ByteArray
-                let len = read_i32(r, endian)? as usize;
-                let mut buf = vec![0u8; len];
+                let len = budget.collection_len(read_i32(r, endian)?)?;
+                let mut buf = Vec::new();
+                buf.try_reserve_exact(len)
+                    .map_err(|error| Error::other(error.to_string()))?;
+                buf.resize(len, 0);
                 r.read_exact(&mut buf)?;
                 Ok(NbtValue::ByteArray(buf.iter().map(|&b| b as i8).collect()))
             }
-            8 => Ok(NbtValue::String(read_string(r, endian)?)),
+            8 => Ok(NbtValue::String(read_string(r, endian, budget)?)),
             9 => {
                 // List
                 let tag_id = read_u8(r)?;
-                let len = read_i32(r, endian)? as usize;
-                let mut list = Vec::with_capacity(len);
+                let len = budget.collection_len(read_i32(r, endian)?)?;
+                let mut list = Vec::new();
+                list.try_reserve_exact(len)
+                    .map_err(|error| Error::other(error.to_string()))?;
                 for _ in 0..len {
-                    list.push(read_payload(r, tag_id, endian)?);
+                    list.push(read_payload(r, tag_id, endian, depth + 1, budget)?);
                 }
                 Ok(NbtValue::List(list))
             }
@@ -340,16 +421,18 @@ pub mod io {
                     if tag_id == 0 {
                         break;
                     }
-                    let name = read_string(r, endian)?;
-                    let tag = read_payload(r, tag_id, endian)?;
+                    let name = read_string(r, endian, budget)?;
+                    let tag = read_payload(r, tag_id, endian, depth + 1, budget)?;
                     map.insert(name, tag);
                 }
                 Ok(NbtValue::Compound(map))
             }
             11 => {
                 // IntArray
-                let len = read_i32(r, endian)? as usize;
-                let mut buf = Vec::with_capacity(len);
+                let len = budget.collection_len(read_i32(r, endian)?)?;
+                let mut buf = Vec::new();
+                buf.try_reserve_exact(len)
+                    .map_err(|error| Error::other(error.to_string()))?;
                 for _ in 0..len {
                     buf.push(read_i32(r, endian)?);
                 }
@@ -357,8 +440,10 @@ pub mod io {
             }
             12 => {
                 // LongArray
-                let len = read_i32(r, endian)? as usize;
-                let mut buf = Vec::with_capacity(len);
+                let len = budget.collection_len(read_i32(r, endian)?)?;
+                let mut buf = Vec::new();
+                buf.try_reserve_exact(len)
+                    .map_err(|error| Error::other(error.to_string()))?;
                 for _ in 0..len {
                     buf.push(read_i64(r, endian)?);
                 }
@@ -372,6 +457,14 @@ pub mod io {
     }
 
     pub fn read_nbt<R: Read>(r: &mut R, endian: Endian) -> IoResult<NbtValue> {
+        read_nbt_with_limits(r, endian, NbtReadLimits::default())
+    }
+
+    pub fn read_nbt_with_limits<R: Read>(
+        r: &mut R,
+        endian: Endian,
+        limits: NbtReadLimits,
+    ) -> IoResult<NbtValue> {
         let tag_id = read_u8(r)?;
         if tag_id != 10 {
             // Must be compound
@@ -380,8 +473,9 @@ pub mod io {
                 "Root tag must be compound",
             ));
         }
-        let _name = read_string(r, endian)?; // Root name
-        read_payload(r, 10, endian)
+        let mut budget = ReadBudget { limits, nodes: 0 };
+        let _name = read_string(r, endian, &budget)?; // Root name
+        read_payload(r, 10, endian, 0, &mut budget)
     }
 
     fn write_u8<W: Write>(w: &mut W, v: u8) -> IoResult<()> {
@@ -543,5 +637,25 @@ mod snbt_roundtrip_tests {
             back.get("LastChanged"),
             Some(&NbtValue::Long(9_007_199_254_740_993))
         );
+    }
+}
+
+#[cfg(test)]
+mod bounded_nbt_tests {
+    use super::io::{read_nbt_with_limits, NbtReadLimits};
+    use super::Endian;
+
+    #[test]
+    fn negative_collection_length_is_rejected_before_allocation() {
+        let bytes = [
+            10, 0, 0, // root compound + empty name
+            9, 0, 1, b'l', // named list
+            1,    // byte element type
+            0xff, 0xff, 0xff, 0xff, // negative length
+        ];
+        let error =
+            read_nbt_with_limits(&mut bytes.as_slice(), Endian::Big, NbtReadLimits::default())
+                .unwrap_err();
+        assert!(error.to_string().contains("negative NBT collection"));
     }
 }

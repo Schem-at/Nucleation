@@ -27,6 +27,10 @@ NESTED_ENUM = re.compile(r"^    class ([A-Za-z_][A-Za-z0-9_]*)\(enum\.Enum\):$")
 
 
 def normalize(source: str) -> tuple[str, int, int, int]:
+    # Stubgen occasionally emits an unsubscripted Callable for native callback
+    # parameters.  Bare generics fail strict Mypy even though the generated
+    # signature cannot express the callback's ABI more precisely.
+    source = re.sub(r"(?<=: )Callable(?=[,)])", "Callable[..., object]", source)
     lines = source.splitlines()
     output: list[str] = []
     outer: str | None = None
@@ -56,6 +60,12 @@ def normalize(source: str) -> tuple[str, int, int, int]:
             continue
 
         if outer is not None:
+            # nanobind 2.12 may qualify annotations and enum constants through
+            # both wrapper layers (`Outer.Outer`). The nested enum is removed
+            # above, so collapse those references to the public wrapper before
+            # matching constants and methods. Older stubgen output already uses
+            # the single-qualified spelling, making this idempotent.
+            line = line.replace(f"{outer}.{outer}", outer)
             if re.fullmatch(
                 rf"    [A-Za-z_][A-Za-z0-9_]*: {re.escape(outer)}",
                 line,

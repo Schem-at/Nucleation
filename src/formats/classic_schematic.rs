@@ -25,10 +25,7 @@
 //!
 //! Array order is `y * Width * Length + z * Width + x`.
 
-use flate2::read::GzDecoder;
-use quartz_nbt::io::{read_nbt, Flavor};
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
-use std::io::{Cursor, Read};
 
 use crate::block_entity::BlockEntity;
 use crate::block_state::BlockState;
@@ -49,8 +46,20 @@ impl SchematicImporter for ClassicSchematicFormat {
         is_classic_schematic(data)
     }
 
+    fn detect_bounded(&self, data: &[u8], limits: &crate::formats::limits::DecodeLimits) -> bool {
+        from_classic_schematic_bounded(data, limits).is_ok()
+    }
+
     fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_classic_schematic(data)
+    }
+
+    fn read_bounded(
+        &self,
+        data: &[u8],
+        limits: &crate::formats::limits::DecodeLimits,
+    ) -> Result<UniversalSchematic> {
+        from_classic_schematic_bounded(data, limits)
     }
 }
 
@@ -69,16 +78,19 @@ pub fn is_classic_schematic(data: &[u8]) -> bool {
 }
 
 fn decompress_and_parse(data: &[u8]) -> Result<NbtCompound> {
-    let mut decoder = GzDecoder::new(data);
-    let mut raw = Vec::new();
-    decoder.read_to_end(&mut raw)?;
-    let (root, _) = read_nbt(&mut Cursor::new(raw), Flavor::Uncompressed)?;
-    Ok(root)
+    crate::formats::limits::parse_gzip_nbt(data, &crate::formats::limits::DecodeLimits::default())
 }
 
 /// Read a legacy MCEdit `.schematic` into a `UniversalSchematic`.
 pub fn from_classic_schematic(data: &[u8]) -> Result<UniversalSchematic> {
-    let root = decompress_and_parse(data)?;
+    from_classic_schematic_bounded(data, &crate::formats::limits::DecodeLimits::default())
+}
+
+pub fn from_classic_schematic_bounded(
+    data: &[u8],
+    limits: &crate::formats::limits::DecodeLimits,
+) -> Result<UniversalSchematic> {
+    let root = crate::formats::limits::parse_gzip_nbt(data, limits)?;
 
     let width = root.get::<_, i16>("Width")? as i32;
     let height = root.get::<_, i16>("Height")? as i32;
@@ -86,6 +98,7 @@ pub fn from_classic_schematic(data: &[u8]) -> Result<UniversalSchematic> {
     if width <= 0 || height <= 0 || length <= 0 {
         return Err("Classic schematic has invalid dimensions".into());
     }
+    limits.check_dimensions((i64::from(width), i64::from(height), i64::from(length)))?;
 
     let blocks = match root.get::<_, &NbtTag>("Blocks")? {
         NbtTag::ByteArray(v) => v.as_slice(),
@@ -171,6 +184,7 @@ pub fn from_classic_schematic(data: &[u8]) -> Result<UniversalSchematic> {
     let mut schematic = UniversalSchematic::new(name);
     schematic.set_default_region(region);
 
+    limits.validate_schematic(&schematic)?;
     Ok(schematic)
 }
 

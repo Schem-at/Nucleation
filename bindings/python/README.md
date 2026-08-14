@@ -3,6 +3,10 @@
 A high-performance Minecraft schematic engine, powered by a native Rust core. Parse, edit,
 diff, fingerprint, and generate schematics from Python.
 
+Policy-driven normalization, material profiles, content inspection, and UUID
+standardization are documented in
+[`transformation-policies.md`](../../docs/features/transformation-policies.md).
+
 Wheels are published for CPython 3.12+ (stable ABI) on Linux, macOS, and Windows.
 They include a `py.typed` marker and generated `.pyi` stubs for Mypy, Pyright,
 and editor completion. The installed package-level `__init__.pyi` explicitly

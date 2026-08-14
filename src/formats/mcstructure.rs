@@ -31,8 +31,20 @@ impl SchematicImporter for McStructureFormat {
         }
     }
 
+    fn detect_bounded(&self, data: &[u8], limits: &crate::formats::limits::DecodeLimits) -> bool {
+        from_mcstructure_bounded(data, limits).is_ok()
+    }
+
     fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_mcstructure(data)
+    }
+
+    fn read_bounded(
+        &self,
+        data: &[u8],
+        limits: &crate::formats::limits::DecodeLimits,
+    ) -> Result<UniversalSchematic> {
+        from_mcstructure_bounded(data, limits)
     }
 }
 
@@ -59,8 +71,16 @@ impl SchematicExporter for McStructureFormat {
 }
 
 pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic> {
+    from_mcstructure_bounded(data, &crate::formats::limits::DecodeLimits::default())
+}
+
+pub fn from_mcstructure_bounded(
+    data: &[u8],
+    limits: &crate::formats::limits::DecodeLimits,
+) -> Result<UniversalSchematic> {
+    limits.check_input(data)?;
     let mut cursor = Cursor::new(data);
-    let root_val = read_nbt(&mut cursor, Endian::Little)?;
+    let root_val = crate::nbt::io::read_nbt_with_limits(&mut cursor, Endian::Little, limits.nbt())?;
     let root = match root_val {
         NbtValue::Compound(c) => c,
         _ => return Err("Root is not a compound".into()),
@@ -84,6 +104,7 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic> {
         Some(NbtValue::Int(v)) => *v,
         _ => 0,
     };
+    limits.check_dimensions((i64::from(width), i64::from(height), i64::from(length)))?;
 
     let structure = match root.get("structure") {
         Some(NbtValue::Compound(c)) => c,
@@ -103,6 +124,9 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic> {
         Some(NbtValue::List(l)) => l,
         _ => return Err("Missing block_palette".into()),
     };
+    if block_palette_list.len() > limits.max_palette_entries {
+        return Err("palette limit exceeded".into());
+    }
 
     let mut palette: Vec<BlockState> = Vec::new();
     for tag in block_palette_list.iter() {
@@ -315,6 +339,7 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic> {
     // Post-fix redstone connectivity
     schematic.fix_redstone_connectivity();
 
+    limits.validate_schematic(&schematic)?;
     Ok(schematic)
 }
 

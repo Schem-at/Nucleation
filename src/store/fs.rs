@@ -119,6 +119,19 @@ impl Store for FsStore {
         std::fs::create_dir_all(&self.root)?;
         Ok(())
     }
+
+    /// Stream directly from the file so bounded consumers do not first
+    /// allocate the complete object through `get`.
+    fn reader(&self, key: &str) -> Result<Box<dyn std::io::Read + '_>> {
+        let path = self.path_for(key)?;
+        match std::fs::File::open(&path) {
+            Ok(file) => Ok(Box::new(file)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                Err(StoreError::NotFound(key.to_string()))
+            }
+            Err(error) => Err(error.into()),
+        }
+    }
 }
 
 /// Recursively collect `/`-joined keys for every file under `dir`, relative to

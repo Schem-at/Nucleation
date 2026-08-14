@@ -6,7 +6,7 @@
 //! interactive SSH session. URLs have the form
 //! `ssh://[user@]host/absolute/root`; store keys are paths below that root.
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -14,6 +14,37 @@ use super::{Result, Store, StoreError};
 
 const NOT_FOUND: i32 = 44;
 const ALREADY_EXISTS: i32 = 45;
+
+struct SshReader {
+    child: std::process::Child,
+    stdout: std::process::ChildStdout,
+    finished: bool,
+}
+
+impl Read for SshReader {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let read = self.stdout.read(buffer)?;
+        if read == 0 && !self.finished {
+            self.finished = true;
+            let status = self.child.wait()?;
+            if !status.success() {
+                return Err(std::io::Error::other(format!(
+                    "SSH streaming read failed with {status}"
+                )));
+            }
+        }
+        Ok(read)
+    }
+}
+
+impl Drop for SshReader {
+    fn drop(&mut self) {
+        if !self.finished {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+        }
+    }
+}
 
 /// A remote filesystem store reached through the system OpenSSH client.
 #[derive(Clone, Debug)]
@@ -197,6 +228,32 @@ impl Store for SshStore {
             Some(ALREADY_EXISTS) => Ok(false),
             _ => Err(Self::failed("conditional write", &output)),
         }
+    }
+
+    /// Stream remote stdout rather than collecting `ssh` output in memory.
+    fn reader(&self, key: &str) -> Result<Box<dyn Read + '_>> {
+        if !self.exists(key)? {
+            return Err(StoreError::NotFound(key.to_string()));
+        }
+        let path = Self::quote(&self.path_for(key)?.to_string_lossy());
+        let mut child = self
+            .command(&format!(
+                "test -f {path} || exit {NOT_FOUND}; exec cat -- {path}"
+            ))
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|error| StoreError::Connection(error.to_string()))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| StoreError::Io("SSH stdout was unavailable".into()))?;
+        Ok(Box::new(SshReader {
+            child,
+            stdout,
+            finished: false,
+        }))
     }
 }
 

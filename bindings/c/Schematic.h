@@ -24,6 +24,16 @@ Schematic* Schematic_create(DiplomatStringView name);
 
 Schematic* Schematic_deep_clone(const Schematic* self);
 
+typedef struct Schematic_inspect_transform_plan_json_result {union { NucleationError err;}; bool is_ok;} Schematic_inspect_transform_plan_json_result;
+Schematic_inspect_transform_plan_json_result Schematic_inspect_transform_plan_json(const Schematic* self, DiplomatStringView plan_json, DiplomatWrite* write);
+
+typedef struct Schematic_apply_transform_plan_json_result {union { NucleationError err;}; bool is_ok;} Schematic_apply_transform_plan_json_result;
+Schematic_apply_transform_plan_json_result Schematic_apply_transform_plan_json(Schematic* self, DiplomatStringView plan_json, DiplomatWrite* write);
+
+void Schematic_canonicalize_json(Schematic* self, DiplomatWrite* write);
+
+void Schematic_inspect_registry_safe_json(const Schematic* self, DiplomatWrite* write);
+
 SchematicSplitResult* Schematic_split_connected_attach_nearby(const Schematic* self, uint32_t min_standalone_blocks, uint32_t max_air_gap);
 
 Dimensions Schematic_dimensions(const Schematic* self);
@@ -48,6 +58,9 @@ Schematic_open_result Schematic_open(DiplomatStringView path);
 
 typedef struct Schematic_from_data_result {union {Schematic* ok; NucleationError err;}; bool is_ok;} Schematic_from_data_result;
 Schematic_from_data_result Schematic_from_data(DiplomatU8View data);
+
+typedef struct Schematic_from_data_bounded_result {union {Schematic* ok; NucleationError err;}; bool is_ok;} Schematic_from_data_bounded_result;
+Schematic_from_data_bounded_result Schematic_from_data_bounded(DiplomatU8View data, DiplomatStringView limits_json);
 
 typedef struct Schematic_from_litematic_result {union {Schematic* ok; NucleationError err;}; bool is_ok;} Schematic_from_litematic_result;
 Schematic_from_litematic_result Schematic_from_litematic(DiplomatU8View data);
@@ -272,6 +285,10 @@ typedef struct Schematic_set_provenance_json_result {union { NucleationError err
 Schematic_set_provenance_json_result Schematic_set_provenance_json(Schematic* self, DiplomatStringView json);
 
 void Schematic_clear_provenance(Schematic* self);
+
+void Schematic_transformation_history_json(const Schematic* self, DiplomatWrite* write);
+
+void Schematic_clear_transformation_history(Schematic* self);
 
 void Schematic_flip_x(Schematic* self);
 

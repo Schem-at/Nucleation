@@ -26,8 +26,20 @@ impl SchematicImporter for StructureSnbtFormat {
         is_structure_snbt(data)
     }
 
+    fn detect_bounded(&self, data: &[u8], limits: &crate::formats::limits::DecodeLimits) -> bool {
+        from_structure_snbt_bounded(data, limits).is_ok()
+    }
+
     fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_structure_snbt(data)
+    }
+
+    fn read_bounded(
+        &self,
+        data: &[u8],
+        limits: &crate::formats::limits::DecodeLimits,
+    ) -> Result<UniversalSchematic> {
+        from_structure_snbt_bounded(data, limits)
     }
 }
 
@@ -177,6 +189,9 @@ pub fn is_structure_snbt(data: &[u8]) -> bool {
     let Ok(text) = std::str::from_utf8(data) else {
         return false;
     };
+    if preflight_snbt_text(text, &crate::formats::limits::DecodeLimits::default()).is_err() {
+        return false;
+    }
     let Ok(root) = quartz_nbt::snbt::parse(text) else {
         return false;
     };
@@ -188,14 +203,37 @@ pub fn is_structure_snbt(data: &[u8]) -> bool {
 }
 
 pub fn from_structure_snbt(data: &[u8]) -> Result<UniversalSchematic> {
+    from_structure_snbt_bounded(data, &crate::formats::limits::DecodeLimits::default())
+}
+
+pub fn from_structure_snbt_bounded(
+    data: &[u8],
+    limits: &crate::formats::limits::DecodeLimits,
+) -> Result<UniversalSchematic> {
+    limits.check_input(data)?;
     let text = std::str::from_utf8(data)
         .map_err(|error| FormatError::Parse(format!("structure SNBT is not UTF-8: {error}")))?;
+    preflight_snbt_text(text, limits)?;
     let root = quartz_nbt::snbt::parse(text)
         .map_err(|error| FormatError::Parse(format!("invalid structure SNBT: {error}")))?;
 
     let data_version = root.get::<_, i32>("DataVersion")?;
     let size = int_vec3(root.get::<_, &NbtList>("size")?, "size")?;
     checked_structure_volume(size)?;
+    limits.check_dimensions((i64::from(size.0), i64::from(size.1), i64::from(size.2)))?;
+
+    let palette = root.get::<_, &NbtList>("palette")?;
+    if palette.len() > limits.max_palette_entries {
+        return Err("palette limit exceeded".into());
+    }
+    let entries = root.get::<_, &NbtList>("data")?;
+    if entries.len() > limits.max_volume {
+        return Err("block-entry limit exceeded".into());
+    }
+    let entities = root.get::<_, &NbtList>("entities")?;
+    if entities.len() > limits.max_entities {
+        return Err("entity limit exceeded".into());
+    }
 
     let mut schematic = UniversalSchematic::new("Structure SNBT".to_string());
     schematic.metadata.mc_version = Some(data_version);
@@ -203,7 +241,6 @@ pub fn from_structure_snbt(data: &[u8]) -> Result<UniversalSchematic> {
     schematic.default_region =
         crate::region::Region::new(schematic.default_region_name.clone(), (0, 0, 0), size);
 
-    let entries = root.get::<_, &NbtList>("data")?;
     for (index, entry) in entries.iter().enumerate() {
         let NbtTag::Compound(entry) = entry else {
             return Err(format!("structure SNBT data[{index}] must be a compound").into());
@@ -211,7 +248,6 @@ pub fn from_structure_snbt(data: &[u8]) -> Result<UniversalSchematic> {
         import_block_entry(&mut schematic, entry, index, size)?;
     }
 
-    let entities = root.get::<_, &NbtList>("entities")?;
     for (index, entry) in entities.iter().enumerate() {
         let NbtTag::Compound(entry) = entry else {
             return Err(format!("structure SNBT entities[{index}] must be a compound").into());
@@ -219,7 +255,57 @@ pub fn from_structure_snbt(data: &[u8]) -> Result<UniversalSchematic> {
         import_entity_entry(&mut schematic, entry, index)?;
     }
 
+    limits.validate_schematic(&schematic)?;
     Ok(schematic)
+}
+
+fn preflight_snbt_text(text: &str, limits: &crate::formats::limits::DecodeLimits) -> Result<()> {
+    let mut depth = 0usize;
+    let mut nodes = 1usize;
+    let mut quote = None;
+    let mut escaped = false;
+    let mut string_bytes = 0usize;
+    for character in text.chars() {
+        if let Some(delimiter) = quote {
+            if escaped {
+                escaped = false;
+                string_bytes = string_bytes.saturating_add(character.len_utf8());
+            } else if character == '\\' {
+                escaped = true;
+            } else if character == delimiter {
+                quote = None;
+                string_bytes = 0;
+            } else {
+                string_bytes = string_bytes.saturating_add(character.len_utf8());
+                if string_bytes > limits.max_nbt_string_bytes {
+                    return Err("SNBT string limit exceeded".into());
+                }
+            }
+            continue;
+        }
+        match character {
+            '\'' | '"' => quote = Some(character),
+            '{' | '[' => {
+                depth = depth.saturating_add(1);
+                nodes = nodes.saturating_add(1);
+                if depth > limits.max_nbt_depth {
+                    return Err("SNBT depth limit exceeded".into());
+                }
+            }
+            '}' | ']' => depth = depth.saturating_sub(1),
+            ',' => {
+                nodes = nodes.saturating_add(1);
+                if nodes > limits.max_nbt_nodes {
+                    return Err("SNBT node limit exceeded".into());
+                }
+            }
+            _ => {}
+        }
+    }
+    if quote.is_some() || depth != 0 {
+        return Err("unterminated SNBT structure".into());
+    }
+    Ok(())
 }
 
 fn checked_structure_volume(size: (i32, i32, i32)) -> Result<usize> {

@@ -112,6 +112,68 @@ pub mod ffi {
             Box::new(Schematic(self.0.clone()))
         }
 
+        /// Inspect a versioned transform-plan JSON document without modifying
+        /// this schematic. Writes a deterministic audit-report JSON document.
+        pub fn inspect_transform_plan_json(
+            &self,
+            plan_json: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let plan =
+                crate::processing::TransformPlan::from_json(utf8(plan_json)?).map_err(|error| {
+                    crate::bridge::set_last_error_detail(error.to_string());
+                    NucleationError::InvalidArgument
+                })?;
+            let report = plan.inspect(&self.0).map_err(|error| {
+                crate::bridge::set_last_error_detail(error.to_string());
+                NucleationError::InvalidArgument
+            })?;
+            let _ = write!(out, "{}", report.to_json());
+            Ok(())
+        }
+
+        /// Atomically apply a versioned transform-plan JSON document. Policy
+        /// rejection is represented by `report.rejected == true` and leaves the
+        /// schematic unchanged; malformed plans raise `InvalidArgument`.
+        pub fn apply_transform_plan_json(
+            &mut self,
+            plan_json: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let plan =
+                crate::processing::TransformPlan::from_json(utf8(plan_json)?).map_err(|error| {
+                    crate::bridge::set_last_error_detail(error.to_string());
+                    NucleationError::InvalidArgument
+                })?;
+            let report = match plan.apply(&mut self.0) {
+                Ok(report) | Err(crate::processing::TransformError::Rejected(report)) => report,
+                Err(error) => {
+                    crate::bridge::set_last_error_detail(error.to_string());
+                    return Err(NucleationError::InvalidArgument);
+                }
+            };
+            let _ = write!(out, "{}", report.to_json());
+            Ok(())
+        }
+
+        /// Apply the bundled deterministic, lossless canonicalization preset.
+        pub fn canonicalize_json(&mut self, out: &mut DiplomatWrite) {
+            let report = crate::processing::TransformPlan::canonical()
+                .apply(&mut self.0)
+                .expect("the built-in canonical plan is valid and non-rejecting");
+            let _ = write!(out, "{}", report.to_json());
+        }
+
+        /// Inspect the bundled public-registry policy without modifying this
+        /// schematic. Applications should review `rejected` and `quarantined`
+        /// before choosing whether to call `apply_transform_plan_json`.
+        pub fn inspect_registry_safe_json(&self, out: &mut DiplomatWrite) {
+            let report = crate::processing::TransformPlan::registry_safe()
+                .inspect(&self.0)
+                .expect("the built-in registry-safe plan is valid");
+            let _ = write!(out, "{}", report.to_json());
+        }
+
         /// Split spatially independent machines while keeping nearby tiny
         /// detached parts with their machine. Components at least
         /// `min_standalone_blocks` large always remain independent; smaller
@@ -232,6 +294,31 @@ pub mod ffi {
                     }
                 }
             }
+        }
+
+        /// Decode untrusted bytes using a serialized `DecodeLimits` object.
+        /// Empty JSON selects the conservative library defaults. Limits are
+        /// enforced while decompressing/parsing and again before region
+        /// allocations are accepted.
+        pub fn from_data_bounded(
+            data: &[u8],
+            limits_json: &DiplomatStr,
+        ) -> Result<Box<Schematic>, NucleationError> {
+            let limits = if limits_json.is_empty() {
+                crate::formats::limits::DecodeLimits::default()
+            } else {
+                serde_json::from_str(utf8(limits_json)?)
+                    .map_err(|_| NucleationError::InvalidArgument)?
+            };
+            let manager = get_manager();
+            let manager = manager.lock().map_err(|_| NucleationError::Lock)?;
+            manager
+                .read_bounded(data, &limits)
+                .map(|schematic| Box::new(Schematic(schematic)))
+                .map_err(|error| {
+                    crate::bridge::set_last_error_detail(error.to_string());
+                    NucleationError::Parse
+                })
         }
 
         /// Build a schematic from Litematic data.
@@ -1522,6 +1609,21 @@ pub mod ffi {
         /// Remove embedded source provenance.
         pub fn clear_provenance(&mut self) {
             self.0.metadata.provenance = None;
+        }
+
+        /// Content-addressed processing history as a JSON array. This audit
+        /// trail is deliberately separate from immutable source provenance.
+        pub fn transformation_history_json(&self, out: &mut DiplomatWrite) {
+            let json = serde_json::to_string(&self.0.metadata.transformation_history)
+                .unwrap_or_else(|_| "[]".to_string());
+            let _ = write!(out, "{}", json);
+        }
+
+        /// Clear processing history without changing source provenance or
+        /// schematic content. Intended for callers constructing a new artifact
+        /// lineage, not for hiding registry audit records.
+        pub fn clear_transformation_history(&mut self) {
+            self.0.metadata.transformation_history.clear();
         }
 
         // --- Transformations ---

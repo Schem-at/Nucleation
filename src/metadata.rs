@@ -6,6 +6,30 @@ use std::collections::BTreeMap;
 pub const SCHEMATIC_PROVENANCE_VERSION: u32 = 1;
 /// On-disk NBT key used by every format that can carry custom metadata.
 pub const SCHEMATIC_PROVENANCE_NBT_KEY: &str = "NucleationProvenance";
+/// On-disk NBT key for processing history, kept separate from source provenance.
+pub const TRANSFORMATION_HISTORY_NBT_KEY: &str = "NucleationTransformationHistory";
+
+/// One applied, versioned processing plan. This deliberately contains no
+/// timestamp: deterministic transforms should produce deterministic metadata.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct TransformationRecord {
+    /// Transformation-record schema version.
+    pub schema_version: u32,
+    /// Schema version of the serialized plan that was applied.
+    #[serde(default)]
+    pub plan_schema_version: u32,
+    pub plan_name: String,
+    pub plan_id: String,
+    pub lossless: bool,
+    pub quarantined: bool,
+    #[serde(default)]
+    pub summary: BTreeMap<String, u64>,
+    /// Machine-readable checks performed when this history record was made.
+    /// Values are stable strings such as `passed`, `failed`, and
+    /// `not_applicable` so older readers can preserve unknown checks.
+    #[serde(default)]
+    pub verification: BTreeMap<String, String>,
+}
 
 /// Inclusive world-space bounds for extracted schematic content.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -130,6 +154,10 @@ pub struct Metadata {
     /// `NucleationProvenance` in their Metadata compound.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provenance: Option<SchematicProvenance>,
+    /// Applied processing plans. Source provenance remains immutable; this is
+    /// a separate append-only, content-addressed audit trail.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub transformation_history: Vec<TransformationRecord>,
     /// The Minecraft data version of the *file this schematic was loaded from*,
     /// captured by importers. Distinct from `mc_version` (which doubles as the
     /// export fallback). Drives forward-conversion to canonical on load and is
@@ -187,6 +215,7 @@ impl Metadata {
             mc_version,
             we_version,
             provenance: None,
+            transformation_history: Vec::new(),
             source_data_version: None,
             embedded_test: None,
             cell_contract: None,
@@ -223,6 +252,11 @@ impl Metadata {
         if let Some(provenance) = &self.provenance {
             if let Ok(json) = provenance.to_json() {
                 compound.insert(SCHEMATIC_PROVENANCE_NBT_KEY, NbtTag::String(json));
+            }
+        }
+        if !self.transformation_history.is_empty() {
+            if let Ok(json) = serde_json::to_string(&self.transformation_history) {
+                compound.insert(TRANSFORMATION_HISTORY_NBT_KEY, NbtTag::String(json));
             }
         }
 
@@ -275,6 +309,11 @@ impl Metadata {
             we_version,
         );
         metadata.provenance = provenance;
+        metadata.transformation_history = nbt
+            .get::<_, &str>(TRANSFORMATION_HISTORY_NBT_KEY)
+            .ok()
+            .and_then(|json| serde_json::from_str(json).ok())
+            .unwrap_or_default();
         Ok(metadata)
     }
 }

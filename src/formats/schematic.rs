@@ -1,16 +1,20 @@
 use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::fmt;
-use std::io::{BufReader, Read};
+#[cfg(test)]
+use std::io::BufReader;
+use std::io::Read;
 
 use crate::block_entity::BlockEntity;
 use crate::entity::Entity;
 use crate::formats::error::Result;
 use crate::region::Region;
 use crate::{BlockState, UniversalSchematic};
+#[cfg(test)]
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
+#[cfg(test)]
 use quartz_nbt::io::{read_nbt, Flavor};
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
 
@@ -52,10 +56,10 @@ impl fmt::Display for SchematicVersion {
 }
 
 pub fn is_schematic(data: &[u8]) -> bool {
-    // Decompress the data
-    let reader = BufReader::with_capacity(1 << 20, data); // 1 MiB buf
-    let mut gz = GzDecoder::new(reader);
-    let (root, _) = match read_nbt(&mut gz, Flavor::Uncompressed) {
+    let root = match crate::formats::limits::parse_gzip_nbt(
+        data,
+        &crate::formats::limits::DecodeLimits::default(),
+    ) {
         Ok(result) => result,
         Err(_) => {
             return false;
@@ -444,9 +448,14 @@ fn convert_palette_v2(palette: &Vec<BlockState>) -> (NbtCompound, i32) {
     (nbt_palette, max_id)
 }
 pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic> {
-    let reader = BufReader::with_capacity(1 << 20, data); // 1 MiB buf
-    let mut gz = GzDecoder::new(reader);
-    let (root, _) = read_nbt(&mut gz, Flavor::Uncompressed)?;
+    from_schematic_bounded(data, &crate::formats::limits::DecodeLimits::default())
+}
+
+pub fn from_schematic_bounded(
+    data: &[u8],
+    limits: &crate::formats::limits::DecodeLimits,
+) -> Result<UniversalSchematic> {
+    let root = crate::formats::limits::parse_gzip_nbt(data, limits)?;
 
     let schem = root.get::<_, &NbtCompound>("Schematic").unwrap_or(&root);
     let schem_version = schem.get::<_, i32>("Version")?;
@@ -502,12 +511,30 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic> {
     let width = schem.get::<_, i16>("Width")? as u32;
     let height = schem.get::<_, i16>("Height")? as u32;
     let length = schem.get::<_, i16>("Length")? as u32;
+    limits.check_dimensions((i64::from(width), i64::from(height), i64::from(length)))?;
 
     let block_container = if schem_version == 2 {
         schem
     } else {
         schem.get::<_, &NbtCompound>("Blocks")?
     };
+
+    let palette_len = block_container.get::<_, &NbtCompound>("Palette")?.len();
+    if palette_len > limits.max_palette_entries {
+        return Err("palette limit exceeded".into());
+    }
+    if block_container
+        .get::<_, &NbtList>("BlockEntities")
+        .is_ok_and(|values| values.len() > limits.max_block_entities)
+    {
+        return Err("block-entity limit exceeded".into());
+    }
+    if schem
+        .get::<_, &NbtList>("Entities")
+        .is_ok_and(|values| values.len() > limits.max_entities)
+    {
+        return Err("entity limit exceeded".into());
+    }
 
     let block_palette = parse_block_palette(block_container)?;
 
@@ -538,6 +565,7 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic> {
     }
 
     schematic.add_region(region);
+    limits.validate_schematic(&schematic)?;
     Ok(schematic)
 }
 
@@ -879,8 +907,20 @@ impl SchematicImporter for SchematicFormat {
         is_schematic(data)
     }
 
+    fn detect_bounded(&self, data: &[u8], limits: &crate::formats::limits::DecodeLimits) -> bool {
+        from_schematic_bounded(data, limits).is_ok()
+    }
+
     fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_schematic(data)
+    }
+
+    fn read_bounded(
+        &self,
+        data: &[u8],
+        limits: &crate::formats::limits::DecodeLimits,
+    ) -> Result<UniversalSchematic> {
+        from_schematic_bounded(data, limits)
     }
 }
 

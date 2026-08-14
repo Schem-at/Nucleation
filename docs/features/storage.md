@@ -50,3 +50,15 @@ source. Rectangle filtering happens before `get`, and one MCA is buffered at a
 time. This is the preferred compute/storage split: expand a compressed backup
 once on the storage node, then let workers fetch only the regions assigned to
 their shards rather than copying or loading the complete world.
+
+## Registry ingestion
+
+`RegistryPipeline` builds directly on `Store`: it streams one input key under
+an explicit byte ceiling, uses the bounded format readers, applies a
+serializable transformation plan, and routes the result to configured accept,
+quarantine, or reject prefixes. Accepted and quarantined builds are persisted
+as deterministic `.nusn` snapshots; every attempt also gets a stable JSON audit
+report. Rejections never write a schematic.
+
+See [Transformation and registry policies](transformation-policies.md) for the
+Rust API, built-in presets, declarative extension hooks, and Python JSON facade.

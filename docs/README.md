@@ -53,6 +53,9 @@ Each with a verified Python snippet:
   ([snippet](readme-snippets/17-world-generator-python.md))
 - [Embedded schematic provenance](features/schematic-provenance.md) — the
   shared source, world, map, dimension, and coordinate metadata contract
+- [Transformation and registry policies](features/transformation-policies.md)
+  — bounded decoding, normalization, content/UUID rules, audit history, and
+  storage-backed accept/quarantine/reject routing
 - [Block entities, entities & NBT](features/block-entities-nbt.md)
   ([snippet](readme-snippets/14-block-entities-nbt-python.md))
 - [Geodata](features/geo.md) — `Shape.polygon_prism`,

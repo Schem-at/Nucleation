@@ -43,6 +43,39 @@ public:
   inline std::unique_ptr<Schematic> deep_clone() const;
 
   /**
+   * Inspect a versioned transform-plan JSON document without modifying
+   * this schematic. Writes a deterministic audit-report JSON document.
+   */
+  inline diplomat::result<std::string, NucleationError> inspect_transform_plan_json(std::string_view plan_json) const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> inspect_transform_plan_json_write(std::string_view plan_json, W& writeable_output) const;
+
+  /**
+   * Atomically apply a versioned transform-plan JSON document. Policy
+   * rejection is represented by `report.rejected == true` and leaves the
+   * schematic unchanged; malformed plans raise `InvalidArgument`.
+   */
+  inline diplomat::result<std::string, NucleationError> apply_transform_plan_json(std::string_view plan_json);
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> apply_transform_plan_json_write(std::string_view plan_json, W& writeable_output);
+
+  /**
+   * Apply the bundled deterministic, lossless canonicalization preset.
+   */
+  inline std::string canonicalize_json();
+  template<typename W>
+  inline void canonicalize_json_write(W& writeable_output);
+
+  /**
+   * Inspect the bundled public-registry policy without modifying this
+   * schematic. Applications should review `rejected` and `quarantined`
+   * before choosing whether to call `apply_transform_plan_json`.
+   */
+  inline std::string inspect_registry_safe_json() const;
+  template<typename W>
+  inline void inspect_registry_safe_json_write(W& writeable_output) const;
+
+  /**
    * Split spatially independent machines while keeping nearby tiny
    * detached parts with their machine. Components at least
    * `min_standalone_blocks` large always remain independent; smaller
@@ -108,6 +141,14 @@ public:
    * no format was recognized.
    */
   inline static diplomat::result<std::unique_ptr<Schematic>, NucleationError> from_data(diplomat::span<const uint8_t> data);
+
+  /**
+   * Decode untrusted bytes using a serialized `DecodeLimits` object.
+   * Empty JSON selects the conservative library defaults. Limits are
+   * enforced while decompressing/parsing and again before region
+   * allocations are accepted.
+   */
+  inline static diplomat::result<std::unique_ptr<Schematic>, NucleationError> from_data_bounded(diplomat::span<const uint8_t> data, std::string_view limits_json);
 
   /**
    * Build a schematic from Litematic data.
@@ -692,6 +733,21 @@ public:
    * Remove embedded source provenance.
    */
   inline void clear_provenance();
+
+  /**
+   * Content-addressed processing history as a JSON array. This audit
+   * trail is deliberately separate from immutable source provenance.
+   */
+  inline std::string transformation_history_json() const;
+  template<typename W>
+  inline void transformation_history_json_write(W& writeable_output) const;
+
+  /**
+   * Clear processing history without changing source provenance or
+   * schematic content. Intended for callers constructing a new artifact
+   * lineage, not for hiding registry audit records.
+   */
+  inline void clear_transformation_history();
 
   /**
    * Mirror the default region along the X axis (in place). Block
