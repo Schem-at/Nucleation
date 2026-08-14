@@ -28,7 +28,9 @@ mod item;
 mod metadata;
 pub mod nbt;
 mod print_utils;
+pub mod processing;
 mod region;
+pub mod registry_pipeline;
 pub mod schematic_builder;
 pub mod sdf;
 pub mod selection;
@@ -104,9 +106,16 @@ pub use entity::{ArmorStandEquipment, Entity, NbtValue};
 #[cfg(not(target_arch = "wasm32"))]
 pub use formats::world_pack;
 pub use formats::{litematic, schematic, world_stream};
-pub use metadata::{ProvenanceBounds, SchematicProvenance};
+pub use metadata::{ProvenanceBounds, SchematicProvenance, TransformationRecord};
 pub use print_utils::{format_json_schematic, format_schematic};
+pub use processing::{
+    Action as PolicyAction, ContentPolicy, MaterialFamilyRule, MaterialProfile, TransformPlan,
+    TransformReport, TransformSpec, UuidIdentityBasis, UuidMode, UuidPolicy, UuidRepresentation,
+};
 pub use region::Region;
+pub use registry_pipeline::{
+    RegistryHookRule, RegistryIngestReport, RegistryPipeline, RegistryPipelineError, RegistryRoute,
+};
 pub use schematic_builder::{
     palettes, IoMarker, IoType as BuilderIoType, PaletteEntry, SchematicBuilder,
 };

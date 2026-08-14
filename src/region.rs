@@ -1218,6 +1218,88 @@ impl Region {
         self.palette.clone()
     }
 
+    /// Canonicalize this region's palette without changing any placed block.
+    ///
+    /// Property order is normalized, unused entries are removed, equivalent
+    /// states are deduplicated, air is index zero, and remaining states are
+    /// sorted by their canonical block string. Returns `(old_len, new_len,
+    /// rewritten_cells)`.
+    pub fn canonicalize_palette(&mut self) -> (usize, usize, usize) {
+        let old_len = self.palette.len();
+        let mut normalized = Vec::with_capacity(old_len);
+        for state in &self.palette {
+            let mut state = state.clone();
+            state
+                .properties
+                .sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+            normalized.push(state);
+        }
+
+        let air = BlockState::new("minecraft:air");
+        let mut used: Vec<BlockState> = self
+            .blocks
+            .iter()
+            .filter_map(|&index| normalized.get(index).cloned())
+            .collect();
+        used.push(air.clone());
+        used.sort_by(|a, b| {
+            let a_air = a.name == "minecraft:air";
+            let b_air = b.name == "minecraft:air";
+            b_air
+                .cmp(&a_air)
+                .then_with(|| a.to_string().cmp(&b.to_string()))
+        });
+        used.dedup();
+
+        let lookup: FxHashMap<BlockState, usize> = used
+            .iter()
+            .cloned()
+            .enumerate()
+            .map(|(index, state)| (state, index))
+            .collect();
+        let mut rewritten = 0;
+        for index in &mut self.blocks {
+            if let Some(state) = normalized.get(*index) {
+                let next = lookup[state];
+                if next != *index {
+                    rewritten += 1;
+                }
+                *index = next;
+            }
+        }
+        self.palette = used;
+        self.rebuild_palette_index();
+        self.rebuild_air_index();
+        self.rebuild_non_air_count();
+        (old_len, self.palette.len(), rewritten)
+    }
+
+    /// Rewrite every palette state through `map`, returning the number of
+    /// placed cells whose state changed. Equivalent results are compacted by
+    /// [`Region::canonicalize_palette`].
+    pub fn transform_palette_states<F>(&mut self, mut map: F) -> usize
+    where
+        F: FnMut(&BlockState) -> BlockState,
+    {
+        let next: Vec<BlockState> = self.palette.iter().map(&mut map).collect();
+        let changed_indices: Vec<bool> = self
+            .palette
+            .iter()
+            .zip(&next)
+            .map(|(before, after)| before != after)
+            .collect();
+        let changed_cells = self
+            .blocks
+            .iter()
+            .filter(|&&index| changed_indices.get(index).copied().unwrap_or(false))
+            .count();
+        self.palette = next;
+        self.rebuild_palette_index();
+        self.rebuild_air_index();
+        self.canonicalize_palette();
+        changed_cells
+    }
+
     pub(crate) fn get_palette_nbt(&self) -> NbtList {
         let mut palette = NbtList::new();
         for block in &self.palette {
@@ -1237,6 +1319,11 @@ impl Region {
 
     pub fn count_blocks(&self) -> usize {
         self.non_air_count
+    }
+
+    /// Number of canonical block states currently stored by this region.
+    pub fn palette_len(&self) -> usize {
+        self.palette.len()
     }
 
     pub fn get_palette_index(&self, block: &BlockState) -> Option<usize> {

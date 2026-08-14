@@ -21,3 +21,16 @@ from .design import (
     Gate as Gate,
     Style as Style,
 )
+from .processing import (
+    ContentPolicy as ContentPolicy,
+    DecodeLimits as DecodeLimits,
+    RegistryHookRule as RegistryHookRule,
+    RegistryPipelineConfig as RegistryPipelineConfig,
+    MaterialProfile as MaterialProfile,
+    TransformPlan as TransformPlan,
+    TransformReport as TransformReport,
+    UuidPolicy as UuidPolicy,
+    apply_transform as apply_transform,
+    decode_bounded as decode_bounded,
+    inspect_transform as inspect_transform,
+)

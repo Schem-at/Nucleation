@@ -27,6 +27,31 @@ export class Schematic {
     deepClone(): Schematic;
 
     /**
+     * Inspect a versioned transform-plan JSON document without modifying
+     * this schematic. Writes a deterministic audit-report JSON document.
+     */
+    inspectTransformPlanJson(planJson: string): string;
+
+    /**
+     * Atomically apply a versioned transform-plan JSON document. Policy
+     * rejection is represented by `report.rejected == true` and leaves the
+     * schematic unchanged; malformed plans raise `InvalidArgument`.
+     */
+    applyTransformPlanJson(planJson: string): string;
+
+    /**
+     * Apply the bundled deterministic, lossless canonicalization preset.
+     */
+    canonicalizeJson(): string;
+
+    /**
+     * Inspect the bundled public-registry policy without modifying this
+     * schematic. Applications should review `rejected` and `quarantined`
+     * before choosing whether to call `apply_transform_plan_json`.
+     */
+    inspectRegistrySafeJson(): string;
+
+    /**
      * Split spatially independent machines while keeping nearby tiny
      * detached parts with their machine. Components at least
      * `min_standalone_blocks` large always remain independent; smaller
@@ -60,6 +85,14 @@ export class Schematic {
      * no format was recognized.
      */
     static fromData(data: Array<number>): Schematic;
+
+    /**
+     * Decode untrusted bytes using a serialized `DecodeLimits` object.
+     * Empty JSON selects the conservative library defaults. Limits are
+     * enforced while decompressing/parsing and again before region
+     * allocations are accepted.
+     */
+    static fromDataBounded(data: Array<number>, limitsJson: string): Schematic;
 
     /**
      * Build a schematic from Litematic data.
@@ -574,6 +607,19 @@ export class Schematic {
      * Remove embedded source provenance.
      */
     clearProvenance(): void;
+
+    /**
+     * Content-addressed processing history as a JSON array. This audit
+     * trail is deliberately separate from immutable source provenance.
+     */
+    transformationHistoryJson(): string;
+
+    /**
+     * Clear processing history without changing source provenance or
+     * schematic content. Intended for callers constructing a new artifact
+     * lineage, not for hiding registry audit records.
+     */
+    clearTransformationHistory(): void;
 
     /**
      * Mirror the default region along the X axis (in place). Block

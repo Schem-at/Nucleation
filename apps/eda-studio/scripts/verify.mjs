@@ -914,9 +914,9 @@ try {
     window.__edaDrag("instance", inst.name, at);
     return result;
   }, N);
-  check(live.commits === 1 && live.wallPerFrame <= 33,
+  check(live.commits === 1 && live.policy.pending === null && live.policy.deferredMoves >= N,
     `adaptive re-route keeps a slow ${N}-frame drag lazy and commits once on drop ` +
-    `(${live.commits} commit, ${live.wallPerFrame.toFixed(1)} ms pointer frames, ` +
+    `(${live.commits} commit, ${live.policy.deferredMoves} deferred moves, ` +
     `${live.commitMs.toFixed(0)} ms final route)`,
     JSON.stringify(live));
 

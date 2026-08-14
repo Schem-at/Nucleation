@@ -27,6 +27,16 @@ namespace capi {
 
     diplomat::capi::Schematic* Schematic_deep_clone(const diplomat::capi::Schematic* self);
 
+    typedef struct Schematic_inspect_transform_plan_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_inspect_transform_plan_json_result;
+    Schematic_inspect_transform_plan_json_result Schematic_inspect_transform_plan_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView plan_json, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Schematic_apply_transform_plan_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_apply_transform_plan_json_result;
+    Schematic_apply_transform_plan_json_result Schematic_apply_transform_plan_json(diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView plan_json, diplomat::capi::DiplomatWrite* write);
+
+    void Schematic_canonicalize_json(diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
+
+    void Schematic_inspect_registry_safe_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
+
     diplomat::capi::SchematicSplitResult* Schematic_split_connected_attach_nearby(const diplomat::capi::Schematic* self, uint32_t min_standalone_blocks, uint32_t max_air_gap);
 
     diplomat::capi::Dimensions Schematic_dimensions(const diplomat::capi::Schematic* self);
@@ -51,6 +61,9 @@ namespace capi {
 
     typedef struct Schematic_from_data_result {union {diplomat::capi::Schematic* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_from_data_result;
     Schematic_from_data_result Schematic_from_data(diplomat::capi::DiplomatU8View data);
+
+    typedef struct Schematic_from_data_bounded_result {union {diplomat::capi::Schematic* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_from_data_bounded_result;
+    Schematic_from_data_bounded_result Schematic_from_data_bounded(diplomat::capi::DiplomatU8View data, diplomat::capi::DiplomatStringView limits_json);
 
     typedef struct Schematic_from_litematic_result {union {diplomat::capi::Schematic* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_from_litematic_result;
     Schematic_from_litematic_result Schematic_from_litematic(diplomat::capi::DiplomatU8View data);
@@ -276,6 +289,10 @@ namespace capi {
 
     void Schematic_clear_provenance(diplomat::capi::Schematic* self);
 
+    void Schematic_transformation_history_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
+
+    void Schematic_clear_transformation_history(diplomat::capi::Schematic* self);
+
     void Schematic_flip_x(diplomat::capi::Schematic* self);
 
     void Schematic_flip_y(diplomat::capi::Schematic* self);
@@ -429,6 +446,68 @@ inline std::unique_ptr<Schematic> Schematic::deep_clone() const {
     return std::unique_ptr<Schematic>(Schematic::FromFFI(result));
 }
 
+inline diplomat::result<std::string, NucleationError> Schematic::inspect_transform_plan_json(std::string_view plan_json) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Schematic_inspect_transform_plan_json(this->AsFFI(),
+        {plan_json.data(), plan_json.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Schematic::inspect_transform_plan_json_write(std::string_view plan_json, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Schematic_inspect_transform_plan_json(this->AsFFI(),
+        {plan_json.data(), plan_json.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Schematic::apply_transform_plan_json(std::string_view plan_json) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Schematic_apply_transform_plan_json(this->AsFFI(),
+        {plan_json.data(), plan_json.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Schematic::apply_transform_plan_json_write(std::string_view plan_json, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Schematic_apply_transform_plan_json(this->AsFFI(),
+        {plan_json.data(), plan_json.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline std::string Schematic::canonicalize_json() {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::Schematic_canonicalize_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void Schematic::canonicalize_json_write(W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::Schematic_canonicalize_json(this->AsFFI(),
+        &write);
+}
+
+inline std::string Schematic::inspect_registry_safe_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::Schematic_inspect_registry_safe_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void Schematic::inspect_registry_safe_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::Schematic_inspect_registry_safe_json(this->AsFFI(),
+        &write);
+}
+
 inline std::unique_ptr<SchematicSplitResult> Schematic::split_connected_attach_nearby(uint32_t min_standalone_blocks, uint32_t max_air_gap) const {
     auto result = diplomat::capi::Schematic_split_connected_attach_nearby(this->AsFFI(),
         min_standalone_blocks,
@@ -495,6 +574,12 @@ inline diplomat::result<std::unique_ptr<Schematic>, NucleationError> Schematic::
 
 inline diplomat::result<std::unique_ptr<Schematic>, NucleationError> Schematic::from_data(diplomat::span<const uint8_t> data) {
     auto result = diplomat::capi::Schematic_from_data({data.data(), data.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Ok<std::unique_ptr<Schematic>>(std::unique_ptr<Schematic>(Schematic::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Schematic>, NucleationError> Schematic::from_data_bounded(diplomat::span<const uint8_t> data, std::string_view limits_json) {
+    auto result = diplomat::capi::Schematic_from_data_bounded({data.data(), data.size()},
+        {limits_json.data(), limits_json.size()});
     return result.is_ok ? diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Ok<std::unique_ptr<Schematic>>(std::unique_ptr<Schematic>(Schematic::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
@@ -1448,6 +1533,24 @@ inline diplomat::result<std::monostate, NucleationError> Schematic::set_provenan
 
 inline void Schematic::clear_provenance() {
     diplomat::capi::Schematic_clear_provenance(this->AsFFI());
+}
+
+inline std::string Schematic::transformation_history_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::Schematic_transformation_history_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void Schematic::transformation_history_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::Schematic_transformation_history_json(this->AsFFI(),
+        &write);
+}
+
+inline void Schematic::clear_transformation_history() {
+    diplomat::capi::Schematic_clear_transformation_history(this->AsFFI());
 }
 
 inline void Schematic::flip_x() {

@@ -47,6 +47,7 @@ Every capability, with its own deep-dive doc:
 - [Chunk iteration, streaming, worlds](docs/features/streaming-and-worlds.md) — constant-memory pipelines and world I/O
 - [World segmentation](docs/features/world-segmentation.md) — a whole world into individual builds with provenance, deterministically
 - [Embedded schematic provenance](docs/features/schematic-provenance.md) — standardized world, map, dimension, coordinates, and source identity inside each build
+- [Transformation and content policies](docs/features/transformation-policies.md) — canonical palettes, material standards, entity/NBT rules, UUID rewriting, and registry-safe inspection
 - [Block entities, entities, NBT](docs/features/block-entities-nbt.md) — SNBT round-trips
 - [Redstone simulation](docs/features/redstone-simulation.md) — MCHPRS redpiler, typed circuit executors
 - [Tick simulation](docs/features/tick-simulation.md) — vanilla-accurate tick loop, verified against captures from the game

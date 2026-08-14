@@ -63,6 +63,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run tests
         run: cargo test
+      - name: Build untrusted-input fuzz targets
+        run: cargo check --manifest-path fuzz/Cargo.toml --bins
       - name: Build the bridge surface
         run: cargo build --lib --features bridge
 

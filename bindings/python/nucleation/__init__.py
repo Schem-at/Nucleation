@@ -37,3 +37,16 @@ from .curation import (  # noqa: F401 — pure-Python corpus curation layer
     write_registry_archives,
     write_top_owner_archives,
 )
+from .processing import (  # noqa: F401 — typed facade over the shared JSON policy contract
+    ContentPolicy,
+    DecodeLimits,
+    RegistryHookRule,
+    RegistryPipelineConfig,
+    MaterialProfile,
+    TransformPlan,
+    TransformReport,
+    UuidPolicy,
+    apply_transform,
+    decode_bounded,
+    inspect_transform,
+)

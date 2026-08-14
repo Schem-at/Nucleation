@@ -79,6 +79,109 @@ export class Schematic {
     }
 
     /**
+     * Inspect a versioned transform-plan JSON document without modifying
+     * this schematic. Writes a deterministic audit-report JSON document.
+     */
+    inspectTransformPlanJson(planJson) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const planJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, planJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Schematic_inspect_transform_plan_json(diplomatReceive.buffer, this.ffiValue, planJsonSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Atomically apply a versioned transform-plan JSON document. Policy
+     * rejection is represented by `report.rejected == true` and leaves the
+     * schematic unchanged; malformed plans raise `InvalidArgument`.
+     */
+    applyTransformPlanJson(planJson) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const planJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, planJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Schematic_apply_transform_plan_json(diplomatReceive.buffer, this.ffiValue, planJsonSlice.ptr, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Apply the bundled deterministic, lossless canonicalization preset.
+     */
+    canonicalizeJson() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Schematic_canonicalize_json(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * Inspect the bundled public-registry policy without modifying this
+     * schematic. Applications should review `rejected` and `quarantined`
+     * before choosing whether to call `apply_transform_plan_json`.
+     */
+    inspectRegistrySafeJson() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Schematic_inspect_registry_safe_json(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
      * Split spatially independent machines while keeping nearby tiny
      * detached parts with their machine. Components at least
      * `min_standalone_blocks` large always remain independent; smaller
@@ -188,6 +291,38 @@ export class Schematic {
 
 
         const result = wasm.Schematic_from_data(diplomatReceive.buffer, dataSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new Schematic(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Decode untrusted bytes using a serialized `DecodeLimits` object.
+     * Empty JSON selects the conservative library defaults. Limits are
+     * enforced while decompressing/parsing and again before region
+     * allocations are accepted.
+     */
+    static fromDataBounded(data, limitsJson) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const dataSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, data, "u8")));
+        const limitsJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, limitsJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_from_data_bounded(diplomatReceive.buffer, dataSlice.ptr, limitsJsonSlice.ptr);
 
         try {
             if (!diplomatReceive.resultFlag) {
@@ -2259,6 +2394,40 @@ export class Schematic {
      */
     clearProvenance() {
     wasm.Schematic_clear_provenance(this.ffiValue);
+
+        try {}
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * Content-addressed processing history as a JSON array. This audit
+     * trail is deliberately separate from immutable source provenance.
+     */
+    transformationHistoryJson() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Schematic_transformation_history_json(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * Clear processing history without changing source provenance or
+     * schematic content. Intended for callers constructing a new artifact
+     * lineage, not for hiding registry audit records.
+     */
+    clearTransformationHistory() {
+    wasm.Schematic_clear_transformation_history(this.ffiValue);
 
         try {}
 

@@ -319,7 +319,7 @@ fn snapshot_header_format() {
     assert_eq!(&bytes[0..4], b"NUSN", "magic mismatch");
     assert_eq!(
         u32::from_le_bytes(bytes[4..8].try_into().unwrap()),
-        2,
+        3,
         "version mismatch"
     );
 }

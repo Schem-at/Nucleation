@@ -1,11 +1,23 @@
 use crate::formats::error::Result;
+use crate::formats::limits::DecodeLimits;
 use crate::universal_schematic::UniversalSchematic;
 use std::sync::{Arc, Mutex, OnceLock};
 
 pub trait SchematicImporter: Send + Sync {
     fn name(&self) -> String;
     fn detect(&self, data: &[u8]) -> bool;
+    /// Allocation-bounded detection for untrusted inputs. Importers whose
+    /// normal detector parses or decompresses data must override this method.
+    fn detect_bounded(&self, data: &[u8], limits: &DecodeLimits) -> bool {
+        limits.check_input(data).is_ok() && self.detect(data)
+    }
     fn read(&self, data: &[u8]) -> Result<UniversalSchematic>;
+    fn read_bounded(&self, data: &[u8], limits: &DecodeLimits) -> Result<UniversalSchematic> {
+        limits.check_input(data)?;
+        let schematic = self.read(data)?;
+        limits.validate_schematic(&schematic)?;
+        Ok(schematic)
+    }
     fn read_with_settings(
         &self,
         data: &[u8],
@@ -75,10 +87,44 @@ impl FormatManager {
         None
     }
 
+    /// Detect an untrusted format without bypassing caller allocation limits.
+    pub fn detect_format_bounded(&self, data: &[u8], limits: &DecodeLimits) -> Option<String> {
+        self.importers
+            .iter()
+            .find(|importer| importer.detect_bounded(data, limits))
+            .map(|importer| importer.name())
+    }
+
     pub fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         for importer in &self.importers {
             if importer.detect(data) {
                 return importer.read(data);
+            }
+        }
+        Err("Unknown or unsupported schematic format".into())
+    }
+
+    /// Decode untrusted data through explicit byte, NBT, dimension, volume,
+    /// palette, and entity allocation limits.
+    pub fn read_bounded(&self, data: &[u8], limits: &DecodeLimits) -> Result<UniversalSchematic> {
+        self.read_bounded_with_format(data, limits)
+            .map(|(_, schematic)| schematic)
+    }
+
+    /// Bounded decode plus the importer name selected by the same detection
+    /// pass. This avoids callers performing a separate untrusted detection.
+    pub fn read_bounded_with_format(
+        &self,
+        data: &[u8],
+        limits: &DecodeLimits,
+    ) -> Result<(String, UniversalSchematic)> {
+        limits.check_input(data)?;
+        for importer in &self.importers {
+            if importer.detect_bounded(data, limits) {
+                let name = importer.name();
+                return importer
+                    .read_bounded(data, limits)
+                    .map(|schematic| (name, schematic));
             }
         }
         Err("Unknown or unsupported schematic format".into())

@@ -24,8 +24,11 @@ ROOT="$PWD"
 # meshing is named explicitly so the intent survives a bridge-full edit.
 CANON="bridge-full,routing,hdl,meshing"
 
-# Exhaustive sim suites are 256- and 3040-case loops. They are a merge gate,
-# not an iteration cost. `full` sets EDA_EXHAUSTIVE=1; every other tier samples.
+# Exhaustive sim suites cover complete four-bit truth tables. Production-width
+# generators also receive structural audits, because an exhaustive eight-bit
+# physical ALU would require 524,288 slow simulation cases. They are a merge
+# gate, not an iteration cost. `full` sets EDA_EXHAUSTIVE=1; every other tier
+# samples.
 SAMPLE_CASES="${EDA_SAMPLE_CASES:-24}"
 
 # A plain string, not an array: macOS ships bash 3.2, where expanding an empty
@@ -131,8 +134,12 @@ tier_pre_land() {
     fi
     echo "port $port is free"' || true
 
-  step "studio: headless verify" bash -c \
-    'cd apps/eda-studio && { [ -d node_modules ] || npm ci; }; npm run verify' || true
+  step "studio: wasm engine" env \
+    NUCLEATION_WASM_FEATURES="bridge,simulation,mc-tick,routing,hdl,meshing" \
+    ./tools/package-npm.sh dist/npm-eda || true
+
+  step "studio: build + headless verify" bash -c \
+    'cd apps/eda-studio && { [ -d node_modules ] || npm ci; }; npm run build && npm run verify' || true
 
   step "python demo smoke" ./examples/bridge_smoke/python/run.sh || true
 }
@@ -158,13 +165,17 @@ tier_full() {
 
   step "routing check suite"      ./tools/check_routing.sh || true
 
-  # Exhaustive sim suites — the 256/256 and 3040-check loops, unsampled.
-  # No --quick, no --cases: every script defaults to exhaustive, and that is
-  # the point of this tier. Do not add sampling flags here.
+  # Exhaustive sim suites. Pin the scalable generators to four bits so every
+  # input combination is checked in finite CI time, then audit production-size
+  # geometry separately. Never invoke build_alu.py/build_ppa.py with their
+  # larger defaults and no --cases: that is 524,288 ALU cases at 8 bits and an
+  # effectively unbounded truth table at the PPA's 32-bit default.
   step "sim: adder exhaustive"    python3 redstone-eda/build_adder.py || true
   step "sim: rca exhaustive"      python3 redstone-eda/rca_cells.py || true
-  step "sim: alu exhaustive"      python3 redstone-eda/build_alu.py || true
-  step "sim: ppa exhaustive"      python3 redstone-eda/build_ppa.py || true
+  step "sim: alu 4-bit exhaustive" python3 redstone-eda/build_alu.py --width 4 || true
+  step "audit: alu 8-bit structure" python3 redstone-eda/build_alu.py --width 8 --no-sim || true
+  step "sim: ppa 4-bit exhaustive" python3 redstone-eda/build_ppa.py --width 4 || true
+  step "audit: ppa 32-bit structure" python3 redstone-eda/build_ppa.py --width 32 --no-sim || true
   step "sim: genlib cells"        python3 redstone-eda/genlib_map.py --cells || true
   for d in seg7 cmp4 popcnt4; do
     step "sim: genlib $d"         python3 redstone-eda/genlib_map.py --design "$d" || true
@@ -175,7 +186,8 @@ tier_full() {
   # Wheel + npm rebuild. Only the bridge surface affects these; the guards in
   # package-npm.sh make a no-op rebuild cheap.
   step "npm package (wasm)"       ./tools/package-npm.sh dist/npm || true
-  step "python wheel"             bash -c 'cd bindings/python && maturin build --release' || true
+  step "python wheel"             python3 -m build --wheel bindings/python \
+    --outdir target/python-wheels || true
 
   # Everything CI gates on: bindings freshness/determinism, coverage, smokes.
   step "prepush gates"            python3 tools/prepush.py || true

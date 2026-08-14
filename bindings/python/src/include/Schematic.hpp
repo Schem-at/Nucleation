@@ -27,6 +27,16 @@ namespace capi {
 
     nucleation::capi::Schematic* Schematic_deep_clone(const nucleation::capi::Schematic* self);
 
+    typedef struct Schematic_inspect_transform_plan_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_inspect_transform_plan_json_result;
+    Schematic_inspect_transform_plan_json_result Schematic_inspect_transform_plan_json(const nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatStringView plan_json, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Schematic_apply_transform_plan_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_apply_transform_plan_json_result;
+    Schematic_apply_transform_plan_json_result Schematic_apply_transform_plan_json(nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatStringView plan_json, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    void Schematic_canonicalize_json(nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    void Schematic_inspect_registry_safe_json(const nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
     nucleation::capi::SchematicSplitResult* Schematic_split_connected_attach_nearby(const nucleation::capi::Schematic* self, uint32_t min_standalone_blocks, uint32_t max_air_gap);
 
     nucleation::capi::Dimensions Schematic_dimensions(const nucleation::capi::Schematic* self);
@@ -51,6 +61,9 @@ namespace capi {
 
     typedef struct Schematic_from_data_result {union {nucleation::capi::Schematic* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_from_data_result;
     Schematic_from_data_result Schematic_from_data(nucleation::diplomat::capi::DiplomatU8View data);
+
+    typedef struct Schematic_from_data_bounded_result {union {nucleation::capi::Schematic* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_from_data_bounded_result;
+    Schematic_from_data_bounded_result Schematic_from_data_bounded(nucleation::diplomat::capi::DiplomatU8View data, nucleation::diplomat::capi::DiplomatStringView limits_json);
 
     typedef struct Schematic_from_litematic_result {union {nucleation::capi::Schematic* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_from_litematic_result;
     Schematic_from_litematic_result Schematic_from_litematic(nucleation::diplomat::capi::DiplomatU8View data);
@@ -276,6 +289,10 @@ namespace capi {
 
     void Schematic_clear_provenance(nucleation::capi::Schematic* self);
 
+    void Schematic_transformation_history_json(const nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    void Schematic_clear_transformation_history(nucleation::capi::Schematic* self);
+
     void Schematic_flip_x(nucleation::capi::Schematic* self);
 
     void Schematic_flip_y(nucleation::capi::Schematic* self);
@@ -429,6 +446,68 @@ inline std::unique_ptr<nucleation::Schematic> nucleation::Schematic::deep_clone(
     return std::unique_ptr<nucleation::Schematic>(nucleation::Schematic::FromFFI(result));
 }
 
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Schematic::inspect_transform_plan_json(std::string_view plan_json) const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::Schematic_inspect_transform_plan_json(this->AsFFI(),
+        {plan_json.data(), plan_json.size()},
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Schematic::inspect_transform_plan_json_write(std::string_view plan_json, W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::Schematic_inspect_transform_plan_json(this->AsFFI(),
+        {plan_json.data(), plan_json.size()},
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Schematic::apply_transform_plan_json(std::string_view plan_json) {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::Schematic_apply_transform_plan_json(this->AsFFI(),
+        {plan_json.data(), plan_json.size()},
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Schematic::apply_transform_plan_json_write(std::string_view plan_json, W& writeable) {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::Schematic_apply_transform_plan_json(this->AsFFI(),
+        {plan_json.data(), plan_json.size()},
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline std::string nucleation::Schematic::canonicalize_json() {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::Schematic_canonicalize_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void nucleation::Schematic::canonicalize_json_write(W& writeable) {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::Schematic_canonicalize_json(this->AsFFI(),
+        &write);
+}
+
+inline std::string nucleation::Schematic::inspect_registry_safe_json() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::Schematic_inspect_registry_safe_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void nucleation::Schematic::inspect_registry_safe_json_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::Schematic_inspect_registry_safe_json(this->AsFFI(),
+        &write);
+}
+
 inline std::unique_ptr<nucleation::SchematicSplitResult> nucleation::Schematic::split_connected_attach_nearby(uint32_t min_standalone_blocks, uint32_t max_air_gap) const {
     auto result = nucleation::capi::Schematic_split_connected_attach_nearby(this->AsFFI(),
         min_standalone_blocks,
@@ -495,6 +574,12 @@ inline nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucl
 
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError> nucleation::Schematic::from_data(nucleation::diplomat::span<const uint8_t> data) {
     auto result = nucleation::capi::Schematic_from_data({data.data(), data.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Schematic>>(std::unique_ptr<nucleation::Schematic>(nucleation::Schematic::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError> nucleation::Schematic::from_data_bounded(nucleation::diplomat::span<const uint8_t> data, std::string_view limits_json) {
+    auto result = nucleation::capi::Schematic_from_data_bounded({data.data(), data.size()},
+        {limits_json.data(), limits_json.size()});
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Schematic>>(std::unique_ptr<nucleation::Schematic>(nucleation::Schematic::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
@@ -1448,6 +1533,24 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
 
 inline void nucleation::Schematic::clear_provenance() {
     nucleation::capi::Schematic_clear_provenance(this->AsFFI());
+}
+
+inline std::string nucleation::Schematic::transformation_history_json() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::Schematic_transformation_history_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void nucleation::Schematic::transformation_history_json_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::Schematic_transformation_history_json(this->AsFFI(),
+        &write);
+}
+
+inline void nucleation::Schematic::clear_transformation_history() {
+    nucleation::capi::Schematic_clear_transformation_history(this->AsFFI());
 }
 
 inline void nucleation::Schematic::flip_x() {

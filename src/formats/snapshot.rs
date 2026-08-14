@@ -1,14 +1,14 @@
 use crate::definition_region::DefinitionRegion;
 use crate::formats::error::Result;
 use crate::formats::manager::{SchematicExporter, SchematicImporter};
-use crate::metadata::{Metadata, SchematicProvenance};
+use crate::metadata::{Metadata, SchematicProvenance, TransformationRecord};
 use crate::universal_schematic::UniversalSchematic;
 use crate::Region;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 const MAGIC: &[u8; 4] = b"NUSN";
-const VERSION: u32 = 2;
+const VERSION: u32 = 3;
 
 /// The metadata layout written by snapshot version 1. Keep this separate from
 /// [`Metadata`]: bincode structs are positional, so adding a field to the live
@@ -51,9 +51,34 @@ struct SnapshotMetadataV2 {
     provenance_json: Option<String>,
 }
 
-#[derive(Serialize)]
-struct SnapshotV2Ref<'a> {
+#[derive(Deserialize)]
+struct SnapshotV2 {
     metadata: SnapshotMetadataV2,
+    default_region: Region,
+    other_regions: HashMap<String, Region>,
+    default_region_name: String,
+    definition_regions: HashMap<String, DefinitionRegion>,
+}
+
+/// Version 3 adds transformation history without changing the positional v2
+/// wire type, so existing snapshots remain readable.
+#[derive(Serialize, Deserialize)]
+struct SnapshotMetadataV3 {
+    name: Option<String>,
+    author: Option<String>,
+    description: Option<String>,
+    created: Option<u64>,
+    modified: Option<u64>,
+    lm_version: Option<i32>,
+    mc_version: Option<i32>,
+    we_version: Option<i32>,
+    provenance_json: Option<String>,
+    transformation_history_json: Option<String>,
+}
+
+#[derive(Serialize)]
+struct SnapshotV3Ref<'a> {
+    metadata: SnapshotMetadataV3,
     default_region: &'a Region,
     other_regions: &'a HashMap<String, Region>,
     default_region_name: &'a str,
@@ -61,8 +86,8 @@ struct SnapshotV2Ref<'a> {
 }
 
 #[derive(Deserialize)]
-struct SnapshotV2 {
-    metadata: SnapshotMetadataV2,
+struct SnapshotV3 {
+    metadata: SnapshotMetadataV3,
     default_region: Region,
     other_regions: HashMap<String, Region>,
     default_region_name: String,
@@ -82,6 +107,14 @@ impl SchematicImporter for SnapshotFormat {
 
     fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_snapshot(data)
+    }
+
+    fn read_bounded(
+        &self,
+        data: &[u8],
+        limits: &crate::formats::limits::DecodeLimits,
+    ) -> Result<UniversalSchematic> {
+        from_snapshot_bounded(data, limits)
     }
 }
 
@@ -114,8 +147,15 @@ pub fn to_snapshot(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
         .as_ref()
         .map(serde_json::to_string)
         .transpose()?;
-    let snapshot = SnapshotV2Ref {
-        metadata: SnapshotMetadataV2 {
+    let transformation_history_json = if schematic.metadata.transformation_history.is_empty() {
+        None
+    } else {
+        Some(serde_json::to_string(
+            &schematic.metadata.transformation_history,
+        )?)
+    };
+    let snapshot = SnapshotV3Ref {
+        metadata: SnapshotMetadataV3 {
             name: schematic.metadata.name.clone(),
             author: schematic.metadata.author.clone(),
             description: schematic.metadata.description.clone(),
@@ -125,6 +165,7 @@ pub fn to_snapshot(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
             mc_version: schematic.metadata.mc_version,
             we_version: schematic.metadata.we_version,
             provenance_json,
+            transformation_history_json,
         },
         default_region: &schematic.default_region,
         other_regions: &schematic.other_regions,
@@ -140,6 +181,16 @@ pub fn to_snapshot(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
 }
 
 pub fn from_snapshot(data: &[u8]) -> Result<UniversalSchematic> {
+    from_snapshot_bounded(data, &crate::formats::limits::DecodeLimits::default())
+}
+
+pub fn from_snapshot_bounded(
+    data: &[u8],
+    limits: &crate::formats::limits::DecodeLimits,
+) -> Result<UniversalSchematic> {
+    use bincode::Options;
+
+    limits.check_input(data)?;
     if data.len() < 8 {
         return Err("Snapshot data too short".into());
     }
@@ -147,9 +198,16 @@ pub fn from_snapshot(data: &[u8]) -> Result<UniversalSchematic> {
         return Err("Invalid snapshot magic bytes".into());
     }
     let version = u32::from_le_bytes(data[4..8].try_into()?);
+    let options = || {
+        bincode::DefaultOptions::new()
+            .with_fixint_encoding()
+            .allow_trailing_bytes()
+            .with_limit(limits.max_decompressed_bytes as u64)
+    };
     let mut schematic = match version {
-        1 => schematic_from_v1(bincode::deserialize(&data[8..])?),
-        VERSION => schematic_from_v2(bincode::deserialize(&data[8..])?)?,
+        1 => schematic_from_v1(options().deserialize(&data[8..])?),
+        2 => schematic_from_v2(options().deserialize(&data[8..])?)?,
+        VERSION => schematic_from_v3(options().deserialize(&data[8..])?)?,
         _ => return Err(format!("Unsupported snapshot version: {}", version).into()),
     };
 
@@ -159,6 +217,7 @@ pub fn from_snapshot(data: &[u8]) -> Result<UniversalSchematic> {
         rebuild_region(region);
     }
 
+    limits.validate_schematic(&schematic)?;
     Ok(schematic)
 }
 
@@ -173,6 +232,7 @@ fn metadata_from_v1(metadata: SnapshotMetadataV1) -> Metadata {
         mc_version: metadata.mc_version,
         we_version: metadata.we_version,
         provenance: None,
+        transformation_history: Vec::new(),
         source_data_version: None,
         embedded_test: None,
         cell_contract: None,
@@ -222,6 +282,45 @@ fn schematic_from_v2(snapshot: SnapshotV2) -> Result<UniversalSchematic> {
         mc_version: snapshot.metadata.mc_version,
         we_version: snapshot.metadata.we_version,
         provenance,
+        transformation_history: Vec::new(),
+        source_data_version: None,
+        embedded_test: None,
+        cell_contract: None,
+    };
+    Ok(schematic_from_parts(
+        metadata,
+        snapshot.default_region,
+        snapshot.other_regions,
+        snapshot.default_region_name,
+        snapshot.definition_regions,
+    ))
+}
+
+fn schematic_from_v3(snapshot: SnapshotV3) -> Result<UniversalSchematic> {
+    let provenance = snapshot
+        .metadata
+        .provenance_json
+        .as_deref()
+        .map(serde_json::from_str::<SchematicProvenance>)
+        .transpose()?;
+    let transformation_history = snapshot
+        .metadata
+        .transformation_history_json
+        .as_deref()
+        .map(serde_json::from_str::<Vec<TransformationRecord>>)
+        .transpose()?
+        .unwrap_or_default();
+    let metadata = Metadata {
+        name: snapshot.metadata.name,
+        author: snapshot.metadata.author,
+        description: snapshot.metadata.description,
+        created: snapshot.metadata.created,
+        modified: snapshot.metadata.modified,
+        lm_version: snapshot.metadata.lm_version,
+        mc_version: snapshot.metadata.mc_version,
+        we_version: snapshot.metadata.we_version,
+        provenance,
+        transformation_history,
         source_data_version: None,
         embedded_test: None,
         cell_contract: None,

@@ -34,6 +34,56 @@ final class Schematic {
         return new Schematic($ret, true);
     }
 
+    public function inspectTransformPlanJson(string $plan_json) {
+        $__n0 = strlen($plan_json);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $plan_json, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Schematic_inspect_transform_plan_json($this->ptr, $__view0, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function applyTransformPlanJson(string $plan_json) {
+        $__n0 = strlen($plan_json);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $plan_json, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Schematic_apply_transform_plan_json($this->ptr, $__view0, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function canonicalizeJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->Schematic_canonicalize_json($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function inspectRegistrySafeJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->Schematic_inspect_registry_safe_json($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function splitConnectedAttachNearby( $min_standalone_blocks,  $max_air_gap) {
         $ret = Lib::ffi()->Schematic_split_connected_attach_nearby($this->ptr, $min_standalone_blocks, $max_air_gap);
         return new SchematicSplitResult($ret, true);
@@ -153,6 +203,34 @@ final class Schematic {
         }
         $__view0->len = $__n0;
         $result = Lib::ffi()->Schematic_from_data($__view0);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Schematic($result->ok, true);
+    }
+
+    public static function fromDataBounded(array $data, string $limits_json) {
+        $__n0 = count($data);
+        $__view0 = Lib::ffi()->new('DiplomatU8View');
+        if ($__n0 > 0) {
+            $__arr0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            foreach ($data as $__i0 => $__v0) { $__arr0[$__i0] = $__v0; }
+            $__view0->data = \FFI::addr($__arr0[0]);
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $__n1 = strlen($limits_json);
+        $__view1 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n1 > 0) {
+            $__buf1 = Lib::ffi()->new("uint8_t[" . $__n1 . "]", false);
+            \FFI::memcpy($__buf1, $limits_json, $__n1);
+            $__view1->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf1[0]));
+        } else {
+            $__view1->data = null;
+        }
+        $__view1->len = $__n1;
+        $result = Lib::ffi()->Schematic_from_data_bounded($__view0, $__view1);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }
@@ -1194,6 +1272,16 @@ final class Schematic {
 
     public function clearProvenance() {
         Lib::ffi()->Schematic_clear_provenance($this->ptr);
+    }
+
+    public function transformationHistoryJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->Schematic_transformation_history_json($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function clearTransformationHistory() {
+        Lib::ffi()->Schematic_clear_transformation_history($this->ptr);
     }
 
     public function flipX() {

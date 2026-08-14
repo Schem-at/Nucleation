@@ -144,8 +144,21 @@ impl SchematicImporter for McaFormat {
         is_mca(data)
     }
 
+    fn detect_bounded(&self, data: &[u8], limits: &crate::formats::limits::DecodeLimits) -> bool {
+        limits.check_input(data).is_ok() && is_mca(data)
+    }
+
     fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_mca(data)
+    }
+
+    fn read_bounded(
+        &self,
+        data: &[u8],
+        limits: &crate::formats::limits::DecodeLimits,
+    ) -> Result<UniversalSchematic> {
+        limits.check_input(data)?;
+        Err("bounded MCA ingestion requires the world-segment streaming API and explicit world bounds".into())
     }
 
     fn read_with_settings(
@@ -181,8 +194,21 @@ impl SchematicImporter for WorldZipFormat {
         is_world_zip(data)
     }
 
+    fn detect_bounded(&self, data: &[u8], limits: &crate::formats::limits::DecodeLimits) -> bool {
+        limits.check_input(data).is_ok() && data.starts_with(b"PK\x03\x04")
+    }
+
     fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_world_zip(data)
+    }
+
+    fn read_bounded(
+        &self,
+        data: &[u8],
+        limits: &crate::formats::limits::DecodeLimits,
+    ) -> Result<UniversalSchematic> {
+        limits.check_input(data)?;
+        Err("bounded world ZIP ingestion requires the world-segment streaming API and explicit world bounds".into())
     }
 
     fn read_with_settings(
