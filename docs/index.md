@@ -7,7 +7,10 @@ hide:
 <section class="bb-hero">
   <div class="bb-hero__copy">
     <p class="bb-address">docs/index.md <span>·</span> crate 0.10.13</p>
-    <h1>Built volume,<br>under program control.</h1>
+    <h1>
+      <span>Minecraft, treated as</span>
+      <span>programmable matter.</span>
+    </h1>
     <p class="bb-lede">
       Nucleation reads, writes, builds, simulates, meshes, and renders Minecraft
       schematics. Rust is the implementation. Six generated bindings expose the
