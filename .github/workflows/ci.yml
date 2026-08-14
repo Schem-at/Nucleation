@@ -356,8 +356,17 @@ jobs:
           print("manylinux wheel functional check OK")
           EOF
           wheel-test-venv/bin/python -m mypy --strict bindings/python/tests/typecheck_api.py
-          wheel-test-venv/bin/python -m pyright bindings/python/tests/typecheck_api.py
+          # The Python wrapper does not automatically tell Pyright which
+          # interpreter launched it. Point resolution at the wheel-test venv
+          # so this cannot accidentally inspect a runner-global installation.
           wheel-test-venv/bin/python -m pyright \
+            --pythonpath wheel-test-venv/bin/python \
+            bindings/python/tests/typecheck_api.py
+          wheel-test-venv/bin/python -m pyright \
+            --pythonpath wheel-test-venv/bin/python \
+            wheel-test-venv/lib/python3.12/site-packages/nucleation/__init__.pyi
+          wheel-test-venv/bin/python -m pyright \
+            --pythonpath wheel-test-venv/bin/python \
             wheel-test-venv/lib/python3.12/site-packages/nucleation/nucleation.pyi
       - uses: actions/upload-artifact@v4
         with:

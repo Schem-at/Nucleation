@@ -86,8 +86,10 @@ target_link_libraries(nucleation PUBLIC nucleation_rust ${Python3_SABI_LIBRARY})
 
 # Generate type information from nanobind's structured signatures. The
 # extension is a top-level module in the build tree and becomes the
-# `nucleation.nucleation` submodule when installed below, so the generated
-# `nucleation.pyi` is installed beside it inside the veneer package.
+# `nucleation.nucleation` submodule when installed below. Keep that native
+# stub beside the extension, and also compose a package-level `__init__.pyi`
+# with explicit aliases. A wildcard-only re-export is understood by Mypy but
+# not consistently by Pyright when the source is a native submodule.
 nanobind_add_stub(
   nucleation_stub
   MODULE nucleation
@@ -102,6 +104,8 @@ add_custom_target(
     "${Python_EXECUTABLE}"
     "${CMAKE_CURRENT_SOURCE_DIR}/normalize_stub.py"
     "${CMAKE_CURRENT_BINARY_DIR}/nucleation.pyi"
+    "${CMAKE_CURRENT_BINARY_DIR}/__init__.pyi"
+    "${CMAKE_CURRENT_SOURCE_DIR}/nucleation/__init__.pyi"
   DEPENDS nucleation_stub
   VERBATIM
 )
@@ -114,6 +118,7 @@ install(TARGETS nucleation LIBRARY DESTINATION nucleation)
 install(
   FILES
     "${CMAKE_CURRENT_BINARY_DIR}/nucleation.pyi"
+    "${CMAKE_CURRENT_BINARY_DIR}/__init__.pyi"
     "${CMAKE_CURRENT_BINARY_DIR}/py.typed"
   DESTINATION nucleation
 )

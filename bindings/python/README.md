@@ -5,7 +5,10 @@ diff, fingerprint, and generate schematics from Python.
 
 Wheels are published for CPython 3.12+ (stable ABI) on Linux, macOS, and Windows.
 They include a `py.typed` marker and generated `.pyi` stubs for Mypy, Pyright,
-and editor completion.
+and editor completion. The installed package-level `__init__.pyi` explicitly
+re-exports every generated native type, followed by the hand-written veneer
+types; this keeps package exports equally visible to Mypy and Pyright while
+preserving the native classes' type identities.
 
 ## Install
 
