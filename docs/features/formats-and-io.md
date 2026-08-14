@@ -29,7 +29,7 @@ strings, start with [Basics](basics.md).
 | **Bedrock structure** | `.mcstructure` | yes | yes | `mcstructure` | Java block IDs and states are translated through GeyserMC mappings |
 | **Java structure SNBT source** | `.snbt` | yes | yes | `structure_snbt` | Human-readable structure source used by data packs, mod tooling, guides, and GameTest suites |
 | **Nucleation snapshot** | `.nusn` | yes | yes | `snapshot` | Fast, uncompressed internal interchange format |
-| **Legacy MCEdit** | `.schematic` | yes | no | — | Pre-Flattening numeric IDs; import only |
+| **Legacy MCEdit** | `.schematic` | yes | no | n/a | Pre-Flattening numeric IDs; import only |
 
 Use `.schem` for Sponge output. The modern Sponge exporter accepts
 `.schematic` as an extension alias, but it does not produce the deprecated
@@ -128,7 +128,7 @@ fallback.
 
 ## Round-trip fidelity, measured
 
-[`examples/readme/formats-and-io/round-trip.rs`](../../examples/readme/formats-and-io/round-trip.rs)
+[`examples/readme/formats-and-io/round-trip.rs`](https://github.com/Schem-at/Nucleation/blob/master/examples/readme/formats-and-io/round-trip.rs)
 builds one 19-block fixture containing block-state properties and chest NBT. It
 writes every schematic container with an exporter, auto-detects each result,
 loads it, and compares a content-exact fingerprint with the original.

@@ -23,8 +23,7 @@ js   = Scripting.run_js_script(path)
 ```
 
 Inside the sandbox: `Schematic.new(name)` with the block-editing surface
-(`set_block`, `fill_cuboid`, ...), plus the palette toolbox —
-`palette_gradient_ids(name, r1,g1,b1, r2,g2,b2, steps)`,
+(`set_block`, `fill_cuboid`, ...), plus the palette toolbox: `palette_gradient_ids(name, r1,g1,b1, r2,g2,b2, steps)`,
 `palette_block_ids(name)`, `palette_closest_block(name, r,g,b)`.
 
 ```lua
@@ -43,10 +42,10 @@ end
 result = wall  -- global `result` is what the host receives
 ```
 
-Output: 48×11×1, 287 blocks, red/orange/yellow concrete — the verified
+Output: 48×11×1, 287 blocks, red/orange/yellow concrete: the verified
 run lives in
 [`docs/readme-snippets/10-scripting-lua-python.md`](../readme-snippets/10-scripting-lua-python.md).
 
 Current quirks: the entry points are file-path-only (no run-from-string in
 the bridge yet), and `dimensions()` on a script's schematic reports the
-allocated region — use `tight_dimensions()` for the content size.
+allocated region: use `tight_dimensions()` for the content size.

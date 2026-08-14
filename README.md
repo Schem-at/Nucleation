@@ -138,6 +138,18 @@ saved, and is saved settled so what you paste is what was proven.
   feature docs, with its verified output
 - [Release notes](RELEASE_NOTES.md)
 
+The public documentation site is built with Material for MkDocs. Preview it
+locally with:
+
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements-docs.txt
+.venv/bin/mkdocs serve
+```
+
+Pushes to `master` publish the same strict build to GitHub Pages through
+`.github/workflows/docs.yml`.
+
 Also in the box: layer-art templates (schematics from ASCII art).
 
 **Start here: [`docs/DEV.md`](docs/DEV.md) — the iteration recipe.** The crate

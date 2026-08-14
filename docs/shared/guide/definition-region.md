@@ -9,7 +9,6 @@
 3. [Geometric Transformations](#geometric-transformations)
 4. [Boolean Operations](#boolean-operations)
 11. [Serialization & Persistence](#serialization--persistence)
-12. [Metadata](#metadata)
 13. [Connectivity Analysis](#connectivity-analysis)
 14. [Filtering with Schematics](#filtering-with-schematics)
 15. [Sort Strategies for Circuit Execution](#sort-strategies-for-circuit-execution)
@@ -241,7 +240,7 @@ combined = region_a.union(region_b);
 
 ---
 
-## Serialization & Persistence
+## Serialization & Persistence {#serialization--persistence}
 
 Definition Regions can be serialized and embedded directly into schematic files. This allows you to define logical regions (like inputs, outputs, or documentation zones) that persist when the schematic is saved and loaded.
 

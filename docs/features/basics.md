@@ -1,9 +1,9 @@
 # Basics
 
-A `Schematic` is Nucleation's editable model: blocks, entities, block entities,
-metadata, and one or more regions. Start empty or open an existing build, edit it
-with ordinary Minecraft block-state strings, inspect the result, then save it in
-the format you need.
+A `Schematic` holds blocks, entities, block entities, metadata, and one or more
+regions. It can start empty or come from an existing file. Every edit uses the
+same coordinate and block-state model, regardless of the eventual output
+format.
 
 ## Build a beacon
 
@@ -19,7 +19,7 @@ beacon.save_to_file("beacon.schem")
 ```
 
 <div align="center">
-<img src="../media/readme/basics/beacon.gif" width="480" alt="A three-by-three gold-block beacon assembling at the origin of a five-by-five Cartesian grid">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/readme/basics/beacon.gif" width="480" alt="A three-by-three gold-block beacon assembling at the origin of a five-by-five Cartesian grid">
 </div>
 
 [Download the beacon](../downloads/readme/basics/beacon.schem)
@@ -59,17 +59,16 @@ print(block.name())  # minecraft:crafting_table
 ```
 
 <div align="center">
-<img src="../media/readme/basics/animation.gif" width="480" alt="A compact crafting nook assembling with two centered windows, a crafting table, chest, and two wall torches">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/readme/basics/animation.gif" width="480" alt="A compact crafting nook assembling with two centered windows, a crafting table, chest, and two wall torches">
 </div>
 
 [Download the crafting nook](../downloads/readme/basics/crafting-nook.schem)
 
 ## Coordinates and automatic growth
 
-Coordinates are signed integers in Minecraft order: **X, Y, Z**. Positive Y is
-up. A newly created schematic does not need dimensions up front: placing a block
-automatically grows the default region to contain it, including negative
-coordinates.
+Coordinates are signed integers in Minecraft order: `X`, `Y`, `Z`. Positive Y
+is up. A new schematic has no required dimensions. Placing a block grows the
+default region to include that coordinate, including negative values.
 
 ```python
 build = Schematic.create("negative_coordinates")
@@ -114,7 +113,7 @@ A jukebox accepts a disc name through `record=`, or a comparator strength throug
 `signal=`. See [Block entities and NBT](block-entities-nbt.md) for explicit NBT
 and [Redstone simulation](redstone-simulation.md) for running circuits.
 
-One more brace tag places through the **tick engine** rather than writing NBT:
+The `{simulate=true}` tag sends placement through the tick engine:
 
 ```python
 build.set_block(4, 0, 0, "minecraft:redstone_block")
@@ -122,14 +121,14 @@ build.set_block(5, 0, 0, "minecraft:redstone_wire{simulate=true}")
 build.get_block(5, 0, 0)   # ...redstone_wire[east=side,...,power=15,west=side]
 ```
 
-`{simulate=true}` treats the schematic as a world and places the block the way
-a hand would: the state derives its connections from the neighbourhood, its
-`onPlace` runs, and whatever the placement genuinely triggers is written back —
-a wire arrives connected and powered, a repeater locked or lit, and a piston
-that ends up powered really extends. It must be the only tag in the braces,
-and it needs the tick engine — present in every published binding; in a Rust
-build, the `bridge` and `mc-tick` features. Details in
-[Tick simulation](tick-simulation.md#placing-through-the-engine).
+`{simulate=true}` treats the schematic as a world for this operation. The engine
+derives connections from neighbouring blocks, runs `onPlace`, and writes the
+resulting state back. A wire can arrive connected and powered. A repeater can
+arrive locked or lit. A powered piston can extend.
+
+This tag must be the only item inside the braces. Published bindings include the
+tick engine. Rust builds require the `bridge` and `mc-tick` features. See
+[placing through the engine](tick-simulation.md#placing-through-the-engine).
 
 ## Inspect blocks
 

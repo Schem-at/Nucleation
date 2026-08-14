@@ -261,7 +261,7 @@ The distance-based sorting ensures that rotating your schematic 180° produces t
 **After 180° Rotation**:
 - Sign at (0, 64, 0) (rotated position)
 - Wires at (0, 64-71, 0) (rotated positions)
-- Bit 0 = (0, 64, 0), Bit 7 = (0, 71, 0) ✅ Same ordering!
+- Bit 0 = (0, 64, 0), Bit 7 = (0, 71, 0), with the same ordering
 
 This works because positions are sorted by their **relative offset** from the sign, not absolute coordinates.
 

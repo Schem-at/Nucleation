@@ -88,7 +88,7 @@ const bytes = schematic.to_litematic();
 12. [Procedural Building](#procedural-building)
 13. [3D Mesh Generation](#3d-mesh-generation)
 
-## Installation & Setup
+## Installation & Setup {#installation--setup}
 
 ### Node.js / Bundlers
 

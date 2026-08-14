@@ -89,7 +89,7 @@ let atlas = build_global_atlas(&schematic, &pack, &config)?;
 // Mesh chunks using the shared atlas (no per-chunk atlas duplication)
 let meshes: Vec<MeshOutput> = schematic.mesh_chunks_with_atlas(&pack, &config, 32, atlas.clone())?;
 
-// Save with shared atlas (NUCM v2 format — dramatically smaller files)
+// Save with shared atlas (NUCM v2 format: dramatically smaller files)
 cache::save_cached_mesh_with_atlas(&meshes, &atlas, Path::new("output.nucm"))?;
 ```
 
@@ -148,7 +148,7 @@ use nucleation::meshing::{MeshProgress, MeshPhase};
 
 let mut iter = schematic.mesh_chunks(&pack, &config, 32);
 iter.set_progress_callback(Box::new(|progress: MeshProgress| {
-    println!("[{:?}] {}/{} chunks — {} vertices, {} triangles",
+    println!("[{:?}] {}/{} chunks: {} vertices, {} triangles",
         progress.phase, progress.chunks_done, progress.chunks_total,
         progress.vertices_so_far, progress.triangles_so_far);
 }));
@@ -191,9 +191,9 @@ pub struct MeshOutput {
 ```
 
 **Key methods:**
-- `total_vertices()` / `total_triangles()` — aggregate counts across all layers
-- `is_empty()` / `has_transparency()` — layer queries
-- `to_glb()` / `to_usdz()` — export to standard 3D formats
+- `total_vertices()` / `total_triangles()`: aggregate counts across all layers
+- `is_empty()` / `has_transparency()`: layer queries
+- `to_glb()` / `to_usdz()`: export to standard 3D formats
 
 **Three layers** exist because they require different GPU render states:
 - **Opaque**: No blending, writes depth. Rendered first.
@@ -240,7 +240,7 @@ pub struct AtlasRegion {
 }
 ```
 
-The mesh vertex UVs are already in atlas space — they reference the correct atlas region directly. Renderers just need to upload the atlas as a texture and sample at the vertex UVs.
+The mesh vertex UVs are already in atlas space: they reference the correct atlas region directly. Renderers just need to upload the atlas as a texture and sample at the vertex UVs.
 
 ### 2.4 BoundingBox
 
@@ -337,13 +337,13 @@ Repeated `chunk_count` times, sequentially:
 |------|------|-------|
 | 1 | u8 | lod_level (0 = full detail) |
 
-#### Atlas Mode (v2 only — 1 byte)
+#### Atlas Mode (v2 only: 1 byte)
 
 | Size | Type | Field |
 |------|------|-------|
 | 1 | u8 | atlas_mode (0 = uses shared atlas from header, 1 = has own atlas below) |
 
-**v1 files** do not have this byte — they always have a per-chunk atlas immediately after `lod_level`.
+**v1 files** do not have this byte: they always have a per-chunk atlas immediately after `lod_level`.
 
 **v2 files** always have this byte. If `atlas_mode == 0`, the chunk uses the shared atlas from the header (no atlas data follows). If `atlas_mode == 1`, a per-chunk atlas follows in the same format as v1.
 
@@ -392,7 +392,7 @@ Per animated texture (repeated `anim_count` times):
 | 4 | u32 | atlas_x |
 | 4 | u32 | atlas_y |
 
-#### Three Mesh Layers (opaque, cutout, transparent — in order)
+#### Three Mesh Layers (opaque, cutout, transparent: in order)
 
 Each layer has the same structure:
 
@@ -475,7 +475,7 @@ Same quantization as positions but no delta encoding. 2 components (u, v) per ve
 | 4 | u32 | compressed_len |
 | N | bytes | DEFLATE data |
 
-**Encoding:** `u8_val = (color.clamp(0,1) * 255.0 + 0.5) as u8` — 4 bytes per vertex (R, G, B, A).
+**Encoding:** `u8_val = (color.clamp(0,1) * 255.0 + 0.5) as u8`: 4 bytes per vertex (R, G, B, A).
 
 ##### Indices (delta-encoded u32, DEFLATE)
 
@@ -493,9 +493,9 @@ Same quantization as positions but no delta encoding. 2 components (u, v) per ve
 Every compressed field uses the same envelope:
 
 ```
-raw_len:        u32 LE   — size of uncompressed data
-compressed_len: u32 LE   — size of DEFLATE payload
-data:           [u8; compressed_len] — raw DEFLATE (RFC 1951, no zlib/gzip header)
+raw_len:        u32 LE: size of uncompressed data
+compressed_len: u32 LE: size of DEFLATE payload
+data:           [u8; compressed_len]: raw DEFLATE (RFC 1951, no zlib/gzip header)
 ```
 
 The Rust implementation uses `flate2` with `Compression::fast()`. JavaScript parsers should use raw DEFLATE inflate (e.g., `fflate.inflateSync()`).
@@ -507,7 +507,7 @@ The Rust implementation uses `flate2` with `Compression::fast()`. JavaScript par
 | cutecounter (3x18x4) | 4.4K | 115 KB | 19.5 KB | 0.17x |
 | Evaluator (25x27x37) | 178K | 4.6 MB | 546 KB | 0.12x |
 | uss-texas (175x53x31) | 590K | 15.3 MB | 2.4 MB | 0.16x |
-| IRIS_B (499x379x442) | 283M | N/A | 570 MB | — |
+| IRIS_B (499x379x442) | 283M | N/A | 570 MB | n/a |
 
 NUCM is typically **6-8x smaller** than GLB thanks to quantization and compression.
 
@@ -516,11 +516,11 @@ NUCM is typically **6-8x smaller** than GLB thanks to quantization and compressi
 ```rust
 use nucleation::meshing::cache;
 
-// Serialize (v2 without shared atlas — per-chunk atlases)
+// Serialize (v2 without shared atlas: per-chunk atlases)
 let bytes: Vec<u8> = cache::serialize_meshes(&meshes);
 cache::save_cached_mesh(&meshes, Path::new("output.nucm"))?;
 
-// Serialize (v2 with shared atlas — dramatically smaller for multi-chunk)
+// Serialize (v2 with shared atlas: dramatically smaller for multi-chunk)
 let bytes: Vec<u8> = cache::serialize_meshes_with_atlas(&meshes, &atlas);
 cache::save_cached_mesh_with_atlas(&meshes, &atlas, Path::new("output.nucm"))?;
 
@@ -533,7 +533,7 @@ let meshes = cache::load_cached_mesh(Path::new("input.nucm"))?;
 
 ---
 
-## 4. Rendering Pipeline (Desktop — wgpu)
+## 4. Rendering Pipeline (Desktop: wgpu) {#4-rendering-pipeline}
 
 The desktop renderer (`examples/render_schematic.rs`) uses wgpu (WebGPU API) with a WGSL shader.
 
@@ -648,7 +648,7 @@ const { chunks, totalChunks, version, sharedAtlas } = parseNUCM(arrayBuffer, max
 
 Supports both v1 and v2 formats. Uses `fflate.inflateSync()` for raw DEFLATE decompression. Handles all dequantization (u16→f32 positions with AABB, i8→f32 normals with renormalization, u16→f32 UVs, u8→f32 colors) and delta decoding (positions + indices).
 
-For v2 files with `HAS_SHARED_ATLAS`, the shared atlas is parsed from the header and assigned to each chunk that uses `atlas_mode == 0`. Chunks always have an `atlas` field regardless of version — renderers don't need to distinguish between shared and per-chunk atlases.
+For v2 files with `HAS_SHARED_ATLAS`, the shared atlas is parsed from the header and assigned to each chunk that uses `atlas_mode == 0`. Chunks always have an `atlas` field regardless of version: renderers don't need to distinguish between shared and per-chunk atlases.
 
 `maxChunks` enables early exit to limit GPU memory for large schematics.
 
@@ -691,7 +691,7 @@ while (iter.advance()) {
     const nucm = chunk.toNucm();     // Single chunk as .nucm
 }
 
-// Global atlas (v2 — shared atlas across chunks)
+// Global atlas (v2: shared atlas across chunks)
 const atlas = schematic.buildGlobalAtlas(pack, config);
 // atlas.width(), atlas.height(), atlas.toBytes() → Uint8Array (RGBA)
 
@@ -725,7 +725,7 @@ data = chunks.nucm_data               # bytes object
 regions = schematic.mesh_by_region(pack, config)
 regions.save_nucm("output.nucm")     # All regions in one file
 
-# Global atlas (v2 — shared atlas across chunks)
+# Global atlas (v2: shared atlas across chunks)
 atlas = schematic.build_global_atlas(pack, config)
 # atlas.width, atlas.height, atlas.rgba_data(), atlas.region_count
 
@@ -745,7 +745,7 @@ ByteArray glb = meshresult_glb_data(mesh);
 FFIChunkMeshResult* chunks = schematic_mesh_by_chunk_size(schematic, pack, config, 32);
 ByteArray nucm = chunkmeshresult_nucm_data(chunks);
 
-// Global atlas (v2 — shared atlas across chunks)
+// Global atlas (v2: shared atlas across chunks)
 FFITextureAtlas* atlas = schematic_build_global_atlas(schematic, pack, config);
 // textureatlas_width(atlas), textureatlas_height(atlas)
 // textureatlas_rgba_data(atlas, &out_ptr, &out_len)

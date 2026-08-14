@@ -1,0 +1,12 @@
+<form class="md-header__option" data-md-component="palette">
+  {% for option in config.theme.palette %}
+    {% set scheme  = option.scheme  | d("default", true) %}
+    {% set primary = option.primary | d("indigo", true) %}
+    {% set accent  = option.accent  | d("indigo", true) %}
+    <input class="md-option" data-md-color-media="{{ option.media }}" data-md-color-scheme="{{ scheme | replace(' ', '-') }}" data-md-color-primary="{{ primary | replace(' ', '-') }}" data-md-color-accent="{{ accent | replace(' ', '-') }}" aria-label="{{ option.toggle.name }}" type="radio" name="__palette" id="__palette_{{ loop.index0 }}">
+    <label class="md-header__button md-icon" title="{{ option.toggle.name }}" for="__palette_{{ loop.index % loop.length }}" hidden>
+      {% include ".icons/" ~ option.toggle.icon ~ ".svg" %}
+      <span class="bb-ground-label">{{ option.toggle.name | replace('Switch to ', '') }}</span>
+    </label>
+  {% endfor %}
+</form>

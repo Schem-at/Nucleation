@@ -22,8 +22,7 @@ how each copy was placed:
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/fingerprint.png" width="820" alt="One build, a moved and turned copy flagged DUPLICATE, and a one-block-different copy flagged UNIQUE">
 </div>
 
-Each preset is an equivalence class, and they are *not* interchangeable —
-pick by what you need to be blind to:
+Each preset is an equivalence class, and they are *not* interchangeable: pick by what you need to be blind to:
 
 | preset | invariant to | a block is | one added block |
 |---|---|---|---|
@@ -31,11 +30,11 @@ pick by what you need to be blind to:
 | `shape` | translation + all 48 orientations | its id only | unique |
 | `structural` | translation + yaw rotations + mirror | **"solid" or invisible** | unique only if it changes the solid massing |
 
-`structural` answers "is this the same solid *massing*?" — every solid block
+`structural` answers "is this the same solid *massing*?": every solid block
 collapses to one token and everything else (glass, dust, torches, air) is
 invisible to it. Two builds differing by a pane of glass are duplicates under
 `structural` and distance 0.0 apart; that is its purpose, not a bug. **Do not
-index deduplication on `structural`** — use `exact` (content identity) or
+index deduplication on `structural`**: use `exact` (content identity) or
 `shape` (orientation-blind identity) for that.
 
 And nucleation can *find the repetition in a build*, the lattice of a tiling
@@ -73,9 +72,9 @@ nucleation = { version = "*", features = ["autostack"] }
 ## Concepts
 
 `detect_structures` ranks the repeating structures in a build by **region
-coverage** — how much of the build is locally periodic under a candidate period
-— so it is robust to surrounding non-periodic infrastructure (a screen is found
-even when a decoder breaks the global run). Each result is a `Structure`:
+coverage**: how much of the build is locally periodic under a candidate period.
+It can find a screen even when a decoder breaks the global run. Each result is
+a `Structure`:
 
 | field | meaning |
 |---|---|
@@ -123,10 +122,10 @@ structs = s.detect_structures()      # list of dicts (mode, vectors, coverage, �
 top = structs[0]
 print(top["label"])                  # "1D run · Y · 96% of build"
 
-# 1D / diagonal — pass the period vector + new cell count
+# 1D / diagonal: pass the period vector + new cell count
 bigger = s.autostack_resize_1d(*top["vectors"][0], 8)
 
-# 2D — two period vectors + (n1, n2)
+# 2D: two period vectors + (n1, n2)
 v1, v2 = top["vectors"]              # when top["mode"] == "2d"
 screen = s.autostack_resize_2d(*v1, *v2, 16, 16)
 
@@ -177,7 +176,7 @@ Python/WASM/FFI trio is checked by `tools/check_api_parity.rs`.
 ## Shipping & feature flags
 
 `autostack` is wired into the feature graph so it ships with every binding
-automatically — **no build script or CI change is needed**:
+automatically: **no build script or CI change is needed**:
 
 ```toml
 default = ["store-fs", "autostack"]
@@ -226,7 +225,7 @@ the voxel detector and dedups by vector (the browser resizer does exactly this).
 
 The voxel core (region-coverage detection + 1D/diagonal/2D resize) is validated
 byte-for-byte against the reference prototype (`experiments/voxel-map/`) on real
-builds — see `tests/autostack_test.rs` and the `autostack::tests` /
+builds: see `tests/autostack_test.rs` and the `autostack::tests` /
 `autostack::graph_detect::tests` unit tests.
 
 Still prototype-only (not yet in the core): near-periodic / signal-booster

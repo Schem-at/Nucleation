@@ -251,7 +251,6 @@ schematic-builder -i blocks.txt -o blocks.litematic --no-palette
 
 ## See Also
 
-- [SchematicBuilder Guide](../guide/schematic-builder.md)
-- [CLI Tool Guide](../guide/cli-tool.md)
-- [Examples](../examples/)
-
+- [SchematicBuilder Guide](guide/schematic-builder.md)
+- [CLI source](https://github.com/Schem-at/Nucleation/tree/master/crates/nucleation-cli)
+- [Examples](https://github.com/Schem-at/Nucleation/tree/master/examples)

@@ -1,6 +1,6 @@
 # Everything composes: a warped, holey, painted torus (Python)
 
-Five ideas stack into one build. The [README turntable](../../README.md#everything-composes)
+Five ideas stack into one build. The [README turntable](https://github.com/Schem-at/Nucleation#everything-composes)
 wraps Van Gogh's Starry Night around this torus; this network-free version paints
 it by hue around the ring so it runs anywhere. Swap `hsv_to_rgb(...)` for an image
 sample and you have the painting version.

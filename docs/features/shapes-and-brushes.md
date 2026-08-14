@@ -1,10 +1,11 @@
 # Shapes, brushes, and masked fills
 
-## Build: shapes, brushes, palettes
+## Geometry and material
 
-
-Spheres, tori, cones, pyramids, and bezier ribbons, plus boolean combinators,
-filled by brushes that pick each block:
+A `Shape` decides which coordinates belong to a volume. A `Brush` chooses the
+block state at each accepted coordinate. Both are independent, so one shape can
+be filled with a fixed block, a palette match, a gradient, or a normal-based
+shade.
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/shapes-gallery.png" width="700" alt="Shape gallery: sphere, torus, cone, pyramid, bezier ribbon">
 
@@ -12,7 +13,7 @@ A gradient brush follows a shape's own parameter, around the ring of a torus or
 along a bezier, and snaps every color to a palette:
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gradient-torus.png" width="480" alt="Rainbow torus: a seamless curve gradient snapped to the wool palette">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gradient-torus.png" width="480" alt="Rainbow torus with a closed curve gradient snapped to the wool palette">
 </div>
 
 ```python
@@ -72,7 +73,7 @@ ramp closes on itself with no seam. A trefoil knot, one hue dithered red -> blue
 -> green -> red around its length:
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gradient-knot.png" width="440" alt="A trefoil knot colored by a seamless cyclic gradient sweeping red to blue to green and back">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gradient-knot.png" width="440" alt="A trefoil knot coloured by a closed cyclic gradient from red through blue and green back to red">
 </div>
 
 And when a ramp still bands, dither it: `Palette.…().dithered()` makes every
@@ -130,21 +131,21 @@ BuildingTool.fill_replacing(temple, decay_sphere, weathered_brush,
 
 ## Reference
 
-The building tool fills a **shape** (which blocks) with a **brush** (which
-block goes at each position). All of it is available in every binding.
+The building tool fills a `Shape` with a `Brush`. Every binding exposes both
+types.
 
 ## Shapes
 
 `sphere`, `cuboid`, `ellipsoid`, `cylinder` / `cylinder_between`, `cone`,
 `torus`, `pyramid`, `disk`, `plane`, `triangle`, `line`, `bezier`
 (control points + thickness + resolution), and `polygon_prism` (a closed 2D
-footprint extruded between two Y levels — building footprints, lake outlines)
-— plus combinators `union_with`, `intersection_with`, `difference_with`, and
+footprint extruded between two Y levels, suitable for building footprints and
+lake outlines). Combinators include `union_with`, `intersection_with`, `difference_with`, and
 `hollow(thickness)`. An [SDF tree](sdf-and-fields.md) is a `Shape` too
 (`Shape.sdf`), and so is a voxelized [mesh](meshing-and-rendering.md)
 (`Voxelizer.shape_from_glb` / `shape_from_obj`).
 
-Several shapes are **parametric**: a position inside them maps to a
+Several shapes are parametric: a position inside them maps to a
 parameter `t ∈ [0, 1]` (angle around a torus, distance along a line or
 bezier, height up a cone/pyramid). Parametric brushes read it.
 
@@ -165,13 +166,13 @@ Every color brush takes `set_palette(palette)` and interpolates in `Rgb` or
 
 `curve_gradient` detail: `stops` are `t` values in `[0, 1]` with flat RGB
 triples in `colors`. On a closed shape (torus), make the first and last
-stop colors equal and the ring is seamless — the README's rainbow torus is:
+stop colours equal. The gradient then closes at the join. The README torus uses:
 
 ```python
 stops = [i / 6 for i in range(7)]
 colors = [255, 40, 40,   255, 180, 0,   60, 200, 60,
           40, 180, 220,  60, 70, 230,   200, 60, 220,
-          255, 40, 40]  # first == last -> seamless wrap
+          255, 40, 40]  # first == last closes the wrap
 brush = Brush.curve_gradient(stops, bytes(colors), InterpolationSpace.Oklab)
 brush.set_palette(Palette.wool())
 BuildingTool.fill(s, Shape.torus(0, 0, 0, 16, 6, 0, 1, 0), brush)
@@ -188,10 +189,10 @@ BuildingTool.fill_replacing(s, shape, brush,
                             '["minecraft:stone_bricks"]')   # only listed blocks
 ```
 
-The README's weathered temple is `fill_replacing` with a mossy/cracked
-gradient brush inside a sphere — `scene_masked_fill` in
-[`tools/readme-media/generate.py`](../../tools/readme-media/generate.py).
+The README weathered temple uses `fill_replacing` with a mossy and cracked
+gradient brush inside a sphere. Its source is `scene_masked_fill` in
+[`tools/readme-media/generate.py`](https://github.com/Schem-at/Nucleation/blob/master/tools/readme-media/generate.py).
 
 `rstack(s, shape, brush, count, dx, dy, dz)` stamps `count` offset copies.
 
-Verified runnable examples: [`docs/readme-snippets/`](../readme-snippets/).
+Verified runnable examples: [`docs/readme-snippets/`](https://github.com/Schem-at/Nucleation/tree/master/docs/readme-snippets).

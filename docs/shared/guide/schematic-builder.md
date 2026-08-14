@@ -51,7 +51,7 @@ let circuit = SchematicBuilder::new()  // Standard palette auto-loaded!
 - `c` - Concrete (gray)
 - `·` - Air
 
-See [Unicode Palette Reference](../api/unicode-palette.md) for the complete list.
+See [Unicode Palette Reference](../unicode-palette.md) for the complete list.
 
 ### 2. Custom Palettes
 
@@ -239,14 +239,13 @@ let adder = SchematicBuilder::new()
 
 ## Examples
 
-See [docs/examples/](../examples/) for complete working examples:
-- [4-Bit Adder](../examples/4-bit-adder.md) - Hierarchical circuit composition
-- [Checkerboard](../examples/checkerboard.md) - 2D tiling patterns
-- [CLI Usage](../examples/cli-usage.md) - Command-line workflows
+See the [examples directory](https://github.com/Schem-at/Nucleation/tree/master/examples) for complete working examples:
+- [4-Bit Adder](https://github.com/Schem-at/Nucleation/blob/master/examples/build_4bit_ripple_carry_adder.py) - Hierarchical circuit composition
+- [Checkerboard](https://github.com/Schem-at/Nucleation/blob/master/examples/test_checkerboard.rs) - 2D tiling patterns
+- [CLI source](https://github.com/Schem-at/Nucleation/tree/master/crates/nucleation-cli) - Command-line workflows
 
 ## API Reference
 
-- [Rust API](../api/rust.md#schematicbuilder)
-- [JavaScript API](../api/javascript.md#schematicbuilder)
-- [Python API](../api/python.md#schematicbuilder)
-
+- [Rust API](../../rust/README.md#schematicbuilder)
+- [JavaScript API](../../javascript/README.md#schematicbuilder)
+- [Python API](../../python/README.md#schematicbuilder)

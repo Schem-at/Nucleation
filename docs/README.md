@@ -1,88 +1,73 @@
 # Nucleation documentation
 
-Start with the [project README](../README.md) — installation, the feature index,
-and the gallery. Everything here goes deeper.
+The [documentation home](index.md) contains installation commands, a measured
+specimen, and the shortest route into each subsystem.
 
-Since v0.3.0 every binding is generated from one source of truth
-(`src/bridge/`), so **the API is the same everywhere**: same types, same
-methods, per-language casing (`set_block` in Rust/Python, `setBlock` in
-JS/Kotlin/PHP), unified `NucleationError` errors.
+Rust owns the implementation. Since v0.3.0, `src/bridge/` has defined the API
+for Python, JavaScript, Kotlin, PHP, C, and C++. Generated bindings keep the same
+types and methods while following local naming conventions. Rust and Python use
+`set_block`; JavaScript and Kotlin use `setBlock`. Binding errors share the
+`NucleationError` model where the target language permits it.
 
-## Feature guides
+## Start here
 
-- [Basics](features/basics.md) — create a schematic, place and inspect blocks,
-  coordinates, automatic growth, and block-state strings
-- [Formats and I/O](features/formats-and-io.md) — format detection, conversion,
-  round-trip fidelity, and filesystem/byte APIs
-- [Regions, transforms & stamping](features/regions-and-transforms.md)
-  — region lifecycle, scoped rigid transforms, `stamp_box` / `stamp_region`
-  ([snippet](readme-snippets/13-regions-transforms-python.md))
-- [Shapes, brushes, and masked fills](features/shapes-and-brushes.md)
-- [Palettes: turning colors into blocks](features/palettes-and-color.md)
-- [SDF shapes and terrain](features/sdf-and-fields.md)
-- [Embedded scripting (Lua / JS)](features/scripting.md)
-- [Auto-stack: detect and resize repetition](features/analysis.md)
-  ([design notes](autostack-design.pdf))
-- [The Minecraft block database](features/block-database.md) — data
-  provenance, the 26.2 refresh pipeline, Bedrock mappings
-- [Insign IO integration](features/redstone-simulation.md) — executors from sign
-  annotations
-- [Tick simulation](features/tick-simulation.md) — run a build the way the game
-  would and read the results as data
-  ([mechanics notes](features/tick-simulation-mechanics.md))
-- [Meshing, .nucm, and rendering](features/meshing-and-rendering.md)
-- [Animating a build](features/animation.md) — assembly, layer printing,
-  reveals along a shape's own curve; deterministic frame sampling
+| Path | Subject |
+|---|---|
+| [Basics](features/basics.md) | Create a schematic, place blocks, inspect state, and save the result. |
+| [Formats and I/O](features/formats-and-io.md) | Detect input by content, choose an exporter, and state the losses before conversion. |
+| [Bindings](features/bindings-and-languages.md) | Package names, error forms, naming, and target-specific limits. |
+| [Gallery](gallery.md) | Rendered output with source and downloadable schematics. |
 
-## More capabilities
+## Construction
 
-Each with a verified Python snippet:
+| Path | Subject |
+|---|---|
+| [Regions and transforms](features/regions-and-transforms.md) | Region lifecycle, rigid transforms, `stamp_box`, and `stamp_region`. |
+| [Shapes and brushes](features/shapes-and-brushes.md) | Primitive geometry, boolean composition, masked fills, and material choice. |
+| [Palettes and colour](features/palettes-and-color.md) | Measured block colours, ramps, matching, and dithering. |
+| [SDFs and fields](features/sdf-and-fields.md) | Typed scalar fields, bounded sampling, terrain, Voronoi, and noise. |
+| [Voxelization](features/voxelize.md) | GLB and OBJ input, texture projection, and surface-only conversion. |
+| [Geodata](features/geo.md) | Elevation grids and OpenStreetMap footprints. |
 
-- [Voxelize 3D models](features/voxelize.md) — GLB/OBJ → building
-  `Shape`s, texture projection, and surface-only voxelization (negative
-  `shell`) for open ribbons that dip or self-overlap
-- [Read, iterate, and stream](features/streaming-and-worlds.md) — chunk
-  iteration strategies + the `WorldStream`/`WorldSink` constant-memory world
-  pipeline ([snippet](readme-snippets/12-chunk-iteration-python.md)), and the
-  `to_schematic` ↔ `from_schematic` bridge that makes any fill (SDF, OSM,
-  heightmap, noise) a custom world **generator** or **filter**
-- [World segmentation](features/world-segmentation.md) — turn a whole world
-  save into individual builds: learned-substrate subtraction, morphological
-  clustering, cross-tile stitching, tiers, partition hints, snapshot identity,
-  and a provenance envelope per build — byte-identical on every re-run
-  ([snippet](readme-snippets/17-world-generator-python.md))
-- [Embedded schematic provenance](features/schematic-provenance.md) — the
-  shared source, world, map, dimension, and coordinate metadata contract
-- [Transformation and registry policies](features/transformation-policies.md)
-  — bounded decoding, normalization, content/UUID rules, audit history, and
-  storage-backed accept/quarantine/reject routing
-- [Block entities, entities & NBT](features/block-entities-nbt.md)
-  ([snippet](readme-snippets/14-block-entities-nbt-python.md))
-- [Geodata](features/geo.md) — `Shape.polygon_prism`,
-  `Geo.extrude_footprints`, `Geo.heightmap_terrain`, then out to a playable
-  world ([snippet](readme-snippets/16-geo-osm-python.md))
-- [Pluggable storage](features/storage.md) — `StoreIo` / `Store`
-  over one URI (memory / filesystem / SSH / S3 / Redis / Postgres)
-  ([snippet](readme-snippets/15-storage-python.md))
+## Worlds and stored data
 
-## Per-language references
+| Path | Subject |
+|---|---|
+| [Streaming and worlds](features/streaming-and-worlds.md) | Chunk iteration and constant-memory world input and output. |
+| [World segmentation](features/world-segmentation.md) | Substrate subtraction, clustering, stitching, tiers, and provenance. |
+| [Schematic provenance](features/schematic-provenance.md) | Source identity, map coordinates, dimensions, and world metadata. |
+| [Transformation policies](features/transformation-policies.md) | Bounded decoding, normalization, content rules, audit history, and routing. |
+| [Block entities and NBT](features/block-entities-nbt.md) | Typed SNBT round trips for blocks and entities. |
+| [Storage](features/storage.md) | Memory, filesystem, SSH, S3, Redis, and Postgres backends under one interface. |
 
-- [Rust](rust/) · [JavaScript](javascript/) · [Python](python/) ·
-  [Kotlin](../bindings/kotlin/) · [PHP](../bindings/php/) ·
-  [C](../bindings/c/) · [C++](../bindings/cpp/)
+## Execution and output
 
-## Verified examples
+| Path | Subject |
+|---|---|
+| [Redstone simulation](features/redstone-simulation.md) | Compiled circuit execution and typed Insign I/O. |
+| [Tick simulation](features/tick-simulation.md) | Game-order ticks, updates, fluids, pistons, entities, and snapshots. |
+| [Meshing and rendering](features/meshing-and-rendering.md) | NUCM, GLB, glTF, USDZ, and the headless renderer. |
+| [Animation](features/animation.md) | Groups, tracks, assembly order, layer printing, and deterministic sampling. |
+| [Analysis](features/analysis.md) | Diff, fingerprint, repetition detection, and auto-stack. |
+| [Scripting](features/scripting.md) | Lua and JavaScript execution against the schematic API. |
 
-Every snippet in the README ran for real with captured output:
-[`docs/readme-snippets/`](readme-snippets/). The README's images regenerate
-from [`tools/readme-media/generate.py`](../tools/readme-media/generate.py).
+## Language references
 
-## Formats
+[Rust](rust/) · [JavaScript](javascript/) · [Python](python/) ·
+[Kotlin](../bindings/kotlin/) · [PHP](../bindings/php/) ·
+[C](../bindings/c/) · [C++](../bindings/cpp/)
 
-`.litematic` · Sponge `.schem` · legacy MCEdit `.schematic` (import only) ·
-Bedrock `.mcstructure` · `.nusn` (fast binary snapshot) — with content-based
-auto-detection — plus Anvil region files, zipped worlds, and world directories.
+## Verified material
 
-## License
+The snippets under [`docs/readme-snippets/`](readme-snippets/) include captured
+output. Images used by the overview regenerate from
+[`tools/readme-media/generate.py`](../tools/readme-media/generate.py).
 
-MIT — see [LICENSE](../LICENSE).
+Supported containers include `.litematic`, Sponge `.schem`, Bedrock
+`.mcstructure`, Java structure `.snbt`, and `.nusn`. Legacy MCEdit `.schematic`
+is import-only. World I/O also accepts Anvil regions, zipped worlds, and world
+directories.
+
+## Licence
+
+MIT. See [LICENSE](../LICENSE).
