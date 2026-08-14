@@ -31,14 +31,16 @@ NUCLEATION_WASM_FEATURES=bridge,simulation,mc-tick,routing,hdl,meshing \
 
 # 2. run the app (this directory)
 npm install
+npx playwright install chromium  # required by `npm run verify`
 npm run dev          # syncs public/engine + public/cells, serves :8455
 ```
 
 Open <http://localhost:8455/>.
 
-`dev`, `build` and `verify` all re-sync the engine and then **verify** that every
-copy of it is the one on disk (`npm run check-engine`); the header badge turns
-red and says `STALE ENGINE` if the page ever loads a different one. See
+`dev` and `build` re-sync the engine; `build` and `verify` then **verify** that
+every copy is the one on disk (`npm run check-engine`). Run `npm run build &&
+npm run verify` for the full UI check. The header badge turns red and says
+`STALE ENGINE` if the page ever loads a different one. See
 [The engine you are measuring](#the-engine-you-are-measuring) for why that guard
 exists — it is the difference between a red check and a red herring.
 

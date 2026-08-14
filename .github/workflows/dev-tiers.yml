@@ -76,6 +76,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install Studio dependencies and Chromium
+        working-directory: apps/eda-studio
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
       - run: tools/dev.sh pre-land
       - name: sccache stats
         if: always()
