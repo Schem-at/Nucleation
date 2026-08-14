@@ -20,6 +20,7 @@ use std::collections::BTreeSet;
 const SCHEM: &str = "wol-project/m10-full/d44bbed2cdad55d93551056046accb7b.schem";
 
 #[test]
+#[ignore = "requires the local ORE d44bbed2 corpus fixture"]
 fn d44bbed2_real_voxels_split_into_two_substantial_builds() {
     let data = std::fs::read(SCHEM).expect("read d44bbed2.schem");
     let schem = UniversalSchematic::from_schematic(&data).expect("parse d44bbed2.schem");

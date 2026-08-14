@@ -131,6 +131,10 @@ tier_pre_land() {
     fi
     echo "port $port is free"' || true
 
+  step "studio: wasm engine" env \
+    NUCLEATION_WASM_FEATURES="bridge,simulation,mc-tick,routing,hdl,meshing" \
+    ./tools/package-npm.sh dist/npm-eda || true
+
   step "studio: headless verify" bash -c \
     'cd apps/eda-studio && { [ -d node_modules ] || npm ci; }; npm run verify' || true
 
