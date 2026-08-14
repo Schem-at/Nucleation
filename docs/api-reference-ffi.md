@@ -724,7 +724,7 @@ void schematic_set_we_version(SchematicWrapper* schematic, int version);
 
 ---
 
-## Dimensions & Bounds
+## Dimensions & Bounds {#dimensions--bounds}
 
 ```c
 // Returns IntArray [width, height, length]. Caller must free_int_array().
@@ -837,7 +837,7 @@ CChunkArray schematic_get_chunks_with_strategy(
 
 ## Definition Regions
 
-### Creation & Lifecycle
+### Creation & Lifecycle {#creation--lifecycle}
 
 ```c
 DefinitionRegionWrapper* definitionregion_new(void);
@@ -1177,7 +1177,7 @@ SchematicBuilderWrapper* schematicbuilder_from_template(const char* template);
 
 ---
 
-## Sign Text & Insign
+## Sign Text & Insign {#sign-text--insign}
 
 ```c
 // Extract sign text. Returns JSON array string. Caller must free_string().
@@ -1189,7 +1189,7 @@ char* schematic_compile_insign(const SchematicWrapper* schematic);
 
 ---
 
-## Debug & Utility
+## Debug & Utility {#debug--utility}
 
 ```c
 char* schematic_debug_info(const SchematicWrapper* schematic);

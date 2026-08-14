@@ -1,4 +1,5 @@
 /target
+/site/
 /tests/output/*
 /pkg/
 .history/

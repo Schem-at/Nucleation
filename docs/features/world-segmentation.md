@@ -1,7 +1,7 @@
 # World segmentation: from a world save to individual builds
 
 `nucleation::world_segment` turns a whole Minecraft world into a set of discrete,
-individually addressable builds — each one a normal `UniversalSchematic` plus a
+individually addressable builds: each one a normal `UniversalSchematic` plus a
 **provenance envelope** recording exactly where in the world it came from. It is
 built for doing this *repeatably*: the same world bytes and the same configuration
 produce byte-identical output, on any machine, in any order, every time.
@@ -25,20 +25,20 @@ world save ──► tiles ──► substrate removed ──► clusters ──
 ```
 
 1. **Tile** the world (one region file = one tile by default).
-2. **Subtract substrate** — the natural ground — so terrain stops gluing
+2. **Subtract substrate.** Remove the natural ground so terrain stops gluing
    everything together.
 3. **Cluster** what remains with morphological closing, so a machine, its
    floating wiring, and its support frame come out as *one* build instead of
    dozens of fragments.
 4. **Stitch** clusters that cross tile boundaries back together.
 5. **Score** every build into a tier (`Confident` / `Probable` / `Debris`).
-   Debris is *kept*, never deleted — the machine orders the queue, a human
+   Debris is *kept*, never deleted: the machine orders the queue, a human
    decides worth.
 6. **Materialize** each build into a local-origin schematic plus its
    `Provenance`.
 
 Everything upstream of I/O is a pure function. There is no clock, no RNG, no
-hash-map iteration order anywhere in the pipeline — that is what makes runs
+hash-map iteration order anywhere in the pipeline. This makes runs
 reproducible and shardable.
 
 ## Quick start
@@ -63,7 +63,7 @@ let mut samples = Vec::new();
 source.for_each_tile(&mut |tile| {
     samples.push(tile);
     if samples.len() >= 24 {
-        return Err(nucleation::world_segment::TileError::Stop); // enough — stop streaming
+        return Err(nucleation::world_segment::TileError::Stop); // enough: stop streaming
     }
     Ok(())
 })?;
@@ -73,7 +73,7 @@ let profile = WorldProfile::derive(&samples, &ProfileParams {
     ..Default::default()
 });
 
-// 3. Optional: partition hints — named boxes a build may never span.
+// 3. Optional: partition hints: named boxes a build may never span.
 let partitions = PartitionIndex::new(vec![]); // none
 
 // 4. Configure and run.
@@ -87,7 +87,7 @@ let job = SegmentJob {
     source_id: "my-world".into(),     // opaque labels, yours to define
     snapshot_id: "2026-07-24".into(),
     min_y: -64, max_y: 320,
-    extracted_at: 1_753_300_000,      // an input — never read from the clock
+    extracted_at: 1_753_300_000,      // an input: never read from the clock
     match_iou: 0.5,
 };
 
@@ -96,7 +96,7 @@ let mut stats = WorldSegmenter::run_streaming(
     &source, &profile, &partitions, &job, &[],
     &mut |build| {
         // one build at a time: schematic + provenance, then dropped
-        println!("{} — {} blocks, {:?}",
+        println!("{}: {} blocks, {:?}",
                  build.provenance.stable_build_id,
                  build.provenance.block_count,
                  build.provenance.tier);
@@ -159,7 +159,7 @@ the output `Store`. Neither layer copies or loads the complete map.
 
 ## The pieces
 
-### `TileSource` — where voxels come from
+### `TileSource`: where voxels come from
 
 | Implementation | Access | Notes |
 |---|---|---|
@@ -176,15 +176,15 @@ archive without paying for the rest of it.
 `TarArchiveSource` filters junk aggressively and *reports* every skip on stderr rather
 than silently dropping it: backup files (`*.mca.bak`, `r.X.Z.mca.<digits>.backup`),
 entries outside `region/`, empty entries, region coordinates beyond ±120 000
-(sign-extension artifacts in some server backups), and — if you call
-`.with_world_border(n)` — regions entirely outside the border. An inclusive
+(sign-extension artifacts in some server backups), and: if you call
+`.with_world_border(n)`: regions entirely outside the border. An inclusive
 `.with_world_rect(min_x, min_z, max_x, max_z)` also clips blocks before they are
 stored, and `quiet_filtered_entries()` suppresses benign out-of-scope messages.
 A malformed region
 or a corrupt chunk skips *that region* and keeps streaming; a callback error
 aborts the run (that one is yours).
 
-### `WorldProfile` — what counts as ground
+### `WorldProfile`: what counts as ground
 
 Substrate is decided per block by two tests: the block's name is in the
 **substrate palette** AND its Y is inside the **substrate band**. Both come from
@@ -198,7 +198,7 @@ empirically:
 
 The result is a small, serializable value with a stable `profile_hash()`.
 **Pin it**: derive once, save it, and reuse it for every later run of the same
-world — reproducibility then survives even future changes to the derivation
+world: reproducibility then survives even future changes to the derivation
 heuristic, and forward-only sources don't pay a second streaming pass.
 
 Calibration guidance, learned on real worlds:
@@ -212,11 +212,11 @@ Calibration guidance, learned on real worlds:
   default of 0.9. Print per-level coverage from your samples when in doubt.
 - **`palette_min_share` exists because players place blocks at ground level.**
   Without it, one redstone wire inside the band puts `redstone_wire` in the
-  "ground" palette — and then substrate subtraction eats the bottom layer of
+  "ground" palette. Substrate subtraction then eats the bottom layer of
   every build. Dominance filtering (≥1% of band blocks) keeps the palette to
   actual ground materials.
 
-### `SegConfig` — clustering
+### `SegConfig`: clustering
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -231,19 +231,19 @@ Calibration guidance, learned on real worlds:
 | `drop_unpartitioned` | `false` | with `HardCut`, omit roads/gutters outside all hints |
 
 Two structures end up in the same build iff their occupied cells are within
-Chebyshev **2R+1 cells** — with defaults, gaps up to roughly 20 blocks bridge,
+Chebyshev **2R+1 cells**: with defaults, gaps up to roughly 20 blocks bridge,
 wider gaps separate. Those are the only geometry knobs, and both have a physical
 meaning you can explain: `cell_size` is resolution, `closing_radius` is "how far
 apart can two parts of the same build float".
 
 `ClusterId`s (and everything derived from them) are bound to a
-`config_hash` folding the config, the profile, and the partition hints — outputs
+`config_hash` folding the config, the profile, and the partition hints: outputs
 produced under different settings can never collide or be confused in a cache.
 
-### Partition hints — boundaries a build may not cross
+### Partition hints: boundaries a build may not cross
 
 If you know the world is divided into parcels (a plot grid, districts, claim
-regions — any set of named boxes), pass them:
+regions: any set of named boxes), pass them:
 
 ```rust
 let hints = vec![PartitionHint {
@@ -259,14 +259,14 @@ Under `HardCut`, blocks are partitioned **per block** (boundaries need not align
 with cells), each partition is clustered in isolation, and stitching will never
 union clusters across differing partitions. Two adjacent builds on opposite
 sides of a boundary stay two builds, however close. Each build records the
-partition it fell in (`Cluster::partition_id`, `Provenance::partition_id`) — an
+partition it fell in (`Cluster::partition_id`, `Provenance::partition_id`). An
 opaque join key back to whatever your boxes mean.
 
 `Prefer` is currently inert (documented as such); `Off` ignores hints entirely.
 
 **Partition floors.** In parcelled worlds, owners often floor their parcel with
 a material of their choice. Globally that material is rare (so the profile's
-palette can't catch it), but locally it is dominant — and a surviving floor
+palette cannot catch it), but locally it is dominant. A surviving floor
 bridges everything on the parcel into one giant cluster.
 `partition_floor_share: Some(0.3)` fixes this generically: per partition, any
 material holding ≥30% of that partition's blocks *inside the substrate band* is
@@ -449,24 +449,23 @@ enter the content ID; keep predicate source under version control with the run.
 
 Tiles are segmented independently; `StitchState` reunites builds that cross tile
 boundaries. Its `merge` is **associative, commutative, and idempotent** (property
-tested), so partial stitches can be combined in any order and any grouping —
-including a tree reduction across machines. Sequential single-process merging is
+tested), so partial stitches can be combined in any order and any grouping: including a tree reduction across machines. Sequential single-process merging is
 what `WorldSegmenter` does; the algebra is what makes anything fancier possible
 without changing results.
 
 If you consume `TileSegments` directly: `MarginCell` entries carry their
 partition, and a stitcher must never union margin entries whose partitions
-differ — two entries can share a cell precisely because per-block partitioning
+differ: two entries can share a cell precisely because per-block partitioning
 allows a cell to straddle a boundary.
 
 ### Scoring
 
 `score(&build, &ScoreConfig)` assigns a tier from explainable signals (block
-count, bbox volume, density, cluster count — each recorded on the result):
+count, bbox volume, density, cluster count: each recorded on the result):
 
-- `Debris` — at or below `debris_max_blocks` (default 100),
-- `Confident` — at least `confident_min_blocks` **and** `confident_min_density`,
-- `Probable` — everything between.
+- `Debris`: at or below `debris_max_blocks` (default 100),
+- `Confident`: at least `confident_min_blocks` **and** `confident_min_density`,
+- `Probable`: everything between.
 
 Scoring is per-build and pure (no percentiles over the whole set), so it shards
 and re-runs freely. Nothing filters Debris out; it is a label for triage.
@@ -484,7 +483,7 @@ matches by bounding-box IoU:
   `Split { inherits }` with fresh ids,
 - many prior, one current → `Merge { from }`, inheriting from the largest prior.
 
-All tie-breaks are content-ordered — input order never changes the outcome.
+All tie-breaks are content-ordered: input order never changes the outcome.
 Spatial identity is deliberate: a build edited in place keeps its id (and your
 curation attached to it); a content-hash identity would orphan it on every edit.
 
@@ -500,7 +499,7 @@ config_hash · profile_hash · extracted_at
 ```
 
 `block_count` describes the schematic actually produced. `extracted_at` is a
-caller-supplied timestamp — the library never reads the clock, so identical
+caller-supplied timestamp: the library never reads the clock, so identical
 inputs give byte-identical envelopes. Materialization also embeds the common
 [`SchematicProvenance`](schematic-provenance.md) record in every schematic.
 Keep the JSONL envelopes as a queryable index (which box, snapshot, and
@@ -533,16 +532,16 @@ partition) that attribution or cataloguing can join without opening every file.
 
 - **Catalogue a creative server's map**: stream the nightly backup, HardCut on
   the plot grid, and publish each non-debris build as a schematic with its
-  provenance row — 845 regions became ~4,500 addressable builds in ~30 minutes
+  provenance row: 845 regions became ~4,500 addressable builds in ~30 minutes
   in our validation run, deterministically.
 - **Incremental snapshots**: keep each run's provenance; feed it as `prior` to
   the next run. Edited builds keep their `StableBuildId` with a new fingerprint;
-  new builds mint ids; splits and merges are labeled as such — a version history
+  new builds mint ids; splits and merges are labeled as such: a version history
   of a living world.
 - **Non-world voxel data**: anything you can voxelize into tiles can be
-  segmented — the pipeline never asks where the voxels came from.
+  segmented: the pipeline never asks where the voxels came from.
 - **Distributed extraction** (advanced): segment tiles on many workers, ship
-  `TileSegments` + serialized `StitchState`s, tree-reduce with `merge` — the
+  `TileSegments` + serialized `StitchState`s, tree-reduce with `merge`: the
   algebra guarantees the same answer as a single-threaded fold.
 
 ## FFI / bindings

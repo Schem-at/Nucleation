@@ -131,7 +131,7 @@ contract changes.
 same projected-footprint JSON used by `Geo.extrude_footprints`, spatially clips
 work to the requested chunk, and reports sparse coverage. Network fetching, OSM
 PBF parsing, source revision selection, and latitude/longitude projection remain
-explicit caller responsibilities—Nucleation never guesses a CRS or silently
+explicit caller responsibilities: Nucleation never guesses a CRS or silently
 substitutes missing tiles.
 
 ```python
@@ -168,7 +168,7 @@ Those adapters return the same bounded `ChunkResult`; traversal, scheduling,
 caching, cancellation, and persistence remain separate concerns.
 
 The complete deterministic SDF + projected-feature example is
-[`infinite_riverfall_world.py`](../../examples/features/streaming-and-worlds/infinite_riverfall_world.py).
+[`infinite_riverfall_world.py`](https://github.com/Schem-at/Nucleation/blob/master/examples/features/streaming-and-worlds/infinite_riverfall_world.py).
 The OSM Financial District below uses the same projected-vector boundary: 179
 buildings streamed one 16×16 chunk column at a time.
 

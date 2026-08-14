@@ -1,10 +1,10 @@
 # The Nucleation Gallery
 
 Ten builds that show what composes. The static recipes live in
-[`tools/readme-media/generate.py`](../tools/readme-media/generate.py); the
+[`tools/readme-media/generate.py`](https://github.com/Schem-at/Nucleation/blob/master/tools/readme-media/generate.py); the
 animated trefoil has its own public-Python generator. Everything is rendered by
 Nucleation itself and small enough to read in a sitting. Back to the
-[README](../README.md).
+[documentation home](index.md).
 
 Snippets below assume `from nucleation import *`, an empty schematic `s`, and a
 little `hsv(t)` helper that returns an `(r, g, b)` for a hue in `[0, 1)`.
@@ -40,7 +40,7 @@ then travels across the loop boundary while the camera completes exactly one
 turn per six-second period.
 
 <div align="center">
-<img src="media/gallery/trefoil.gif" width="460" alt="A seamless animated trefoil knot assembling and dissolving as a rainbow wave travels around it">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gallery/trefoil.gif" width="460" alt="An animated trefoil knot assembling and dissolving as a rainbow wave travels around it">
 </div>
 
 ```python
@@ -66,7 +66,7 @@ camera.set_repeat_forever()
 animation.animate_camera(camera, 0)
 ```
 
-[Complete Python generator](../examples/gallery/trefoil/generate.py) ·
+[Complete Python generator](https://github.com/Schem-at/Nucleation/blob/master/examples/gallery/trefoil/generate.py) ·
 [Download the generated schematic](downloads/gallery/trefoil.schem)
 
 ## Menger sponge
@@ -244,4 +244,4 @@ for y in range(h):
 
 That's ten. Every one is a few dozen lines that lean on the same handful of
 primitives: shapes, an SDF string, a brush, a palette, a voxelizer. Pick one,
-change a number, and it's yours. Back to the [README](../README.md).
+change a number, and it's yours. Back to the [documentation home](index.md).

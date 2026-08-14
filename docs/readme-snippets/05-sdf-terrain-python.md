@@ -33,6 +33,6 @@ terrain: (29, 18, 29) blocks: 6927
 ```
 
 The complete runnable file is
-[`examples/readme/sdf-gradient/generate.py`](../../examples/readme/sdf-gradient/generate.py).
+[`examples/readme/sdf-gradient/generate.py`](https://github.com/Schem-at/Nucleation/blob/master/examples/readme/sdf-gradient/generate.py).
 JSON is only needed when importing or exporting an old SDF recipe:
 `Sdf.from_json_string(data)` / `field.to_json()`.

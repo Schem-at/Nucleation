@@ -1,0 +1,159 @@
+site_name: Nucleation
+site_description: Load, build, simulate, mesh, and render Minecraft schematics from seven languages.
+site_url: https://schem-at.github.io/Nucleation/
+repo_url: https://github.com/Schem-at/Nucleation
+repo_name: Schem-at/Nucleation
+edit_uri: edit/master/docs/
+copyright: Copyright &copy; 2026 Nucleation contributors · MIT licensed
+
+theme:
+  name: material
+  custom_dir: overrides
+  font: false
+  language: en
+  icon:
+    logo: material/cube-scan
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: basalt
+      toggle:
+        icon: material/book-open-page-variant
+        name: Switch to Vellum
+    - media: "(prefers-color-scheme: light)"
+      scheme: vellum
+      toggle:
+        icon: material/texture-box
+        name: Switch to Basalt
+  features:
+    - announce.dismiss
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - navigation.footer
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Basics: features/basics.md
+      - Formats and I/O: features/formats-and-io.md
+      - Bindings and languages: features/bindings-and-languages.md
+  - Build:
+      - Shapes and brushes: features/shapes-and-brushes.md
+      - SDFs, terrain, and fields: features/sdf-and-fields.md
+      - Palettes and color: features/palettes-and-color.md
+      - Regions and transforms: features/regions-and-transforms.md
+      - Composition: features/composition.md
+      - Voxelize 3D models: features/voxelize.md
+      - Geodata: features/geo.md
+      - Blocks, entities, and NBT: features/block-entities-nbt.md
+  - Worlds and data:
+      - Streaming and worlds: features/streaming-and-worlds.md
+      - World segmentation: features/world-segmentation.md
+      - Schematic provenance: features/schematic-provenance.md
+      - Transformation policies: features/transformation-policies.md
+      - Versions and translation: features/versions-and-translation.md
+      - Block database: features/block-database.md
+      - Storage: features/storage.md
+  - Simulate and render:
+      - Redstone simulation: features/redstone-simulation.md
+      - Tick simulation: features/tick-simulation.md
+      - Tick mechanics: features/tick-simulation-mechanics.md
+      - Meshing and rendering: features/meshing-and-rendering.md
+      - Animation: features/animation.md
+      - Analysis: features/analysis.md
+      - Embedded scripting: features/scripting.md
+  - Gallery: gallery.md
+  - API reference:
+      - Rust: rust/README.md
+      - Python: python/README.md
+      - JavaScript: javascript/README.md
+      - Python API: api-reference-python.md
+      - WASM API: api-reference-wasm.md
+      - FFI API: api-reference-ffi.md
+  - Contributing: DEV.md
+
+plugins:
+  - search:
+      lang: en
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      title: On this page
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Schem-at/Nucleation
+      name: Nucleation on GitHub
+    - icon: fontawesome/brands/rust
+      link: https://crates.io/crates/nucleation
+      name: Nucleation on crates.io
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/nucleation/
+      name: Nucleation on PyPI
+    - icon: fontawesome/brands/npm
+      link: https://www.npmjs.com/package/nucleation
+      name: Nucleation on npm
+
+exclude_docs: |
+  /README.md
+  animation-video-api.md
+  building/
+  compiled-circuit-integration-note.md
+  fork-surface.md
+  planning/
+  plans/
+  schematic-renderer-integration.md
+  sim-lab-animation-handover.md
+  sim-lab-timeline-handover.md
+  superpowers/
+
+validation:
+  nav:
+    omitted_files: info
+    not_found: warn
+    absolute_links: relative_to_docs
+  links:
+    not_found: warn
+    absolute_links: relative_to_docs
+    unrecognized_links: warn
+    anchors: warn
+
+watch:
+  - README.md

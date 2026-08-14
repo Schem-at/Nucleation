@@ -19,7 +19,7 @@ s.set_block(x, 0, y, palette.closest_block_dithered(r, g, b, x, 0, y))
 ```
 
 The full recipe, including the flat-palette filter chain, is `scene_paintings`
-in [`tools/readme-media/generate.py`](../../tools/readme-media/generate.py).
+in [`tools/readme-media/generate.py`](https://github.com/Schem-at/Nucleation/blob/master/tools/readme-media/generate.py).
 
 And a flat image is also a heightmap: read each pixel's brightness as a column
 height and paint it with its own color, and the same Starry Night lifts off the
@@ -56,7 +56,7 @@ Palette.wood().block_ids_json()   # ["minecraft:birch_planks", "minecraft:spruce
 Palette.concrete().len()          # 16
 ```
 
-`PaletteBuilder` composes filters over the block database — vanilla tags,
+`PaletteBuilder` composes filters over the block database: vanilla tags,
 definition kinds, and classification flags:
 
 ```python
@@ -87,11 +87,10 @@ Palette.grayscale().ramp_ids_json(255, 255, 255, 0, 0, 0, 24)
 
 Known limitation: matching runs on each block's *average* texture color, so a
 block whose average is neutral but whose texture is patterned (birch wood's
-bark eyes, ores' flecks) can be selected even though it reads as noise —
-exclude such blocks by keyword if they bother you.
+bark eyes, ores' flecks) can be selected even though it reads as noise: exclude such blocks by keyword if they bother you.
 
 **`gradient_ids(start, end, steps)`** samples the color line per step and
-snaps each sample to the *closest* block — repeats allowed. This is the right
+snaps each sample to the *closest* block: repeats allowed. This is the right
 tool for value→block lookups where you index the list:
 
 ```python
@@ -99,7 +98,7 @@ ramp = json.loads(Palette.wool().gradient_ids_json(255, 80, 40, 60, 40, 180, 8))
 s.set_block(px, 0, pz, ramp[escape_iterations(px, pz)])
 ```
 
-Index a ramp by any value — escape time, height, temperature:
+Index a ramp by any value: escape time, height, temperature:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mandelbrot.png" width="420" alt="128x128 block mandelbrot from a concrete ramp">
@@ -111,7 +110,7 @@ indexing, and `closest_block(r, g, b)` answers single lookups.
 
 ## Palettes inside other systems
 
-- Every color/gradient **brush** takes `set_palette(palette)` — snapping
+- Every color/gradient **brush** takes `set_palette(palette)`: snapping
   happens per placed block.
 - **SDF material rules** accept palettes in `gradient` fill rules
   ([SDF guide](sdf-and-fields.md)).
@@ -119,4 +118,4 @@ indexing, and `closest_block(r, g, b)` answers single lookups.
   `palette_block_ids`, and `palette_closest_block`
   ([scripting guide](scripting.md)).
 
-Verified runnable examples: [`docs/readme-snippets/`](../readme-snippets/).
+Verified runnable examples: [`docs/readme-snippets/`](https://github.com/Schem-at/Nucleation/tree/master/docs/readme-snippets).

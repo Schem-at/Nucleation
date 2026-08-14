@@ -396,7 +396,7 @@ This helps debug issues where bits map to unexpected positions.
 
 ## API Reference
 
-- [Rust API](../api/rust.md#typedcircuitexecutor)
-- [JavaScript API](../api/javascript.md#typedcircuitexecutor)
-- [Python API](../api/python.md#typedcircuitexecutor)
+- [Rust API](../../rust/README.md#typedcircuitexecutor)
+- [JavaScript API](../../javascript/README.md#typedcircuitexecutor)
+- [Python API](../../python/README.md#typedcircuitexecutor)
 - [Circuit API Guide](circuit-api.md) - CircuitBuilder and DefinitionRegion

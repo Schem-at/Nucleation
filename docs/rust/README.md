@@ -514,7 +514,7 @@ nucleation = { version = "*", features = ["simulation", "serde"] }
 
 ## Examples
 
-See the [`examples/`](../../examples/) directory for complete working examples:
+See the [`examples/`](https://github.com/Schem-at/Nucleation/tree/master/examples) directory for complete working examples:
 
 - `create_simple_litematic.rs` - Basic schematic creation
 - `test_unicode_circuit.rs` - SchematicBuilder with Unicode palettes
@@ -526,5 +526,4 @@ See the [`examples/`](../../examples/) directory for complete working examples:
 - [SchematicBuilder Guide](../shared/guide/schematic-builder.md)
 - [TypedCircuitExecutor Guide](../shared/guide/typed-executor.md)
 - [Unicode Palette Reference](../shared/unicode-palette.md)
-
 

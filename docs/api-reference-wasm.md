@@ -1063,7 +1063,7 @@ for (const st of [...s.detectStructuresGraph(), ...s.detectStructures()]) {
 all.sort((a, b) => b.coverage - a.coverage);   // diagonal (high coverage) first
 ```
 
-### SchematicWrapper.autostackResize1d / autostackResize2d
+### SchematicWrapper.autostackResize1d / autostackResize2d {#schematicwrapperautostackresize1d--autostackresize2d}
 
 | Method | Signature | Description |
 |--------|-----------|-------------|

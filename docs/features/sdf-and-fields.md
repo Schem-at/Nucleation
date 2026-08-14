@@ -69,7 +69,7 @@ rocket = hull.subtract(window_cut).union_with(window)
 ```
 
 <div align="center">
-<img src="../media/features/sdf-and-fields/primitive-rocket.gif" width="420" alt="A small red and white voxel rocket materializing from clustered block layers, holding complete, then dematerializing">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/features/sdf-and-fields/primitive-rocket.gif" width="420" alt="A small red and white voxel rocket materializing from clustered block layers, holding complete, then dematerializing">
 </div>
 
 The animation evaluates that exact graph at voxel centers. Small fragments of
@@ -77,14 +77,14 @@ each Y layer become construction groups, making the blocks visibly assemble
 without hiding the composition behind custom rendering code.
 
 <div align="center">
-<a href="../../examples/features/sdf-and-fields/primitive_rocket.py">Complete Python generator</a>
-· <a href="../downloads/features/sdf-and-fields/primitive-rocket.schem">Download .schem</a>
+<a href="https://github.com/Schem-at/Nucleation/blob/master/examples/features/sdf-and-fields/primitive_rocket.py">Complete Python generator</a>
+· <a href="https://schem-at.github.io/Nucleation/downloads/features/sdf-and-fields/primitive-rocket.schem">Download .schem</a>
 </div>
 
 ## Portable custom fields
 
 Use `FieldProgramBuilder` when a field is mathematical but not a built-in node.
-It records deterministic typed bytecode—scalar, vector, and boolean values;
+It records deterministic typed bytecode for scalar, vector, and boolean values;
 local slots; arithmetic and trigonometry; comparisons and selection; and
 statically bounded `repeat`/`breakIf` blocks. `Sdf.from_program(program)` turns
 the validated result into an ordinary node, so it can be transformed, combined,
@@ -113,7 +113,7 @@ differences. Evaluation scratch storage is reused by each program evaluator,
 avoiding per-voxel heap allocation.
 
 The complete power-8 Mandelbulb program is
-[`examples/field_program_mandelbulb.py`](../../examples/field_program_mandelbulb.py).
+[`examples/field_program_mandelbulb.py`](https://github.com/Schem-at/Nucleation/blob/master/examples/field_program_mandelbulb.py).
 It builds bounded bytecode, round-trips versioned JSON, converts to `Sdf`, and
 composes with native nodes. The release-validation instructions below run it
 manually against a freshly installed wheel; current CI uses a smaller inline
@@ -127,8 +127,8 @@ records the resulting voxels into `BuildAnimation` groups, and asks Nucleation's
 renderer and GIF encoder for the final loop.
 
 <div align="center">
-<img src="../media/features/sdf-and-fields/gyroid-bloom.gif" width="390" alt="A cyan voxel gyroid assembling upward from spatial block clusters, holding complete, then dematerializing">
-<img src="../media/features/sdf-and-fields/mandelbulb-forge.gif" width="390" alt="A violet and magenta voxel Mandelbulb assembling outward from radial block clusters, holding complete, then dematerializing">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/features/sdf-and-fields/gyroid-bloom.gif" width="390" alt="A cyan voxel gyroid assembling upward from spatial block clusters, holding complete, then dematerializing">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/features/sdf-and-fields/mandelbulb-forge.gif" width="390" alt="A violet and magenta voxel Mandelbulb assembling outward from radial block clusters, holding complete, then dematerializing">
 </div>
 
 <table>
@@ -139,16 +139,16 @@ A compact implicit program evaluates
 <code>|sin x cos y + sin y cos z + sin z cos x| - t</code>, then intersects the
 surface with a native sphere. Non-empty Y layers are split into small spatial
 groups, so the labyrinth visibly assembles from bottom to top.<br><br>
-<a href="../../examples/features/sdf-and-fields/gyroid_bloom.py">Complete Python generator</a>
-· <a href="../downloads/features/sdf-and-fields/gyroid-bloom.schem">Download .schem</a>
+<a href="https://github.com/Schem-at/Nucleation/blob/master/examples/features/sdf-and-fields/gyroid_bloom.py">Complete Python generator</a>
+· <a href="https://schem-at.github.io/Nucleation/downloads/features/sdf-and-fields/gyroid-bloom.schem">Download .schem</a>
 </td>
 <td width="50%" valign="top">
 <strong>Mandelbulb forge</strong><br>
 The twelve-iteration power-8 estimator is the same versioned program used by the
 portable example above. Its occupied voxels are grouped by radius, angular
 sector, and hemisphere, so the fractal assembles from its core outward.<br><br>
-<a href="../../examples/features/sdf-and-fields/mandelbulb_forge.py">Complete Python generator</a>
-· <a href="../downloads/features/sdf-and-fields/mandelbulb-forge.schem">Download .schem</a>
+<a href="https://github.com/Schem-at/Nucleation/blob/master/examples/features/sdf-and-fields/mandelbulb_forge.py">Complete Python generator</a>
+· <a href="https://schem-at.github.io/Nucleation/downloads/features/sdf-and-fields/mandelbulb-forge.schem">Download .schem</a>
 </td>
 </tr>
 </table>
@@ -247,7 +247,7 @@ through tuff to andesite, with the lava pool sitting in the crater.
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/cross-section.png" width="720" alt="The volcano island sliced through the crater, exposing the lava pool and the stone strata inside">
 </div>
 
-Materials can also key on the **surface normal**, not just height and depth. On a
+Materials can key on the surface normal as well as height and depth. On a
 heightmap it is the gradient of the heights; on a solid build `DistanceField`'s
 `slope` gives it directly. Its upward component decides the ground cover: gentle
 ground greens over, steep faces stay rock, snow caps the flat peaks.
@@ -258,7 +258,7 @@ surf = "grass_block" if ny > 0.82 else "stone"             # + snow on high flat
 ```
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/slope-paint.png" width="760" alt="A rolling landscape painted by slope: grass on the flats, coarse dirt on the inclines, bare stone on the steepest faces, snow on the high flats">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/slope-paint.png" width="760" alt="Rolling terrain painted by slope: grass on the flats, coarse dirt on inclines, bare stone on steep faces, and snow on high flats">
 </div>
 
 ## Fields and patterns
@@ -439,8 +439,8 @@ preset names or `{"ids": [...]}`; `range` must be `[min, max]` (swap
 lightness-sorted palette directly instead of color-matching. `surface`
 rules scatter decorations on matching surface blocks.
 
-The [README](../../README.md)'s volcano island is one such tree —
-`scene_hero` in [`tools/readme-media/generate.py`](../../tools/readme-media/generate.py)
+The [project README](https://github.com/Schem-at/Nucleation#readme) volcano island uses one such tree.
+`scene_hero` in [`tools/readme-media/generate.py`](https://github.com/Schem-at/Nucleation/blob/master/tools/readme-media/generate.py)
 is the full recipe (smooth-unioned ellipsoids and a cone, cylinder-cored
 crater, 4-octave displacement, noise-gated snow, flower scatter).
 
@@ -462,9 +462,9 @@ rules = {"fill": [{"gradient": {
 # one schematic_from_sdf call per frame, three spheres orbiting under smoothUnion k=10
 ```
 
-The full scene — including the camera setup that keeps the loop from
-pulsing (`RenderConfig.set_sphere_fit`) — is `scene_metaballs` in
-[`tools/readme-media/generate.py`](../../tools/readme-media/generate.py).
+The full scene is `scene_metaballs` in
+[`tools/readme-media/generate.py`](https://github.com/Schem-at/Nucleation/blob/master/tools/readme-media/generate.py).
+Its camera calls `RenderConfig.set_sphere_fit` to keep the loop from pulsing.
 You can also let the engine pick the ladder itself:
 `Palette.grayscale().ramp_ids_json(255,255,255, 0,0,0, 19)`
 ([palette guide](palettes-and-color.md)).

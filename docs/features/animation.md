@@ -1,7 +1,7 @@
 # Animating a build
 
 Nucleation can describe **which block is where, at what pose, at time *t***.
-That description is a plain data model — no GPU, no rendering — so it drives
+That description is a plain data model with no GPU or rendering dependency. It drives
 nucleation's own renderer, an exported JSON timeline, or anything else that can
 draw a transform.
 
@@ -23,7 +23,7 @@ positions ──> Grouping ──> [Group]  ──> Timeline ──seek(t)──
                           (order + delays)
 ```
 
-- A **`Group`** is one animatable unit — a block, a layer, a chunk, a region.
+- A **`Group`** is one animatable unit: a block, a layer, a chunk, a region.
 - A **`Clip`** is what happens to a group: property tracks with keyframes,
   easing, delay, repeat, ping-pong.
 - A **`Stagger`** decides the *order* groups animate in and *when* each starts.
@@ -63,7 +63,7 @@ a.render_gif(Path("pack.zip").read_bytes(), view, "stairs.gif", 18, 750)
 ```
 
 <div align="center">
-<img src="../media/readme/animation/workshop.gif" width="420" alt="A workshop floor assembling with a furnace, crafting table, chest, and equipped armor stand">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/readme/animation/workshop.gif" width="420" alt="A workshop floor assembling with a furnace, crafting table, chest, and equipped armor stand">
 </div>
 
 For travelling-wave geometry such as the trefoil, use
@@ -72,7 +72,7 @@ Custom effects use `AnimationEffect.create`, `add_tween`, and `add_keyframe`;
 blocks and the camera consume exactly the same effect representation.
 
 The complete README example is
-[`examples/readme/animation/workshop.py`](../../examples/readme/animation/workshop.py),
+[`examples/readme/animation/workshop.py`](https://github.com/Schem-at/Nucleation/blob/master/examples/readme/animation/workshop.py),
 and its exact output is available as a
 [`workshop.schem` download](../downloads/readme/animation/workshop.schem).
 
@@ -114,14 +114,14 @@ design: *what moves* and *how it moves* stay fixed, and only the ranking changes
 | `DistanceFrom(point)` | ripples outward from a point |
 | `Key(Vec<f64>)` | any caller-supplied sort key |
 | `Custom(Vec<usize>)` | an explicit permutation |
-| `Random(seed)` | seeded shuffle — never unseeded |
+| `Random(seed)` | seeded shuffle: never unseeded |
 
 `Key` is the general case, and two helpers produce the interesting keys.
 
 ### Along a shape's own curve
 
 `ShapeEnum::parameter_at` gives the parametric `t` of a position along a line,
-cylinder, cone, torus, pyramid or bezier — the same `t` a `curve_gradient` brush
+cylinder, cone, torus, pyramid or bezier: the same `t` a `curve_gradient` brush
 uses to pick a colour. Feed it to the animator and blocks arrive **in the order
 the curve sweeps**:
 
@@ -149,7 +149,7 @@ anim.timeline_mut().add_staggered(
 This trips people up, so it is worth stating plainly:
 
 - The easing inside a **`Clip`** shapes **how a group moves** once it starts.
-- `Stagger::ease` shapes **when each group starts** — an accelerating or
+- `Stagger::ease` shapes **when each group starts**: an accelerating or
   decelerating wave across the build.
 
 ```rust
@@ -210,7 +210,7 @@ source rather than two that can disagree.
 
 ### Modifiers
 
-A `Modifier` post-processes a track's value — `SinCosBounce` drives the
+A `Modifier` post-processes a track's value: `SinCosBounce` drives the
 `0.5 · (|sin v| + |cos v|)` arc when a track sweeps `0..4π`:
 
 ```rust
@@ -236,7 +236,7 @@ per block **changes material batching and raises draw counts**. Use `PerBlock`
 for hero shots of hundreds to low thousands of blocks; use `Layer` or `Chunk`
 for anything large. Measure before relying on it.
 
-Air is never grouped — air is absence, not a block.
+Air is never grouped: air is absence, not a block.
 
 ## The camera is on the same clock
 
@@ -252,7 +252,7 @@ The mapping is: `RotY → yaw`, `RotX → pitch`, `ScaleUniform → zoom`,
 
 ## Determinism
 
-`Timeline::seek` is pure — no interior mutation, no wall-clock. The same time
+`Timeline::seek` is pure: no interior mutation, no wall-clock. The same time
 always yields the same frame, sampling out of order changes nothing, and
 `Order::Random` is seeded with no unseeded variant.
 
@@ -270,7 +270,7 @@ A group's pose pivots about its **centroid** by default, which is what makes
 `Pose::pivot` to swing a group about a hinge instead.
 
 `Pose::normal_matrix()` returns the inverse-transpose for transforming normals.
-Renderers **must** apply it — skip it and rotated geometry shades wrong in a way
+Renderers **must** apply it: skip it and rotated geometry shades wrong in a way
 that reads as a lighting bug. Degenerate poses (a block at scale 0 mid-reveal)
 return identity rather than emitting NaNs.
 
@@ -291,7 +291,7 @@ anim.timeline_mut().add_staggered(
 let spin = presets::turntable(anim.duration_ms());
 anim.timeline_mut().add(spin, Target::Camera, 0.0);
 
-// One MeshOutput per group, index-aligned — this is the contract.
+// One MeshOutput per group, index-aligned: this is the contract.
 let meshes = schem.mesh_groups(&pack, &MeshConfig::default(), anim.groups())?;
 
 let mut rc = RenderConfig::isometric();
@@ -310,7 +310,7 @@ backgrounds:
 rc.background = Some([0.0, 0.0, 0.0, 0.0]);
 ```
 
-GIF only has **1-bit** transparency — a pixel is fully opaque or fully gone. That
+GIF only has **1-bit** transparency: a pixel is fully opaque or fully gone. That
 would normally fringe antialiased edges, but the renderer does not multisample
 (`count: 1`), so edges are hard-cut and the cutout is clean. Two ffmpeg flags do
 the work:
@@ -326,7 +326,7 @@ ffmpeg -y -framerate 24 -i 'out/f%04d.png' \
 `alpha_threshold=128` picks the opaque/clear cutoff. Omit either and the
 background comes back as solid black.
 
-For full 8-bit alpha, APNG is the alternative and GitHub renders it — but
+For full 8-bit alpha, APNG is the alternative. GitHub renders it, but
 expect roughly double the file size:
 
 ```bash
@@ -336,7 +336,7 @@ ffmpeg -y -framerate 24 -i 'out/f%04d.png' -plays 0 -f apng out.png
 Keep README animations small: drop to 12–15fps, shrink the canvas, and lower
 `max_colors`. A 480×360 55-frame clip lands around 430 KB as a GIF.
 
-`mesh_groups` is what keeps mesh *i* aligned with group *i* — groups that
+`mesh_groups` is what keeps mesh *i* aligned with group *i*: groups that
 contain only air still produce an entry so the indices never slip.
 
 The GPU renderer, atlas and geometry buffers are built **once** and reused for
@@ -381,7 +381,7 @@ bindings, call
 
 ## Screen-space overlays (labels, leader lines, code)
 
-Text and 2D chrome live in a **compositor**, not the 3D renderer — that keeps a
+Text and 2D chrome live in a `compositor`, outside the 3D renderer. This keeps a
 heavy text-rendering dependency out of the library. The renderer's job is to
 say *where on screen* a block is; the compositor draws the callout.
 
@@ -397,7 +397,7 @@ if let Some((px, py)) = project_point(&view_projs[i], [2.5, 2.5, 2.5], rc.width,
 
 `examples/readme/animation/assemble.rs` writes these anchors to `anchors.json`; a
 compositor then draws a leader line and caption that track the block frame by
-frame. A 2D screen-space grid is the same idea — evenly spaced lines drawn by
+frame. A 2D screen-space grid is the same idea: evenly spaced lines drawn by
 the compositor.
 
 ## Presets
@@ -413,5 +413,5 @@ the compositor.
 | `print_layers(schem, axis, ms)` | layer-by-layer print |
 | `along_shape(schem, shape, clip, ms)` | reveal along a curve |
 
-Presets return ordinary `Clip`s and `BuildAnimator`s — keep editing the timeline
+Presets return ordinary `Clip`s and `BuildAnimator`s: keep editing the timeline
 if one is nearly right.

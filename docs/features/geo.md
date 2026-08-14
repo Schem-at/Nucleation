@@ -42,6 +42,6 @@ city.save_world("fidi-world/", "")     # or stream chunk-by-chunk with WorldSink
 ```
 
 All four are reproducible recipes in
-[`tools/readme-media/generate.py`](../../tools/readme-media/generate.py)
+[`tools/readme-media/generate.py`](https://github.com/Schem-at/Nucleation/blob/master/tools/readme-media/generate.py)
 (`globe`, `mountains`, `city`), and the geo API has a
 [runnable snippet](../readme-snippets/16-geo-osm-python.md).

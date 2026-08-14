@@ -32,4 +32,4 @@ Swap the torus for a mesh, the painting for a heightmap, the palette for
 grayscale, and it is a different build with the same five moves. There's a
 [runnable version](../readme-snippets/18-compose-torus-python.md) you can paste
 and adapt; the full recipe is `scene_compose` in
-[`tools/readme-media/generate.py`](../../tools/readme-media/generate.py).
+[`tools/readme-media/generate.py`](https://github.com/Schem-at/Nucleation/blob/master/tools/readme-media/generate.py).
