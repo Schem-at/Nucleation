@@ -1,185 +1,208 @@
 # Formats and I/O
 
-Nucleation uses one editable [`Schematic`](basics.md) model for every supported
-container. Load by content, edit through the normal construction API, then choose
-the output format explicitly or by file extension.
+Nucleation loads every supported container into one editable schematic model.
+Input detection reads the payload, not the filename. Output is explicit: choose
+an exporter, version, and settings, or let a native file method select the
+exporter from a known extension.
 
-```python
-from nucleation import Schematic
+![Content detectors feeding one editable schematic model, followed by explicit exporters for structure, snapshot, and world formats](../media/readme/formats-and-io/format-pipeline.svg)
 
-build = Schematic.load_from_file("build.litematic")
-build.set_block(1, 3, 1, "minecraft:glowstone")
-build.save_to_file("build.schem")
-```
+## One fixture in three bindings
 
-`load_from_file` inspects the bytes rather than trusting the filename. The
-extension matters when writing: `.litematic`, `.schem`, `.mcstructure`, `.snbt`,
-`.nusn`, and `.zip` select their corresponding exporters. An unknown output
-extension is an error; Nucleation does not silently choose a fallback format.
+The examples build the same 19-block fixture. It includes block-state
+properties and chest NBT because those are common format-loss boundaries.
 
-For coordinates, block placement, automatic region growth, and block-state
-strings, start with [Basics](basics.md).
+=== "Python"
 
-## Schematic containers
+    ```python
+    --8<-- "examples/readme/formats-and-io/formats_io.py:build"
+    ```
 
-| Format | Extension | Read | Write | Exporter key | Notes |
+=== "JavaScript"
+
+    ```javascript
+    --8<-- "examples/readme/formats-and-io/formats_io.mjs:build"
+    ```
+
+=== "Rust"
+
+    ```rust
+    --8<-- "examples/readme/formats-and-io/rust/src/main.rs:build"
+    ```
+
+<figure markdown="span">
+  ![A stone-brick format test fixture assembling with a named chest, oak stair, and lever](../media/readme/formats-and-io/round-trip-build.gif){ width="460" }
+  <figcaption>The three programs export this fixture with exact schematic-content parity.</figcaption>
+</figure>
+
+## Supported containers
+
+| Format | Extension | Read | Write | Exporter key | Important boundary |
 | --- | --- | :---: | :---: | --- | --- |
-| **Litematica** | `.litematic` | yes | yes | `litematic` | Multi-region native; the reference container |
-| **Sponge Schematic** | `.schem` | yes | yes | `schematic` | WorldEdit/community format; exporter versions `v2` and `v3` |
-| **Bedrock structure** | `.mcstructure` | yes | yes | `mcstructure` | Java block IDs and states are translated through GeyserMC mappings |
-| **Java structure SNBT source** | `.snbt` | yes | yes | `structure_snbt` | Human-readable structure source used by data packs, mod tooling, guides, and GameTest suites |
-| **Nucleation snapshot** | `.nusn` | yes | yes | `snapshot` | Fast, uncompressed internal interchange format |
-| **Legacy MCEdit** | `.schematic` | yes | no | n/a | Pre-Flattening numeric IDs; import only |
+| Litematica | `.litematic` | yes | yes | `litematic` | Preserves multiple regions and Java data |
+| Sponge Schematic | `.schem` | yes | yes | `schematic` | Export versions `v2` and `v3` |
+| Bedrock structure | `.mcstructure` | yes | yes | `mcstructure` | Translates Java IDs and states through GeyserMC mappings |
+| Java structure SNBT | `.snbt` | yes | yes | `structure_snbt` | Textual, rectangular, and single-volume |
+| Nucleation snapshot | `.nusn` | yes | yes | `snapshot` | Fast uncompressed internal interchange |
+| Legacy MCEdit | `.schematic` | yes | no | none | Numeric pre-Flattening IDs; import only |
 
-Use `.schem` for Sponge output. The modern Sponge exporter accepts
-`.schematic` as an extension alias, but it does not produce the deprecated
-MCEdit format.
+Use `.schem` for modern Sponge output. The writer accepts `.schematic` as an
+extension alias, but it still produces Sponge data, not the legacy MCEdit
+format.
 
-## Worlds are a separate I/O surface
+World data has a separate surface because a world can be much larger than a
+structure container:
 
-Anvil data can be much larger than a normal schematic container, so world APIs
-support bounded imports and directory-oriented output:
+- MCA region bytes: `from_mca` and `from_mca_bounded`;
+- zipped world bytes: `from_world_zip`, bounded variants, or `from_data`;
+- native world directory: `from_world_directory` and its bounded variant;
+- output: `save_world`, `to_world_zip_b64`, or the `world` exporter.
 
-- `.mca` region file: `Schematic.from_mca(...)` or
-  `Schematic.from_mca_bounded(...)`;
-- zipped world: `Schematic.from_world_zip(...)`, bounded variants, or generic
-  content detection through `from_data`;
-- world directory: `Schematic.from_world_directory(...)` or
-  `from_world_directory_bounded(...)` on native targets;
-- export: `save_world(...)`, `to_world_zip_b64(...)`, or `.zip` through the
-  normal extension-based writer.
+Use [Streaming and worlds](streaming-and-worlds.md) when the complete world
+should not become one in-memory schematic.
 
-See [Chunk iteration, streaming, and worlds](streaming-and-worlds.md) for
-constant-memory pipelines and world-generation workflows.
+## Detect input by content
 
-## Input detection is content-based
+`load_from_file` reads the bytes and runs the registered detectors. Renaming a
+litematic to `unknown.bin` does not change its format. `from_data` performs the
+same detection on a byte buffer and works in every generated binding.
 
-Both `load_from_file` and `from_data` run the registered format detectors over
-the payload. Renaming a litematic to `mystery.bin` does not change what it is:
+=== "Python"
 
-```python
-from pathlib import Path
-from nucleation import Schematic
+    ```python
+    --8<-- "examples/readme/formats-and-io/formats_io.py:bytes"
+    ```
 
-payload = Path("mystery.bin").read_bytes()
-build = Schematic.from_data(payload)
+=== "JavaScript"
+
+    ```javascript
+    --8<-- "examples/readme/formats-and-io/formats_io.mjs:bytes"
+    ```
+
+=== "Rust"
+
+    ```rust
+    --8<-- "examples/readme/formats-and-io/rust/src/main.rs:bytes"
+    ```
+
+If a detector recognizes the container but parsing fails, loading returns a
+parse error. If no detector matches, it returns an invalid-argument error. It
+does not manufacture a partial schematic from unknown bytes.
+
+Use bounded decoders for untrusted or unusually large payloads. The limits cap
+input bytes, decompressed NBT bytes, region count, volume, palette size, block
+entities, and entities before the payload can consume unbounded memory:
+
+=== "Python"
+
+    ```python
+    build = Schematic.from_data_bounded(payload, "")  # conservative defaults
+    ```
+
+=== "JavaScript"
+
+    ```javascript
+    const build = Schematic.fromDataBounded([...payload], ""); // conservative defaults
+    ```
+
+=== "Rust"
+
+    ```rust
+    use nucleation::formats::limits::DecodeLimits;
+
+    let limits = DecodeLimits::default();
+    let build = manager.read_bounded(&payload, &limits)?;
+    ```
+
+An empty JSON string selects `DecodeLimits::default()`. To override limits in
+a generated binding, serialize the complete limits object with every field;
+missing fields are rejected instead of silently inheriting values.
+
+## Write bytes or files
+
+Generated bindings serialize shared binary output as base64. Decode it before
+writing a file or sending an HTTP response. This is the normal JavaScript/WASM
+path because browser code has no native filesystem method.
+
+The general form is:
+
+```text
+save_as_b64(exporter_key, version, settings_json)
 ```
 
-The detector recognizes Litematica, Sponge, Bedrock structures, Java structure
-SNBT, Nucleation snapshots, legacy MCEdit schematics, MCA region files, and
-zipped worlds. If no format matches, loading fails instead of constructing a
-partial schematic.
+Pass an empty version or settings string to use that exporter's defaults.
+Convenience methods such as `to_litematic_b64`, `to_schematic_b64`,
+`to_mcstructure_b64`, `to_snapshot_b64`, and `to_world_zip_b64` fix the target
+format in the method name.
 
-Structure SNBT is a textual Java structure source format used by ordinary mod
-and data-pack tooling as well as Test Blocks and suites such as Lithium's. It
-contains `DataVersion`, `size`, positioned `data` entries, `entities`, and a
-string `palette`. Nucleation accepts its
-`minecraft:block{property:value}` state spelling and maps it to the normal
-editable block-state model. Saving emits a complete rectangular structure; when
-the schematic spans multiple regions, their bounding box is flattened and gaps
-are written as air. Import and export reject axes larger than 256 blocks or
-volumes larger than 262,144 blocks before allocating the full structure.
-
-## Byte pipelines
-
-Generated bindings accept raw bytes on input. Serialized output crosses the
-shared binding boundary as base64, so decode it before writing or sending binary
-data:
+Python and Rust native builds can also write files directly. The filename
+selects the format:
 
 ```python
-from base64 import b64decode
-from pathlib import Path
-from nucleation import Schematic
-
-build = Schematic.from_data(Path("in.litematic").read_bytes())
+build = Schematic.load_from_file("input.litematic")
 build.set_block(1, 3, 1, "minecraft:glowstone")
-
-encoded = build.save_as_b64("schematic", "v3", "")
-Path("out.schem").write_bytes(b64decode(encoded))
+build.save_to_file("output.schem")
 ```
 
-The three arguments to `save_as_b64` are the exporter key, optional version,
-and optional JSON settings. Pass an empty string for a format's default version
-or settings. JavaScript/WASM has no filesystem methods, so this byte/base64 path
-is its normal I/O workflow; generated bindings apply their usual language casing.
-
-Convenience exporters such as `to_litematic_b64`, `to_schematic_b64`,
-`to_mcstructure_b64`, `to_snapshot_b64`, and `to_world_zip_b64` are also
-available when the target format is fixed.
-
-## Explicit output format and version
-
-`save_to_file` selects an exporter from the filename. Use
-`save_to_file_with_format` when the filename is intentionally opaque or when a
-specific Sponge version is required:
+An unknown extension is an error. To write through an opaque filename or pin a
+Sponge version, name the exporter:
 
 ```python
-build.save_to_file_with_format(
-    "artifact.bin",
-    "schematic",
-    "v2",
-)
+build.save_to_file_with_format("artifact.bin", "schematic", "v2")
 ```
 
-The supported named exporter keys are `litematic`, `schematic`, `mcstructure`,
-`structure_snbt`, `snapshot`, and `world`. An unsupported key, version, or
-extension returns a `NucleationError`; it never writes Litematic as an implicit
-fallback.
+Supported exporter keys are `litematic`, `schematic`, `mcstructure`,
+`structure_snbt`, `snapshot`, and `world`. An unsupported key or version fails
+before a fallback format can be written.
 
-## Round-trip fidelity, measured
+## What a round trip preserves
 
-[`examples/readme/formats-and-io/round-trip.rs`](https://github.com/Schem-at/Nucleation/blob/master/examples/readme/formats-and-io/round-trip.rs)
-builds one 19-block fixture containing block-state properties and chest NBT. It
-writes every schematic container with an exporter, auto-detects each result,
-loads it, and compares a content-exact fingerprint with the original.
+The verifier runs every binding, loads every exported file through content
+detection, and compares the results to the Litematica fixture with the exact
+diff preset.
 
-The current checkout produced:
+| Download | Bytes in this artifact | Exact diff distance | Interpretation |
+| --- | ---: | ---: | --- |
+| [Litematica](../downloads/readme/formats-and-io/round-trip.litematic) | 489 | 0 | Full fixture content preserved |
+| [Sponge v3](../downloads/readme/formats-and-io/round-trip.schem) | 336 | 1 | Blocks, states, and chest data preserved; reader adds an empty `components` compound |
+| [Structure SNBT](../downloads/readme/formats-and-io/round-trip.snbt) | 39,429 | 0 | Full fixture content preserved |
+| [Snapshot](../downloads/readme/formats-and-io/round-trip.nusn) | 8,984 | 0 | Full fixture content preserved |
+| [Bedrock structure](../downloads/readme/formats-and-io/round-trip.mcstructure) | 945 | 3 | Edition translation changes the Java-facing representation |
 
-| Format | Bytes | Content fingerprint | Result |
-| --- | ---: | --- | --- |
-| Litematica | 483 | `5654c8b94f558113be01dc6a31c0dc8d` | identical |
-| Sponge `.schem` | 328 | `ab2071dca4aa393fe44697bf160ad00b` | equivalent content; reader adds an empty `components` compound |
-| Structure `.snbt` | 328,906 | `5654c8b94f558113be01dc6a31c0dc8d` | identical |
-| Snapshot `.nusn` | 70,202 | `5654c8b94f558113be01dc6a31c0dc8d` | identical |
-| Bedrock `.mcstructure` | 945 | `b881f6eb62f4bd96b8185bcd7b9fad0f` | translated to Bedrock IDs and states |
+<figure markdown="span">
+  ![The exact 19-block fixture represented by all five downloadable containers](../media/readme/formats-and-io/format-fixture.png){ width="600" }
+  <figcaption>Visual equality is useful, but the verifier compares blocks, properties, block entities, entities, and metadata.</figcaption>
+</figure>
 
-Download the exact generated outputs:
+The Litematica byte count can vary slightly because its metadata carries a
+timestamp. Exact content equality does not mean byte-for-byte container
+identity. Compression settings, tag order, format metadata, and rectangular air
+cells can all change serialized bytes without changing the represented build.
 
-- [`round-trip.litematic`](../downloads/readme/formats-and-io/round-trip.litematic)
-- [`round-trip.schem`](../downloads/readme/formats-and-io/round-trip.schem)
-- [`round-trip.snbt`](../downloads/readme/formats-and-io/round-trip.snbt)
-- [`round-trip.nusn`](../downloads/readme/formats-and-io/round-trip.nusn)
-- [`round-trip.mcstructure`](../downloads/readme/formats-and-io/round-trip.mcstructure)
+Sponge's empty `components` compound is harmless but visible to an exact NBT
+comparison. Bedrock output is a translation boundary, not a same-edition round
+trip. Read [Versions and translation](versions-and-translation.md) before using
+cross-edition output as an equality check.
 
-“Identical” here means the canonical schematic content fingerprint matches, not
-that container bytes are byte-for-byte identical. Structure SNBT writes every
-position in the rectangular structure, including air, so the human-readable
-output is deliberately larger than the binary formats. Sponge preserves
-the fixture's blocks, states, and chest data; its reader adds an empty Minecraft
-1.20.5+ `components` placeholder, which is harmless but visible to an exact NBT
-fingerprint. Bedrock is a translation boundary rather than a same-edition
-round trip. See [Versions and translation](versions-and-translation.md).
+Structure SNBT writes a complete rectangular structure, including air. It also
+rejects axes longer than 256 blocks or volumes larger than 262,144 cells before
+allocating the full rectangle. Its corpus tests cover 33 Java GameTest
+structures, including block entities and entities.
 
-Legacy MCEdit is intentionally import-only: its numeric-ID model cannot express
-modern block states without loss.
+Legacy MCEdit remains import-only because numeric IDs cannot represent modern
+block states without loss.
 
-Structure SNBT has additional corpus coverage against all 33 structures in
-Lithium's Java GameTest suite. The tests import each fixture, export it back to
-SNBT, re-import it, and compare dimensions, data version, every block state,
-block-entity NBT, and entities. Empty entity placeholders without an `id` are
-ignored, matching vanilla's structure loader.
+## Verify the guide
 
-The pinned Lithium corpus is local and gitignored, so its test is explicitly
-ignored in clean checkouts rather than silently passing. With the fixtures
-installed, run it with:
+The guide verifier executes Python, JavaScript, and Rust; checks exact parity
+between their source schematics; reloads all five formats from each binding;
+and regenerates the still, downloads, and 53-frame animation.
 
-```shell
-cargo test --test structure_snbt_tests lithium_fixture_corpus -- --ignored
+```bash
+./tools/verify-formats-io-docs.sh
 ```
 
-## Next
-
-- [Basics](basics.md) for editing the loaded schematic
-- [Versions and translation](versions-and-translation.md) for Java/Bedrock and data-version changes
-- [Chunk iteration, streaming, and worlds](streaming-and-worlds.md) for large-world I/O
-- [Pluggable storage](storage.md) for memory, filesystem, SSH, S3, Redis, and Postgres URIs
+Continue with [Basics](basics.md) for editing,
+[Versions and translation](versions-and-translation.md) for data-version and
+edition boundaries, or [Pluggable storage](storage.md) for filesystem, SSH, S3,
+Redis, and Postgres URIs.
