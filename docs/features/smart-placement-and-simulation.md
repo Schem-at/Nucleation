@@ -9,7 +9,9 @@ They are not interchangeable. In particular, `{signal=13}` does not run a
 simulator, and `{simulate=true}` does not leave a live world ticking behind the
 schematic.
 
-![A selection guide mapping comparator values to signal shorthand, derived placement to simulated placement, circuit output to MCHPRS, and world evolution to TickSimulation](../media/readme/smart-simulation/choose-engine.svg)
+<div class="bb-kineglyph" data-kineglyph="smart-simulation" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
+  <img src="../../media/kineglyph/smart-simulation.svg" alt="Four questions selecting signal shorthand, simulated placement, MCHPRS, or TickSimulation">
+</div>
 
 ## One circuit, authored in three bindings
 

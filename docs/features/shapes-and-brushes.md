@@ -16,7 +16,9 @@ reads the same parameter, so construction order and material position agree.
 
 ## Geometry and material are separate
 
-![A sphere shape and striped gradient brush combining into a striped voxel sphere](../media/readme/shapes-brushes/shape-brush-map.svg)
+<div class="bb-kineglyph" data-kineglyph="shapes-and-brushes" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
+  <img src="../../media/kineglyph/shapes-and-brushes.svg" alt="A sphere mask and material ramp composing into a coloured voxel slice">
+</div>
 
 The shape owns spatial questions: bounds, membership, surface normal, and, for
 parametric shapes, a normalized `t`. The brush owns material questions. Color

@@ -5,7 +5,9 @@ bindings. The annotations in `src/bridge/` define the shared API. Diplomat
 generates JavaScript/TypeScript, Python, Kotlin/JVM, PHP, C, and C++ from those
 definitions.
 
-![The Rust core and annotated bridge feeding Diplomat, which generates JavaScript, Python, Kotlin, PHP, C, and C++ bindings](../media/readme/bindings-and-languages/binding-pipeline.svg)
+<div class="bb-kineglyph" data-kineglyph="bindings-and-languages" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
+  <img src="../../media/kineglyph/bindings-and-languages.svg" alt="The Rust core, annotated bridge contract, and seven language surfaces">
+</div>
 
 Generated files are committed. Release CI regenerates them twice, checks that
 both passes are identical, and refuses any diff from the committed bindings.

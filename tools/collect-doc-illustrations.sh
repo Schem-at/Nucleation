@@ -11,14 +11,14 @@ temporary="$temporary_dir/nucleation-system-illustrations.zip"
 trap 'rm -rf "$temporary_dir"' EXIT
 
 illustrations=(
-  docs/media/readme/fast-generation/operation-map.svg \
-  docs/media/readme/shapes-brushes/shape-brush-map.svg \
-  docs/media/readme/sdf-and-fields/sdf-field-pipeline.svg \
-  docs/media/readme/palettes-and-color/color-pipeline.svg \
-  docs/media/readme/smart-simulation/choose-engine.svg \
-  docs/media/readme/formats-and-io/format-pipeline.svg \
-  docs/media/readme/bindings-and-languages/binding-pipeline.svg \
-  docs/media/readme/meshing-and-rendering/render-pipeline.svg
+  docs/media/kineglyph/fast-generation.svg \
+  docs/media/kineglyph/shapes-and-brushes.svg \
+  docs/media/kineglyph/sdf-and-fields.svg \
+  docs/media/kineglyph/palettes-and-color.svg \
+  docs/media/kineglyph/smart-simulation.svg \
+  docs/media/kineglyph/formats-and-io.svg \
+  docs/media/kineglyph/bindings-and-languages.svg \
+  docs/media/kineglyph/meshing-and-rendering.svg
 )
 
 zip -j -X -q "$temporary" "${illustrations[@]}"

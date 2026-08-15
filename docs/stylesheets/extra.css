@@ -797,10 +797,35 @@ body {
   word-break: normal;
 }
 
+.bb-kineglyph {
+  margin: 28px 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.md-typeset .bb-kineglyph > img {
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  display: block;
+  height: auto;
+  margin: 0;
+  width: 100%;
+}
+
+.bb-kineglyph .kg-figure {
+  border-color: var(--rule);
+  box-shadow: none;
+  margin: 0;
+}
+
+.bb-kineglyph .kg-figure__machine {
+  font-family: var(--mono);
+}
+
 .bb-illustrations {
   display: grid;
-  gap: 24px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  grid-template-columns: minmax(0, 1fr);
   margin-top: 48px;
 }
 
@@ -814,25 +839,32 @@ body {
 }
 
 .bb-illustration__stage {
-  align-items: center;
-  aspect-ratio: 16 / 7;
   background: #0d1014;
   border-bottom: 1px solid var(--rule);
-  display: flex;
-  justify-content: center;
+  display: block;
   overflow: hidden;
-  padding: 12px;
+  padding: 0;
 }
 
 .md-typeset .bb-illustration__stage img {
   border: 0;
   border-radius: 0;
   display: block;
-  height: 100%;
+  height: auto;
   margin: 0;
   object-fit: contain;
   transition: transform var(--d2) var(--ease);
   width: 100%;
+}
+
+.bb-illustration__stage .bb-kineglyph {
+  margin: 0;
+}
+
+.bb-illustration__stage .bb-kineglyph > img,
+.bb-illustration__stage .kg-figure {
+  border: 0;
+  border-radius: 0;
 }
 
 .bb-illustration__stage:hover img {

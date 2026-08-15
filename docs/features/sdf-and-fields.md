@@ -10,7 +10,9 @@ Keeping those meanings separate makes the graph reusable. One scalar field can
 perturb an SDF and color the resulting blocks without pretending that the noise
 itself is a distance.
 
-![A scalar field branching into SDF displacement and a field brush before both meet in a schematic fill](../media/readme/sdf-and-fields/sdf-field-pipeline.svg)
+<div class="bb-kineglyph" data-kineglyph="sdf-and-fields" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
+  <img src="../../media/kineglyph/sdf-and-fields.svg" alt="One scalar field branching into geometry and material before both meet in a schematic fill">
+</div>
 
 ## One field, two jobs, three bindings
 

@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "theme": "nucleation",
+  "width": 960,
+  "scenes": [
+    {
+      "slug": "fast-generation",
+      "title": "Fast generation",
+      "summary": "Workload fingerprints line up with the bulk call that moves parsing and bounds work out of the loop."
+    },
+    {
+      "slug": "shapes-and-brushes",
+      "title": "Shapes and brushes",
+      "summary": "A mask and a material rule remain independent until fill composes them into block states."
+    },
+    {
+      "slug": "sdf-and-fields",
+      "title": "SDF and fields",
+      "summary": "One scalar field bifurcates into occupancy and material, then recombines as editable blocks."
+    },
+    {
+      "slug": "palettes-and-color",
+      "title": "Palettes and colour",
+      "summary": "A colour laboratory separates perceptual measurement, palette constraints, and surface strategy."
+    },
+    {
+      "slug": "smart-simulation",
+      "title": "Placement and simulation",
+      "summary": "A four-question instrument selects the smallest state model that can answer the job."
+    },
+    {
+      "slug": "formats-and-io",
+      "title": "Formats and I/O",
+      "summary": "A compact format hub separates container detection, the editable model, and explicit export."
+    },
+    {
+      "slug": "bindings-and-languages",
+      "title": "Bindings and languages",
+      "summary": "A physical stack distinguishes the native core, the generated bridge contract, and each package surface."
+    },
+    {
+      "slug": "meshing-and-rendering",
+      "title": "Meshing and rendering",
+      "summary": "Exploded mesh slabs make draw order tangible before the shared geometry branches to data or pixels."
+    }
+  ],
+  "kineglyphCommit": "d76ae1ecc201fe581f006398e91418ee65cb2795",
+  "bundle": {
+    "path": "javascripts/vendor/kineglyph-web.js",
+    "sha256": "f973567cbcfc9e24ea63585a65318089a282bbd50f40fc21be51df1f92d78a65"
+  }
+}

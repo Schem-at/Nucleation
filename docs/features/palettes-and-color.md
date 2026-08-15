@@ -6,7 +6,9 @@ choose blocks. A palette limits the candidates before matching begins. That
 separation matters: color matching answers *which candidate is nearest*;
 palette design decides *which candidates are acceptable*.
 
-![A target color entering Oklab matching, meeting a filtered block palette, and leaving through nearest, gradient, ramp, or dither selection](../media/readme/palettes-and-color/color-pipeline.svg)
+<div class="bb-kineglyph" data-kineglyph="palettes-and-color" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
+  <img src="../../media/kineglyph/palettes-and-color.svg" alt="A target colour passing through Oklab measurement, a constrained block palette, and four selection methods">
+</div>
 
 ## One color atlas in three bindings
 

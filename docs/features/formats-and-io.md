@@ -5,7 +5,9 @@ Input detection reads the payload, not the filename. Output is explicit: choose
 an exporter, version, and settings, or let a native file method select the
 exporter from a known extension.
 
-![Content detectors feeding one editable schematic model, followed by explicit exporters for structure, snapshot, and world formats](../media/readme/formats-and-io/format-pipeline.svg)
+<div class="bb-kineglyph" data-kineglyph="formats-and-io" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
+  <img src="../../media/kineglyph/formats-and-io.svg" alt="Format detectors converging on one editable schematic model before explicit export">
+</div>
 
 ## One fixture in three bindings
 

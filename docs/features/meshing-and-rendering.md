@@ -5,7 +5,9 @@ Rendering turns those triangles plus a camera and lights into pixels. Keep the
 two stages separate when the result belongs in a browser, a DCC tool, a cache,
 or a custom engine.
 
-![A schematic and resource pack feeding opaque, cutout, and transparent mesh layers, then branching to portable 3D data or the native pixel renderer](../media/readme/meshing-and-rendering/render-pipeline.svg)
+<div class="bb-kineglyph" data-kineglyph="meshing-and-rendering" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
+  <img src="../../media/kineglyph/meshing-and-rendering.svg" alt="Opaque, cutout, and transparent mesh layers branching to portable 3D data or rendered pixels">
+</div>
 
 ## A layer-complete fixture in three bindings
 
