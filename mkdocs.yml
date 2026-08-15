@@ -65,6 +65,7 @@ nav:
       - Block database: features/block-database.md
       - Storage: features/storage.md
   - Simulate and render:
+      - Smart placement and simulation: features/smart-placement-and-simulation.md
       - Redstone simulation: features/redstone-simulation.md
       - Tick simulation: features/tick-simulation.md
       - Tick mechanics: features/tick-simulation-mechanics.md
