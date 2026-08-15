@@ -1,198 +1,206 @@
-# Shapes, brushes, and masked fills
+# Shapes and brushes
 
-## Geometry and material
+A `Shape` answers whether a coordinate belongs to a volume. A `Brush` chooses
+the block written at an accepted coordinate. `BuildingTool.fill` combines the
+two without constructing a coordinate list in the host language.
 
-A `Shape` decides which coordinates belong to a volume. A `Brush` chooses the
-block state at each accepted coordinate. Both are independent, so one shape can
-be filled with a fixed block, a palette match, a gradient, or a normal-based
-shade.
+This separation lets one torus use a solid block, a spatial gradient, surface
+shading, or a gradient that follows the ring. The animation below uses the
+torus parameter to divide the shape into 24 ordered groups. Its color gradient
+reads the same parameter, so construction order and material position agree.
 
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/shapes-gallery.png" width="700" alt="Shape gallery: sphere, torus, cone, pyramid, bezier ribbon">
+<figure markdown="span">
+  ![A voxel torus assembling around its ring while its wool colors progress from red through gold, cyan, violet, and back to red](../media/readme/shapes-brushes/torus-sweep.gif){ width="460" }
+  <figcaption>The shape supplies coordinates and a normalized position around the ring; the brush maps that position to wool.</figcaption>
+</figure>
 
-A gradient brush follows a shape's own parameter, around the ring of a torus or
-along a bezier, and snaps every color to a palette:
+## Geometry and material are separate
 
-<div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gradient-torus.png" width="480" alt="Rainbow torus with a closed curve gradient snapped to the wool palette">
-</div>
+![A sphere shape and striped gradient brush combining into a striped voxel sphere](../media/readme/shapes-brushes/shape-brush-map.svg)
 
-```python
-brush = Brush.curve_gradient(stops, rainbow_colors, InterpolationSpace.Oklab)
-brush.set_palette(Palette.wool())
-BuildingTool.fill(s, Shape.torus(0, 0, 0, 16, 6, 0, 1, 0), brush)
+The shape owns spatial questions: bounds, membership, surface normal, and, for
+parametric shapes, a normalized `t`. The brush owns material questions. Color
+brushes can snap their result to a selected block palette.
+
+```text
+Shape.for_each_point
+        │
+        ├── coordinate
+        ├── surface normal
+        └── optional parameter t
+                    │
+                    ▼
+             Brush.get_block
+                    │
+                    ▼
+          schematic palette write
 ```
 
-The shaded brush lights a base color by surface normal, giving 3D-lit forms out
-of flat blocks:
+## One scene in three bindings
 
-<div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/shaded-sphere.png" width="300" alt="Lambertian-shaded terracotta sphere">
-</div>
+The fixture uses four independent operations:
 
-```python
-brush = Brush.shaded(224, 130, 84,  -1.0, 0.7, -0.3)   # base color, light direction
-brush.set_palette(Palette.terracotta())
-BuildingTool.fill(s, Shape.sphere(0, 0, 0, 16), brush)
+1. Fill a stone-brick cuboid with a solid brush.
+2. Replace only the part of that plinth inside a sphere.
+3. Fill a torus with a closed curve gradient.
+4. Union two spheres, hollow the result, and shade it by surface normal.
+
+=== "Python"
+
+    ```python
+    --8<-- "examples/readme/shapes-brushes/shapes_brushes.py:build"
+    ```
+
+=== "JavaScript"
+
+    ```javascript
+    --8<-- "examples/readme/shapes-brushes/shapes_brushes.mjs:build"
+    ```
+
+=== "Rust"
+
+    ```rust
+    --8<-- "examples/readme/shapes-brushes/rust/src/main.rs:build"
+    ```
+
+<figure markdown="span">
+  ![An orbital garden with a weathered stone plinth, a closed rainbow wool torus, and a shaded hollow terracotta shell](../media/readme/shapes-brushes/orbital-garden.png){ width="700" }
+  <figcaption>All three programs produce this 6,627-block schematic with exact cell parity.</figcaption>
+</figure>
+
+[Download the generated orbital garden](../downloads/readme/shapes-brushes/orbital-garden.schem)
+
+Generated bindings expose opaque `Shape` and `Brush` values. Rust exposes the
+concrete geometry types and the `ShapeEnum`/`BrushEnum` dispatch used by the
+same fill engine.
+
+## Compose shapes before filling
+
+Boolean combinators return another shape. They can be nested and then passed to
+any brush:
+
+| Combinator | Accepted coordinates |
+| --- | --- |
+| `union_with` | inside either child |
+| `intersection_with` | inside both children |
+| `difference_with` | inside the first child and outside the second |
+| `hollow(thickness)` | inside the shape and within the requested face distance of its boundary |
+
+The shell in the fixture is evaluated as:
+
+```text
+hollow(
+  union(
+    sphere(center = [-4, 14, 0], radius = 6),
+    sphere(center = [ 4, 14, 0], radius = 6)
+  ),
+  thickness = 1
+)
 ```
 
-And palettes turn colors into blocks. Ask for pure white to pure black in 24
-steps and the engine picks the blocks itself: distinct, ordered, with off-hue
-candidates penalized (bottom row; above it, the lightness-sorted wool,
-concrete, terracotta, and planks presets):
+Composition operates on voxel membership. A smooth blend between distance
+fields belongs to the [SDFs and fields](sdf-and-fields.md) guide.
 
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/palette-ramps.png" width="740" alt="Preset palette ramps plus the engine-generated 24-step white-to-black ladder">
+### Primitive shapes
 
-```python
-Palette.grayscale().ramp_ids_json(255, 255, 255,  0, 0, 0,  24)
-# 24 distinct blocks: white_wool ... iron_block ... deepslate_tiles ... black_concrete
-```
+| Family | Constructors |
+| --- | --- |
+| Volumes | `sphere`, `cuboid`, `ellipsoid`, `cylinder`, `cylinder_between`, `cone`, `pyramid`, `polygon_prism` |
+| Curved paths | `torus`, `line`, `bezier`, `tube_along` |
+| Surfaces | `disk`, `plane`, `triangle` |
+| Derived | `sdf`, `sdf_bounded`, voxelized mesh shapes, boolean combinators, `hollow` |
 
-Seven presets ship, each a curated set you can list with `block_ids_json`:
-`concrete` and `wool` (16 dyed colors each), `terracotta` (17), `wood` (13 plank
-tones), `grayscale` (81 neutrals), and the broad `decorative` (951) and
-`structural` (316) sets. Between any two colors a palette interpolates directly:
-`gradient_ids_json` samples the line evenly, `ramp_ids_json` picks distinct steps.
+Constructors use schematic coordinates. Axes and direction vectors are
+normalized internally where required. Zero-length vectors fall back to each
+shape's documented default orientation.
 
-```python
-Palette.concrete().gradient_ids_json(200, 30, 70,  245, 205, 55,  8)
-# crimson -> gold: red, red, pink, orange, orange, yellow, yellow, yellow
-Palette.terracotta().ramp_ids_json(220, 40, 44,  40, 80, 220,  6)   # distinct steps
-# red, pink, magenta, purple, blue, light_blue terracotta
-```
+## Choose how the shape is painted
 
-A gradient brush does the same in 3D and paints as it fills. Five pairs, each a
-`linear_gradient` in Oklab over a dithered palette, so every ramp is a smooth
-blend rather than a few hard steps:
-
-<div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gradient-pairs.png" width="720" alt="Five smooth two-color block gradients: crimson to gold, teal to violet, lime to blue, magenta to cyan, orange to indigo">
-</div>
-
-Sweep a single hue around a closed loop instead of between two endpoints and the
-ramp closes on itself with no seam. A trefoil knot, one hue dithered red -> blue
--> green -> red around its length:
-
-<div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gradient-knot.png" width="440" alt="A trefoil knot coloured by a closed cyclic gradient from red through blue and green back to red">
-</div>
-
-And when a ramp still bands, dither it: `Palette.…().dithered()` makes every
-brush alternate between the two nearest blocks per voxel (ordered Bayer,
-deterministic). Hard bands on the left, dissolved on the right:
-
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/dither-compare.png" width="740" alt="The same shaded sphere with hard palette snapping (banded) and dithered snapping (smooth)">
-
-Or build palettes from pure color logic over the block database, no names, just
-measured color values and block facts:
-
-```python
-b = PaletteBuilder.create()
-b.chroma_below(0.022)               # near-neutral only
-b.lightness_between(0.35, 0.75)     # mid-grays
-b.full_blocks_only()
-mid_grays = b.build()               # 40+ blocks, picked by math
-
-Blocks.by_color_json(120, 200, 60, 0.10)
-# everything lime-ish, nearest first: lime_concrete_powder (0.053), ...
-```
-
-And shapes aren't limited to the primitives: **any SDF tree is a `Shape`**, so
-smooth-blended distance fields fill with every brush. Field-gradient normals
-mean the shaded brush shades a blend continuously across the seam:
-
-<div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/sdf-shape-shaded.png" width="400" alt="A smooth-union SDF blob filled with the shaded brush">
-</div>
-
-```python
-blob = Shape.sdf('{"type": "smoothUnion", "k": 6.0, "a": {"type": "sphere", "radius": 10}, '
-                 '"b": {"type": "translate", "offset": [11, 3, 0], "child": {"type": "sphere", "radius": 7}}}')
-BuildingTool.fill(s, blob, shaded_brush)      # masked fills work too
-```
-
-More in the guides: [shapes & brushes](shapes-and-brushes.md) ·
-[palettes, ramps, and pixel art](palettes-and-color.md).
-
-## Edit without collateral damage
-
-
-Masked fills touch only what you allow: `fill_only_air` builds around existing
-work; `fill_replacing` swaps listed blocks inside a shape. Here a temple weathers
-into moss and cracks within a sphere of decay:
-
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/masked-fill.png" width="760" alt="Greek temple before/after weathering via fill_replacing">
-
-```python
-BuildingTool.fill_replacing(temple, decay_sphere, weathered_brush,
-                            '["minecraft:stone_bricks"]')
-```
-
----
-
-## Reference
-
-The building tool fills a `Shape` with a `Brush`. Every binding exposes both
-types.
-
-## Shapes
-
-`sphere`, `cuboid`, `ellipsoid`, `cylinder` / `cylinder_between`, `cone`,
-`torus`, `pyramid`, `disk`, `plane`, `triangle`, `line`, `bezier`
-(control points + thickness + resolution), and `polygon_prism` (a closed 2D
-footprint extruded between two Y levels, suitable for building footprints and
-lake outlines). Combinators include `union_with`, `intersection_with`, `difference_with`, and
-`hollow(thickness)`. An [SDF tree](sdf-and-fields.md) is a `Shape` too
-(`Shape.sdf`), and so is a voxelized [mesh](meshing-and-rendering.md)
-(`Voxelizer.shape_from_glb` / `shape_from_obj`).
-
-Several shapes are parametric: a position inside them maps to a
-parameter `t ∈ [0, 1]` (angle around a torus, distance along a line or
-bezier, height up a cone/pyramid). Parametric brushes read it.
-
-## Brushes
-
-| Brush | What it does |
+| Brush | Material rule |
 | --- | --- |
 | `solid(block)` | one fixed block state |
-| `color(r, g, b)` | nearest palette block to a color |
-| `shaded(r, g, b, lx, ly, lz)` | Lambertian shading of a base color by surface normal, snapped to the palette |
-| `linear_gradient(...)` | color gradient between two anchored points |
-| `bilinear_gradient(...)` | four corner colors over a patch |
-| `point_gradient(positions, colors, falloff, space)` | inverse-distance-weighted blend of colored anchor points |
-| `curve_gradient(stops, colors, space)` | colors placed along a parametric shape's own `t` |
+| `color(r, g, b)` | palette block nearest one target color |
+| `linear_gradient` | interpolation between two anchored points |
+| `bilinear_gradient` | four corner colors over a patch |
+| `point_gradient` | distance-weighted colors around anchor points |
+| `curve_gradient` | color stops sampled from a shape's parameter `t` |
+| `shaded` | base color lit by the shape's surface normal |
+| `spotlight` | color constrained by a position, direction, and cone |
+| `field` / `field3` / `field_sdf` | color selected from a scalar field |
 
-Every color brush takes `set_palette(palette)` and interpolates in `Rgb` or
-`Oklab` (`InterpolationSpace`).
+Color interpolation can use RGB or Oklab. The interpolated color is then
+matched against the brush palette. A wool palette cannot select concrete, even
+when concrete is the closer global color match.
 
-`curve_gradient` detail: `stops` are `t` values in `[0, 1]` with flat RGB
-triples in `colors`. On a closed shape (torus), make the first and last
-stop colours equal. The gradient then closes at the join. The README torus uses:
+`curve_gradient` needs a parametric shape such as a torus, line, cylinder,
+cone, pyramid, bezier, or tube path. Closed curves should repeat their first
+color at stop `1.0`; that is why the fixture begins and ends with red.
 
-```python
-stops = [i / 6 for i in range(7)]
-colors = [255, 40, 40,   255, 180, 0,   60, 200, 60,
-          40, 180, 220,  60, 70, 230,   200, 60, 220,
-          255, 40, 40]  # first == last closes the wrap
-brush = Brush.curve_gradient(stops, bytes(colors), InterpolationSpace.Oklab)
-brush.set_palette(Palette.wool())
-BuildingTool.fill(s, Shape.torus(0, 0, 0, 16, 6, 0, 1, 0), brush)
+See [Palettes and color](palettes-and-color.md) for preset contents, custom
+filters, ramps, and ordered dithering.
+
+## Limit an edit with a mask
+
+The ordinary `fill` operation replaces every accepted cell. Two masked forms
+inspect the destination first:
+
+- `fill_only_air` writes only where the schematic currently contains air or no
+  block.
+- `fill_replacing` writes only where the existing block ID appears in its JSON
+  target list. State properties do not affect the match.
+
+The garden's weathering sphere overlaps the plinth and surrounding air. Its
+target list contains only `minecraft:stone_bricks`, so moss is written into the
+plinth without creating a mossy sphere above it.
+
+Fill order is observable when shapes overlap. In the fixture the gradient torus
+is written before the terracotta shell, so shell cells win at intersections.
+
+## Cost and bounds
+
+A fill first expands the schematic to the shape bounds, then enumerates
+candidate coordinates inside those bounds. Primitive shapes provide specialized
+iteration where available. Composite shapes scan their combined bounds and
+test child membership.
+
+The bounding box still matters when the shape is mostly empty. A long diagonal
+line and a thin torus can occupy relatively few blocks while asking the shape
+to examine a larger coordinate range. For a supplied sparse point cloud,
+[`set_blocks`](fast-generation.md) is a better representation.
+
+`BuildingTool.fill` keeps the enumeration inside the native or WASM module. It
+does not create a Python or JavaScript list containing every accepted voxel.
+The resulting schematic region still follows the allocation rules described in
+[Fast schematic generation](fast-generation.md#bounds-are-part-of-the-memory-model).
+
+## Inspect and verify the artifact
+
+Each executable example checks the exact block count, tight dimensions, and a
+known plinth cell before saving:
+
+=== "Python"
+
+    ```python
+    --8<-- "examples/readme/shapes-brushes/shapes_brushes.py:inspect"
+    ```
+
+=== "JavaScript"
+
+    ```javascript
+    --8<-- "examples/readme/shapes-brushes/shapes_brushes.mjs:inspect"
+    ```
+
+=== "Rust"
+
+    ```rust
+    --8<-- "examples/readme/shapes-brushes/rust/src/main.rs:inspect"
+    ```
+
+The guide verifier executes all three sources, loads their exports, and checks
+an exact diff distance of zero. It also regenerates the still and the 56-frame
+torus animation.
+
+```bash
+.venv/bin/python examples/readme/shapes-brushes/generate.py
+./tools/verify-shapes-brushes-docs.sh
 ```
-
-## Masked fills
-
-Fills that respect existing content:
-
-```python
-BuildingTool.fill(s, shape, brush)                     # overwrite everything
-BuildingTool.fill_only_air(s, shape, brush)            # never touch placed blocks
-BuildingTool.fill_replacing(s, shape, brush,
-                            '["minecraft:stone_bricks"]')   # only listed blocks
-```
-
-The README weathered temple uses `fill_replacing` with a mossy and cracked
-gradient brush inside a sphere. Its source is `scene_masked_fill` in
-[`tools/readme-media/generate.py`](https://github.com/Schem-at/Nucleation/blob/master/tools/readme-media/generate.py).
-
-`rstack(s, shape, brush, count, dx, dy, dz)` stamps `count` offset copies.
-
-Verified runnable examples: [`docs/readme-snippets/`](https://github.com/Schem-at/Nucleation/tree/master/docs/readme-snippets).
