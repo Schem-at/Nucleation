@@ -1,121 +1,172 @@
 # Palettes and color
 
-## Paintings, in blocks
+Minecraft blocks are not flat swatches. Nucleation measures their texture
+colors, converts those measurements to Oklab, and uses perceptual distance to
+choose blocks. A palette limits the candidates before matching begins. That
+separation matters: color matching answers *which candidate is nearest*;
+palette design decides *which candidates are acceptable*.
 
+![A target color entering Oklab matching, meeting a filtered block palette, and leaving through nearest, gradient, ramp, or dither selection](../media/readme/palettes-and-color/color-pipeline.svg)
 
-Everything above composes, pointed at art: flat-texture palettes built by
-color-logic filters, chroma-boosted matching (so muted pigments land on
-saturated blocks, not gray clays), and per-voxel ordered dithering. Van Gogh's
-Starry Night, 128 blocks wide:
+## One color atlas in three bindings
 
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/painting-starry-night.png" width="760" alt="Van Gogh's Starry Night as block pixel art, 128 blocks wide">
+The guide fixture is a 32 by 16 wall with 448 blocks. Its large lower panel
+maps 32 gray values through four concrete blocks with ordered dithering. The
+middle strip is a 32-sample concrete gradient, where repeated block IDs are
+allowed. The top strip is a 12-block ramp, where every selected ID must be
+distinct.
 
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/painting-gallery.png" width="760" alt="Sunflowers, The Great Wave off Kanagawa, and Girl with a Pearl Earring as block pixel art">
+First choose the allowed blocks. The builder example keeps survival-obtainable,
+opaque, full blocks near a measured green. The fixture also uses a preset and
+an explicit four-block palette.
 
-```python
-palette = flat_art_palette().dithered()          # PaletteBuilder + map-art excludes
-r, g, b = boost(*pixel, sat=1.35)                # chroma exaggeration pre-match
-s.set_block(x, 0, y, palette.closest_block_dithered(r, g, b, x, 0, y))
+=== "Python"
+
+    ```python
+    --8<-- "examples/readme/palettes-and-color/palettes_color.py:choose"
+    ```
+
+=== "JavaScript"
+
+    ```javascript
+    --8<-- "examples/readme/palettes-and-color/palettes_color.mjs:choose"
+    ```
+
+=== "Rust"
+
+    ```rust
+    --8<-- "examples/readme/palettes-and-color/rust/src/main.rs:choose"
+    ```
+
+Then use the palette as a lookup table. All three programs below produce the
+same schematic, including every dither decision.
+
+=== "Python"
+
+    ```python
+    --8<-- "examples/readme/palettes-and-color/palettes_color.py:build"
+    ```
+
+=== "JavaScript"
+
+    ```javascript
+    --8<-- "examples/readme/palettes-and-color/palettes_color.mjs:build"
+    ```
+
+=== "Rust"
+
+    ```rust
+    --8<-- "examples/readme/palettes-and-color/rust/src/main.rs:build"
+    ```
+
+<figure markdown="span">
+  ![The color atlas assembling from dithered grayscale rows, a snapped gradient, and a distinct concrete ramp](../media/readme/palettes-and-color/color-atlas-build.gif){ width="500" }
+  <figcaption>Four grayscale blocks produce the lower panel. Position-aware Bayer thresholds create the intermediate tones.</figcaption>
+</figure>
+
+[Download the color atlas](../downloads/readme/palettes-and-color/color-atlas.schem).
+
+## Pick a palette before picking a color
+
+Presets cover common material constraints:
+
+| Palette | Contents |
+| --- | --- |
+| `concrete`, `wool`, `terracotta` | The corresponding 16-color material family; terracotta also includes plain terracotta |
+| `wood` | Planks plus bamboo mosaic |
+| `grayscale` | Opaque full cubes close to the neutral Oklab axis |
+| `structural` | A conservative set for load-bearing-looking construction |
+| `decorative` | A broader set that permits stairs and slabs but excludes block entities |
+| `solid` | No transparent, falling, or block-entity candidates |
+| `all` | Every colored, placeable block in blockpedia |
+
+`from_block_ids` is the strictest design choice because you name every allowed
+material. Unknown IDs and blocks without measured color are skipped rather
+than causing an error, so check `len()` after construction.
+
+`PaletteBuilder` combines block metadata and color constraints. Repeated
+required tags use AND semantics. Repeated definition kinds use OR semantics.
+Geometry and transparency filters use extracted model metadata, not guesses
+based on block names. The generated-binding builder is consumed by `build()`;
+calling it again reports `AlreadyConsumed`. Native Rust uses the ordinary
+owned-builder pattern.
+
+Useful filters include:
+
+- physical constraints: full blocks, no gravity, no support requirement;
+- inventory constraints: survival-obtainable, no block entities, no light sources;
+- registry constraints: required or excluded vanilla tags, definition kinds, and ID keywords;
+- measured color constraints: Oklab lightness range, maximum chroma, or distance from an RGB target.
+
+## Ramp and gradient solve different problems
+
+Both APIs interpolate between endpoint colors in Oklab, but they impose
+different constraints.
+
+| Query | Guarantee | Best use |
+| --- | --- | --- |
+| `ramp_ids` | Exactly *n* distinct IDs in monotonic order | A material chart where each step must be different |
+| `gradient_ids` | Exactly *n* samples; IDs may repeat | Indexing height, heat, density, escape time, or another scalar |
+| `gradient_ids_between_blocks` | Same as gradient, using measured block colors as endpoints | A lookup anchored to two known materials |
+| `sorted_by_lightness` | Every palette member ordered dark to light | Direct intensity indexing without endpoint colors |
+
+A concrete palette has only 16 candidates. Asking it for 32 gradient samples
+must repeat IDs, and that is useful: adjacent values remain stable instead of
+being forced onto a worse color. A 12-step ramp solves a different optimization
+problem. It assigns 12 distinct blocks to ordered targets along the color line,
+so some picks may be farther from their target than the nearest repeated block.
+
+`ramp_ids` rejects zero steps, equal endpoints, and palettes smaller than the
+requested ramp. `gradient_ids` returns the requested number of entries unless
+the palette is empty. Texture averages drive both operations. Patterned blocks
+can therefore match an average color while reading as noisy at full scale;
+exclude them by tag, kind, or keyword when surface character matters.
+
+## Ordered dithering adds spatial resolution
+
+`closest_block_dithered` finds the two nearest palette colors, projects the
+target between them, and compares that fraction with a 4 by 4 Bayer threshold.
+The threshold depends on `(x, y, z)`, so the result is deterministic and
+neighboring cells distribute the two materials in a stable pattern.
+
+This is not random noise. The same target and position always return the same
+block. Pass real schematic coordinates rather than image-local coordinates if
+separate tiles must join without a visible seam. With fewer than two palette
+members, dithering reduces to ordinary nearest-color matching.
+
+`dithered()` applies the same position-aware behavior when a color, linear
+gradient, curve-gradient, bilinear-gradient, or shaded brush snaps its output
+through a palette. Direct ramp and list queries are unchanged.
+
+<figure markdown="span">
+  ![An isometric render of a thin wall containing a dithered grayscale field and two colored lookup strips](../media/readme/palettes-and-color/color-atlas.png){ width="720" }
+  <figcaption>The large panel has only four source materials. Its apparent extra shades come from spatial mixing, not new block colors.</figcaption>
+</figure>
+
+## From images to fields
+
+The same pipeline covers several jobs:
+
+- pixel art: map each source pixel through a constrained, dithered palette;
+- heightmaps: use brightness for height and the source RGB for surface material;
+- scalar fields: index a repeated gradient by density, temperature, or distance;
+- shaded shapes: let a brush compute lighting, then snap the result to a material family;
+- material zoning: construct separate palettes for structural, decorative, or biome-specific surfaces.
+
+For large images, precompute a gradient when the input is one-dimensional.
+Call `closest_block` or `closest_block_dithered` when the full RGB vector
+matters. Palette construction scans block metadata, so build once and reuse the
+result through the complete image or volume.
+
+## Verify the guide
+
+The verifier executes the Python, JavaScript, and Rust sources, compares their
+schematics with an exact diff, checks the 448-block count and 32 by 16 by 1
+bounds, regenerates the still and animation, and validates both image sizes.
+
+```bash
+./tools/verify-palettes-color-docs.sh
 ```
 
-The full recipe, including the flat-palette filter chain, is `scene_paintings`
-in [`tools/readme-media/generate.py`](https://github.com/Schem-at/Nucleation/blob/master/tools/readme-media/generate.py).
-
-And a flat image is also a heightmap: read each pixel's brightness as a column
-height and paint it with its own color, and the same Starry Night lifts off the
-canvas into rolling, luminous terrain, the moon and stars its highest peaks.
-
-<div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/heightmap.png" width="760" alt="Van Gogh's Starry Night as 3D relief terrain, pixel brightness lifted into hills with the moon and stars as peaks">
-</div>
-
----
-
-## Reference
-
-A `Palette` is a set of colored blocks used to translate colors into block
-choices. Everything here works identically in every binding (snake_case in
-Python/Rust, camelCase in JS/Kotlin/PHP).
-
-## Presets and custom palettes
-
-```python
-Palette.wool()          # the 16 wools
-Palette.concrete()      # the 16 concretes
-Palette.terracotta()    # unglazed terracottas (17)
-Palette.wood()          # the planks family (13)
-Palette.grayscale()     # opaque full cubes with near-neutral measured color (81)
-Palette.decorative()    # the broad decorative set (~950 blocks)
-Palette.structural()    # bricks, stones, and building blocks (~316)
-Palette.solid()         # solid blocks (no transparency/gravity/tile entities)
-Palette.all()           # every colored block except technical ones
-Palette.from_block_ids('["minecraft:stone", "minecraft:oak_planks"]')
-
-# List what any palette holds, or count it:
-Palette.wood().block_ids_json()   # ["minecraft:birch_planks", "minecraft:spruce_planks", ...]
-Palette.concrete().len()          # 16
-```
-
-`PaletteBuilder` composes filters over the block database: vanilla tags,
-definition kinds, and classification flags:
-
-```python
-b = PaletteBuilder.create()
-b.tag("wool")                  # require a vanilla tag (AND across calls)
-b.kind("stair")                # require a definition kind (OR across calls)
-b.exclude_tag("mineable/axe")
-b.full_blocks_only()           # model-derived full-cube geometry
-b.exclude_transparent()
-b.survival_only()
-b.exclude_keyword("infested")
-palette = b.build()
-```
-
-## Two ways to get a ramp
-
-**`ramp_ids(start, end, steps)`** picks exactly `steps` **distinct** blocks
-forming the smoothest ramp the palette can make between two colors. Targets
-are spaced evenly along the Oklab line; blocks are assigned by a minimum-cost
-monotonic matching over their projections onto that line, so off-hue blocks
-are penalized and the result never repeats a block. It errors when the
-palette has fewer than `steps` blocks or the endpoints are equal.
-
-```python
-Palette.grayscale().ramp_ids_json(255, 255, 255, 0, 0, 0, 24)
-# 24 distinct blocks, white_wool ... iron_block ... deepslate_tiles ... black_concrete
-```
-
-Known limitation: matching runs on each block's *average* texture color, so a
-block whose average is neutral but whose texture is patterned (birch wood's
-bark eyes, ores' flecks) can be selected even though it reads as noise: exclude such blocks by keyword if they bother you.
-
-**`gradient_ids(start, end, steps)`** samples the color line per step and
-snaps each sample to the *closest* block: repeats allowed. This is the right
-tool for value→block lookups where you index the list:
-
-```python
-ramp = json.loads(Palette.wool().gradient_ids_json(255, 80, 40, 60, 40, 180, 8))
-s.set_block(px, 0, pz, ramp[escape_iterations(px, pz)])
-```
-
-Index a ramp by any value: escape time, height, temperature:
-
-<div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mandelbrot.png" width="420" alt="128x128 block mandelbrot from a concrete ramp">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/build-timelapse.gif" width="420" alt="The mandelbrot materializing in escape-time order">
-</div>
-
-`sorted_by_lightness()` reorders any palette dark→light (Oklab L) for direct
-indexing, and `closest_block(r, g, b)` answers single lookups.
-
-## Palettes inside other systems
-
-- Every color/gradient **brush** takes `set_palette(palette)`: snapping
-  happens per placed block.
-- **SDF material rules** accept palettes in `gradient` fill rules
-  ([SDF guide](sdf-and-fields.md)).
-- The **scripting engines** expose `palette_gradient_ids`,
-  `palette_block_ids`, and `palette_closest_block`
-  ([scripting guide](scripting.md)).
-
-Verified runnable examples: [`docs/readme-snippets/`](https://github.com/Schem-at/Nucleation/tree/master/docs/readme-snippets).
+Continue with [SDFs and fields](sdf-and-fields.md) to drive block choice from
+signed distance, gradients, noise, and material rules.

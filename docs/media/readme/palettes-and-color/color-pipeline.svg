@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">Nucleation color pipeline</title>
+  <desc id="desc">A target RGB color enters Oklab space, is compared with a filtered block palette, and leaves through nearest, gradient, distinct ramp, or ordered dither selection.</desc>
+  <defs>
+    <linearGradient id="spectrum" x1="0" x2="1">
+      <stop offset="0" stop-color="#213c8f"/>
+      <stop offset=".32" stop-color="#36a7a0"/>
+      <stop offset=".66" stop-color="#e6ae39"/>
+      <stop offset="1" stop-color="#db5b4b"/>
+    </linearGradient>
+    <pattern id="dither" width="16" height="16" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="#ced3d9"/>
+      <rect width="8" height="8" fill="#50565f"/>
+      <rect x="8" y="8" width="8" height="8" fill="#50565f"/>
+    </pattern>
+    <style>
+      .box { fill:#15191f; stroke:#3a424e; stroke-width:2 }
+      .label { fill:#e9edf2; font:600 20px ui-monospace,SFMono-Regular,Menlo,monospace }
+      .small { fill:#9aa4b2; font:15px ui-monospace,SFMono-Regular,Menlo,monospace }
+      .arrow { fill:none; stroke:#62d4c2; stroke-width:3; marker-end:url(#head) }
+    </style>
+    <marker id="head" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#62d4c2"/></marker>
+  </defs>
+  <rect width="1200" height="420" rx="20" fill="#0d1014"/>
+  <rect class="box" x="38" y="135" width="180" height="150" rx="12"/>
+  <rect x="70" y="166" width="116" height="42" rx="6" fill="url(#spectrum)"/>
+  <text class="label" x="70" y="245">target RGB</text>
+  <text class="small" x="70" y="268">pixel / field / value</text>
+
+  <path class="arrow" d="M218 210 H292"/>
+  <rect class="box" x="292" y="135" width="205" height="150" rx="12"/>
+  <circle cx="342" cy="186" r="17" fill="#36a7a0"/><circle cx="393" cy="220" r="17" fill="#e6ae39"/><circle cx="444" cy="178" r="17" fill="#db5b4b"/>
+  <text class="label" x="324" y="245">Oklab</text>
+  <text class="small" x="324" y="268">perceptual distance</text>
+
+  <path class="arrow" d="M497 210 H571"/>
+  <rect class="box" x="571" y="98" width="226" height="224" rx="12"/>
+  <g transform="translate(603 132)">
+    <rect width="34" height="34" fill="#202b59"/><rect x="40" width="34" height="34" fill="#384c83"/><rect x="80" width="34" height="34" fill="#388b80"/><rect x="120" width="34" height="34" fill="#91a549"/>
+    <rect y="40" width="34" height="34" fill="#bd7d39"/><rect x="40" y="40" width="34" height="34" fill="#dba947"/><rect x="80" y="40" width="34" height="34" fill="#c46353"/><rect x="120" y="40" width="34" height="34" fill="#e6d8b7"/>
+  </g>
+  <text class="label" x="603" y="247">block palette</text>
+  <text class="small" x="603" y="271">presets or builder filters</text>
+  <text class="small" x="603" y="295">measured texture colors</text>
+
+  <path class="arrow" d="M797 210 H866"/>
+  <rect class="box" x="866" y="24" width="294" height="372" rx="12"/>
+  <text class="label" x="902" y="66">selection</text>
+  <circle cx="918" cy="108" r="16" fill="#388b80"/><text class="small" x="948" y="114">closest block</text>
+  <rect x="902" y="145" width="220" height="24" rx="4" fill="url(#spectrum)"/><text class="small" x="902" y="193">gradient: repeats allowed</text>
+  <g transform="translate(902 220)"><rect width="25" height="25" fill="#213c8f"/><rect x="27" width="25" height="25" fill="#386b96"/><rect x="54" width="25" height="25" fill="#36a7a0"/><rect x="81" width="25" height="25" fill="#91a549"/><rect x="108" width="25" height="25" fill="#e6ae39"/><rect x="135" width="25" height="25" fill="#db5b4b"/></g>
+  <text class="small" x="902" y="270">ramp: distinct blocks</text>
+  <rect x="902" y="300" width="220" height="44" rx="4" fill="url(#dither)"/>
+  <text class="small" x="902" y="370">dither: position-aware mix</text>
+</svg>
