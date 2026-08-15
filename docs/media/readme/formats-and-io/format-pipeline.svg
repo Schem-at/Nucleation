@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="380" viewBox="0 0 960 380" role="img" aria-labelledby="title desc">
+  <title id="title">Nucleation format input and output pipeline</title>
+  <desc id="desc">Content detectors identify six input families and load one editable schematic model. Explicit exporters then write Litematica, Sponge, Bedrock, structure SNBT, snapshots, or worlds.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0l8 4-8 4z" fill="#657184"/></marker>
+  </defs>
+  <rect width="960" height="380" rx="18" fill="#11151b"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+    <text x="28" y="38" fill="#8d99aa" font-size="13">READ: DETECT BY CONTENT</text>
+    <text x="711" y="38" fill="#8d99aa" font-size="13">WRITE: CHOOSE EXPLICITLY</text>
+    <g transform="translate(28 62)" font-size="13">
+      <g fill="#171c24" stroke="#343d4b">
+        <rect width="210" height="40" rx="7"/><rect y="48" width="210" height="40" rx="7"/><rect y="96" width="210" height="40" rx="7"/>
+        <rect y="144" width="210" height="40" rx="7"/><rect y="192" width="210" height="40" rx="7"/><rect y="240" width="210" height="40" rx="7"/>
+      </g>
+      <g fill="#f4f7fb">
+        <text x="15" y="25">Litematica / Sponge</text><text x="15" y="73">Bedrock structure</text>
+        <text x="15" y="121">Java structure SNBT</text><text x="15" y="169">Nucleation snapshot</text>
+        <text x="15" y="217">Legacy MCEdit</text><text x="15" y="265">MCA / zipped world</text>
+      </g>
+    </g>
+    <g stroke="#657184" stroke-width="2" marker-end="url(#arrow)">
+      <path d="M250 82C330 82 326 172 380 172"/><path d="M250 130C330 130 326 182 380 182"/>
+      <path d="M250 178h130"/><path d="M250 226C330 226 326 194 380 194"/>
+      <path d="M250 274C330 274 326 204 380 204"/><path d="M250 322C330 322 326 214 380 214"/>
+    </g>
+    <g transform="translate(380 119)">
+      <rect width="220" height="116" rx="14" fill="#171c24" stroke="#4ec9b0" stroke-width="2"/>
+      <path d="M72 47l38-20 38 20-38 20zM72 47v38l38 20V67M148 47v38l-38 20" fill="none" stroke="#4ec9b0" stroke-width="3"/>
+      <text x="21" y="143" fill="#f4f7fb" font-size="17">EDITABLE SCHEMATIC</text>
+      <text x="48" y="165" fill="#8d99aa" font-size="12">blocks · regions · NBT</text>
+    </g>
+    <g stroke="#657184" stroke-width="2" marker-end="url(#arrow)">
+      <path d="M600 178h108"/><path d="M600 188C660 188 662 92 708 92"/><path d="M600 198C660 198 662 284 708 284"/>
+    </g>
+    <g transform="translate(708 62)" font-size="13">
+      <g fill="#171c24" stroke="#343d4b"><rect width="224" height="64" rx="8"/><rect y="76" width="224" height="64" rx="8"/><rect y="152" width="224" height="64" rx="8"/><rect y="228" width="224" height="64" rx="8"/></g>
+      <g fill="#f4f7fb"><text x="15" y="27">litematic / schematic</text><text x="15" y="47" fill="#8d99aa">preserve Java structure</text>
+      <text x="15" y="103">mcstructure / SNBT</text><text x="15" y="123" fill="#8d99aa">translate or flatten</text>
+      <text x="15" y="179">snapshot</text><text x="15" y="199" fill="#8d99aa">fast internal interchange</text>
+      <text x="15" y="255">world</text><text x="15" y="275" fill="#8d99aa">directory or zip</text></g>
+    </g>
+  </g>
+</svg>
