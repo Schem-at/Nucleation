@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="470" viewBox="0 0 1100 470" role="img" aria-labelledby="title desc">
+  <title id="title">SDF and scalar field construction pipeline</title>
+  <desc id="desc">A reusable scalar field branches into geometry displacement and material color. The displaced SDF combines with boolean nodes, becomes a bounded shape, and joins the field brush in a schematic fill.</desc>
+  <defs>
+    <linearGradient id="field" x1="0" x2="1"><stop stop-color="#273a91"/><stop offset=".5" stop-color="#39b9a5"/><stop offset="1" stop-color="#efb738"/></linearGradient>
+    <style>
+      .box{fill:#15191f;stroke:#3a424e;stroke-width:2}.main{fill:#edf1f5;font:600 19px ui-monospace,SFMono-Regular,Menlo,monospace}.small{fill:#9ba6b4;font:14px ui-monospace,SFMono-Regular,Menlo,monospace}.edge{fill:none;stroke:#62d4c2;stroke-width:3;marker-end:url(#arrow)}.branch{fill:none;stroke:#768195;stroke-width:2;stroke-dasharray:7 6;marker-end:url(#gray)}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L0 6L9 3z" fill="#62d4c2"/></marker>
+    <marker id="gray" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L0 6L9 3z" fill="#768195"/></marker>
+  </defs>
+  <rect width="1100" height="470" rx="20" fill="#0d1014"/>
+  <rect class="box" x="38" y="155" width="205" height="160" rx="12"/>
+  <rect x="68" y="186" width="145" height="36" rx="6" fill="url(#field)"/>
+  <text class="main" x="68" y="260">Field3</text><text class="small" x="68" y="285">scalar over (x,y,z)</text>
+
+  <path class="edge" d="M243 200H326"/><path class="branch" d="M243 270C280 270 280 385 326 385"/>
+  <rect class="box" x="326" y="92" width="218" height="174" rx="12"/>
+  <circle cx="382" cy="156" r="32" fill="#334057"/><path d="M356 156c20-24 38 22 55-10" fill="none" stroke="#62d4c2" stroke-width="5"/>
+  <text class="main" x="358" y="218">Sdf graph</text><text class="small" x="358" y="242">offset + boolean</text>
+  <rect class="box" x="326" y="322" width="218" height="110" rx="12"/>
+  <rect x="358" y="350" width="154" height="24" rx="4" fill="url(#field)"/>
+  <text class="main" x="358" y="407">field brush</text>
+
+  <path class="edge" d="M544 180H627"/><rect class="box" x="627" y="122" width="190" height="116" rx="12"/>
+  <text class="main" x="662" y="169">bounded</text><text class="main" x="662" y="197">Shape</text><text class="small" x="662" y="220">voxel centres</text>
+  <path class="edge" d="M817 180H902V235"/><path class="edge" d="M544 377H902V292"/>
+  <rect class="box" x="902" y="192" width="160" height="126" rx="12"/>
+  <text class="main" x="932" y="242">fill</text><text class="small" x="932" y="269">shape + brush</text><text class="main" x="932" y="300">schematic</text>
+  <text class="small" x="38" y="447">One immutable field can drive both surface displacement and material without changing its scalar meaning.</text>
+</svg>
