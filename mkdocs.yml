@@ -73,6 +73,7 @@ nav:
       - Animation: features/animation.md
       - Analysis: features/analysis.md
       - Embedded scripting: features/scripting.md
+  - Illustrations: illustrations.md
   - Gallery: gallery.md
   - API reference:
       - Rust: rust/README.md
