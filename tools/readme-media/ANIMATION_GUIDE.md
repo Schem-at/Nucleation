@@ -242,8 +242,6 @@ loops, the code-sync compositor, projection overlays, the 3D grid, wgpu 30.
 - **Redstone helpers** illustration — different subsystem (simulation API); a
   *state* animation (lever→lamp tick), not block placement. Its own small design.
   Belongs in `docs/features/redstone-simulation.md`.
-- **Bounds / tight-bounds** illustration — wants the grid + leader labels, not
-  code-sync. Its own design.
 
 **Known bugs to consider:**
 - Sponge `.schem` reader injects an empty `components` NBT tag on read (harmless
@@ -251,7 +249,9 @@ loops, the code-sync compositor, projection overlays, the 3D grid, wgpu 30.
   `stable_nbt_token` ignore empty compounds.
 - Grid half-block offset + no origin option (see grid section).
 
-**Not yet bridged:** the whole `animation` module is Rust-only. Exposing it to
-Python/JS/etc. is a `src/bridge/animation.rs` + `gen-bindings.sh` job (Diplomat
-can't pass `Vec<Frame>`/closures, so the bridge collapses the pipeline into one
-`render_to_files`-style call and clips become array-based builder methods).
+**Binding status:** `BuildAnimation`, `AnimationEffect`, and the construction
+timeline are generated for Python and JavaScript from `src/bridge/animation.rs`.
+Python can render GIFs through the native renderer. JavaScript can record and
+evaluate animation frames, but the native file renderer is disabled in WASM.
+The signed-coordinate GIF in `examples/readme/basics/generate_coordinates.py`
+is a current Python example.

@@ -1,0 +1,10 @@
+[package]
+name = "nucleation-basics-docs"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+nucleation = { path = "../../../..", features = ["bridge", "mc-tick"] }
