@@ -1,0 +1,10 @@
+[package]
+name = "nucleation-meshing-rendering-docs"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+nucleation = { path = "../../../..", features = ["meshing", "rendering"] }

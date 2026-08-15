@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="390" viewBox="0 0 960 390" role="img" aria-labelledby="title desc">
+  <title id="title">Schematic meshing and rendering pipeline</title>
+  <desc id="desc">A schematic and resource pack resolve into opaque, cutout, and transparent mesh layers with a texture atlas. The result can be exported as GLB, USDZ, or NUCM, or passed to the native renderer for PNG, GIF, or video pixels.</desc>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0l8 4-8 4z" fill="#657184"/></marker></defs>
+  <rect width="960" height="390" rx="18" fill="#11151b"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+    <g transform="translate(28 58)">
+      <rect width="200" height="74" rx="10" fill="#171c24" stroke="#343d4b"/>
+      <text x="18" y="30" fill="#f4f7fb" font-size="17">SCHEMATIC</text><text x="18" y="53" fill="#8d99aa" font-size="12">blocks · states · bounds</text>
+      <rect y="112" width="200" height="74" rx="10" fill="#171c24" stroke="#343d4b"/>
+      <text x="18" y="142" fill="#f4f7fb" font-size="17">RESOURCE PACK</text><text x="18" y="165" fill="#8d99aa" font-size="12">models · textures · tint</text>
+    </g>
+    <path d="M228 95C310 95 298 166 354 166M228 207C310 207 298 176 354 176" fill="none" stroke="#657184" stroke-width="2" marker-end="url(#a)"/>
+    <g transform="translate(354 58)">
+      <rect width="250" height="222" rx="14" fill="#171c24" stroke="#4ec9b0" stroke-width="2"/>
+      <text x="20" y="34" fill="#f4f7fb" font-size="18">MESHER</text>
+      <g transform="translate(20 56)" font-size="13">
+        <rect width="210" height="38" rx="6" fill="#252c36"/><text x="13" y="24" fill="#f4f7fb">OPAQUE · depth write</text>
+        <rect y="48" width="210" height="38" rx="6" fill="#252c36"/><text x="13" y="72" fill="#d4aa45">CUTOUT · alpha discard</text>
+        <rect y="96" width="210" height="38" rx="6" fill="#252c36"/><text x="13" y="120" fill="#7386d5">TRANSPARENT · blending</text>
+        <rect y="144" width="210" height="38" rx="6" fill="#252c36"/><text x="13" y="168" fill="#4ec9b0">SHARED TEXTURE ATLAS</text>
+      </g>
+    </g>
+    <g stroke="#657184" stroke-width="2" marker-end="url(#a)"><path d="M604 145C670 145 664 84 712 84"/><path d="M604 194C670 194 664 254 712 254"/></g>
+    <g transform="translate(712 48)">
+      <rect width="220" height="104" rx="10" fill="#171c24" stroke="#343d4b"/>
+      <text x="18" y="31" fill="#8d99aa" font-size="13">PORTABLE DATA</text><text x="18" y="60" fill="#f4f7fb" font-size="18">GLB · USDZ · NUCM</text><text x="18" y="83" fill="#8d99aa" font-size="12">web, DCC, cache</text>
+      <rect y="170" width="220" height="104" rx="10" fill="#171c24" stroke="#343d4b"/>
+      <text x="18" y="201" fill="#8d99aa" font-size="13">NATIVE RENDERER</text><text x="18" y="230" fill="#f4f7fb" font-size="18">PNG · GIF · VIDEO</text><text x="18" y="253" fill="#8d99aa" font-size="12">camera, grid, lighting</text>
+    </g>
+    <text x="28" y="350" fill="#8d99aa" font-size="13">MESH ONCE · EXPORT OR DRAW · KEEP TRANSPARENCY ORDER EXPLICIT</text>
+  </g>
+</svg>
