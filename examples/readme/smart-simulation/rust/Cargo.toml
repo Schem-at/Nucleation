@@ -1,0 +1,11 @@
+[package]
+name = "nucleation-smart-simulation-docs"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+nucleation = { path = "../../../..", features = ["bridge", "mc-tick"] }
+mc-tick = { path = "../../../../crates/mc-tick" }
