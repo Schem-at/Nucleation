@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" role="img" aria-labelledby="title desc">
+  <title id="title">Choose a bulk operation from the shape of the input data</title>
+  <desc id="desc">Four panels map a dense box to fill cuboid, sparse equal blocks to set blocks, mixed repeated blocks to prepare and place, and geometric volumes to building tool fill.</desc>
+  <rect width="960" height="360" rx="18" fill="#11151b"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+    <g transform="translate(24 24)">
+      <rect width="216" height="312" rx="12" fill="#171c24" stroke="#343d4b"/>
+      <text x="18" y="30" fill="#8d99aa" font-size="13">DENSE BOX</text>
+      <g fill="#4ec9b0" stroke="#11151b" stroke-width="2">
+        <path d="M48 93l52-26 52 26-52 26z"/>
+        <path d="M48 93v64l52 27v-65z" opacity=".78"/>
+        <path d="M152 93v64l-52 27v-65z" opacity=".55"/>
+      </g>
+      <text x="18" y="230" fill="#f4f7fb" font-size="17">fill_cuboid</text>
+      <text x="18" y="256" fill="#8d99aa" font-size="12">one bounds growth</text>
+      <text x="18" y="276" fill="#8d99aa" font-size="12">one palette lookup</text>
+    </g>
+    <g transform="translate(256 24)">
+      <rect width="216" height="312" rx="12" fill="#171c24" stroke="#343d4b"/>
+      <text x="18" y="30" fill="#8d99aa" font-size="13">SPARSE, ONE BLOCK</text>
+      <g fill="#d4aa45">
+        <circle cx="48" cy="86" r="8"/><circle cx="96" cy="112" r="8"/>
+        <circle cx="157" cy="74" r="8"/><circle cx="62" cy="154" r="8"/>
+        <circle cx="132" cy="169" r="8"/><circle cx="174" cy="137" r="8"/>
+      </g>
+      <path d="M36 192h144" stroke="#343d4b" stroke-dasharray="4 5"/>
+      <text x="18" y="230" fill="#f4f7fb" font-size="17">set_blocks</text>
+      <text x="18" y="256" fill="#8d99aa" font-size="12">one binding call</text>
+      <text x="18" y="276" fill="#8d99aa" font-size="12">one parsed descriptor</text>
+    </g>
+    <g transform="translate(488 24)">
+      <rect width="216" height="312" rx="12" fill="#171c24" stroke="#343d4b"/>
+      <text x="18" y="30" fill="#8d99aa" font-size="13">MIXED HOT LOOP</text>
+      <g>
+        <rect x="38" y="70" width="34" height="34" fill="#4ec9b0"/>
+        <rect x="91" y="70" width="34" height="34" fill="#d4aa45"/>
+        <rect x="144" y="70" width="34" height="34" fill="#7386d5"/>
+        <path d="M55 122v50m53-50v50m53-50v50" stroke="#657184" stroke-width="3"/>
+        <circle cx="55" cy="177" r="7" fill="#4ec9b0"/>
+        <circle cx="108" cy="177" r="7" fill="#d4aa45"/>
+        <circle cx="161" cy="177" r="7" fill="#7386d5"/>
+      </g>
+      <text x="18" y="230" fill="#f4f7fb" font-size="17">prepare + place</text>
+      <text x="18" y="256" fill="#8d99aa" font-size="12">resolve each id once</text>
+      <text x="18" y="276" fill="#8d99aa" font-size="12">write palette indices</text>
+    </g>
+    <g transform="translate(720 24)">
+      <rect width="216" height="312" rx="12" fill="#171c24" stroke="#343d4b"/>
+      <text x="18" y="30" fill="#8d99aa" font-size="13">GEOMETRY + MATERIAL</text>
+      <path d="M108 59c43 0 72 37 72 78s-29 64-72 64-72-23-72-64 29-78 72-78z" fill="#7386d5" opacity=".22" stroke="#7386d5" stroke-width="2"/>
+      <path d="M49 150c30-55 88-63 119-18" fill="none" stroke="#4ec9b0" stroke-width="8" stroke-linecap="round"/>
+      <text x="18" y="230" fill="#f4f7fb" font-size="17">BuildingTool.fill</text>
+      <text x="18" y="256" fill="#8d99aa" font-size="12">shape enumerates cells</text>
+      <text x="18" y="276" fill="#8d99aa" font-size="12">brush chooses blocks</text>
+    </g>
+  </g>
+</svg>

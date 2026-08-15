@@ -47,6 +47,7 @@ nav:
       - Formats and I/O: features/formats-and-io.md
       - Bindings and languages: features/bindings-and-languages.md
   - Build:
+      - Fast schematic generation: features/fast-generation.md
       - Shapes and brushes: features/shapes-and-brushes.md
       - SDFs, terrain, and fields: features/sdf-and-fields.md
       - Palettes and color: features/palettes-and-color.md
