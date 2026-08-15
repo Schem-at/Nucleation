@@ -1,7 +1,20 @@
 {
-  "schemaVersion": 1,
-  "theme": "nucleation",
+  "schemaVersion": 2,
+  "themes": {
+    "dark": "nucleation-dark",
+    "light": "nucleation-light"
+  },
   "width": 960,
+  "variants": [
+    {
+      "name": "dark",
+      "suffix": ""
+    },
+    {
+      "name": "light",
+      "suffix": ".light"
+    }
+  ],
   "scenes": [
     {
       "slug": "fast-generation",
@@ -36,7 +49,7 @@
     {
       "slug": "bindings-and-languages",
       "title": "Bindings and languages",
-      "summary": "A physical stack distinguishes the native core, the generated bridge contract, and each package surface."
+      "summary": "One annotated Rust bridge and Diplomat generate six language surfaces that share naming, byte, and JSON contracts."
     },
     {
       "slug": "meshing-and-rendering",
@@ -44,9 +57,9 @@
       "summary": "Exploded mesh slabs make draw order tangible before the shared geometry branches to data or pixels."
     }
   ],
-  "kineglyphCommit": "d76ae1ecc201fe581f006398e91418ee65cb2795",
+  "kineglyphCommit": "5178762cfce452ba5d9ceb8aa828ddfddcdfd37e",
   "bundle": {
     "path": "javascripts/vendor/kineglyph-web.js",
-    "sha256": "f973567cbcfc9e24ea63585a65318089a282bbd50f40fc21be51df1f92d78a65"
+    "sha256": "7079ce78816477410b8b66304d2bbdd209d2d09df6048335206bb17cb747a855"
   }
 }

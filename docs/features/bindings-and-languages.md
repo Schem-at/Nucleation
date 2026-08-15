@@ -6,7 +6,8 @@ generates JavaScript/TypeScript, Python, Kotlin/JVM, PHP, C, and C++ from those
 definitions.
 
 <div class="bb-kineglyph" data-kineglyph="bindings-and-languages" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-  <img src="../../media/kineglyph/bindings-and-languages.svg" alt="The Rust core, annotated bridge contract, and seven language surfaces">
+  <img class="kg-fallback--dark" src="../../media/kineglyph/bindings-and-languages.svg" alt="The Rust core, annotated bridge contract, and seven language surfaces">
+  <img class="kg-fallback--light" src="../../media/kineglyph/bindings-and-languages.light.svg" alt="">
 </div>
 
 Generated files are committed. Release CI regenerates them twice, checks that

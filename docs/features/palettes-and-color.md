@@ -7,7 +7,8 @@ separation matters: color matching answers *which candidate is nearest*;
 palette design decides *which candidates are acceptable*.
 
 <div class="bb-kineglyph" data-kineglyph="palettes-and-color" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-  <img src="../../media/kineglyph/palettes-and-color.svg" alt="A target colour passing through Oklab measurement, a constrained block palette, and four selection methods">
+  <img class="kg-fallback--dark" src="../../media/kineglyph/palettes-and-color.svg" alt="A target colour passing through Oklab measurement, a constrained block palette, and four selection methods">
+  <img class="kg-fallback--light" src="../../media/kineglyph/palettes-and-color.light.svg" alt="">
 </div>
 
 ## One color atlas in three bindings

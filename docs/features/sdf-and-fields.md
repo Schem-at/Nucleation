@@ -11,7 +11,8 @@ perturb an SDF and color the resulting blocks without pretending that the noise
 itself is a distance.
 
 <div class="bb-kineglyph" data-kineglyph="sdf-and-fields" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-  <img src="../../media/kineglyph/sdf-and-fields.svg" alt="One scalar field branching into geometry and material before both meet in a schematic fill">
+  <img class="kg-fallback--dark" src="../../media/kineglyph/sdf-and-fields.svg" alt="One scalar field branching into geometry and material before both meet in a schematic fill">
+  <img class="kg-fallback--light" src="../../media/kineglyph/sdf-and-fields.light.svg" alt="">
 </div>
 
 ## One field, two jobs, three bindings

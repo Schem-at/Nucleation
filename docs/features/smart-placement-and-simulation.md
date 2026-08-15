@@ -10,7 +10,8 @@ simulator, and `{simulate=true}` does not leave a live world ticking behind the
 schematic.
 
 <div class="bb-kineglyph" data-kineglyph="smart-simulation" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-  <img src="../../media/kineglyph/smart-simulation.svg" alt="Four questions selecting signal shorthand, simulated placement, MCHPRS, or TickSimulation">
+  <img class="kg-fallback--dark" src="../../media/kineglyph/smart-simulation.svg" alt="Four questions selecting signal shorthand, simulated placement, MCHPRS, or TickSimulation">
+  <img class="kg-fallback--light" src="../../media/kineglyph/smart-simulation.light.svg" alt="">
 </div>
 
 ## One circuit, authored in three bindings

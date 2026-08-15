@@ -6,7 +6,8 @@ an exporter, version, and settings, or let a native file method select the
 exporter from a known extension.
 
 <div class="bb-kineglyph" data-kineglyph="formats-and-io" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-  <img src="../../media/kineglyph/formats-and-io.svg" alt="Format detectors converging on one editable schematic model before explicit export">
+  <img class="kg-fallback--dark" src="../../media/kineglyph/formats-and-io.svg" alt="Format detectors converging on one editable schematic model before explicit export">
+  <img class="kg-fallback--light" src="../../media/kineglyph/formats-and-io.light.svg" alt="">
 </div>
 
 ## One fixture in three bindings

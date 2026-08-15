@@ -1,6 +1,17 @@
 let controllers = [];
 let visibilityCleanups = [];
+let themeObserver;
 let generation = 0;
+
+function activeKineglyphTheme(runtime) {
+  const scheme = document.body.getAttribute("data-md-color-scheme");
+  return runtime.themes[scheme === "vellum" ? "nucleation-light" : "nucleation-dark"];
+}
+
+function applyKineglyphTheme(runtime) {
+  const theme = activeKineglyphTheme(runtime);
+  for (const controller of controllers) controller.setTheme(theme);
+}
 
 async function mountKineglyphPage() {
   generation += 1;
@@ -8,6 +19,7 @@ async function mountKineglyphPage() {
 
   for (const cleanup of visibilityCleanups) cleanup();
   visibilityCleanups = [];
+  themeObserver?.disconnect();
   for (const controller of controllers) controller.destroy();
   controllers = [];
 
@@ -15,6 +27,12 @@ async function mountKineglyphPage() {
   if (current !== generation) return;
 
   controllers = runtime.autoMount();
+  applyKineglyphTheme(runtime);
+  themeObserver = new MutationObserver(() => applyKineglyphTheme(runtime));
+  themeObserver.observe(document.body, {
+    attributes: true,
+    attributeFilter: ["data-md-color-scheme"],
+  });
   for (const controller of controllers) {
     visibilityCleanups.push(
       runtime.startWhenVisible(controller.element, () => controller.restart(true), {

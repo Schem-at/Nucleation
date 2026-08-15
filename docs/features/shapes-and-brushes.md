@@ -17,7 +17,8 @@ reads the same parameter, so construction order and material position agree.
 ## Geometry and material are separate
 
 <div class="bb-kineglyph" data-kineglyph="shapes-and-brushes" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-  <img src="../../media/kineglyph/shapes-and-brushes.svg" alt="A sphere mask and material ramp composing into a coloured voxel slice">
+  <img class="kg-fallback--dark" src="../../media/kineglyph/shapes-and-brushes.svg" alt="A sphere mask and material ramp composing into a coloured voxel slice">
+  <img class="kg-fallback--light" src="../../media/kineglyph/shapes-and-brushes.light.svg" alt="">
 </div>
 
 The shape owns spatial questions: bounds, membership, surface normal, and, for

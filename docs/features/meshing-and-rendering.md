@@ -6,7 +6,8 @@ two stages separate when the result belongs in a browser, a DCC tool, a cache,
 or a custom engine.
 
 <div class="bb-kineglyph" data-kineglyph="meshing-and-rendering" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-  <img src="../../media/kineglyph/meshing-and-rendering.svg" alt="Opaque, cutout, and transparent mesh layers branching to portable 3D data or rendered pixels">
+  <img class="kg-fallback--dark" src="../../media/kineglyph/meshing-and-rendering.svg" alt="Opaque, cutout, and transparent mesh layers branching to portable 3D data or rendered pixels">
+  <img class="kg-fallback--light" src="../../media/kineglyph/meshing-and-rendering.light.svg" alt="">
 </div>
 
 ## A layer-complete fixture in three bindings

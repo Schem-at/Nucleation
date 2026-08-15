@@ -4,7 +4,7 @@ Eight interactive explanations for the parts that are easier to understand
 spatially than as an API list. Each is a responsive Kineglyph scene with a
 seekable entrance, keyboard controls, and a static SVG fallback.
 
-[Download all eight SVGs](downloads/illustrations/nucleation-system-illustrations.zip){ .md-button .md-button--primary }
+[Download the SVG set](downloads/illustrations/nucleation-system-illustrations.zip){ .md-button .md-button--primary }
 [Browse the build gallery](gallery.md){ .md-button }
 
 <div class="bb-illustrations">
@@ -12,7 +12,8 @@ seekable entrance, keyboard controls, and a static SVG fallback.
 <figure class="bb-illustration">
   <div class="bb-illustration__stage">
     <div class="bb-kineglyph" data-kineglyph="fast-generation" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-      <img src="../media/kineglyph/fast-generation.svg" alt="Four workload shapes aligned with their fast bulk generation APIs">
+      <img class="kg-fallback--dark" src="../media/kineglyph/fast-generation.svg" alt="Four workload shapes aligned with their fast bulk generation APIs">
+      <img class="kg-fallback--light" src="../media/kineglyph/fast-generation.light.svg" alt="">
     </div>
   </div>
   <figcaption>
@@ -25,7 +26,8 @@ seekable entrance, keyboard controls, and a static SVG fallback.
 <figure class="bb-illustration">
   <div class="bb-illustration__stage">
     <div class="bb-kineglyph" data-kineglyph="shapes-and-brushes" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-      <img src="../media/kineglyph/shapes-and-brushes.svg" alt="A sphere mask and material ramp composing into a coloured voxel slice">
+      <img class="kg-fallback--dark" src="../media/kineglyph/shapes-and-brushes.svg" alt="A sphere mask and material ramp composing into a coloured voxel slice">
+      <img class="kg-fallback--light" src="../media/kineglyph/shapes-and-brushes.light.svg" alt="">
     </div>
   </div>
   <figcaption>
@@ -38,7 +40,8 @@ seekable entrance, keyboard controls, and a static SVG fallback.
 <figure class="bb-illustration">
   <div class="bb-illustration__stage">
     <div class="bb-kineglyph" data-kineglyph="sdf-and-fields" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-      <img src="../media/kineglyph/sdf-and-fields.svg" alt="One scalar field branching into geometry and material before schematic fill">
+      <img class="kg-fallback--dark" src="../media/kineglyph/sdf-and-fields.svg" alt="One scalar field branching into geometry and material before schematic fill">
+      <img class="kg-fallback--light" src="../media/kineglyph/sdf-and-fields.light.svg" alt="">
     </div>
   </div>
   <figcaption>
@@ -51,7 +54,8 @@ seekable entrance, keyboard controls, and a static SVG fallback.
 <figure class="bb-illustration">
   <div class="bb-illustration__stage">
     <div class="bb-kineglyph" data-kineglyph="palettes-and-color" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-      <img src="../media/kineglyph/palettes-and-color.svg" alt="A target colour passing through Oklab, a constrained block palette, and four selection methods">
+      <img class="kg-fallback--dark" src="../media/kineglyph/palettes-and-color.svg" alt="A target colour passing through Oklab, a constrained block palette, and four selection methods">
+      <img class="kg-fallback--light" src="../media/kineglyph/palettes-and-color.light.svg" alt="">
     </div>
   </div>
   <figcaption>
@@ -64,7 +68,8 @@ seekable entrance, keyboard controls, and a static SVG fallback.
 <figure class="bb-illustration">
   <div class="bb-illustration__stage">
     <div class="bb-kineglyph" data-kineglyph="smart-simulation" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-      <img src="../media/kineglyph/smart-simulation.svg" alt="Four questions selecting signal shorthand, simulated placement, MCHPRS, or TickSimulation">
+      <img class="kg-fallback--dark" src="../media/kineglyph/smart-simulation.svg" alt="Four questions selecting signal shorthand, simulated placement, MCHPRS, or TickSimulation">
+      <img class="kg-fallback--light" src="../media/kineglyph/smart-simulation.light.svg" alt="">
     </div>
   </div>
   <figcaption>
@@ -77,7 +82,8 @@ seekable entrance, keyboard controls, and a static SVG fallback.
 <figure class="bb-illustration">
   <div class="bb-illustration__stage">
     <div class="bb-kineglyph" data-kineglyph="formats-and-io" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-      <img src="../media/kineglyph/formats-and-io.svg" alt="Format detectors converging on one editable schematic model before explicit export">
+      <img class="kg-fallback--dark" src="../media/kineglyph/formats-and-io.svg" alt="Format detectors converging on one editable schematic model before explicit export">
+      <img class="kg-fallback--light" src="../media/kineglyph/formats-and-io.light.svg" alt="">
     </div>
   </div>
   <figcaption>
@@ -90,7 +96,8 @@ seekable entrance, keyboard controls, and a static SVG fallback.
 <figure class="bb-illustration">
   <div class="bb-illustration__stage">
     <div class="bb-kineglyph" data-kineglyph="bindings-and-languages" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-      <img src="../media/kineglyph/bindings-and-languages.svg" alt="The Rust core, annotated bridge contract, and seven language surfaces">
+      <img class="kg-fallback--dark" src="../media/kineglyph/bindings-and-languages.svg" alt="The Rust core, annotated bridge contract, and seven language surfaces">
+      <img class="kg-fallback--light" src="../media/kineglyph/bindings-and-languages.light.svg" alt="">
     </div>
   </div>
   <figcaption>
@@ -103,7 +110,8 @@ seekable entrance, keyboard controls, and a static SVG fallback.
 <figure class="bb-illustration">
   <div class="bb-illustration__stage">
     <div class="bb-kineglyph" data-kineglyph="meshing-and-rendering" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-      <img src="../media/kineglyph/meshing-and-rendering.svg" alt="Three ordered mesh layers branching to portable 3D data or native rendered pixels">
+      <img class="kg-fallback--dark" src="../media/kineglyph/meshing-and-rendering.svg" alt="Three ordered mesh layers branching to portable 3D data or native rendered pixels">
+      <img class="kg-fallback--light" src="../media/kineglyph/meshing-and-rendering.light.svg" alt="">
     </div>
   </div>
   <figcaption>
