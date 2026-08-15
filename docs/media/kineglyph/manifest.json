@@ -57,9 +57,9 @@
       "summary": "Exploded mesh slabs make draw order tangible before the shared geometry branches to data or pixels."
     }
   ],
-  "kineglyphCommit": "5178762cfce452ba5d9ceb8aa828ddfddcdfd37e",
+  "kineglyphCommit": "f02d6ca3d0ecc367c0ed332a8d3c7bd46cc48697",
   "bundle": {
     "path": "javascripts/vendor/kineglyph-web.js",
-    "sha256": "7079ce78816477410b8b66304d2bbdd209d2d09df6048335206bb17cb747a855"
+    "sha256": "3c7e2a8e200169e1c1bdb5a5f87cbb42684000277603850499343e3629543dbf"
   }
 }

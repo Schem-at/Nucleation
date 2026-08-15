@@ -15,6 +15,12 @@ itself is a distance.
   <img class="kg-fallback--light" src="../../media/kineglyph/sdf-and-fields.light.svg" alt="">
 </div>
 
+The viewport on the right is built in this page, not played back from a saved
+render. Each shape or material choice runs Nucleation's browser binding,
+fills a fresh schematic from the SDF, meshes it to GLB, and passes those bytes
+to Kineglyph's live surface. Drag to orbit; use the controls below the figure to
+rebuild it.
+
 ## One field, two jobs, three bindings
 
 The field observatory uses the same seeded FBM node twice. It offsets an

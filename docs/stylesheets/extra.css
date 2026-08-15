@@ -870,6 +870,19 @@ body {
   font-family: var(--mono);
 }
 
+.bb-kineglyph .nuc-sdf-surface model-viewer {
+  --poster-color: transparent;
+  cursor: grab;
+}
+
+.bb-kineglyph .nuc-sdf-surface model-viewer:active {
+  cursor: grabbing;
+}
+
+.bb-kineglyph .nuc-sdf-surface model-viewer::part(default-progress-bar) {
+  display: none;
+}
+
 .bb-illustrations {
   display: grid;
   gap: 32px;

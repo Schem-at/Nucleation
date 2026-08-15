@@ -1,0 +1,39 @@
+{
+  "features": [
+    "bridge",
+    "meshing"
+  ],
+  "wasmSha256": "ff9ba440af8ae2e3b5e2e07bf2aaceebc63dc0facdf244287de1c3c09b26fd53",
+  "modules": [
+    "BlockPos.mjs",
+    "BlockState.mjs",
+    "Brush.mjs",
+    "BuildingTool.mjs",
+    "Curve3D.mjs",
+    "Dimensions.mjs",
+    "Field3.mjs",
+    "FieldProgram.mjs",
+    "FieldProgramDistanceKind.mjs",
+    "FieldRange.mjs",
+    "InterpolationSpace.mjs",
+    "MeshBounds.mjs",
+    "MeshConfig.mjs",
+    "MeshResult.mjs",
+    "NucleationError.mjs",
+    "Palette.mjs",
+    "ResourcePack.mjs",
+    "ResourcePackList.mjs",
+    "Schematic.mjs",
+    "SchematicSplitResult.mjs",
+    "Sdf.mjs",
+    "SdfAxis.mjs",
+    "SdfBounds.mjs",
+    "SdfCellMode.mjs",
+    "SdfNormal.mjs",
+    "Shape.mjs",
+    "TextureInfo.mjs",
+    "diplomat-runtime.mjs",
+    "diplomat-wasm.mjs",
+    "diplomat.config.mjs"
+  ]
+}

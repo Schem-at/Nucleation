@@ -7198,7 +7198,7 @@ function Oo(e = {}) {
 			r.setAttribute("data-kineglyph-error", `unknown scene "${t}"`);
 			continue;
 		}
-		let a = r.dataset.theme, o = a === void 0 ? void 0 : e.themes?.[a] ?? To.get(a), s = r.dataset.layout, c = r.dataset.width === void 0 ? void 0 : Number(r.dataset.width), l = xo(r, {
+		let a = r.dataset.theme, o = a === void 0 ? void 0 : e.themes?.[a] ?? To.get(a), s = r.dataset.layout, c = r.dataset.width === void 0 ? void 0 : Number(r.dataset.width), l = e.mountOptions?.(r, t) ?? {}, u = xo(r, {
 			scene: i,
 			...o === void 0 ? {} : { theme: o },
 			...s === void 0 ? {} : { layout: s },
@@ -7207,11 +7207,12 @@ function Oo(e = {}) {
 			controls: r.dataset.controls !== "false",
 			readout: r.dataset.readout !== "false",
 			...r.dataset.reducedMotion === void 0 ? {} : { reducedMotion: r.dataset.reducedMotion === "true" },
-			...r.dataset.idPrefix === void 0 ? {} : { idPrefix: r.dataset.idPrefix }
+			...r.dataset.idPrefix === void 0 ? {} : { idPrefix: r.dataset.idPrefix },
+			...l
 		});
-		r.dataset.kineglyphMounted = "true", l.on("destroy", () => {
+		r.dataset.kineglyphMounted = "true", u.on("destroy", () => {
 			delete r.dataset.kineglyphMounted;
-		}), n.push(l);
+		}), n.push(u);
 	}
 	return n;
 }
@@ -10935,7 +10936,141 @@ var cl = z("shape-brush-ramp", [
 	title: "A scalar can shape geometry and material at once",
 	body: "Keeping both branches on the same field avoids the drift caused by unrelated noise functions."
 });
-function fl() {
+function fl(e) {
+	return {
+		SHAPE_BLOOM: {
+			target: e,
+			actions: [{
+				type: "set",
+				var: "shape",
+				value: "bloom"
+			}]
+		},
+		SHAPE_RINGS: {
+			target: e,
+			actions: [{
+				type: "set",
+				var: "shape",
+				value: "rings"
+			}]
+		},
+		SHAPE_FRAME: {
+			target: e,
+			actions: [{
+				type: "set",
+				var: "shape",
+				value: "frame"
+			}]
+		},
+		MATERIAL_FIELD: {
+			target: e,
+			actions: [{
+				type: "set",
+				var: "material",
+				value: "field"
+			}]
+		},
+		MATERIAL_CALCITE: {
+			target: e,
+			actions: [{
+				type: "set",
+				var: "material",
+				value: "calcite"
+			}]
+		},
+		MATERIAL_COPPER: {
+			target: e,
+			actions: [{
+				type: "set",
+				var: "material",
+				value: "copper"
+			}]
+		}
+	};
+}
+var pl = {
+	...dl.machine,
+	variables: {
+		...dl.machine.variables,
+		shape: "bloom",
+		material: "field"
+	},
+	states: Object.fromEntries(Object.entries(dl.machine.states).map(([e, t]) => [e, {
+		...t,
+		on: {
+			...t.on,
+			...fl(e)
+		}
+	}]))
+}, ml = [
+	{
+		id: "sdf-shape-bloom",
+		label: "Bloom",
+		event: "SHAPE_BLOOM",
+		group: "Shape",
+		activeWhen: {
+			var: "shape",
+			op: "eq",
+			value: "bloom"
+		}
+	},
+	{
+		id: "sdf-shape-rings",
+		label: "Rings",
+		event: "SHAPE_RINGS",
+		group: "Shape",
+		activeWhen: {
+			var: "shape",
+			op: "eq",
+			value: "rings"
+		}
+	},
+	{
+		id: "sdf-shape-frame",
+		label: "Frame",
+		event: "SHAPE_FRAME",
+		group: "Shape",
+		activeWhen: {
+			var: "shape",
+			op: "eq",
+			value: "frame"
+		}
+	},
+	{
+		id: "sdf-material-field",
+		label: "Field ramp",
+		event: "MATERIAL_FIELD",
+		group: "Material",
+		activeWhen: {
+			var: "material",
+			op: "eq",
+			value: "field"
+		}
+	},
+	{
+		id: "sdf-material-calcite",
+		label: "Calcite",
+		event: "MATERIAL_CALCITE",
+		group: "Material",
+		activeWhen: {
+			var: "material",
+			op: "eq",
+			value: "calcite"
+		}
+	},
+	{
+		id: "sdf-material-copper",
+		label: "Copper",
+		event: "MATERIAL_COPPER",
+		group: "Material",
+		activeWhen: {
+			var: "material",
+			op: "eq",
+			value: "copper"
+		}
+	}
+];
+function hl() {
 	return {
 		...z("sdf-field", [{
 			id: "sdf-contours",
@@ -10977,7 +11112,7 @@ function fl() {
 		...Gc(ul[0])
 	};
 }
-function pl(e, t) {
+function gl(e, t) {
 	let n = t === "geometry" ? {
 		id: "sdf-geometry-shape",
 		type: "path",
@@ -11022,19 +11157,38 @@ function pl(e, t) {
 		...Gc(e)
 	};
 }
-var ml = {
-	...z("sdf-schematic", [Kn("sdf-result-cube", "cube", {
-		tone: "accent",
-		size: 76
-	}), Jc("sdf-result-copy", "FILL", "Schematic", "editable blocks")], {
-		gap: 14,
+var _l = {
+	...z("sdf-schematic", [{
+		id: "sdf-live-build",
+		type: "image",
+		src: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20240%20176%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%238994a3%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22M120%2019%20205%2062v67l-85%2042-85-42V62Z%22%20opacity%3D%22.34%22%2F%3E%3Cpath%20d%3D%22m35%2062%2085%2043%2085-43M120%20105v66%22%20opacity%3D%22.28%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%238994a3%22%3E%3Crect%20x%3D%2274%22%20y%3D%2265%22%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%223%22%20opacity%3D%22.45%22%2F%3E%3Crect%20x%3D%22100%22%20y%3D%2251%22%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%223%22%20opacity%3D%22.7%22%2F%3E%3Crect%20x%3D%22126%22%20y%3D%2266%22%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%223%22%20opacity%3D%22.52%22%2F%3E%3Crect%20x%3D%22100%22%20y%3D%2279%22%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%223%22%20opacity%3D%22.86%22%2F%3E%3Crect%20x%3D%22126%22%20y%3D%2294%22%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%223%22%20opacity%3D%22.7%22%2F%3E%3Crect%20x%3D%2274%22%20y%3D%2294%22%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%223%22%20opacity%3D%22.6%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%22120%22%20cy%3D%22105%22%20r%3D%2254%22%20fill%3D%22none%22%20stroke%3D%22%2362d4c3%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%224%207%22%20opacity%3D%22.8%22%2F%3E%3C%2Fsvg%3E",
+		alt: "Interactive Minecraft schematic generated from the selected SDF",
+		fit: "contain",
+		live: !0,
+		width: {
+			wide: 220,
+			compact: 180,
+			narrow: "fill"
+		},
+		height: {
+			wide: 176,
+			compact: 150,
+			narrow: 210
+		},
+		radius: 8
+	}, Jc("sdf-result-copy", "LIVE · WASM", "Schematic", "drag to inspect")], {
+		gap: 10,
 		align: "center",
-		padding: 20,
-		frame: B("floating", { radius: 10 }),
+		padding: {
+			wide: 14,
+			compact: 12,
+			narrow: 14
+		},
+		frame: B("raised", { radius: 10 }),
 		width: "fill"
 	}),
 	...Gc(ul[3])
-}, hl = [
+}, vl = [
 	{
 		id: "sdf-field-geometry",
 		from: {
@@ -11127,13 +11281,13 @@ var ml = {
 		route: "curve",
 		head: "triangle"
 	}
-], gl = Zc(3, "sdf-and-fields", "SDF and fields", "One scalar field bifurcates into occupancy and material, then recombines as editable blocks.", Ct({
+], yl = Zc(3, "sdf-and-fields", "SDF and fields", "One scalar field bifurcates into occupancy and material, then recombines as editable blocks.", Ct({
 	schemaVersion: 2,
 	id: "sdf-and-fields",
 	title: "SDFs and scalar fields",
 	description: "One scalar field splits into a geometry branch and a material branch before fill recombines them.",
 	breakpoints: {
-		wide: 780,
+		wide: 900,
 		compact: 520
 	},
 	background: "canvas",
@@ -11142,37 +11296,39 @@ var ml = {
 		type: "group",
 		layout: {
 			wide: "row",
-			compact: "stack"
+			compact: "row",
+			narrow: "stack"
 		},
 		gap: {
-			wide: 74,
-			compact: 34
+			wide: 64,
+			compact: 30,
+			narrow: 34
 		},
 		align: "stretch",
 		width: "fill",
 		children: [
-			fl(),
-			z("sdf-branches", [pl(ul[1], "geometry"), pl(ul[2], "material")], {
+			hl(),
+			z("sdf-branches", [gl(ul[1], "geometry"), gl(ul[2], "material")], {
 				gap: 12,
 				width: "fill"
 			}),
-			ml
+			_l
 		]
 	}),
-	edges: hl,
-	machine: dl.machine,
-	controls: dl.controls,
+	edges: vl,
+	machine: pl,
+	controls: ml,
 	timeline: Xc([
 		"sdf-field",
 		"sdf-geometry",
 		"sdf-material",
 		"sdf-schematic"
-	], hl.map((e) => e.id)),
+	], vl.map((e) => e.id)),
 	metadata: {
 		source: "sdf-and-fields/sdf-field-pipeline.svg",
 		revision: 2
 	}
-}), "Focus the field, either reading, or the resulting schematic.", "Contours arrive first, the two interpretations split apart, and fill closes the loop."), _l = [
+}), "Choose a volume and material, then drag the generated schematic to inspect the result.", "Contours arrive first, the two interpretations split apart, and fill closes the loop."), bl = [
 	{
 		key: "target",
 		label: "Target",
@@ -11201,10 +11357,10 @@ var ml = {
 		title: "Selection method changes the texture",
 		body: "Nearest, ramps, gradients, and dithering trade exact local colour for continuity or pattern."
 	}
-], vl = Wc("color-laboratory", _l, {
+], xl = Wc("color-laboratory", bl, {
 	title: "Colour selection is measurement under constraints",
 	body: "Convert the target, filter the available blocks, then choose a selection strategy for the surface."
-}), yl = Zc(4, "palettes-and-color", "Palettes and colour", "A colour laboratory separates perceptual measurement, palette constraints, and surface strategy.", Ct({
+}), Sl = Zc(4, "palettes-and-color", "Palettes and colour", "A colour laboratory separates perceptual measurement, palette constraints, and surface strategy.", Ct({
 	schemaVersion: 2,
 	id: "palettes-and-color",
 	title: "Palettes and colour",
@@ -11258,7 +11414,7 @@ var ml = {
 					frame: B("floating", { radius: 8 }),
 					width: "fill"
 				}),
-				...Gc(_l[0])
+				...Gc(bl[0])
 			},
 			{
 				...z("color-lab", [{
@@ -11325,7 +11481,7 @@ var ml = {
 					frame: B("raised", { radius: 8 }),
 					width: "fill"
 				}),
-				...Gc(_l[1])
+				...Gc(bl[1])
 			},
 			{
 				...z("color-palette", [Jn("color-blocks", [
@@ -11354,7 +11510,7 @@ var ml = {
 					frame: B("inset", { radius: 8 }),
 					width: "fill"
 				}),
-				...Gc(_l[2])
+				...Gc(bl[2])
 			},
 			{
 				...z("color-methods", [
@@ -11367,7 +11523,7 @@ var ml = {
 						id: `color-method-${e}-mark`,
 						type: "circle",
 						radius: 5 + n,
-						fill: _l[n % _l.length]?.key === "lab" ? "info" : "accent",
+						fill: bl[n % bl.length]?.key === "lab" ? "info" : "accent",
 						stroke: "none"
 					},
 					Vn(`color-method-${e}-name`, e ?? ""),
@@ -11385,12 +11541,12 @@ var ml = {
 					frame: B("raised", { radius: 8 }),
 					width: "fill"
 				}),
-				...Gc(_l[3])
+				...Gc(bl[3])
 			}
 		]
 	}),
-	machine: vl.machine,
-	controls: vl.controls,
+	machine: xl.machine,
+	controls: xl.controls,
 	timeline: Xc([
 		"color-target",
 		"color-lab",
@@ -11401,7 +11557,7 @@ var ml = {
 		source: "palettes-and-color/color-pipeline.svg",
 		revision: 2
 	}
-}), "Inspect each bench instrument to see the contract it owns.", "The target, Oklab disc, block palette, and methods appear in the order data reaches them."), bl = [
+}), "Inspect each bench instrument to see the contract it owns.", "The target, Oklab disc, block palette, and methods appear in the order data reaches them."), Cl = [
 	{
 		key: "signal",
 		label: "Signal",
@@ -11442,11 +11598,11 @@ var ml = {
 		answer: "TickSimulation",
 		tone: "success"
 	}
-], xl = Wc("simulation-choice", bl, {
+], wl = Wc("simulation-choice", Cl, {
 	title: "Choose the smallest engine that answers the question",
 	body: "Direct shorthand, placement context, circuit execution, and world ticks solve different classes of state."
 });
-function Sl(e, t) {
+function Tl(e, t) {
 	return {
 		...Jn(e.node, [
 			z(`${e.node}-index`, [Wn(`${e.node}-index-text`, String(t + 1).padStart(2, "0"), {
@@ -11483,7 +11639,7 @@ function Sl(e, t) {
 		...Gc(e)
 	};
 }
-var Cl = Zc(5, "smart-simulation", "Placement and simulation", "A four-question instrument selects the smallest state model that can answer the job.", Ct({
+var El = Zc(5, "smart-simulation", "Placement and simulation", "A four-question instrument selects the smallest state model that can answer the job.", Ct({
 	schemaVersion: 2,
 	id: "smart-simulation",
 	title: "Choosing a simulation surface",
@@ -11493,20 +11649,20 @@ var Cl = Zc(5, "smart-simulation", "Placement and simulation", "A four-question 
 		compact: 520
 	},
 	background: "canvas",
-	root: qc("sim", "PLACEMENT + SIMULATION", "Ask what must be true, then pay only for that model.", z("sim-instrument", bl.map(Sl), {
+	root: qc("sim", "PLACEMENT + SIMULATION", "Ask what must be true, then pay only for that model.", z("sim-instrument", Cl.map(Tl), {
 		gap: 4,
 		padding: [10, 12],
 		frame: B("raised", { radius: 10 }),
 		width: "fill"
 	})),
-	machine: xl.machine,
-	controls: xl.controls,
-	timeline: Xc(bl.map((e) => e.node)),
+	machine: wl.machine,
+	controls: wl.controls,
+	timeline: Xc(Cl.map((e) => e.node)),
 	metadata: {
 		source: "smart-simulation/choose-engine.svg",
 		revision: 2
 	}
-}), "Focus a question to see why its engine is sufficient.", "The instrument advances from direct state to full temporal simulation."), wl = [
+}), "Focus a question to see why its engine is sufficient.", "The instrument advances from direct state to full temporal simulation."), Dl = [
 	{
 		key: "detect",
 		label: "Detect",
@@ -11528,11 +11684,11 @@ var Cl = Zc(5, "smart-simulation", "Placement and simulation", "A four-question 
 		title: "Export is an explicit destination choice",
 		body: "Structure, snapshot, and world formats keep their own capabilities and loss boundaries visible."
 	}
-], Tl = Wc("format-hub", wl, {
+], Ol = Wc("format-hub", Dl, {
 	title: "Many containers, one model, explicit destinations",
 	body: "Nucleation isolates format quirks at the edge so edits and analysis operate on one schematic representation."
 });
-function El(e, t, n) {
+function kl(e, t, n) {
 	return z(e, [Wn(`${e}-text`, t, {
 		tone: n,
 		align: "center",
@@ -11543,7 +11699,7 @@ function El(e, t, n) {
 		width: "fill"
 	});
 }
-var Dl = {
+var Al = {
 	...z("format-inputs", [Bn("format-inputs-label", "DETECT + PARSE"), {
 		id: "format-input-grid",
 		type: "group",
@@ -11561,15 +11717,15 @@ var Dl = {
 			".nusn",
 			".snbt",
 			"world/"
-		].map((e, t) => El(`format-in-${t}`, e, t % 2 == 0 ? "info" : "accent"))
+		].map((e, t) => kl(`format-in-${t}`, e, t % 2 == 0 ? "info" : "accent"))
 	}], {
 		gap: 10,
 		padding: 16,
 		frame: B("raised", { radius: 8 }),
 		width: "fill"
 	}),
-	...Gc(wl[0])
-}, Ol = {
+	...Gc(Dl[0])
+}, jl = {
 	...z("format-model", [
 		Kn("format-model-cube", "cube", {
 			tone: "accent",
@@ -11591,8 +11747,8 @@ var Dl = {
 		frame: B("glass", { radius: 12 }),
 		width: "fill"
 	}),
-	...Gc(wl[1])
-}, kl = {
+	...Gc(Dl[1])
+}, Ml = {
 	...z("format-outputs", [Bn("format-outputs-label", "EXPORT"), ...[
 		["STRUCTURE", ".schem · .litematic"],
 		["SNAPSHOT", ".nusn · .snbt"],
@@ -11611,8 +11767,8 @@ var Dl = {
 		frame: B("raised", { radius: 8 }),
 		width: "fill"
 	}),
-	...Gc(wl[2])
-}, Al = [{
+	...Gc(Dl[2])
+}, Nl = [{
 	id: "format-read",
 	from: {
 		node: "format-inputs",
@@ -11660,7 +11816,7 @@ var Dl = {
 		count: 2,
 		period: 1700
 	}
-}], jl = Zc(6, "formats-and-io", "Formats and I/O", "A compact format hub separates container detection, the editable model, and explicit export.", Ct({
+}], Pl = Zc(6, "formats-and-io", "Formats and I/O", "A compact format hub separates container detection, the editable model, and explicit export.", Ct({
 	schemaVersion: 2,
 	id: "formats-and-io",
 	title: "Formats and I/O",
@@ -11684,24 +11840,24 @@ var Dl = {
 		align: "stretch",
 		width: "fill",
 		children: [
-			Dl,
-			Ol,
-			kl
+			Al,
+			jl,
+			Ml
 		]
 	}),
-	edges: Al,
-	machine: Tl.machine,
-	controls: Tl.controls,
+	edges: Nl,
+	machine: Ol.machine,
+	controls: Ol.controls,
 	timeline: Xc([
 		"format-inputs",
 		"format-model",
 		"format-outputs"
-	], Al.map((e) => e.id)),
+	], Nl.map((e) => e.id)),
 	metadata: {
 		source: "formats-and-io/format-pipeline.svg",
 		revision: 2
 	}
-}), "Focus ingress, the model, or egress to inspect the boundary.", "Formats converge on the model, then flow back out through deliberate export paths."), Ml = [
+}), "Focus ingress, the model, or egress to inspect the boundary.", "Formats converge on the model, then flow back out through deliberate export paths."), Fl = [
 	{
 		key: "javascript",
 		label: "JS / TS",
@@ -11765,11 +11921,11 @@ var Dl = {
 		runtime: "native",
 		tone: "warning"
 	}
-], Nl = Wc("binding-surfaces-v2", Ml, {
+], Il = Wc("binding-surfaces-v2", Fl, {
 	title: "One implementation, generated foreign surfaces",
 	body: "The annotated bridge owns naming and transport contracts; native Rust remains a direct call path."
 });
-function Pl(e) {
+function Ll(e) {
 	return {
 		...z(e.node, [Vn(`${e.node}-name`, e.label), Wn(`${e.node}-runtime`, e.runtime, { tone: e.tone })], {
 			gap: 3,
@@ -11796,7 +11952,7 @@ Zc(7, "bindings-and-languages", "Bindings and languages", "A physical stack dist
 			padding: [18, 20],
 			frame: B("floating", { radius: 8 }),
 			width: "fill"
-		}), Pl(Ml[6])], {
+		}), Ll(Fl[6])], {
 			gap: 12,
 			align: "stretch",
 			width: "fill"
@@ -11825,14 +11981,14 @@ Zc(7, "bindings-and-languages", "Bindings and languages", "A physical stack dist
 			},
 			gap: 8,
 			width: "fill",
-			children: Ml.slice(0, 6).map(Pl)
+			children: Fl.slice(0, 6).map(Ll)
 		}
 	], {
 		gap: 12,
 		width: "fill"
 	})),
-	machine: Nl.machine,
-	controls: Nl.controls,
+	machine: Il.machine,
+	controls: Il.controls,
 	timeline: Xc([
 		"binding-core-row",
 		"binding-bridge",
@@ -11843,7 +11999,7 @@ Zc(7, "bindings-and-languages", "Bindings and languages", "A physical stack dist
 		revision: 2
 	}
 }), "Choose a language tab to inspect its transport without losing the shared architecture.", "The core lands first, the bridge settles above it, and the generated surfaces fan out last.");
-var Fl = [
+var Rl = [
 	{
 		key: "opaque",
 		label: "Opaque",
@@ -11879,11 +12035,11 @@ var Fl = [
 		title: "The native renderer turns the same mesh into pixels",
 		body: "Camera, grid, materials, and lighting produce stills or deterministic animation frames."
 	}
-], Il = Wc("mesh-layers-v2", Fl, {
+], zl = Wc("mesh-layers-v2", Rl, {
 	title: "Mesh once, then keep the geometry or draw it",
 	body: "The mesher builds three ordered layers over one atlas; export and native rendering share that result."
 });
-function Ll(e, t, n, r) {
+function Bl(e, t, n, r) {
 	return {
 		...z(e.node, [Jn(`${e.node}-copy`, [Wn(`${e.node}-order`, r, { tone: t }), Vn(`${e.node}-name`, e.label)], {
 			gap: 12,
@@ -11907,7 +12063,7 @@ function Ll(e, t, n, r) {
 		...Gc(e)
 	};
 }
-function Rl(e, t, n, r) {
+function Vl(e, t, n, r) {
 	return {
 		...z(e.node, [
 			Kn(`${e.node}-icon`, t, {
@@ -11926,7 +12082,7 @@ function Rl(e, t, n, r) {
 		...Gc(e)
 	};
 }
-var zl = [{
+var Hl = [{
 	id: "mesh-to-portable",
 	from: {
 		node: "mesh-stack",
@@ -11974,7 +12130,7 @@ var zl = [{
 		count: 1,
 		period: 1800
 	}
-}], Bl = Zc(8, "meshing-and-rendering", "Meshing and rendering", "Exploded mesh slabs make draw order tangible before the shared geometry branches to data or pixels.", Ct({
+}], Ul = Zc(8, "meshing-and-rendering", "Meshing and rendering", "Exploded mesh slabs make draw order tangible before the shared geometry branches to data or pixels.", Ct({
 	schemaVersion: 2,
 	id: "meshing-and-rendering",
 	title: "Meshing and rendering",
@@ -12006,9 +12162,9 @@ var zl = [{
 				align: "center",
 				width: "fill"
 			}),
-			Ll(Fl[0], "accent", "100%", "01"),
-			Ll(Fl[1], "warning", "76%", "02"),
-			Ll(Fl[2], "info", "52%", "03"),
+			Bl(Rl[0], "accent", "100%", "01"),
+			Bl(Rl[1], "warning", "76%", "02"),
+			Bl(Rl[2], "info", "52%", "03"),
 			Jn("mesh-atlas", [Kn("mesh-atlas-icon", "texture", {
 				tone: "success",
 				size: 20
@@ -12024,25 +12180,25 @@ var zl = [{
 			padding: 16,
 			frame: B("raised", { radius: 10 }),
 			width: "fill"
-		}), z("mesh-outputs", [Rl(Fl[3], "export", "GLB · GLTF · USDZ · NUCM", "success"), Rl(Fl[4], "camera", "PNG · GIF · VIDEO", "warning")], {
+		}), z("mesh-outputs", [Vl(Rl[3], "export", "GLB · GLTF · USDZ · NUCM", "success"), Vl(Rl[4], "camera", "PNG · GIF · VIDEO", "warning")], {
 			gap: 12,
 			justify: "center",
 			width: "fill"
 		})]
 	}),
-	edges: zl,
-	machine: Il.machine,
-	controls: Il.controls,
+	edges: Hl,
+	machine: zl.machine,
+	controls: zl.controls,
 	timeline: Xc([
 		"mesh-stack",
 		"mesh-portable",
 		"mesh-pixels"
-	], zl.map((e) => e.id)),
+	], Hl.map((e) => e.id)),
 	metadata: {
 		source: "meshing-and-rendering/render-pipeline.svg",
 		revision: 2
 	}
-}), "Focus any layer or output to inspect its rendering contract.", "The mesh assembles in draw order, then both output surfaces receive the completed geometry."), Vl = [
+}), "Focus any layer or output to inspect its rendering contract.", "The mesh assembles in draw order, then both output surfaces receive the completed geometry."), Wl = [
 	{
 		second: 0,
 		active: 8
@@ -12083,7 +12239,7 @@ var zl = [{
 		second: 9,
 		active: 87
 	}
-], Hl = Ue(.16, 1, .3, 1), Ul = We({
+], Gl = Ue(.16, 1, .3, 1), Kl = We({
 	frequency: 9.5,
 	damping: 7.5
 });
@@ -12170,7 +12326,7 @@ Nt({
 		fast: 140,
 		normal: 300,
 		slow: 680,
-		easing: Hl
+		easing: Gl
 	},
 	strokes: {
 		hairline: 1,
@@ -12214,15 +12370,15 @@ Nt({
 });
 //#endregion
 //#region ../scenes/dist/catalogue.js
-var Wl = [
+var ql = [
 	tl,
 	ll,
-	gl,
 	yl,
-	Cl,
-	jl,
+	Sl,
+	El,
+	Pl,
 	zc,
-	Bl,
+	Ul,
 	_c,
 	{
 		slug: "throughput-over-time",
@@ -12242,7 +12398,7 @@ var Wl = [
 				composition: "plot-in-card"
 			}
 		}, (e) => {
-			let t = gc(Vl, {
+			let t = gc(Wl, {
 				id: "stream-trend",
 				x: "second",
 				y: "active",
@@ -12301,7 +12457,7 @@ var Wl = [
 				},
 				motion: "auto",
 				duration: 1350,
-				easing: Hl
+				easing: Gl
 			}), n = e.add(t), r = e.stack([
 				e.eyebrow("STREAM SAMPLE", {
 					tone: "accent",
@@ -12394,10 +12550,10 @@ var Wl = [
 			e.root(f), e.sequence([
 				[e.reveal(r, {
 					offset: 8,
-					easing: Hl
+					easing: Gl
 				}), e.reveal(i, {
 					offset: -8,
-					easing: Hl
+					easing: Gl
 				})],
 				e.reveal(n),
 				e.reveal([
@@ -12409,7 +12565,7 @@ var Wl = [
 					stagger: 90,
 					offset: 6,
 					scale: .97,
-					easing: Ul
+					easing: Kl
 				})
 			], { gap: 90 });
 		})
@@ -12417,10 +12573,10 @@ var Wl = [
 	Hc,
 	Bc
 ].sort((e, t) => e.order - t.order);
-function Gl(e) {
-	return Wl.find((t) => t.slug === e || t.scene.id === e);
+function Jl(e) {
+	return ql.find((t) => t.slug === e || t.scene.id === e);
 }
-var Kl = Nt({
+var Yl = Nt({
 	name: "nucleation-dark",
 	colors: {
 		canvas: "#101216",
@@ -12542,9 +12698,9 @@ var Kl = Nt({
 			stroke: "border"
 		}
 	}
-}), ql = {
-	nucleation: Kl,
-	"nucleation-dark": Kl,
+}), Xl = {
+	nucleation: Yl,
+	"nucleation-dark": Yl,
 	"nucleation-light": Nt({
 		name: "nucleation-light",
 		colors: {
@@ -12572,7 +12728,7 @@ var Kl = Nt({
 			chartNegative: "#b76060",
 			chartNeutral: "#858b87"
 		}
-	}, Kl),
+	}, Yl),
 	pock: Nt({
 		name: "pock",
 		colors: {
@@ -12769,11 +12925,11 @@ var Kl = Nt({
 			eyebrow: !1
 		}
 	})
-}, Jl = [
+}, Zl = [
 	"nucleation",
 	"pock",
 	"schematio"
-], Yl = {
+], Ql = {
 	nucleation: {
 		label: "Nucleation",
 		note: "Basalt / Vellum · quiet, technical, editorial"
@@ -12787,14 +12943,14 @@ var Kl = Nt({
 		note: "Graphite / fuchsia · soft, spatial, product-led"
 	}
 };
-function Xl(e) {
+function $l(e) {
 	return e === "nucleation" || e === "pock" || e === "schematio";
 }
 //#endregion
 //#region src/bundle.ts
-for (let e of Wl) Eo(e.slug, e.scene);
-for (let [e, t] of Object.entries(ql)) Do(e, t);
+for (let e of ql) Eo(e.slug, e.scene);
+for (let [e, t] of Object.entries(Xl)) Do(e, t);
 //#endregion
-export { uo as FIGURE_STYLES, po as LiveSurfaceManager, lo as STYLE_ID, ht as alphaGradient, cc as area, Oo as autoMount, Ar as backdrop, ic as bar, kr as blur, mc as calloutAt, Wl as catalogue, Nn as createMachineState, Nt as createTheme, Mt as defaultTheme, Ct as defineScene, lc as dot, fo as ensureStyles, br as figure, Gl as findCatalogueEntry, ac as groupedBar, dc as heatmap, Or as innerShadow, Xl as isThemeName, sc as line, pt as linearGradient, B as material, vo as modelViewerSurface, xo as mountKineglyph, jr as noise, gc as plot, hc as pointLabel, mt as radialGradient, pc as range, Eo as registerScene, Do as registerTheme, Si as resolveFigure, fc as rule, Mr as shader, Dr as shadow, uc as sparkline, oc as stackedBar, ko as startWhenVisible, Yl as themeCopy, Jl as themeNames, ql as themes };
+export { uo as FIGURE_STYLES, po as LiveSurfaceManager, lo as STYLE_ID, ht as alphaGradient, cc as area, Oo as autoMount, Ar as backdrop, ic as bar, kr as blur, mc as calloutAt, ql as catalogue, Nn as createMachineState, Nt as createTheme, Mt as defaultTheme, Ct as defineScene, lc as dot, fo as ensureStyles, br as figure, Jl as findCatalogueEntry, ac as groupedBar, dc as heatmap, Or as innerShadow, $l as isThemeName, sc as line, pt as linearGradient, B as material, vo as modelViewerSurface, xo as mountKineglyph, jr as noise, gc as plot, hc as pointLabel, mt as radialGradient, pc as range, Eo as registerScene, Do as registerTheme, Si as resolveFigure, fc as rule, Mr as shader, Dr as shadow, uc as sparkline, oc as stackedBar, ko as startWhenVisible, Ql as themeCopy, Zl as themeNames, Xl as themes };
 
 //# sourceMappingURL=kineglyph-web.js.map
