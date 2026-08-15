@@ -1,80 +1,198 @@
-# Animating a build
+# Animation engine
 
-Nucleation can describe **which block is where, at what pose, at time *t***.
-That description is a plain data model with no GPU or rendering dependency. It drives
-nucleation's own renderer, an exported JSON timeline, or anything else that can
-draw a transform.
+A schematic describes a finished build. `BuildAnimation` adds a clock. It owns
+the finished schematic while recording which mutations belong together, when
+their effects start, and how the camera moves.
 
-It answers the questions a schematic library actually gets asked: *show me this
-build assembling itself*, *print it layer by layer*, *reveal it along the curve
-it was built from*, *replay this diff*.
+The timeline is plain data. Sampling it at time `t` returns group poses and a
+camera pose. Rendering is a later stage, so JavaScript can record and inspect
+an animation in WASM even though the native GPU and file encoders are not part
+of that package.
 
-> **Status:** the deterministic core, renderer, direct GIF/PNG output, and
-> generated Rust/JavaScript/Python/Kotlin bindings work end to end. The concise
-> construction-shaped API is `BuildAnimation`; `BuildAnimator` remains the
-> lower-level API for existing schematics and custom grouping.
+## How the engine works
 
-## The shape of it
-
+```text
+set_block / operation calls
+          │
+          ├── update the owned schematic
+          │
+          └── record steps: positions + effect + order key + mesh snapshot
+                                      │
+                                      ▼
+                  groups + clips + delays + camera tracks
+                                      │
+                              frame_at(time_ms)
+                                      │
+                       group poses + camera pose
+                                      │
+                  ┌───────────────────┴───────────────────┐
+                  ▼                                       ▼
+             JSON inspection                   mesh and native render
+                                                │
+                                      GIF / PNG frames / video
 ```
-positions ──> Grouping ──> [Group]  ──> Timeline ──seek(t)──> Frame
-                                ▲                               │
-                             Stagger                         [(GroupId, Pose)]
-                          (order + delays)
-```
 
-- A **`Group`** is one animatable unit: a block, a layer, a chunk, a region.
-- A **`Clip`** is what happens to a group: property tracks with keyframes,
-  easing, delay, repeat, ping-pong.
-- A **`Stagger`** decides the *order* groups animate in and *when* each starts.
-- A **`Timeline`** binds clips to targets; `seek(t)` returns a **`Frame`** of
-  poses.
+Four data types carry most of the design:
 
-## Quick start: record normal construction code
+| Type | Job |
+| --- | --- |
+| `Group` | Positions that move as one draw target. |
+| `Clip` | Property tracks, keyframes, easing, delay, and repetition. |
+| `Stagger` | The order of groups and the delay between their starts. |
+| `Frame` | The group poses and optional camera pose at one sampled time. |
 
-`BuildAnimation` owns a schematic and records each mutation as a target. Calls
-outside a group become separate steps; calls between `begin_group()` and
-`end_group()` animate together. The default is drop-and-pop and can be replaced
-for the whole build or one call.
+`BuildAnimation` is the construction-shaped API used by the generated
+bindings. `BuildAnimator` is the lower-level Rust API for regrouping an existing
+schematic and editing its `Timeline` directly.
+
+## Record construction
+
+Each call outside an explicit group becomes one animation target. Calls between
+`begin_group` and `end_group` share a target and start together. `with_effect`
+applies to one target, while `set_default_effect` changes the fallback for every
+later target.
+
+=== "Python"
+
+    ```python
+    --8<-- "examples/readme/animation/engine.py:record"
+    ```
+
+=== "JavaScript"
+
+    ```javascript
+    --8<-- "examples/readme/animation/engine.mjs:record"
+    ```
+
+=== "Rust"
+
+    ```rust
+    --8<-- "tests/animation_docs_examples.rs:record"
+    ```
+
+The Rust tab is the body of a test that returns `Result<(), String>`. All three
+versions record three groups: the five-block course, the diamond block, and the
+furnace. The turntable is a camera target on the same timeline.
+
+For geometry that should arrive along a curve, use `begin_keyed_group(key)` and
+`set_stagger_total_ms(...)`. Custom effects use `AnimationEffect.create`,
+`add_tween`, and `add_keyframe` in generated bindings.
+
+## Sample the timeline
+
+Sampling does not advance internal state. Asking for 450 ms twice returns the
+same frame, and sampling later times before earlier ones does not change the
+result.
+
+=== "Python"
+
+    ```python
+    --8<-- "examples/readme/animation/engine.py:sample"
+    ```
+
+=== "JavaScript"
+
+    ```javascript
+    --8<-- "examples/readme/animation/engine.mjs:sample"
+    ```
+
+=== "Rust"
+
+    ```rust
+    --8<-- "tests/animation_docs_examples.rs:sample"
+    ```
+
+`frame_json` and `frameJson` expose the WASM-safe form. Rust returns a `Frame`
+directly. A frame contains poses and camera data; the blocks remain in the
+schematic and recorded mesh snapshots.
+
+For a capture at `fps`, the engine derives each timestamp from its frame index.
+It does not keep adding a rounded frame duration. A loop period samples
+`[0, period)` and leaves out the duplicate endpoint.
+
+## From frames to pixels
+
+Native rendering has five stages:
+
+1. Parse the resource-pack zip.
+2. Mesh each recorded group from its stored schematic snapshot.
+3. Sample the requested frames and optional final hold.
+4. Create one GPU renderer, then update group-pose uniforms for each frame.
+5. Encode RGBA frames as a GIF, numbered PNGs, or a video stream.
+
+The mesh at index `i` belongs to animation group `i`. That alignment is the
+contract between the timeline and renderer. A timed operation can therefore
+move one group without rebuilding every other mesh.
+
+`render_gif` performs the complete path in-process and writes an infinitely
+looping GIF. `render_frames` writes numbered PNGs for an external compositor.
+`render_video` streams frames to FFmpeg instead of retaining the complete frame
+sequence.
+
+## How the docs animations are generated
+
+Every rendered example has a checked-in generator under
+`examples/readme/<section>/`. The workshop generator uses the public Python API.
+It records the build first:
 
 ```python
-from pathlib import Path
-from nucleation import AnimationEffect, BuildAnimation, RenderConfig
-
-a = BuildAnimation.create("stairs")
-a.set_default_effect(AnimationEffect.drop_and_pop(480, 4.5))
-
-a.begin_group()
-for x in range(8):
-    a.set_block(x, 0, 0, "minecraft:stone")
-a.end_group()
-
-a.with_effect(AnimationEffect.spin_in(600, 1)).set_block(
-    7, 1, 0, "minecraft:diamond_block"
-)
-
-camera = AnimationEffect.turntable(4_000)
-a.animate_camera(camera, 0)
-
-view = RenderConfig.create(480, 360)
-view.set_isometric()
-view.set_fitted_grid(1, 1, -0.002, False, .42, .52, .60, .26)
-a.render_gif(Path("pack.zip").read_bytes(), view, "stairs.gif", 18, 750)
+--8<-- "examples/readme/animation/workshop.py:record"
 ```
 
-<div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/readme/animation/workshop.gif" width="420" alt="A workshop floor assembling with a furnace, crafting table, chest, and equipped armor stand">
-</div>
+The camera and render configuration are ordinary data. `sphere_fit` keeps the
+framing stable while groups arrive, and the fitted grid follows the build's
+actual X/Z bounds.
 
-For travelling-wave geometry such as the trefoil, use
-`begin_keyed_group(key)` for each segment and `set_stagger_total_ms(...)`.
-Custom effects use `AnimationEffect.create`, `add_tween`, and `add_keyframe`;
-blocks and the camera consume exactly the same effect representation.
+```python
+--8<-- "examples/readme/animation/workshop.py:camera"
+```
 
-The complete README example is
-[`examples/readme/animation/workshop.py`](https://github.com/Schem-at/Nucleation/blob/master/examples/readme/animation/workshop.py),
-and its exact output is available as a
-[`workshop.schem` download](../downloads/readme/animation/workshop.schem).
+The final section reads a resource pack, chooses output paths, renders the GIF,
+and saves the schematic offered beside it.
+
+```python
+--8<-- "examples/readme/animation/workshop.py:output"
+```
+
+Run it from the repository root after placing a vanilla resource pack at
+`render_work/pack.zip`:
+
+```bash
+.venv/bin/python examples/readme/animation/workshop.py
+```
+
+Set `NUCLEATION_PACK`, `NUCLEATION_OUT`, or `NUCLEATION_SCHEM_OUT` to use other
+paths. The current generator produces 73 frames at 18 fps on a 420 by 420
+canvas, including its final hold.
+
+<figure markdown="span">
+  ![A workshop floor assembling with a furnace, crafting table, chest, and equipped armor stand](../media/readme/animation/workshop.gif){ width="420" }
+  <figcaption>The floor is one group. The furnace, table, chest, and armor stand are separate targets.</figcaption>
+</figure>
+
+[Download the generated workshop](../downloads/readme/animation/workshop.schem)
+
+The docs verifier runs the Python, JavaScript, and Rust recorder examples. It
+also regenerates the workshop in a temporary directory, checks the 73-frame
+result and canvas size, and compares the generated schematic with the download:
+
+```bash
+./tools/verify-animation-docs.sh
+```
+
+## Binding support
+
+| Capability | Python | JavaScript / WASM | Rust |
+| --- | --- | --- | --- |
+| Record groups, effects, camera, and operations | Yes | Yes | Yes |
+| Sample frames | `frame_json` | `frameJson` | `frame_at` / `frames` |
+| Inspect recorded operations | `operations_json` | `operationsJson` | typed receipts and operations |
+| Render GIF, PNG frames, or video | Native methods | Not in the WASM package | Native renderer functions |
+| Save the owned schematic to a path | Yes | Use exported bytes through the host | Yes |
+
+JavaScript callers can consume frame JSON in their own renderer or send the
+recorded build to a native service. The generated WASM class deliberately omits
+native filesystem and GPU-render methods.
 
 ## Lower-level Rust timeline
 
@@ -122,8 +240,8 @@ design: *what moves* and *how it moves* stay fixed, and only the ranking changes
 
 `ShapeEnum::parameter_at` gives the parametric `t` of a position along a line,
 cylinder, cone, torus, pyramid or bezier: the same `t` a `curve_gradient` brush
-uses to pick a colour. Feed it to the animator and blocks arrive **in the order
-the curve sweeps**:
+uses to pick a colour. Feed it to the animator and blocks arrive in the order
+the curve sweeps:
 
 ```rust
 let anim = presets::along_shape(&schem, &shape, presets::drop_and_pop(300.0, 6.0), 2000.0);
@@ -148,8 +266,8 @@ anim.timeline_mut().add_staggered(
 
 This trips people up, so it is worth stating plainly:
 
-- The easing inside a **`Clip`** shapes **how a group moves** once it starts.
-- `Stagger::ease` shapes **when each group starts**: an accelerating or
+- The easing inside a `Clip` shapes how a group moves once it starts.
+- `Stagger::ease` shapes when each group starts: an accelerating or
   decelerating wave across the build.
 
 ```rust
@@ -177,7 +295,7 @@ Animatable properties: `X`/`Y`/`Z`, `RotX`/`RotY`/`RotZ` (degrees),
 `ScaleX`/`ScaleY`/`ScaleZ`/`ScaleUniform`, `Opacity`, `TintR/G/B/A`,
 `EmissiveR/G/B`.
 
-A clip **only overrides the channels it animates**, so clips layer: one for
+A clip overrides only the channels it animates, so clips layer: one for
 position, another for rotation, added independently.
 
 Before its delay elapses a clip holds its first frame; after it finishes it
@@ -232,7 +350,7 @@ keyframes instead.
 | `Custom(sets)` | whatever you pass | |
 
 Greedy meshing batches geometry by `(texture, AO pattern)`, so splitting a build
-per block **changes material batching and raises draw counts**. Use `PerBlock`
+per block changes material batching and raises draw counts. Use `PerBlock`
 for hero shots of hundreds to low thousands of blocks; use `Layer` or `Chunk`
 for anything large. Measure before relying on it.
 
@@ -259,18 +377,19 @@ always yields the same frame, sampling out of order changes nothing, and
 Frame times come from `i × 1000 ÷ fps` computed in `f64`, so they do not drift
 the way accumulated sums would.
 
-This is not incidental. Regenerated README media must be byte-identical, the
-same property that let the wgpu 24→30 upgrade be verified by comparing render
-hashes.
+The sampled timeline is reproducible. Encoded media also depends on the exact
+resource pack, renderer version, and encoder version. The docs verifier checks
+the generated build, frame count, and canvas instead of assuming files from
+different tool versions have the same byte hash.
 
 ## Pivots
 
-A group's pose pivots about its **centroid** by default, which is what makes
+A group's pose pivots about its centroid by default, which is what makes
 "scale in place" work without any arithmetic at the call site. Override
 `Pose::pivot` to swing a group about a hinge instead.
 
-`Pose::normal_matrix()` returns the inverse-transpose for transforming normals.
-Renderers **must** apply it: skip it and rotated geometry shades wrong in a way
+`Pose::normal_matrix()` returns the inverse-transpose used for shading normals.
+Renderers must apply it: skip it and rotated geometry shades wrong in a way
 that reads as a lighting bug. Degenerate poses (a block at scale 0 mid-reveal)
 return identity rather than emitting NaNs.
 
@@ -299,9 +418,10 @@ rc.sphere_fit = true;          // steady framing while the camera orbits
 render_animation_to_files(&meshes, &anim.frames(24.0), &rc, None, "out/f")?;
 ```
 
-Then assemble the frames with ffmpeg (below).
+This writes numbered PNGs. Assemble those frames with FFmpeg when an external
+compositor or a different media format is required.
 
-### Transparent GIFs for docs
+### Transparent GIFs from PNG frames
 
 Set an alpha-0 clear and the frames drop into a README on light *or* dark
 backgrounds:
@@ -310,7 +430,7 @@ backgrounds:
 rc.background = Some([0.0, 0.0, 0.0, 0.0]);
 ```
 
-GIF only has **1-bit** transparency: a pixel is fully opaque or fully gone. That
+GIF has 1-bit transparency: a pixel is fully opaque or fully gone. That
 would normally fringe antialiased edges, but the renderer does not multisample
 (`count: 1`), so edges are hard-cut and the cutout is clean. Two ffmpeg flags do
 the work:
@@ -326,30 +446,29 @@ ffmpeg -y -framerate 24 -i 'out/f%04d.png' \
 `alpha_threshold=128` picks the opaque/clear cutoff. Omit either and the
 background comes back as solid black.
 
-For full 8-bit alpha, APNG is the alternative. GitHub renders it, but
-expect roughly double the file size:
+For full 8-bit alpha, APNG is the alternative. GitHub renders it:
 
 ```bash
 ffmpeg -y -framerate 24 -i 'out/f%04d.png' -plays 0 -f apng out.png
 ```
 
-Keep README animations small: drop to 12–15fps, shrink the canvas, and lower
-`max_colors`. A 480×360 55-frame clip lands around 430 KB as a GIF.
+Keep docs animations small: reduce the frame rate, shrink the canvas, and lower
+`max_colors`. File size depends heavily on camera movement and palette changes.
 
 `mesh_groups` is what keeps mesh *i* aligned with group *i*: groups that
 contain only air still produce an entry so the indices never slip.
 
-The GPU renderer, atlas and geometry buffers are built **once** and reused for
-every frame; only a small uniform buffer is rewritten per frame. Rendering an
-animation is therefore much cheaper than rendering N stills.
+The GPU renderer, atlas, and geometry buffers are built once and reused for
+every frame. Only the pose uniforms change, which avoids reconstructing the
+renderer for a sequence of independent stills.
 
 `examples/render_animation.rs` is the runnable version of the above.
 
 ### What rendering costs
 
-Each group is meshed independently, so faces between groups are **not** culled
-against each other. That is what you want when groups move apart, and wasteful
-when they never do. Per-block grouping also means one draw call per block.
+Each group is meshed independently, so faces remain between adjacent groups.
+Those faces become necessary when groups move apart and cost extra when the
+groups stay together. Per-block grouping also means one draw call per block.
 Prefer `Layer` or `Chunk` for large builds.
 
 ## Reference grid and axes
