@@ -205,18 +205,45 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
           echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-      - name: Build nucleation native library (full bridge surface)
+      - name: Build native library and world worker (full production surface)
         # bridge-full, matching the wheels: the generated bindings reference the
         # entire surface, and downstream consumers (schemati's PHP layer) call
         # meshing through these exact release libs — a core-only artifact turns
-        # those calls into missing-symbol errors at runtime.
-        run: cargo build --release --lib --features bridge-full --target ${{ matrix.target }}
+        # those calls into missing-symbol errors at runtime. segment_world is
+        # shipped from the same commit with the filesystem and SSH Store
+        # backends used by distributed extractors, so compute workers never
+        # need a Rust toolchain or a locally-compiled, version-drifting binary.
+        run: |
+          cargo build --release --lib --features bridge-full --target ${{ matrix.target }}
+          cargo build --release --example segment_world --features world-segment,store-fs,store-ssh --target ${{ matrix.target }}
+      - name: Smoke-test world worker on its native runner
+        shell: bash
+        run: |
+          host_target=$(rustc -vV | sed -n 's/^host: //p')
+          if [[ "$host_target" != "${{ matrix.target }}" ]]; then
+            echo "Skipping execution of cross-compiled ${{ matrix.target }} worker on $host_target"
+            exit 0
+          fi
+          worker="target/${{ matrix.target }}/release/examples/segment_world"
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            worker="${worker}.exe"
+          fi
+          "$worker" --help >/dev/null
+          test "$("$worker" --version)" = "segment_world ${{ needs.check-version.outputs.version }}"
       - name: Stage artifact
         shell: bash
         run: |
           mkdir -p out
           cp target/${{ matrix.target }}/release/*nucleation* out/ 2>/dev/null || true
           find out -maxdepth 1 -type d -mindepth 1 -exec rm -rf {} +
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            cp target/${{ matrix.target }}/release/examples/segment_world.exe out/segment_world.exe
+            test -s out/segment_world.exe
+          else
+            cp target/${{ matrix.target }}/release/examples/segment_world out/segment_world
+            chmod 0755 out/segment_world
+            test -x out/segment_world
+          fi
           cp -r bindings/c out/include
           cp -r bindings/php out/php
       - uses: actions/upload-artifact@v4

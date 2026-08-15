@@ -63,27 +63,35 @@ struct Grid {
     offset_z: i32,
 }
 
+const USAGE: &str = "usage: segment_world <world-dir|world.tar[.gz|.zst]> <out-dir> <min-x> <min-z> <max-x> <max-z> \
+     [--source-id ID] [--world-name NAME] [--map-name NAME] \
+     [--dimension ID] [--snapshot-id ID] [--extracted-at UNIX_SECONDS] \
+     [--substrate BLOCK[,BLOCK...]] [--substrate-band MIN,MAX] \
+     [--grid-pitch BLOCKS] [--grid-size BLOCKS] \
+     [--grid-offset-x X] [--grid-offset-z Z] \
+     [--grid-index-bounds MIN_X,MIN_Z,MAX_X,MAX_Z] \
+     [--partition-hints FILE.json] [--drop-unpartitioned true|false] \
+     [--partition-floor-share FRACTION] \
+     [--partition-dense-layer-coverage FRACTION] \
+     [--preserve-support-blocks true|false] \
+     [--split-min-blocks COUNT] \
+     [--component-attach-mode exact|nearby|nearest] \
+     [--component-join-gap BLOCKS] \
+     [--component-min-blocks COUNT] \
+     [--world-prefix STORE_KEY_TO_REGION_DIR]";
+
 fn parse_args() -> Cli {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if matches!(args.as_slice(), [arg] if arg == "--help" || arg == "-h") {
+        println!("{USAGE}");
+        std::process::exit(0);
+    }
+    if matches!(args.as_slice(), [arg] if arg == "--version" || arg == "-V") {
+        println!("segment_world {}", env!("CARGO_PKG_VERSION"));
+        std::process::exit(0);
+    }
     if args.len() < 6 {
-        eprintln!(
-            "usage: segment_world <world-dir|world.tar[.gz|.zst]> <out-dir> <min-x> <min-z> <max-x> <max-z> \
-             [--source-id ID] [--world-name NAME] [--map-name NAME] \
-             [--dimension ID] [--snapshot-id ID] [--extracted-at UNIX_SECONDS] \
-             [--substrate BLOCK[,BLOCK...]] [--substrate-band MIN,MAX] \
-             [--grid-pitch BLOCKS] [--grid-size BLOCKS] \
-             [--grid-offset-x X] [--grid-offset-z Z] \
-             [--grid-index-bounds MIN_X,MIN_Z,MAX_X,MAX_Z] \
-             [--partition-hints FILE.json] [--drop-unpartitioned true|false] \
-             [--partition-floor-share FRACTION] \
-             [--partition-dense-layer-coverage FRACTION] \
-             [--preserve-support-blocks true|false] \
-             [--split-min-blocks COUNT] \
-             [--component-attach-mode exact|nearby|nearest] \
-             [--component-join-gap BLOCKS] \
-             [--component-min-blocks COUNT] \
-             [--world-prefix STORE_KEY_TO_REGION_DIR]"
-        );
+        eprintln!("{USAGE}");
         std::process::exit(2);
     }
     let number = |index: usize| {

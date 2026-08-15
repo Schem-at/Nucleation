@@ -1,3 +1,13 @@
+# Nucleation v0.10.14
+
+**Version-matched world extraction workers.** Every native release archive now
+ships the production `segment_world` executable beside the shared library,
+generated headers, and language bindings. Distributed consumers can install one
+release atomically instead of compiling an architecture-specific helper on each
+worker. The packaged driver retains bounded directory/archive reads, SSH-backed
+Store input, deterministic provenance, partition/floor handling, disconnected
+component splitting, and support-block preservation.
+
 # Nucleation v0.10.13
 
 **Policy-driven normalization and registry ingestion.** Schematics can now be
