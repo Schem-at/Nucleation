@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="340" viewBox="0 0 960 340" role="img" aria-labelledby="title desc">
+  <title id="title">A shape and brush combine in BuildingTool fill</title>
+  <desc id="desc">A sphere mask and a striped material rule enter BuildingTool fill and produce a striped voxel sphere.</desc>
+  <rect width="960" height="340" rx="18" fill="#11151b"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+    <g transform="translate(42 38)">
+      <text x="96" y="0" fill="#8d99aa" font-size="14" text-anchor="middle">SHAPE: WHERE</text>
+      <circle cx="96" cy="112" r="78" fill="#4ec9b0" opacity=".18" stroke="#4ec9b0" stroke-width="3"/>
+      <g fill="#4ec9b0">
+        <circle cx="66" cy="82" r="5"/><circle cx="96" cy="82" r="5"/><circle cx="126" cy="82" r="5"/>
+        <circle cx="51" cy="112" r="5"/><circle cx="81" cy="112" r="5"/><circle cx="111" cy="112" r="5"/><circle cx="141" cy="112" r="5"/>
+        <circle cx="66" cy="142" r="5"/><circle cx="96" cy="142" r="5"/><circle cx="126" cy="142" r="5"/>
+      </g>
+      <text x="96" y="230" fill="#f4f7fb" font-size="18" text-anchor="middle">Shape.sphere</text>
+    </g>
+    <g transform="translate(336 38)">
+      <text x="96" y="0" fill="#8d99aa" font-size="14" text-anchor="middle">BRUSH: WHAT</text>
+      <rect x="20" y="38" width="152" height="148" rx="10" fill="#171c24" stroke="#343d4b"/>
+      <rect x="34" y="54" width="124" height="25" fill="#e5574f"/>
+      <rect x="34" y="84" width="124" height="25" fill="#d4aa45"/>
+      <rect x="34" y="114" width="124" height="25" fill="#4ec9b0"/>
+      <rect x="34" y="144" width="124" height="25" fill="#7386d5"/>
+      <text x="96" y="230" fill="#f4f7fb" font-size="18" text-anchor="middle">curve gradient</text>
+    </g>
+    <path d="M245 144h66m216 0h66" stroke="#657184" stroke-width="3" marker-end="url(#arrow)"/>
+    <g transform="translate(650 38)">
+      <text x="116" y="0" fill="#8d99aa" font-size="14" text-anchor="middle">FILLED SCHEMATIC</text>
+      <defs><clipPath id="sphere"><circle cx="116" cy="112" r="78"/></clipPath></defs>
+      <g clip-path="url(#sphere)">
+        <rect x="38" y="34" width="156" height="39" fill="#e5574f"/>
+        <rect x="38" y="73" width="156" height="39" fill="#d4aa45"/>
+        <rect x="38" y="112" width="156" height="39" fill="#4ec9b0"/>
+        <rect x="38" y="151" width="156" height="39" fill="#7386d5"/>
+        <path d="M38 34h156v156H38z" fill="url(#grid)" opacity=".38"/>
+      </g>
+      <circle cx="116" cy="112" r="78" fill="none" stroke="#f4f7fb" stroke-width="2"/>
+      <text x="116" y="230" fill="#f4f7fb" font-size="18" text-anchor="middle">BuildingTool.fill</text>
+    </g>
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0l10 5-10 5z" fill="#657184"/></marker>
+      <pattern id="grid" width="13" height="13" patternUnits="userSpaceOnUse"><path d="M13 0H0v13" fill="none" stroke="#11151b" stroke-width="1"/></pattern>
+    </defs>
+  </g>
+</svg>
