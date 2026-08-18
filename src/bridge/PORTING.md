@@ -5,8 +5,8 @@ three existing files first — they are the pattern: `shared.rs` (shared error e
 POD structs), `schematic.rs` (the core opaque), `autostack.rs` (a ported module that
 cross-references `Schematic` and uses the static-methods-on-a-dummy-opaque pattern).
 
-Diplomat reference examples (many patterns, known-good): the fork checkout at
-`/Users/harrison/code/stencil/diplomat/feature_tests/src/*.rs`.
+Diplomat reference examples (many patterns, known-good): `diplomat/feature_tests/src/*.rs`
+in a checkout of the Diplomat fork (`github.com/Nano112/diplomat`).
 
 ## Layout
 

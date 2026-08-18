@@ -7,17 +7,35 @@ Sources:
   * ConverterFlattenItemStack.java    -> FLATTEN_ITEM_MAP + ITEMS_WITH_DAMAGE
   * ConverterFlattenSpawnEgg.java      -> SPAWN_EGG_MAP
   * ConverterFlattenEntity.java        -> ENTITY_BLOCK_NAME_TO_ID
-"""
-import re, sys
 
-JAVA = "/Users/andrews/Desktop/item-layout-tool/DataConverterJava/src/main/java/ca/spottedleaf/dataconverter/minecraft"
+Usage:
+  extract_flattening.py <dataconverter-java-root> [output.rs]
+
+<dataconverter-java-root> is the `.../ca/spottedleaf/dataconverter/minecraft`
+directory of a DataConverter checkout; it may also be given as
+DATACONVERTER_JAVA_ROOT. The output defaults to this repo's
+`src/dataconverter/flattening/data.rs`.
+"""
+import os, re, sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+JAVA = (sys.argv[1] if len(sys.argv) > 1 else os.environ.get("DATACONVERTER_JAVA_ROOT", "")).rstrip("/")
+if not JAVA:
+    sys.exit(
+        "no DataConverter Java source root given.\n"
+        "Pass it as the first argument, or set DATACONVERTER_JAVA_ROOT, pointing at\n"
+        "the '.../ca/spottedleaf/dataconverter/minecraft' directory of a checkout."
+    )
+
 HELPER = JAVA + "/converters/helpers/HelperBlockFlatteningV1450.java"
 ITEM = JAVA + "/converters/itemstack/ConverterFlattenItemStack.java"
 EGG = JAVA + "/converters/itemstack/ConverterFlattenSpawnEgg.java"
 ENTITY = JAVA + "/converters/entity/ConverterFlattenEntity.java"
 ITEMNAME = JAVA + "/converters/helpers/HelperItemNameV102.java"
 EGGNAME = JAVA + "/converters/helpers/HelperSpawnEggNameV105.java"
-OUT = "/Users/andrews/Desktop/item-layout-tool/nucleation/src/dataconverter/flattening/data.rs"
+OUT = sys.argv[2] if len(sys.argv) > 2 else str(REPO_ROOT / "src/dataconverter/flattening/data.rs")
 
 
 def rs_str(s):

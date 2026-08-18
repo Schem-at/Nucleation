@@ -562,8 +562,8 @@ Three things it does **not** do, all named rather than smoothed over:
   stands; what can be said is that the mechanism cycles end to end and returns
   almost exactly home.
 
-`examples/door55_render.rs` output of this run:
-`/Users/harrison/Desktop/nucleation-handoff/door55/door55_bucket_dispense.mp4`
+`examples/door55_render.rs` output of this run was written to
+`door55/door55_bucket_dispense.mp4` in the handoff capture directory
 (60 ticks, press on 5).
 
 ### Settled: the fireball does clip its plate, and vanilla throws it east

@@ -1,20 +1,29 @@
 //! Mesh a small schematic containing both blocks and entities, and export
 //! the result as GLB so entity rendering can be inspected visually.
 //!
-//! Run with: `cargo run --features meshing --example entity_mesh_test [pack.zip]`
-//! Default pack path: /Users/harrison/Documents/code/Schematic-Mesher/pack.zip
+//! Run with: `cargo run --features meshing --example entity_mesh_test <pack.zip>`
+//!
+//! The resource pack is not in the repo, so it must be supplied: either as the
+//! first argument, or via the `NUCLEATION_PACK` environment variable.
 //! Output: /tmp/entity_mesh_test.glb
 
 use nucleation::meshing::{MeshConfig, ResourcePackSource};
 use nucleation::{BlockState, Entity, UniversalSchematic};
 
-const DEFAULT_PACK: &str = "/Users/harrison/Documents/code/Schematic-Mesher/pack.zip";
 const OUT_PATH: &str = "/tmp/entity_mesh_test.glb";
 
 fn main() {
     let pack_path = std::env::args()
         .nth(1)
-        .unwrap_or_else(|| DEFAULT_PACK.to_string());
+        .or_else(|| std::env::var("NUCLEATION_PACK").ok())
+        .unwrap_or_else(|| {
+            eprintln!(
+                "no resource pack given.\n\
+                 Pass one as the first argument, or set NUCLEATION_PACK to a pack .zip:\n\
+                 \x20 cargo run --features meshing --example entity_mesh_test -- /path/to/pack.zip"
+            );
+            std::process::exit(1);
+        });
 
     let mut s = UniversalSchematic::new("entity_mesh_test".to_string());
     // A small 3x1x3 stone platform so entities stand on something.

@@ -4,7 +4,7 @@ Plan to make `.mcstructure` import/export round-trip correctly for redstone
 and all common block types. Two repos involved:
 
 - **nucleation** (this repo) — `src/formats/mcstructure.rs`
-- **blockpedia** at `/Users/harrison/Documents/code/blockpedia/warp/blockpedia`
+- **blockpedia** — a separate checkout, at `warp/blockpedia` inside that repo
   (crates.io `blockpedia = "0.1.8"`, used by nucleation as the Java↔Bedrock
   oracle). Owned by the same author; safe to modify + push.
 
@@ -171,7 +171,7 @@ imports a bedrock fixture and asserts equality.
 
 ---
 
-## Blockpedia tickets (path: `/Users/harrison/Documents/code/blockpedia/warp/blockpedia`)
+## Blockpedia tickets (all paths below are relative to `warp/blockpedia` in the blockpedia checkout)
 
 ### BP-1. Audit existing Java→Bedrock state translations
 **File:** `src/tests.rs` already contains
@@ -276,7 +276,7 @@ local path override:
 
 ```toml
 [patch.crates-io]
-blockpedia = { path = "/Users/harrison/Documents/code/blockpedia/warp/blockpedia" }
+blockpedia = { path = "../blockpedia/warp/blockpedia" }
 ```
 
 (Add to nucleation's root `Cargo.toml`; remove before release.)

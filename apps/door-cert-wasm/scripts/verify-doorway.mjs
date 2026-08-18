@@ -19,7 +19,8 @@
  */
 
 import { chromium } from "playwright";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -27,13 +28,29 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SHOTS = join(ROOT, "screenshots");
 mkdirSync(SHOTS, { recursive: true });
 
+// The community door files are not redistributable, so they live outside the
+// repo. Point DOOR_CORPUS at the directory holding them; it defaults to
+// ~/Downloads, which is where they land when downloaded.
+const CORPUS = process.env.DOOR_CORPUS ?? join(homedir(), "Downloads");
+const corpus = (name) => {
+  const path = join(CORPUS, name);
+  if (!existsSync(path)) {
+    console.error(
+      `missing door corpus file: ${path}\n` +
+        `Set DOOR_CORPUS to the directory containing "${name}".`,
+    );
+    process.exit(1);
+  }
+  return path;
+};
+
 const URL = "http://localhost:8433/";
 /** Each door with the opening the standard says it has. */
 const DOORS = [
   { id: "door6x6", file: "/tmp/door6x6.litematic", w: 6, h: 6 },
   {
     id: "door4x4",
-    file: "/Users/harrison/Downloads/fast 4x4 vault door (barrels filled).litematic",
+    file: corpus("fast 4x4 vault door (barrels filled).litematic"),
     w: 4,
     h: 4,
   },

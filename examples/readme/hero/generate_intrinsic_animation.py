@@ -136,9 +136,12 @@ def prepare(output: Path) -> None:
 
 def render_indices(indices: list[int], output: Path, workers: int) -> list[dict[str, object]]:
     prepare(output)
-    pack_path = os.environ.get(
-        "NUCLEATION_PACK", "/Users/harrison/code/schemati/renderer/harness/pack.zip"
-    )
+    # The resource pack is not redistributable, so it is not in the repo.
+    pack_path = os.environ.get("NUCLEATION_PACK")
+    if not pack_path:
+        raise SystemExit(
+            "set NUCLEATION_PACK to the path of a resource pack .zip to render with"
+        )
     records: list[dict[str, object]] = []
     if workers == 1:
         init_worker(pack_path)

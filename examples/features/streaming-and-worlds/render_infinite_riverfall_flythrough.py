@@ -63,12 +63,14 @@ def load_window(world_dir: Path, center_x: int) -> Schematic:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    # The resource pack is not redistributable, so it is not in the repo.
+    pack_env = os.environ.get("NUCLEATION_PACK")
     parser.add_argument(
         "--pack",
         type=Path,
-        default=Path(
-            os.environ.get("NUCLEATION_PACK", "/Users/harrison/Downloads/pack.zip")
-        ),
+        default=Path(pack_env) if pack_env else None,
+        required=pack_env is None,
+        help="Resource pack .zip to render with (defaults to $NUCLEATION_PACK).",
     )
     parser.add_argument(
         "--output",

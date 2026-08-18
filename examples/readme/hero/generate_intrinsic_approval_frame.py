@@ -202,9 +202,13 @@ def main() -> None:
     root = Path(__file__).resolve().parents[3]
     output = root / "render_work/scorched-3x7-intrinsic"
     output.mkdir(parents=True, exist_ok=True)
-    pack_path = Path(
-        os.environ.get("NUCLEATION_PACK", "/Users/harrison/code/schemati/renderer/harness/pack.zip")
-    )
+    # The resource pack is not redistributable, so it is not in the repo.
+    pack_env = os.environ.get("NUCLEATION_PACK")
+    if not pack_env:
+        raise SystemExit(
+            "set NUCLEATION_PACK to the path of a resource pack .zip to render with"
+        )
+    pack_path = Path(pack_env)
     schematic, metrics = build_frame()
     schematic_path = output / "approval-frame.schem"
     image_path = output / "approval-frame.png"
