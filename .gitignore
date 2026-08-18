@@ -95,6 +95,8 @@ docs/stylesheets/tailwind.css
 # Web-app build/runtime artifacts (apps/ ships sources only)
 apps/*/node_modules/
 apps/*/*/node_modules/
+# Example projects install their own dependencies to be runnable; only their sources belong here.
+examples/**/node_modules/
 apps/*/dist/
 apps/*/*/dist/
 apps/*/backend/.venv/

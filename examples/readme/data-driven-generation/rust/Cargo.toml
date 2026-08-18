@@ -1,0 +1,11 @@
+[package]
+name = "nucleation-data-driven-docs"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+image = { version = "0.24", default-features = false, features = ["png"] }
+nucleation = { path = "../../../.." }

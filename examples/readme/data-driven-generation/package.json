@@ -1,0 +1,8 @@
+{
+  "name": "nucleation-data-driven-docs",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "pngjs": "^7.0.0"
+  }
+}
