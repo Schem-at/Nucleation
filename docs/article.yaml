@@ -1,0 +1,134 @@
+slug: nucleation
+title: Nucleation
+form: docs
+status: published
+category: documentation
+tags: [minecraft, schematics, rust, python, javascript]
+
+# Metadata below drives the index card, the SEO/OG tags and the JSON-LD Article.
+# `site_url` is required for canonical, og:url, og:image and sitemap.xml — without
+# it pagina omits them all and warns per page. Value carried over from mkdocs.yml.
+#
+# It is the FALLBACK, not the deployment address. This article has more than one
+# home — schemat.io and a GitHub Pages mirror — so where a build is served is a
+# build-time input, passed as the full URL:
+#     pagina build docs --site-url https://schem-at.github.io/Nucleation/pagina/
+# pagina takes the path of that URL as the site base, so one flag gives both the
+# asset URLs and the canonical. tools/build-pagina-mirror.sh is what CI runs.
+#
+# The value below carries a path, which pagina reads only the origin of, so a build
+# that does NOT pass --site-url will warn (`seo-site-url-path-ignored`) rather than
+# silently emit canonical https://schem-at.github.io/. It used to do exactly that.
+description: Load, build, simulate, mesh, and render Minecraft schematics from one Rust core and six generated bindings.
+author: Nucleation contributors
+site_url: https://schem-at.github.io/Nucleation/
+cover: media/gallery-montage.png
+cover_alt: Four builds generated and rendered by Nucleation — a fractal sponge, a torus knot, a fox, and a tree
+
+kineglyph:
+  theme: theme/kineglyph.mjs
+  width: 960
+snippets:
+  roots: [".", ".."]        # ".." because --8<-- paths are repo-root relative (examples/…)
+
+# ---------------------------------------------------------------------------
+# nav
+#
+# Every page listed here renders with zero diagnostics under `pagina build`
+# (strict). The eight pages held back are listed in the PORTING BACKLOG at the
+# bottom of this file, each with the reason it currently fails, so nothing is
+# lost — `pagina pack` treats a nav entry it cannot build as an error by design,
+# so a page joins this list only once it builds clean.
+# ---------------------------------------------------------------------------
+nav:
+  - { title: Home, page: index.md }
+  - section: Get started
+    children:
+      - { title: Basics, page: features/basics.md }
+      - { title: Formats and I/O, page: features/formats-and-io.md }
+      - { title: Bindings and languages, page: features/bindings-and-languages.md }
+  - section: Build
+    children:
+      - { title: Data-driven generation, page: features/data-driven-generation.md }
+      - { title: Fast schematic generation, page: features/fast-generation.md }
+      - { title: Shapes and brushes, page: features/shapes-and-brushes.md }
+      - { title: SDFs, terrain, and fields, page: features/sdf-and-fields.md }
+      - { title: Palettes and color, page: features/palettes-and-color.md }
+      - { title: Regions and transforms, page: features/regions-and-transforms.md }
+      - { title: Voxelize 3D models, page: features/voxelize.md }
+      - { title: "Blocks, entities, and NBT", page: features/block-entities-nbt.md }
+  - section: Worlds and data
+    children:
+      - { title: Streaming and worlds, page: features/streaming-and-worlds.md }
+      - { title: World segmentation, page: features/world-segmentation.md }
+      - { title: Schematic provenance, page: features/schematic-provenance.md }
+      - { title: Transformation policies, page: features/transformation-policies.md }
+      - { title: Versions and translation, page: features/versions-and-translation.md }
+      - { title: Block database, page: features/block-database.md }
+      - { title: Storage, page: features/storage.md }
+  - section: Simulate and render
+    children:
+      - { title: Smart placement and simulation, page: features/smart-placement-and-simulation.md }
+      - { title: Redstone simulation, page: features/redstone-simulation.md }
+      - { title: Tick simulation, page: features/tick-simulation.md }
+      - { title: Tick mechanics, page: features/tick-simulation-mechanics.md }
+      - { title: Meshing and rendering, page: features/meshing-and-rendering.md }
+      - { title: Animation, page: features/animation.md }
+      - { title: Analysis, page: features/analysis.md }
+  - { title: Illustrations, page: illustrations.md }
+  - { title: Gallery, page: gallery.md }
+  - { title: Contributing, page: DEV.md }
+
+# ===========================================================================
+# PORTING BACKLOG — pages that exist on disk but are held out of `nav`
+#
+# These are NOT missing files. Each one renders, but fails `pagina build`
+# strict with the diagnostic noted. Re-add the entry to `nav` above once the
+# cause is fixed; the section each belongs to is given in brackets.
+#
+#   [Build] features/composition.md
+#       link-unresolved: ../readme-snippets/18-compose-torus-python.md is not
+#       in nav. The readme-snippets/*.md files are snippet sources, not pages.
+#       Fix: convert the link to a `--8<--` include, or drop the cross-link.
+#
+#   [Build] features/geo.md
+#       link-unresolved: ../readme-snippets/16-geo-osm-python.md (same cause).
+#
+#   [Simulate and render] features/scripting.md
+#       link-unresolved: ../readme-snippets/10-scripting-lua-python.md (same cause).
+#
+#   [API reference] rust/README.md
+#       link-unresolved ×5: ../shared/guide/schematic-builder.md,
+#       ../shared/guide/typed-executor.md, ../shared/unicode-palette.md.
+#       The docs/shared/ tree is shared prose that was never given nav entries.
+#       Fix: add a "Guides" nav section for docs/shared/, or inline the content.
+#
+#   [API reference] python/README.md
+#       link-unresolved ×5: same docs/shared/ targets as rust/README.md.
+#
+#   [API reference] javascript/README.md
+#       link-unresolved ×8: the same docs/shared/ targets plus
+#       ../shared/guide/circuit-api.md.
+#
+#   [API reference] api-reference-wasm.md
+#       anchor-missing ×2: #schematicwrapperdetectstructures and
+#       #schematicwrapperdetectstructuresgraph have no matching heading.
+#       These are generated files — fix the generator, not the output.
+#
+#   [API reference] api-reference-ffi.md
+#       anchor-missing ×2: #format-io and #file-io have no matching heading.
+#       Also generated.
+#
+#   [API reference] api-reference-python.md
+#       CONSEQUENTIAL, not broken on its own — it built clean with the full
+#       nav. It links to features/geo.md and features/scripting.md, both held
+#       back above, so keeping it in nav would raise two fresh dead links.
+#       Restoring geo.md and scripting.md restores this page too; re-add all
+#       three together.
+#
+# Not in nav and not intended to be — docs/ holds material that is not part of
+# this article at all: autostack-design.{pdf,tex}, planning/, plans/,
+# overrides/, javascripts/ (MkDocs), stylesheets/, readme-snippets/, shared/,
+# superpowers/, and the *-handover.md notes. `pagina pack` selects from nav, so
+# none of it ships; leave it where it is.
+# ===========================================================================

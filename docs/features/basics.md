@@ -1,3 +1,8 @@
+---
+title: Basics
+description: Create, inspect, and save a Minecraft schematic — blocks, block states, coordinates, and file round trips — in Python, JavaScript, and Rust.
+---
+
 # Basics
 
 A `Schematic` is an editable Minecraft build. It holds blocks, block entities,

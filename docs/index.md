@@ -1,49 +1,58 @@
 ---
 title: Nucleation
-hide:
-  - toc
 ---
 
-<section class="bb-hero">
-  <div class="bb-hero__copy">
-    <p class="bb-address">docs/index.md <span>·</span> crate 0.10.13</p>
-    <h1>
-      <span>Minecraft, treated as</span>
-      <span>programmable matter.</span>
-    </h1>
-    <p class="bb-lede">
-      Nucleation reads, writes, builds, simulates, meshes, and renders Minecraft
-      schematics. Rust is the implementation. Six generated bindings expose the
-      same model to Python, JavaScript, Kotlin, PHP, C, and C++.
-    </p>
-    <div class="bb-actions">
-      <a class="md-button md-button--primary" href="features/basics/">Start with a schematic</a>
-      <a class="md-button" href="features/formats-and-io/">Read the format guarantees</a>
-    </div>
-  </div>
+<style>
+/* Two call-to-action links on the landing page. pagina ships no button
+   primitive, so this is defined here — over pagina's own --pg-* token
+   contract, so it follows the reader's light/dark theme — and travels with
+   the article rather than depending on a host stylesheet. The `nu-` prefix
+   keeps it out of pagina's `pg-` namespace. */
+.nu-cta {
+  display: inline-block;
+  margin: 0 0.5rem 0.5rem 0;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--pg-line-strong, var(--pg-line));
+  border-radius: var(--pg-radius);
+  color: var(--pg-fg);
+  font-weight: 600;
+  text-decoration: none;
+}
+.nu-cta:hover { border-color: var(--pg-accent); }
+.nu-cta--primary {
+  background: var(--pg-accent);
+  border-color: var(--pg-accent);
+  color: var(--pg-accent-fg);
+}
+/* `<model-viewer>` defaults to height:150px in its own stylesheet, which beats
+   an `aspect-ratio`, so the height is set outright or the model renders as a
+   sliver in a letterbox. */
+.nu-model {
+  display: block;
+  width: 100%;
+  height: min(26rem, 56vh);
+  background: var(--pg-bg-sunken);
+  border-radius: var(--pg-radius);
+}
+</style>
 
-  <figure class="bb-specimen">
-    <div class="bb-specimen__header">
-      <span class="bb-source"><span>examples/readme/hero/</span>generate_intrinsic_animation.py</span>
-      <span class="bb-extent">x 118 · y 121 · z 046</span>
-    </div>
-    <div class="bb-specimen__stage">
-      <img src="media/hero.gif" alt="A scorched animated 3 by 7 torus knot generated and rendered by Nucleation">
-    </div>
-    <div class="bb-specimen__status">
-      <span><i aria-hidden="true"></i>97,961 cells · .schem · timing not recorded</span>
-      <a href="https://github.com/Schem-at/Nucleation/tree/master/examples/readme/hero">source</a>
-    </div>
-    <figcaption>
-      Each frame is a separate schematic. The braid advances while a periodic
-      field cuts scorched plates over a molten core. The published artifact does
-      not contain a render-time measurement.
-    </figcaption>
-  </figure>
-</section>
+# Minecraft, treated as programmable matter.
 
-<!-- Specimen facts verified on 2026-08-15 with nucleation 0.10.13 against
-docs/downloads/readme/hero/scorched-3x7-frame-000.schem. -->
+Nucleation reads, writes, builds, simulates, meshes, and renders Minecraft\
+schematics. Rust is the implementation. Six generated bindings expose the same\
+model to Python, JavaScript, Kotlin, PHP, C, and C++.
+
+<model-viewer class="nu-model" src="media/capture-1779012187376.glb" alt="An interactive 3D view of a schematic exported from Nucleation as glTF" camera-controls="" touch-action="pan-y"></model-viewer>
+
+[Start with a schematic](features/basics.md){ .nu-cta .nu-cta--primary }
+[Read the format guarantees](features/formats-and-io.md){ .nu-cta }
+
+<figure class="kg" data-scene="scenes/formats-and-io.mjs" data-controls="false" data-readout="false"></figure>
+
+<figure>
+  <img src="media/hero.gif" alt="A scorched animated 3 by 7 torus knot generated and rendered by Nucleation">
+  <figcaption>Each frame is a separate schematic. The braid advances while a periodic field cuts scorched plates over a molten core.</figcaption>
+</figure>
 
 ## Install
 
@@ -71,7 +80,8 @@ Kotlin/JVM, PHP, C, and C++ are published as release archives. Their generated
 surface follows the same bridge definitions and the naming rules of each
 language.
 
-<p class="bb-aside">One address space survives the trip from file parser to tick engine and renderer.</p>
+!!! quote ""
+    One address space survives the trip from file parser to tick engine and renderer.
 
 ## First file
 
@@ -93,44 +103,18 @@ build.save_to_file("signal-lamp.schem")
 
 ## Index
 
-<nav class="bb-index" aria-label="Feature index">
-  <a href="features/formats-and-io/">
-    <code>io/formats</code>
-    <span>Litematica, Sponge, MCEdit import, Bedrock, NUSN, Anvil regions, and world containers.</span>
-  </a>
-  <a href="features/shapes-and-brushes/">
-    <code>build/geometry</code>
-    <span>Shapes, brushes, masked fills, palettes, fields, terrain, geodata, and mesh voxelization.</span>
-  </a>
-  <a href="features/regions-and-transforms/">
-    <code>build/regions</code>
-    <span>Named regions, rigid transforms, deterministic stamping, and composition.</span>
-  </a>
-  <a href="features/tick-simulation/">
-    <code>sim/tick</code>
-    <span>Block ticks, update order, fluids, pistons, entities, checkpoints, and snapshots.</span>
-  </a>
-  <a href="features/redstone-simulation/">
-    <code>sim/redstone</code>
-    <span>Compiled redstone execution, typed inputs and outputs, and Insign annotations.</span>
-  </a>
-  <a href="features/meshing-and-rendering/">
-    <code>output/mesh</code>
-    <span>NUCM, GLB, glTF, USDZ, headless stills, and deterministic animation frames.</span>
-  </a>
-  <a href="features/world-segmentation/">
-    <code>world/segment</code>
-    <span>Bounded world streams, substrate subtraction, clustering, stitching, and provenance.</span>
-  </a>
-  <a href="features/bindings-and-languages/">
-    <code>api/bindings</code>
-    <span>One generated API across Rust, Python, JavaScript, Kotlin, PHP, C, and C++.</span>
-  </a>
-  <a href="gallery/">
-    <code>output/gallery</code>
-    <span>Rendered builds with source: knots, terrain, fractals, maps, text, and voxelized models.</span>
-  </a>
-</nav>
+| Area | What it covers |
+|---|---|
+| [`build/data`](features/data-driven-generation.md) | Turn images, arrays, and external datasets into positions, block states, and block entities. |
+| [`io/formats`](features/formats-and-io.md) | Litematica, Sponge, MCEdit import, Bedrock, NUSN, Anvil regions, and world containers. |
+| [`build/geometry`](features/shapes-and-brushes.md) | Shapes, brushes, masked fills, palettes, fields, terrain, geodata, and mesh voxelization. |
+| [`build/regions`](features/regions-and-transforms.md) | Named regions, rigid transforms, deterministic stamping, and composition. |
+| [`sim/tick`](features/tick-simulation.md) | Block ticks, update order, fluids, pistons, entities, checkpoints, and snapshots. |
+| [`sim/redstone`](features/redstone-simulation.md) | Compiled redstone execution, typed inputs and outputs, and Insign annotations. |
+| [`output/mesh`](features/meshing-and-rendering.md) | NUCM, GLB, glTF, USDZ, headless stills, and deterministic animation frames. |
+| [`world/segment`](features/world-segmentation.md) | Bounded world streams, substrate subtraction, clustering, stitching, and provenance. |
+| [`api/bindings`](features/bindings-and-languages.md) | One generated API across Rust, Python, JavaScript, Kotlin, PHP, C, and C++. |
+| [`output/gallery`](gallery.md) | Rendered builds with source: knots, terrain, fractals, maps, text, and voxelized models. |
 
 ## Known boundaries
 

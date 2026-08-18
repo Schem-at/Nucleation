@@ -5,16 +5,28 @@ on:
     branches: [master]
     paths:
       - "docs/**"
+      - "examples/readme/**"
       - "overrides/**"
       - "mkdocs.yml"
       - "requirements-docs.txt"
+      - "tools/render-kineglyph-docs.mjs"
+      - "tools/sync-kineglyph-illustrations.mjs"
+      - "tools/build-pagina-mirror.sh"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/docs.yml"
   pull_request:
     paths:
       - "docs/**"
+      - "examples/readme/**"
       - "overrides/**"
       - "mkdocs.yml"
       - "requirements-docs.txt"
+      - "tools/render-kineglyph-docs.mjs"
+      - "tools/sync-kineglyph-illustrations.mjs"
+      - "tools/build-pagina-mirror.sh"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
@@ -30,12 +42,67 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements-docs.txt
+      - run: npm ci
+      - name: Build docs CSS
+        run: npm run docs:css
+      - name: Validate consumer-owned Kineglyph scenes
+        run: node tools/render-kineglyph-docs.mjs /tmp/nucleation-kineglyph 960
       - run: mkdocs build --strict
+
+      # ---- the pagina mirror ------------------------------------------------------------------
+      # `docs/` is a pagina article folder as well as an MkDocs source. It is built into a
+      # sub-directory of the same Pages artifact rather than deployed separately, because a
+      # repository has exactly one Pages deployment: two workflows publishing to it would be two
+      # workflows overwriting each other. MkDocs keeps `/Nucleation/` until the port is finished;
+      # promoting the mirror is then a one-line change to PAGINA_SITE_URL plus swapping which
+      # output becomes the artifact root.
+      #
+      # The script packs `docs/` into a portable bundle, unpacks it, and builds *that* — see its
+      # header for why. It is the same script a developer runs locally, and it exits non-zero on
+      # any pagina diagnostic, not only on a strict-mode error: a docs site that deploys with a
+      # dead link or a missing canonical has published its defects silently, which is worse than a
+      # red build. It runs on pull requests too, so a broken page is caught before it can deploy.
+      - name: Build the pagina mirror
+        env:
+          # The full deployment URL: pagina takes the path as the site base, so this one value
+          # decides both the asset URLs and the canonical.
+          PAGINA_SITE_URL: https://schem-at.github.io/Nucleation/pagina/
+          # Set the repository variable PAGINA_MIRROR_OF to the primary copy's URL (e.g.
+          # https://schemat.io/docs/nucleation/) once schemat.io actually serves this article.
+          # Every page's canonical then hands ranking to that copy instead of competing with it.
+          # Empty until then: a canonical pointing at a page that 404s is worse than none.
+          PAGINA_MIRROR_OF: ${{ vars.PAGINA_MIRROR_OF }}
+          PAGINA_WORK: ${{ runner.temp }}/pagina-toolchain
+        run: tools/build-pagina-mirror.sh "${{ runner.temp }}/pagina-mirror"
+
+      # The importable half of the loop. The bundle is a build output, not a committed file:
+      # committing it would put a 30 MB binary that is fully derived from `docs/` into the history,
+      # where it can only ever drift from its source. Downloading it from the run that built the
+      # published mirror gives the same file with none of that.
+      - name: Upload the article bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: nucleation-pagina-bundle
+          path: ${{ runner.temp }}/pagina-mirror.pgz
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Assemble the Pages artifact
+        if: github.event_name != 'pull_request'
+        run: |
+          rm -rf site/pagina
+          mkdir -p site/pagina
+          cp -R "${{ runner.temp }}/pagina-mirror/." site/pagina/
+
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:

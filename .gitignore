@@ -1,5 +1,11 @@
 /target
 /site/
+# The pagina mirror: build output and the toolchain it is built with. Neither is committed —
+# `docs/` is the source, and everything below is derived from it on demand. See
+# tools/build-pagina-mirror.sh.
+/site-pagina/
+/site-pagina.pgz
+/.pagina-toolchain/
 /tests/output/*
 /pkg/
 .history/
@@ -81,6 +87,10 @@ bindings/kotlin/.kotlin/
 /tools/gametest/work-1213/
 /tools/gametest/work-bisect/
 /tools/gametest/logs/
+
+# Docs CSS build (source is docs/stylesheets/tailwind.src.css)
+/node_modules/
+docs/stylesheets/tailwind.css
 
 # Web-app build/runtime artifacts (apps/ ships sources only)
 apps/*/node_modules/

@@ -1,0 +1,14 @@
+{
+  "name": "nucleation-docs-build",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Build tooling for the Nucleation documentation site.",
+  "scripts": {
+    "docs:css": "tailwindcss -i docs/stylesheets/tailwind.src.css -o docs/stylesheets/tailwind.css --minify",
+    "docs:css:watch": "tailwindcss -i docs/stylesheets/tailwind.src.css -o docs/stylesheets/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.11",
+    "tailwindcss": "^4.1.11"
+  }
+}
