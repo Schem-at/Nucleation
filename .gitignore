@@ -97,6 +97,18 @@ apps/*/node_modules/
 apps/*/*/node_modules/
 # Example projects install their own dependencies to be runnable; only their sources belong here.
 examples/**/node_modules/
+
+# Scratch that other toolchains write into whatever directory they are run from.
+# pagina's and Kineglyph's test suites create temp trees with mkdtemp; when TMPDIR is
+# relative (or unset in a sandbox) those land here rather than in /tmp, and a stray
+# `git add` would sweep in tens of thousands of files. The real fix belongs in those
+# repos; this keeps their accidents out of this one's status.
+/pagina-*/
+/kg-prerender-*/
+/playwright-transform-cache-*/
+/smoke-*/
+/nucleation-replace-*/
+/laravel-blade*
 apps/*/dist/
 apps/*/*/dist/
 apps/*/backend/.venv/
