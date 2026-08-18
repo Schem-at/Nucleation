@@ -9,11 +9,8 @@ on:
       - "overrides/**"
       - "mkdocs.yml"
       - "requirements-docs.txt"
-      - "tools/render-kineglyph-docs.mjs"
       - "tools/sync-kineglyph-illustrations.mjs"
       - "tools/build-pagina-mirror.sh"
-      - "package.json"
-      - "package-lock.json"
       - ".github/workflows/docs.yml"
   pull_request:
     paths:
@@ -22,11 +19,8 @@ on:
       - "overrides/**"
       - "mkdocs.yml"
       - "requirements-docs.txt"
-      - "tools/render-kineglyph-docs.mjs"
       - "tools/sync-kineglyph-illustrations.mjs"
       - "tools/build-pagina-mirror.sh"
-      - "package.json"
-      - "package-lock.json"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
@@ -42,20 +36,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Node is here for the pagina mirror, which installs its own toolchain into a work
+      # directory. There is no root npm project to `npm ci`, so no cache key either.
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements-docs.txt
-      - run: npm ci
-      - name: Build docs CSS
-        run: npm run docs:css
-      - name: Validate consumer-owned Kineglyph scenes
-        run: node tools/render-kineglyph-docs.mjs /tmp/nucleation-kineglyph 960
       - run: mkdocs build --strict
 
       # ---- the pagina mirror ------------------------------------------------------------------
