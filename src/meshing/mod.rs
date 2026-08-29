@@ -1263,6 +1263,23 @@ impl UniversalSchematic {
         region_name: Option<&str>,
         groups: &[crate::animation::Group],
     ) -> Result<Vec<MeshOutput>> {
+        Ok(self
+            .mesh_groups_in_region_raw(pack, config, region_name, groups)?
+            .into_iter()
+            .map(|output| mesh_output_from_mesher(output, None))
+            .collect())
+    }
+
+    /// The mesher's own output per group — the atlas and layers before they are
+    /// repackaged as [`MeshOutput`]; exporters that assemble their own scene
+    /// (the animated build GLB) start here.
+    pub(crate) fn mesh_groups_in_region_raw(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+        region_name: Option<&str>,
+        groups: &[crate::animation::Group],
+    ) -> Result<Vec<MesherOutput>> {
         let mesher_config = config.to_mesher_config();
         let region = region_name.and_then(|name| self.get_region(name));
         let entities = region
@@ -1298,16 +1315,14 @@ impl UniversalSchematic {
 
             if blocks.is_empty() {
                 // Keep index alignment with `groups` even when empty.
-                out.push(MeshOutput {
-                    opaque: MeshLayer::default(),
-                    cutout: MeshLayer::default(),
-                    transparent: MeshLayer::default(),
+                out.push(MesherOutput {
+                    opaque_mesh: MeshLayer::default(),
+                    cutout_mesh: MeshLayer::default(),
+                    transparent_mesh: MeshLayer::default(),
                     atlas: schematic_mesher::TextureAtlas::empty(),
+                    bounds: MesherBoundingBox::new([0.0; 3], [0.0; 3]),
                     greedy_materials: Vec::new(),
                     animated_textures: Vec::new(),
-                    bounds: MesherBoundingBox::new([0.0; 3], [0.0; 3]),
-                    chunk_coord: None,
-                    lod_level: 0,
                 });
                 continue;
             }
@@ -1318,7 +1333,7 @@ impl UniversalSchematic {
             let output = mesher
                 .mesh(&source)
                 .map_err(|e| MeshError::Meshing(e.to_string()))?;
-            out.push(mesh_output_from_mesher(output, None));
+            out.push(output);
         }
         Ok(out)
     }

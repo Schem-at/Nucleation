@@ -2213,6 +2213,32 @@ impl BuildAnimation {
         Ok(outputs)
     }
 
+    /// The mesher's raw output per group, from each group's schematic snapshot.
+    #[cfg(feature = "meshing")]
+    pub(super) fn mesh_outputs_raw(
+        &self,
+        pack: &crate::meshing::ResourcePackSource,
+        config: &crate::meshing::MeshConfig,
+    ) -> crate::meshing::Result<Vec<schematic_mesher::MesherOutput>> {
+        let mut outputs = Vec::with_capacity(self.steps.len());
+        for (id, step) in self.steps.iter().enumerate() {
+            let group = Group::new(id as GroupId, step.blocks.clone());
+            let mut meshed = step.mesh_source.mesh_groups_in_region_raw(
+                pack,
+                config,
+                step.mesh_region.as_deref(),
+                &[group],
+            )?;
+            outputs.push(meshed.remove(0));
+        }
+        Ok(outputs)
+    }
+
+    /// Blocks recorded per group, in group order.
+    pub(super) fn group_block_counts(&self) -> Vec<usize> {
+        self.steps.iter().map(|step| step.blocks.len()).collect()
+    }
+
     pub fn timeline(&self) -> Timeline {
         let groups = self.groups();
         let mut timeline = Timeline::new(groups);

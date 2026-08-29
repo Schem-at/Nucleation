@@ -27,6 +27,8 @@
 
 pub mod builder;
 pub mod easing;
+#[cfg(feature = "meshing")]
+pub mod glb;
 pub mod operation;
 pub mod pose;
 pub mod presets;
