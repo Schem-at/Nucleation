@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { AnimationEffect, BuildAnimation, ResourcePack } from "nucleation";
+import { AnimationEffect, BuildAnimation, ResourcePack, Schematic } from "nucleation";
 
 const EPSILON = 1e-4;
 const fixture = (name) =>
@@ -139,6 +139,19 @@ for (const [name, build] of BUILDS) {
       /./,
       "duplicate name rejected",
     );
+  });
+
+  test(`${name}: the finished build exports as .schem and .litematic`, () => {
+    const animation = build();
+    const bytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const schem = bytes(animation.toSchemB64());
+    const litematic = bytes(animation.toLitematicB64());
+    assert.deepEqual([...schem.slice(0, 2)], [0x1f, 0x8b], "schem is gzip NBT");
+    assert.deepEqual([...litematic.slice(0, 2)], [0x1f, 0x8b], "litematic is gzip NBT");
+    const fromSchem = Schematic.fromSchematic(schem);
+    const fromLitematic = Schematic.fromLitematic(litematic);
+    assert.ok(fromSchem.blockCount() > 0, "schem has blocks");
+    assert.equal(fromSchem.blockCount(), fromLitematic.blockCount(), "same build in both");
   });
 
   test(`${name}: sampling is pure and order-independent`, () => {

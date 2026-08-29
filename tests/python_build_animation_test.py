@@ -123,4 +123,17 @@ if pack_path and Path(pack_path).exists():
     assert any(node.get("name") == "anchor:beacon" for node in doc["nodes"])
     print("Build-animation Python GLB: OK")
 
+from nucleation import Schematic
+
+for name, build in (("beacon", build_beacon), ("crafting-nook", build_crafting_nook)):
+    animation = build()
+    schem = base64.b64decode(animation.to_schem_b64())
+    litematic = base64.b64decode(animation.to_litematic_b64())
+    assert schem[:2] == b"\x1f\x8b" and litematic[:2] == b"\x1f\x8b", f"{name}: gzip NBT"
+    from_schem = Schematic.from_schematic(list(schem))
+    from_litematic = Schematic.from_litematic(list(litematic))
+    assert from_schem.block_count() > 0, f"{name}: schem has blocks"
+    assert from_schem.block_count() == from_litematic.block_count(), f"{name}: same build"
+print("Build-animation Python schematics: OK")
+
 print("Build-animation Python parity: OK")
