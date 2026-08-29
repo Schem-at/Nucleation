@@ -166,6 +166,16 @@ public:
   template<typename W>
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> anchors_json_write(W& writeable_output) const;
 
+  /**
+   * The build as an animated GLB — one textured node per group, TRS
+   * keyframes sampled at `fps`, anchors as child nodes, and
+   * `extras.nucleation` for opacity/tint/emissive and the camera track —
+   * base64-encoded.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> to_animated_glb_b64(const nucleation::ResourcePack& pack, float fps) const;
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> to_animated_glb_b64_write(const nucleation::ResourcePack& pack, float fps, W& writeable_output) const;
+
   inline nucleation::diplomat::result<std::string, nucleation::NucleationError> operations_json() const;
   template<typename W>
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> operations_json_write(W& writeable_output) const;

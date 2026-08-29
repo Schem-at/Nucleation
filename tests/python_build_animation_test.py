@@ -4,8 +4,10 @@ Run via tools/verify-build-animation.sh, or directly with the repository's
 virtualenv after `pip install ./bindings/python`.
 """
 
+import base64
 import json
 import math
+import os
 from pathlib import Path
 
 from nucleation import AnimationEffect, BuildAnimation
@@ -105,4 +107,20 @@ def check(name, build):
 
 check("beacon", build_beacon)
 check("crafting-nook", build_crafting_nook)
+
+# The animated GLB needs the vanilla pack the docs generators use.
+pack_path = os.environ.get("NUCLEATION_PACK")
+if pack_path and Path(pack_path).exists():
+    from nucleation import ResourcePack
+
+    pack = ResourcePack.from_bytes(list(Path(pack_path).read_bytes()))
+    glb = base64.b64decode(build_beacon().to_animated_glb_b64(pack, 30))
+    assert glb[:4] == b"glTF", "animated GLB magic"
+    json_len = int.from_bytes(glb[12:16], "little")
+    doc = json.loads(glb[20 : 20 + json_len])
+    assert doc["nodes"][0]["name"] == "build:beacon"
+    assert sum(1 for node in doc["nodes"] if node.get("name", "").startswith("group:")) == 10
+    assert any(node.get("name") == "anchor:beacon" for node in doc["nodes"])
+    print("Build-animation Python GLB: OK")
+
 print("Build-animation Python parity: OK")

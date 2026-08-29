@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { AnimationEffect, BuildAnimation } from "nucleation";
+import { AnimationEffect, BuildAnimation, ResourcePack } from "nucleation";
 
 const EPSILON = 1e-4;
 const fixture = (name) =>
@@ -89,6 +89,32 @@ const BUILDS = [
   ["beacon", buildBeacon],
   ["crafting-nook", buildCraftingNook],
 ];
+
+function glbJson(bytes) {
+  assert.equal(String.fromCharCode(...bytes.subarray(0, 4)), "glTF");
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  assert.equal(view.getUint32(8, true), bytes.byteLength, "GLB length header");
+  const jsonLength = view.getUint32(12, true);
+  return JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jsonLength)));
+}
+
+// The vanilla pack the docs generators use; the verify script points
+// NUCLEATION_PACK at render_work/pack.zip when it exists.
+const packPath = process.env.NUCLEATION_PACK;
+test("beacon: animated GLB carries named groups, the anchor, and extras", { skip: !packPath }, () => {
+  const pack = ResourcePack.fromBytes(Array.from(readFileSync(packPath)));
+  const animation = buildBeacon();
+  const bytes = Uint8Array.from(Buffer.from(animation.toAnimatedGlbB64(pack, 30), "base64"));
+  const json = glbJson(bytes);
+  const names = json.nodes.map((node) => node.name);
+  assert.equal(names[0], "build:beacon");
+  assert.equal(names.filter((name) => name.startsWith("group:")).length, 10);
+  assert.ok(names.includes("anchor:beacon"));
+  assert.equal(json.animations[0].name, "beacon");
+  assert.equal(json.nodes[0].extras.nucleation.groups, 10);
+  assertClose(json.nodes[0].extras.nucleation.durationMs, 2400, "durationMs");
+  assert.equal(json.materials.length, 10);
+});
 
 for (const [name, build] of BUILDS) {
   test(`${name}: WASM engine matches the native fixture`, () => {

@@ -2,6 +2,7 @@
 import type { AnimationEffect } from "./AnimationEffect.mjs"
 import type { Brush } from "./Brush.mjs"
 import type { NucleationError } from "./NucleationError.mjs"
+import type { ResourcePack } from "./ResourcePack.mjs"
 import type { Schematic } from "./Schematic.mjs"
 import type { Shape } from "./Shape.mjs"
 import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
@@ -136,6 +137,14 @@ export class BuildAnimation {
      * Every recorded anchor as JSON: `[{ name, group, local: [x, y, z] }]`.
      */
     anchorsJson(): string;
+
+    /**
+     * The build as an animated GLB — one textured node per group, TRS
+     * keyframes sampled at `fps`, anchors as child nodes, and
+     * `extras.nucleation` for opacity/tint/emissive and the camera track —
+     * base64-encoded.
+     */
+    toAnimatedGlbB64(pack: ResourcePack, fps: number): string;
 
     operationsJson(): string;
 

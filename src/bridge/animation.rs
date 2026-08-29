@@ -552,6 +552,25 @@ pub mod ffi {
             write!(out, "{}", json).map_err(|_| NucleationError::Serialize)
         }
 
+        /// The build as an animated GLB — one textured node per group, TRS
+        /// keyframes sampled at `fps`, anchors as child nodes, and
+        /// `extras.nucleation` for opacity/tint/emissive and the camera track —
+        /// base64-encoded.
+        #[cfg(feature = "meshing")]
+        pub fn to_animated_glb_b64(
+            &self,
+            pack: &ResourcePack,
+            fps: f32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let data = self
+                .0
+                .to_animated_glb(&pack.0, &crate::meshing::MeshConfig::default(), fps)
+                .map_err(|_| NucleationError::Mesh)?;
+            super::super::meshing::write_b64(&data, out);
+            Ok(())
+        }
+
         pub fn operations_json(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
             let json = self
                 .0

@@ -8,6 +8,10 @@ REPO_ROOT="$PWD"
 WORK_DIR="$(mktemp -d /tmp/nucleation-build-animation.XXXXXX)"
 trap 'rm -rf "$WORK_DIR"' EXIT
 mkdir -p "$WORK_DIR/javascript/node_modules" "$WORK_DIR/javascript/fixtures"
+# The animated-GLB checks need the vanilla pack the docs generators use.
+if [[ -z "${NUCLEATION_PACK:-}" && -f "$REPO_ROOT/render_work/pack.zip" ]]; then
+  export NUCLEATION_PACK="$REPO_ROOT/render_work/pack.zip"
+fi
 
 cargo test --quiet --test build_animation_parity >"$WORK_DIR/rust.log" 2>&1 \
   || { cat "$WORK_DIR/rust.log"; exit 1; }

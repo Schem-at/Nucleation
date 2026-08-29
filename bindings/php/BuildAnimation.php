@@ -471,6 +471,15 @@ final class BuildAnimation {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function toAnimatedGlbB64( $pack,  $fps) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->BuildAnimation_to_animated_glb_b64($this->ptr, $pack->ptr, $fps, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function operationsJson() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         $result = Lib::ffi()->BuildAnimation_operations_json($this->ptr, $write);

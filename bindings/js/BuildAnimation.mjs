@@ -2,6 +2,7 @@
 import { AnimationEffect } from "./AnimationEffect.mjs"
 import { Brush } from "./Brush.mjs"
 import { NucleationError } from "./NucleationError.mjs"
+import { ResourcePack } from "./ResourcePack.mjs"
 import { Schematic } from "./Schematic.mjs"
 import { Shape } from "./Shape.mjs"
 import wasm from "./diplomat-wasm.mjs";
@@ -899,6 +900,35 @@ export class BuildAnimation {
 
 
         const result = wasm.BuildAnimation_anchors_json(diplomatReceive.buffer, this.ffiValue, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * The build as an animated GLB — one textured node per group, TRS
+     * keyframes sampled at `fps`, anchors as child nodes, and
+     * `extras.nucleation` for opacity/tint/emissive and the camera track —
+     * base64-encoded.
+     */
+    toAnimatedGlbB64(pack, fps) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.BuildAnimation_to_animated_glb_b64(diplomatReceive.buffer, this.ffiValue, pack.ffiValue, fps, write.buffer);
 
         try {
             if (!diplomatReceive.resultFlag) {

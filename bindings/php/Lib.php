@@ -225,6 +225,8 @@ typedef struct BuildAnimation_add_anchor_to_group_result { union { NucleationErr
 BuildAnimation_add_anchor_to_group_result BuildAnimation_add_anchor_to_group(BuildAnimation* self, uint32_t group, DiplomatStringView name, float x, float y, float z);
 typedef struct BuildAnimation_anchors_json_result { union { NucleationError err; }; bool is_ok; } BuildAnimation_anchors_json_result;
 BuildAnimation_anchors_json_result BuildAnimation_anchors_json(BuildAnimation* self, DiplomatWrite* write);
+typedef struct BuildAnimation_to_animated_glb_b64_result { union { NucleationError err; }; bool is_ok; } BuildAnimation_to_animated_glb_b64_result;
+BuildAnimation_to_animated_glb_b64_result BuildAnimation_to_animated_glb_b64(BuildAnimation* self, ResourcePack* pack, float fps, DiplomatWrite* write);
 typedef struct BuildAnimation_operations_json_result { union { NucleationError err; }; bool is_ok; } BuildAnimation_operations_json_result;
 BuildAnimation_operations_json_result BuildAnimation_operations_json(BuildAnimation* self, DiplomatWrite* write);
 typedef struct BuildAnimation_frame_json_result { union { NucleationError err; }; bool is_ok; } BuildAnimation_frame_json_result;
