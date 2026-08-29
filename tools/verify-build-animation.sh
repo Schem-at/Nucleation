@@ -22,4 +22,8 @@ ln -s "$REPO_ROOT/dist/npm" "$WORK_DIR/javascript/node_modules/nucleation"
 ( cd "$WORK_DIR/javascript" && node --test node_build_animation_test.mjs ) >"$WORK_DIR/javascript.log" 2>&1 \
   || { cat "$WORK_DIR/javascript.log"; exit 1; }
 
-echo "Build-animation parity passed: Rust fixtures, WASM/JS"
+"$REPO_ROOT/.venv/bin/python" "$REPO_ROOT/tests/python_build_animation_test.py" >"$WORK_DIR/python.log" 2>&1 \
+  || { cat "$WORK_DIR/python.log"; exit 1; }
+grep -q "Build-animation Python parity: OK" "$WORK_DIR/python.log"
+
+echo "Build-animation parity passed: Rust fixtures, WASM/JS, Python"
