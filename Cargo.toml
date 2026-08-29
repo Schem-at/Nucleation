@@ -201,7 +201,7 @@ testcontainers-modules = { version = "0.11", features = [
 # release was published from (253d2b6 + manifest-only packaging fixes; same
 # source). cargo publish keeps the version and drops the git side, so the
 # published nucleation crate keeps meshing/rendering.
-schematic-mesher = { version = "0.2.0", git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "dbb0a31a347e93176c64bf8782fd4a2f3c72b822", optional = true }
+schematic-mesher = { version = "0.2.0", git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "286323e472cd8a5363b66a035a3be02ecdd4f164", optional = true }
 
 # Rendering dependencies - optional
 wgpu = { version = "30", optional = true }
