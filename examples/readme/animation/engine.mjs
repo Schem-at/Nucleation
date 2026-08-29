@@ -22,6 +22,9 @@ animation.setBlock(0, 1, 0, "minecraft:furnace[facing=south]");
 animation.animateCamera(AnimationEffect.turntable(3_000), 0);
 // --8<-- [end:record]
 
+import { ResourcePack } from "nucleation";
+import { readFileSync, writeFileSync } from "node:fs";
+
 
 // --8<-- [start:sample]
 const frame = JSON.parse(animation.frameJson(450));
@@ -38,6 +41,16 @@ animation.addAnchorToGroup(1, "diamond", 4, 1.5, 0);
 const settled = JSON.parse(animation.frameJson(animation.durationMs()));
 console.log(settled.anchors[0].world); // [4, 1.5, 0] — the top centre of the block
 // --8<-- [end:anchors]
+
+// --8<-- [start:animated-glb]
+// One glTF binary any viewer can play: a node per group, TRS keyframes at
+// 30 fps, anchors as child nodes, and `extras.nucleation` for the rest.
+if (process.env.NUCLEATION_PACK) {
+  const pack = ResourcePack.fromBytes(Array.from(readFileSync(process.env.NUCLEATION_PACK)));
+  const glb = Buffer.from(animation.toAnimatedGlbB64(pack, 30), "base64");
+  writeFileSync("engine_walkthrough.glb", glb);
+}
+// --8<-- [end:animated-glb]
 
 if (animation.groupCount() !== 3) throw new Error("group count changed");
 if (settled.anchors.length !== 1 || settled.anchors[0].world.join() !== "4,1.5,0")

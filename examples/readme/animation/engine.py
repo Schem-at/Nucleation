@@ -1,8 +1,11 @@
 """Verified Python recorder example for docs/features/animation.md."""
 
+import base64
 import json
+import os
+from pathlib import Path
 
-from nucleation import AnimationEffect, BuildAnimation
+from nucleation import AnimationEffect, BuildAnimation, ResourcePack
 
 
 # --8<-- [start:record]
@@ -43,6 +46,15 @@ animation.add_anchor_to_group(1, "diamond", 4.0, 1.5, 0.0)
 settled = json.loads(animation.frame_json(animation.duration_ms()))
 print(settled["anchors"][0]["world"])  # [4.0, 1.5, 0.0] — the top centre of the block
 # --8<-- [end:anchors]
+
+# --8<-- [start:animated-glb]
+# One glTF binary any viewer can play: a node per group, TRS keyframes at
+# 30 fps, anchors as child nodes, and `extras.nucleation` for the rest.
+if os.environ.get("NUCLEATION_PACK"):
+    pack = ResourcePack.from_bytes(list(Path(os.environ["NUCLEATION_PACK"]).read_bytes()))
+    glb = base64.b64decode(animation.to_animated_glb_b64(pack, 30))
+    Path("engine_walkthrough.glb").write_bytes(glb)
+# --8<-- [end:animated-glb]
 
 assert settled["anchors"][0]["world"] == [4.0, 1.5, 0.0], "anchor did not settle"
 

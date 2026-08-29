@@ -396,6 +396,36 @@ line that lands with the block — is the renderer's decision.
 `anchorsJson()` lists the declarations (`name`, `group`, `local`). Names are
 unique per animation.
 
+## Animated GLB
+
+`toAnimatedGlbB64(pack, fps)` writes the whole build as one glTF binary that
+any viewer can play: a root node `build:<name>`, one child `group:<id>` per
+animation group with its textured mesh, translation / rotation / scale
+keyframe tracks sampled at `fps` from the same timeline `frameJson` reads, and
+an empty `anchor:<name>` child under the group each anchor belongs to.
+Constant runs are deduplicated, so a long hold costs two keys. Geometry and
+tracks share the engine's block space (a block centred on its integer
+coordinate), so an anchor's node sits exactly where `frameJson` reports it.
+
+What core glTF cannot animate rides in `extras.nucleation` and is ignored by
+viewers that do not know it:
+
+- root: `{ version, durationMs, fps, groups, camera: { times, yaw, pitch, zoom, targetOffset } | null }`
+- group: `{ group, blocks, poseTrack: { times, opacity, tint, emissive } | null }`
+- anchor: `{ anchor, group }`
+
+=== "Python"
+
+    ```python
+    --8<-- "examples/readme/animation/engine.py:animated-glb"
+    ```
+
+=== "JavaScript"
+
+    ```javascript
+    --8<-- "examples/readme/animation/engine.mjs:animated-glb"
+    ```
+
 ## Determinism
 
 `Timeline::seek` is pure: no interior mutation, no wall-clock. The same time

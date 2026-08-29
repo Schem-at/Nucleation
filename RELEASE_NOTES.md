@@ -5,7 +5,10 @@ named anchors (`add_anchor`, `add_anchor_to_group`, `anchors_json`) that every
 frame reports in world space after the group's pose, for hotspots and labels
 that land with their block. The beacon and crafting-nook builds are pinned as
 native fixtures and verified against the WASM/JS and Python engines by
-`tools/verify-build-animation.sh`.
+`tools/verify-build-animation.sh`. `BuildAnimation.to_animated_glb_b64(pack, fps)`
+exports the build as an animated GLB — named group nodes with textured meshes,
+TRS keyframes, anchor child nodes, and `extras.nucleation` for opacity / tint /
+emissive and camera tracks — so a build plays in any glTF viewer.
 
 # Nucleation v0.10.14
 
