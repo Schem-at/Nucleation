@@ -35,6 +35,17 @@ print(animation.duration_ms())  # 3000.0, set by the camera track
 print(len(frame["poses"]))      # 3 group poses at t=450 ms
 # --8<-- [end:sample]
 
+# --8<-- [start:anchors]
+# A named point on the diamond block's group (group 1). Frames report it in
+# world space after the group's pose, so a renderer or a docs tool can draw a
+# hotspot, a leader line, or a label that lands with the block.
+animation.add_anchor_to_group(1, "diamond", 4.5, 2.0, 0.5)
+settled = json.loads(animation.frame_json(animation.duration_ms()))
+print(settled["anchors"][0]["world"])  # [4.5, 2.0, 0.5]
+# --8<-- [end:anchors]
+
+assert settled["anchors"][0]["world"] == [4.5, 2.0, 0.5], "anchor did not settle"
+
 assert animation.group_count() == 3
 assert animation.duration_ms() == 3_000
 assert len(frame["poses"]) == 3

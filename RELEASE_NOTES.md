@@ -1,3 +1,12 @@
+# Unreleased
+
+**Build-animation anchors and cross-binding parity.** `BuildAnimation` records
+named anchors (`add_anchor`, `add_anchor_to_group`, `anchors_json`) that every
+frame reports in world space after the group's pose, for hotspots and labels
+that land with their block. The beacon and crafting-nook builds are pinned as
+native fixtures and verified against the WASM/JS and Python engines by
+`tools/verify-build-animation.sh`.
+
 # Nucleation v0.10.14
 
 **Version-matched world extraction workers.** Every native release archive now
