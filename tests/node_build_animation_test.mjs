@@ -17,6 +17,7 @@ export function buildBeacon() {
     for (let z = -1; z <= 1; z += 1) animation.setBlock(x, 0, z, "minecraft:gold_block");
   }
   animation.withEffect(AnimationEffect.spinIn(680, 1)).setBlock(0, 1, 0, "minecraft:beacon");
+  animation.addAnchor("beacon", 0.5, 2.0, 0.5);
   const camera = AnimationEffect.create(2_400);
   camera.addTween("rotateY", -4, 4, "inOutSine");
   animation.animateCamera(camera, 0);
@@ -54,10 +55,12 @@ export function buildCraftingNook() {
   }
   animation.endGroup();
   animation.withEffect(AnimationEffect.spinIn(620, 1)).setBlock(1, 1, 1, "minecraft:crafting_table");
+  animation.addAnchor("crafting-table", 1.5, 2.0, 1.5);
   animation.setBlock(3, 1, 1, "minecraft:chest[facing=south]");
   animation.beginGroup();
   animation.setBlock(4, 2, 1, "minecraft:wall_torch[facing=south]");
   animation.setBlock(1, 2, 4, "minecraft:wall_torch[facing=east]");
+  animation.addAnchor("torches", 4.5, 2.5, 1.5);
   animation.endGroup();
   const camera = AnimationEffect.create(3_000);
   camera.addTween("rotateY", -5, 6, "inOutSine");
@@ -97,6 +100,19 @@ for (const [name, build] of BUILDS) {
       const frame = JSON.parse(animation.frameJson(t));
       assertClose(frame, expected.frames[i], `frames[${i}] @${t}ms`);
     });
+  });
+
+  test(`${name}: anchors match the native declarations and samples`, () => {
+    const expected = fixture(name);
+    const animation = build();
+    assertClose(JSON.parse(animation.anchorsJson()), expected.anchors, "anchors");
+    const last = JSON.parse(animation.frameJson(expected.sampleTimesMs.at(-1)));
+    assertClose(last.anchors, expected.frames.at(-1).anchors, "final anchors");
+    assert.throws(
+      () => animation.addAnchor(expected.anchors[0].name, 0, 0, 0),
+      /./,
+      "duplicate name rejected",
+    );
   });
 
   test(`${name}: sampling is pure and order-independent`, () => {

@@ -514,6 +514,44 @@ pub mod ffi {
             self.0.set_operation_gizmos(enabled);
         }
 
+        /// Record a named point on the open group, or on the most recent group.
+        /// Coordinates are the block coordinates poses use. Returns the group
+        /// id the anchor belongs to.
+        pub fn add_anchor(
+            &mut self,
+            name: &DiplomatStr,
+            x: f32,
+            y: f32,
+            z: f32,
+        ) -> Result<u32, NucleationError> {
+            let name = utf8(name)?;
+            self.0
+                .add_anchor(name, x, y, z)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Record a named point on an already recorded group.
+        pub fn add_anchor_to_group(
+            &mut self,
+            group: u32,
+            name: &DiplomatStr,
+            x: f32,
+            y: f32,
+            z: f32,
+        ) -> Result<(), NucleationError> {
+            let name = utf8(name)?;
+            self.0
+                .add_anchor_to_group(group, name, x, y, z)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Every recorded anchor as JSON: `[{ name, group, local: [x, y, z] }]`.
+        pub fn anchors_json(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
+            let json =
+                serde_json::to_string(self.0.anchors()).map_err(|_| NucleationError::Serialize)?;
+            write!(out, "{}", json).map_err(|_| NucleationError::Serialize)
+        }
+
         pub fn operations_json(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
             let json = self
                 .0

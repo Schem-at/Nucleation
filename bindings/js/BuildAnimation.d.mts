@@ -120,6 +120,23 @@ export class BuildAnimation {
 
     setOperationGizmos(enabled: boolean): void;
 
+    /**
+     * Record a named point on the open group, or on the most recent group.
+     * Coordinates are the block coordinates poses use. Returns the group
+     * id the anchor belongs to.
+     */
+    addAnchor(name: string, x: number, y: number, z: number): number;
+
+    /**
+     * Record a named point on an already recorded group.
+     */
+    addAnchorToGroup(group: number, name: string, x: number, y: number, z: number): void;
+
+    /**
+     * Every recorded anchor as JSON: `[{ name, group, local: [x, y, z] }]`.
+     */
+    anchorsJson(): string;
+
     operationsJson(): string;
 
     frameJson(timeMs: number): string;

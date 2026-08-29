@@ -1,8 +1,30 @@
 {
+  "anchors": [
+    {
+      "group": 9,
+      "local": [
+        0.5,
+        2.0,
+        0.5
+      ],
+      "name": "beacon"
+    }
+  ],
   "durationMs": 2400.0,
   "frames": [
     {
-      "anchors": [],
+      "anchors": [
+        {
+          "group": 9,
+          "name": "beacon",
+          "opacity": 1.0,
+          "world": [
+            0.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
       "camera": {
         "pitch": 0.0,
         "target_offset": [
@@ -659,7 +681,18 @@
       "time_ms": 0.0
     },
     {
-      "anchors": [],
+      "anchors": [
+        {
+          "group": 9,
+          "name": "beacon",
+          "opacity": 1.0,
+          "world": [
+            0.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
       "camera": {
         "pitch": 0.0,
         "target_offset": [
@@ -1316,7 +1349,18 @@
       "time_ms": 450.0
     },
     {
-      "anchors": [],
+      "anchors": [
+        {
+          "group": 9,
+          "name": "beacon",
+          "opacity": 1.0,
+          "world": [
+            0.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
       "camera": {
         "pitch": 0.0,
         "target_offset": [
@@ -1973,7 +2017,18 @@
       "time_ms": 1000.0
     },
     {
-      "anchors": [],
+      "anchors": [
+        {
+          "group": 9,
+          "name": "beacon",
+          "opacity": 1.0,
+          "world": [
+            0.4217998683452606,
+            1.9805306196212769,
+            -0.5502772331237793
+          ]
+        }
+      ],
       "camera": {
         "pitch": 0.0,
         "target_offset": [
@@ -2630,7 +2685,18 @@
       "time_ms": 1500.0
     },
     {
-      "anchors": [],
+      "anchors": [
+        {
+          "group": 9,
+          "name": "beacon",
+          "opacity": 1.0,
+          "world": [
+            0.5,
+            2.0,
+            0.5
+          ]
+        }
+      ],
       "camera": {
         "pitch": 0.0,
         "target_offset": [

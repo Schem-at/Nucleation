@@ -48,6 +48,9 @@ internal interface BuildAnimationLib: Library {
     fun BuildAnimation_stamp_region(handle: Pointer, source: Pointer, region: Slice, x: Int, y: Int, z: Int, exclusions: Slice, durationMs: Float): ResultUnitInt
     fun BuildAnimation_stamp_box(handle: Pointer, source: Pointer, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int, x: Int, y: Int, z: Int, exclusions: Slice, durationMs: Float): ResultUnitInt
     fun BuildAnimation_set_operation_gizmos(handle: Pointer, enabled: Boolean): Unit
+    fun BuildAnimation_add_anchor(handle: Pointer, name: Slice, x: Float, y: Float, z: Float): ResultFFIUint32Int
+    fun BuildAnimation_add_anchor_to_group(handle: Pointer, group: FFIUint32, name: Slice, x: Float, y: Float, z: Float): ResultUnitInt
+    fun BuildAnimation_anchors_json(handle: Pointer, write: Pointer): ResultUnitInt
     fun BuildAnimation_operations_json(handle: Pointer, write: Pointer): ResultUnitInt
     fun BuildAnimation_frame_json(handle: Pointer, timeMs: Float, write: Pointer): ResultUnitInt
     fun BuildAnimation_fill_along_parameter(handle: Pointer, shape: Pointer, brush: Pointer, groupCount: FFIUint32): ResultFFIUint32Int
@@ -588,6 +591,59 @@ class BuildAnimation internal constructor (
 
         val returnVal = lib.BuildAnimation_set_operation_gizmos(handle, enabled);
 
+    }
+
+    /** Record a named point on the open group, or on the most recent group.
+    *Coordinates are the block coordinates poses use. Returns the group
+    *id the anchor belongs to.
+    */
+    fun addAnchor(name: String, x: Float, y: Float, z: Float): Result<UInt> {
+        val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
+
+        val returnVal = lib.BuildAnimation_add_anchor(handle, nameSliceMemory.slice, x, y, z);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return (nativeOkVal.toUInt()).ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            nameSliceMemory.close()
+        }
+    }
+
+    /** Record a named point on an already recorded group.
+    */
+    fun addAnchorToGroup(group: UInt, name: String, x: Float, y: Float, z: Float): Result<Unit> {
+        val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
+
+        val returnVal = lib.BuildAnimation_add_anchor_to_group(handle, FFIUint32(group), nameSliceMemory.slice, x, y, z);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            nameSliceMemory.close()
+        }
+    }
+
+    /** Every recorded anchor as JSON: `[{ name, group, local: [x, y, z] }]`.
+    */
+    fun anchorsJson(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.BuildAnimation_anchors_json(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
     }
 
     fun operationsJson(): Result<String> {

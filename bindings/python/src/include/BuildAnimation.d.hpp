@@ -147,6 +147,25 @@ public:
 
   inline void set_operation_gizmos(bool enabled);
 
+  /**
+   * Record a named point on the open group, or on the most recent group.
+   * Coordinates are the block coordinates poses use. Returns the group
+   * id the anchor belongs to.
+   */
+  inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> add_anchor(std::string_view name, float x, float y, float z);
+
+  /**
+   * Record a named point on an already recorded group.
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> add_anchor_to_group(uint32_t group, std::string_view name, float x, float y, float z);
+
+  /**
+   * Every recorded anchor as JSON: `[{ name, group, local: [x, y, z] }]`.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> anchors_json() const;
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> anchors_json_write(W& writeable_output) const;
+
   inline nucleation::diplomat::result<std::string, nucleation::NucleationError> operations_json() const;
   template<typename W>
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> operations_json_write(W& writeable_output) const;

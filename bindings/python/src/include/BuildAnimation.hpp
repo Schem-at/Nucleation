@@ -139,6 +139,15 @@ namespace capi {
 
     void BuildAnimation_set_operation_gizmos(nucleation::capi::BuildAnimation* self, bool enabled);
 
+    typedef struct BuildAnimation_add_anchor_result {union {uint32_t ok; nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_add_anchor_result;
+    BuildAnimation_add_anchor_result BuildAnimation_add_anchor(nucleation::capi::BuildAnimation* self, nucleation::diplomat::capi::DiplomatStringView name, float x, float y, float z);
+
+    typedef struct BuildAnimation_add_anchor_to_group_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_add_anchor_to_group_result;
+    BuildAnimation_add_anchor_to_group_result BuildAnimation_add_anchor_to_group(nucleation::capi::BuildAnimation* self, uint32_t group, nucleation::diplomat::capi::DiplomatStringView name, float x, float y, float z);
+
+    typedef struct BuildAnimation_anchors_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_anchors_json_result;
+    BuildAnimation_anchors_json_result BuildAnimation_anchors_json(const nucleation::capi::BuildAnimation* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
     typedef struct BuildAnimation_operations_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_operations_json_result;
     BuildAnimation_operations_json_result BuildAnimation_operations_json(const nucleation::capi::BuildAnimation* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
@@ -465,6 +474,40 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
 inline void nucleation::BuildAnimation::set_operation_gizmos(bool enabled) {
     nucleation::capi::BuildAnimation_set_operation_gizmos(this->AsFFI(),
         enabled);
+}
+
+inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> nucleation::BuildAnimation::add_anchor(std::string_view name, float x, float y, float z) {
+    auto result = nucleation::capi::BuildAnimation_add_anchor(this->AsFFI(),
+        {name.data(), name.size()},
+        x,
+        y,
+        z);
+    return result.is_ok ? nucleation::diplomat::result<uint32_t, nucleation::NucleationError>(nucleation::diplomat::Ok<uint32_t>(result.ok)) : nucleation::diplomat::result<uint32_t, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::BuildAnimation::add_anchor_to_group(uint32_t group, std::string_view name, float x, float y, float z) {
+    auto result = nucleation::capi::BuildAnimation_add_anchor_to_group(this->AsFFI(),
+        group,
+        {name.data(), name.size()},
+        x,
+        y,
+        z);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::BuildAnimation::anchors_json() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::BuildAnimation_anchors_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::BuildAnimation::anchors_json_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::BuildAnimation_anchors_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
 inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::BuildAnimation::operations_json() const {

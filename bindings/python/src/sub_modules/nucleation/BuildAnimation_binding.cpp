@@ -19,7 +19,10 @@ void add_BuildAnimation_binding(nb::module_ mod) {
 
     nb::class_<nucleation::BuildAnimation> opaque(mod, "BuildAnimation", nb::type_slots(nucleation_BuildAnimation_slots));
     opaque
+        .def("add_anchor", &nucleation::BuildAnimation::add_anchor, "name"_a, "x"_a, "y"_a, "z"_a)
+        .def("add_anchor_to_group", &nucleation::BuildAnimation::add_anchor_to_group, "group"_a, "name"_a, "x"_a, "y"_a, "z"_a)
         .def("add_armor_stand", &nucleation::BuildAnimation::add_armor_stand, "x"_a, "y"_a, "z"_a, "yaw"_a, "armor_material"_a)
+        .def("anchors_json", &nucleation::BuildAnimation::anchors_json)
         .def("animate_all", &nucleation::BuildAnimation::animate_all, "effect"_a)
         .def("animate_camera", &nucleation::BuildAnimation::animate_camera, "effect"_a, "offset_ms"_a)
         .def("begin_group", &nucleation::BuildAnimation::begin_group)

@@ -219,6 +219,12 @@ BuildAnimation_stamp_region_result BuildAnimation_stamp_region(BuildAnimation* s
 typedef struct BuildAnimation_stamp_box_result { union { NucleationError err; }; bool is_ok; } BuildAnimation_stamp_box_result;
 BuildAnimation_stamp_box_result BuildAnimation_stamp_box(BuildAnimation* self, Schematic* source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t x, int32_t y, int32_t z, DiplomatStringView exclusions, float duration_ms);
 void BuildAnimation_set_operation_gizmos(BuildAnimation* self, bool enabled);
+typedef struct BuildAnimation_add_anchor_result { union { uint32_t ok; NucleationError err; }; bool is_ok; } BuildAnimation_add_anchor_result;
+BuildAnimation_add_anchor_result BuildAnimation_add_anchor(BuildAnimation* self, DiplomatStringView name, float x, float y, float z);
+typedef struct BuildAnimation_add_anchor_to_group_result { union { NucleationError err; }; bool is_ok; } BuildAnimation_add_anchor_to_group_result;
+BuildAnimation_add_anchor_to_group_result BuildAnimation_add_anchor_to_group(BuildAnimation* self, uint32_t group, DiplomatStringView name, float x, float y, float z);
+typedef struct BuildAnimation_anchors_json_result { union { NucleationError err; }; bool is_ok; } BuildAnimation_anchors_json_result;
+BuildAnimation_anchors_json_result BuildAnimation_anchors_json(BuildAnimation* self, DiplomatWrite* write);
 typedef struct BuildAnimation_operations_json_result { union { NucleationError err; }; bool is_ok; } BuildAnimation_operations_json_result;
 BuildAnimation_operations_json_result BuildAnimation_operations_json(BuildAnimation* self, DiplomatWrite* write);
 typedef struct BuildAnimation_frame_json_result { union { NucleationError err; }; bool is_ok; } BuildAnimation_frame_json_result;

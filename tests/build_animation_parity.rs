@@ -23,6 +23,7 @@ fn beacon() -> BuildAnimation {
         .with_effect(presets::spin_in(680.0, 1.0))
         .set_block(0, 1, 0, "minecraft:beacon")
         .unwrap();
+    animation.add_anchor("beacon", 0.5, 2.0, 0.5).unwrap();
     let camera =
         AnimationEffect::new(2_400.0).tween(Property::RotY, -4.0, 4.0, Easing::InOut(Power::Sine));
     animation.animate_camera(camera.clip().clone(), 0.0);
@@ -70,6 +71,9 @@ fn crafting_nook() -> BuildAnimation {
         .set_block(1, 1, 1, "minecraft:crafting_table")
         .unwrap();
     animation
+        .add_anchor("crafting-table", 1.5, 2.0, 1.5)
+        .unwrap();
+    animation
         .set_block(3, 1, 1, "minecraft:chest[facing=south]")
         .unwrap();
     animation.begin_group(None).unwrap();
@@ -79,6 +83,7 @@ fn crafting_nook() -> BuildAnimation {
     animation
         .set_block(1, 2, 4, "minecraft:wall_torch[facing=east]")
         .unwrap();
+    animation.add_anchor("torches", 4.5, 2.5, 1.5).unwrap();
     animation.end_group().unwrap();
     let camera =
         AnimationEffect::new(3_000.0).tween(Property::RotY, -5.0, 6.0, Easing::InOut(Power::Sine));
@@ -95,6 +100,7 @@ fn fixture(name: &str, animation: &BuildAnimation) -> Value {
         "name": name,
         "groupCount": animation.groups().len(),
         "durationMs": animation.duration_ms(),
+        "anchors": serde_json::to_value(animation.anchors()).unwrap(),
         "sampleTimesMs": SAMPLE_TIMES_MS,
         "frames": frames,
     })
@@ -159,6 +165,7 @@ fn first_difference(a: &Value, b: &Value, path: &str) -> Option<String> {
 fn beacon_matches_fixture() {
     let animation = beacon();
     assert_eq!(animation.groups().len(), 10);
+    assert_eq!(animation.anchors().len(), 1);
     check("beacon", animation);
 }
 
@@ -166,6 +173,7 @@ fn beacon_matches_fixture() {
 fn crafting_nook_matches_fixture() {
     let animation = crafting_nook();
     assert_eq!(animation.groups().len(), 5);
+    assert_eq!(animation.anchors().len(), 2);
     check("crafting-nook", animation);
 }
 

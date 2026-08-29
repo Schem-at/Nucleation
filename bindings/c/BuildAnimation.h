@@ -136,6 +136,15 @@ BuildAnimation_stamp_box_result BuildAnimation_stamp_box(BuildAnimation* self, c
 
 void BuildAnimation_set_operation_gizmos(BuildAnimation* self, bool enabled);
 
+typedef struct BuildAnimation_add_anchor_result {union {uint32_t ok; NucleationError err;}; bool is_ok;} BuildAnimation_add_anchor_result;
+BuildAnimation_add_anchor_result BuildAnimation_add_anchor(BuildAnimation* self, DiplomatStringView name, float x, float y, float z);
+
+typedef struct BuildAnimation_add_anchor_to_group_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_add_anchor_to_group_result;
+BuildAnimation_add_anchor_to_group_result BuildAnimation_add_anchor_to_group(BuildAnimation* self, uint32_t group, DiplomatStringView name, float x, float y, float z);
+
+typedef struct BuildAnimation_anchors_json_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_anchors_json_result;
+BuildAnimation_anchors_json_result BuildAnimation_anchors_json(const BuildAnimation* self, DiplomatWrite* write);
+
 typedef struct BuildAnimation_operations_json_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_operations_json_result;
 BuildAnimation_operations_json_result BuildAnimation_operations_json(const BuildAnimation* self, DiplomatWrite* write);
 
