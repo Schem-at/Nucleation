@@ -146,6 +146,17 @@ export class BuildAnimation {
      */
     toAnimatedGlbB64(pack: ResourcePack, fps: number): string;
 
+    /**
+     * The finished build as a Sponge `.schem`, base64-encoded — every recorded
+     * placement applied, no timeline.
+     */
+    toSchemB64(): string;
+
+    /**
+     * The finished build as a `.litematic`, base64-encoded.
+     */
+    toLitematicB64(): string;
+
     operationsJson(): string;
 
     frameJson(timeMs: number): string;

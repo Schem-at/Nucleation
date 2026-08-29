@@ -52,6 +52,8 @@ internal interface BuildAnimationLib: Library {
     fun BuildAnimation_add_anchor_to_group(handle: Pointer, group: FFIUint32, name: Slice, x: Float, y: Float, z: Float): ResultUnitInt
     fun BuildAnimation_anchors_json(handle: Pointer, write: Pointer): ResultUnitInt
     fun BuildAnimation_to_animated_glb_b64(handle: Pointer, pack: Pointer, fps: Float, write: Pointer): ResultUnitInt
+    fun BuildAnimation_to_schem_b64(handle: Pointer, write: Pointer): ResultUnitInt
+    fun BuildAnimation_to_litematic_b64(handle: Pointer, write: Pointer): ResultUnitInt
     fun BuildAnimation_operations_json(handle: Pointer, write: Pointer): ResultUnitInt
     fun BuildAnimation_frame_json(handle: Pointer, timeMs: Float, write: Pointer): ResultUnitInt
     fun BuildAnimation_fill_along_parameter(handle: Pointer, shape: Pointer, brush: Pointer, groupCount: FFIUint32): ResultFFIUint32Int
@@ -655,6 +657,37 @@ class BuildAnimation internal constructor (
     fun toAnimatedGlbB64(pack: ResourcePack, fps: Float): Result<String> {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.BuildAnimation_to_animated_glb_b64(handle, pack.handle, fps, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** The finished build as a Sponge `.schem`, base64-encoded — every recorded
+    *placement applied, no timeline.
+    */
+    fun toSchemB64(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.BuildAnimation_to_schem_b64(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** The finished build as a `.litematic`, base64-encoded.
+    */
+    fun toLitematicB64(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.BuildAnimation_to_litematic_b64(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
 

@@ -173,6 +173,21 @@ public:
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> to_animated_glb_b64_write(const ResourcePack& pack, float fps, W& writeable_output) const;
 
+  /**
+   * The finished build as a Sponge `.schem`, base64-encoded — every recorded
+   * placement applied, no timeline.
+   */
+  inline diplomat::result<std::string, NucleationError> to_schem_b64() const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> to_schem_b64_write(W& writeable_output) const;
+
+  /**
+   * The finished build as a `.litematic`, base64-encoded.
+   */
+  inline diplomat::result<std::string, NucleationError> to_litematic_b64() const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> to_litematic_b64_write(W& writeable_output) const;
+
   inline diplomat::result<std::string, NucleationError> operations_json() const;
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> operations_json_write(W& writeable_output) const;

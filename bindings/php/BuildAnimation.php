@@ -480,6 +480,24 @@ final class BuildAnimation {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function toSchemB64() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->BuildAnimation_to_schem_b64($this->ptr, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function toLitematicB64() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->BuildAnimation_to_litematic_b64($this->ptr, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function operationsJson() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         $result = Lib::ffi()->BuildAnimation_operations_json($this->ptr, $write);

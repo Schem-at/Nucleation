@@ -148,6 +148,12 @@ BuildAnimation_anchors_json_result BuildAnimation_anchors_json(const BuildAnimat
 typedef struct BuildAnimation_to_animated_glb_b64_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_to_animated_glb_b64_result;
 BuildAnimation_to_animated_glb_b64_result BuildAnimation_to_animated_glb_b64(const BuildAnimation* self, const ResourcePack* pack, float fps, DiplomatWrite* write);
 
+typedef struct BuildAnimation_to_schem_b64_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_to_schem_b64_result;
+BuildAnimation_to_schem_b64_result BuildAnimation_to_schem_b64(const BuildAnimation* self, DiplomatWrite* write);
+
+typedef struct BuildAnimation_to_litematic_b64_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_to_litematic_b64_result;
+BuildAnimation_to_litematic_b64_result BuildAnimation_to_litematic_b64(const BuildAnimation* self, DiplomatWrite* write);
+
 typedef struct BuildAnimation_operations_json_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_operations_json_result;
 BuildAnimation_operations_json_result BuildAnimation_operations_json(const BuildAnimation* self, DiplomatWrite* write);
 

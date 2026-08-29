@@ -151,6 +151,12 @@ namespace capi {
     typedef struct BuildAnimation_to_animated_glb_b64_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_to_animated_glb_b64_result;
     BuildAnimation_to_animated_glb_b64_result BuildAnimation_to_animated_glb_b64(const nucleation::capi::BuildAnimation* self, const nucleation::capi::ResourcePack* pack, float fps, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    typedef struct BuildAnimation_to_schem_b64_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_to_schem_b64_result;
+    BuildAnimation_to_schem_b64_result BuildAnimation_to_schem_b64(const nucleation::capi::BuildAnimation* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    typedef struct BuildAnimation_to_litematic_b64_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_to_litematic_b64_result;
+    BuildAnimation_to_litematic_b64_result BuildAnimation_to_litematic_b64(const nucleation::capi::BuildAnimation* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
     typedef struct BuildAnimation_operations_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_operations_json_result;
     BuildAnimation_operations_json_result BuildAnimation_operations_json(const nucleation::capi::BuildAnimation* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
@@ -528,6 +534,36 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
     auto result = nucleation::capi::BuildAnimation_to_animated_glb_b64(this->AsFFI(),
         pack.AsFFI(),
         fps,
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::BuildAnimation::to_schem_b64() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::BuildAnimation_to_schem_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::BuildAnimation::to_schem_b64_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::BuildAnimation_to_schem_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::BuildAnimation::to_litematic_b64() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::BuildAnimation_to_litematic_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::BuildAnimation::to_litematic_b64_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::BuildAnimation_to_litematic_b64(this->AsFFI(),
         &write);
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }

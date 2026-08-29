@@ -571,6 +571,23 @@ pub mod ffi {
             Ok(())
         }
 
+        /// The finished build as a Sponge `.schem`, base64-encoded — every recorded
+        /// placement applied, no timeline.
+        pub fn to_schem_b64(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
+            let data = crate::formats::schematic::to_schematic(self.0.schematic())
+                .map_err(|_| NucleationError::Serialize)?;
+            let _ = write!(out, "{}", super::super::schematic::b64(&data));
+            Ok(())
+        }
+
+        /// The finished build as a `.litematic`, base64-encoded.
+        pub fn to_litematic_b64(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
+            let data = crate::formats::litematic::to_litematic(self.0.schematic())
+                .map_err(|_| NucleationError::Serialize)?;
+            let _ = write!(out, "{}", super::super::schematic::b64(&data));
+            Ok(())
+        }
+
         pub fn operations_json(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
             let json = self
                 .0

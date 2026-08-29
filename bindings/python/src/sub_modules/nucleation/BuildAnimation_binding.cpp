@@ -73,6 +73,8 @@ void add_BuildAnimation_binding(nb::module_ mod) {
         .def("stamp_box", &nucleation::BuildAnimation::stamp_box, "source"_a, "min_x"_a, "min_y"_a, "min_z"_a, "max_x"_a, "max_y"_a, "max_z"_a, "x"_a, "y"_a, "z"_a, "exclusions"_a, "duration_ms"_a)
         .def("stamp_region", &nucleation::BuildAnimation::stamp_region, "source"_a, "region"_a, "x"_a, "y"_a, "z"_a, "exclusions"_a, "duration_ms"_a)
         .def("to_animated_glb_b64", &nucleation::BuildAnimation::to_animated_glb_b64, "pack"_a, "fps"_a)
+        .def("to_litematic_b64", &nucleation::BuildAnimation::to_litematic_b64)
+        .def("to_schem_b64", &nucleation::BuildAnimation::to_schem_b64)
         .def("translate", &nucleation::BuildAnimation::translate, "x"_a, "y"_a, "z"_a, "duration_ms"_a)
         .def("translate_all", &nucleation::BuildAnimation::translate_all, "x"_a, "y"_a, "z"_a, "duration_ms"_a)
         .def("translate_region", &nucleation::BuildAnimation::translate_region, "region"_a, "x"_a, "y"_a, "z"_a, "duration_ms"_a)

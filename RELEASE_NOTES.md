@@ -8,7 +8,7 @@ native fixtures and verified against the WASM/JS and Python engines by
 `tools/verify-build-animation.sh`. `BuildAnimation.to_animated_glb_b64(pack, fps)`
 exports the build as an animated GLB — named group nodes with textured meshes,
 TRS keyframes, anchor child nodes, and `extras.nucleation` for opacity / tint /
-emissive and camera tracks — so a build plays in any glTF viewer.
+emissive and camera tracks — so a build plays in any glTF viewer. `to_schem_b64` / `to_litematic_b64` export the finished build as a Sponge schematic or a Litematica file.
 
 # Nucleation v0.10.14
 

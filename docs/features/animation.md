@@ -426,6 +426,14 @@ viewers that do not know it:
     --8<-- "examples/readme/animation/engine.mjs:animated-glb"
     ```
 
+
+### The finished build as a schematic
+
+`toSchemB64()` and `toLitematicB64()` (`to_schem_b64` / `to_litematic_b64` in Python and Rust)
+write the build with every recorded placement applied — the end state, no timeline — as a Sponge
+`.schem` or a `.litematic`, base64-encoded like the GLB. A docs page that animates a build can
+offer the same build as a file a player drops into a world.
+
 ## Determinism
 
 `Timeline::seek` is pure: no interior mutation, no wall-clock. The same time

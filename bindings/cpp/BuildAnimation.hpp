@@ -151,6 +151,12 @@ namespace capi {
     typedef struct BuildAnimation_to_animated_glb_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_to_animated_glb_b64_result;
     BuildAnimation_to_animated_glb_b64_result BuildAnimation_to_animated_glb_b64(const diplomat::capi::BuildAnimation* self, const diplomat::capi::ResourcePack* pack, float fps, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct BuildAnimation_to_schem_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_to_schem_b64_result;
+    BuildAnimation_to_schem_b64_result BuildAnimation_to_schem_b64(const diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct BuildAnimation_to_litematic_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_to_litematic_b64_result;
+    BuildAnimation_to_litematic_b64_result BuildAnimation_to_litematic_b64(const diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatWrite* write);
+
     typedef struct BuildAnimation_operations_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_operations_json_result;
     BuildAnimation_operations_json_result BuildAnimation_operations_json(const diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatWrite* write);
 
@@ -528,6 +534,36 @@ inline diplomat::result<std::monostate, NucleationError> BuildAnimation::to_anim
     auto result = diplomat::capi::BuildAnimation_to_animated_glb_b64(this->AsFFI(),
         pack.AsFFI(),
         fps,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> BuildAnimation::to_schem_b64() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::BuildAnimation_to_schem_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::to_schem_b64_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::BuildAnimation_to_schem_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> BuildAnimation::to_litematic_b64() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::BuildAnimation_to_litematic_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::to_litematic_b64_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::BuildAnimation_to_litematic_b64(this->AsFFI(),
         &write);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
