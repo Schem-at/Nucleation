@@ -164,9 +164,122 @@ impl Default for Pose {
     }
 }
 
+/// Translation, unit quaternion `[x, y, z, w]`, and scale of a column-major
+/// affine matrix (`m[3]` holds the translation, as [`Pose::to_matrix`] writes
+/// it). A mirrored matrix (negative determinant) keeps the sign on the X scale
+/// so glTF viewers reproduce the flip.
+pub fn decompose_trs(m: Mat4) -> ([f32; 3], [f32; 4], [f32; 3]) {
+    let translation = [m[3][0], m[3][1], m[3][2]];
+    let column = |i: usize| [m[i][0], m[i][1], m[i][2]];
+    let len = |v: [f32; 3]| (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    let (cx, cy, cz) = (column(0), column(1), column(2));
+    let det = cx[0] * (cy[1] * cz[2] - cy[2] * cz[1]) - cx[1] * (cy[0] * cz[2] - cy[2] * cz[0])
+        + cx[2] * (cy[0] * cz[1] - cy[1] * cz[0]);
+    let mut scale = [len(cx), len(cy), len(cz)];
+    if det < 0.0 {
+        scale[0] = -scale[0];
+    }
+    let safe = |s: f32| if s.abs() < 1e-12 { 1.0 } else { s };
+    // r[c] is column c of the pure rotation.
+    let r = [
+        [
+            cx[0] / safe(scale[0]),
+            cx[1] / safe(scale[0]),
+            cx[2] / safe(scale[0]),
+        ],
+        [
+            cy[0] / safe(scale[1]),
+            cy[1] / safe(scale[1]),
+            cy[2] / safe(scale[1]),
+        ],
+        [
+            cz[0] / safe(scale[2]),
+            cz[1] / safe(scale[2]),
+            cz[2] / safe(scale[2]),
+        ],
+    ];
+    // Row-major view m_rc = r[c][r] for the standard matrix → quaternion form.
+    let (m00, m11, m22) = (r[0][0], r[1][1], r[2][2]);
+    let (m01, m02, m10, m12, m20, m21) = (r[1][0], r[2][0], r[0][1], r[2][1], r[0][2], r[1][2]);
+    let trace = m00 + m11 + m22;
+    let q = if trace > 0.0 {
+        let s = (trace + 1.0).sqrt() * 2.0;
+        [(m21 - m12) / s, (m02 - m20) / s, (m10 - m01) / s, 0.25 * s]
+    } else if m00 > m11 && m00 > m22 {
+        let s = (1.0 + m00 - m11 - m22).sqrt() * 2.0;
+        [0.25 * s, (m01 + m10) / s, (m02 + m20) / s, (m21 - m12) / s]
+    } else if m11 > m22 {
+        let s = (1.0 + m11 - m00 - m22).sqrt() * 2.0;
+        [(m01 + m10) / s, 0.25 * s, (m12 + m21) / s, (m02 - m20) / s]
+    } else {
+        let s = (1.0 + m22 - m00 - m11).sqrt() * 2.0;
+        [(m02 + m20) / s, (m12 + m21) / s, 0.25 * s, (m10 - m01) / s]
+    };
+    let n = (q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3])
+        .sqrt()
+        .max(1e-12);
+    (translation, [q[0] / n, q[1] / n, q[2] / n, q[3] / n], scale)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn decompose_recovers_translate_rotate_scale() {
+        let mut pose = Pose::about([0.0; 3]);
+        pose.translate = [2.0, 3.0, 4.0];
+        pose.rotate_deg = [0.0, 90.0, 0.0];
+        pose.scale = [2.0, 2.0, 2.0];
+        let (t, q, s) = decompose_trs(pose.to_matrix());
+        for (a, b) in t.iter().zip([2.0, 3.0, 4.0]) {
+            assert!((a - b).abs() < 1e-4, "{t:?}");
+        }
+        for (a, b) in s.iter().zip([2.0, 2.0, 2.0]) {
+            assert!((a - b).abs() < 1e-4, "{s:?}");
+        }
+        let half = (45f32).to_radians();
+        let expected = [0.0, half.sin(), 0.0, half.cos()];
+        let dot: f32 = q.iter().zip(expected).map(|(a, b)| a * b).sum();
+        assert!(dot.abs() > 0.9999, "quaternion {q:?} vs {expected:?}");
+        // Round trip: rebuilding the matrix from TRS reproduces the original.
+        let mut rebuilt = Pose::about([0.0; 3]);
+        rebuilt.translate = t;
+        rebuilt.rotate_deg = [0.0, 90.0, 0.0];
+        rebuilt.scale = s;
+        for (a, b) in rebuilt
+            .to_matrix()
+            .iter()
+            .flatten()
+            .zip(pose.to_matrix().iter().flatten())
+        {
+            assert!((a - b).abs() < 1e-4);
+        }
+    }
+
+    #[test]
+    fn decompose_keeps_flips_on_the_x_scale() {
+        let mut m = super::super::operation::identity();
+        m[0][0] = -1.0;
+        let (_, q, s) = decompose_trs(m);
+        assert!(
+            (s[0] + 1.0).abs() < 1e-6 && (s[1] - 1.0).abs() < 1e-6,
+            "{s:?}"
+        );
+        assert!(
+            (q[3] - 1.0).abs() < 1e-6,
+            "no rotation for a pure mirror: {q:?}"
+        );
+    }
+
+    #[test]
+    fn decompose_handles_a_collapsed_scale() {
+        let mut pose = Pose::about([1.0, 1.0, 1.0]);
+        pose.scale = [0.0; 3];
+        let (t, q, s) = decompose_trs(pose.to_matrix());
+        assert!(t.iter().chain(&q).chain(&s).all(|v| v.is_finite()));
+        assert!(s.iter().all(|v| v.abs() < 1e-6));
+    }
 
     fn close(a: [f32; 3], b: [f32; 3], eps: f32) -> bool {
         (0..3).all(|i| (a[i] - b[i]).abs() < eps)
