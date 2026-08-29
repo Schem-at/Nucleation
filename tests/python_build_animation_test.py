@@ -21,7 +21,7 @@ def build_beacon():
         for z in range(-1, 2):
             animation.set_block(x, 0, z, "minecraft:gold_block")
     animation.with_effect(AnimationEffect.spin_in(680, 1)).set_block(0, 1, 0, "minecraft:beacon")
-    animation.add_anchor("beacon", 0.5, 2.0, 0.5)
+    animation.add_anchor("beacon", 0.0, 1.5, 0.0)
     camera = AnimationEffect.create(2_400)
     camera.add_tween("rotateY", -4, 4, "inOutSine")
     animation.animate_camera(camera, 0)
@@ -58,12 +58,12 @@ def build_crafting_nook():
     animation.with_effect(AnimationEffect.spin_in(620, 1)).set_block(
         1, 1, 1, "minecraft:crafting_table"
     )
-    animation.add_anchor("crafting-table", 1.5, 2.0, 1.5)
+    animation.add_anchor("crafting-table", 1.0, 1.5, 1.0)
     animation.set_block(3, 1, 1, "minecraft:chest[facing=south]")
     animation.begin_group()
     animation.set_block(4, 2, 1, "minecraft:wall_torch[facing=south]")
     animation.set_block(1, 2, 4, "minecraft:wall_torch[facing=east]")
-    animation.add_anchor("torches", 4.5, 2.5, 1.5)
+    animation.add_anchor("torches", 4.0, 2.0, 1.0)
     animation.end_group()
     camera = AnimationEffect.create(3_000)
     camera.add_tween("rotateY", -5, 6, "inOutSine")

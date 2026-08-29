@@ -34,13 +34,13 @@ console.log(frame.poses.length);      // 3 group poses at t=450 ms
 // A named point on the diamond block's group (group 1). Frames report it in
 // world space after the group's pose, so a renderer or a docs tool can draw a
 // hotspot, a leader line, or a label that lands with the block.
-animation.addAnchorToGroup(1, "diamond", 4.5, 2.0, 0.5);
+animation.addAnchorToGroup(1, "diamond", 4, 1.5, 0);
 const settled = JSON.parse(animation.frameJson(animation.durationMs()));
-console.log(settled.anchors[0].world); // [4.5, 2, 0.5]
+console.log(settled.anchors[0].world); // [4, 1.5, 0] — the top centre of the block
 // --8<-- [end:anchors]
 
 if (animation.groupCount() !== 3) throw new Error("group count changed");
-if (settled.anchors.length !== 1 || settled.anchors[0].world.join() !== "4.5,2,0.5")
+if (settled.anchors.length !== 1 || settled.anchors[0].world.join() !== "4,1.5,0")
   throw new Error("anchor did not settle on the diamond block");
 if (animation.durationMs() !== 3_000) throw new Error("duration changed");
 if (frame.poses.length !== 3) throw new Error("frame shape changed");

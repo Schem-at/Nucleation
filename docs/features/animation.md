@@ -373,7 +373,8 @@ The mapping is: `RotY → yaw`, `RotX → pitch`, `ScaleUniform → zoom`,
 An anchor is a named point on one animation group. Record it on the open group
 or the most recent one with `addAnchor(name, x, y, z)`, or on any group with
 `addAnchorToGroup(group, name, x, y, z)`. Coordinates are the block coordinates
-poses use, so `[4.5, 2.0, 0.5]` is the top-centre of the block at `(4, 1, 0)`.
+poses use — a block is centred on its integer coordinate — so `[4, 1.5, 0]` is
+the top centre of the block at `(4, 1, 0)`.
 
 Every frame carries `anchors: [{ name, group, world, opacity }]`: the point
 after its group's pose at that instant, plus the group's opacity. The engine
