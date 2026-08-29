@@ -558,6 +558,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect(),
             camera: None,
             gizmos: Vec::new(),
+            anchors: Vec::new(),
         });
     }
 

@@ -138,7 +138,7 @@ jobs:
           # actually tracked by git. target/ reached 102 GB locally; a single
           # committed artifact makes every clone pay for it forever.
           if git ls-files | grep -nE '(^|/)(target|dist|pkg)/|\.(o|rlib|rmeta|dylib|so|wasm)$' \
-               | grep -vE '^\s*[0-9]+:tests/corpus/' ; then
+               | grep -vE '^\s*[0-9]+:(tests/corpus/|docs/javascripts/vendor/)' ; then
             echo "::error::tracked build artifacts found (see docs/DEV.md 'Disk hygiene')"
             exit 1
           fi
