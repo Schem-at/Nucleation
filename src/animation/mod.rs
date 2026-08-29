@@ -42,7 +42,9 @@ pub use operation::{
 };
 pub use pose::{Mat4, Pose};
 pub use stagger::{Axis, Group, GroupId, Grouping, Order, Pos, Spread, Stagger, StaggerFrom};
-pub use timeline::{CameraPose, Frame, GizmoKind, GizmoLine, Target, Timeline};
+pub use timeline::{
+    Anchor, AnchorSample, CameraPose, Frame, GizmoKind, GizmoLine, Target, Timeline,
+};
 pub use track::{Clip, Keyframe, Modifier, Property, Repeat, Track};
 
 use crate::universal_schematic::UniversalSchematic;

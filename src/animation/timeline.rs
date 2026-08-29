@@ -91,6 +91,26 @@ pub struct GizmoLine {
     pub color: [f32; 4],
 }
 
+/// A named point recorded on one animation group, in the same block
+/// coordinates poses use. Renderers and documentation tools decide what to
+/// draw at it; the engine only transforms it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Anchor {
+    pub name: String,
+    pub group: GroupId,
+    pub local: [f32; 3],
+}
+
+/// An anchor at one instant: its group's pose applied to the local point,
+/// plus the group's opacity so a consumer can fade with the block.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AnchorSample {
+    pub name: String,
+    pub group: GroupId,
+    pub world: [f32; 3],
+    pub opacity: f32,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Frame {
     pub time_ms: f32,
@@ -99,6 +119,9 @@ pub struct Frame {
     pub camera: Option<CameraPose>,
     #[serde(default)]
     pub gizmos: Vec<GizmoLine>,
+    /// Every recorded anchor after its group's pose at `time_ms`.
+    #[serde(default)]
+    pub anchors: Vec<AnchorSample>,
 }
 
 impl Frame {
@@ -214,6 +237,7 @@ impl Timeline {
             poses,
             camera,
             gizmos: Vec::new(),
+            anchors: Vec::new(),
         }
     }
 

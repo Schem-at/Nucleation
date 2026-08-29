@@ -2,6 +2,7 @@
   "durationMs": 2400.0,
   "frames": [
     {
+      "anchors": [],
       "camera": {
         "pitch": 0.0,
         "target_offset": [
@@ -658,6 +659,7 @@
       "time_ms": 0.0
     },
     {
+      "anchors": [],
       "camera": {
         "pitch": 0.0,
         "target_offset": [
@@ -1314,6 +1316,7 @@
       "time_ms": 450.0
     },
     {
+      "anchors": [],
       "camera": {
         "pitch": 0.0,
         "target_offset": [
@@ -1970,6 +1973,7 @@
       "time_ms": 1000.0
     },
     {
+      "anchors": [],
       "camera": {
         "pitch": 0.0,
         "target_offset": [
@@ -2626,6 +2630,7 @@
       "time_ms": 1500.0
     },
     {
+      "anchors": [],
       "camera": {
         "pitch": 0.0,
         "target_offset": [

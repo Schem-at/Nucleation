@@ -113,6 +113,9 @@ pub struct BuildAnimation {
     camera: Vec<(Clip, f32)>,
     operations: Vec<RecordedOperation>,
     operation_gizmos: bool,
+    anchors: Vec<super::Anchor>,
+    /// Anchors added while a group is open; attached to that group in `end_group`.
+    open_group_anchors: Vec<(String, [f32; 3])>,
 }
 
 impl BuildAnimation {
@@ -130,6 +133,8 @@ impl BuildAnimation {
             camera: Vec::new(),
             operations: Vec::new(),
             operation_gizmos: true,
+            anchors: Vec::new(),
+            open_group_anchors: Vec::new(),
         }
     }
 
@@ -315,6 +320,13 @@ impl BuildAnimation {
             return Err("an animation group cannot be empty".into());
         }
         let id = self.steps.len() as GroupId;
+        for (name, local) in self.open_group_anchors.drain(..) {
+            self.anchors.push(super::Anchor {
+                name,
+                group: id,
+                local,
+            });
+        }
         self.steps.push(RecordedStep {
             blocks: group.blocks,
             region: group.region.clone().unwrap_or_else(|| "Main".to_string()),
@@ -1777,6 +1789,69 @@ impl BuildAnimation {
         self.operation_gizmos = enabled;
     }
 
+    fn validate_anchor_name(&self, name: &str) -> Result<(), String> {
+        if name.trim().is_empty() {
+            return Err("anchor names cannot be empty".into());
+        }
+        if self.anchors.iter().any(|anchor| anchor.name == name)
+            || self
+                .open_group_anchors
+                .iter()
+                .any(|(pending, _)| pending == name)
+        {
+            return Err(format!("anchor \"{name}\" already exists"));
+        }
+        Ok(())
+    }
+
+    /// Record a named point on the open group, or on the most recent group when
+    /// none is open. Coordinates are the block coordinates poses use. Returns the
+    /// group the anchor belongs to (for an open group, the id `end_group` will
+    /// assign).
+    pub fn add_anchor(&mut self, name: &str, x: f32, y: f32, z: f32) -> Result<GroupId, String> {
+        self.validate_anchor_name(name)?;
+        if self.open_group.is_some() {
+            self.open_group_anchors.push((name.to_string(), [x, y, z]));
+            return Ok(self.steps.len() as GroupId);
+        }
+        let group =
+            self.steps.len().checked_sub(1).ok_or_else(|| {
+                "add_anchor needs a recorded group; place a block first".to_string()
+            })? as GroupId;
+        self.anchors.push(super::Anchor {
+            name: name.to_string(),
+            group,
+            local: [x, y, z],
+        });
+        Ok(group)
+    }
+
+    /// Record a named point on an already recorded group.
+    pub fn add_anchor_to_group(
+        &mut self,
+        group: GroupId,
+        name: &str,
+        x: f32,
+        y: f32,
+        z: f32,
+    ) -> Result<(), String> {
+        self.validate_anchor_name(name)?;
+        if (group as usize) >= self.steps.len() {
+            return Err(format!("unknown animation group {group}"));
+        }
+        self.anchors.push(super::Anchor {
+            name: name.to_string(),
+            group,
+            local: [x, y, z],
+        });
+        Ok(())
+    }
+
+    /// Every recorded anchor, in declaration order.
+    pub fn anchors(&self) -> &[super::Anchor] {
+        &self.anchors
+    }
+
     fn operation_bounds(operation: &RecordedOperation) -> Option<([f32; 3], [f32; 3])> {
         let bounds = operation.receipt.before_bounds.as_ref()?;
         Some((
@@ -2071,6 +2146,22 @@ impl BuildAnimation {
                 pose.to_matrix(),
             ));
         }
+        frame.anchors = self
+            .anchors
+            .iter()
+            .map(|anchor| {
+                let pose = frame.pose(anchor.group);
+                let matrix = pose
+                    .and_then(|pose| pose.matrix)
+                    .unwrap_or_else(super::operation::identity);
+                super::AnchorSample {
+                    name: anchor.name.clone(),
+                    group: anchor.group,
+                    world: super::operation::transform_point(matrix, anchor.local),
+                    opacity: pose.map_or(0.0, |pose| pose.opacity),
+                }
+            })
+            .collect();
         if self.operation_gizmos {
             for operation in &self.operations {
                 let end = operation.start_ms + operation.duration_ms;
@@ -2220,6 +2311,63 @@ impl BuildAnimation {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn anchors_follow_their_group_pose() {
+        let mut animation = super::BuildAnimation::new("anchors");
+        animation.set_step_ms(100.0);
+        animation.set_block(0, 0, 0, "minecraft:stone").unwrap();
+        let group = animation.add_anchor("stone-top", 0.5, 1.0, 0.5).unwrap();
+        assert_eq!(group, 0);
+        assert_eq!(animation.anchors().len(), 1);
+
+        let frame = animation.frame_at(animation.duration_ms() + 1.0);
+        let sample = &frame.anchors[0];
+        assert_eq!(sample.name, "stone-top");
+        assert_eq!(sample.group, 0);
+        for (a, b) in sample.world.iter().zip([0.5, 1.0, 0.5]) {
+            assert!(
+                (a - b).abs() < 1e-5,
+                "settled anchor stays put: {:?}",
+                sample.world
+            );
+        }
+        assert!((sample.opacity - 1.0).abs() < 1e-6);
+
+        let early = animation.frame_at(0.0);
+        assert_eq!(
+            early.anchors.len(),
+            1,
+            "anchors are reported before the block lands"
+        );
+        assert!(early.anchors[0].opacity < 1.0 || early.anchors[0].world != sample.world);
+    }
+
+    #[test]
+    fn add_anchor_targets_the_open_group_and_rejects_duplicates() {
+        let mut animation = super::BuildAnimation::new("anchors");
+        assert!(animation.add_anchor("nothing", 0.0, 0.0, 0.0).is_err());
+        animation.begin_group(None).unwrap();
+        animation.set_block(0, 0, 0, "minecraft:stone").unwrap();
+        animation.set_block(1, 0, 0, "minecraft:stone").unwrap();
+        animation.add_anchor("floor", 1.0, 1.0, 0.5).unwrap();
+        let id = animation.end_group().unwrap();
+        assert_eq!(animation.anchors()[0].group, id);
+        assert!(
+            animation.add_anchor("floor", 0.0, 0.0, 0.0).is_err(),
+            "duplicate name"
+        );
+        assert!(
+            animation
+                .add_anchor_to_group(99, "x", 0.0, 0.0, 0.0)
+                .is_err(),
+            "unknown group"
+        );
+        assert!(
+            animation.add_anchor("", 0.0, 0.0, 0.0).is_err(),
+            "empty name"
+        );
+    }
+
     use super::*;
     use crate::animation::{presets, Property};
     use crate::building::{BrushEnum, Curve3D, ShapeEnum, SolidBrush, TubePath};
