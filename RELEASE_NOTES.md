@@ -1,3 +1,57 @@
+# Nucleation v0.10.17
+
+**Mesh voxelization is no longer quadratic in the volume.** Filling a
+voxelized mesh used to call `MeshShape::normal_at` for every solid voxel
+whatever the brush did with the value, and each of those calls ran an
+expanding ring search over the triangle grid with a fresh allocation, so the
+cost grew as the sixth power of the target size. Three changes fix it.
+`Brush::uses_normal` lets a brush say it ignores the surface normal, and the
+seven brushes that do (`Solid`, `Color`, `Linear`, `MultiPoint`, `Point`,
+`Bilinear`, `Field`) now cost nothing to shade. `MeshShape` precomputes a
+triangle id per voxel once, next to the mask it already builds, with one
+rayon pass over the triangles and one BFS to hand ids inward, so `normal_at`
+and `surface_color` are array lookups. `voxelize_textured` samples colours in
+parallel, memoises the palette search on the exact colour and resolves each
+palette index to a block once instead of cloning a `String` per voxel.
+
+| case (5,000 triangle sphere, BoxTextured cube) | 0.10.16 | 0.10.17 |
+| --- | --- | --- |
+| solid fill, size 32 | 424 ms | 1.60 ms |
+| solid fill, size 64 | 19.0 s | 8.31 ms |
+| solid fill, size 128 | 83.8 ms (extrapolated, first size-128 measurement, task 3) | 75.1 ms |
+| shell fill, size 32 | 8.44 ms | 1.75 ms |
+| shell fill, size 64 | 23.0 ms | 3.73 ms |
+| shell fill, size 128 | 17.7 ms (extrapolated, first size-128 measurement, task 3) | 11.5 ms |
+| textured cube, size 32 | 391 ms | 7.02 ms |
+| textured cube, size 64 | 29.1 s | 76.0 ms |
+| textured cube, size 128 | 3.06 s (extrapolated, first size-128 measurement, task 3) | 2.09 s |
+
+Measured on the build host (16-core x86_64 server), medians, with `cargo bench
+--features voxelize --bench voxelize_bench`. Size 128 was never run on
+unchanged 0.10.16 code (roughly half an hour per sample on the old N^6
+trend), so its "before" figure is the first size-128 measurement taken once
+the triangle-id precompute landed, not a true pre-optimization baseline. The
+output is unchanged: a committed golden fixture pins the sha256 of the
+sorted block list for the solid sphere, the shell sphere and the textured
+cube at size 32, and it holds byte for byte across all three changes.
+
+**Bulk block queries on the bridge.** `Schematic.count_blocks_json` tallies
+non-air blocks by id in one pass, `replace_blocks_json` applies a from-id to
+to-id map in place and returns how many blocks changed, and
+`non_air_blocks_packed_b64` exports positions and palette indices as a
+compact little endian blob with the palette as length prefixed JSON. Tools
+that used to pull `get_all_blocks_json` just to count or rewrite materials no
+longer have to; that method still exists, still materialises air, and its
+documentation now says so. All three treat `minecraft:air`, `cave_air` and
+`void_air` alike as air.
+
+**`Brush::uses_normal`.** A brush trait method, default `true`, that a brush
+overrides to say it never reads the surface normal or colour handed to it.
+The seven brushes that always return the same value regardless of shading
+input (`Solid`, `Color`, `Linear`, `MultiPoint`, `Point`, `Bilinear`, `Field`)
+override it to `false`, letting the fill loop skip the `normal_at` call
+entirely for them.
+
 # Nucleation v0.10.16
 
 **Mesh voxelization in the browser.** The wasm build now ships the `voxelize`

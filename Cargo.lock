@@ -3497,7 +3497,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.10.16"
+version = "0.10.17"
 dependencies = [
  "anyhow",
  "aws-sdk-s3",
@@ -3546,6 +3546,7 @@ dependencies = [
  "schematic-mesher",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "smol_str",
  "tar",
  "testcontainers-modules",
