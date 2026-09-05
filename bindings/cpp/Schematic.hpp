@@ -221,6 +221,13 @@ namespace capi {
 
     void Schematic_get_non_air_blocks_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
 
+    void Schematic_count_blocks_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Schematic_replace_blocks_json_result {union {uint64_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_replace_blocks_json_result;
+    Schematic_replace_blocks_json_result Schematic_replace_blocks_json(diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView map_json);
+
+    void Schematic_non_air_blocks_packed_b64(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
+
     void Schematic_get_chunk_blocks_json(const diplomat::capi::Schematic* self, int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, diplomat::capi::DiplomatWrite* write);
 
     void Schematic_get_chunks_json(const diplomat::capi::Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, diplomat::capi::DiplomatWrite* write);
@@ -1226,6 +1233,40 @@ template<typename W>
 inline void Schematic::get_non_air_blocks_json_write(W& writeable) const {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     diplomat::capi::Schematic_get_non_air_blocks_json(this->AsFFI(),
+        &write);
+}
+
+inline std::string Schematic::count_blocks_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::Schematic_count_blocks_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void Schematic::count_blocks_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::Schematic_count_blocks_json(this->AsFFI(),
+        &write);
+}
+
+inline diplomat::result<uint64_t, NucleationError> Schematic::replace_blocks_json(std::string_view map_json) {
+    auto result = diplomat::capi::Schematic_replace_blocks_json(this->AsFFI(),
+        {map_json.data(), map_json.size()});
+    return result.is_ok ? diplomat::result<uint64_t, NucleationError>(diplomat::Ok<uint64_t>(result.ok)) : diplomat::result<uint64_t, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline std::string Schematic::non_air_blocks_packed_b64() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::Schematic_non_air_blocks_packed_b64(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void Schematic::non_air_blocks_packed_b64_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::Schematic_non_air_blocks_packed_b64(this->AsFFI(),
         &write);
 }
 

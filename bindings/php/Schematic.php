@@ -1047,6 +1047,36 @@ final class Schematic {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function countBlocksJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->Schematic_count_blocks_json($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function replaceBlocksJson(string $map_json) {
+        $__n0 = strlen($map_json);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $map_json, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Schematic_replace_blocks_json($this->ptr, $__view0);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return $result->ok;
+    }
+
+    public function nonAirBlocksPackedB64() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->Schematic_non_air_blocks_packed_b64($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function getChunkBlocksJson( $offset_x,  $offset_y,  $offset_z,  $width,  $height,  $length) {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         Lib::ffi()->Schematic_get_chunk_blocks_json($this->ptr, $offset_x, $offset_y, $offset_z, $width, $height, $length, $write);

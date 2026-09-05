@@ -1247,6 +1247,11 @@ pub mod ffi {
         /// Air cells are materialized too — on a large sparse build this
         /// dump is `volume()`-sized and can exhaust wasm memory; renderers
         /// and analyzers want `get_non_air_blocks_json`.
+        ///
+        /// Prefer `get_non_air_blocks_json` for a block list,
+        /// `count_blocks_json` for a material tally and
+        /// `non_air_blocks_packed_b64` for bulk transfer. This method is
+        /// kept for compatibility and is the wrong tool at any real size.
         pub fn get_all_blocks_json(&self, out: &mut DiplomatWrite) {
             let items: Vec<serde_json::Value> = self
                 .0
@@ -1301,6 +1306,111 @@ pub mod ffi {
                 .collect();
             let json = serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string());
             let _ = write!(out, "{}", json);
+        }
+
+        /// Non-air blocks tallied by id: `{"minecraft:stone": 123, ...}`.
+        /// One pass, no per block allocation, so a caller that only wants a
+        /// material list never has to pull `get_non_air_blocks_json`.
+        pub fn count_blocks_json(&self, out: &mut DiplomatWrite) {
+            let mut counts: HashMap<&str, u64> = HashMap::new();
+            for (_, block) in self.0.iter_blocks() {
+                if block.name == "minecraft:air" {
+                    continue;
+                }
+                *counts.entry(block.name.as_str()).or_insert(0) += 1;
+            }
+            // BTreeMap for a stable key order, so two identical schematics
+            // serialize to identical JSON.
+            let ordered: std::collections::BTreeMap<&str, u64> = counts.into_iter().collect();
+            let json = serde_json::to_string(&ordered).unwrap_or_else(|_| "{}".to_string());
+            let _ = write!(out, "{}", json);
+        }
+
+        /// Apply a `{"from id": "to id"}` map in place and return how many
+        /// blocks changed. Keys match on block id only, ignoring block
+        /// states; values may carry states (`minecraft:oak_stairs[facing=north]`).
+        /// A block whose id is not a key is left alone. Errors with `Parse`
+        /// on malformed JSON or an unparseable target id.
+        pub fn replace_blocks_json(
+            &mut self,
+            map_json: &DiplomatStr,
+        ) -> Result<u64, NucleationError> {
+            let raw: HashMap<String, String> =
+                serde_json::from_str(utf8(map_json)?).map_err(|_| NucleationError::Parse)?;
+            let mut targets: HashMap<String, crate::BlockState> = HashMap::new();
+            for (from, to) in raw {
+                let (state, _) = crate::UniversalSchematic::parse_block_string(&to)
+                    .map_err(|_| NucleationError::Parse)?;
+                targets.insert(from, state);
+            }
+            // Collect first: iter_blocks borrows the schematic immutably.
+            let edits: Vec<(crate::block_position::BlockPosition, crate::BlockState)> = self
+                .0
+                .iter_blocks()
+                .filter_map(|(pos, block)| {
+                    targets.get(block.name.as_str()).map(|to| (pos, to.clone()))
+                })
+                .collect();
+            let changed = edits.len() as u64;
+            for (pos, state) in edits {
+                self.0.set_block(pos.x, pos.y, pos.z, &state);
+            }
+            Ok(changed)
+        }
+
+        /// Every non-air block as a compact binary blob, base64 encoded
+        /// (`DiplomatWrite` is UTF-8 only, see `to_litematic_b64`). Little
+        /// endian throughout:
+        ///
+        /// ```text
+        /// u32 count
+        /// count * { i32 x, i32 y, i32 z, u16 palette_index }
+        /// u32 palette_json_len
+        /// u8[palette_json_len]   ["minecraft:stone", ...]
+        /// ```
+        ///
+        /// Palette indices are assigned in first-seen order, so the same
+        /// schematic always packs identically. About seven times smaller
+        /// than `get_non_air_blocks_json` and free of per block JSON
+        /// parsing on the far side. Empty when the schematic holds more
+        /// than 65,535 distinct non-air ids, which no real build does.
+        pub fn non_air_blocks_packed_b64(&self, out: &mut DiplomatWrite) {
+            let mut palette: Vec<&str> = Vec::new();
+            let mut index_of: HashMap<&str, u16> = HashMap::new();
+            let mut body: Vec<u8> = Vec::new();
+            let mut count: u32 = 0;
+            for (pos, block) in self.0.iter_blocks() {
+                if block.name == "minecraft:air" {
+                    continue;
+                }
+                let name = block.name.as_str();
+                let index = match index_of.get(name) {
+                    Some(&i) => i,
+                    None => {
+                        if palette.len() >= u16::MAX as usize {
+                            // Past what a u16 index can address: write nothing
+                            // rather than truncate to a wrong palette.
+                            return;
+                        }
+                        let i = palette.len() as u16;
+                        palette.push(name);
+                        index_of.insert(name, i);
+                        i
+                    }
+                };
+                body.extend_from_slice(&pos.x.to_le_bytes());
+                body.extend_from_slice(&pos.y.to_le_bytes());
+                body.extend_from_slice(&pos.z.to_le_bytes());
+                body.extend_from_slice(&index.to_le_bytes());
+                count += 1;
+            }
+            let palette_json = serde_json::to_vec(&palette).unwrap_or_else(|_| b"[]".to_vec());
+            let mut packed = Vec::with_capacity(4 + body.len() + 4 + palette_json.len());
+            packed.extend_from_slice(&count.to_le_bytes());
+            packed.extend_from_slice(&body);
+            packed.extend_from_slice(&(palette_json.len() as u32).to_le_bytes());
+            packed.extend_from_slice(&palette_json);
+            let _ = write!(out, "{}", b64(&packed));
         }
 
         /// All blocks within a sub-region (chunk) of the schematic, as the same

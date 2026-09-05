@@ -512,6 +512,11 @@ public:
    * Air cells are materialized too — on a large sparse build this
    * dump is `volume()`-sized and can exhaust wasm memory; renderers
    * and analyzers want `get_non_air_blocks_json`.
+   *
+   * Prefer `get_non_air_blocks_json` for a block list,
+   * `count_blocks_json` for a material tally and
+   * `non_air_blocks_packed_b64` for bulk transfer. This method is
+   * kept for compatibility and is the wrong tool at any real size.
    */
   inline std::string get_all_blocks_json() const;
   template<typename W>
@@ -533,6 +538,46 @@ public:
   inline std::string get_non_air_blocks_json() const;
   template<typename W>
   inline void get_non_air_blocks_json_write(W& writeable_output) const;
+
+  /**
+   * Non-air blocks tallied by id: `{"minecraft:stone": 123, ...}`.
+   * One pass, no per block allocation, so a caller that only wants a
+   * material list never has to pull `get_non_air_blocks_json`.
+   */
+  inline std::string count_blocks_json() const;
+  template<typename W>
+  inline void count_blocks_json_write(W& writeable_output) const;
+
+  /**
+   * Apply a `{"from id": "to id"}` map in place and return how many
+   * blocks changed. Keys match on block id only, ignoring block
+   * states; values may carry states (`minecraft:oak_stairs[facing=north]`).
+   * A block whose id is not a key is left alone. Errors with `Parse`
+   * on malformed JSON or an unparseable target id.
+   */
+  inline diplomat::result<uint64_t, NucleationError> replace_blocks_json(std::string_view map_json);
+
+  /**
+   * Every non-air block as a compact binary blob, base64 encoded
+   * (`DiplomatWrite` is UTF-8 only, see `to_litematic_b64`). Little
+   * endian throughout:
+   *
+   * ```text
+   * u32 count
+   * count * { i32 x, i32 y, i32 z, u16 palette_index }
+   * u32 palette_json_len
+   * u8[palette_json_len]   ["minecraft:stone", ...]
+   * ```
+   *
+   * Palette indices are assigned in first-seen order, so the same
+   * schematic always packs identically. About seven times smaller
+   * than `get_non_air_blocks_json` and free of per block JSON
+   * parsing on the far side. Empty when the schematic holds more
+   * than 65,535 distinct non-air ids, which no real build does.
+   */
+  inline std::string non_air_blocks_packed_b64() const;
+  template<typename W>
+  inline void non_air_blocks_packed_b64_write(W& writeable_output) const;
 
   /**
    * All blocks within a sub-region (chunk) of the schematic, as the same

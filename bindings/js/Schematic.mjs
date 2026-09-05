@@ -1741,6 +1741,11 @@ export class Schematic {
      * Air cells are materialized too — on a large sparse build this
      * dump is `volume()`-sized and can exhaust wasm memory; renderers
      * and analyzers want `get_non_air_blocks_json`.
+     *
+     * Prefer `get_non_air_blocks_json` for a block list,
+     * `count_blocks_json` for a material tally and
+     * `non_air_blocks_packed_b64` for bulk transfer. This method is
+     * kept for compatibility and is the wrong tool at any real size.
      */
     getAllBlocksJson() {
         const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
@@ -1798,6 +1803,91 @@ export class Schematic {
         const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
 
     wasm.Schematic_get_non_air_blocks_json(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * Non-air blocks tallied by id: `{"minecraft:stone": 123, ...}`.
+     * One pass, no per block allocation, so a caller that only wants a
+     * material list never has to pull `get_non_air_blocks_json`.
+     */
+    countBlocksJson() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Schematic_count_blocks_json(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * Apply a `{"from id": "to id"}` map in place and return how many
+     * blocks changed. Keys match on block id only, ignoring block
+     * states; values may carry states (`minecraft:oak_stairs[facing=north]`).
+     * A block whose id is not a key is left alone. Errors with `Parse`
+     * on malformed JSON or an unparseable target id.
+     */
+    replaceBlocksJson(mapJson) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const mapJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, mapJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 9, 8, true);
+
+
+        const result = wasm.Schematic_replace_blocks_json(diplomatReceive.buffer, this.ffiValue, mapJsonSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return (new BigUint64Array(wasm.memory.buffer, diplomatReceive.buffer, 1))[0];
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Every non-air block as a compact binary blob, base64 encoded
+     * (`DiplomatWrite` is UTF-8 only, see `to_litematic_b64`). Little
+     * endian throughout:
+     *
+     * ```text
+     * u32 count
+     * count * { i32 x, i32 y, i32 z, u16 palette_index }
+     * u32 palette_json_len
+     * u8[palette_json_len]   ["minecraft:stone", ...]
+     * ```
+     *
+     * Palette indices are assigned in first-seen order, so the same
+     * schematic always packs identically. About seven times smaller
+     * than `get_non_air_blocks_json` and free of per block JSON
+     * parsing on the far side. Empty when the schematic holds more
+     * than 65,535 distinct non-air ids, which no real build does.
+     */
+    nonAirBlocksPackedB64() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Schematic_non_air_blocks_packed_b64(this.ffiValue, write.buffer);
 
         try {
             return write.readString8();

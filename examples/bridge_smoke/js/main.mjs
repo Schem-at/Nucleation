@@ -39,6 +39,24 @@ const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 const loaded = Schematic.fromLitematic(bytes);
 expect(loaded.getBlockName(1, 2, 3) === "minecraft:stone", "b64 roundtrip preserves block");
 
+// --- bulk block queries (count / replace / packed export) ---
+const counted = JSON.parse(s.countBlocksJson());
+expect(counted["minecraft:stone"] === 1, "countBlocksJson tallies stone");
+// u64 reaches JS as a BigInt on some backends and a Number on others; Number()
+// reads both. Replace back to stone so the diff check below still sees a match.
+expect(Number(s.replaceBlocksJson('{"minecraft:stone":"minecraft:glass"}')) === 1,
+  "replaceBlocksJson reports one change");
+expect(Number(s.replaceBlocksJson('{"minecraft:glass":"minecraft:stone"}')) === 1,
+  "replaceBlocksJson is reversible");
+const packed = Uint8Array.from(atob(s.nonAirBlocksPackedB64()), (c) => c.charCodeAt(0));
+const view = new DataView(packed.buffer);
+expect(view.getUint32(0, true) === 1, "packed export holds one block");
+expect(view.getInt32(4, true) === 1 && view.getInt32(8, true) === 2
+  && view.getInt32(12, true) === 3, "packed export keeps the position");
+const paletteLen = view.getUint32(4 + 14, true);
+const palette = JSON.parse(new TextDecoder().decode(packed.subarray(8 + 14, 8 + 14 + paletteLen)));
+expect(palette[view.getUint16(16, true)] === "minecraft:stone", "packed palette names the block");
+
 // --- builder: consuming build + AlreadyConsumed ---
 const b = SchematicBuilder.create();
 b.map("s", "minecraft:stone");

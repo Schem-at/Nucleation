@@ -1,5 +1,8 @@
 """End-to-end smoke test for the generated Python (nanobind) bindings."""
 import base64
+import json
+import struct
+
 import nucleation as m
 
 # --- schematic: create/set/get + error path ---
@@ -16,6 +19,20 @@ except Exception as e:
 b64 = s.to_litematic_b64()
 loaded = m.Schematic.from_litematic(base64.b64decode(b64))
 assert loaded.get_block_name(1, 2, 3) == "minecraft:stone"
+
+# --- bulk block queries (count / replace / packed export) ---
+counts = json.loads(s.count_blocks_json())
+assert counts["minecraft:stone"] == 1, counts
+assert s.replace_blocks_json('{"minecraft:stone":"minecraft:glass"}') == 1
+assert s.replace_blocks_json('{"minecraft:glass":"minecraft:stone"}') == 1
+packed = base64.b64decode(s.non_air_blocks_packed_b64())
+(count,) = struct.unpack_from("<I", packed, 0)
+assert count == 1, count
+x, y, z, index = struct.unpack_from("<iiiH", packed, 4)
+assert (x, y, z) == (1, 2, 3), (x, y, z)
+(plen,) = struct.unpack_from("<I", packed, 4 + count * 14)
+palette = json.loads(packed[8 + count * 14 : 8 + count * 14 + plen])
+assert palette[index] == "minecraft:stone", palette
 
 # --- builder: consuming build + AlreadyConsumed ---
 b = m.SchematicBuilder.create()

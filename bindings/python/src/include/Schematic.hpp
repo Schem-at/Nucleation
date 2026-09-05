@@ -221,6 +221,13 @@ namespace capi {
 
     void Schematic_get_non_air_blocks_json(const nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    void Schematic_count_blocks_json(const nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Schematic_replace_blocks_json_result {union {uint64_t ok; nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_replace_blocks_json_result;
+    Schematic_replace_blocks_json_result Schematic_replace_blocks_json(nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatStringView map_json);
+
+    void Schematic_non_air_blocks_packed_b64(const nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
     void Schematic_get_chunk_blocks_json(const nucleation::capi::Schematic* self, int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, nucleation::diplomat::capi::DiplomatWrite* write);
 
     void Schematic_get_chunks_json(const nucleation::capi::Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, nucleation::diplomat::capi::DiplomatWrite* write);
@@ -1226,6 +1233,40 @@ template<typename W>
 inline void nucleation::Schematic::get_non_air_blocks_json_write(W& writeable) const {
     nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
     nucleation::capi::Schematic_get_non_air_blocks_json(this->AsFFI(),
+        &write);
+}
+
+inline std::string nucleation::Schematic::count_blocks_json() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::Schematic_count_blocks_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void nucleation::Schematic::count_blocks_json_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::Schematic_count_blocks_json(this->AsFFI(),
+        &write);
+}
+
+inline nucleation::diplomat::result<uint64_t, nucleation::NucleationError> nucleation::Schematic::replace_blocks_json(std::string_view map_json) {
+    auto result = nucleation::capi::Schematic_replace_blocks_json(this->AsFFI(),
+        {map_json.data(), map_json.size()});
+    return result.is_ok ? nucleation::diplomat::result<uint64_t, nucleation::NucleationError>(nucleation::diplomat::Ok<uint64_t>(result.ok)) : nucleation::diplomat::result<uint64_t, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline std::string nucleation::Schematic::non_air_blocks_packed_b64() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::Schematic_non_air_blocks_packed_b64(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void nucleation::Schematic::non_air_blocks_packed_b64_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::Schematic_non_air_blocks_packed_b64(this->AsFFI(),
         &write);
 }
 
