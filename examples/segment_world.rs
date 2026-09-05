@@ -25,6 +25,7 @@ use nucleation::{Connectivity, ProvenanceBounds, SchematicProvenance};
 struct Cli {
     input: String,
     snapshot_store: Option<String>,
+    empty_region_policy: nucleation::world_segment::snapshot::EmptyRegionPolicy,
     progress_json: bool,
     world_prefix: Option<String>,
     output: String,
@@ -81,7 +82,8 @@ const USAGE: &str = "usage: segment_world <world-dir|world.tar[.gz|.zst]> <out-d
      [--component-join-gap BLOCKS] \
      [--component-min-blocks COUNT] \
      [--world-prefix STORE_KEY_TO_REGION_DIR] \
-     [--snapshot-store STORE_DIR_OR_URI] [--progress-json true|false]\n\
+     [--snapshot-store STORE_DIR_OR_URI] [--progress-json true|false] \
+     [--empty-region-policy reject|acknowledge-zero-byte]\n\
 index: segment_world index <world-dir|archive|store-uri> <snapshot-store> \
      --source-id ID [--dimension ID] [--world-prefix REGION_PREFIX] \
      [--previous-manifest FILE.json] [--capture-unreadable true|false]";
@@ -122,6 +124,7 @@ fn parse_args() -> Cli {
     let mut cli = Cli {
         input,
         snapshot_store: None,
+        empty_region_policy: nucleation::world_segment::snapshot::EmptyRegionPolicy::Reject,
         progress_json: false,
         world_prefix: None,
         output: args[1].clone(),
@@ -157,6 +160,14 @@ fn parse_args() -> Cli {
             .unwrap_or_else(|| panic!("{} requires a value", args[index]));
         match args[index].as_str() {
             "--snapshot-store" => cli.snapshot_store = Some(value.clone()),
+            "--empty-region-policy" => {
+                use nucleation::world_segment::snapshot::EmptyRegionPolicy;
+                cli.empty_region_policy = match value.as_str() {
+                    "reject" => EmptyRegionPolicy::Reject,
+                    "acknowledge-zero-byte" => EmptyRegionPolicy::AcknowledgeZeroByte,
+                    _ => panic!("--empty-region-policy expects reject or acknowledge-zero-byte"),
+                };
+            }
             "--progress-json" => cli.progress_json = value == "true",
             "--source-id" => cli.source_id = value.clone(),
             "--world-name" => cli.world_name = value.clone(),
@@ -352,7 +363,13 @@ fn source(cli: &Cli) -> Box<dyn TileSource> {
             Box::new(nucleation::store::FsStore::new(store_uri))
         };
         return Box::new(
-            SnapshotTiles::new(manifest, store, cli.rect).expect("open snapshot source"),
+            SnapshotTiles::with_empty_region_policy(
+                manifest,
+                store,
+                cli.rect,
+                cli.empty_region_policy,
+            )
+            .expect("open snapshot source"),
         );
     }
     if let Some(prefix) = &cli.world_prefix {
@@ -941,7 +958,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             progress(
                 &cli,
                 "build_extracted",
-                serde_json::json!({"builds": written, "stable_id": provenance.stable_build_id.to_string(), "blocks": provenance.block_count, "tier": provenance.tier}),
+                serde_json::json!({"builds": written, "stable_id": provenance.stable_build_id.to_string(), "blocks": provenance.block_count, "tier": provenance.tier,
+                    "world_bbox": provenance.world_bbox, "parent_id": build.provenance.stable_build_id.to_string()}),
             );
             println!(
                 "segment_world: wrote {} ({} blocks, {:?}, {} block entities)",
@@ -967,14 +985,44 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         input_source.as_ref()
     };
-    let stats: RunStats = WorldSegmenter::try_run_streaming(
-        extraction_source,
-        &profile,
-        &partitions,
-        &job,
-        &[],
-        &mut emit,
-    )?;
+    let mut spatial_count = 0usize;
+    let mut observe = |event: nucleation::world_segment::runner::SpatialObservation| {
+        if !cli.progress_json {
+            return;
+        }
+        // Diagnostic candidates are bounded. Final output counts/catalogues are
+        // always complete, even when a very noisy world exhausts this budget.
+        spatial_count += 1;
+        if spatial_count <= 20_000 {
+            progress(&cli, "spatial_shape", serde_json::to_value(event).unwrap());
+        } else if spatial_count == 20_001 {
+            progress(
+                &cli,
+                "spatial_limit_reached",
+                serde_json::json!({"limit": 20000}),
+            );
+        }
+    };
+    let stats: RunStats = if cli.progress_json {
+        WorldSegmenter::try_run_streaming_observed(
+            extraction_source,
+            &profile,
+            &partitions,
+            &job,
+            &[],
+            &mut emit,
+            &mut observe,
+        )?
+    } else {
+        WorldSegmenter::try_run_streaming(
+            extraction_source,
+            &profile,
+            &partitions,
+            &job,
+            &[],
+            &mut emit,
+        )?
+    };
     let catalog_key = format!(
         "catalog/x{}_{}_z{}_{}.jsonl",
         cli.rect.0, cli.rect.2, cli.rect.1, cli.rect.3
@@ -984,11 +1032,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         catalog.push('\n');
     }
     store.put(&catalog_key, catalog.as_bytes())?;
+    let gaps = acknowledged_gaps(&cli)?;
     let completion = serde_json::json!({"protocol": 1, "event": "extraction_completed", "complete": cli.snapshot_store.is_some(),
+        "coverage": if gaps.is_empty() { "complete" } else { "acknowledged_gaps" },
+        "empty_region_policy": if cli.empty_region_policy == nucleation::world_segment::snapshot::EmptyRegionPolicy::Reject { "reject" } else { "acknowledge-zero-byte" },
+        "acknowledged_zero_byte_regions": gaps,
         "builds": written, "catalog": catalog_key, "source_hash": cli.snapshot_id,
         "bounds": cli.rect, "profile_hash": profile.profile_hash().to_string(), "stats": stats});
     store.put("completion.json", &serde_json::to_vec(&completion)?)?;
     progress(&cli, "extraction_completed", completion);
     println!("segment_world: {stats:?}; wrote {written} schematics");
     Ok(())
+}
+
+fn acknowledged_gaps(cli: &Cli) -> Result<Vec<(i32, i32)>, Box<dyn std::error::Error>> {
+    use nucleation::world_segment::snapshot::{EmptyRegionPolicy, SnapshotManifest};
+    if cli.empty_region_policy == EmptyRegionPolicy::Reject || cli.snapshot_store.is_none() {
+        return Ok(vec![]);
+    }
+    let manifest = SnapshotManifest::from_bytes(&std::fs::read(&cli.input)?)?;
+    let mut gaps: Vec<_> = manifest
+        .regions
+        .values()
+        .filter(|r| {
+            r.error.is_some()
+                && r.bytes == 0
+                && r.chunks.is_empty()
+                && r.x >= cli.rect.0.div_euclid(512)
+                && r.x <= cli.rect.2.div_euclid(512)
+                && r.z >= cli.rect.1.div_euclid(512)
+                && r.z <= cli.rect.3.div_euclid(512)
+        })
+        .map(|r| (r.x, r.z))
+        .collect();
+    gaps.sort();
+    Ok(gaps)
 }

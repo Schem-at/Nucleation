@@ -182,6 +182,19 @@ fn archival_capture_preserves_unreadable_regions_but_never_extracts_them_as_empt
     )
     .unwrap();
     assert!(damaged.tile(TileId { x: 0, z: 0 }).is_err());
+    let acknowledged = SnapshotTiles::with_empty_region_policy(
+        manifest.clone(),
+        Box::new(FsStore::new(&store_path)),
+        (0, 0, 511, 511),
+        nucleation::world_segment::snapshot::EmptyRegionPolicy::AcknowledgeZeroByte,
+    )
+    .unwrap();
+    assert!(acknowledged.tile(TileId { x: 0, z: 0 }).unwrap().is_none());
+    // The policy does not authorize missing objects or modified bytes.
+    store
+        .put(&manifest.regions["r.0.0.mca"].object_key, b"corrupt")
+        .unwrap();
+    assert!(acknowledged.tile(TileId { x: 0, z: 0 }).is_err());
     let readable = SnapshotTiles::new(
         manifest,
         Box::new(FsStore::new(&store_path)),
@@ -209,6 +222,34 @@ fn snapshot_reads_are_independent_of_original_world_and_verify_objects() {
     store
         .put(&manifest.regions["r.0.0.mca"].object_key, b"corrupt")
         .unwrap();
+    assert!(source.tile(TileId { x: 0, z: 0 }).is_err());
+}
+
+#[test]
+fn zero_byte_acknowledgement_never_skips_nonempty_corruption() {
+    use nucleation::world_segment::snapshot::{index_snapshot_with_policy, EmptyRegionPolicy};
+    let fixture = Fixture::new();
+    fixture.world(1);
+    std::fs::write(fixture.0.join("world/region/r.0.0.mca"), b"broken").unwrap();
+    let store_path = fixture.0.join("objects");
+    let (manifest, _) = index_snapshot_with_policy(
+        fixture.0.join("world").to_str().unwrap(),
+        &FsStore::new(&store_path),
+        "test:world",
+        "minecraft:overworld",
+        None,
+        None,
+        true,
+        &mut |_| {},
+    )
+    .unwrap();
+    let source = SnapshotTiles::with_empty_region_policy(
+        manifest,
+        Box::new(FsStore::new(&store_path)),
+        (0, 0, 511, 511),
+        EmptyRegionPolicy::AcknowledgeZeroByte,
+    )
+    .unwrap();
     assert!(source.tile(TileId { x: 0, z: 0 }).is_err());
 }
 
@@ -330,6 +371,70 @@ fn deleting_a_region_changes_its_dependencies_but_keeps_previous_bytes_readable(
         .get(&first.regions["r.0.0.mca"].object_key)
         .unwrap()
         .is_some());
+}
+
+#[test]
+fn worker_cli_requires_acknowledgement_and_receipts_zero_byte_gaps() {
+    use nucleation::world_segment::snapshot::index_snapshot_with_policy;
+    let fixture = Fixture::new();
+    fixture.world(1);
+    std::fs::write(fixture.0.join("world/region/r.0.0.mca"), b"").unwrap();
+    let objects = fixture.0.join("objects");
+    let (_, progress) = index_snapshot_with_policy(
+        fixture.0.join("world").to_str().unwrap(),
+        &FsStore::new(&objects),
+        "test:world",
+        "minecraft:overworld",
+        None,
+        None,
+        true,
+        &mut |_| {},
+    )
+    .unwrap();
+    let manifest = objects.join(progress.manifest_key.unwrap());
+    for (policy, success) in [("reject", false), ("acknowledge-zero-byte", true)] {
+        let output = fixture.0.join(policy);
+        let run = std::process::Command::new(env!("CARGO_BIN_EXE_segment_world"))
+            .args([
+                manifest.to_str().unwrap(),
+                output.to_str().unwrap(),
+                "0",
+                "0",
+                "511",
+                "511",
+                "--snapshot-store",
+                objects.to_str().unwrap(),
+                "--source-id",
+                "test:world",
+                "--empty-region-policy",
+                policy,
+                "--substrate",
+                "minecraft:stone",
+                "--substrate-band",
+                "0,0",
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(
+            run.status.success(),
+            success,
+            "{}",
+            String::from_utf8_lossy(&run.stderr)
+        );
+        if success {
+            let report: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(output.join("completion.json")).unwrap())
+                    .unwrap();
+            assert_eq!(report["coverage"], "acknowledged_gaps");
+            assert_eq!(
+                report["acknowledged_zero_byte_regions"],
+                serde_json::json!([[0, 0]])
+            );
+            assert_eq!(report["builds"], 0);
+        } else {
+            assert!(!output.join("completion.json").exists());
+        }
+    }
 }
 
 #[test]

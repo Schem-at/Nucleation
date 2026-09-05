@@ -32,7 +32,7 @@ pub use materialize::{materialize, materialize_with_block_entities, MaterializeC
 pub use partition::{PartitionHint, PartitionIndex, PartitionPolicy};
 pub use profile::{ProfileParams, WorldProfile};
 pub use provenance::{Provenance, StableBuildId};
-pub use runner::{MaterializedBuild, RunStats, SegmentJob, WorldSegmenter};
+pub use runner::{MaterializedBuild, RunStats, SegmentJob, SpatialObservation, WorldSegmenter};
 pub use score::{score, ScoreConfig, Scored, Signal, Tier};
 pub use segment::{
     segment_tile, segment_tile_membership, Cluster, DisconnectedSplit, MarginCell, SegConfig,
