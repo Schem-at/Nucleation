@@ -16,24 +16,30 @@ palette index to a block once instead of cloning a `String` per voxel.
 
 | case (5,000 triangle sphere, BoxTextured cube) | 0.10.16 | 0.10.17 |
 | --- | --- | --- |
-| solid fill, size 32 | 424 ms | 1.60 ms |
-| solid fill, size 64 | 19.0 s | 8.31 ms |
-| solid fill, size 128 | 83.8 ms (extrapolated, first size-128 measurement, task 3) | 75.1 ms |
-| shell fill, size 32 | 8.44 ms | 1.75 ms |
-| shell fill, size 64 | 23.0 ms | 3.73 ms |
-| shell fill, size 128 | 17.7 ms (extrapolated, first size-128 measurement, task 3) | 11.5 ms |
-| textured cube, size 32 | 391 ms | 7.02 ms |
-| textured cube, size 64 | 29.1 s | 76.0 ms |
-| textured cube, size 128 | 3.06 s (extrapolated, first size-128 measurement, task 3) | 2.09 s |
+| solid fill, size 32 | 424 ms | 1.66 ms |
+| solid fill, size 64 | 19.0 s | 8.44 ms |
+| solid fill, size 128 | not measured | 75.1 ms |
+| shell fill, size 32 | 8.44 ms | 1.80 ms |
+| shell fill, size 64 | 23.0 ms | 3.79 ms |
+| shell fill, size 128 | not measured | 12.8 ms |
+| textured cube, size 32 | 391 ms | 9.01 ms |
+| textured cube, size 64 | 29.1 s | 69.0 ms |
+| textured cube, size 128 | not measured | 2.28 s |
 
 Measured on the build host (16-core x86_64 server), medians, with `cargo bench
---features voxelize --bench voxelize_bench`. Size 128 was never run on
-unchanged 0.10.16 code (roughly half an hour per sample on the old N^6
-trend), so its "before" figure is the first size-128 measurement taken once
-the triangle-id precompute landed, not a true pre-optimization baseline. The
-output is unchanged: a committed golden fixture pins the sha256 of the
-sorted block list for the solid sphere, the shell sphere and the textured
-cube at size 32, and it holds byte for byte across all three changes.
+--features bridge,voxelize --bench voxelize_bench`. The 0.10.17 column is one
+fresh run of all three cases at all three sizes on the released code, so it
+supersedes the per-task figures recorded while the branch was in progress.
+Size 128 was never benchmarked on unchanged 0.10.16 code, because on the old
+N^6 trend one sample took roughly half an hour: the one 0.10.16 size-128
+number that does exist is a solid fill timed by hand at 1,578 s, which is
+where this work started. The output is unchanged: a committed golden fixture
+pins the sha256 of the sorted block list for the solid sphere, the shell
+sphere and the textured cube at size 32, and it holds byte for byte across
+all three changes. A fourth case, a wool-palette `ShadedBrush` fill of the
+same sphere, is pinned fresh at this release: it is the one that runs
+`normal_at` on curved geometry, so it guards the new triangle-id field
+itself.
 
 **Bulk block queries on the bridge.** `Schematic.count_blocks_json` tallies
 non-air blocks by id in one pass, `replace_blocks_json` applies a from-id to
@@ -51,6 +57,29 @@ The seven brushes that always return the same value regardless of shading
 input (`Solid`, `Color`, `Linear`, `MultiPoint`, `Point`, `Bilinear`, `Field`)
 override it to `false`, letting the fill loop skip the `normal_at` call
 entirely for them.
+
+**Two behaviour changes to check before upgrading.**
+
+`get_non_air_blocks_json` now excludes `minecraft:cave_air` and
+`minecraft:void_air` as well as `minecraft:air`. Every "non-air" method in the
+library shares one `is_air` definition covering all three, which is what the
+name always claimed; before this release only `minecraft:air` was filtered, so
+a schematic carrying cave or void air handed those blocks to the caller. A
+caller that was relying on receiving them (to rebuild a region's exact cell
+contents, say) should use `get_all_blocks_json` instead.
+
+`fill_sdf_function` no longer calls the caller's `normal` closure when the
+brush's `uses_normal()` is `false`. This is the `Brush::uses_normal` gate
+applied to the SDF path, and it reaches the Python FFI:
+`nucleation_python_fill_sdf_function` will not invoke a Python normal callback
+for a fill whose brush ignores normals. The blocks placed are unchanged, since
+the value was discarded anyway, but a callback with side effects (counting
+calls, logging, mutating state) will see fewer of them, and one that raised on
+purpose will no longer be reached.
+
+`replace_blocks_json`'s return value is also now strictly the number of blocks
+that changed: a block already equal to its target is skipped, so a map that
+rewrites an id to itself returns 0 rather than the number of matches.
 
 # Nucleation v0.10.16
 

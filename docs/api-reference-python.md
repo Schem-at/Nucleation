@@ -138,10 +138,15 @@ packed = base64.b64decode(schem.non_air_blocks_packed_b64())
 
 `count_blocks_json` tallies non-air blocks by id in one pass.
 `replace_blocks_json` applies a from-id to to-id map in place and returns the
-number of blocks changed; keys match on the id, values may carry block states.
+number of blocks actually changed; keys match on the id, values may carry
+block states. A block that already equals its target is not counted, so a
+stone-to-stone map returns 0.
 `non_air_blocks_packed_b64` is the compact export: little endian `u32 count`,
 then `i32 x, i32 y, i32 z, u16 palette_index` per block, then a `u32` length
-and that many bytes of palette JSON.
+and that many bytes of palette JSON. Palette indices are `u16`, so a
+schematic holding more than 65,535 distinct non-air block states cannot be
+addressed: the method returns an empty string rather than a truncated
+palette.
 
 `get_all_blocks_json` still exists and still materialises air, which makes it
 `volume()`-sized. Prefer `get_non_air_blocks_json` or the packed export.

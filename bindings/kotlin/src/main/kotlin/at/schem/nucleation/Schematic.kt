@@ -1523,8 +1523,10 @@ class Schematic internal constructor (
     *but not NBT: `parse_block_string` only returns a `BlockState`, so
     *any `{...}` payload on a `to` value is silently dropped rather
     *than copied onto the replaced block.
-    *A block whose id is not a key is left alone. Errors with `Parse`
-    *on malformed JSON or an unparseable target id.
+    *A block whose id is not a key is left alone, and so is one that
+    *already equals its target: the count is the number of blocks
+    *actually changed, so a map that rewrites stone to stone returns 0.
+    *Errors with `Parse` on malformed JSON or an unparseable target id.
     */
     fun replaceBlocksJson(mapJson: String): Result<ULong> {
         val mapJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(mapJson)
@@ -1556,9 +1558,13 @@ class Schematic internal constructor (
     *Palette indices are assigned in first-seen order, so the same
     *schematic always packs identically. About seven times smaller
     *than `get_non_air_blocks_json` and free of per block JSON
-    *parsing on the far side. The guard bails as soon as 65,535
-    *distinct non-air ids are already recorded, so nothing is written
-    *once a 65,536th distinct id shows up; no real build has that many.
+    *parsing on the far side.
+    *
+    *Palette indices are `u16`, so at most 65,535 distinct non-air
+    *block states can be addressed. A schematic with more than that
+    *writes **an empty string**, not a truncated palette: callers must
+    *treat an empty result as "too many distinct states, fall back to
+    *`get_non_air_blocks_json`". No real build has that many.
     */
     fun nonAirBlocksPackedB64(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
