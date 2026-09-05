@@ -209,6 +209,7 @@ impl MeshModel {
             }
         }
 
+        drop_degenerate_triangles(&mut triangles, "GLB");
         if triangles.is_empty() {
             return Err("GLB contains no triangles".to_string());
         }
@@ -292,6 +293,7 @@ impl MeshModel {
             }
         }
 
+        drop_degenerate_triangles(&mut triangles, "OBJ");
         if triangles.is_empty() {
             return Err("OBJ contains no triangles".to_string());
         }
@@ -300,6 +302,46 @@ impl MeshModel {
             materials: Vec::new(),
         })
     }
+}
+
+/// Smallest triangle area a loader keeps. Below this the triangle is
+/// geometrically degenerate: two of its vertices coincide, or all three are
+/// collinear.
+const MIN_TRIANGLE_AREA: f64 = 1e-12;
+
+/// Twice the area of a triangle, in f64 so a sliver whose f32 cross product
+/// would flush to zero is still measured honestly.
+fn double_area(positions: &[[f32; 3]; 3]) -> f64 {
+    let p = |i: usize, a: usize| positions[i][a] as f64;
+    let e1 = [p(1, 0) - p(0, 0), p(1, 1) - p(0, 1), p(1, 2) - p(0, 2)];
+    let e2 = [p(2, 0) - p(0, 0), p(2, 1) - p(0, 1), p(2, 2) - p(0, 2)];
+    let n = [
+        e1[1] * e2[2] - e1[2] * e2[1],
+        e1[2] * e2[0] - e1[0] * e2[2],
+        e1[0] * e2[1] - e1[1] * e2[0],
+    ];
+    (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt()
+}
+
+/// Drop zero-area triangles at load, returning how many went.
+///
+/// A degenerate triangle poisons every query that touches it: the closest
+/// point on it is computed by dividing by its area, so the answer is NaN, and
+/// NaN loses no comparison. The nearest-triangle search would then keep it as
+/// its best candidate forever and never take its early out, turning one bad
+/// triangle into a full walk of the mesh per voxel. They carry no surface, so
+/// dropping them changes no geometry.
+fn drop_degenerate_triangles(triangles: &mut Vec<MeshTriangle>, source: &str) -> usize {
+    let before = triangles.len();
+    triangles.retain(|t| double_area(&t.positions) * 0.5 > MIN_TRIANGLE_AREA);
+    let dropped = before - triangles.len();
+    if dropped > 0 {
+        log::debug!(
+            "{source} load: dropped {dropped} degenerate triangle(s) of {before} \
+             (area at or below {MIN_TRIANGLE_AREA:e})"
+        );
+    }
+    dropped
 }
 
 /// OBJ index token → 0-based index (`1`-based positives, negative = relative

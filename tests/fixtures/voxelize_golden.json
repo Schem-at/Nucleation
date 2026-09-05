@@ -1,4 +1,8 @@
 {
+  "sphere_shaded_32": {
+    "blocks": 17256,
+    "sha256": "af3e35a527d12fb746f1e43fad2f7124e0dd70e8e688df7bbc211bde1609fea9"
+  },
   "sphere_shell_32": {
     "blocks": 6152,
     "sha256": "af526b9380bbc1216b1dac340dadb38274503ca335c3010fa75747be0bf211df"

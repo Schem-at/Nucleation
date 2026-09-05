@@ -1333,31 +1333,52 @@ pub mod ffi {
         /// but not NBT: `parse_block_string` only returns a `BlockState`, so
         /// any `{...}` payload on a `to` value is silently dropped rather
         /// than copied onto the replaced block.
-        /// A block whose id is not a key is left alone. Errors with `Parse`
-        /// on malformed JSON or an unparseable target id.
+        /// A block whose id is not a key is left alone, and so is one that
+        /// already equals its target: the count is the number of blocks
+        /// actually changed, so a map that rewrites stone to stone returns 0.
+        /// Errors with `Parse` on malformed JSON or an unparseable target id.
         pub fn replace_blocks_json(
             &mut self,
             map_json: &DiplomatStr,
         ) -> Result<u64, NucleationError> {
             let raw: HashMap<String, String> =
                 serde_json::from_str(utf8(map_json)?).map_err(|_| NucleationError::Parse)?;
-            let mut targets: HashMap<String, crate::BlockState> = HashMap::new();
+            // The distinct targets, parsed once, plus a from-id to target
+            // index map. There are as many targets as the caller wrote keys,
+            // never as many as the schematic has blocks.
+            let mut states: Vec<crate::BlockState> = Vec::with_capacity(raw.len());
+            let mut targets: HashMap<String, u16> = HashMap::with_capacity(raw.len());
+            if raw.len() > u16::MAX as usize {
+                // The edit list indexes targets with a u16. No real material
+                // map is anywhere near this large.
+                return Err(NucleationError::InvalidArgument);
+            }
             for (from, to) in raw {
                 let (state, _) = crate::UniversalSchematic::parse_block_string(&to)
                     .map_err(|_| NucleationError::Parse)?;
-                targets.insert(from, state);
+                let index = match states.iter().position(|s| *s == state) {
+                    Some(i) => i,
+                    None => {
+                        states.push(state);
+                        states.len() - 1
+                    }
+                };
+                targets.insert(from, index as u16);
             }
-            // Collect first: iter_blocks borrows the schematic immutably.
-            let edits: Vec<(crate::block_position::BlockPosition, crate::BlockState)> = self
+            // Collect first: iter_blocks borrows the schematic immutably. One
+            // position and one index per changed block, no BlockState clone.
+            let edits: Vec<(crate::block_position::BlockPosition, u16)> = self
                 .0
                 .iter_blocks()
                 .filter_map(|(pos, block)| {
-                    targets.get(block.name.as_str()).map(|to| (pos, to.clone()))
+                    let &index = targets.get(block.name.as_str())?;
+                    (states[index as usize] != *block).then_some((pos, index))
                 })
                 .collect();
             let changed = edits.len() as u64;
-            for (pos, state) in edits {
-                self.0.set_block(pos.x, pos.y, pos.z, &state);
+            for (pos, index) in edits {
+                self.0
+                    .set_block(pos.x, pos.y, pos.z, &states[index as usize]);
             }
             Ok(changed)
         }
@@ -1376,9 +1397,13 @@ pub mod ffi {
         /// Palette indices are assigned in first-seen order, so the same
         /// schematic always packs identically. About seven times smaller
         /// than `get_non_air_blocks_json` and free of per block JSON
-        /// parsing on the far side. The guard bails as soon as 65,535
-        /// distinct non-air ids are already recorded, so nothing is written
-        /// once a 65,536th distinct id shows up; no real build has that many.
+        /// parsing on the far side.
+        ///
+        /// Palette indices are `u16`, so at most 65,535 distinct non-air
+        /// block states can be addressed. A schematic with more than that
+        /// writes **an empty string**, not a truncated palette: callers must
+        /// treat an empty result as "too many distinct states, fall back to
+        /// `get_non_air_blocks_json`". No real build has that many.
         pub fn non_air_blocks_packed_b64(&self, out: &mut DiplomatWrite) {
             let mut palette: Vec<&str> = Vec::new();
             let mut index_of: HashMap<&str, u16> = HashMap::new();

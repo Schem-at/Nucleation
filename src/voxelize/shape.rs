@@ -28,6 +28,10 @@ struct TriGrid {
     /// lets the ring search jump over the empty middle of a big model
     /// instead of walking every cell of every ring.
     occupancy: OnceLock<Vec<u32>>,
+    /// Largest table this grid will build, in corners. Always
+    /// [`OCCUPANCY_MAX_CORNERS`] in production; the tests lower it so they can
+    /// reach the "over the cap" path on a small mesh.
+    occupancy_cap: usize,
 }
 
 /// Largest occupancy table `TriGrid` will build, in corners. 2^24 corners is
@@ -39,7 +43,12 @@ const OCCUPANCY_MAX_CORNERS: usize = 1 << 24;
 impl TriGrid {
     const CELL: f32 = 1.0;
 
-    fn build(triangles: &[MeshTriangle], min: [f32; 3], max: [f32; 3]) -> Self {
+    fn build(
+        triangles: &[MeshTriangle],
+        min: [f32; 3],
+        max: [f32; 3],
+        occupancy_cap: usize,
+    ) -> Self {
         let dims = [
             (((max[0] - min[0]) / Self::CELL).ceil() as i32).max(1),
             (((max[1] - min[1]) / Self::CELL).ceil() as i32).max(1),
@@ -79,15 +88,17 @@ impl TriGrid {
             dims,
             cells,
             occupancy: OnceLock::new(),
+            occupancy_cap,
         }
     }
 
     /// Inclusive prefix sums over the bucket sizes, on a grid one larger in
     /// each axis so the box query below needs no bounds special cases.
     /// `None` once the table would cost more than it saves: past
-    /// `OCCUPANCY_MAX_CORNERS` the search simply starts at ring 0 again,
-    /// which is slower but correct and costs no memory.
+    /// `occupancy_cap` the search simply starts at ring 0 again, which is
+    /// slower but correct and costs no memory.
     fn occupancy(&self) -> Option<&[u32]> {
+        let cap = self.occupancy_cap;
         let ps = self.occupancy.get_or_init(|| {
             let (dy, dz) = (self.dims[1] as usize, self.dims[2] as usize);
             let (sx, sy, sz) = (
@@ -96,7 +107,7 @@ impl TriGrid {
                 self.dims[2] as usize + 1,
             );
             // An empty table is the "too big, do not build" marker.
-            if sx.saturating_mul(sy).saturating_mul(sz) > OCCUPANCY_MAX_CORNERS {
+            if sx.saturating_mul(sy).saturating_mul(sz) > cap {
                 return Vec::new();
             }
             let mut ps = vec![0u32; sx * sy * sz];
@@ -265,8 +276,27 @@ const JITTER: f32 = 1e-4;
 impl MeshShape {
     /// Index a (typically fitted) model for voxel queries.
     pub fn new(model: MeshModel) -> Self {
+        Self::with_occupancy_cap(model, OCCUPANCY_MAX_CORNERS)
+    }
+
+    /// [`MeshShape::new`] with the grid's occupancy-table cap overridden, in
+    /// corners. Only the tests use this: a cap of 0 forces the "table too big,
+    /// do not build it" path on a mesh small enough to voxelize in a
+    /// millisecond, instead of a 258-block cube whose buckets alone are about
+    /// 400 MB.
+    pub(crate) fn with_occupancy_cap(model: MeshModel, occupancy_cap: usize) -> Self {
+        // The surface field stores a triangle id per voxel as a u32 and keeps
+        // `u32::MAX` as its "no triangle" sentinel, so the last index must
+        // stay addressable.
+        assert!(
+            model.triangles.len() < u32::MAX as usize,
+            "MeshShape supports up to {} triangles ({} given): triangle ids are u32 \
+             and u32::MAX is the field's no-triangle sentinel",
+            u32::MAX as usize - 1,
+            model.triangles.len()
+        );
         let (min, max) = model.aabb().unwrap_or(([0.0; 3], [0.0; 3]));
-        let grid = TriGrid::build(&model.triangles, min, max);
+        let grid = TriGrid::build(&model.triangles, min, max, occupancy_cap);
         // Voxel (x, y, z) covers [x, x+1); keep every voxel whose cube
         // intersects the AABB.
         let bounds = (
@@ -404,6 +434,14 @@ impl MeshShape {
                                 seen[ti] = epoch;
                                 let q = closest_point_on_triangle(p, &d.triangles[ti].positions);
                                 let dist = distance(p, q);
+                                // A NaN distance loses no comparison, so a
+                                // single degenerate triangle would be kept as
+                                // the best candidate forever and the ring
+                                // early-out would never fire. Loaders drop
+                                // those triangles; this is the second line.
+                                if !dist.is_finite() {
+                                    continue;
+                                }
                                 if best.is_none_or(|(_, _, bd)| dist < bd) {
                                     best = Some((ti, q, dist));
                                 }
@@ -566,11 +604,14 @@ impl MeshShape {
     /// would nest one pass inside another, with every other worker parked on
     /// the `OnceLock` and unable to help.
     pub(crate) fn warm_surface_field(&self) {
-        let _ = self.surface_field();
-        // triangle_at falls back to the ring search for a voxel with no field
-        // entry, which reaches the grid's lazy occupancy table, so warm that
-        // too. None is a valid answer (the table is capped) and is cached.
+        // The occupancy table first: `compute_field` seeds from the triangles
+        // but `triangle_at` falls back to the ring search for a voxel with no
+        // field entry, and that reaches the grid's lazy table. Built here it
+        // is built once on this thread; left to a rayon worker it would park
+        // every other worker on the same `OnceLock`. `None` is a valid answer
+        // (the table is capped) and is cached either way.
         let _ = self.data.grid.occupancy();
+        let _ = self.surface_field();
     }
 
     /// Triangle claiming this voxel, from the field, falling back to the
@@ -975,11 +1016,15 @@ impl Shape for MeshShape {
                 let e1 = sub(t[1], t[0]);
                 let e2 = sub(t[2], t[0]);
                 let n = cross(e1, e2);
-                let len = (n[0] as f64).hypot(n[1] as f64).hypot(n[2] as f64);
+                // Plain arithmetic rather than `hypot`: `hypot` is a libm call
+                // whose native and wasm implementations need not agree to the
+                // last bit, and this value picks the shading bucket.
+                let (nx, ny, nz) = (n[0] as f64, n[1] as f64, n[2] as f64);
+                let len = (nx * nx + ny * ny + nz * nz).sqrt();
                 if len < 1e-12 {
                     (0.0, 1.0, 0.0)
                 } else {
-                    (n[0] as f64 / len, n[1] as f64 / len, n[2] as f64 / len)
+                    (nx / len, ny / len, nz / len)
                 }
             }
             None => (0.0, 1.0, 0.0),
@@ -1308,19 +1353,19 @@ f 4 7 3
         }
     }
 
-    /// Past `OCCUPANCY_MAX_CORNERS` no table is built and the search starts
-    /// at ring 0 again. Release only: the grid's own buckets are about
-    /// 400 MB at this size, and a debug build walks them far too slowly.
+    /// Over the cap no table is built and the search starts at ring 0 again.
+    /// The cap is a constructor parameter so this can be a size 9 cube with a
+    /// cap of one corner rather than a 258-block cube whose buckets alone are
+    /// about 400 MB to allocate in CI.
     #[test]
     fn an_oversized_grid_builds_no_table_and_still_finds_the_nearest_triangle() {
-        if cfg!(debug_assertions) {
-            return;
-        }
-        let shape = cube(258.0);
+        let mut model = MeshModel::from_obj_str(CUBE_OBJ).expect("cube parses");
+        model.fit(9.0);
+        let shape = MeshShape::with_occupancy_cap(model, 1);
         let grid = &shape.data.grid;
         assert!(
             (grid.dims[0] as usize + 1) * (grid.dims[1] as usize + 1) * (grid.dims[2] as usize + 1)
-                > OCCUPANCY_MAX_CORNERS,
+                > 1,
             "the probe mesh must be over the cap, dims are {:?}",
             grid.dims
         );
@@ -1341,6 +1386,47 @@ f 4 7 3
                 (dist - brute_force_distance(&shape, p)).abs() <= 1e-3,
                 "grid search missed the nearest triangle at {x},{y},{z}"
             );
+        }
+    }
+
+    /// A zero-area triangle makes `closest_point_on_triangle` divide by zero,
+    /// and NaN loses no comparison, so before the loaders dropped these one
+    /// bad face would win every nearest-triangle query on the mesh. The
+    /// degenerate face is last in the OBJ, so dropping it leaves the cube's
+    /// own triangle ids where they were and the two shapes must agree
+    /// exactly.
+    #[test]
+    fn a_degenerate_triangle_does_not_capture_the_nearest_triangle_search() {
+        // Vertex 9 repeated three times: a triangle of three coincident points.
+        let poisoned_obj = format!("{CUBE_OBJ}v 0.5 0.5 0.5\nf 9 9 9\n");
+        let mut poisoned = MeshModel::from_obj_str(&poisoned_obj).expect("cube parses");
+        let mut clean = MeshModel::from_obj_str(CUBE_OBJ).expect("cube parses");
+        assert_eq!(
+            poisoned.triangles.len(),
+            clean.triangles.len(),
+            "the degenerate face must be dropped at load"
+        );
+        poisoned.fit(8.0);
+        clean.fit(8.0);
+        let poisoned = MeshShape::new(poisoned);
+        let clean = MeshShape::new(clean);
+
+        let (x0, y0, z0, x1, y1, z1) = clean.data.bounds;
+        for x in x0..=x1 {
+            for y in y0..=y1 {
+                for z in z0..=z1 {
+                    let p = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
+                    let a = poisoned.nearest_triangle(p).expect("cube has triangles");
+                    let b = clean.nearest_triangle(p).expect("cube has triangles");
+                    assert_eq!(a.0, b.0, "different triangle at {x},{y},{z}");
+                    assert!(
+                        (a.2 - b.2).abs() <= 1e-6,
+                        "different distance at {x},{y},{z}: {} vs {}",
+                        a.2,
+                        b.2
+                    );
+                }
+            }
         }
     }
 
@@ -1416,6 +1502,79 @@ f 4 7 3
         assert!(
             elapsed.as_secs_f64() < 2.0,
             "size 128 solid fill took {elapsed:?}, budget is 2 s"
+        );
+    }
+
+    /// A brush that reads the normal and does nothing else with it. A real
+    /// shading brush (`ShadedBrush`) would work too, but its own colour math
+    /// costs about a microsecond per voxel and would dominate a size 128 fill,
+    /// leaving the budget below measuring the palette rather than the mesh.
+    /// This one costs a compare, so what the clock sees is the surface field.
+    struct NormalProbeBrush {
+        block: crate::BlockState,
+    }
+
+    impl crate::building::Brush for NormalProbeBrush {
+        fn get_block(
+            &self,
+            _x: i32,
+            _y: i32,
+            _z: i32,
+            normal: (f64, f64, f64),
+        ) -> Option<crate::BlockState> {
+            (normal.1 > -2.0).then(|| self.block.clone())
+        }
+
+        fn uses_normal(&self) -> bool {
+            true
+        }
+    }
+
+    /// The same case for a brush that does read the normal. `SolidBrush`
+    /// above never reaches `normal_at`, so it times the mask and nothing else;
+    /// this one pays for the surface field build and one field lookup per
+    /// voxel, which is the work the design's N^6 blowup used to live in.
+    /// Release only, for the same reason as the case above.
+    ///
+    /// The budget is 4 s rather than the solid case's 2 s, on measurement:
+    /// alone on the build host this fill takes 1.6 s to 1.9 s, and 2.0 s to
+    /// 2.3 s sharing the machine with the rest of the suite. Nearly all of it
+    /// is one phase of the field build, settling the medial voxels where two
+    /// triangles are exactly as close (13,590 of them at size 128, 1.35 s of
+    /// a 1.65 s build), each by a full ring search from deep inside the
+    /// sphere. That cost is the design's, not this test's, and it is linear
+    /// in the volume; what this guard exists to catch is a return to the
+    /// quadratic behaviour, which at size 128 is minutes, not seconds.
+    #[test]
+    fn size_128_normal_reading_fill_is_under_two_seconds() {
+        if cfg!(debug_assertions) {
+            return;
+        }
+        use crate::building::{Brush, BuildingTool};
+        use crate::voxelize::test_meshes::sphere_5k;
+        let mut model = MeshModel::from_obj_str(&sphere_5k()).expect("sphere parses");
+        model.fit(128.0);
+        let shape = MeshShape::new(model);
+        let brush = NormalProbeBrush {
+            block: crate::BlockState::new("minecraft:stone"),
+        };
+        assert!(
+            brush.uses_normal(),
+            "the point of this case is that normal_at runs"
+        );
+        let mut schematic = crate::UniversalSchematic::new("perf".to_string());
+
+        let started = std::time::Instant::now();
+        BuildingTool::new(&mut schematic).fill(&shape, &brush);
+        let elapsed = started.elapsed();
+
+        assert!(
+            schematic.total_blocks() > 1_000_000,
+            "the fill did real work"
+        );
+        assert!(
+            elapsed.as_secs_f64() < 4.0,
+            "size 128 normal reading fill took {elapsed:?}, budget is 4 s"
         );
     }
 }

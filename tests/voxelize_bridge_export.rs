@@ -77,6 +77,27 @@ fn replace_blocks_json_rewrites_and_counts() {
 }
 
 #[test]
+fn replace_blocks_json_counts_only_blocks_that_actually_changed() {
+    let mut s = sample();
+    // Stone to stone: every stone block matches the map, none of them moves,
+    // so nothing was changed.
+    let changed = s
+        .replace_blocks_json(br#"{"minecraft:stone":"minecraft:stone"}"#)
+        .expect("valid map");
+    assert_eq!(changed, 0, "a no-op map changes nothing");
+    let out = written(|w| s.count_blocks_json(w));
+    let counts: serde_json::Value = serde_json::from_str(&out).expect("valid JSON");
+    assert_eq!(counts["minecraft:stone"], 2, "and leaves the blocks alone");
+
+    // An id with no match in the schematic is likewise 0.
+    assert_eq!(
+        s.replace_blocks_json(br#"{"minecraft:diamond_block":"minecraft:glass"}"#)
+            .expect("valid map"),
+        0
+    );
+}
+
+#[test]
 fn packed_export_round_trips() {
     use base64::Engine as _;
     let s = sample();

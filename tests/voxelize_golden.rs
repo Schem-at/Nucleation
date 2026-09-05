@@ -3,9 +3,16 @@
 //!
 //! The fixture is generated once from unchanged code by the ignored test at
 //! the bottom of this file, then committed. Every later change must keep
-//! these three hashes.
+//! these hashes.
+//!
+//! Three of the four cases (`sphere_solid_32`, `sphere_shell_32`,
+//! `textured_cube_32`) are the v0.10.16 baseline and have not moved since.
+//! The fourth, `sphere_shaded_32`, did not exist in v0.10.16: it is a fresh
+//! pin taken at the head of the v0.10.17 work, and it is the only case that
+//! runs a brush whose `uses_normal()` is true, so it is the one that covers
+//! `MeshShape::normal_at` on curved geometry.
 
-use nucleation::building::{BlockPalette, BuildingTool, SolidBrush};
+use nucleation::building::{BlockPalette, BuildingTool, ShadedBrush, SolidBrush};
 use nucleation::voxelize::{test_meshes::sphere_5k, voxelize_textured, MeshModel, MeshShape};
 use nucleation::{BlockState, UniversalSchematic};
 use sha2::{Digest, Sha256};
@@ -44,12 +51,29 @@ fn fill_solid(shape: &MeshShape, name: &str) -> UniversalSchematic {
     schematic
 }
 
-/// The three pinned cases, as `case name -> (block count, sha256)`.
+/// A shaded fill: a fixed light direction and the 16 wool colours, so the
+/// only thing that can move the hash is `MeshShape::normal_at`.
+fn fill_shaded(shape: &MeshShape, name: &str) -> UniversalSchematic {
+    let mut schematic = UniversalSchematic::new(name.to_string());
+    let brush = ShadedBrush::new((200, 190, 170), (0.3, 0.9, 0.2))
+        .with_palette(std::sync::Arc::new(BlockPalette::new_wool()));
+    BuildingTool::new(&mut schematic).fill(shape, &brush);
+    schematic
+}
+
+/// The four pinned cases, as `case name -> (block count, sha256)`.
 fn cases() -> BTreeMap<String, (usize, String)> {
     let mut out = BTreeMap::new();
     out.insert(
         "sphere_solid_32".to_string(),
         digest(&fill_solid(&sphere(32.0), "sphere_solid_32")),
+    );
+    // New at v0.10.17, not a v0.10.16 baseline: the first case whose brush
+    // reads the surface normal, so the hash pins the surface field's normals
+    // over a curved mesh.
+    out.insert(
+        "sphere_shaded_32".to_string(),
+        digest(&fill_shaded(&sphere(32.0), "sphere_shaded_32")),
     );
     out.insert(
         "sphere_shell_32".to_string(),
@@ -73,7 +97,7 @@ fn cases() -> BTreeMap<String, (usize, String)> {
 const FIXTURE: &str = "tests/fixtures/voxelize_golden.json";
 
 #[test]
-fn voxelize_output_matches_the_v0_10_16_golden() {
+fn voxelize_output_matches_the_golden_fixture() {
     let raw = std::fs::read_to_string(FIXTURE).expect(
         "tests/fixtures/voxelize_golden.json is missing; regenerate it with \
          `cargo test --release --features voxelize --test voxelize_golden \
@@ -100,7 +124,9 @@ fn voxelize_output_matches_the_v0_10_16_golden() {
 
 /// One off generator. Run with `-- --ignored` on unchanged code, then commit
 /// the fixture. Never run it again to "fix" a failure: a failure means the
-/// output moved, which is the thing this file exists to catch.
+/// output moved, which is the thing this file exists to catch. It rewrites
+/// every case, so when a new case is added the diff on the fixture must show
+/// exactly one new key and nothing else.
 #[test]
 #[ignore]
 fn write_golden_fixture() {
