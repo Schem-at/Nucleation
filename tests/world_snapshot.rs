@@ -349,6 +349,34 @@ fn worker_cli_indexes_extracts_and_certifies_an_empty_rectangle() {
         assert_eq!(report["builds"], expected);
         assert!(output.join(report["catalog"].as_str().unwrap()).is_file());
     }
+    let clipped = fixture.0.join("clipped");
+    let run = std::process::Command::new(env!("CARGO_BIN_EXE_segment_world"))
+        .args([
+            manifest.to_str().unwrap(),
+            clipped.to_str().unwrap(),
+            "0",
+            "0",
+            "511",
+            "511",
+            "--snapshot-store",
+            objects.to_str().unwrap(),
+            "--source-id",
+            "test:world",
+            "--substrate",
+            "minecraft:stone",
+            "--substrate-band",
+            "0,0",
+            "--split-min-blocks",
+            "100000",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        !run.status.success(),
+        "implicit selection cannot certify a clipped build"
+    );
+    assert!(String::from_utf8_lossy(&run.stderr).contains("uncertified extraction boundary"));
+    assert!(!clipped.join("completion.json").exists());
 }
 
 #[test]

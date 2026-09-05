@@ -17,8 +17,10 @@ Consumers should batch and bound event storage, fence by worker attempt/lease, h
 
 The 2D source map can use these links to highlight candidate → stitched-group → final-piece ancestry. Background images, plot-owner hints and Dynmap projections belong to the application, not this extraction protocol. They must not become implicit segmentation inputs.
 
-## Explicit source gaps (0.10.17)
+## Explicit source gaps (0.10.18)
 
 Snapshot extraction defaults to `--empty-region-policy reject`. An operator may explicitly select `acknowledge-zero-byte` to process around zero-byte MCA placeholders. The immutable manifest retains the original error and content-addressed bytes. Actual objects must still exist and pass their length and BLAKE3 checks; nonempty corrupt regions always fail.
 
 The completion receipt includes `empty_region_policy`, `coverage` (`complete` or `acknowledged_gaps`), and sorted `acknowledged_zero_byte_regions` coordinate pairs. `complete: true` means the configured extraction completed, not that missing bytes were recovered. Consumers must surface the gaps, pin the policy in extraction identities, and never infer deletions inside unobserved regions. Coverage/boundary checks remain enabled.
+
+Only explicit partition hints or grid definitions certify hard-cut boundaries. The CLI's implicit `selection` partition is never accepted as a certificate: arbitrary selections must leave an empty margin around content. The 0.10.17 release attempt was stopped before publication to include this guard regression fix in 0.10.18.

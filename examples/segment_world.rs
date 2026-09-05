@@ -972,10 +972,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let input_source = source(&cli);
+    // "selection" is an internal segmentation convenience, not independent
+    // evidence of a safe boundary. Only explicit caller-owned partitions may
+    // certify hard cuts; unpartitioned selections require an empty margin.
+    let no_certified_partitions = PartitionIndex::new(vec![]);
+    let certified_partitions = if cli.partition_hints.is_some() || cli.grid.is_some() {
+        &partitions
+    } else {
+        &no_certified_partitions
+    };
     let checked = nucleation::world_segment::coverage::CoverageCheckedTiles {
         source: input_source.as_ref(),
         profile: &profile,
-        partitions: &partitions,
+        partitions: certified_partitions,
         rect: cli.rect,
         margin: 16i32.saturating_add(cli.component_join_gap as i32),
         drop_unpartitioned,
