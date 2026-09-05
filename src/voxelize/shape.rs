@@ -567,6 +567,10 @@ impl MeshShape {
     /// the `OnceLock` and unable to help.
     pub(crate) fn warm_surface_field(&self) {
         let _ = self.surface_field();
+        // triangle_at falls back to the ring search for a voxel with no field
+        // entry, which reaches the grid's lazy occupancy table, so warm that
+        // too. None is a valid answer (the table is capped) and is cached.
+        let _ = self.data.grid.occupancy();
     }
 
     /// Triangle claiming this voxel, from the field, falling back to the

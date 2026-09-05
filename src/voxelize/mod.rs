@@ -22,6 +22,14 @@ use crate::{BlockState, UniversalSchematic};
 /// Fallback color for voxels with no texture information (mid-gray).
 const FALLBACK_RGB: [u8; 3] = [128, 128, 128];
 
+/// Forces [`voxelize_textured`] down its sequential path on every target.
+/// A test hook, so the sequential and the rayon path can be pinned to the
+/// same output in one test binary, and an escape hatch for a host that does
+/// not want the voxelizer taking the rayon pool. Not part of the API.
+#[doc(hidden)]
+pub static VOXELIZE_FORCE_SEQUENTIAL: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 /// Voxelize `model_shape` into a schematic, coloring every solid voxel with
 /// the palette block closest to its nearest-surface texture color. Interior
 /// voxels inherit the color of the nearest surface point (they are hidden
@@ -80,6 +88,9 @@ pub fn voxelize_textured(
         });
         slots.push(slot);
     }
+    // The slots carry everything the rest of the walk needs, so give the
+    // sampled colours back here: 20 bytes per voxel at the peak, 16 after.
+    drop(colors);
 
     // One palette scan per distinct colour, in parallel on native. The scan
     // itself is unchanged, so every voxel still gets the entry the per voxel
@@ -113,10 +124,10 @@ pub fn voxelize_textured(
 }
 
 /// Whether the textured walk may use rayon. Native yes, wasm32 no (it has no
-/// thread pool worth the name), and `NUCLEATION_VOXELIZE_SEQUENTIAL` forces
-/// the sequential path anywhere, which is how the two are tested against each
+/// thread pool worth the name), and [`VOXELIZE_FORCE_SEQUENTIAL`] forces the
+/// sequential path anywhere, which is how the two are tested against each
 /// other.
 fn use_parallel() -> bool {
     cfg!(not(target_arch = "wasm32"))
-        && std::env::var_os("NUCLEATION_VOXELIZE_SEQUENTIAL").is_none()
+        && !VOXELIZE_FORCE_SEQUENTIAL.load(std::sync::atomic::Ordering::Relaxed)
 }

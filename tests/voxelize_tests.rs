@@ -337,10 +337,13 @@ fn the_textured_memo_matches_an_uncached_walk() {
 }
 
 /// The colour sampling runs on rayon by default and sequentially when
-/// NUCLEATION_VOXELIZE_SEQUENTIAL is set (the wasm path, and the escape
-/// hatch for a single threaded host). Both must place the same blocks.
+/// VOXELIZE_FORCE_SEQUENTIAL is set (the wasm path, and the escape hatch for
+/// a single threaded host). Both must place the same blocks.
 #[test]
 fn the_sequential_sampling_path_matches_the_parallel_one() {
+    use nucleation::voxelize::VOXELIZE_FORCE_SEQUENTIAL;
+    use std::sync::atomic::Ordering;
+
     let bytes = std::fs::read("tests/samples/BoxTextured.glb").expect("committed sample");
     let mut model = MeshModel::from_glb_bytes(&bytes).expect("BoxTextured loads");
     model.fit(16.0);
@@ -349,9 +352,11 @@ fn the_sequential_sampling_path_matches_the_parallel_one() {
 
     let parallel = voxelize_textured(&shape, &palette, "parallel");
 
-    std::env::set_var("NUCLEATION_VOXELIZE_SEQUENTIAL", "1");
+    // A sibling test that runs while the flag is up simply takes the
+    // sequential path, which this test is here to prove is the same output.
+    VOXELIZE_FORCE_SEQUENTIAL.store(true, Ordering::Relaxed);
     let sequential = voxelize_textured(&shape, &palette, "sequential");
-    std::env::remove_var("NUCLEATION_VOXELIZE_SEQUENTIAL");
+    VOXELIZE_FORCE_SEQUENTIAL.store(false, Ordering::Relaxed);
 
     assert!(parallel.total_blocks() > 0);
     assert_eq!(sequential.total_blocks(), parallel.total_blocks());
