@@ -30,6 +30,12 @@ struct TriGrid {
     occupancy: OnceLock<Vec<u32>>,
 }
 
+/// Largest occupancy table `TriGrid` will build, in corners. 2^24 corners is
+/// 64 MiB of `u32`, which a grid of about 256 cells per axis reaches. Past
+/// that the table costs more memory and more build time than the ring skip
+/// saves, so it is not built at all.
+const OCCUPANCY_MAX_CORNERS: usize = 1 << 24;
+
 impl TriGrid {
     const CELL: f32 = 1.0;
 
@@ -78,14 +84,21 @@ impl TriGrid {
 
     /// Inclusive prefix sums over the bucket sizes, on a grid one larger in
     /// each axis so the box query below needs no bounds special cases.
-    fn occupancy(&self) -> &[u32] {
-        self.occupancy.get_or_init(|| {
+    /// `None` once the table would cost more than it saves: past
+    /// `OCCUPANCY_MAX_CORNERS` the search simply starts at ring 0 again,
+    /// which is slower but correct and costs no memory.
+    fn occupancy(&self) -> Option<&[u32]> {
+        let ps = self.occupancy.get_or_init(|| {
             let (dy, dz) = (self.dims[1] as usize, self.dims[2] as usize);
             let (sx, sy, sz) = (
                 self.dims[0] as usize + 1,
                 self.dims[1] as usize + 1,
                 self.dims[2] as usize + 1,
             );
+            // An empty table is the "too big, do not build" marker.
+            if sx.saturating_mul(sy).saturating_mul(sz) > OCCUPANCY_MAX_CORNERS {
+                return Vec::new();
+            }
             let mut ps = vec![0u32; sx * sy * sz];
             for x in 1..sx {
                 for y in 1..sy {
@@ -102,14 +115,14 @@ impl TriGrid {
                 }
             }
             ps
-        })
+        });
+        (!ps.is_empty()).then_some(ps.as_slice())
     }
 
     /// Triangle registrations inside the inclusive cell box, already clamped
     /// to the grid by the caller.
-    fn count_in(&self, lo: [i32; 3], hi: [i32; 3]) -> u32 {
-        let ps = self.occupancy();
-        let (sy, sz) = (self.dims[1] as usize + 1, self.dims[2] as usize + 1);
+    fn count_in(ps: &[u32], dims: [i32; 3], lo: [i32; 3], hi: [i32; 3]) -> u32 {
+        let (sy, sz) = (dims[1] as usize + 1, dims[2] as usize + 1);
         let at =
             |x: i32, y: i32, z: i32| ps[(x as usize * sy + y as usize) * sz + z as usize] as i64;
         let (x0, y0, z0) = (lo[0], lo[1], lo[2]);
@@ -124,8 +137,12 @@ impl TriGrid {
 
     /// Smallest Chebyshev ring around `start` that holds any triangle at all.
     /// Every smaller ring is empty, so a search may begin here without
-    /// changing which triangle it finds first.
+    /// changing which triangle it finds first. Falls back to 0 (start where
+    /// the search always did) when there is no occupancy table.
     fn first_occupied_ring(&self, start: [i32; 3], max_r: i32) -> i32 {
+        let Some(ps) = self.occupancy() else {
+            return 0;
+        };
         let box_of = |r: i32| {
             (
                 [
@@ -140,15 +157,22 @@ impl TriGrid {
                 ],
             )
         };
-        let (lo, hi) = box_of(max_r);
-        if self.count_in(lo, hi) == 0 {
+        let count = |r: i32| {
+            let (lo, hi) = box_of(r);
+            Self::count_in(ps, self.dims, lo, hi)
+        };
+        // The common case by far: a voxel near the surface, whose own cell
+        // already holds triangles. No search needed.
+        if count(0) > 0 {
+            return 0;
+        }
+        if count(max_r) == 0 {
             return max_r + 1;
         }
-        let (mut low, mut high) = (0i32, max_r);
+        let (mut low, mut high) = (1i32, max_r);
         while low < high {
             let mid = low + (high - low) / 2;
-            let (lo, hi) = box_of(mid);
-            if self.count_in(lo, hi) == 0 {
+            if count(mid) == 0 {
                 low = mid + 1;
             } else {
                 high = mid;
@@ -309,15 +333,15 @@ impl MeshShape {
         crossings % 2 == 1
     }
 
-    /// Nearest triangle to `p`: `(triangle index, closest point, distance)`.
-    /// Grid-accelerated expanding-ring search. `None` for an empty mesh.
-    /// `nearest_triangle`, but allowed to give up early once no triangle
-    /// can be within `limit` — the cheap query the shell test needs.
+    /// `nearest_triangle`, reported only when the hit is within `limit`:
+    /// the query the shell test needs.
     fn nearest_triangle_within(&self, p: [f32; 3], limit: f32) -> Option<(usize, [f32; 3], f32)> {
         let hit = self.nearest_triangle(p)?;
         (hit.2 <= limit).then_some(hit)
     }
 
+    /// Nearest triangle to `p`: `(triangle index, closest point, distance)`.
+    /// Grid-accelerated expanding-ring search. `None` for an empty mesh.
     fn nearest_triangle(&self, p: [f32; 3]) -> Option<(usize, [f32; 3], f32)> {
         let d = &self.data;
         if d.triangles.is_empty() {
@@ -712,11 +736,17 @@ impl MeshShape {
         // can apply is more right than another, so the ring search settles
         // them, which keeps the historical answer byte for byte. They are the
         // medial set, O(N^2) of an O(N^3) volume, and they are settled once
-        // here in parallel rather than on every lookup.
+        // here in parallel rather than on every lookup. Only voxels inside
+        // the solid mask are worth settling: those are the ones a fill or a
+        // textured pass ever asks about. A contested voxel outside the mask
+        // (the seed pass claims a ring of air around the surface too) keeps
+        // the seed reduction's answer, which is a triangle exactly as close.
         let ties: Vec<usize> = contested
             .iter()
             .enumerate()
-            .filter(|(idx, &c)| c && tri[*idx] != NO_TRI)
+            .filter(|(idx, &c)| {
+                c && tri[*idx] != NO_TRI && mask.bits[*idx >> 6] >> (*idx & 63) & 1 == 1
+            })
             .map(|(idx, _)| idx)
             .collect();
         let resolved: Vec<u32> = ties
@@ -1148,6 +1178,202 @@ mod surface_field_tests {
             }
         }
         assert!(checked > 200, "only {checked} surface voxels checked");
+    }
+
+    /// Closed unit cube, 12 triangles, so that the medial planes give the
+    /// field plenty of exact ties to settle.
+    const CUBE_OBJ: &str = "
+v 0 0 0
+v 1 0 0
+v 1 1 0
+v 0 1 0
+v 0 0 1
+v 1 0 1
+v 1 1 1
+v 0 1 1
+f 1 3 2
+f 1 4 3
+f 5 6 7
+f 5 7 8
+f 1 5 8
+f 1 8 4
+f 2 3 7
+f 2 7 6
+f 1 2 6
+f 1 6 5
+f 4 8 7
+f 4 7 3
+";
+
+    fn cube(size: f32) -> MeshShape {
+        let mut model = MeshModel::from_obj_str(CUBE_OBJ).expect("cube parses");
+        model.fit(size);
+        MeshShape::new(model)
+    }
+
+    /// Nearest triangle by walking every triangle, the answer the grid
+    /// search is an optimisation of. Ties go to the lowest index, so this
+    /// only pins the distance, which is what the probes below compare.
+    fn brute_force_distance(shape: &MeshShape, p: [f32; 3]) -> f32 {
+        shape
+            .data
+            .triangles
+            .iter()
+            .map(|t| distance(p, closest_point_on_triangle(p, &t.positions)))
+            .fold(f32::INFINITY, f32::min)
+    }
+
+    /// The eight term inclusion-exclusion is easy to get wrong by one, so
+    /// check it against a plain sum over the buckets, including boxes that
+    /// touch every face of the grid.
+    #[test]
+    fn count_in_matches_a_brute_force_bucket_sum() {
+        let shape = cube(6.0);
+        let grid = &shape.data.grid;
+        let ps = grid
+            .occupancy()
+            .expect("a size 6 grid is well under the cap");
+        let [dx, dy, dz] = grid.dims;
+        let boxes = [
+            ([0, 0, 0], [dx - 1, dy - 1, dz - 1]),
+            ([0, 0, 0], [0, 0, 0]),
+            ([dx - 1, dy - 1, dz - 1], [dx - 1, dy - 1, dz - 1]),
+            ([0, 0, 0], [dx - 1, 0, 0]),
+            ([0, dy / 2, 0], [dx - 1, dy - 1, dz - 1]),
+            ([1, 1, 1], [dx - 2, dy - 2, dz - 2]),
+            ([dx / 2, 0, dz / 2], [dx / 2, dy - 1, dz / 2]),
+        ];
+        for (lo, hi) in boxes {
+            let mut want = 0u32;
+            for cx in lo[0]..=hi[0] {
+                for cy in lo[1]..=hi[1] {
+                    for cz in lo[2]..=hi[2] {
+                        want += grid.bucket([cx, cy, cz]).len() as u32;
+                    }
+                }
+            }
+            assert_eq!(
+                TriGrid::count_in(ps, grid.dims, lo, hi),
+                want,
+                "box {lo:?}..={hi:?}"
+            );
+        }
+    }
+
+    /// The occupancy table is an optimisation, so the search must give the
+    /// same answers without it. This forces the "table not built" state the
+    /// cap produces on a huge grid, without allocating a huge grid.
+    #[test]
+    fn the_ring_search_agrees_with_and_without_the_occupancy_table() {
+        let with_table = cube(9.0);
+        let without_table = cube(9.0);
+        without_table
+            .data
+            .grid
+            .occupancy
+            .set(Vec::new())
+            .expect("occupancy not built yet");
+        assert!(without_table.data.grid.occupancy().is_none());
+        assert!(with_table.data.grid.occupancy().is_some());
+
+        let (x0, y0, z0, x1, y1, z1) = with_table.data.bounds;
+        for x in x0..=x1 {
+            for y in y0..=y1 {
+                for z in z0..=z1 {
+                    let p = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
+                    let a = with_table.nearest_triangle(p).expect("cube has triangles");
+                    let b = without_table
+                        .nearest_triangle(p)
+                        .expect("cube has triangles");
+                    assert_eq!(a.0, b.0, "different triangle at {x},{y},{z}");
+                    assert!(
+                        (a.2 - brute_force_distance(&with_table, p)).abs() <= 1e-4,
+                        "grid search missed the nearest triangle at {x},{y},{z}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Past `OCCUPANCY_MAX_CORNERS` no table is built and the search starts
+    /// at ring 0 again. Release only: the grid's own buckets are about
+    /// 400 MB at this size, and a debug build walks them far too slowly.
+    #[test]
+    fn an_oversized_grid_builds_no_table_and_still_finds_the_nearest_triangle() {
+        if cfg!(debug_assertions) {
+            return;
+        }
+        let shape = cube(258.0);
+        let grid = &shape.data.grid;
+        assert!(
+            (grid.dims[0] as usize + 1) * (grid.dims[1] as usize + 1) * (grid.dims[2] as usize + 1)
+                > OCCUPANCY_MAX_CORNERS,
+            "the probe mesh must be over the cap, dims are {:?}",
+            grid.dims
+        );
+        assert!(grid.occupancy().is_none(), "the cap must skip the table");
+
+        let (x0, y0, z0, x1, y1, z1) = shape.data.bounds;
+        let probes = [
+            (x0, y0, z0),
+            (x1, y1, z1),
+            ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2),
+            (x0 + 3, (y0 + y1) / 2, z1 - 3),
+            ((x0 + x1) / 2, y0 + 1, (z0 + z1) / 2),
+        ];
+        for (x, y, z) in probes {
+            let p = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
+            let (_, _, dist) = shape.nearest_triangle(p).expect("cube has triangles");
+            assert!(
+                (dist - brute_force_distance(&shape, p)).abs() <= 1e-3,
+                "grid search missed the nearest triangle at {x},{y},{z}"
+            );
+        }
+    }
+
+    /// The interior of a cube is all exact ties between two or three faces,
+    /// which is exactly what the field cannot decide on its own. Every voxel
+    /// of the mask, interior included, must still report the triangle the
+    /// ring search reports.
+    #[test]
+    fn every_mask_voxel_reports_the_ring_search_triangle() {
+        let shape = cube(14.0);
+        let mask = shape.solid_mask();
+        let (x0, y0, z0, x1, y1, z1) = shape.data.bounds;
+        let mut interior = 0usize;
+        for x in x0..=x1 {
+            for y in y0..=y1 {
+                for z in z0..=z1 {
+                    if !mask.get(x, y, z) {
+                        continue;
+                    }
+                    let p = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
+                    let want = shape.nearest_triangle(p).map(|(ti, _, _)| ti);
+                    assert_eq!(
+                        shape.triangle_at(x, y, z),
+                        want,
+                        "field disagrees with the ring search at {x},{y},{z}"
+                    );
+                    let on_surface = [
+                        (1, 0, 0),
+                        (-1, 0, 0),
+                        (0, 1, 0),
+                        (0, -1, 0),
+                        (0, 0, 1),
+                        (0, 0, -1),
+                    ]
+                    .iter()
+                    .any(|(dx, dy, dz)| !mask.get(x + dx, y + dy, z + dz));
+                    if !on_surface {
+                        interior += 1;
+                    }
+                }
+            }
+        }
+        assert!(
+            interior > 500,
+            "only {interior} interior voxels checked, the ties live in there"
+        );
     }
 
     /// Release-mode budget for the case the design calls out: a size 128
