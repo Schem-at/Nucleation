@@ -24,6 +24,8 @@ use nucleation::{Connectivity, ProvenanceBounds, SchematicProvenance};
 
 struct Cli {
     input: String,
+    snapshot_store: Option<String>,
+    progress_json: bool,
     world_prefix: Option<String>,
     output: String,
     rect: (i32, i32, i32, i32),
@@ -78,7 +80,11 @@ const USAGE: &str = "usage: segment_world <world-dir|world.tar[.gz|.zst]> <out-d
      [--component-attach-mode exact|nearby|nearest] \
      [--component-join-gap BLOCKS] \
      [--component-min-blocks COUNT] \
-     [--world-prefix STORE_KEY_TO_REGION_DIR]";
+     [--world-prefix STORE_KEY_TO_REGION_DIR] \
+     [--snapshot-store STORE_DIR_OR_URI] [--progress-json true|false]\n\
+index: segment_world index <world-dir|archive|store-uri> <snapshot-store> \
+     --source-id ID [--dimension ID] [--world-prefix REGION_PREFIX] \
+     [--previous-manifest FILE.json] [--capture-unreadable true|false]";
 
 fn parse_args() -> Cli {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -115,6 +121,8 @@ fn parse_args() -> Cli {
         .to_string();
     let mut cli = Cli {
         input,
+        snapshot_store: None,
+        progress_json: false,
         world_prefix: None,
         output: args[1].clone(),
         rect: (x0.min(x1), z0.min(z1), x0.max(x1), z0.max(z1)),
@@ -148,6 +156,8 @@ fn parse_args() -> Cli {
             .get(index + 1)
             .unwrap_or_else(|| panic!("{} requires a value", args[index]));
         match args[index].as_str() {
+            "--snapshot-store" => cli.snapshot_store = Some(value.clone()),
+            "--progress-json" => cli.progress_json = value == "true",
             "--source-id" => cli.source_id = value.clone(),
             "--world-name" => cli.world_name = value.clone(),
             "--map-name" => cli.map_name = value.clone(),
@@ -294,6 +304,10 @@ fn parse_args() -> Cli {
         "--substrate and --substrate-band must be supplied together"
     );
     assert!(
+        cli.component_join_gap <= 64,
+        "--component-join-gap must be in 0..=64"
+    );
+    assert!(
         cli.grid.is_some() || cli.grid_index_bounds.is_none(),
         "--grid-index-bounds requires grid options"
     );
@@ -318,6 +332,29 @@ fn parse_args() -> Cli {
 }
 
 fn source(cli: &Cli) -> Box<dyn TileSource> {
+    if let Some(store_uri) = &cli.snapshot_store {
+        use nucleation::world_segment::snapshot::{SnapshotManifest, SnapshotTiles};
+        let manifest = SnapshotManifest::from_bytes(
+            &std::fs::read(&cli.input).expect("read sealed snapshot manifest"),
+        )
+        .expect("validate snapshot manifest");
+        assert_eq!(
+            manifest.source_id, cli.source_id,
+            "snapshot source identity mismatch"
+        );
+        assert_eq!(
+            manifest.dimension, cli.dimension,
+            "snapshot dimension mismatch"
+        );
+        let store: Box<dyn nucleation::store::Store> = if store_uri.contains("://") {
+            nucleation::store::open(store_uri).expect("open snapshot store")
+        } else {
+            Box::new(nucleation::store::FsStore::new(store_uri))
+        };
+        return Box::new(
+            SnapshotTiles::new(manifest, store, cli.rect).expect("open snapshot source"),
+        );
+    }
     if let Some(prefix) = &cli.world_prefix {
         let store = nucleation::store::open(&cli.input)
             .unwrap_or_else(|e| panic!("failed to open input store {}: {e}", cli.input));
@@ -508,8 +545,78 @@ fn output_store(
     }
 }
 
+fn index_command() -> Result<(), Box<dyn std::error::Error>> {
+    use nucleation::world_segment::snapshot::{index_snapshot_with_policy, SnapshotManifest};
+    let args: Vec<String> = std::env::args().skip(2).collect();
+    if args.len() < 2 {
+        return Err("usage: segment_world index INPUT SNAPSHOT_STORE --source-id ID [--dimension ID] [--world-prefix PREFIX] [--previous-manifest PATH]".into());
+    }
+    let mut source_id = None;
+    let mut dimension = "minecraft:overworld".to_string();
+    let mut prefix = None;
+    let mut previous = None;
+    let mut capture_unreadable = false;
+    let mut index = 2;
+    while index < args.len() {
+        let value = args.get(index + 1).ok_or("index option requires a value")?;
+        match args[index].as_str() {
+            "--source-id" => source_id = Some(value.as_str()),
+            "--dimension" => dimension = value.clone(),
+            "--world-prefix" => prefix = Some(value.as_str()),
+            "--capture-unreadable" => {
+                capture_unreadable = value
+                    .parse()
+                    .map_err(|_| "--capture-unreadable expects true or false")?
+            }
+            "--previous-manifest" => {
+                previous = Some(SnapshotManifest::from_bytes(&std::fs::read(value)?)?)
+            }
+            _ => return Err(format!("unknown index option: {}", args[index]).into()),
+        }
+        index += 2;
+    }
+    let store: Box<dyn nucleation::store::Store> = if args[1].contains("://") {
+        nucleation::store::open(&args[1])?
+    } else {
+        Box::new(nucleation::store::FsStore::new(&args[1]))
+    };
+    index_snapshot_with_policy(
+        &args[0],
+        store.as_ref(),
+        source_id.ok_or("--source-id is required")?,
+        &dimension,
+        prefix,
+        previous.as_ref(),
+        capture_unreadable,
+        &mut |event| {
+            println!(
+                "{}",
+                serde_json::to_string(event).expect("serialize snapshot progress")
+            );
+        },
+    )?;
+    Ok(())
+}
+
+fn progress(cli: &Cli, event: &str, details: serde_json::Value) {
+    if cli.progress_json {
+        println!(
+            "{}",
+            serde_json::json!({"protocol": 1, "event": event, "details": details})
+        );
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().nth(1).as_deref() == Some("index") {
+        return index_command();
+    }
     let cli = parse_args();
+    progress(
+        &cli,
+        "extraction_started",
+        serde_json::json!({"bounds": cli.rect, "engine_version": env!("CARGO_PKG_VERSION")}),
+    );
     let store = output_store(&cli)?;
     store.health()?;
 
@@ -526,7 +633,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             samples.push(tile);
             Ok(())
         })?;
-        if samples.is_empty() {
+        if samples.is_empty() && cli.snapshot_store.is_none() {
             return Err("the selected rectangle contained no readable region data".into());
         }
         WorldProfile::derive(
@@ -569,6 +676,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         profile.substrate_y_band, profile.substrate_palette
     );
     drop(samples);
+    progress(
+        &cli,
+        "profile_ready",
+        serde_json::json!({"substrate": profile.substrate_palette, "substrate_band": profile.substrate_y_band, "profile_hash": profile.profile_hash().to_string()}),
+    );
 
     let (partitions, partition_metadata, partition_catalog_hash) = partitions(&cli);
     let partition_floor_share =
@@ -826,6 +938,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let bytes = to_schematic(&piece).expect("serialize schematic");
             store.put(&key, &bytes).expect("store schematic");
             written += 1;
+            progress(
+                &cli,
+                "build_extracted",
+                serde_json::json!({"builds": written, "stable_id": provenance.stable_build_id.to_string(), "blocks": provenance.block_count, "tier": provenance.tier}),
+            );
             println!(
                 "segment_world: wrote {} ({} blocks, {:?}, {} block entities)",
                 key,
@@ -836,14 +953,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let stats: RunStats = WorldSegmenter::run_streaming(
-        source(&cli).as_ref(),
+    let input_source = source(&cli);
+    let checked = nucleation::world_segment::coverage::CoverageCheckedTiles {
+        source: input_source.as_ref(),
+        profile: &profile,
+        partitions: &partitions,
+        rect: cli.rect,
+        margin: 16i32.saturating_add(cli.component_join_gap as i32),
+        drop_unpartitioned,
+    };
+    let extraction_source: &dyn TileSource = if cli.snapshot_store.is_some() {
+        &checked
+    } else {
+        input_source.as_ref()
+    };
+    let stats: RunStats = WorldSegmenter::try_run_streaming(
+        extraction_source,
         &profile,
         &partitions,
         &job,
         &[],
         &mut emit,
-    );
+    )?;
     let catalog_key = format!(
         "catalog/x{}_{}_z{}_{}.jsonl",
         cli.rect.0, cli.rect.2, cli.rect.1, cli.rect.3
@@ -853,6 +984,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         catalog.push('\n');
     }
     store.put(&catalog_key, catalog.as_bytes())?;
+    let completion = serde_json::json!({"protocol": 1, "event": "extraction_completed", "complete": cli.snapshot_store.is_some(),
+        "builds": written, "catalog": catalog_key, "source_hash": cli.snapshot_id,
+        "bounds": cli.rect, "profile_hash": profile.profile_hash().to_string(), "stats": stats});
+    store.put("completion.json", &serde_json::to_vec(&completion)?)?;
+    progress(&cli, "extraction_completed", completion);
     println!("segment_world: {stats:?}; wrote {written} schematics");
     Ok(())
 }

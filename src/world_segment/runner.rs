@@ -23,7 +23,7 @@ use crate::world_segment::profile::WorldProfile;
 use crate::world_segment::provenance::Provenance;
 use crate::world_segment::score::{score, ScoreConfig, Tier};
 use crate::world_segment::segment::{segment_tile_membership, SegConfig};
-use crate::world_segment::source::TileSource;
+use crate::world_segment::source::{TileError, TileSource};
 use crate::world_segment::stitch::StitchState;
 use crate::Connectivity;
 
@@ -180,6 +180,20 @@ impl WorldSegmenter {
         prior: &[PriorBuild],
         emit: &mut dyn FnMut(MaterializedBuild),
     ) -> RunStats {
+        Self::try_run_streaming(source, profile, partitions, job, prior, emit)
+            .expect("tile source failed")
+    }
+
+    /// Fallible worker API. A source failure is returned before any build is
+    /// emitted, so callers cannot mistake a partial read for deleted builds.
+    pub fn try_run_streaming(
+        source: &dyn TileSource,
+        profile: &WorldProfile,
+        partitions: &PartitionIndex,
+        job: &SegmentJob,
+        prior: &[PriorBuild],
+        emit: &mut dyn FnMut(MaterializedBuild),
+    ) -> Result<RunStats, TileError> {
         let mut stitch = StitchState::empty();
         // Every surviving (non-substrate, non-dropped-cluster) block, grouped
         // by the per-tile ClusterId it belonged to before stitching. A build's
@@ -197,68 +211,63 @@ impl WorldSegmenter {
             BTreeMap<(i32, i32, i32), BlockEntity>,
         > = BTreeMap::new();
 
-        source
-            .for_each_tile(&mut |tile| {
-                let (segs, membership) =
-                    segment_tile_membership(&tile, profile, &job.config, partitions);
-                stitch = StitchState::merge(
-                    std::mem::replace(&mut stitch, StitchState::empty()),
-                    StitchState::from(&segs, job.config.cell_size, job.min_y),
-                    job.config.closing_radius,
-                );
+        source.for_each_tile(&mut |tile| {
+            let (segs, membership) =
+                segment_tile_membership(&tile, profile, &job.config, partitions);
+            stitch = StitchState::merge(
+                std::mem::replace(&mut stitch, StitchState::empty()),
+                StitchState::from(&segs, job.config.cell_size, job.min_y),
+                job.config.closing_radius,
+            );
 
-                // Built once per tile, not once per membership entry.
-                let tile_blocks: BTreeMap<(i32, i32, i32), BlockState> =
-                    tile.blocks().map(|(p, b)| (p, b.clone())).collect();
-                let membership_by_pos: BTreeMap<(i32, i32, i32), ClusterId> =
-                    membership.iter().map(|(pos, cid)| (*pos, *cid)).collect();
-                let mut support_membership_by_pos = BTreeMap::new();
-                for (&pos, &cid) in &membership_by_pos {
-                    if let Some(block) = tile_blocks.get(&pos) {
-                        blocks_by_cluster
+            // Built once per tile, not once per membership entry.
+            let tile_blocks: BTreeMap<(i32, i32, i32), BlockState> =
+                tile.blocks().map(|(p, b)| (p, b.clone())).collect();
+            let membership_by_pos: BTreeMap<(i32, i32, i32), ClusterId> =
+                membership.iter().map(|(pos, cid)| (*pos, *cid)).collect();
+            let mut support_membership_by_pos = BTreeMap::new();
+            for (&pos, &cid) in &membership_by_pos {
+                if let Some(block) = tile_blocks.get(&pos) {
+                    blocks_by_cluster
+                        .entry(cid)
+                        .or_default()
+                        .insert(pos, block.clone());
+                }
+                if job.config.preserve_support_blocks {
+                    let Some(support_y) = pos.1.checked_sub(1) else {
+                        continue;
+                    };
+                    let support = (pos.0, support_y, pos.2);
+                    // A block that already survived subtraction is normal
+                    // build content, not support-only enrichment.
+                    if membership_by_pos.contains_key(&support) {
+                        continue;
+                    }
+                    if let Some(block) = tile_blocks.get(&support) {
+                        supports_by_cluster
                             .entry(cid)
                             .or_default()
-                            .insert(pos, block.clone());
-                    }
-                    if job.config.preserve_support_blocks {
-                        let Some(support_y) = pos.1.checked_sub(1) else {
-                            continue;
-                        };
-                        let support = (pos.0, support_y, pos.2);
-                        // A block that already survived subtraction is normal
-                        // build content, not support-only enrichment.
-                        if membership_by_pos.contains_key(&support) {
-                            continue;
-                        }
-                        if let Some(block) = tile_blocks.get(&support) {
-                            supports_by_cluster
-                                .entry(cid)
-                                .or_default()
-                                .insert(support, block.clone());
-                            support_membership_by_pos.insert(support, cid);
-                        }
+                            .insert(support, block.clone());
+                        support_membership_by_pos.insert(support, cid);
                     }
                 }
-                for block_entity in tile.block_entities() {
-                    if let Some(cid) = membership_by_pos.get(&block_entity.position) {
-                        block_entities_by_cluster
-                            .entry(*cid)
-                            .or_default()
-                            .insert(block_entity.position, block_entity.clone());
-                    } else if let Some(cid) = support_membership_by_pos.get(&block_entity.position)
-                    {
-                        support_entities_by_cluster
-                            .entry(*cid)
-                            .or_default()
-                            .insert(block_entity.position, block_entity.clone());
-                    }
+            }
+            for block_entity in tile.block_entities() {
+                if let Some(cid) = membership_by_pos.get(&block_entity.position) {
+                    block_entities_by_cluster
+                        .entry(*cid)
+                        .or_default()
+                        .insert(block_entity.position, block_entity.clone());
+                } else if let Some(cid) = support_membership_by_pos.get(&block_entity.position) {
+                    support_entities_by_cluster
+                        .entry(*cid)
+                        .or_default()
+                        .insert(block_entity.position, block_entity.clone());
                 }
+            }
 
-                Ok(())
-            })
-            // Acceptable for this task: a failing source aborts the run rather
-            // than partially materializing. See Task 5's report for the note.
-            .expect("tile source failed");
+            Ok(())
+        })?;
 
         let builds = stitch.finish();
 
@@ -390,7 +399,7 @@ impl WorldSegmenter {
             });
         }
 
-        stats
+        Ok(stats)
     }
 }
 

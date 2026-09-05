@@ -206,7 +206,7 @@ impl VoxelTile {
 }
 
 /// Canonical string for palette dedup: name plus sorted properties.
-fn palette_key(state: &BlockState) -> String {
+pub(crate) fn palette_key(state: &BlockState) -> String {
     let mut props: Vec<String> = state
         .properties
         .iter()

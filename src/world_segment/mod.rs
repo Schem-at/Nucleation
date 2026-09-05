@@ -5,6 +5,7 @@
 //! the work is ordered or sharded.
 
 pub mod classify;
+pub mod coverage;
 pub mod grid;
 pub mod identity;
 pub mod ids;
@@ -15,6 +16,7 @@ pub mod provenance;
 pub mod runner;
 pub mod score;
 pub mod segment;
+pub mod snapshot;
 pub mod source;
 pub mod stitch;
 pub mod store_source;

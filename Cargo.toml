@@ -262,6 +262,11 @@ name = "refresh-bedrock-mappings"
 path = "tools/mc-data/refresh-bedrock-mappings.rs"
 required-features = ["mc-data-refresh"]
 
+[[bin]]
+name = "segment_world"
+path = "examples/segment_world.rs"
+required-features = ["world-segment", "store-fs"]
+
 [dev-dependencies]
 num-complex = "0.4"
 base64 = "0.22"

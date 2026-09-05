@@ -50,6 +50,17 @@ pub fn materialize_with_block_entities(
     );
     let min = build.bbox.0;
     let mut schem = UniversalSchematic::new(stable_id.to_string());
+    // Allocate the final dense region once. Growing it for each placed block
+    // repeatedly copies the volume, which is especially costly on large builds.
+    schem.set_default_region(crate::region::Region::new(
+        "Main".to_string(),
+        (0, 0, 0),
+        (
+            build.bbox.1 .0 - min.0 + 1,
+            build.bbox.1 .1 - min.1 + 1,
+            build.bbox.1 .2 - min.2 + 1,
+        ),
+    ));
     // BTreeMap iteration is sorted → deterministic placement.
     for (&(x, y, z), state) in blocks.iter() {
         schem.set_block(x - min.0, y - min.1, z - min.2, state);
