@@ -1,0 +1,14 @@
+{
+  "sphere_shell_32": {
+    "blocks": 6152,
+    "sha256": "af526b9380bbc1216b1dac340dadb38274503ca335c3010fa75747be0bf211df"
+  },
+  "sphere_solid_32": {
+    "blocks": 17256,
+    "sha256": "f469ac6eb69db26ee4bee3a7487c0b7f228a684ac887ed76cf44b8fb6e58522e"
+  },
+  "textured_cube_32": {
+    "blocks": 32768,
+    "sha256": "b1126234e1ceec6722d8c72babc4c27d645df9a66b7a5ed26ef5409bed06e042"
+  }
+}

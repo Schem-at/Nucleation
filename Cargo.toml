@@ -271,6 +271,8 @@ required-features = ["world-segment", "store-fs"]
 [dev-dependencies]
 num-complex = "0.4"
 base64 = "0.22"
+# Golden hashes for the voxelize regression fixtures (tests/voxelize_golden.rs).
+sha2 = "0.10"
 ffmpeg-sidecar = "2.4"
 winit = "0.30"
 bincode = "1"
@@ -307,6 +309,11 @@ harness = false
 [[bench]]
 name = "fingerprint_bench"
 harness = false
+
+[[bench]]
+name = "voxelize_bench"
+harness = false
+required-features = ["voxelize"]
 
 [[example]]
 name = "wol_extract"

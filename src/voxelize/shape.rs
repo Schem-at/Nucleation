@@ -263,6 +263,18 @@ impl MeshShape {
         best
     }
 
+    /// A copy with the same geometry and shell settings but an empty mask and
+    /// field cache. Benchmarks use it to time a cold fill without reparsing the
+    /// mesh; a plain `clone` deliberately shares the caches.
+    pub fn clone_uncached(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            shell: self.shell,
+            shell_only: self.shell_only,
+            mask: Arc::new(OnceLock::new()),
+        }
+    }
+
     /// A copy of this shape that also claims voxels whose center lies
     /// within `thickness` blocks of the mesh surface, in addition to the
     /// parity-solid interior. `0.7`–`1.0` closes single-voxel walls.

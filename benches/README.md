@@ -45,6 +45,19 @@ These Criterion benchmarks remove the Python boundary and isolate palette,
 region, block-state parsing, block-entity, fill, transformation, copy, and
 export costs.
 
+## Mesh voxelization
+
+```bash
+cargo bench --features voxelize --bench voxelize_bench
+NUCLEATION_BENCH_LARGE=1 cargo bench --features voxelize --bench voxelize_bench
+```
+
+Solid and shell fills of a generated 5,000 triangle UV sphere at 32 and 64
+voxels, plus the textured `BoxTextured.glb` cube at the same sizes. Size 128
+is behind `NUCLEATION_BENCH_LARGE=1`. Every case rebuilds the mask and the
+surface field per iteration (`MeshShape::clone_uncached`), so the numbers are
+cold fill times, not cache hit times.
+
 ## Redstone tick engine
 
 ```bash

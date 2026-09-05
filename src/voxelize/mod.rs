@@ -9,6 +9,8 @@
 
 mod model;
 mod shape;
+#[doc(hidden)]
+pub mod test_meshes;
 
 pub use model::{MeshModel, MeshTriangle, TextureImage};
 pub use shape::MeshShape;
