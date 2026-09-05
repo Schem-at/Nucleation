@@ -1039,3 +1039,69 @@ fn dithered_palette_blends_between_ramp_steps() {
     // Determinism: same input, same result.
     assert_eq!(fill_with(two.dithered()), fill_with(two.dithered()));
 }
+
+/// A cuboid that counts how many times the fill loop asked it for a normal.
+struct CountingShape {
+    inner: nucleation::building::Cuboid,
+    normals: std::cell::Cell<usize>,
+}
+
+impl nucleation::building::Shape for CountingShape {
+    fn contains(&self, x: i32, y: i32, z: i32) -> bool {
+        self.inner.contains(x, y, z)
+    }
+    fn points(&self) -> Vec<(i32, i32, i32)> {
+        self.inner.points()
+    }
+    fn normal_at(&self, x: i32, y: i32, z: i32) -> (f64, f64, f64) {
+        self.normals.set(self.normals.get() + 1);
+        self.inner.normal_at(x, y, z)
+    }
+    fn bounds(&self) -> (i32, i32, i32, i32, i32, i32) {
+        self.inner.bounds()
+    }
+    fn for_each_point<F>(&self, f: F)
+    where
+        F: FnMut(i32, i32, i32),
+    {
+        self.inner.for_each_point(f)
+    }
+}
+
+fn counting_cube() -> CountingShape {
+    CountingShape {
+        inner: nucleation::building::Cuboid::new((0, 0, 0), (3, 3, 3)),
+        normals: std::cell::Cell::new(0),
+    }
+}
+
+#[test]
+fn a_solid_brush_never_asks_the_shape_for_a_normal() {
+    use nucleation::building::{Brush, BuildingTool, SolidBrush};
+    let shape = counting_cube();
+    let brush = SolidBrush::new(nucleation::BlockState::new("minecraft:stone"));
+    assert!(!brush.uses_normal(), "SolidBrush ignores the normal");
+
+    let mut schematic = nucleation::UniversalSchematic::new("gate".to_string());
+    BuildingTool::new(&mut schematic).fill(&shape, &brush);
+
+    assert!(schematic.total_blocks() > 0, "the fill placed blocks");
+    assert_eq!(shape.normals.get(), 0, "no normal was computed");
+}
+
+#[test]
+fn a_shaded_brush_still_asks_the_shape_for_a_normal() {
+    use nucleation::building::{Brush, BuildingTool, ShadedBrush};
+    let shape = counting_cube();
+    let brush = ShadedBrush::new((255, 255, 255), (0.0, 1.0, 0.0));
+    assert!(brush.uses_normal(), "ShadedBrush reads the normal");
+
+    let mut schematic = nucleation::UniversalSchematic::new("gate".to_string());
+    BuildingTool::new(&mut schematic).fill(&shape, &brush);
+
+    assert_eq!(
+        shape.normals.get() as i32,
+        schematic.total_blocks(),
+        "one normal per placed voxel"
+    );
+}

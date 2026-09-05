@@ -27,8 +27,15 @@ impl<'a> BuildingTool<'a> {
         self.schematic
             .ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
 
+        // Computing a normal can cost a nearest surface query (see
+        // MeshShape); only pay for it when the brush reads the value.
+        let wants_normal = brush.uses_normal();
         shape.for_each_point(|x, y, z| {
-            let normal = shape.normal_at(x, y, z);
+            let normal = if wants_normal {
+                shape.normal_at(x, y, z)
+            } else {
+                (0.0, 0.0, 0.0)
+            };
             if let Some(block) = brush.get_block(x, y, z, normal) {
                 self.schematic.set_block(x, y, z, &block);
             }
@@ -49,11 +56,16 @@ impl<'a> BuildingTool<'a> {
         self.schematic
             .ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
 
+        let wants_normal = brush.uses_normal();
         shape.for_each_point(|x, y, z| {
             if !mode.allows(self.schematic.get_block(x, y, z)) {
                 return;
             }
-            let normal = shape.normal_at(x, y, z);
+            let normal = if wants_normal {
+                shape.normal_at(x, y, z)
+            } else {
+                (0.0, 0.0, 0.0)
+            };
             let t = shape.parameter_at(x, y, z);
             if let Some(block) = brush.get_block_with_parameter(x, y, z, normal, t) {
                 self.schematic.set_block(x, y, z, &block);
@@ -83,6 +95,7 @@ impl<'a> BuildingTool<'a> {
         let mut staged = self.schematic.clone();
         staged.ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
 
+        let wants_normal = brush.uses_normal();
         for y in min_y..=max_y {
             for z in min_z..=max_z {
                 for x in min_x..=max_x {
@@ -91,26 +104,30 @@ impl<'a> BuildingTool<'a> {
                         continue;
                     }
 
-                    let gradient = match normal(fx, fy, fz)? {
-                        Some(value) => value,
-                        None => (
-                            eval(fx + epsilon, fy, fz)? - eval(fx - epsilon, fy, fz)?,
-                            eval(fx, fy + epsilon, fz)? - eval(fx, fy - epsilon, fz)?,
-                            eval(fx, fy, fz + epsilon)? - eval(fx, fy, fz - epsilon)?,
-                        ),
-                    };
-                    let length = (gradient.0 * gradient.0
-                        + gradient.1 * gradient.1
-                        + gradient.2 * gradient.2)
-                        .sqrt();
-                    let normal = if length > 1e-12 && length.is_finite() {
-                        (
-                            gradient.0 / length,
-                            gradient.1 / length,
-                            gradient.2 / length,
-                        )
+                    let normal = if !wants_normal {
+                        (0.0, 0.0, 0.0)
                     } else {
-                        (0.0, 1.0, 0.0)
+                        let gradient = match normal(fx, fy, fz)? {
+                            Some(value) => value,
+                            None => (
+                                eval(fx + epsilon, fy, fz)? - eval(fx - epsilon, fy, fz)?,
+                                eval(fx, fy + epsilon, fz)? - eval(fx, fy - epsilon, fz)?,
+                                eval(fx, fy, fz + epsilon)? - eval(fx, fy, fz - epsilon)?,
+                            ),
+                        };
+                        let length = (gradient.0 * gradient.0
+                            + gradient.1 * gradient.1
+                            + gradient.2 * gradient.2)
+                            .sqrt();
+                        if length > 1e-12 && length.is_finite() {
+                            (
+                                gradient.0 / length,
+                                gradient.1 / length,
+                                gradient.2 / length,
+                            )
+                        } else {
+                            (0.0, 1.0, 0.0)
+                        }
                     };
                     if let Some(block) = brush.get_block_with_parameter(x, y, z, normal, None) {
                         staged.set_block(x, y, z, &block);

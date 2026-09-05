@@ -578,6 +578,14 @@ fn get_default_palette() -> Arc<BlockPalette> {
 pub trait Brush {
     /// Get the block to place at the given coordinates, optionally using the surface normal
     fn get_block(&self, x: i32, y: i32, z: i32, normal: (f64, f64, f64)) -> Option<BlockState>;
+
+    /// Whether `get_block` actually reads `normal`. The fill loops skip the
+    /// shape's `normal_at` call entirely when this is false, which is the
+    /// difference between an O(1) and an O(N^3) per voxel cost on a mesh
+    /// shape. Defaults to true so an out of tree brush keeps working.
+    fn uses_normal(&self) -> bool {
+        true
+    }
 }
 
 /// A brush that places a single specific block
@@ -595,6 +603,10 @@ impl SolidBrush {
 impl Brush for SolidBrush {
     fn get_block(&self, _x: i32, _y: i32, _z: i32, _normal: (f64, f64, f64)) -> Option<BlockState> {
         Some(self.block.clone())
+    }
+
+    fn uses_normal(&self) -> bool {
+        false
     }
 }
 
@@ -630,6 +642,10 @@ impl Brush for ColorBrush {
         self.palette
             .snap(&self.target_color, x, y, z)
             .map(BlockState::new)
+    }
+
+    fn uses_normal(&self) -> bool {
+        false
     }
 }
 
@@ -736,6 +752,10 @@ impl Brush for LinearGradientBrush {
         };
 
         self.palette.snap(&color, x, y, z).map(BlockState::new)
+    }
+
+    fn uses_normal(&self) -> bool {
+        false
     }
 }
 
@@ -876,6 +896,10 @@ impl Brush for MultiPointGradientBrush {
         };
 
         self.palette.snap(&color, x, y, z).map(BlockState::new)
+    }
+
+    fn uses_normal(&self) -> bool {
+        false
     }
 }
 
@@ -1096,6 +1120,10 @@ impl Brush for PointGradientBrush {
 
         self.palette.snap(&color, x, y, z).map(BlockState::new)
     }
+
+    fn uses_normal(&self) -> bool {
+        false
+    }
 }
 
 impl Brush for BilinearGradientBrush {
@@ -1164,6 +1192,10 @@ impl Brush for BilinearGradientBrush {
         };
 
         self.palette.snap(&color, x, y, z).map(BlockState::new)
+    }
+
+    fn uses_normal(&self) -> bool {
+        false
     }
 }
 
@@ -1608,5 +1640,9 @@ impl Brush for FieldBrush {
         self.palette
             .snap(&sample_stops(&self.stops, t, self.space), x, y, z)
             .map(BlockState::new)
+    }
+
+    fn uses_normal(&self) -> bool {
+        false
     }
 }

@@ -200,6 +200,21 @@ impl Brush for BrushEnum {
             BrushEnum::Field(b) => b.get_block(x, y, z, normal),
         }
     }
+
+    fn uses_normal(&self) -> bool {
+        match self {
+            BrushEnum::Solid(b) => b.uses_normal(),
+            BrushEnum::Color(b) => b.uses_normal(),
+            BrushEnum::Linear(b) => b.uses_normal(),
+            BrushEnum::Bilinear(b) => b.uses_normal(),
+            BrushEnum::Point(b) => b.uses_normal(),
+            BrushEnum::MultiPoint(b) => b.uses_normal(),
+            BrushEnum::Shaded(b) => b.uses_normal(),
+            BrushEnum::CurveGradient(b) => b.uses_normal(),
+            BrushEnum::Spotlight(b) => b.uses_normal(),
+            BrushEnum::Field(b) => b.uses_normal(),
+        }
+    }
 }
 
 impl BrushEnum {
