@@ -5,7 +5,16 @@
 use super::model::{MeshModel, MeshTriangle, TextureImage};
 use crate::building::Shape;
 use rayon::prelude::*;
+use std::cell::RefCell;
 use std::sync::{Arc, OnceLock};
+
+thread_local! {
+    /// Epoch stamped visit marks for the nearest_triangle ring search
+    /// fallback, so it stops allocating vec![false; triangles] per call.
+    /// One buffer per thread, grown to the largest mesh that thread has
+    /// seen. Never borrowed reentrantly: the search calls no user code.
+    static RING_VISIT: RefCell<(u32, Vec<u32>)> = const { RefCell::new((0, Vec::new())) };
+}
 
 /// Uniform spatial grid over the triangles (cell size = 1 voxel).
 struct TriGrid {
@@ -108,6 +117,10 @@ pub struct MeshShape {
     /// sweeps + shell rasterization). Reset by `with_shell`, shared by
     /// plain clones.
     mask: Arc<OnceLock<SolidMask>>,
+    /// Lazily computed triangle id per voxel over the same bounding volume
+    /// as `mask`. Turns normal_at and surface_color into array lookups.
+    /// Reset wherever `mask` is reset.
+    field: Arc<OnceLock<SurfaceField>>,
     /// Also claim voxels whose center is within this distance of the
     /// surface (in blocks). 0.0 = pure parity solid. Rescues thin/hollow
     /// geometry (double-walled vessels, open shells) whose walls slip
@@ -152,6 +165,7 @@ impl MeshShape {
             shell: 0.0,
             shell_only: false,
             mask: Arc::new(OnceLock::new()),
+            field: Arc::new(OnceLock::new()),
             data: Arc::new(MeshData {
                 triangles: model.triangles,
                 materials: model.materials,
@@ -217,50 +231,64 @@ impl MeshShape {
         if d.triangles.is_empty() {
             return None;
         }
-        let start = d.grid.cell_of(p);
-        let max_r = d.grid.dims[0].max(d.grid.dims[1]).max(d.grid.dims[2]);
-        let mut best: Option<(usize, [f32; 3], f32)> = None;
-        let mut seen = vec![false; d.triangles.len()];
-        for r in 0..=max_r {
-            // Any cell beyond Chebyshev ring `r` is at least `(r) * CELL`
-            // away from a point inside the start cell's ring-0 cube, so once
-            // the best distance is under that we can stop.
-            if let Some((_, _, dist)) = best {
-                if dist <= (r as f32 - 1.0).max(0.0) * TriGrid::CELL {
-                    break;
-                }
+        RING_VISIT.with(|cell| {
+            let mut guard = cell.borrow_mut();
+            let (epoch, seen) = &mut *guard;
+            if seen.len() < d.triangles.len() {
+                seen.resize(d.triangles.len(), 0);
             }
-            let mut any_cell = false;
-            for cx in (start[0] - r).max(0)..=(start[0] + r).min(d.grid.dims[0] - 1) {
-                for cy in (start[1] - r).max(0)..=(start[1] + r).min(d.grid.dims[1] - 1) {
-                    for cz in (start[2] - r).max(0)..=(start[2] + r).min(d.grid.dims[2] - 1) {
-                        let on_shell = (cx - start[0]).abs() == r
-                            || (cy - start[1]).abs() == r
-                            || (cz - start[2]).abs() == r;
-                        if !on_shell {
-                            continue;
-                        }
-                        any_cell = true;
-                        for &t in d.grid.bucket([cx, cy, cz]) {
-                            let ti = t as usize;
-                            if seen[ti] {
+            // Epoch 0 means "never visited", so wrap by clearing.
+            *epoch = epoch.wrapping_add(1);
+            if *epoch == 0 {
+                seen.iter_mut().for_each(|s| *s = 0);
+                *epoch = 1;
+            }
+            let epoch = *epoch;
+
+            let start = d.grid.cell_of(p);
+            let max_r = d.grid.dims[0].max(d.grid.dims[1]).max(d.grid.dims[2]);
+            let mut best: Option<(usize, [f32; 3], f32)> = None;
+            for r in 0..=max_r {
+                // Any cell beyond Chebyshev ring `r` is at least `(r) * CELL`
+                // away from a point inside the start cell's ring-0 cube, so once
+                // the best distance is under that we can stop.
+                if let Some((_, _, dist)) = best {
+                    if dist <= (r as f32 - 1.0).max(0.0) * TriGrid::CELL {
+                        break;
+                    }
+                }
+                let mut any_cell = false;
+                for cx in (start[0] - r).max(0)..=(start[0] + r).min(d.grid.dims[0] - 1) {
+                    for cy in (start[1] - r).max(0)..=(start[1] + r).min(d.grid.dims[1] - 1) {
+                        for cz in (start[2] - r).max(0)..=(start[2] + r).min(d.grid.dims[2] - 1) {
+                            let on_shell = (cx - start[0]).abs() == r
+                                || (cy - start[1]).abs() == r
+                                || (cz - start[2]).abs() == r;
+                            if !on_shell {
                                 continue;
                             }
-                            seen[ti] = true;
-                            let q = closest_point_on_triangle(p, &d.triangles[ti].positions);
-                            let dist = distance(p, q);
-                            if best.is_none_or(|(_, _, bd)| dist < bd) {
-                                best = Some((ti, q, dist));
+                            any_cell = true;
+                            for &t in d.grid.bucket([cx, cy, cz]) {
+                                let ti = t as usize;
+                                if seen[ti] == epoch {
+                                    continue;
+                                }
+                                seen[ti] = epoch;
+                                let q = closest_point_on_triangle(p, &d.triangles[ti].positions);
+                                let dist = distance(p, q);
+                                if best.is_none_or(|(_, _, bd)| dist < bd) {
+                                    best = Some((ti, q, dist));
+                                }
                             }
                         }
                     }
                 }
+                if !any_cell && best.is_some() {
+                    break;
+                }
             }
-            if !any_cell && best.is_some() {
-                break;
-            }
-        }
-        best
+            best
+        })
     }
 
     /// A copy with the same geometry and shell settings but an empty mask and
@@ -272,6 +300,7 @@ impl MeshShape {
             shell: self.shell,
             shell_only: self.shell_only,
             mask: Arc::new(OnceLock::new()),
+            field: Arc::new(OnceLock::new()),
         }
     }
 
@@ -284,6 +313,7 @@ impl MeshShape {
             shell: thickness.max(0.0),
             shell_only: false,
             mask: Arc::new(OnceLock::new()),
+            field: Arc::new(OnceLock::new()),
         }
     }
 
@@ -296,6 +326,7 @@ impl MeshShape {
             shell: thickness.max(1e-3),
             shell_only: true,
             mask: Arc::new(OnceLock::new()),
+            field: Arc::new(OnceLock::new()),
         }
     }
 
@@ -305,8 +336,9 @@ impl MeshShape {
     /// its material has no texture (constant-color materials always work).
     pub fn surface_color(&self, x: i32, y: i32, z: i32) -> Option<[u8; 3]> {
         let p = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
-        let (ti, q, _) = self.nearest_triangle(p)?;
+        let ti = self.triangle_at(x, y, z)?;
         let tri = &self.data.triangles[ti];
+        let q = closest_point_on_triangle(p, &tri.positions);
         let img = self.data.materials.get(tri.material? as usize)?.as_ref()?;
         if img.width == 1 && img.height == 1 {
             return Some([img.pixels[0], img.pixels[1], img.pixels[2]]);
@@ -353,9 +385,250 @@ impl SolidMask {
     }
 }
 
+/// Triangle id per voxel over the shape's bounds. `u32::MAX` means no
+/// triangle reached this voxel, which only happens outside the solid mask.
+struct SurfaceField {
+    origin: (i32, i32, i32),
+    dims: (usize, usize, usize),
+    /// Triangle id per voxel, `NO_TRI` for none. `CONTESTED` is set on
+    /// voxels where two triangles are exactly as close, so no rule the field
+    /// can apply is more right than another: the ring search settles those
+    /// one by one, which keeps the historical answer byte for byte.
+    tri: Vec<u32>,
+}
+
+const NO_TRI: u32 = u32::MAX;
+/// High bit of a field entry: this voxel is an exact tie, ask the ring
+/// search. Triangle counts never come near 2^31, so the id fits below it.
+const CONTESTED: u32 = 1 << 31;
+/// A voxel centre farther than this from every triangle cannot be a surface
+/// voxel: the surface would have to pass between it and the outside. Half a
+/// voxel diagonal is 0.867, so 1.5 covers a full neighbour ring.
+const SEED_RADIUS: f32 = 1.5;
+/// Two distances this close are a tie, not a winner.
+const TIE_EPS: f32 = 1e-6;
+
+impl SurfaceField {
+    fn index(&self, x: i32, y: i32, z: i32) -> Option<usize> {
+        let (ox, oy, oz) = self.origin;
+        let (dx, dy, dz) = self.dims;
+        let (ix, iy, iz) = ((x - ox) as isize, (y - oy) as isize, (z - oz) as isize);
+        if ix < 0 || iy < 0 || iz < 0 {
+            return None;
+        }
+        let (ix, iy, iz) = (ix as usize, iy as usize, iz as usize);
+        if ix >= dx || iy >= dy || iz >= dz {
+            return None;
+        }
+        Some((ix * dy + iy) * dz + iz)
+    }
+
+    fn get(&self, x: i32, y: i32, z: i32) -> Option<usize> {
+        let id = self.tri[self.index(x, y, z)?];
+        (id != NO_TRI).then_some((id & !CONTESTED) as usize)
+    }
+
+    /// The field's answer only where it is the whole answer: a contested
+    /// voxel reports nothing so the caller can settle it exactly.
+    fn settled(&self, x: i32, y: i32, z: i32) -> Option<usize> {
+        if self.tri[self.index(x, y, z)?] & CONTESTED != 0 {
+            return None;
+        }
+        self.get(x, y, z)
+    }
+}
+
 impl MeshShape {
     fn solid_mask(&self) -> &SolidMask {
         self.mask.get_or_init(|| self.compute_mask())
+    }
+
+    fn surface_field(&self) -> &SurfaceField {
+        self.field.get_or_init(|| self.compute_field())
+    }
+
+    /// Triangle claiming this voxel, from the field, falling back to the
+    /// ring search when the voxel is outside the field (an out of bounds
+    /// query), the mesh is empty, or two triangles are exactly as close.
+    fn triangle_at(&self, x: i32, y: i32, z: i32) -> Option<usize> {
+        if let Some(id) = self.surface_field().settled(x, y, z) {
+            return Some(id);
+        }
+        let p = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
+        self.nearest_triangle(p).map(|(ti, _, _)| ti)
+    }
+
+    /// One rayon pass over the triangles claims every voxel within
+    /// SEED_RADIUS of the surface, then one BFS hands those ids inward to
+    /// the rest of the solid mask. O(triangles * shell volume + N^3).
+    fn compute_field(&self) -> SurfaceField {
+        let d = &self.data;
+        let mask = self.solid_mask();
+        let (x0, y0, z0, x1, y1, z1) = d.bounds;
+        let dims = mask.dims;
+        let total = dims.0 * dims.1 * dims.2;
+        let mut tri = vec![NO_TRI; total];
+        if d.triangles.is_empty() {
+            return SurfaceField {
+                origin: (x0, y0, z0),
+                dims,
+                tri,
+            };
+        }
+        let mut contested = vec![false; total];
+
+        // Seed pass. Same shape as the shell rasterization above: a
+        // per-triangle bounding box walk, collected in triangle order so the
+        // reduction below is deterministic.
+        let claims: Vec<Vec<(usize, f32, u32)>> = d
+            .triangles
+            .par_iter()
+            .enumerate()
+            .map(|(ti, t)| {
+                let mut out = Vec::new();
+                let mut tmin = [f32::INFINITY; 3];
+                let mut tmax = [f32::NEG_INFINITY; 3];
+                for pt in &t.positions {
+                    for a in 0..3 {
+                        tmin[a] = tmin[a].min(pt[a]);
+                        tmax[a] = tmax[a].max(pt[a]);
+                    }
+                }
+                let lo = [
+                    ((tmin[0] - SEED_RADIUS).floor() as i32).max(x0),
+                    ((tmin[1] - SEED_RADIUS).floor() as i32).max(y0),
+                    ((tmin[2] - SEED_RADIUS).floor() as i32).max(z0),
+                ];
+                let hi = [
+                    ((tmax[0] + SEED_RADIUS).ceil() as i32).min(x1),
+                    ((tmax[1] + SEED_RADIUS).ceil() as i32).min(y1),
+                    ((tmax[2] + SEED_RADIUS).ceil() as i32).min(z1),
+                ];
+                for x in lo[0]..=hi[0] {
+                    for y in lo[1]..=hi[1] {
+                        for z in lo[2]..=hi[2] {
+                            let c = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
+                            let q = closest_point_on_triangle(c, &t.positions);
+                            let dist = distance(c, q);
+                            if dist <= SEED_RADIUS {
+                                let idx = (((x - x0) as usize) * dims.1 + (y - y0) as usize)
+                                    * dims.2
+                                    + (z - z0) as usize;
+                                out.push((idx, dist, ti as u32));
+                            }
+                        }
+                    }
+                }
+                out
+            })
+            .collect();
+
+        let mut best = vec![f32::INFINITY; total];
+        for list in &claims {
+            for &(idx, dist, ti) in list {
+                // Strictly closer wins; an exact tie is left contested, for
+                // the ring search to settle the way it always has.
+                if dist < best[idx] - TIE_EPS {
+                    best[idx] = dist;
+                    tri[idx] = ti;
+                    contested[idx] = false;
+                } else if (dist - best[idx]).abs() <= TIE_EPS {
+                    contested[idx] = true;
+                }
+            }
+        }
+        drop(claims);
+        drop(best);
+
+        let (dy, dz) = (dims.1, dims.2);
+        let distance_to = |idx: usize, ti: u32| {
+            let (iz, iy, ix) = (idx % dz, (idx / dz) % dy, idx / (dy * dz));
+            let c = [
+                (x0 + ix as i32) as f32 + 0.5,
+                (y0 + iy as i32) as f32 + 0.5,
+                (z0 + iz as i32) as f32 + 0.5,
+            ];
+            distance(
+                c,
+                closest_point_on_triangle(c, &d.triangles[ti as usize].positions),
+            )
+        };
+
+        // BFS: hand the seeded ids inward over 6 neighbours, through solid
+        // voxels only. Every solid voxel of a closed mesh is reached. The
+        // walk goes wave by wave so that two fronts arriving at one voxel in
+        // the same wave can be compared on true distance instead of on queue
+        // order: the closer triangle wins, an exact tie is left contested.
+        let mut wave = vec![0u32; total];
+        let mut frontier: Vec<usize> = Vec::new();
+        for (idx, &id) in tri.iter().enumerate() {
+            if id != NO_TRI {
+                wave[idx] = 1;
+                frontier.push(idx);
+            }
+        }
+        let mut w = 1u32;
+        let plane = dy * dz;
+        let mut next: Vec<usize> = Vec::new();
+        while !frontier.is_empty() {
+            w += 1;
+            next.clear();
+            for &idx in &frontier {
+                let id = tri[idx];
+                let iz = idx % dz;
+                let iy = (idx / dz) % dy;
+                let ix = idx / (dy * dz);
+                let mut neighbours = [usize::MAX; 6];
+                let mut count = 0usize;
+                for (in_range, offset) in [
+                    (ix + 1 < dims.0, plane as isize),
+                    (ix > 0, -(plane as isize)),
+                    (iy + 1 < dy, dz as isize),
+                    (iy > 0, -(dz as isize)),
+                    (iz + 1 < dz, 1),
+                    (iz > 0, -1),
+                ] {
+                    if in_range {
+                        neighbours[count] = (idx as isize + offset) as usize;
+                        count += 1;
+                    }
+                }
+                for &n in &neighbours[..count] {
+                    if wave[n] == 0 {
+                        if mask.bits[n >> 6] >> (n & 63) & 1 != 1 {
+                            continue;
+                        }
+                        tri[n] = id;
+                        wave[n] = w;
+                        next.push(n);
+                    } else if wave[n] == w && tri[n] != id {
+                        let held = distance_to(n, tri[n]);
+                        let challenger = distance_to(n, id);
+                        if challenger < held - TIE_EPS {
+                            tri[n] = id;
+                            contested[n] = false;
+                        } else if (held - challenger).abs() <= TIE_EPS {
+                            contested[n] = true;
+                        }
+                    }
+                }
+            }
+            std::mem::swap(&mut frontier, &mut next);
+        }
+
+        // Fold the tie marks into the ids so the field stays one array on
+        // the lookup path.
+        for (idx, &c) in contested.iter().enumerate() {
+            if c && tri[idx] != NO_TRI {
+                tri[idx] |= CONTESTED;
+            }
+        }
+
+        SurfaceField {
+            origin: (x0, y0, z0),
+            dims,
+            tri,
+        }
     }
 
     /// Bulk solve: three scanline parity sweeps (one ray per column per
@@ -545,9 +818,8 @@ impl Shape for MeshShape {
     }
 
     fn normal_at(&self, x: i32, y: i32, z: i32) -> (f64, f64, f64) {
-        let p = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
-        match self.nearest_triangle(p) {
-            Some((ti, _, _)) => {
+        match self.triangle_at(x, y, z) {
+            Some(ti) => {
                 let t = &self.data.triangles[ti].positions;
                 let e1 = sub(t[1], t[0]);
                 let e2 = sub(t[2], t[0]);
@@ -704,4 +976,99 @@ fn barycentric(q: [f32; 3], tri: &[[f32; 3]; 3]) -> (f32, f32, f32) {
     let v = (d11 * d20 - d01 * d21) / denom;
     let w = (d00 * d21 - d01 * d20) / denom;
     (1.0 - v - w, v, w)
+}
+
+#[cfg(test)]
+mod surface_field_tests {
+    use super::*;
+    use crate::building::Shape;
+    use crate::voxelize::test_meshes::uv_sphere_obj;
+    use crate::voxelize::MeshModel;
+
+    fn small_sphere() -> MeshShape {
+        let mut model = MeshModel::from_obj_str(&uv_sphere_obj(12, 12)).expect("sphere parses");
+        model.fit(12.0);
+        MeshShape::new(model)
+    }
+
+    /// On every surface voxel (a solid voxel with a non solid 6 neighbour)
+    /// the field's triangle must be the ring search's triangle, or a
+    /// triangle exactly as close (ties are legal, the ring search picks by
+    /// bucket order and the field picks the lowest id).
+    #[test]
+    fn field_ids_agree_with_the_ring_search_on_the_surface() {
+        let shape = small_sphere();
+        let field = shape.surface_field();
+        let mut checked = 0usize;
+        let (x0, y0, z0, x1, y1, z1) = shape.bounds();
+        for x in x0..=x1 {
+            for y in y0..=y1 {
+                for z in z0..=z1 {
+                    if !shape.contains(x, y, z) {
+                        continue;
+                    }
+                    let on_surface = [
+                        (1, 0, 0),
+                        (-1, 0, 0),
+                        (0, 1, 0),
+                        (0, -1, 0),
+                        (0, 0, 1),
+                        (0, 0, -1),
+                    ]
+                    .iter()
+                    .any(|(dx, dy, dz)| !shape.contains(x + dx, y + dy, z + dz));
+                    if !on_surface {
+                        continue;
+                    }
+                    let p = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
+                    let (want, _, want_dist) =
+                        shape.nearest_triangle(p).expect("mesh has triangles");
+                    let got = field
+                        .get(x, y, z)
+                        .unwrap_or_else(|| panic!("no field id at {x},{y},{z}"));
+                    let got_dist = distance(
+                        p,
+                        closest_point_on_triangle(p, &shape.data.triangles[got].positions),
+                    );
+                    assert!(
+                        got == want || (got_dist - want_dist).abs() <= 1e-4,
+                        "field picked {got} (d={got_dist}) but the ring search picked \
+                         {want} (d={want_dist}) at {x},{y},{z}"
+                    );
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked > 200, "only {checked} surface voxels checked");
+    }
+
+    /// Release-mode budget for the case the design calls out: a size 128
+    /// solid fill of the 5,000 triangle sphere. Skipped in debug builds,
+    /// where the same work is roughly twenty times slower.
+    #[test]
+    fn size_128_solid_fill_is_under_two_seconds() {
+        if cfg!(debug_assertions) {
+            return;
+        }
+        use crate::building::{BuildingTool, SolidBrush};
+        use crate::voxelize::test_meshes::sphere_5k;
+        let mut model = MeshModel::from_obj_str(&sphere_5k()).expect("sphere parses");
+        model.fit(128.0);
+        let shape = MeshShape::new(model);
+        let brush = SolidBrush::new(crate::BlockState::new("minecraft:stone"));
+        let mut schematic = crate::UniversalSchematic::new("perf".to_string());
+
+        let started = std::time::Instant::now();
+        BuildingTool::new(&mut schematic).fill(&shape, &brush);
+        let elapsed = started.elapsed();
+
+        assert!(
+            schematic.total_blocks() > 1_000_000,
+            "the fill did real work"
+        );
+        assert!(
+            elapsed.as_secs_f64() < 2.0,
+            "size 128 solid fill took {elapsed:?}, budget is 2 s"
+        );
+    }
 }
