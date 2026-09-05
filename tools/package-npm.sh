@@ -13,7 +13,11 @@ OUT="${1:-dist/npm}"
 # separate MCHPRS-backed redstone world and is NOT what the browser apps use.
 # Naming the wrong one produces an engine that loads, meshes, and silently has
 # no TickSimulation at all — which is how a whole app came up dead.
-FEATURES="${NUCLEATION_WASM_FEATURES:-bridge,mc-tick,meshing}"
+# `voxelize` is the mesh-to-voxel importer (Voxelizer: shape_from_obj,
+# shape_from_glb, schematic_from_glb_textured). Its deps are wasm-clean —
+# gltf rides with default-features off, and image only decodes bytes we hand
+# it — so the browser can import OBJ/GLB models without a server round trip.
+FEATURES="${NUCLEATION_WASM_FEATURES:-bridge,mc-tick,meshing,voxelize}"
 
 # ---------------------------------------------------------------- input guard
 # A release wasm build is minutes, and this script gets called from `npm run

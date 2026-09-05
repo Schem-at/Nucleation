@@ -1,3 +1,14 @@
+# Nucleation v0.10.16
+
+**Mesh voxelization in the browser.** The wasm build now ships the `voxelize`
+feature, so `Voxelizer.shape_from_obj`, `Voxelizer.shape_from_glb` and
+`Voxelizer.schematic_from_glb_textured` are exported from `nucleation.wasm` and
+callable from the npm package. The generated JS bindings already described this
+surface; only the wasm binary was missing the symbols, so an OBJ/GLB import had
+to round-trip through a server. Its dependencies are wasm-clean (`gltf` with
+default features off, `image` decoding bytes handed to it), so nothing else in
+the package changes.
+
 # Nucleation v0.10.15
 
 **Immutable, incremental world snapshots.** `segment_world index` stores Anvil
