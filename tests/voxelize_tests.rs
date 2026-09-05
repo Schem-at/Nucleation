@@ -267,3 +267,104 @@ f -4 -1 -2
     assert!(MeshModel::from_obj_str("v 0 0 0\n").is_err());
     assert!(MeshModel::from_glb_bytes(b"not a glb").is_err());
 }
+
+#[test]
+fn palette_index_lookup_agrees_with_the_cloning_lookup() {
+    use nucleation::blockpedia::ExtendedColorData;
+    let palette = BlockPalette::new_wool();
+    for rgb in [
+        [0u8, 0, 0],
+        [255, 255, 255],
+        [12, 200, 43],
+        [199, 21, 133],
+        [128, 128, 128],
+        // A tie candidate: equidistant colours must still pick the first
+        // entry the scan meets, exactly as the cloning lookup does.
+        [64, 64, 64],
+        [1, 1, 1],
+    ] {
+        let target = ExtendedColorData::from_rgb(rgb[0], rgb[1], rgb[2]);
+        let index = palette
+            .find_closest_index(&target)
+            .expect("wool is not empty");
+        assert_eq!(
+            palette.block_id(index).map(str::to_string),
+            palette.find_closest(&target),
+            "index lookup and cloning lookup disagree on {rgb:?}"
+        );
+    }
+
+    // An index past the end resolves to nothing rather than panicking.
+    assert_eq!(palette.block_id(usize::MAX), None);
+}
+
+/// The memoised, parallel textured path must place exactly what a plain
+/// per voxel loop over the same primitives places.
+#[test]
+fn the_textured_memo_matches_an_uncached_walk() {
+    use nucleation::blockpedia::ExtendedColorData;
+    let bytes = std::fs::read("tests/samples/BoxTextured.glb").expect("committed sample");
+    let mut model = MeshModel::from_glb_bytes(&bytes).expect("BoxTextured loads");
+    model.fit(16.0);
+    let shape = MeshShape::new(model);
+    let palette = BlockPalette::new_wool();
+
+    let memoised = voxelize_textured(&shape, &palette, "memo");
+
+    let mut plain = nucleation::UniversalSchematic::new("plain".to_string());
+    shape.for_each_point(|x, y, z| {
+        let rgb = shape.surface_color(x, y, z).unwrap_or([128, 128, 128]);
+        let target = ExtendedColorData::from_rgb(rgb[0], rgb[1], rgb[2]);
+        if let Some(id) = palette.find_closest(&target) {
+            plain.set_block(x, y, z, &nucleation::BlockState::new(id));
+        }
+    });
+
+    assert!(plain.total_blocks() > 0, "the reference walk placed blocks");
+    assert_eq!(memoised.total_blocks(), plain.total_blocks());
+    for (pos, block) in plain.iter_blocks() {
+        assert_eq!(
+            memoised
+                .get_block(pos.x, pos.y, pos.z)
+                .map(|b| b.name.as_str()),
+            Some(block.name.as_str()),
+            "memoised path differs at {},{},{}",
+            pos.x,
+            pos.y,
+            pos.z
+        );
+    }
+}
+
+/// The colour sampling runs on rayon by default and sequentially when
+/// NUCLEATION_VOXELIZE_SEQUENTIAL is set (the wasm path, and the escape
+/// hatch for a single threaded host). Both must place the same blocks.
+#[test]
+fn the_sequential_sampling_path_matches_the_parallel_one() {
+    let bytes = std::fs::read("tests/samples/BoxTextured.glb").expect("committed sample");
+    let mut model = MeshModel::from_glb_bytes(&bytes).expect("BoxTextured loads");
+    model.fit(16.0);
+    let shape = MeshShape::new(model);
+    let palette = BlockPalette::new_wool();
+
+    let parallel = voxelize_textured(&shape, &palette, "parallel");
+
+    std::env::set_var("NUCLEATION_VOXELIZE_SEQUENTIAL", "1");
+    let sequential = voxelize_textured(&shape, &palette, "sequential");
+    std::env::remove_var("NUCLEATION_VOXELIZE_SEQUENTIAL");
+
+    assert!(parallel.total_blocks() > 0);
+    assert_eq!(sequential.total_blocks(), parallel.total_blocks());
+    for (pos, block) in parallel.iter_blocks() {
+        assert_eq!(
+            sequential
+                .get_block(pos.x, pos.y, pos.z)
+                .map(|b| b.name.as_str()),
+            Some(block.name.as_str()),
+            "sequential path differs at {},{},{}",
+            pos.x,
+            pos.y,
+            pos.z
+        );
+    }
+}

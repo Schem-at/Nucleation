@@ -552,17 +552,30 @@ impl BlockPalette {
         Some(self.blocks[pick].1.clone())
     }
 
-    pub fn find_closest(&self, target: &ExtendedColorData) -> Option<String> {
+    /// Index of the palette entry nearest `target` in Oklab, or None when
+    /// the palette is empty. Allocation free, so a caller resolving many
+    /// voxels can keep indices and clone the ids once at the end.
+    pub fn find_closest_index(&self, target: &ExtendedColorData) -> Option<usize> {
         let mut best_dist = f32::MAX;
-        let mut best_id = None;
-        for (color, id) in &self.blocks {
+        let mut best = None;
+        for (index, (color, _)) in self.blocks.iter().enumerate() {
             let dist = target.distance_oklab(color);
             if dist < best_dist {
                 best_dist = dist;
-                best_id = Some(id);
+                best = Some(index);
             }
         }
-        best_id.cloned()
+        best
+    }
+
+    /// The block id at a palette index, for resolving a batch of indices.
+    pub fn block_id(&self, index: usize) -> Option<&str> {
+        self.blocks.get(index).map(|(_, id)| id.as_str())
+    }
+
+    pub fn find_closest(&self, target: &ExtendedColorData) -> Option<String> {
+        self.find_closest_index(target)
+            .map(|index| self.blocks[index].1.clone())
     }
 }
 

@@ -32,13 +32,85 @@ pub fn voxelize_textured(
     palette: &BlockPalette,
     schematic_name: &str,
 ) -> UniversalSchematic {
+    use rayon::prelude::*;
+    use std::collections::HashMap;
+
     let mut schematic = UniversalSchematic::new(schematic_name.to_string());
-    model_shape.for_each_point(|x, y, z| {
+
+    // One pass to enumerate the solid voxels, so the colour sampling below
+    // can run over a slice. The mask is already built by then.
+    let mut points: Vec<(i32, i32, i32)> = Vec::new();
+    model_shape.for_each_point(|x, y, z| points.push((x, y, z)));
+
+    // Sample every voxel's surface colour, packed as 24 bit RGB. O(1) per
+    // voxel since the surface field landed, and on native it runs on rayon.
+    let sample = |&(x, y, z): &(i32, i32, i32)| -> u32 {
         let rgb = model_shape.surface_color(x, y, z).unwrap_or(FALLBACK_RGB);
-        let target = ExtendedColorData::from_rgb(rgb[0], rgb[1], rgb[2]);
-        if let Some(id) = palette.find_closest(&target) {
-            schematic.set_block(x, y, z, &BlockState::new(id));
+        ((rgb[0] as u32) << 16) | ((rgb[1] as u32) << 8) | rgb[2] as u32
+    };
+    let colors: Vec<u32> = if use_parallel() {
+        points.par_iter().map(sample).collect()
+    } else {
+        points.iter().map(sample).collect()
+    };
+
+    // Memoise the palette search on the exact 24 bit colour. A texture has
+    // far fewer distinct colours than the model has voxels, so this turns a
+    // per voxel palette scan into one scan per distinct colour. The key is
+    // exact rather than quantised on purpose: quantising would change which
+    // block some voxels get, and the golden fixture pins them.
+    //
+    // Each voxel keeps a u32 slot into `distinct` rather than a palette
+    // index, which is the same four bytes and cannot overflow on a palette
+    // larger than 65,535 entries. First seen order makes `distinct`
+    // deterministic, so the parallel match below is too.
+    let mut memo: HashMap<u32, u32> = HashMap::new();
+    let mut distinct: Vec<u32> = Vec::new();
+    let mut slots: Vec<u32> = Vec::with_capacity(colors.len());
+    for &key in &colors {
+        let slot = *memo.entry(key).or_insert_with(|| {
+            distinct.push(key);
+            (distinct.len() - 1) as u32
+        });
+        slots.push(slot);
+    }
+
+    // One palette scan per distinct colour, in parallel on native. The scan
+    // itself is unchanged, so every voxel still gets the entry the per voxel
+    // loop would have given it, ties included.
+    let match_color = |&key: &u32| -> Option<usize> {
+        let target = ExtendedColorData::from_rgb((key >> 16) as u8, (key >> 8) as u8, key as u8);
+        palette.find_closest_index(&target)
+    };
+    let matched: Vec<Option<usize>> = if use_parallel() {
+        distinct.par_iter().map(match_color).collect()
+    } else {
+        distinct.iter().map(match_color).collect()
+    };
+
+    // Resolve each distinct palette index to a BlockState once.
+    let mut states: HashMap<usize, BlockState> = HashMap::new();
+    for index in matched.iter().flatten() {
+        if let std::collections::hash_map::Entry::Vacant(slot) = states.entry(*index) {
+            if let Some(id) = palette.block_id(*index) {
+                slot.insert(BlockState::new(id));
+            }
         }
-    });
+    }
+
+    for (&(x, y, z), &slot) in points.iter().zip(&slots) {
+        if let Some(state) = matched[slot as usize].and_then(|i| states.get(&i)) {
+            schematic.set_block(x, y, z, state);
+        }
+    }
     schematic
+}
+
+/// Whether the textured walk may use rayon. Native yes, wasm32 no (it has no
+/// thread pool worth the name), and `NUCLEATION_VOXELIZE_SEQUENTIAL` forces
+/// the sequential path anywhere, which is how the two are tested against each
+/// other.
+fn use_parallel() -> bool {
+    cfg!(not(target_arch = "wasm32"))
+        && std::env::var_os("NUCLEATION_VOXELIZE_SEQUENTIAL").is_none()
 }
