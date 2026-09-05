@@ -1,4 +1,6 @@
-# Nucleation v0.10.17
+# Nucleation v0.10.19
+
+This release also carries the world-segment changes published as 0.10.17 and 0.10.18 from the ingestion branch (observable extraction, explicit source gap receipts, no implicit selection boundary certification), which had no notes of their own.
 
 **Mesh voxelization is no longer quadratic in the volume.** Filling a
 voxelized mesh used to call `MeshShape::normal_at` for every solid voxel

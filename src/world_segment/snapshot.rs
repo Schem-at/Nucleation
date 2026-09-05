@@ -488,10 +488,19 @@ fn archive_reader(path: &str) -> Result<Box<dyn Read>, TileError> {
 }
 
 /// Random-access source whose object hashes are verified before decoding.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum EmptyRegionPolicy {
+    #[default]
+    Reject,
+    /// Explicit acknowledgement of missing source bytes, not proof of air.
+    AcknowledgeZeroByte,
+}
+
 pub struct SnapshotTiles {
     manifest: SnapshotManifest,
     store: Box<dyn Store>,
     rect: (i32, i32, i32, i32),
+    empty_region_policy: EmptyRegionPolicy,
 }
 
 impl SnapshotTiles {
@@ -499,6 +508,15 @@ impl SnapshotTiles {
         manifest: SnapshotManifest,
         store: Box<dyn Store>,
         rect: (i32, i32, i32, i32),
+    ) -> Result<Self, TileError> {
+        Self::with_empty_region_policy(manifest, store, rect, EmptyRegionPolicy::Reject)
+    }
+
+    pub fn with_empty_region_policy(
+        manifest: SnapshotManifest,
+        store: Box<dyn Store>,
+        rect: (i32, i32, i32, i32),
+        empty_region_policy: EmptyRegionPolicy,
     ) -> Result<Self, TileError> {
         manifest.validate()?;
         if rect.0 > rect.2 || rect.1 > rect.3 {
@@ -508,6 +526,7 @@ impl SnapshotTiles {
             manifest,
             store,
             rect,
+            empty_region_policy,
         })
     }
 }
@@ -550,10 +569,15 @@ impl TileSource for SnapshotTiles {
             return Ok(None);
         };
         if let Some(error) = &region.error {
-            return Err(malformed(format!(
-                "snapshot region {},{} is unreadable: {error}",
-                id.x, id.z
-            )));
+            if self.empty_region_policy != EmptyRegionPolicy::AcknowledgeZeroByte
+                || region.bytes != 0
+                || !region.chunks.is_empty()
+            {
+                return Err(malformed(format!(
+                    "snapshot region {},{} is unreadable: {error}",
+                    id.x, id.z
+                )));
+            }
         }
         let bytes = bounded_read(self.store.reader(&region.object_key).map_err(io)?)?;
         if bytes.len() as u64 != region.bytes
@@ -563,6 +587,11 @@ impl TileSource for SnapshotTiles {
                 "snapshot object failed integrity check: {}",
                 region.object_key
             )));
+        }
+        // Verify the actual object above even for acknowledged placeholders:
+        // a missing or tampered object is never an accepted coverage gap.
+        if region.error.is_some() && bytes.is_empty() {
+            return Ok(None);
         }
         WorldSourceTiles::new(
             WorldSource::from_mca_bytes(bytes).map_err(malformed)?,

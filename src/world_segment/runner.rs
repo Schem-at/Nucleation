@@ -152,6 +152,18 @@ pub struct RunStats {
 /// identity-matches them, and materializes each into a schematic.
 pub struct WorldSegmenter;
 
+/// Observational geometry only. This callback never participates in identities,
+/// classification, stitching or materialization. Parents are bounded for UI use.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct SpatialObservation {
+    pub phase: &'static str,
+    pub id: String,
+    pub world_bbox: ((i32, i32, i32), (i32, i32, i32)),
+    pub blocks: u64,
+    pub parents: Vec<String>,
+    pub parent_count: usize,
+}
+
 impl WorldSegmenter {
     pub fn run(
         source: &dyn TileSource,
@@ -194,6 +206,32 @@ impl WorldSegmenter {
         prior: &[PriorBuild],
         emit: &mut dyn FnMut(MaterializedBuild),
     ) -> Result<RunStats, TileError> {
+        Self::run_observed(source, profile, partitions, job, prior, emit, None)
+    }
+
+    /// The same deterministic extraction, with optional spatial diagnostics.
+    /// Candidates are tile-local; stitched groups may still be split by a caller.
+    pub fn try_run_streaming_observed(
+        source: &dyn TileSource,
+        profile: &WorldProfile,
+        partitions: &PartitionIndex,
+        job: &SegmentJob,
+        prior: &[PriorBuild],
+        emit: &mut dyn FnMut(MaterializedBuild),
+        observe: &mut dyn FnMut(SpatialObservation),
+    ) -> Result<RunStats, TileError> {
+        Self::run_observed(source, profile, partitions, job, prior, emit, Some(observe))
+    }
+
+    fn run_observed(
+        source: &dyn TileSource,
+        profile: &WorldProfile,
+        partitions: &PartitionIndex,
+        job: &SegmentJob,
+        prior: &[PriorBuild],
+        emit: &mut dyn FnMut(MaterializedBuild),
+        mut observe: Option<&mut dyn FnMut(SpatialObservation)>,
+    ) -> Result<RunStats, TileError> {
         let mut stitch = StitchState::empty();
         // Every surviving (non-substrate, non-dropped-cluster) block, grouped
         // by the per-tile ClusterId it belonged to before stitching. A build's
@@ -214,6 +252,18 @@ impl WorldSegmenter {
         source.for_each_tile(&mut |tile| {
             let (segs, membership) =
                 segment_tile_membership(&tile, profile, &job.config, partitions);
+            if let Some(callback) = observe.as_mut() {
+                for cluster in &segs.clusters {
+                    callback(SpatialObservation {
+                        phase: "candidate",
+                        id: cluster.id.0.to_string(),
+                        world_bbox: cluster.bbox,
+                        blocks: cluster.block_count,
+                        parents: Vec::new(),
+                        parent_count: 0,
+                    });
+                }
+            }
             stitch = StitchState::merge(
                 std::mem::replace(&mut stitch, StitchState::empty()),
                 StitchState::from(&segs, job.config.cell_size, job.min_y),
@@ -292,6 +342,21 @@ impl WorldSegmenter {
 
         let mut stats = RunStats::default();
         for build in ordered_builds {
+            if let Some(callback) = observe.as_mut() {
+                callback(SpatialObservation {
+                    phase: "stitched",
+                    id: stable_by_build[&build.id].to_string(),
+                    world_bbox: build.bbox,
+                    blocks: build.block_count,
+                    parents: build
+                        .cluster_ids
+                        .iter()
+                        .take(64)
+                        .map(|id| id.0.to_string())
+                        .collect(),
+                    parent_count: build.cluster_ids.len(),
+                });
+            }
             // Union the blocks of every cluster this build absorbed.
             let mut blocks: BTreeMap<(i32, i32, i32), BlockState> = BTreeMap::new();
             let mut block_entities: BTreeMap<(i32, i32, i32), BlockEntity> = BTreeMap::new();
@@ -510,6 +575,40 @@ mod tests {
         expected_provenance.sort_by_key(|p| p.stable_build_id);
         emitted_provenance.sort_by_key(|p| p.stable_build_id);
         assert_eq!(emitted_provenance, expected_provenance);
+
+        let mut observed = Vec::new();
+        let mut geometry = Vec::new();
+        let observed_stats = WorldSegmenter::try_run_streaming_observed(
+            &source,
+            &profile,
+            &partitions,
+            &job,
+            &[],
+            &mut |mb| observed.push(mb.provenance),
+            &mut |shape| geometry.push(shape),
+        )
+        .unwrap();
+        observed.sort_by_key(|p| p.stable_build_id);
+        assert_eq!(
+            observed, expected_provenance,
+            "observation must not change identity or bounds"
+        );
+        assert_eq!(observed_stats.builds, stats.builds);
+        let candidates: Vec<_> = geometry.iter().filter(|s| s.phase == "candidate").collect();
+        assert!(!candidates.is_empty());
+        let stitched: Vec<_> = geometry.iter().filter(|s| s.phase == "stitched").collect();
+        assert_eq!(stitched.len(), observed.len());
+        for shape in stitched {
+            assert!(observed
+                .iter()
+                .any(|p| p.stable_build_id.to_string() == shape.id
+                    && p.world_bbox == shape.world_bbox));
+            assert!(shape
+                .parents
+                .iter()
+                .all(|id| candidates.iter().any(|c| &c.id == id)));
+            assert!(shape.parent_count >= shape.parents.len());
+        }
     }
 
     #[test]
