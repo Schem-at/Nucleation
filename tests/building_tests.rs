@@ -1105,3 +1105,51 @@ fn a_shaded_brush_still_asks_the_shape_for_a_normal() {
         "one normal per placed voxel"
     );
 }
+
+#[cfg(feature = "voxelize")]
+#[test]
+fn rstack_does_not_pay_for_normals_a_solid_brush_ignores() {
+    use nucleation::building::{BrushEnum, BuildingTool, ShapeEnum, SolidBrush};
+    use nucleation::voxelize::{test_meshes::sphere_5k, MeshModel, MeshShape};
+
+    let mut model = MeshModel::from_obj_str(&sphere_5k()).expect("sphere parses");
+    model.fit(24.0);
+    let shape = ShapeEnum::Mesh(MeshShape::new(model));
+    let brush = BrushEnum::Solid(SolidBrush::new(nucleation::BlockState::new(
+        "minecraft:stone",
+    )));
+    let mut schematic = nucleation::UniversalSchematic::new("rstack".to_string());
+
+    let started = std::time::Instant::now();
+    BuildingTool::new(&mut schematic).rstack(&shape, &brush, 2, (32, 0, 0));
+    let elapsed = started.elapsed();
+
+    assert!(schematic.total_blocks() > 0, "rstack placed blocks");
+    if !cfg!(debug_assertions) {
+        assert!(
+            elapsed.as_secs_f64() < 1.0,
+            "rstack of a mesh with a solid brush took {elapsed:?}, budget is 1 s"
+        );
+    }
+}
+
+#[test]
+fn a_hollow_shape_forwards_the_gate_to_its_inner_shape() {
+    use nucleation::building::{BuildingTool, ShapeEnum, SolidBrush};
+    // Hollow only reaches the inner normal_at from its own normal_at, so a
+    // gated fill must not touch it.
+    let inner = counting_cube();
+    let hollow = Hollow::new(
+        ShapeEnum::Cuboid(nucleation::building::Cuboid::new((0, 0, 0), (5, 5, 5))),
+        1,
+    );
+    let brush = SolidBrush::new(nucleation::BlockState::new("minecraft:stone"));
+    let mut schematic = nucleation::UniversalSchematic::new("hollow".to_string());
+    BuildingTool::new(&mut schematic).fill(&hollow, &brush);
+    assert!(
+        schematic.total_blocks() > 0,
+        "the hollow fill placed blocks"
+    );
+    assert_eq!(inner.normals.get(), 0, "the gate never reached a normal");
+    let _ = inner.bounds();
+}

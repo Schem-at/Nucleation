@@ -99,6 +99,14 @@ impl Shape for BezierCurve {
         points
     }
 
+    /// Nearest point on the curve, then the outward radial direction.
+    ///
+    /// Linear in the `resolution` passed to BezierCurve::new, which the
+    /// caller fixes and which does not grow with the fill volume, so this is
+    /// O(1) in the target size and is not the pattern MeshShape::normal_at
+    /// had. `contains` walks the same segments, so caching one without the
+    /// other would buy nothing. Brushes that ignore the normal skip this
+    /// entirely (Brush::uses_normal).
     fn normal_at(&self, x: i32, y: i32, z: i32) -> (f64, f64, f64) {
         let px = x as f64;
         let py = y as f64;

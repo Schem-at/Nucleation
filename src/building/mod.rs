@@ -149,6 +149,10 @@ impl<'a> BuildingTool<'a> {
         count: usize,
         offset: (i32, i32, i32),
     ) {
+        // Same gate as fill/fill_enum_masked: a normal can cost a nearest
+        // surface query (see MeshShape), so only pay for it when the brush
+        // reads the value. Computed once, not once per copy.
+        let wants_normal = brush.uses_normal();
         for i in 0..count {
             let dx = offset.0 * i as i32;
             let dy = offset.1 * i as i32;
@@ -159,7 +163,11 @@ impl<'a> BuildingTool<'a> {
                 .ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
 
             translated.for_each_point(|x, y, z| {
-                let normal = translated.normal_at(x, y, z);
+                let normal = if wants_normal {
+                    translated.normal_at(x, y, z)
+                } else {
+                    (0.0, 0.0, 0.0)
+                };
                 let t = shape.parameter_at(x - dx, y - dy, z - dz);
                 if let Some(block) = brush.get_block_with_parameter(x, y, z, normal, t) {
                     self.schematic.set_block(x, y, z, &block);
