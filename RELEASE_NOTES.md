@@ -1,4 +1,16 @@
-# Unreleased
+# Nucleation v0.10.15
+
+**Immutable, incremental world snapshots.** `segment_world index` stores Anvil
+regions by content hash and produces deterministic manifests with semantic chunk
+hashes. Repeated backups reuse unchanged region indexes and stored objects;
+snapshot-backed extraction verifies object integrity without needing the original
+world. Unreadable regions can be recorded explicitly for operator review.
+
+**Observable, coverage-certified extraction.** The worker emits NDJSON progress
+and seals successful snapshot-backed runs with a versioned completion report.
+Extraction rejects artificial boundary cuts instead of silently producing partial
+builds, while complete hard partitions remain valid. The worker is also available
+as a Cargo binary, including in the crates.io source package.
 
 **Build-animation anchors and cross-binding parity.** `BuildAnimation` records
 named anchors (`add_anchor`, `add_anchor_to_group`, `anchors_json`) that every

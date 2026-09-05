@@ -63,6 +63,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run tests
         run: cargo test
+      - name: Test snapshot indexing and coverage-certified world extraction
+        run: |
+          cargo test --no-default-features --features world-segment,store-fs,store-ssh --lib world_segment
+          cargo test --no-default-features --features world-segment,store-fs,store-ssh --test world_snapshot --test world_segment_pipeline
       - name: Build untrusted-input fuzz targets
         run: cargo check --manifest-path fuzz/Cargo.toml --bins
       - name: Build the bridge surface
@@ -215,7 +219,7 @@ jobs:
         # need a Rust toolchain or a locally-compiled, version-drifting binary.
         run: |
           cargo build --release --lib --features bridge-full --target ${{ matrix.target }}
-          cargo build --release --example segment_world --features world-segment,store-fs,store-ssh --target ${{ matrix.target }}
+          cargo build --release --no-default-features --bin segment_world --features world-segment,store-fs,store-ssh --target ${{ matrix.target }}
       - name: Smoke-test world worker on its native runner
         shell: bash
         run: |
@@ -224,7 +228,7 @@ jobs:
             echo "Skipping execution of cross-compiled ${{ matrix.target }} worker on $host_target"
             exit 0
           fi
-          worker="target/${{ matrix.target }}/release/examples/segment_world"
+          worker="target/${{ matrix.target }}/release/segment_world"
           if [[ "${{ matrix.target }}" == *windows* ]]; then
             worker="${worker}.exe"
           fi
@@ -237,10 +241,10 @@ jobs:
           cp target/${{ matrix.target }}/release/*nucleation* out/ 2>/dev/null || true
           find out -maxdepth 1 -type d -mindepth 1 -exec rm -rf {} +
           if [[ "${{ matrix.target }}" == *windows* ]]; then
-            cp target/${{ matrix.target }}/release/examples/segment_world.exe out/segment_world.exe
+            cp target/${{ matrix.target }}/release/segment_world.exe out/segment_world.exe
             test -s out/segment_world.exe
           else
-            cp target/${{ matrix.target }}/release/examples/segment_world out/segment_world
+            cp target/${{ matrix.target }}/release/segment_world out/segment_world
             chmod 0755 out/segment_world
             test -x out/segment_world
           fi
