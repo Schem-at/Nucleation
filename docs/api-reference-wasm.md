@@ -7,6 +7,7 @@ Nucleation provides first-class WebAssembly bindings for use in browsers and Nod
 ## Table of Contents
 
 - [Core](#core)
+  - [Bulk block queries](#bulk-block-queries)
   - [SchematicWrapper](#schematicwrapper)
   - [BlockStateWrapper](#blockstatewrapper)
   - [SchematicBuilderWrapper](#schematicbuilderwrapper)
@@ -52,6 +53,27 @@ Nucleation provides first-class WebAssembly bindings for use in browsers and Nod
 ---
 
 ## Core
+
+### Bulk block queries
+
+Three methods exist so a tool never has to pull the whole block list just to
+count or rewrite it:
+
+```js
+const counts = JSON.parse(schem.countBlocksJson());   // {"minecraft:stone": 1234, ...}
+const changed = schem.replaceBlocksJson('{"minecraft:stone":"minecraft:glass"}');
+const packed = Uint8Array.from(atob(schem.nonAirBlocksPackedB64()), (c) => c.charCodeAt(0));
+```
+
+`countBlocksJson` tallies non-air blocks by id in one pass.
+`replaceBlocksJson` applies a from-id to to-id map in place and returns the
+number of blocks changed; keys match on the id, values may carry block states.
+`nonAirBlocksPackedB64` is the compact export: little endian `u32 count`,
+then `i32 x, i32 y, i32 z, u16 palette_index` per block, then a `u32` length
+and that many bytes of palette JSON.
+
+`getAllBlocksJson` still exists and still materialises air, which makes it
+`volume()`-sized. Prefer `getNonAirBlocksJson` or the packed export.
 
 ### SchematicWrapper
 

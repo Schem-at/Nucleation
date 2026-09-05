@@ -125,6 +125,27 @@ Tight bounds follow current content, not mutation history: replacing a boundary
 block with air shrinks them, and `tight_bounds_min()` / `tight_bounds_max()`
 raise `NucleationError.NotFound` once the final non-air block is removed.
 
+## Bulk block queries
+
+Three methods exist so a tool never has to pull the whole block list just to
+count or rewrite it:
+
+```python
+counts = json.loads(schem.count_blocks_json())   # {"minecraft:stone": 1234, ...}
+changed = schem.replace_blocks_json('{"minecraft:stone":"minecraft:glass"}')
+packed = base64.b64decode(schem.non_air_blocks_packed_b64())
+```
+
+`count_blocks_json` tallies non-air blocks by id in one pass.
+`replace_blocks_json` applies a from-id to to-id map in place and returns the
+number of blocks changed; keys match on the id, values may carry block states.
+`non_air_blocks_packed_b64` is the compact export: little endian `u32 count`,
+then `i32 x, i32 y, i32 z, u16 palette_index` per block, then a `u32` length
+and that many bytes of palette JSON.
+
+`get_all_blocks_json` still exists and still materialises air, which makes it
+`volume()`-sized. Prefer `get_non_air_blocks_json` or the packed export.
+
 ## Analysis: fingerprints, diff, auto-stack
 
 These live on their own top-level classes, taking schematics as arguments:
