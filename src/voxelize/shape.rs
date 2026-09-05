@@ -22,6 +22,12 @@ struct TriGrid {
     dims: [i32; 3],
     /// `dims.x * dims.y * dims.z` buckets of triangle indices.
     cells: Vec<Vec<u32>>,
+    /// Inclusive 3D prefix sums of the bucket sizes, one entry per cell
+    /// corner. Built on the first ring search, never for a plain solid fill.
+    /// It answers "is this whole box of cells empty" in eight lookups, which
+    /// lets the ring search jump over the empty middle of a big model
+    /// instead of walking every cell of every ring.
+    occupancy: OnceLock<Vec<u32>>,
 }
 
 impl TriGrid {
@@ -62,7 +68,93 @@ impl TriGrid {
                 }
             }
         }
-        Self { min, dims, cells }
+        Self {
+            min,
+            dims,
+            cells,
+            occupancy: OnceLock::new(),
+        }
+    }
+
+    /// Inclusive prefix sums over the bucket sizes, on a grid one larger in
+    /// each axis so the box query below needs no bounds special cases.
+    fn occupancy(&self) -> &[u32] {
+        self.occupancy.get_or_init(|| {
+            let (dy, dz) = (self.dims[1] as usize, self.dims[2] as usize);
+            let (sx, sy, sz) = (
+                self.dims[0] as usize + 1,
+                self.dims[1] as usize + 1,
+                self.dims[2] as usize + 1,
+            );
+            let mut ps = vec![0u32; sx * sy * sz];
+            for x in 1..sx {
+                for y in 1..sy {
+                    for z in 1..sz {
+                        let here = self.cells[((x - 1) * dy + (y - 1)) * dz + (z - 1)].len() as i64;
+                        let at = |x: usize, y: usize, z: usize| ps[(x * sy + y) * sz + z] as i64;
+                        let v = here + at(x - 1, y, z) + at(x, y - 1, z) + at(x, y, z - 1)
+                            - at(x - 1, y - 1, z)
+                            - at(x - 1, y, z - 1)
+                            - at(x, y - 1, z - 1)
+                            + at(x - 1, y - 1, z - 1);
+                        ps[(x * sy + y) * sz + z] = v as u32;
+                    }
+                }
+            }
+            ps
+        })
+    }
+
+    /// Triangle registrations inside the inclusive cell box, already clamped
+    /// to the grid by the caller.
+    fn count_in(&self, lo: [i32; 3], hi: [i32; 3]) -> u32 {
+        let ps = self.occupancy();
+        let (sy, sz) = (self.dims[1] as usize + 1, self.dims[2] as usize + 1);
+        let at =
+            |x: i32, y: i32, z: i32| ps[(x as usize * sy + y as usize) * sz + z as usize] as i64;
+        let (x0, y0, z0) = (lo[0], lo[1], lo[2]);
+        let (x1, y1, z1) = (hi[0] + 1, hi[1] + 1, hi[2] + 1);
+        let v = at(x1, y1, z1) - at(x0, y1, z1) - at(x1, y0, z1) - at(x1, y1, z0)
+            + at(x0, y0, z1)
+            + at(x0, y1, z0)
+            + at(x1, y0, z0)
+            - at(x0, y0, z0);
+        v as u32
+    }
+
+    /// Smallest Chebyshev ring around `start` that holds any triangle at all.
+    /// Every smaller ring is empty, so a search may begin here without
+    /// changing which triangle it finds first.
+    fn first_occupied_ring(&self, start: [i32; 3], max_r: i32) -> i32 {
+        let box_of = |r: i32| {
+            (
+                [
+                    (start[0] - r).max(0),
+                    (start[1] - r).max(0),
+                    (start[2] - r).max(0),
+                ],
+                [
+                    (start[0] + r).min(self.dims[0] - 1),
+                    (start[1] + r).min(self.dims[1] - 1),
+                    (start[2] + r).min(self.dims[2] - 1),
+                ],
+            )
+        };
+        let (lo, hi) = box_of(max_r);
+        if self.count_in(lo, hi) == 0 {
+            return max_r + 1;
+        }
+        let (mut low, mut high) = (0i32, max_r);
+        while low < high {
+            let mid = low + (high - low) / 2;
+            let (lo, hi) = box_of(mid);
+            if self.count_in(lo, hi) == 0 {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+        low
     }
 
     fn clamp_axis(dims: [i32; 3], axis: usize, v: i32) -> i32 {
@@ -248,7 +340,9 @@ impl MeshShape {
             let start = d.grid.cell_of(p);
             let max_r = d.grid.dims[0].max(d.grid.dims[1]).max(d.grid.dims[2]);
             let mut best: Option<(usize, [f32; 3], f32)> = None;
-            for r in 0..=max_r {
+            // Rings below this one hold no triangle at all, so starting here
+            // finds the same triangle in the same order, only sooner.
+            for r in d.grid.first_occupied_ring(start, max_r)..=max_r {
                 // Any cell beyond Chebyshev ring `r` is at least `(r) * CELL`
                 // away from a point inside the start cell's ring-0 cube, so once
                 // the best distance is under that we can stop.
@@ -258,14 +352,24 @@ impl MeshShape {
                     }
                 }
                 let mut any_cell = false;
+                let zlo = (start[2] - r).max(0);
+                let zhi = (start[2] + r).min(d.grid.dims[2] - 1);
                 for cx in (start[0] - r).max(0)..=(start[0] + r).min(d.grid.dims[0] - 1) {
                     for cy in (start[1] - r).max(0)..=(start[1] + r).min(d.grid.dims[1] - 1) {
-                        for cz in (start[2] - r).max(0)..=(start[2] + r).min(d.grid.dims[2] - 1) {
-                            let on_shell = (cx - start[0]).abs() == r
-                                || (cy - start[1]).abs() == r
-                                || (cz - start[2]).abs() == r;
-                            if !on_shell {
-                                continue;
+                        // Cells are visited in the same (cx, cy, cz) order a
+                        // full box scan would use, so ties still resolve to
+                        // the same triangle. When neither x nor y is already
+                        // on the ring's shell only the two z faces are on it,
+                        // and the span between them is jumped in one step
+                        // instead of walked cell by cell.
+                        let ring_face = (cx - start[0]).abs() == r || (cy - start[1]).abs() == r;
+                        let mut cz = zlo;
+                        while cz <= zhi {
+                            if !ring_face && (cz - start[2]).abs() != r {
+                                cz = start[2] + r;
+                                if cz > zhi {
+                                    break;
+                                }
                             }
                             any_cell = true;
                             for &t in d.grid.bucket([cx, cy, cz]) {
@@ -280,6 +384,7 @@ impl MeshShape {
                                     best = Some((ti, q, dist));
                                 }
                             }
+                            cz += 1;
                         }
                     }
                 }
@@ -390,17 +495,10 @@ impl SolidMask {
 struct SurfaceField {
     origin: (i32, i32, i32),
     dims: (usize, usize, usize),
-    /// Triangle id per voxel, `NO_TRI` for none. `CONTESTED` is set on
-    /// voxels where two triangles are exactly as close, so no rule the field
-    /// can apply is more right than another: the ring search settles those
-    /// one by one, which keeps the historical answer byte for byte.
     tri: Vec<u32>,
 }
 
 const NO_TRI: u32 = u32::MAX;
-/// High bit of a field entry: this voxel is an exact tie, ask the ring
-/// search. Triangle counts never come near 2^31, so the id fits below it.
-const CONTESTED: u32 = 1 << 31;
 /// A voxel centre farther than this from every triangle cannot be a surface
 /// voxel: the surface would have to pass between it and the outside. Half a
 /// voxel diagonal is 0.867, so 1.5 covers a full neighbour ring.
@@ -425,16 +523,7 @@ impl SurfaceField {
 
     fn get(&self, x: i32, y: i32, z: i32) -> Option<usize> {
         let id = self.tri[self.index(x, y, z)?];
-        (id != NO_TRI).then_some((id & !CONTESTED) as usize)
-    }
-
-    /// The field's answer only where it is the whole answer: a contested
-    /// voxel reports nothing so the caller can settle it exactly.
-    fn settled(&self, x: i32, y: i32, z: i32) -> Option<usize> {
-        if self.tri[self.index(x, y, z)?] & CONTESTED != 0 {
-            return None;
-        }
-        self.get(x, y, z)
+        (id != NO_TRI).then_some(id as usize)
     }
 }
 
@@ -449,9 +538,9 @@ impl MeshShape {
 
     /// Triangle claiming this voxel, from the field, falling back to the
     /// ring search when the voxel is outside the field (an out of bounds
-    /// query), the mesh is empty, or two triangles are exactly as close.
+    /// query) or the mesh is empty.
     fn triangle_at(&self, x: i32, y: i32, z: i32) -> Option<usize> {
-        if let Some(id) = self.surface_field().settled(x, y, z) {
+        if let Some(id) = self.surface_field().get(x, y, z) {
             return Some(id);
         }
         let p = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
@@ -541,13 +630,16 @@ impl MeshShape {
         drop(best);
 
         let (dy, dz) = (dims.1, dims.2);
-        let distance_to = |idx: usize, ti: u32| {
+        let centre = |idx: usize| {
             let (iz, iy, ix) = (idx % dz, (idx / dz) % dy, idx / (dy * dz));
-            let c = [
+            [
                 (x0 + ix as i32) as f32 + 0.5,
                 (y0 + iy as i32) as f32 + 0.5,
                 (z0 + iz as i32) as f32 + 0.5,
-            ];
+            ]
+        };
+        let distance_to = |idx: usize, ti: u32| {
+            let c = centre(idx);
             distance(
                 c,
                 closest_point_on_triangle(c, &d.triangles[ti as usize].positions),
@@ -616,11 +708,27 @@ impl MeshShape {
             std::mem::swap(&mut frontier, &mut next);
         }
 
-        // Fold the tie marks into the ids so the field stays one array on
-        // the lookup path.
-        for (idx, &c) in contested.iter().enumerate() {
-            if c && tri[idx] != NO_TRI {
-                tri[idx] |= CONTESTED;
+        // Voxels where two triangles are exactly as close: no rule the field
+        // can apply is more right than another, so the ring search settles
+        // them, which keeps the historical answer byte for byte. They are the
+        // medial set, O(N^2) of an O(N^3) volume, and they are settled once
+        // here in parallel rather than on every lookup.
+        let ties: Vec<usize> = contested
+            .iter()
+            .enumerate()
+            .filter(|(idx, &c)| c && tri[*idx] != NO_TRI)
+            .map(|(idx, _)| idx)
+            .collect();
+        let resolved: Vec<u32> = ties
+            .par_iter()
+            .map(|&idx| {
+                self.nearest_triangle(centre(idx))
+                    .map_or(NO_TRI, |(ti, _, _)| ti as u32)
+            })
+            .collect();
+        for (&idx, &id) in ties.iter().zip(resolved.iter()) {
+            if id != NO_TRI {
+                tri[idx] = id;
             }
         }
 
