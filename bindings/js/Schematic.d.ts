@@ -442,14 +442,18 @@ export class Schematic {
     /**
      * Non-air blocks tallied by id: `{"minecraft:stone": 123, ...}`.
      * One pass, no per block allocation, so a caller that only wants a
-     * material list never has to pull `get_non_air_blocks_json`.
+     * material list never has to pull `get_non_air_blocks_json`. "Air"
+     * covers `minecraft:air`, `cave_air` and `void_air` alike.
      */
     countBlocksJson(): string;
 
     /**
      * Apply a `{"from id": "to id"}` map in place and return how many
      * blocks changed. Keys match on block id only, ignoring block
-     * states; values may carry states (`minecraft:oak_stairs[facing=north]`).
+     * states; values may carry states (`minecraft:oak_stairs[facing=north]`),
+     * but not NBT: `parse_block_string` only returns a `BlockState`, so
+     * any `{...}` payload on a `to` value is silently dropped rather
+     * than copied onto the replaced block.
      * A block whose id is not a key is left alone. Errors with `Parse`
      * on malformed JSON or an unparseable target id.
      */
@@ -470,8 +474,9 @@ export class Schematic {
      * Palette indices are assigned in first-seen order, so the same
      * schematic always packs identically. About seven times smaller
      * than `get_non_air_blocks_json` and free of per block JSON
-     * parsing on the far side. Empty when the schematic holds more
-     * than 65,535 distinct non-air ids, which no real build does.
+     * parsing on the far side. The guard bails as soon as 65,535
+     * distinct non-air ids are already recorded, so nothing is written
+     * once a 65,536th distinct id shows up; no real build has that many.
      */
     nonAirBlocksPackedB64(): string;
 

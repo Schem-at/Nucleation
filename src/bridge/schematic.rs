@@ -1301,7 +1301,7 @@ pub mod ffi {
             let items: Vec<serde_json::Value> = self
                 .0
                 .iter_blocks()
-                .filter(|(_, block)| block.name != "minecraft:air")
+                .filter(|(_, block)| !crate::universal_schematic::is_air(block.name.as_str()))
                 .map(|(pos, block)| block_json(&pos, block))
                 .collect();
             let json = serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string());
@@ -1310,11 +1310,12 @@ pub mod ffi {
 
         /// Non-air blocks tallied by id: `{"minecraft:stone": 123, ...}`.
         /// One pass, no per block allocation, so a caller that only wants a
-        /// material list never has to pull `get_non_air_blocks_json`.
+        /// material list never has to pull `get_non_air_blocks_json`. "Air"
+        /// covers `minecraft:air`, `cave_air` and `void_air` alike.
         pub fn count_blocks_json(&self, out: &mut DiplomatWrite) {
             let mut counts: HashMap<&str, u64> = HashMap::new();
             for (_, block) in self.0.iter_blocks() {
-                if block.name == "minecraft:air" {
+                if crate::universal_schematic::is_air(block.name.as_str()) {
                     continue;
                 }
                 *counts.entry(block.name.as_str()).or_insert(0) += 1;
@@ -1328,7 +1329,10 @@ pub mod ffi {
 
         /// Apply a `{"from id": "to id"}` map in place and return how many
         /// blocks changed. Keys match on block id only, ignoring block
-        /// states; values may carry states (`minecraft:oak_stairs[facing=north]`).
+        /// states; values may carry states (`minecraft:oak_stairs[facing=north]`),
+        /// but not NBT: `parse_block_string` only returns a `BlockState`, so
+        /// any `{...}` payload on a `to` value is silently dropped rather
+        /// than copied onto the replaced block.
         /// A block whose id is not a key is left alone. Errors with `Parse`
         /// on malformed JSON or an unparseable target id.
         pub fn replace_blocks_json(
@@ -1372,15 +1376,16 @@ pub mod ffi {
         /// Palette indices are assigned in first-seen order, so the same
         /// schematic always packs identically. About seven times smaller
         /// than `get_non_air_blocks_json` and free of per block JSON
-        /// parsing on the far side. Empty when the schematic holds more
-        /// than 65,535 distinct non-air ids, which no real build does.
+        /// parsing on the far side. The guard bails as soon as 65,535
+        /// distinct non-air ids are already recorded, so nothing is written
+        /// once a 65,536th distinct id shows up; no real build has that many.
         pub fn non_air_blocks_packed_b64(&self, out: &mut DiplomatWrite) {
             let mut palette: Vec<&str> = Vec::new();
             let mut index_of: HashMap<&str, u16> = HashMap::new();
             let mut body: Vec<u8> = Vec::new();
             let mut count: u32 = 0;
             for (pos, block) in self.0.iter_blocks() {
-                if block.name == "minecraft:air" {
+                if crate::universal_schematic::is_air(block.name.as_str()) {
                     continue;
                 }
                 let name = block.name.as_str();

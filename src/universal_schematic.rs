@@ -2986,12 +2986,18 @@ pub fn is_redstone_connectable(block: &BlockState) -> bool {
         || name == "minecraft:target"
 }
 
+/// True for `minecraft:air` and its two variants (`cave_air`, `void_air`).
+/// The single place bulk block queries and opacity checks agree on what
+/// counts as air, so a schematic full of cave air tallies as empty rather
+/// than as a wall of "cave_air" blocks.
+pub fn is_air(name: &str) -> bool {
+    name == "minecraft:air" || name == "minecraft:cave_air" || name == "minecraft:void_air"
+}
+
 pub fn is_opaque(block: &BlockState) -> bool {
     let name = block.name.as_str();
     // Simplified opaque check - most common non-opaque blocks
-    !(name == "minecraft:air"
-        || name == "minecraft:cave_air"
-        || name == "minecraft:void_air"
+    !(is_air(name)
         || name.contains("glass")
         || name.contains("slab")
         || name.contains("stairs")

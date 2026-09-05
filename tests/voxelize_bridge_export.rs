@@ -23,6 +23,18 @@ fn sample() -> Box<Schematic> {
     s
 }
 
+/// A schematic with a stateful block and a `cave_air` cell, for asserting
+/// that the bulk queries tally by name (ignoring block state) and treat
+/// every air variant as air, not just `minecraft:air`.
+fn sample_with_state_and_cave_air() -> Box<Schematic> {
+    let mut s = Schematic::create(b"bulk-state");
+    s.set_block(0, 0, 0, b"minecraft:stone").unwrap();
+    s.set_block_from_string(1, 0, 0, b"minecraft:oak_stairs[facing=north]")
+        .unwrap();
+    s.set_block(2, 0, 0, b"minecraft:cave_air").unwrap();
+    s
+}
+
 #[test]
 fn count_blocks_json_tallies_non_air_blocks() {
     let s = sample();
@@ -31,6 +43,23 @@ fn count_blocks_json_tallies_non_air_blocks() {
     assert_eq!(counts["minecraft:stone"], 2);
     assert_eq!(counts["minecraft:dirt"], 1);
     assert!(counts.get("minecraft:air").is_none(), "air is excluded");
+}
+
+#[test]
+fn count_blocks_json_keys_by_name_and_excludes_every_air_variant() {
+    let s = sample_with_state_and_cave_air();
+    let out = written(|w| s.count_blocks_json(w));
+    let counts: serde_json::Value = serde_json::from_str(&out).expect("valid JSON");
+    assert_eq!(counts["minecraft:stone"], 1);
+    // Keyed by id only: the `[facing=north]` state does not split the tally
+    // into a separate key.
+    assert_eq!(counts["minecraft:oak_stairs"], 1);
+    assert!(counts.get("minecraft:air").is_none());
+    assert!(
+        counts.get("minecraft:cave_air").is_none(),
+        "cave_air is air too"
+    );
+    assert_eq!(counts.as_object().expect("object").len(), 2);
 }
 
 #[test]

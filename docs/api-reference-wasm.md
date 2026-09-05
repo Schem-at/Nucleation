@@ -67,7 +67,8 @@ const packed = Uint8Array.from(atob(schem.nonAirBlocksPackedB64()), (c) => c.cha
 
 `countBlocksJson` tallies non-air blocks by id in one pass.
 `replaceBlocksJson` applies a from-id to to-id map in place and returns the
-number of blocks changed; keys match on the id, values may carry block states.
+number of blocks changed as a `bigint` (the underlying count is a Rust `u64`);
+keys match on the id, values may carry block states but not NBT.
 `nonAirBlocksPackedB64` is the compact export: little endian `u32 count`,
 then `i32 x, i32 y, i32 z, u16 palette_index` per block, then a `u32` length
 and that many bytes of palette JSON.
