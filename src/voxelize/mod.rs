@@ -42,6 +42,12 @@ pub fn voxelize_textured(
     let mut points: Vec<(i32, i32, i32)> = Vec::new();
     model_shape.for_each_point(|x, y, z| points.push((x, y, z)));
 
+    // Build the surface field before entering the parallel region. It is a
+    // rayon pass of its own behind a OnceLock, so letting the first sample
+    // trigger it would nest one rayon pass inside another with every other
+    // worker parked on the lock.
+    model_shape.warm_surface_field();
+
     // Sample every voxel's surface colour, packed as 24 bit RGB. O(1) per
     // voxel since the surface field landed, and on native it runs on rayon.
     let sample = |&(x, y, z): &(i32, i32, i32)| -> u32 {

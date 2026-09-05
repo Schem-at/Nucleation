@@ -560,6 +560,15 @@ impl MeshShape {
         self.field.get_or_init(|| self.compute_field())
     }
 
+    /// Build the surface field now, on the calling thread. `compute_field` is
+    /// itself a rayon pass, so a caller that is about to sample colours in
+    /// parallel must force it first: built lazily from inside a rayon job it
+    /// would nest one pass inside another, with every other worker parked on
+    /// the `OnceLock` and unable to help.
+    pub(crate) fn warm_surface_field(&self) {
+        let _ = self.surface_field();
+    }
+
     /// Triangle claiming this voxel, from the field, falling back to the
     /// ring search when the voxel is outside the field (an out of bounds
     /// query) or the mesh is empty.
