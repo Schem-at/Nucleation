@@ -16,7 +16,7 @@ and `surface_color` are array lookups. `voxelize_textured` samples colours in
 parallel, memoises the palette search on the exact colour and resolves each
 palette index to a block once instead of cloning a `String` per voxel.
 
-| case (5,000 triangle sphere, BoxTextured cube) | 0.10.16 | 0.10.17 |
+| case (5,000 triangle sphere, BoxTextured cube) | 0.10.16 | 0.10.19 |
 | --- | --- | --- |
 | solid fill, size 32 | 424 ms | 1.66 ms |
 | solid fill, size 64 | 19.0 s | 8.44 ms |
@@ -29,7 +29,7 @@ palette index to a block once instead of cloning a `String` per voxel.
 | textured cube, size 128 | not measured | 2.28 s |
 
 Measured on the build host (16-core x86_64 server), medians, with `cargo bench
---features bridge,voxelize --bench voxelize_bench`. The 0.10.17 column is one
+--features bridge,voxelize --bench voxelize_bench`. The 0.10.19 column is one
 fresh run of all three cases at all three sizes on the released code, so it
 supersedes the per-task figures recorded while the branch was in progress.
 Size 128 was never benchmarked on unchanged 0.10.16 code, because on the old
