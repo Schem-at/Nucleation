@@ -315,6 +315,8 @@ Curve3D_from_points_result Curve3D_from_points(DiplomatF64View coordinates, bool
 uint32_t Curve3D_point_count(Curve3D* self);
 bool Curve3D_is_closed(Curve3D* self);
 void Curve3D_destroy(Curve3D* self);
+Palette* Palette_materials();
+Palette* Palette_for_material(Palette* self, bool translucent);
 Palette* Palette_all();
 Palette* Palette_solid();
 Palette* Palette_structural();

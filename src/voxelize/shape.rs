@@ -2,7 +2,7 @@
 //! uniform-grid spatial index for ray parity tests and nearest-triangle
 //! queries (normals + texture lookups).
 
-use super::model::{MeshModel, MeshTriangle, TextureImage};
+use super::model::{MeshModel, MeshTriangle};
 use crate::building::Shape;
 use rayon::prelude::*;
 use std::cell::RefCell;
@@ -263,7 +263,7 @@ pub struct MeshShape {
 
 struct MeshData {
     triangles: Vec<MeshTriangle>,
-    materials: Vec<Option<TextureImage>>,
+    materials: Vec<Option<super::MeshMaterial>>,
     grid: TriGrid,
     /// Inclusive voxel bounds of the fitted AABB.
     bounds: (i32, i32, i32, i32, i32, i32),
@@ -502,21 +502,18 @@ impl MeshShape {
     /// triangle's material. `None` when the triangle has no usable UVs or
     /// its material has no texture (constant-color materials always work).
     pub fn surface_color(&self, x: i32, y: i32, z: i32) -> Option<[u8; 3]> {
+        let sample = self.surface_sample(x, y, z)?;
+        (sample.visible && sample.textured).then(|| sample.rgb(1.0))
+    }
+
+    pub fn surface_sample(&self, x: i32, y: i32, z: i32) -> Option<super::SurfaceSample> {
         let p = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
-        let ti = self.triangle_at(x, y, z)?;
-        let tri = &self.data.triangles[ti];
-        let q = closest_point_on_triangle(p, &tri.positions);
-        let img = self.data.materials.get(tri.material? as usize)?.as_ref()?;
-        if img.width == 1 && img.height == 1 {
-            return Some([img.pixels[0], img.pixels[1], img.pixels[2]]);
-        }
-        let uvs = tri.uvs?;
-        let (u, v, w) = barycentric(q, &tri.positions);
-        let uv = [
-            uvs[0][0] * u + uvs[1][0] * v + uvs[2][0] * w,
-            uvs[0][1] * u + uvs[1][1] * v + uvs[2][1] * w,
-        ];
-        Some(img.sample_bilinear(uv[0], uv[1]))
+        let tri = &self.data.triangles[self.triangle_at(x, y, z)?];
+        Some(super::material::sample_triangle(
+            &self.data.materials,
+            tri,
+            p,
+        ))
     }
 }
 

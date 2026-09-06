@@ -7,6 +7,8 @@ import com.sun.jna.Structure
 
 internal interface PaletteLib: Library {
     fun Palette_destroy(handle: Pointer)
+    fun Palette_materials(): Pointer
+    fun Palette_for_material(handle: Pointer, translucent: Boolean): Pointer
     fun Palette_all(): Pointer
     fun Palette_solid(): Pointer
     fun Palette_structural(): Pointer
@@ -58,6 +60,18 @@ class Palette internal constructor (
     companion object {
         internal val libClass: Class<PaletteLib> = PaletteLib::class.java
         internal val lib: PaletteLib = Native.load("nucleation", libClass)
+        @JvmStatic
+
+        /** Opaque building blocks and full glass blocks, for material-aware imports.
+        */
+        fun materials(): Palette {
+
+            val returnVal = lib.Palette_materials();
+            val selfEdges: List<Any> = listOf()
+            val handle = returnVal
+            val returnOpaque = Palette(handle, selfEdges, true)
+            return returnOpaque
+        }
         @JvmStatic
 
         /** Every block blockpedia knows a color for (the default palette
@@ -194,6 +208,19 @@ class Palette internal constructor (
                 idsJsonSliceMemory.close()
             }
         }
+    }
+
+    /** Keep only opaque blocks (`false`) or full glass blocks (`true`).
+    *Includes/excludes remain respected. Returns an empty palette when
+    *no suitable block exists; check `len()` before matching colours.
+    */
+    fun forMaterial(translucent: Boolean): Palette {
+
+        val returnVal = lib.Palette_for_material(handle, translucent);
+        val selfEdges: List<Any> = listOf()
+        val handle = returnVal
+        val returnOpaque = Palette(handle, selfEdges, true)
+        return returnOpaque
     }
 
     /** A copy of this palette with ordered dithering enabled: brushes

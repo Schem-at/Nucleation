@@ -1,6 +1,9 @@
 //! Mesh model loading: GLB (glTF binary) and minimal OBJ, plus the `fit`
 //! normalization that maps a model into voxel space.
 
+use super::material::{AlphaMode, MaterialTexture, MeshMaterial};
+use std::sync::Arc;
+
 /// A decoded RGBA8 texture image.
 #[derive(Clone)]
 pub struct TextureImage {
@@ -54,20 +57,23 @@ impl TextureImage {
 pub struct MeshTriangle {
     pub positions: [[f32; 3]; 3],
     pub uvs: Option<[[f32; 2]; 3]>,
+    pub emissive_uvs: Option<[[f32; 2]; 3]>,
+    pub transmission_uvs: Option<[[f32; 2]; 3]>,
+    /// Linear vertex colour, multiplied by the material base colour.
+    pub colors: Option<[[f32; 4]; 3]>,
     /// Index into [`MeshModel::materials`].
     pub material: Option<u32>,
 }
 
-/// Triangles in model space plus a material → decoded-RGBA-image table.
+/// Triangles in model space plus glTF surface materials and shared textures.
 ///
 /// Load with [`MeshModel::from_glb_bytes`] / [`MeshModel::from_obj_str`], then
 /// normalize into voxel space with [`MeshModel::fit`].
 #[derive(Clone)]
 pub struct MeshModel {
     pub triangles: Vec<MeshTriangle>,
-    /// One slot per glTF material; `None` when the material carries neither a
-    /// base-color texture nor a usable base-color factor.
-    pub materials: Vec<Option<TextureImage>>,
+    /// One slot per glTF material, followed by the implicit default material.
+    pub materials: Vec<Option<MeshMaterial>>,
 }
 
 impl MeshModel {
@@ -117,9 +123,8 @@ impl MeshModel {
 
     /// Parse a binary glTF (`.glb`) with embedded buffers/images: full node
     /// hierarchy traversal with transforms applied, all triangle-mode
-    /// primitives (non-triangle modes are ignored), and base-color textures
-    /// decoded to RGBA (materials without a texture fall back to a 1×1 image
-    /// of their base-color factor).
+    /// primitives (non-triangle modes are ignored), default-pose skinning, and
+    /// base colour, alpha coverage, emission and transmission materials.
     pub fn from_glb_bytes(data: &[u8]) -> Result<MeshModel, String> {
         let gltf = gltf::Gltf::from_slice(data).map_err(|e| format!("GLB parse error: {e}"))?;
         let doc = gltf.document;
@@ -147,7 +152,7 @@ impl MeshModel {
         }
 
         // Decode images (best-effort: an undecodable image just loses its texture).
-        let mut images: Vec<Option<TextureImage>> = Vec::with_capacity(doc.images().count());
+        let mut images: Vec<Option<Arc<TextureImage>>> = Vec::with_capacity(doc.images().count());
         for img in doc.images() {
             let bytes: Option<Vec<u8>> = match img.source() {
                 gltf::image::Source::View { view, .. } => {
@@ -161,53 +166,74 @@ impl MeshModel {
                 .and_then(|b| image::load_from_memory(&b).ok())
                 .map(|d| {
                     let rgba = d.to_rgba8();
-                    TextureImage {
+                    Arc::new(TextureImage {
                         width: rgba.width(),
                         height: rgba.height(),
                         pixels: rgba.into_raw(),
-                    }
+                    })
                 });
             images.push(decoded);
         }
 
-        // Material table: base-color texture, else 1x1 base-color factor.
-        let mut materials: Vec<Option<TextureImage>> = Vec::new();
-        for mat in doc.materials() {
-            if mat.index().is_none() {
-                continue; // default material handled by `material: None`
-            }
-            let pbr = mat.pbr_metallic_roughness();
-            let tex = pbr
-                .base_color_texture()
-                .and_then(|info| images[info.texture().source().index()].clone());
-            let entry = tex.or_else(|| {
-                let f = pbr.base_color_factor();
-                Some(TextureImage {
-                    width: 1,
-                    height: 1,
-                    pixels: vec![
-                        (f[0].clamp(0.0, 1.0) * 255.0).round() as u8,
-                        (f[1].clamp(0.0, 1.0) * 255.0).round() as u8,
-                        (f[2].clamp(0.0, 1.0) * 255.0).round() as u8,
-                        (f[3].clamp(0.0, 1.0) * 255.0).round() as u8,
-                    ],
+        let texture = |info: gltf::texture::Info| -> Option<MaterialTexture> {
+            let t = info.texture();
+            Some(MaterialTexture {
+                image: images[t.source().index()].clone()?,
+                tex_coord: info.tex_coord(),
+                wrap_s: t.sampler().wrap_s(),
+                wrap_t: t.sampler().wrap_t(),
+            })
+        };
+        let mut materials: Vec<Option<MeshMaterial>> = doc
+            .materials()
+            .map(|mat| {
+                let pbr = mat.pbr_metallic_roughness();
+                let transmission = mat.transmission();
+                Some(MeshMaterial {
+                    base_texture: pbr.base_color_texture().and_then(&texture),
+                    base_factor: pbr.base_color_factor(),
+                    alpha_mode: match mat.alpha_mode() {
+                        gltf::material::AlphaMode::Opaque => AlphaMode::Opaque,
+                        gltf::material::AlphaMode::Mask => {
+                            AlphaMode::Mask(mat.alpha_cutoff().unwrap_or(0.5))
+                        }
+                        gltf::material::AlphaMode::Blend => AlphaMode::Blend,
+                    },
+                    transmission: transmission
+                        .as_ref()
+                        .map_or(0.0, |t| t.transmission_factor()),
+                    transmission_texture: transmission
+                        .and_then(|t| t.transmission_texture())
+                        .and_then(&texture),
+                    emissive_factor: mat
+                        .emissive_factor()
+                        .map(|v| v * mat.emissive_strength().unwrap_or(1.0)),
+                    emissive_texture: mat.emissive_texture().and_then(&texture),
                 })
-            });
-            materials.push(entry);
-        }
+            })
+            .collect();
 
+        materials.push(Some(MeshMaterial::default()));
         let mut triangles = Vec::new();
-        let scenes: Vec<gltf::Scene> = doc.scenes().collect();
-        for scene in &scenes {
-            for node in scene.nodes() {
-                visit_node(&node, IDENTITY, &buffers, &mut triangles);
-            }
+        // A glTF can contain alternative scenes; import its default scene only.
+        let roots: Vec<_> = if let Some(scene) = doc.default_scene().or_else(|| doc.scenes().next())
+        {
+            scene.nodes().collect()
+        } else {
+            let children: std::collections::HashSet<_> = doc
+                .nodes()
+                .flat_map(|n| n.children().map(|c| c.index()).collect::<Vec<_>>())
+                .collect();
+            doc.nodes()
+                .filter(|n| !children.contains(&n.index()))
+                .collect()
+        };
+        let mut worlds = vec![IDENTITY; doc.nodes().count()];
+        for node in &roots {
+            node_worlds(node, IDENTITY, &mut worlds);
         }
-        // Models with no scene at all: fall back to walking every root-less node.
-        if scenes.is_empty() {
-            for node in doc.nodes() {
-                visit_node(&node, IDENTITY, &buffers, &mut triangles);
-            }
+        for node in &roots {
+            visit_node(node, &worlds, &buffers, &materials, &mut triangles);
         }
 
         drop_degenerate_triangles(&mut triangles, "GLB");
@@ -286,6 +312,9 @@ impl MeshModel {
                                 positions[corners[2].0],
                             ],
                             uvs,
+                            emissive_uvs: None,
+                            transmission_uvs: None,
+                            colors: None,
                             material: None,
                         });
                     }
@@ -394,48 +423,114 @@ fn transform_point(m: &Mat4, p: [f32; 3]) -> [f32; 3] {
     out
 }
 
+fn node_worlds(node: &gltf::Node, parent: Mat4, worlds: &mut [Mat4]) {
+    let world = mat_mul(&parent, &node.transform().matrix());
+    worlds[node.index()] = world;
+    for child in node.children() {
+        node_worlds(&child, world, worlds);
+    }
+}
+
 fn visit_node(
     node: &gltf::Node,
-    parent: Mat4,
+    worlds: &[Mat4],
     buffers: &[Vec<u8>],
+    materials: &[Option<MeshMaterial>],
     triangles: &mut Vec<MeshTriangle>,
 ) {
-    let world = mat_mul(&parent, &node.transform().matrix());
+    let world = worlds[node.index()];
+    let joints: Option<Vec<Mat4>> = node.skin().map(|skin| {
+        let inverse: Vec<_> = skin
+            .reader(|b| buffers.get(b.index()).map(Vec::as_slice))
+            .read_inverse_bind_matrices()
+            .map(Iterator::collect)
+            .unwrap_or_else(|| vec![IDENTITY; skin.joints().count()]);
+        skin.joints()
+            .enumerate()
+            .map(|(i, j)| mat_mul(&worlds[j.index()], inverse.get(i).unwrap_or(&IDENTITY)))
+            .collect()
+    });
     if let Some(mesh) = node.mesh() {
         for prim in mesh.primitives() {
             if prim.mode() != gltf::mesh::Mode::Triangles {
                 continue;
             }
-            let reader = prim.reader(|buffer| buffers.get(buffer.index()).map(|v| &v[..]));
+            let reader = prim.reader(|buffer| buffers.get(buffer.index()).map(Vec::as_slice));
             let Some(positions) = reader.read_positions() else {
                 continue;
             };
-            let positions: Vec<[f32; 3]> = positions.map(|p| transform_point(&world, p)).collect();
-            let uvs: Option<Vec<[f32; 2]>> =
-                reader.read_tex_coords(0).map(|tc| tc.into_f32().collect());
+            let joint_ids: Option<Vec<_>> = reader.read_joints(0).map(|j| j.into_u16().collect());
+            let weights: Option<Vec<_>> = reader.read_weights(0).map(|w| w.into_f32().collect());
+            let positions: Vec<[f32; 3]> = positions
+                .enumerate()
+                .map(|(i, p)| {
+                    if let Some((matrices, ids, weights)) = joints
+                        .as_ref()
+                        .zip(joint_ids.as_ref().and_then(|v| v.get(i)))
+                        .zip(weights.as_ref().and_then(|v| v.get(i)))
+                        .map(|((a, b), c)| (a, b, c))
+                    {
+                        let mut out = [0.0; 3];
+                        let mut total = 0.0;
+                        for (&id, &w) in ids.iter().zip(weights) {
+                            if w > 0.0 {
+                                if let Some(m) = matrices.get(id as usize) {
+                                    let q = transform_point(m, p);
+                                    for a in 0..3 {
+                                        out[a] += q[a] * w;
+                                    }
+                                    total += w;
+                                }
+                            }
+                        }
+                        if total > 0.0 {
+                            return out.map(|v| v / total);
+                        }
+                    }
+                    transform_point(&world, p)
+                })
+                .collect();
+            let material = Some(prim.material().index().unwrap_or(materials.len() - 1) as u32);
+            let mat = material
+                .and_then(|i| materials.get(i as usize))
+                .and_then(Option::as_ref);
+            let read_uv = |t: Option<&MaterialTexture>| -> Option<Vec<[f32; 2]>> {
+                reader
+                    .read_tex_coords(t.map_or(0, |t| t.tex_coord))
+                    .map(|tc| tc.into_f32().collect())
+            };
+            let uvs = read_uv(mat.and_then(|m| m.base_texture.as_ref()));
+            let emissive_uvs = read_uv(mat.and_then(|m| m.emissive_texture.as_ref()));
+            let transmission_uvs = read_uv(mat.and_then(|m| m.transmission_texture.as_ref()));
+            let colors: Option<Vec<_>> = reader.read_colors(0).map(|c| c.into_rgba_f32().collect());
             let indices: Vec<u32> = match reader.read_indices() {
                 Some(ix) => ix.into_u32().collect(),
                 None => (0..positions.len() as u32).collect(),
             };
-            let material = prim.material().index().map(|i| i as u32);
             for chunk in indices.chunks_exact(3) {
                 let [a, b, c] = [chunk[0] as usize, chunk[1] as usize, chunk[2] as usize];
                 if a >= positions.len() || b >= positions.len() || c >= positions.len() {
                     continue;
                 }
-                let tri_uvs = uvs.as_ref().and_then(|uv| {
-                    (a < uv.len() && b < uv.len() && c < uv.len()).then(|| [uv[a], uv[b], uv[c]])
-                });
+                let uv = |uv: &Option<Vec<[f32; 2]>>| {
+                    uv.as_ref()
+                        .and_then(|uv| Some([*uv.get(a)?, *uv.get(b)?, *uv.get(c)?]))
+                };
                 triangles.push(MeshTriangle {
                     positions: [positions[a], positions[b], positions[c]],
-                    uvs: tri_uvs,
+                    uvs: uv(&uvs),
+                    emissive_uvs: uv(&emissive_uvs),
+                    transmission_uvs: uv(&transmission_uvs),
+                    colors: colors
+                        .as_ref()
+                        .and_then(|v| Some([*v.get(a)?, *v.get(b)?, *v.get(c)?])),
                     material,
                 });
             }
         }
     }
     for child in node.children() {
-        visit_node(&child, world, buffers, triangles);
+        visit_node(&child, worlds, buffers, materials, triangles);
     }
 }
 

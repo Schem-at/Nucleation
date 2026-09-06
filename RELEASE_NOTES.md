@@ -1,5 +1,25 @@
 # Nucleation v0.10.21
 
+Model material import now distinguishes opaque surfaces, alpha cutouts and
+transmissive glass. GLB loading applies base-colour factors and vertex colours
+in linear light, samples emissive and transmission textures with their own UV
+sets, retains emissive colour under baked lighting, and applies default-pose
+skin transforms. Only the selected/default scene is imported. Animation,
+refraction, cast shadows and metallic/roughness rendering are not baked.
+
+`BlockPalette::new_materials` / `Palette.materials()` include opaque building
+blocks and full glass. `for_material` / `forMaterial` restrict any custom palette
+to opaque or glass candidates before nearest-colour matching or dithering;
+exclusions stay respected. Missing material candidates produce an actionable
+error in the configured voxelizer. Neutral clear glass uses white transmission
+colour rather than its decorative texture streaks. Existing explicit block
+replacement operations still override the match.
+
+Texture sampling now interpolates in linear light and respects repeat, mirrored
+repeat and clamp wrapping. This intentionally changes the textured-cube golden
+colours (geometry unchanged); the three geometry/shading baselines are retained.
+
+
 Model imports can target height, width, depth, or the longest side while
 preserving transformed mesh proportions. The new `VoxelModel` API parses GLB
 or OBJ once, returns an allocation-checked size plan, and exports an

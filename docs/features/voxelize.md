@@ -95,3 +95,35 @@ These limits do not alter the legacy shape/textured entry points.
 PHP can use `Voxelizer::loadGlbBase64(base64_encode($bytes))` to avoid expanding
 an entire GLB into a PHP integer array. All target bindings are generated from
 the same bridge, including these configured import methods.
+
+### Materials and transparency (0.10.21)
+
+Use `BlockPalette::new_materials()` (bridge: `Palette.materials()`) for mixed
+opaque/glass models. The configured voxelizer filters the chosen palette by
+surface type; opaque texture colours never select glass, leaves or grates.
+Glass surfaces use full glass blocks, with neutral white mapped to clear glass.
+It never silently re-adds excluded blocks. A palette missing a needed surface
+type returns an error; add glass/opaque blocks to that palette before retrying.
+
+The GLB loader follows glTF alpha coverage: OPAQUE ignores alpha, MASK discards
+below its cutoff, BLEND discards zero coverage and maps surviving partial
+coverage to glass. KHR_materials_transmission (including its linear red-channel
+texture) also selects glass, independently of alpha mode. Masked samples are
+rejected before competing for a surface voxel, preserving backing geometry.
+
+Base textures are sRGB; factors and vertex colours multiply in linear light.
+Emissive textures/factors and KHR_materials_emissive_strength are added after
+lighting, clipped to the available sRGB/block palette gamut. Transmission and
+emissive textures use their declared UV set and sampler wrapping. Directional
+light shades reflected colour, preserving glass tint. Four-influence skinning
+uses the default joint pose and inverse bind matrices; animations are not played.
+The default scene (or first scene) is imported rather than all alternative scenes.
+Hollow is recommended for glass lenses and cutout surfaces; filled mode uses
+nearest-surface appearance for interior voxels. Materials approximate appearance
+with Minecraft blocks; no refraction, shadows or metallic/roughness BRDF is baked.
+
+The same material filtering is available to any colour tool through
+`palette.for_material(false)` / `palette.forMaterial(false)`. Filter once, then
+use ordinary nearest-colour or dithered lookups. Check for an empty result.
+
+Reference: [glTF material specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#materials).

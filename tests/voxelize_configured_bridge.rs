@@ -9,6 +9,8 @@ fn written(fill: impl FnOnce(&mut DiplomatWrite)) -> String {
 #[test]
 fn configured_glb_bridge_loads_estimates_and_exports() {
     use base64::Engine;
+    assert!(Palette::materials().for_material(true).len() >= 17);
+    assert_eq!(Palette::wool().for_material(true).len(), 0);
     let bytes = include_bytes!("fixtures/voxelize-transformed-scan.glb");
     let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
     let model = Voxelizer::load_glb_base64(encoded.as_bytes()).unwrap();

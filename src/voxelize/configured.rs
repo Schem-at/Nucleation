@@ -1,7 +1,9 @@
 //! Axis-based import and baked directional light. The surface path rasterizes
 //! triangles sparsely; it never builds the dense triangle grid/interior field.
-use super::shape::{barycentric, closest_point_on_triangle, cross, sub};
-use super::{MeshModel, MeshShape, MeshTriangle};
+use super::material::sample_triangle;
+use super::shape::{closest_point_on_triangle, cross, sub};
+use super::SurfaceSample;
+use super::{MeshModel, MeshShape};
 use crate::blockpedia::ExtendedColorData;
 use crate::building::{BlockPalette, Shape};
 use crate::{BlockState, UniversalSchematic};
@@ -56,7 +58,7 @@ impl VoxelLight {
         }
         Ok(())
     }
-    fn shade(&self, rgb: [u8; 3], normal: [f32; 3]) -> [u8; 3] {
+    fn brightness(&self, normal: [f32; 3]) -> f32 {
         let n = normal.map(|v| v as f64);
         let l = self.direction.map(|v| v as f64);
         let nl = n.iter().map(|v| v * v).sum::<f64>().sqrt();
@@ -66,8 +68,7 @@ impl VoxelLight {
         } else {
             0.0
         };
-        let brightness = 1.0 - self.strength as f64 * (1.0 - lambert);
-        rgb.map(|v| (v as f64 * brightness).round().clamp(0.0, 255.0) as u8)
+        (1.0 - self.strength as f64 * (1.0 - lambert)) as f32
     }
 }
 
@@ -174,32 +175,47 @@ impl MeshModel {
             (0, 0, 0),
             (d[0] as i32, d[1] as i32, d[2] as i32),
         )?;
-        let mut memo: FxHashMap<[u8; 3], Option<BlockState>> = FxHashMap::default();
+        let palettes = [palette.for_material(false), palette.for_material(true)];
+        let mut memo: FxHashMap<([u8; 3], bool), BlockState> = FxHashMap::default();
         let lighting = options
             .lighting
             .as_ref()
             .filter(|light| light.strength > 0.0);
         let untextured = options.untextured_block.as_ref().map(BlockState::new);
-        let mut put = |x, y, z, color: Option<[u8; 3]>, normal| {
-            if color.is_none() && lighting.is_none() {
+        let mut put = |x, y, z, sample: SurfaceSample, normal| -> Result<(), String> {
+            if !sample.visible {
+                return Ok(());
+            }
+            if !sample.textured && lighting.is_none() {
                 if let Some(state) = &untextured {
                     out.set_block(x, y, z, state);
-                    return;
+                    return Ok(());
                 }
             }
-            let mut rgb = color.unwrap_or([208, 208, 208]);
-            if let Some(light) = lighting {
-                rgb = light.shade(rgb, normal);
+            // Directional shading describes reflected light, not glass tint.
+            let brightness = if sample.translucent {
+                1.0
+            } else {
+                lighting.map_or(1.0, |l| l.brightness(normal))
+            };
+            let rgb = sample.rgb(brightness);
+            let matching = &palettes[sample.translucent as usize];
+            if matching.is_empty() {
+                return Err(if sample.translucent {
+                    "The model contains glass, but the palette has no glass blocks. Choose Solid + glass or add a glass block."
+                } else {
+                    "The model contains opaque surfaces, but the palette has no opaque blocks. Add a solid block."
+                }.into());
             }
-            let state = memo.entry(rgb).or_insert_with(|| {
-                palette
-                    .find_closest_index(&ExtendedColorData::from_rgb(rgb[0], rgb[1], rgb[2]))
-                    .and_then(|i| palette.block_id(i))
-                    .map(BlockState::new)
+            let state = memo.entry((rgb, sample.translucent)).or_insert_with(|| {
+                BlockState::new(
+                    matching
+                        .find_closest(&ExtendedColorData::from_rgb(rgb[0], rgb[1], rgb[2]))
+                        .expect("nonempty material palette"),
+                )
             });
-            if let Some(state) = state {
-                out.set_block(x, y, z, state);
-            }
+            out.set_block(x, y, z, state);
+            Ok(())
         };
         if let Some(hits) = hits {
             // Hash iteration order must not change palette ordering or exports.
@@ -215,20 +231,29 @@ impl MeshModel {
                     sub(tri.positions[1], tri.positions[0]),
                     sub(tri.positions[2], tri.positions[0]),
                 );
-                put(x, y, z, triangle_color(&model, tri, p), normal);
+                put(x, y, z, sample_triangle(&model.materials, tri, p), normal)?;
             }
         } else {
             let shape = MeshShape::new(model);
+            let mut error = None;
             shape.for_each_point(|x, y, z| {
+                if error.is_some() {
+                    return;
+                }
                 let n = shape.normal_at(x, y, z);
-                put(
+                if let Err(e) = put(
                     x,
                     y,
                     z,
-                    shape.surface_color(x, y, z),
+                    shape.surface_sample(x, y, z).unwrap_or_default(),
                     [n.0 as f32, n.1 as f32, n.2 as f32],
-                );
+                ) {
+                    error = Some(e);
+                }
             });
+            if let Some(e) = error {
+                return Err(e);
+            }
         }
         Ok(out)
     }
@@ -241,19 +266,6 @@ fn snap(v: f32) -> f32 {
     } else {
         v
     }
-}
-
-fn triangle_color(model: &MeshModel, tri: &MeshTriangle, p: [f32; 3]) -> Option<[u8; 3]> {
-    let img = model.materials.get(tri.material? as usize)?.as_ref()?;
-    if img.width == 1 && img.height == 1 {
-        return Some([img.pixels[0], img.pixels[1], img.pixels[2]]);
-    }
-    let uv = tri.uvs?;
-    let (a, b, c) = barycentric(closest_point_on_triangle(p, &tri.positions), &tri.positions);
-    Some(img.sample_bilinear(
-        uv[0][0] * a + uv[1][0] * b + uv[2][0] * c,
-        uv[0][1] * a + uv[1][1] * b + uv[2][1] * c,
-    ))
 }
 
 /// Project onto each triangle's dominant plane. Only test a narrow band along
@@ -306,6 +318,16 @@ fn surface_hits(model: &MeshModel, dims: [u32; 3]) -> Result<FxHashMap<u64, (f32
                     if dist > 1.0 {
                         continue;
                     }
+                    // Reject holes before competing for a voxel, so a masked
+                    // foreground cannot hide a visible surface behind it.
+                    let masked = tri
+                        .material
+                        .and_then(|i| model.materials.get(i as usize))
+                        .and_then(Option::as_ref)
+                        .is_some_and(|m| m.alpha_mode != super::AlphaMode::Opaque);
+                    if masked && !sample_triangle(&model.materials, tri, p).visible {
+                        continue;
+                    }
                     let mut xyz = [0; 3];
                     xyz[a] = ia;
                     xyz[b] = ib;
@@ -337,6 +359,7 @@ fn surface_hits(model: &MeshModel, dims: [u32; 3]) -> Result<FxHashMap<u64, (f32
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::voxelize::MeshTriangle;
     fn cube() -> MeshModel {
         MeshModel::from_obj_str("v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nv 0 0 1\nv 1 0 1\nv 1 1 1\nv 0 1 1\nf 1 3 2\nf 1 4 3\nf 5 6 7\nf 5 7 8\nf 1 5 8\nf 1 8 4\nf 2 3 7\nf 2 7 6\nf 1 2 6\nf 1 6 5\nf 4 8 7\nf 4 7 3").unwrap()
     }
@@ -400,6 +423,9 @@ mod tests {
         model.triangles.push(MeshTriangle {
             positions: [[1.0, 2.0, 1.0], [11.0, 8.0, 12.0], [2.0, 7.0, 14.0]],
             uvs: None,
+            emissive_uvs: None,
+            transmission_uvs: None,
+            colors: None,
             material: None,
         });
         let hits = surface_hits(&model, [12, 9, 15]).unwrap();

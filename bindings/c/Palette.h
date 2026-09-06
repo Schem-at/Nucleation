@@ -16,6 +16,10 @@
 
 
 
+Palette* Palette_materials(void);
+
+Palette* Palette_for_material(const Palette* self, bool translucent);
+
 Palette* Palette_all(void);
 
 Palette* Palette_solid(void);
