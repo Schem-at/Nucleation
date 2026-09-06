@@ -79,4 +79,5 @@ test('write buffers and function-parameter allocations use unsigned addresses', 
 
 test('a genuinely out-of-bounds address still throws instead of wrapping', () => {
     assert.throws(() => rt.resultFlag(wasm, (memory.buffer.byteLength - 1) | 0, 4), RangeError);
+    assert.throws(() => rt.writeToArrayBuffer(new ArrayBuffer(8), 0x100000000, 1, Uint32Array), RangeError);
 });

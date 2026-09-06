@@ -35,7 +35,7 @@ def patch_wasm_pointers(root: Path) -> None:
     )
     for original, patched in [
         ("this.ptr = ptr;", "this.ptr = ptr >>> 0;"),
-        ("new typedArrayKind(arrayBuffer, offset)", "new typedArrayKind(arrayBuffer, offset >>> 0)"),
+        ("new typedArrayKind(arrayBuffer, offset)", "new typedArrayKind(arrayBuffer, offset < 0 ? offset >>> 0 : offset)"),
         ("wasm.memory.buffer, buffer, 2", "wasm.memory.buffer, buffer >>> 0, 2"),
     ]:
         if original not in source and patched not in source:

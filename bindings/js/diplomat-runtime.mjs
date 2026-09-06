@@ -88,7 +88,7 @@ export function maybePaddingFields(needsPaddingFields, paddingCount) {
 * (which is a `TypedArray` variant like `Uint8Array` or `Int16Array`)
 */
 export function writeToArrayBuffer(arrayBuffer, offset, value, typedArrayKind) {
-    let buffer = new typedArrayKind(arrayBuffer, offset >>> 0);
+    let buffer = new typedArrayKind(arrayBuffer, offset < 0 ? offset >>> 0 : offset);
     buffer[0] = value;
 }
 
