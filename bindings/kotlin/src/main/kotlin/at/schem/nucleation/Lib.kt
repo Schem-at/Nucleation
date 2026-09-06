@@ -1160,6 +1160,38 @@ class ResultSdfNormalNativeInt: Structure(), Structure.ByValue  {
     }
 
 }
+internal class ResultSliceIntUnion: Union() {
+    @JvmField
+    internal var ok: Slice = Slice()
+    @JvmField
+    internal var err: Int = 0
+}
+
+class ResultSliceInt: Structure(), Structure.ByValue  {
+    @JvmField
+    internal var union: ResultSliceIntUnion = ResultSliceIntUnion()
+
+    @JvmField
+    internal var isOk: Byte = 0
+
+    // Define the fields of the struct
+    override fun getFieldOrder(): List<String> {
+        return listOf("union", "isOk")
+    }
+    internal fun getNativeOk(): Slice? {
+        if (isOk == 1.toByte()) {
+            return union.getTypedValue(Slice::class.java) as Slice
+        }
+        return null
+    }
+    internal fun getNativeErr(): Int? {
+        if (isOk == 0.toByte()) {
+            return union.getTypedValue(Int::class.java) as Int
+        }
+        return null
+    }
+
+}
 internal class ResultTextureInfoNativeIntUnion: Union() {
     @JvmField
     internal var ok: TextureInfoNative = TextureInfoNative()

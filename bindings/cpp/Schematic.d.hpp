@@ -37,6 +37,13 @@ public:
   inline static std::unique_ptr<Schematic> create(std::string_view name);
 
   /**
+   * Release all block/entity storage immediately, keeping an empty valid
+   * schematic handle. JS consumers should call this when a parsed world or
+   * editing session is no longer needed instead of waiting for finalizers.
+   */
+  inline void clear_contents();
+
+  /**
    * Return an independent deep copy. Subsequent block, region, entity,
    * metadata, or transform changes do not affect the original.
    */
@@ -608,6 +615,24 @@ public:
   inline diplomat::result<std::string, NucleationError> get_chunk_non_air_blocks_json(int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length) const;
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> get_chunk_non_air_blocks_json_write(int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, W& writeable_output) const;
+
+  /**
+   * Storage metadata and full block states for palette-index streaming. Region order
+   * is default first, then sorted names (highest precedence first); indices are LOCAL to each region. Bounds
+   * describe allocated storage, never tight bounds. x is fastest, then z, then y.
+   * No block buffer is cloned or serialized here.
+   */
+  inline std::string render_regions_json() const;
+  template<typename W>
+  inline void render_regions_json_write(W& writeable_output) const;
+
+  /**
+   * A bounded window of a region's dense palette indices (including air).
+   * At most 65,536 cells per call; no full-world scan, coordinate tuples, or
+   * intermediate Rust allocation. JS bindings copy the borrowed slice before
+   * returning, so callers may mutate the schematic or grow WASM memory safely.
+   */
+  inline diplomat::result<diplomat::result<diplomat::span<const size_t>, NucleationError>, diplomat::Utf8Error> region_block_indices(std::string_view region_name, uint32_t start, uint32_t count) const;
 
   /**
    * Split the schematic into chunks (default bottom-up strategy). Writes a

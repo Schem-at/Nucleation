@@ -29,6 +29,10 @@ final class Schematic {
         return new Schematic($ret, true);
     }
 
+    public function clearContents() {
+        Lib::ffi()->Schematic_clear_contents($this->ptr);
+    }
+
     public function deepClone() {
         $ret = Lib::ffi()->Schematic_deep_clone($this->ptr);
         return new Schematic($ret, true);
@@ -1090,6 +1094,30 @@ final class Schematic {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }
         return Lib::readAndFreeWrite($write);
+    }
+
+    public function renderRegionsJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->Schematic_render_regions_json($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function regionBlockIndices(string $region_name,  $start,  $count) {
+        $__n0 = strlen($region_name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region_name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Schematic_region_block_indices($this->ptr, $__view0, $start, $count);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return $result->ok;
     }
 
     public function getChunksJson( $chunk_width,  $chunk_height,  $chunk_length) {

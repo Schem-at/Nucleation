@@ -98,6 +98,24 @@ def main() -> None:
     if remaining:
         raise SystemExit("extensionless imports remain:\n" + "\n".join(remaining))
 
+    # Return a packed owned copy for renderer transfer windows. A borrowed WASM
+    # view cannot survive memory.grow or schematic mutation; Array.from boxes it.
+    schematic = ROOT / "Schematic.mjs"
+    source = schematic.read_text()
+    start = source.index("    regionBlockIndices(")
+    end = source.index("\n    }", start)
+    method = source[start:end]
+    old = 'Array.from(new diplomatRuntime.DiplomatSlicePrimitive(wasm, diplomatReceive.buffer, "u32", aEdges).getValue())'
+    new = 'new diplomatRuntime.DiplomatSlicePrimitive(wasm, diplomatReceive.buffer, "u32", aEdges).getValue().slice()'
+    if old not in method:
+        raise SystemExit("regionBlockIndices slice conversion changed")
+    schematic.write_text(source[:start] + method.replace(old, new) + source[end:])
+    declaration = ROOT / "Schematic.d.ts"
+    declaration.write_text(declaration.read_text().replace(
+        "regionBlockIndices(regionName: string, start: number, count: number): Array<number>",
+        "regionBlockIndices(regionName: string, start: number, count: number): Uint32Array",
+    ))
+
     # Node16/NodeNext resolves an imported `./Thing.mjs` declaration to
     # `Thing.d.mts`. Keep Diplomat's `.d.ts` files for bundler compatibility
     # and emit ESM declaration companions from the same patched source.

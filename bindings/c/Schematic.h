@@ -22,6 +22,8 @@
 
 Schematic* Schematic_create(DiplomatStringView name);
 
+void Schematic_clear_contents(Schematic* self);
+
 Schematic* Schematic_deep_clone(const Schematic* self);
 
 typedef struct Schematic_inspect_transform_plan_json_result {union { NucleationError err;}; bool is_ok;} Schematic_inspect_transform_plan_json_result;
@@ -229,6 +231,11 @@ void Schematic_get_chunk_blocks_json(const Schematic* self, int32_t offset_x, in
 
 typedef struct Schematic_get_chunk_non_air_blocks_json_result {union { NucleationError err;}; bool is_ok;} Schematic_get_chunk_non_air_blocks_json_result;
 Schematic_get_chunk_non_air_blocks_json_result Schematic_get_chunk_non_air_blocks_json(const Schematic* self, int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, DiplomatWrite* write);
+
+void Schematic_render_regions_json(const Schematic* self, DiplomatWrite* write);
+
+typedef struct Schematic_region_block_indices_result {union {DiplomatUsizeView ok; NucleationError err;}; bool is_ok;} Schematic_region_block_indices_result;
+Schematic_region_block_indices_result Schematic_region_block_indices(const Schematic* self, DiplomatStringView region_name, uint32_t start, uint32_t count);
 
 void Schematic_get_chunks_json(const Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, DiplomatWrite* write);
 

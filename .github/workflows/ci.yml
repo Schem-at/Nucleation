@@ -168,6 +168,11 @@ jobs:
       - name: Assemble npm package
         run: |
           ./tools/package-npm.sh dist/npm
+          NUCLEATION_WASM_FEATURES=bridge ./tools/package-npm.sh dist/npm-renderer
+          node tools/test-render-stream.mjs dist/npm-renderer/index.mjs
+          mkdir -p dist/npm/renderer
+          cp -R dist/npm-renderer/. dist/npm/renderer/
+          rm -f dist/npm/renderer/.build-stamp dist/npm/renderer/package.json
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('dist/npm/package.json', 'utf8'));

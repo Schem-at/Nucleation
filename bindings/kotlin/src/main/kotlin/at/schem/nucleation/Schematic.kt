@@ -8,6 +8,7 @@ import com.sun.jna.Structure
 internal interface SchematicLib: Library {
     fun Schematic_destroy(handle: Pointer)
     fun Schematic_create(name: Slice): Pointer
+    fun Schematic_clear_contents(handle: Pointer): Unit
     fun Schematic_deep_clone(handle: Pointer): Pointer
     fun Schematic_inspect_transform_plan_json(handle: Pointer, planJson: Slice, write: Pointer): ResultUnitInt
     fun Schematic_apply_transform_plan_json(handle: Pointer, planJson: Slice, write: Pointer): ResultUnitInt
@@ -84,6 +85,8 @@ internal interface SchematicLib: Library {
     fun Schematic_non_air_blocks_packed_b64(handle: Pointer, write: Pointer): Unit
     fun Schematic_get_chunk_blocks_json(handle: Pointer, offsetX: Int, offsetY: Int, offsetZ: Int, width: Int, height: Int, length: Int, write: Pointer): Unit
     fun Schematic_get_chunk_non_air_blocks_json(handle: Pointer, offsetX: Int, offsetY: Int, offsetZ: Int, width: Int, height: Int, length: Int, write: Pointer): ResultUnitInt
+    fun Schematic_render_regions_json(handle: Pointer, write: Pointer): Unit
+    fun Schematic_region_block_indices(handle: Pointer, regionName: Slice, start: FFIUint32, count: FFIUint32): ResultSliceInt
     fun Schematic_get_chunks_json(handle: Pointer, chunkWidth: Int, chunkHeight: Int, chunkLength: Int, write: Pointer): Unit
     fun Schematic_get_chunks_with_strategy_json(handle: Pointer, chunkWidth: Int, chunkHeight: Int, chunkLength: Int, strategy: Slice, cameraX: Float, cameraY: Float, cameraZ: Float, write: Pointer): Unit
     fun Schematic_block_count(handle: Pointer): Int
@@ -555,6 +558,16 @@ class Schematic internal constructor (
                 return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
             }
         }
+    }
+
+    /** Release all block/entity storage immediately, keeping an empty valid
+    *schematic handle. JS consumers should call this when a parsed world or
+    *editing session is no longer needed instead of waiting for finalizers.
+    */
+    fun clearContents(): Unit {
+
+        val returnVal = lib.Schematic_clear_contents(handle);
+
     }
 
     /** Return an independent deep copy. Subsequent block, region, entity,
@@ -1602,6 +1615,42 @@ class Schematic internal constructor (
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Storage metadata and full block states for palette-index streaming. Region order
+    *is default first, then sorted names (highest precedence first); indices are LOCAL to each region. Bounds
+    *describe allocated storage, never tight bounds. x is fastest, then z, then y.
+    *No block buffer is cloned or serialized here.
+    */
+    fun renderRegionsJson(): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_render_regions_json(handle, write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
+    }
+
+    /** A bounded window of a region's dense palette indices (including air).
+    *At most 65,536 cells per call; no full-world scan, coordinate tuples, or
+    *intermediate Rust allocation. JS bindings copy the borrowed slice before
+    *returning, so callers may mutate the schematic or grow WASM memory safely.
+    */
+    fun regionBlockIndices(regionName: String, start: UInt, count: UInt): Result<ULongArray> {
+        // This lifetime edge depends on lifetimes: 'a
+        val aEdges: MutableList<Any> = mutableListOf(this);
+        val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
+
+        val returnVal = lib.Schematic_region_block_indices(handle, regionNameSliceMemory.slice, FFIUint32(start), FFIUint32(count));
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                    return PrimitiveArrayTools.getULongArray(nativeOkVal).ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionNameSliceMemory.close()
         }
     }
 
