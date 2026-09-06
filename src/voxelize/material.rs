@@ -37,8 +37,28 @@ impl MaterialTexture {
             Repeat => i.rem_euclid(n),
         };
         let image = &self.image;
-        let x = uv[0] * image.width as f32 - 0.5;
-        let y = uv[1] * image.height as f32 - 0.5;
+        // Reduce in UV space before converting to pixel indices. Repeated
+        // textures on large scans can have coordinates far outside 0..1.
+        // Casting those directly to i32 would overflow when sampling ix + 1.
+        let bounded = |v: f32, mode| {
+            if !v.is_finite() {
+                return 0.0;
+            }
+            match mode {
+                ClampToEdge => v.clamp(0.0, 1.0),
+                Repeat => v.rem_euclid(1.0),
+                MirroredRepeat => {
+                    let v = v.rem_euclid(2.0);
+                    if v <= 1.0 {
+                        v
+                    } else {
+                        2.0 - v
+                    }
+                }
+            }
+        };
+        let x = bounded(uv[0], self.wrap_s) * image.width as f32 - 0.5;
+        let y = bounded(uv[1], self.wrap_t) * image.height as f32 - 0.5;
         let (ix, iy) = (x.floor() as i32, y.floor() as i32);
         let (fx, fy) = (x - x.floor(), y - y.floor());
         let mut out = [0.0; 4];
@@ -274,6 +294,9 @@ mod tests {
             pixels: vec![0, 0, 0, 255, 255, 255, 255, 255],
         });
         assert!((t.sample([0.0, 0.5], true)[0] - 0.5).abs() < 1e-6);
+        for uv in [[f32::MAX, -f32::MAX], [f32::NAN, f32::INFINITY]] {
+            assert!(t.sample(uv, true).iter().all(|v| v.is_finite()));
+        }
         t.wrap_s = gltf::texture::WrappingMode::ClampToEdge;
         assert_eq!(t.sample([0.0, 0.5], true)[0], 0.0);
         t.wrap_s = gltf::texture::WrappingMode::MirroredRepeat;
