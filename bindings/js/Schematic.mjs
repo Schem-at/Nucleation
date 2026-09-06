@@ -1930,6 +1930,36 @@ export class Schematic {
     }
 
     /**
+     * Non-air blocks inside a bounded box, retaining block-state properties.
+     * Visits only intersecting region cells, not the whole schematic. Bounds
+     * and arithmetic are checked; queries may scan at most 1,048,576 cells
+     * (including region overlaps) and emit at most 32 MiB of JSON. Renderers
+     * should request 16³ sections. Coordinates may be negative.
+     */
+    getChunkNonAirBlocksJson(offsetX, offsetY, offsetZ, width, height, length) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Schematic_get_chunk_non_air_blocks_json(diplomatReceive.buffer, this.ffiValue, offsetX, offsetY, offsetZ, width, height, length, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
      * Split the schematic into chunks (default bottom-up strategy). Writes a
      * JSON array of `{"chunk_x", "chunk_y", "chunk_z", "blocks": [...]}` where
      * blocks have the `get_all_blocks_json` shape (the old `CChunkArray`).

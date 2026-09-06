@@ -83,6 +83,7 @@ internal interface SchematicLib: Library {
     fun Schematic_replace_blocks_json(handle: Pointer, mapJson: Slice): ResultFFIUint64Int
     fun Schematic_non_air_blocks_packed_b64(handle: Pointer, write: Pointer): Unit
     fun Schematic_get_chunk_blocks_json(handle: Pointer, offsetX: Int, offsetY: Int, offsetZ: Int, width: Int, height: Int, length: Int, write: Pointer): Unit
+    fun Schematic_get_chunk_non_air_blocks_json(handle: Pointer, offsetX: Int, offsetY: Int, offsetZ: Int, width: Int, height: Int, length: Int, write: Pointer): ResultUnitInt
     fun Schematic_get_chunks_json(handle: Pointer, chunkWidth: Int, chunkHeight: Int, chunkLength: Int, write: Pointer): Unit
     fun Schematic_get_chunks_with_strategy_json(handle: Pointer, chunkWidth: Int, chunkHeight: Int, chunkLength: Int, strategy: Slice, cameraX: Float, cameraY: Float, cameraZ: Float, write: Pointer): Unit
     fun Schematic_block_count(handle: Pointer): Int
@@ -1583,6 +1584,25 @@ class Schematic internal constructor (
 
         val returnString = DW.writeToString(write)
         return returnString
+    }
+
+    /** Non-air blocks inside a bounded box, retaining block-state properties.
+    *Visits only intersecting region cells, not the whole schematic. Bounds
+    *and arithmetic are checked; queries may scan at most 1,048,576 cells
+    *(including region overlaps) and emit at most 32 MiB of JSON. Renderers
+    *should request 16³ sections. Coordinates may be negative.
+    */
+    fun getChunkNonAirBlocksJson(offsetX: Int, offsetY: Int, offsetZ: Int, width: Int, height: Int, length: Int): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_get_chunk_non_air_blocks_json(handle, offsetX, offsetY, offsetZ, width, height, length, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
     }
 
     /** Split the schematic into chunks (default bottom-up strategy). Writes a

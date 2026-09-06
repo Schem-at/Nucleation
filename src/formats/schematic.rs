@@ -540,15 +540,16 @@ pub fn from_schematic_bounded(
 
     let block_data = parse_block_data(block_container, width, height, length)?;
 
-    let mut region = Region::new(
-        "Main".to_string(),
-        (0, 0, 0),
-        (width as i32, height as i32, length as i32),
-    );
+    // Adopt the decoded indices directly. Constructing a full zero-filled
+    // region and converting a second u32 vector used three volume-sized
+    // buffers simultaneously (over 3 GiB for a large wasm32 schematic).
+    let mut region = Region::new("Main".to_string(), (0, 0, 0), (1, 1, 1));
+    region.size = (width as i32, height as i32, length as i32);
     region.palette = block_palette;
-    region.blocks = block_data.iter().map(|&x| x as usize).collect();
+    region.blocks = block_data;
 
     // Rebuild caches after directly setting palette and blocks
+    region.rebuild_bbox();
     region.rebuild_palette_index();
     region.rebuild_air_index();
     region.rebuild_non_air_count();
@@ -773,7 +774,7 @@ fn parse_block_data(
     width: u32,
     height: u32,
     length: u32,
-) -> Result<Vec<u32>> {
+) -> Result<Vec<usize>> {
     // V2 = BlockData, V3 = Data
     let block_data_i8 = region_tag
         .get::<_, &Vec<i8>>("BlockData")
@@ -791,6 +792,9 @@ fn parse_block_data(
         while !slice.is_empty() {
             let byte = slice[0];
             *slice = &slice[1..];
+            if shift == 28 && byte > 0x0f {
+                return None;
+            }
             out |= ((byte & 0x7F) as u32) << shift;
             if byte & 0x80 == 0 {
                 return Some(out);
@@ -800,20 +804,26 @@ fn parse_block_data(
         None
     }
 
-    let expected_length = (width * height * length) as usize;
-    let mut block_data: Vec<u32> = Vec::with_capacity(expected_length);
-
-    while let Some(id) = read_varint(&mut block_data_u8) {
-        block_data.push(id);
+    let expected_length = (width as usize)
+        .checked_mul(height as usize)
+        .and_then(|v| v.checked_mul(length as usize))
+        .ok_or("Block data volume overflow")?;
+    // Every index needs at least one byte. Reject truncated data before
+    // reserving an output buffer, and never grow beyond the validated volume.
+    if block_data_u8.len() < expected_length {
+        return Err("Block data length mismatch: truncated indices".into());
     }
-
-    if block_data.len() != expected_length {
-        return Err(format!(
-            "Block data length mismatch: expected {}, got {}",
-            expected_length,
-            block_data.len()
-        )
-        .into());
+    let mut block_data = Vec::new();
+    block_data
+        .try_reserve_exact(expected_length)
+        .map_err(|error| format!("Cannot allocate schematic block data: {error}"))?;
+    for _ in 0..expected_length {
+        let id = read_varint(&mut block_data_u8)
+            .ok_or("Block data contains a truncated or invalid varint")?;
+        block_data.push(id as usize);
+    }
+    if !block_data_u8.is_empty() {
+        return Err("Block data length mismatch: excess indices".into());
     }
 
     Ok(block_data)
@@ -1209,6 +1219,24 @@ mod tests {
 
         let parsed_data = parse_block_data(&nbt, 2, 2, 2).expect("Failed to parse block data");
         assert_eq!(parsed_data, vec![0, 1, 2, 1, 0, 2, 1, 0]);
+    }
+
+    #[test]
+    fn block_data_checks_multibyte_indices_and_declared_volume() {
+        let mut nbt = NbtCompound::new();
+        for (bytes, expected) in [
+            (vec![0, 127, 0x80, 1, 0xac, 2], Some(vec![0, 127, 128, 300])),
+            (vec![0, 1, 2], None),
+            (vec![0, 1, 2, 3, 4], None),
+            (vec![0, 1, 2, 0x80], None),
+            (vec![0, 1, 2, 0xff, 0xff, 0xff, 0xff, 0x10], None),
+        ] {
+            nbt.insert(
+                "Data",
+                NbtTag::ByteArray(bytes.into_iter().map(|v| v as i8).collect()),
+            );
+            assert_eq!(parse_block_data(&nbt, 2, 1, 2).ok(), expected);
+        }
     }
 
     #[test]

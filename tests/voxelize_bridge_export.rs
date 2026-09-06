@@ -46,6 +46,83 @@ fn count_blocks_json_tallies_non_air_blocks() {
 }
 
 #[test]
+fn bounded_chunk_query_preserves_states_and_skips_all_air() {
+    let mut s = sample_with_state_and_cave_air();
+    s.set_block_from_string(-2, -17, 5, b"minecraft:oak_stairs[facing=west]")
+        .unwrap();
+    let out = written(|w| {
+        s.get_chunk_non_air_blocks_json(-16, -32, 0, 16, 16, 16, w)
+            .unwrap()
+    });
+    let blocks: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(blocks.as_array().unwrap().len(), 1);
+    assert_eq!(blocks[0]["x"], -2);
+    assert_eq!(blocks[0]["y"], -17);
+    assert_eq!(
+        blocks[0]["properties"],
+        serde_json::json!([["facing", "west"]])
+    );
+    let out = written(|w| {
+        s.get_chunk_non_air_blocks_json(0, 0, 0, 16, 16, 16, w)
+            .unwrap()
+    });
+    let blocks: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(blocks.as_array().unwrap().len(), 2);
+    assert!(blocks
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|b| b["name"] != "minecraft:cave_air"));
+}
+
+#[test]
+fn bounded_chunk_query_checks_work_and_uses_wide_offset_arithmetic() {
+    let s = sample();
+    written(|w| {
+        assert!(s
+            .get_chunk_non_air_blocks_json(0, 0, 0, 588, 16, 1164, w)
+            .is_err())
+    });
+    written(|w| {
+        assert!(s
+            .get_chunk_non_air_blocks_json(0, 0, 0, -1, 16, 16, w)
+            .is_err())
+    });
+    assert_eq!(
+        written(|w| s
+            .get_chunk_non_air_blocks_json(i32::MAX, i32::MIN, 0, 16, 16, 16, w)
+            .unwrap()),
+        "[]"
+    );
+}
+
+#[test]
+fn bounded_chunk_query_uses_each_regions_palette() {
+    use nucleation::{BlockState, UniversalSchematic};
+    let mut source = UniversalSchematic::new("regions".into());
+    source.set_block(0, 0, 0, &BlockState::new("minecraft:stone"));
+    source.set_block_in_region(
+        "other",
+        -3,
+        0,
+        0,
+        &BlockState::new("minecraft:glass"),
+    );
+    let bytes = nucleation::formats::litematic::to_litematic(&source).unwrap();
+    let s = Schematic::from_litematic(&bytes).unwrap();
+    let out = written(|w| {
+        s.get_chunk_non_air_blocks_json(-16, 0, 0, 32, 16, 16, w)
+            .unwrap()
+    });
+    let mut blocks: Vec<serde_json::Value> = serde_json::from_str(&out).unwrap();
+    blocks.sort_by_key(|b| b["x"].as_i64().unwrap());
+    assert_eq!(blocks.len(), 2);
+    assert_eq!(blocks[0]["x"], -3);
+    assert_eq!(blocks[0]["name"], "minecraft:glass");
+    assert_eq!(blocks[1]["name"], "minecraft:stone");
+}
+
+#[test]
 fn count_blocks_json_keys_by_name_and_excludes_every_air_variant() {
     let s = sample_with_state_and_cave_air();
     let out = written(|w| s.count_blocks_json(w));
