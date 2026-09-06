@@ -17,6 +17,12 @@ two additional full-volume arrays. The Westminster reload's wasm memory peak
 fell from approximately 3.70 GiB to 1.74 GiB. Declared block counts and varint
 lengths are checked before accepting the decoded data.
 
+`Schematic.getChunkNonAirBlocksJson` supports bounded preview loading with
+block-state properties and negative coordinates intact. It reads intersecting
+region cells directly and omits all air variants, avoiding whole-volume scans
+and enormous air-filled horizontal slabs. Queries cap visited cells and JSON
+output; 16³ sections are recommended.
+
 # Nucleation v0.10.21
 
 Model material import now distinguishes opaque surfaces, alpha cutouts and

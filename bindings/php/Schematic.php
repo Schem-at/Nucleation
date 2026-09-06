@@ -1083,6 +1083,15 @@ final class Schematic {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function getChunkNonAirBlocksJson( $offset_x,  $offset_y,  $offset_z,  $width,  $height,  $length) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Schematic_get_chunk_non_air_blocks_json($this->ptr, $offset_x, $offset_y, $offset_z, $width, $height, $length, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function getChunksJson( $chunk_width,  $chunk_height,  $chunk_length) {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         Lib::ffi()->Schematic_get_chunks_json($this->ptr, $chunk_width, $chunk_height, $chunk_length, $write);

@@ -493,6 +493,15 @@ export class Schematic {
     getChunkBlocksJson(offsetX: number, offsetY: number, offsetZ: number, width: number, height: number, length: number): string;
 
     /**
+     * Non-air blocks inside a bounded box, retaining block-state properties.
+     * Visits only intersecting region cells, not the whole schematic. Bounds
+     * and arithmetic are checked; queries may scan at most 1,048,576 cells
+     * (including region overlaps) and emit at most 32 MiB of JSON. Renderers
+     * should request 16³ sections. Coordinates may be negative.
+     */
+    getChunkNonAirBlocksJson(offsetX: number, offsetY: number, offsetZ: number, width: number, height: number, length: number): string;
+
+    /**
      * Split the schematic into chunks (default bottom-up strategy). Writes a
      * JSON array of `{"chunk_x", "chunk_y", "chunk_z", "blocks": [...]}` where
      * blocks have the `get_all_blocks_json` shape (the old `CChunkArray`).

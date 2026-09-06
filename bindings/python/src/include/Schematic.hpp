@@ -230,6 +230,9 @@ namespace capi {
 
     void Schematic_get_chunk_blocks_json(const nucleation::capi::Schematic* self, int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Schematic_get_chunk_non_air_blocks_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_get_chunk_non_air_blocks_json_result;
+    Schematic_get_chunk_non_air_blocks_json_result Schematic_get_chunk_non_air_blocks_json(const nucleation::capi::Schematic* self, int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, nucleation::diplomat::capi::DiplomatWrite* write);
+
     void Schematic_get_chunks_json(const nucleation::capi::Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, nucleation::diplomat::capi::DiplomatWrite* write);
 
     void Schematic_get_chunks_with_strategy_json(const nucleation::capi::Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, nucleation::diplomat::capi::DiplomatStringView strategy, float camera_x, float camera_y, float camera_z, nucleation::diplomat::capi::DiplomatWrite* write);
@@ -1294,6 +1297,33 @@ inline void nucleation::Schematic::get_chunk_blocks_json_write(int32_t offset_x,
         height,
         length,
         &write);
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Schematic::get_chunk_non_air_blocks_json(int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length) const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::Schematic_get_chunk_non_air_blocks_json(this->AsFFI(),
+        offset_x,
+        offset_y,
+        offset_z,
+        width,
+        height,
+        length,
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Schematic::get_chunk_non_air_blocks_json_write(int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::Schematic_get_chunk_non_air_blocks_json(this->AsFFI(),
+        offset_x,
+        offset_y,
+        offset_z,
+        width,
+        height,
+        length,
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
 inline std::string nucleation::Schematic::get_chunks_json(int32_t chunk_width, int32_t chunk_height, int32_t chunk_length) const {

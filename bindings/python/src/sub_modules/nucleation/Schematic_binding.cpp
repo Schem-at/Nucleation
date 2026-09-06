@@ -83,6 +83,7 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("get_block_with_properties", std::move(maybe_op_unwrap(&nucleation::Schematic::get_block_with_properties)), "x"_a, "y"_a, "z"_a)
         .def("get_blocks_json", &nucleation::Schematic::get_blocks_json, "positions"_a)
         .def("get_chunk_blocks_json", &nucleation::Schematic::get_chunk_blocks_json, "offset_x"_a, "offset_y"_a, "offset_z"_a, "width"_a, "height"_a, "length"_a)
+        .def("get_chunk_non_air_blocks_json", &nucleation::Schematic::get_chunk_non_air_blocks_json, "offset_x"_a, "offset_y"_a, "offset_z"_a, "width"_a, "height"_a, "length"_a)
         .def("get_chunks_json", &nucleation::Schematic::get_chunks_json, "chunk_width"_a, "chunk_height"_a, "chunk_length"_a)
         .def("get_chunks_with_strategy_json", &nucleation::Schematic::get_chunks_with_strategy_json, "chunk_width"_a, "chunk_height"_a, "chunk_length"_a, "strategy"_a, "camera_x"_a, "camera_y"_a, "camera_z"_a)
         .def("get_entities_json", &nucleation::Schematic::get_entities_json)

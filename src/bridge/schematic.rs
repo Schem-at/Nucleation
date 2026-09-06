@@ -1473,6 +1473,120 @@ pub mod ffi {
             let _ = write!(out, "{}", json);
         }
 
+        /// Non-air blocks inside a bounded box, retaining block-state properties.
+        /// Visits only intersecting region cells, not the whole schematic. Bounds
+        /// and arithmetic are checked; queries may scan at most 1,048,576 cells
+        /// (including region overlaps) and emit at most 32 MiB of JSON. Renderers
+        /// should request 16³ sections. Coordinates may be negative.
+        #[allow(clippy::too_many_arguments)]
+        pub fn get_chunk_non_air_blocks_json(
+            &self,
+            offset_x: i32,
+            offset_y: i32,
+            offset_z: i32,
+            width: i32,
+            height: i32,
+            length: i32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            crate::bridge::clear_last_error_detail();
+            let fail = |message: &str| {
+                crate::bridge::set_last_error_detail(message.to_string());
+                NucleationError::InvalidArgument
+            };
+            let dims = [width, height, length];
+            if dims.iter().any(|&v| v <= 0)
+                || dims
+                    .iter()
+                    .try_fold(1_u64, |v, &d| v.checked_mul(d as u64))
+                    .is_none_or(|v| v > 1_048_576)
+            {
+                return Err(fail(
+                    "Chunk queries require positive dimensions and at most 1,048,576 cells.",
+                ));
+            }
+            let start = [offset_x as i64, offset_y as i64, offset_z as i64];
+            let end = std::array::from_fn::<_, 3, _>(|a| start[a] + dims[a] as i64);
+            let mut intersections = Vec::new();
+            let mut visited = 0_u64;
+            for region in
+                std::iter::once(&self.0.default_region).chain(self.0.other_regions.values())
+            {
+                let bounds = region.get_bounding_box();
+                let min = [
+                    bounds.min.0 as i64,
+                    bounds.min.1 as i64,
+                    bounds.min.2 as i64,
+                ];
+                let max = [
+                    bounds.max.0 as i64 + 1,
+                    bounds.max.1 as i64 + 1,
+                    bounds.max.2 as i64 + 1,
+                ];
+                let lo = std::array::from_fn::<_, 3, _>(|a| start[a].max(min[a]));
+                let hi = std::array::from_fn::<_, 3, _>(|a| end[a].min(max[a]));
+                if (0..3).any(|a| lo[a] >= hi[a]) {
+                    continue;
+                }
+                visited += (0..3).map(|a| (hi[a] - lo[a]) as u64).product::<u64>();
+                if visited > 1_048_576 {
+                    return Err(fail(
+                        "Overlapping regions exceed the chunk query working limit.",
+                    ));
+                }
+                intersections.push((region, lo, hi));
+            }
+            #[derive(serde::Serialize)]
+            struct JsonBlock<'a> {
+                x: i32,
+                y: i32,
+                z: i32,
+                name: &'a str,
+                properties: &'a [(smol_str::SmolStr, smol_str::SmolStr)],
+            }
+            out.write_str("[")
+                .map_err(|_| fail("Cannot write chunk data."))?;
+            let mut first = true;
+            let mut written = 2_usize;
+            for (region, lo, hi) in intersections {
+                for y in lo[1]..hi[1] {
+                    for z in lo[2]..hi[2] {
+                        for x in lo[0]..hi[0] {
+                            let Some(block) = region.get_block(x as i32, y as i32, z as i32) else {
+                                continue;
+                            };
+                            if crate::universal_schematic::is_air(block.name.as_str()) {
+                                continue;
+                            }
+                            let json = serde_json::to_string(&JsonBlock {
+                                x: x as i32,
+                                y: y as i32,
+                                z: z as i32,
+                                name: block.name.as_str(),
+                                properties: &block.properties,
+                            })
+                            .map_err(|_| fail("Cannot encode chunk data."))?;
+                            written += json.len() + usize::from(!first);
+                            if written > 32 * 1024 * 1024 {
+                                return Err(fail(
+                                    "Chunk JSON exceeds 32 MiB. Request a smaller box.",
+                                ));
+                            }
+                            if !first {
+                                out.write_str(",")
+                                    .map_err(|_| fail("Cannot write chunk data."))?;
+                            }
+                            first = false;
+                            out.write_str(&json)
+                                .map_err(|_| fail("Cannot write chunk data."))?;
+                        }
+                    }
+                }
+            }
+            out.write_str("]")
+                .map_err(|_| fail("Cannot write chunk data."))
+        }
+
         // --- Chunking ---
 
         /// Split the schematic into chunks (default bottom-up strategy). Writes a

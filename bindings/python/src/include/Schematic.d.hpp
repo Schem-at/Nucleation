@@ -602,6 +602,17 @@ public:
   inline void get_chunk_blocks_json_write(int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, W& writeable_output) const;
 
   /**
+   * Non-air blocks inside a bounded box, retaining block-state properties.
+   * Visits only intersecting region cells, not the whole schematic. Bounds
+   * and arithmetic are checked; queries may scan at most 1,048,576 cells
+   * (including region overlaps) and emit at most 32 MiB of JSON. Renderers
+   * should request 16³ sections. Coordinates may be negative.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> get_chunk_non_air_blocks_json(int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length) const;
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> get_chunk_non_air_blocks_json_write(int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, W& writeable_output) const;
+
+  /**
    * Split the schematic into chunks (default bottom-up strategy). Writes a
    * JSON array of `{"chunk_x", "chunk_y", "chunk_z", "blocks": [...]}` where
    * blocks have the `get_all_blocks_json` shape (the old `CChunkArray`).
