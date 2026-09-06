@@ -140,6 +140,8 @@ export { Store } from "./Store.mjs"
 
 export { StoreIo } from "./StoreIo.mjs"
 
+export { VoxelModel } from "./VoxelModel.mjs"
+
 export { Voxelizer } from "./Voxelizer.mjs"
 
 export { CellularSdfConfig } from "./CellularSdfConfig.mjs"

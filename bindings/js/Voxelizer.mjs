@@ -3,6 +3,7 @@ import { NucleationError } from "./NucleationError.mjs"
 import { Palette } from "./Palette.mjs"
 import { Schematic } from "./Schematic.mjs"
 import { Shape } from "./Shape.mjs"
+import { VoxelModel } from "./VoxelModel.mjs"
 import wasm from "./diplomat-wasm.mjs";
 import * as diplomatRuntime from "./diplomat-runtime.mjs";
 
@@ -42,6 +43,109 @@ export class Voxelizer {
         return this.#ptr;
     }
 
+
+    /**
+     * Reason the last configured model import failed; cleared on success.
+     */
+    static lastErrorDetail() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Voxelizer_last_error_detail(write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * PHP-friendly GLB input: avoids expanding every byte into a boxed
+     * integer array before copying it over FFI.
+     */
+    static loadGlbBase64(data) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const dataSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, data)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Voxelizer_load_glb_base64(diplomatReceive.buffer, dataSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new VoxelModel(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Parse a GLB once for axis-based size estimates and lit voxelization.
+     */
+    static loadGlb(data) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const dataSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, data, "u8")));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Voxelizer_load_glb(diplomatReceive.buffer, dataSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new VoxelModel(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Parse an OBJ once for axis-based size estimates and lit voxelization.
+     */
+    static loadObj(text) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const textSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, text)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Voxelizer_load_obj(diplomatReceive.buffer, textSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new VoxelModel(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
 
     /**
      * Load a binary glTF (`.glb`, embedded buffers/images) and voxelize

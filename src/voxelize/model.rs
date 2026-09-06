@@ -62,6 +62,7 @@ pub struct MeshTriangle {
 ///
 /// Load with [`MeshModel::from_glb_bytes`] / [`MeshModel::from_obj_str`], then
 /// normalize into voxel space with [`MeshModel::fit`].
+#[derive(Clone)]
 pub struct MeshModel {
     pub triangles: Vec<MeshTriangle>,
     /// One slot per glTF material; `None` when the material carries neither a

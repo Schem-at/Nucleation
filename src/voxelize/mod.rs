@@ -7,11 +7,13 @@
 //! any brush via the building tool or run [`voxelize_textured`] to sample the
 //! model's textures into palette blocks.
 
+mod configured;
 mod model;
 mod shape;
 #[doc(hidden)]
 pub mod test_meshes;
 
+pub use configured::{VoxelLight, VoxelizeOptions, VoxelizePlan};
 pub use model::{MeshModel, MeshTriangle, TextureImage};
 pub use shape::MeshShape;
 

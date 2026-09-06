@@ -7,6 +7,10 @@ import com.sun.jna.Structure
 
 internal interface VoxelizerLib: Library {
     fun Voxelizer_destroy(handle: Pointer)
+    fun Voxelizer_last_error_detail(write: Pointer): Unit
+    fun Voxelizer_load_glb_base64(data: Slice): ResultPointerInt
+    fun Voxelizer_load_glb(data: Slice): ResultPointerInt
+    fun Voxelizer_load_obj(text: Slice): ResultPointerInt
     fun Voxelizer_shape_from_glb(data: Slice, targetSize: Float, shell: Float): ResultPointerInt
     fun Voxelizer_shape_from_obj(text: Slice, targetSize: Float, shell: Float): ResultPointerInt
     fun Voxelizer_schematic_from_glb_textured(data: Slice, targetSize: Float, shell: Float, palette: Pointer, name: Slice): ResultPointerInt
@@ -40,6 +44,84 @@ class Voxelizer internal constructor (
     companion object {
         internal val libClass: Class<VoxelizerLib> = VoxelizerLib::class.java
         internal val lib: VoxelizerLib = Native.load("nucleation", libClass)
+        @JvmStatic
+
+        /** Reason the last configured model import failed; cleared on success.
+        */
+        fun lastErrorDetail(): String {
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.Voxelizer_last_error_detail(write);
+
+            val returnString = DW.writeToString(write)
+            return returnString
+        }
+        @JvmStatic
+
+        /** PHP-friendly GLB input: avoids expanding every byte into a boxed
+        *integer array before copying it over FFI.
+        */
+        fun loadGlbBase64(data: String): Result<VoxelModel> {
+            val dataSliceMemory = PrimitiveArrayTools.borrowUtf8(data)
+
+            val returnVal = lib.Voxelizer_load_glb_base64(dataSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = VoxelModel(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                dataSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Parse a GLB once for axis-based size estimates and lit voxelization.
+        */
+        fun loadGlb(data: UByteArray): Result<VoxelModel> {
+            val dataSliceMemory = PrimitiveArrayTools.borrow(data)
+
+            val returnVal = lib.Voxelizer_load_glb(dataSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = VoxelModel(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                dataSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Parse an OBJ once for axis-based size estimates and lit voxelization.
+        */
+        fun loadObj(text: String): Result<VoxelModel> {
+            val textSliceMemory = PrimitiveArrayTools.borrowUtf8(text)
+
+            val returnVal = lib.Voxelizer_load_obj(textSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = VoxelModel(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                textSliceMemory.close()
+            }
+        }
         @JvmStatic
 
         /** Load a binary glTF (`.glb`, embedded buffers/images) and voxelize

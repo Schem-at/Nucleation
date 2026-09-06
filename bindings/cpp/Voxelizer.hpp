@@ -15,12 +15,24 @@
 #include "Palette.hpp"
 #include "Schematic.hpp"
 #include "Shape.hpp"
+#include "VoxelModel.hpp"
 #include "diplomat_runtime.hpp"
 
 
 namespace diplomat {
 namespace capi {
     extern "C" {
+
+    void Voxelizer_last_error_detail(diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Voxelizer_load_glb_base64_result {union {diplomat::capi::VoxelModel* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Voxelizer_load_glb_base64_result;
+    Voxelizer_load_glb_base64_result Voxelizer_load_glb_base64(diplomat::capi::DiplomatStringView data);
+
+    typedef struct Voxelizer_load_glb_result {union {diplomat::capi::VoxelModel* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Voxelizer_load_glb_result;
+    Voxelizer_load_glb_result Voxelizer_load_glb(diplomat::capi::DiplomatU8View data);
+
+    typedef struct Voxelizer_load_obj_result {union {diplomat::capi::VoxelModel* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Voxelizer_load_obj_result;
+    Voxelizer_load_obj_result Voxelizer_load_obj(diplomat::capi::DiplomatStringView text);
 
     typedef struct Voxelizer_shape_from_glb_result {union {diplomat::capi::Shape* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Voxelizer_shape_from_glb_result;
     Voxelizer_shape_from_glb_result Voxelizer_shape_from_glb(diplomat::capi::DiplomatU8View data, float target_size, float shell);
@@ -36,6 +48,33 @@ namespace capi {
     } // extern "C"
 } // namespace capi
 } // namespace
+
+inline std::string Voxelizer::last_error_detail() {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::Voxelizer_last_error_detail(&write);
+    return output;
+}
+template<typename W>
+inline void Voxelizer::last_error_detail_write(W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::Voxelizer_last_error_detail(&write);
+}
+
+inline diplomat::result<std::unique_ptr<VoxelModel>, NucleationError> Voxelizer::load_glb_base64(std::string_view data) {
+    auto result = diplomat::capi::Voxelizer_load_glb_base64({data.data(), data.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<VoxelModel>, NucleationError>(diplomat::Ok<std::unique_ptr<VoxelModel>>(std::unique_ptr<VoxelModel>(VoxelModel::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<VoxelModel>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<VoxelModel>, NucleationError> Voxelizer::load_glb(diplomat::span<const uint8_t> data) {
+    auto result = diplomat::capi::Voxelizer_load_glb({data.data(), data.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<VoxelModel>, NucleationError>(diplomat::Ok<std::unique_ptr<VoxelModel>>(std::unique_ptr<VoxelModel>(VoxelModel::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<VoxelModel>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<VoxelModel>, NucleationError> Voxelizer::load_obj(std::string_view text) {
+    auto result = diplomat::capi::Voxelizer_load_obj({text.data(), text.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<VoxelModel>, NucleationError>(diplomat::Ok<std::unique_ptr<VoxelModel>>(std::unique_ptr<VoxelModel>(VoxelModel::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<VoxelModel>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
 
 inline diplomat::result<std::unique_ptr<Shape>, NucleationError> Voxelizer::shape_from_glb(diplomat::span<const uint8_t> data, float target_size, float shell) {
     auto result = diplomat::capi::Voxelizer_shape_from_glb({data.data(), data.size()},

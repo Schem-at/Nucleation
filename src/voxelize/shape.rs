@@ -1057,11 +1057,11 @@ impl Shape for MeshShape {
     }
 }
 
-fn sub(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+pub(super) fn sub(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 
-fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+pub(super) fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
     [
         a[1] * b[2] - a[2] * b[1],
         a[2] * b[0] - a[0] * b[2],
@@ -1104,7 +1104,7 @@ fn ray_triangle_t(origin: [f32; 3], dir: [f32; 3], tri: &[[f32; 3]; 3]) -> Optio
 
 /// Closest point on a triangle to `p` (Ericson, *Real-Time Collision
 /// Detection* §5.1.5).
-fn closest_point_on_triangle(p: [f32; 3], tri: &[[f32; 3]; 3]) -> [f32; 3] {
+pub(super) fn closest_point_on_triangle(p: [f32; 3], tri: &[[f32; 3]; 3]) -> [f32; 3] {
     let [a, b, c] = *tri;
     let ab = sub(b, a);
     let ac = sub(c, a);
@@ -1156,7 +1156,7 @@ fn closest_point_on_triangle(p: [f32; 3], tri: &[[f32; 3]; 3]) -> [f32; 3] {
 }
 
 /// Barycentric weights of point `q` (assumed on the triangle's plane).
-fn barycentric(q: [f32; 3], tri: &[[f32; 3]; 3]) -> (f32, f32, f32) {
+pub(super) fn barycentric(q: [f32; 3], tri: &[[f32; 3]; 3]) -> (f32, f32, f32) {
     let v0 = sub(tri[1], tri[0]);
     let v1 = sub(tri[2], tri[0]);
     let v2 = sub(q, tri[0]);

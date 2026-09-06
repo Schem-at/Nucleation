@@ -67,6 +67,10 @@ jobs:
         run: |
           cargo test --no-default-features --features world-segment,store-fs,store-ssh --lib world_segment
           cargo test --no-default-features --features world-segment,store-fs,store-ssh --test world_snapshot --test world_segment_pipeline
+      - name: Test model sizing, sparse surfaces, and baked light
+        run: |
+          cargo test --features bridge,voxelize --lib voxelize::
+          cargo test --features bridge,voxelize --test voxelize_tests --test voxelize_golden --test voxelize_bridge_export --test voxelize_configured_bridge
       - name: Build untrusted-input fuzz targets
         run: cargo check --manifest-path fuzz/Cargo.toml --bins
       - name: Build the bridge surface

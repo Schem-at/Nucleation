@@ -72,6 +72,7 @@ require_once __DIR__ . '/TypedCircuitExecutor.php';
 require_once __DIR__ . '/Value.php';
 require_once __DIR__ . '/Store.php';
 require_once __DIR__ . '/StoreIo.php';
+require_once __DIR__ . '/VoxelModel.php';
 require_once __DIR__ . '/Voxelizer.php';
 require_once __DIR__ . '/CellularSdfConfig.php';
 require_once __DIR__ . '/GeneratedChunk.php';
