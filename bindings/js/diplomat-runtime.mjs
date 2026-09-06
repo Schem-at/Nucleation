@@ -8,11 +8,13 @@ export const internalConstructor = Symbol("constructor");
 export const exposeConstructor = Symbol("exposeConstructor");
 
 export function readString8(wasm, ptr, len) {
+    ptr >>>= 0; // wasm32 addresses are unsigned, including above 2 GiB.
     const buf = new Uint8Array(wasm.memory.buffer, ptr, len);
     return (new TextDecoder("utf-8")).decode(buf)
 }
 
 export function readString16(wasm, ptr, len) {
+    ptr >>>= 0; // wasm32 addresses are unsigned, including above 2 GiB.
     const buf = new Uint16Array(wasm.memory.buffer, ptr, len);
     return String.fromCharCode.apply(null, buf)
 }
@@ -48,6 +50,7 @@ export function withDiplomatWrite(wasm, callback) {
  * @returns {number} The underlying pointer.
  */
 export function ptrRead(wasm, ptr) {
+    ptr >>>= 0; // wasm32 addresses are unsigned, including above 2 GiB.
     return (new Uint32Array(wasm.memory.buffer, ptr, 1))[0];
 }
 
@@ -55,6 +58,7 @@ export function ptrRead(wasm, ptr) {
  * Get the flag of a result type.
  */
 export function resultFlag(wasm, ptr, offset) {
+    ptr >>>= 0; // wasm32 addresses are unsigned, including above 2 GiB.
     return (new Uint8Array(wasm.memory.buffer, ptr + offset, 1))[0];
 }
 
@@ -62,6 +66,7 @@ export function resultFlag(wasm, ptr, offset) {
  * Get the discriminant of a Rust enum.
 */
 export function enumDiscriminant(wasm, ptr) {
+    ptr >>>= 0; // wasm32 addresses are unsigned, including above 2 GiB.
     return (new Int32Array(wasm.memory.buffer, ptr, 1))[0]
 }
 
@@ -83,7 +88,7 @@ export function maybePaddingFields(needsPaddingFields, paddingCount) {
 * (which is a `TypedArray` variant like `Uint8Array` or `Int16Array`)
 */
 export function writeToArrayBuffer(arrayBuffer, offset, value, typedArrayKind) {
-    let buffer = new typedArrayKind(arrayBuffer, offset);
+    let buffer = new typedArrayKind(arrayBuffer, offset >>> 0);
     buffer[0] = value;
 }
 
@@ -223,7 +228,7 @@ export class DiplomatBuf {
         }
     }
 
-    const ptr = wasm.diplomat_alloc(utf8Length, 1);
+    const ptr = wasm.diplomat_alloc(utf8Length, 1) >>> 0;
 
     const result = (new TextEncoder()).encodeInto(string, new Uint8Array(wasm.memory.buffer, ptr, utf8Length));
     console.assert(string.length === result.read && utf8Length === result.written, "UTF-8 write error");
@@ -233,7 +238,7 @@ export class DiplomatBuf {
 
     static str16 = (wasm, string) => {
     const byteLength = string.length * 2;
-    const ptr = wasm.diplomat_alloc(byteLength, 2);
+    const ptr = wasm.diplomat_alloc(byteLength, 2) >>> 0;
 
     const destination = new Uint16Array(wasm.memory.buffer, ptr, string.length);
     for (let i = 0; i < string.length; i++) {
@@ -244,7 +249,7 @@ export class DiplomatBuf {
     }
 
     static sliceWrapper = (wasm, buf) => {
-        const ptr = wasm.diplomat_alloc(8, 4);
+        const ptr = wasm.diplomat_alloc(8, 4) >>> 0;
         let dst = new Uint32Array(wasm.memory.buffer, ptr, 2);
 
         dst[0] = buf.ptr;
@@ -262,7 +267,7 @@ export class DiplomatBuf {
             4;
 
     const byteLength = list.length * elementSize;
-    const ptr = wasm.diplomat_alloc(byteLength, elementSize);
+    const ptr = wasm.diplomat_alloc(byteLength, elementSize) >>> 0;
 
     /**
      * Create an array view of the buffer. This gives us the `set` method which correctly handles untyped values
@@ -288,15 +293,15 @@ export class DiplomatBuf {
 
         const byteLength = strings.length * 4 * 2;
 
-        const ptr = wasm.diplomat_alloc(byteLength, 4);
+        const ptr = wasm.diplomat_alloc(byteLength, 4) >>> 0;
 
-        const destination = new Uint32Array(wasm.memory.buffer, ptr, byteLength);
 
         const stringsAlloc = [];
 
         for (let i = 0; i < strings.length; i++) {
             stringsAlloc.push(encodeStr(wasm, strings[i]));
 
+            const destination = new Uint32Array(wasm.memory.buffer, ptr, strings.length * 2);
             destination[2 * i] = stringsAlloc[i].ptr;
             destination[(2 * i) + 1] = stringsAlloc[i].size;
         }
@@ -310,7 +315,7 @@ export class DiplomatBuf {
     }
 
     static struct = (wasm, size, align) => {
-        const ptr = wasm.diplomat_alloc(size, align);
+        const ptr = wasm.diplomat_alloc(size, align) >>> 0;
 
         return new DiplomatBuf(ptr, size, () => {
             wasm.diplomat_free(ptr, size, align);
@@ -325,7 +330,7 @@ export class DiplomatBuf {
     free;
 
     constructor(ptr, size, free) {
-        this.ptr = ptr;
+        this.ptr = ptr >>> 0;
         this.size = size;
         this.free = free;
         this.leak = () => { };
@@ -357,7 +362,7 @@ export class DiplomatWriteBuf {
 
     constructor(wasm) {
         this.#wasm = wasm;
-        this.#buffer = this.#wasm.diplomat_buffer_write_create(0);
+        this.#buffer = this.#wasm.diplomat_buffer_write_create(0) >>> 0;
 
         this.leak = () => { };
     }
@@ -409,7 +414,7 @@ export class DiplomatSlice {
     constructor(wasm, buffer, bufferType, lifetimeEdges) {
         this.#wasm = wasm;
 
-        const [ptr, size] = new Uint32Array(this.#wasm.memory.buffer, buffer, 2);
+        const [ptr, size] = new Uint32Array(this.#wasm.memory.buffer, buffer >>> 0, 2);
 
         this.#buffer = new bufferType(this.#wasm.memory.buffer, ptr, size);
         this.#bufferType = bufferType;
@@ -432,7 +437,7 @@ export class DiplomatSlice {
 
 export class DiplomatSlicePrimitive extends DiplomatSlice {
     constructor(wasm, buffer, sliceType, lifetimeEdges) {
-        const [ptr, size] = new Uint32Array(wasm.memory.buffer, buffer, 2);
+        const [ptr, size] = new Uint32Array(wasm.memory.buffer, buffer >>> 0, 2);
 
         let arrayType;
         switch (sliceType) {
@@ -552,7 +557,7 @@ export class DiplomatReceiveBuf {
 
         this.#hasResult = hasResult;
 
-        this.#buffer = this.#wasm.diplomat_alloc(this.#size, this.#align);
+        this.#buffer = this.#wasm.diplomat_alloc(this.#size, this.#align) >>> 0;
 
         this.leak = () => { };
     }
@@ -736,7 +741,7 @@ export class FunctionParamAllocator {
 
         this.#capacity = capacity;
         // FunctionParamAllocator is global, so this will be freed when the webpage closes:
-        this.#ptr = wasm.diplomat_alloc(this.#capacity, 1);
+        this.#ptr = wasm.diplomat_alloc(this.#capacity, 1) >>> 0;
     }
 
     /**

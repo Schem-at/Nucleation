@@ -10,7 +10,9 @@ use crate::{BlockState, UniversalSchematic};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-const MAX_VOLUME: u64 = 128 * 1024 * 1024;
+// At most 1 GiB for the wasm32 output region. Model buffers are borrowed during
+// texture decoding; the surface pass remains separately bounded below.
+const MAX_VOLUME: u64 = 256 * 1024 * 1024;
 const MAX_FILLED_VOLUME: u64 = 16 * 1024 * 1024;
 const MAX_SURFACE_BLOCKS: usize = 8 * 1024 * 1024;
 const MAX_CANDIDATES: u64 = 200_000_000;
@@ -131,7 +133,7 @@ impl MeshModel {
                 dimensions[1],
                 dimensions[2],
                 if options.hollow {
-                    "Reduce the target size: the output exceeds the 128-million-cell working limit."
+                    "Reduce the target size: the output exceeds the 256-million-cell working limit."
                 } else {
                     "Enable Hollow or reduce the size: filled models have a 16-million-cell working limit."
                 }
@@ -400,6 +402,25 @@ mod tests {
             cube().voxelize_plan(&opts(19.0, "x")).unwrap().dimensions,
             [19, 19, 19]
         );
+    }
+    #[test]
+    fn wide_height_384_plan_fits_but_larger_or_filled_output_stays_guarded() {
+        let model = box_model([588.0, 384.0, 1164.0]);
+        let mut options = opts(384.0, "y");
+        let plan = model.voxelize_plan(&options).unwrap();
+        assert_eq!(plan.dimensions, [588, 384, 1164]);
+        assert_eq!(plan.volume, 262_821_888);
+        options.hollow = false;
+        assert!(model
+            .voxelize_plan(&options)
+            .unwrap_err()
+            .contains("Enable Hollow"));
+        options.hollow = true;
+        options.target_size = 512.0;
+        assert!(model
+            .voxelize_plan(&options)
+            .unwrap_err()
+            .contains("256-million"));
     }
     #[test]
     fn height_384_is_real_output_not_just_an_estimate() {

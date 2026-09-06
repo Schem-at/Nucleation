@@ -1,3 +1,22 @@
+# Nucleation v0.10.22
+
+The JavaScript bindings now treat wasm32 buffer addresses as unsigned, fixing
+negative `Start offset ... is outside the bounds of the buffer` errors when
+large imports or exports cross 2 GiB. Signed coordinates and enum values retain
+their meaning. String-list allocation also refreshes its memory view after
+inner allocations can grow memory. Binding regeneration preserves these fixes.
+
+GLB texture loading borrows embedded buffer/image bytes and consumes decoded
+RGBA images instead of making redundant copies. Hollow voxelisation supports
+up to 256 million bounding cells (the separate 8-million-surface-block,
+16-million-filled-cell and raster-work limits remain). A Westminster scan with
+an 8K texture exported at height 384: 588 × 384 × 1164, 7,829,382 blocks.
+
+Sponge loading decodes directly into the region's final index storage, avoiding
+two additional full-volume arrays. The Westminster reload's wasm memory peak
+fell from approximately 3.70 GiB to 1.74 GiB. Declared block counts and varint
+lengths are checked before accepting the decoded data.
+
 # Nucleation v0.10.21
 
 Model material import now distinguishes opaque surfaces, alpha cutouts and

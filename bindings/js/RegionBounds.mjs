@@ -154,6 +154,7 @@ export class RegionBounds {
     // This method does not attempt to handle any dependencies between lifetimes, the caller
     // should handle this when constructing edge arrays.
     static _fromFFI(internalConstructor, ptr) {
+        ptr >>>= 0; // unsigned wasm32 address; field values retain their signedness.
         if (internalConstructor !== diplomatRuntime.internalConstructor) {
             throw new Error("RegionBounds._fromFFI is not meant to be called externally. Please use the default constructor.");
         }

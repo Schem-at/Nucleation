@@ -101,6 +101,7 @@ tier_fast() {
 # ------------------------------------------------------------ tier: pre-land
 # Goal: minutes. Must pass before work leaves your machine.
 tier_pre_land() {
+  step "wasm32 unsigned buffer offsets" node --test tests/node_wasm_large_offsets_test.mjs || true
   step "test (canonical, full)" cargo test --features "$CANON" || true
 
   # Every workspace crate's full suite, integration tests included — this is

@@ -2,6 +2,7 @@
 //! normalization that maps a model into voxel space.
 
 use super::material::{AlphaMode, MaterialTexture, MeshMaterial};
+use std::borrow::Cow;
 use std::sync::Arc;
 
 /// A decoded RGBA8 texture image.
@@ -131,14 +132,17 @@ impl MeshModel {
         let blob = gltf.blob;
 
         // Resolve buffers: BIN chunk or embedded data: URIs only.
-        let mut buffers: Vec<Vec<u8>> = Vec::with_capacity(doc.buffers().count());
+        let mut buffers: Vec<Cow<'_, [u8]>> = Vec::with_capacity(doc.buffers().count());
         for buffer in doc.buffers() {
             let data = match buffer.source() {
-                gltf::buffer::Source::Bin => blob
-                    .clone()
-                    .ok_or_else(|| "GLB references BIN chunk but has none".to_string())?,
-                gltf::buffer::Source::Uri(uri) => decode_data_uri(uri)
-                    .ok_or_else(|| format!("unsupported external buffer URI in GLB: {uri}"))?,
+                gltf::buffer::Source::Bin => Cow::Borrowed(
+                    blob.as_deref()
+                        .ok_or_else(|| "GLB references BIN chunk but has none".to_string())?,
+                ),
+                gltf::buffer::Source::Uri(uri) => Cow::Owned(
+                    decode_data_uri(uri)
+                        .ok_or_else(|| format!("unsupported external buffer URI in GLB: {uri}"))?,
+                ),
             };
             if data.len() < buffer.length() {
                 return Err(format!(
@@ -154,18 +158,18 @@ impl MeshModel {
         // Decode images (best-effort: an undecodable image just loses its texture).
         let mut images: Vec<Option<Arc<TextureImage>>> = Vec::with_capacity(doc.images().count());
         for img in doc.images() {
-            let bytes: Option<Vec<u8>> = match img.source() {
+            let bytes: Option<Cow<'_, [u8]>> = match img.source() {
                 gltf::image::Source::View { view, .. } => {
                     let buf = &buffers[view.buffer().index()];
                     buf.get(view.offset()..view.offset() + view.length())
-                        .map(|s| s.to_vec())
+                        .map(Cow::Borrowed)
                 }
-                gltf::image::Source::Uri { uri, .. } => decode_data_uri(uri),
+                gltf::image::Source::Uri { uri, .. } => decode_data_uri(uri).map(Cow::Owned),
             };
             let decoded = bytes
                 .and_then(|b| image::load_from_memory(&b).ok())
                 .map(|d| {
-                    let rgba = d.to_rgba8();
+                    let rgba = d.into_rgba8();
                     Arc::new(TextureImage {
                         width: rgba.width(),
                         height: rgba.height(),
@@ -434,14 +438,14 @@ fn node_worlds(node: &gltf::Node, parent: Mat4, worlds: &mut [Mat4]) {
 fn visit_node(
     node: &gltf::Node,
     worlds: &[Mat4],
-    buffers: &[Vec<u8>],
+    buffers: &[Cow<'_, [u8]>],
     materials: &[Option<MeshMaterial>],
     triangles: &mut Vec<MeshTriangle>,
 ) {
     let world = worlds[node.index()];
     let joints: Option<Vec<Mat4>> = node.skin().map(|skin| {
         let inverse: Vec<_> = skin
-            .reader(|b| buffers.get(b.index()).map(Vec::as_slice))
+            .reader(|b| buffers.get(b.index()).map(AsRef::as_ref))
             .read_inverse_bind_matrices()
             .map(Iterator::collect)
             .unwrap_or_else(|| vec![IDENTITY; skin.joints().count()]);
@@ -455,7 +459,7 @@ fn visit_node(
             if prim.mode() != gltf::mesh::Mode::Triangles {
                 continue;
             }
-            let reader = prim.reader(|buffer| buffers.get(buffer.index()).map(Vec::as_slice));
+            let reader = prim.reader(|buffer| buffers.get(buffer.index()).map(AsRef::as_ref));
             let Some(positions) = reader.read_positions() else {
                 continue;
             };

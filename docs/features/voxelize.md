@@ -86,11 +86,19 @@ The hollow path projects triangles onto their dominant plane and tests a narrow
 band using exact point-to-triangle distance. It keeps voxel centres within one
 block of the surface, without allocating the dense triangle grid or filling the
 interior. The resulting schematic still needs a dense block buffer: working
-limits are 128 million bounding cells for hollow output, 16 million for filled
+limits are 256 million bounding cells for hollow output, 16 million for filled
 output, 8 million surface blocks, 200 million raster candidates/columns, and
 8192 blocks per calculated axis. `planJson` returns a readable error for sizing
 failures; conversion failures expose a reason through `Voxelizer.lastErrorDetail()`.
 These limits do not alter the legacy shape/textured entry points.
+
+As of 0.10.22, embedded GLB buffers and image bytes are borrowed during texture
+decoding. The wasm bindings support unsigned addresses above 2 GiB, and Sponge
+loading adopts decoded indices without two extra full-volume buffers. A large
+Westminster scan was exported and reloaded at height 384 (588 × 384 × 1164,
+7,829,382 surface blocks). Its 8K texture is retained at original resolution.
+Browser hosts should retire an old tool worker when beginning another import:
+Rust allocations do not contribute to JavaScript garbage-collection pressure.
 
 PHP can use `Voxelizer::loadGlbBase64(base64_encode($bytes))` to avoid expanding
 an entire GLB into a PHP integer array. All target bindings are generated from
