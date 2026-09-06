@@ -12,11 +12,28 @@
     "./design": {
       "types": "./veneer/design.d.ts",
       "default": "./veneer/design.mjs"
+    },
+    "./renderer": {
+      "types": "./renderer/index.d.ts",
+      "default": "./renderer/index.mjs"
     }
   },
-  "files": ["*.mjs", "*.d.ts", "*.d.mts", "veneer/", "nucleation.wasm", "diplomat.config.mjs"],
-  "engines": { "node": ">=18" },
-  "repository": { "type": "git", "url": "git+https://github.com/Schem-at/Nucleation.git" },
+  "files": [
+    "*.mjs",
+    "*.d.ts",
+    "*.d.mts",
+    "veneer/",
+    "nucleation.wasm",
+    "diplomat.config.mjs",
+    "renderer/"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Schem-at/Nucleation.git"
+  },
   "homepage": "https://github.com/Schem-at/Nucleation",
   "author": "Nano <nano@schem.at>",
   "license": "MIT"

@@ -53,3 +53,15 @@ embedded scripting are native-only.
 ## License
 
 MIT
+
+### Renderer-only WebAssembly
+
+`import { Schematic } from "nucleation/renderer"` loads the bridge-only WASM build
+for schematic viewing and editing. Simulation, meshing and voxelization remain
+available from the main `nucleation` entry point. Each entry owns a separate WASM
+instance; import only the entry needed by a worker.
+
+Use `renderRegionsJson()` for region bounds and palettes, then
+`regionBlockIndices(name, start, count)` for owned `Uint32Array` windows of at most
+65,536 cells. Indices use x-fastest, then z, then y order. Call `clearContents()`
+when done to release schematic storage immediately.

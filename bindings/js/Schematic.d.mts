@@ -21,6 +21,13 @@ export class Schematic {
     static create(name: string): Schematic;
 
     /**
+     * Release all block/entity storage immediately, keeping an empty valid
+     * schematic handle. JS consumers should call this when a parsed world or
+     * editing session is no longer needed instead of waiting for finalizers.
+     */
+    clearContents(): void;
+
+    /**
      * Return an independent deep copy. Subsequent block, region, entity,
      * metadata, or transform changes do not affect the original.
      */
@@ -500,6 +507,22 @@ export class Schematic {
      * should request 16³ sections. Coordinates may be negative.
      */
     getChunkNonAirBlocksJson(offsetX: number, offsetY: number, offsetZ: number, width: number, height: number, length: number): string;
+
+    /**
+     * Storage metadata and full block states for palette-index streaming. Region order
+     * is default first, then sorted names (highest precedence first); indices are LOCAL to each region. Bounds
+     * describe allocated storage, never tight bounds. x is fastest, then z, then y.
+     * No block buffer is cloned or serialized here.
+     */
+    renderRegionsJson(): string;
+
+    /**
+     * A bounded window of a region's dense palette indices (including air).
+     * At most 65,536 cells per call; no full-world scan, coordinate tuples, or
+     * intermediate Rust allocation. JS bindings copy the borrowed slice before
+     * returning, so callers may mutate the schematic or grow WASM memory safely.
+     */
+    regionBlockIndices(regionName: string, start: number, count: number): Uint32Array;
 
     /**
      * Split the schematic into chunks (default bottom-up strategy). Writes a
