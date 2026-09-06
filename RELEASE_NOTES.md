@@ -1,3 +1,16 @@
+# Nucleation v0.10.20
+
+`Region::merge` now refreshes its occupied bounds after combining block data.
+Previously, merging into an empty region or adding blocks outside the first
+region's occupied area left those bounds stale. A subsequent `to_compact()` could
+discard the new blocks even though `count_blocks()` reported them.
+
+The fix preserves merge precedence: air in the incoming region still does not
+erase existing blocks. The higher-level schematic merge already refreshed bounds
+in its precedence-aware path; this release also fixes callers of `Region::merge`
+itself. Regression tests cover disjoint regions, empty destinations, negative
+region sizes, air overlap, and Litematica v7 to Sponge conversion.
+
 # Nucleation v0.10.19
 
 This release also carries the world-segment changes published as 0.10.17 and 0.10.18 from the ingestion branch (observable extraction, explicit source gap receipts, no implicit selection boundary certification), which had no notes of their own.

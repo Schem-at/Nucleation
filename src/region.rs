@@ -847,6 +847,9 @@ impl Region {
         self.rebuild_air_index();
         self.rebuild_non_air_count();
 
+        // Compaction must include blocks added outside the original region.
+        self.rebuild_tight_bounds();
+
         // Merge entities and block entities
         self.merge_entities(other);
         self.merge_block_entities(other);
