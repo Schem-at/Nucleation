@@ -10,10 +10,10 @@ def accessor(values,fmt,typ,component,bounds=False):
     n=len(values[0]); flat=[x for row in values for x in row]; i=len(doc['accessors']); a={'bufferView':view(struct.pack('<'+fmt*len(flat),*flat)),'componentType':component,'count':len(values),'type':typ}
     if bounds: a.update(min=[min(row[c] for row in values) for c in range(n)],max=[max(row[c] for row in values) for c in range(n)])
     doc['accessors'].append(a); return i
-def png(rgba):
+def png(pixels):
     def chunk(t,b): return struct.pack('>I',len(b))+t+b+struct.pack('>I',zlib.crc32(t+b))
-    return b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',1,1,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(b'\0'+bytes(rgba)))+chunk(b'IEND',b'')
-doc['images']=[{'bufferView':view(png(c)),'mimeType':'image/png'} for c in [(255,255,255,0),(0,128,255,255),(255,0,0,255),(128,128,128,255)]]
+    return b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',len(pixels),1,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(b'\0'+bytes(v for rgba in pixels for v in rgba)))+chunk(b'IEND',b'')
+doc['images']=[{'bufferView':view(png(c)),'mimeType':'image/png'} for c in [[(255,255,255,0)],[(0,0,0,255),(0,128,255,255)],[(0,255,255,255),(255,0,0,255)],[(128,128,128,255)]]]
 doc['textures']=[{'source':i} for i in range(4)]
 doc['materials']=[
  {'pbrMetallicRoughness':{'baseColorTexture':{'index':0}}},
@@ -28,7 +28,7 @@ doc['materials']=[
 prims=[]
 for x,mat,z in [(i*6,i,0) for i in range(7)]+[(42,1,0.25),(42,7,0)]:
     p=[(x,0,z),(x+4,0,z),(x+4,4,z),(x,4,z)];
-    attrs={'POSITION':accessor(p,'f','VEC3',5126,True),'TEXCOORD_0':accessor([(0.5,0.5)]*4,'f','VEC2',5126),'TEXCOORD_1':accessor([(0.5,0.5)]*4,'f','VEC2',5126),'JOINTS_0':accessor([(0,0,0,0)]*4,'H','VEC4',5123),'WEIGHTS_0':accessor([(1,0,0,0)]*4,'f','VEC4',5126)}
+    attrs={'POSITION':accessor(p,'f','VEC3',5126,True),'TEXCOORD_0':accessor([(0.25,0.5)]*4,'f','VEC2',5126),'TEXCOORD_1':accessor([(0.75,0.5)]*4,'f','VEC2',5126),'JOINTS_0':accessor([(0,0,0,0)]*4,'H','VEC4',5123),'WEIGHTS_0':accessor([(1,0,0,0)]*4,'f','VEC4',5126)}
     prims.append({'attributes':attrs,'indices':accessor([(i,) for i in [0,1,2,0,2,3]],'H','SCALAR',5123),'material':mat})
 ibm=accessor([(1,0,0,0,0,1,0,0,0,0,1,0,-1,-2,-3,1)],'f','MAT4',5126)
 doc.update(meshes=[{'primitives':prims}],nodes=[{'mesh':0,'skin':0,'translation':[100,0,0]},{'translation':[2,3,4]},{'mesh':0,'translation':[1000,0,0]}],skins=[{'joints':[1],'inverseBindMatrices':ibm}],scenes=[{'nodes':[0,1]},{'nodes':[2]}],scene=0,buffers=[{'byteLength':len(blob)}])
