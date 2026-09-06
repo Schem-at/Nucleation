@@ -73,6 +73,7 @@ void add_TypedCircuitExecutor_binding(nb::module_);
 void add_Value_binding(nb::module_);
 void add_Store_binding(nb::module_);
 void add_StoreIo_binding(nb::module_);
+void add_VoxelModel_binding(nb::module_);
 void add_Voxelizer_binding(nb::module_);
 void add_CellularSdfConfig_binding(nb::module_);
 void add_GeneratedChunk_binding(nb::module_);
@@ -230,6 +231,7 @@ NB_MODULE(nucleation, mod)
     add_Value_binding(mod);
     add_Store_binding(mod);
     add_StoreIo_binding(mod);
+    add_VoxelModel_binding(mod);
     add_Voxelizer_binding(mod);
     add_CellularSdfConfig_binding(mod);
     add_GeneratedChunk_binding(mod);

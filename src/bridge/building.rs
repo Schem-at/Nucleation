@@ -434,6 +434,22 @@ pub mod ffi {
     pub struct Palette(pub(crate) std::sync::Arc<crate::building::BlockPalette>);
 
     impl Palette {
+        /// Opaque building blocks and full glass blocks, for material-aware imports.
+        pub fn materials() -> Box<Palette> {
+            Box::new(Palette(std::sync::Arc::new(
+                crate::building::BlockPalette::new_materials(),
+            )))
+        }
+
+        /// Keep only opaque blocks (`false`) or full glass blocks (`true`).
+        /// Includes/excludes remain respected. Returns an empty palette when
+        /// no suitable block exists; check `len()` before matching colours.
+        pub fn for_material(&self, translucent: bool) -> Box<Palette> {
+            Box::new(Palette(std::sync::Arc::new(
+                self.0.for_material(translucent),
+            )))
+        }
+
         /// Every block blockpedia knows a color for (the default palette
         /// brushes use when none is set).
         pub fn all() -> Box<Palette> {

@@ -1,3 +1,44 @@
+# Nucleation v0.10.21
+
+Model material import now distinguishes opaque surfaces, alpha cutouts and
+transmissive glass. GLB loading applies base-colour factors and vertex colours
+in linear light, samples emissive and transmission textures with their own UV
+sets, retains emissive colour under baked lighting, and applies default-pose
+skin transforms. Only the selected/default scene is imported. Animation,
+refraction, cast shadows and metallic/roughness rendering are not baked.
+
+`BlockPalette::new_materials` / `Palette.materials()` include opaque building
+blocks and full glass. `for_material` / `forMaterial` restrict any custom palette
+to opaque or glass candidates before nearest-colour matching or dithering;
+exclusions stay respected. Missing material candidates produce an actionable
+error in the configured voxelizer. Neutral clear glass uses white transmission
+colour rather than its decorative texture streaks. Existing explicit block
+replacement operations still override the match.
+
+Texture sampling now interpolates in linear light and respects repeat, mirrored
+repeat and clamp wrapping. This intentionally changes the textured-cube golden
+colours (geometry unchanged); the three geometry/shading baselines are retained.
+
+
+Model imports can target height, width, depth, or the longest side while
+preserving transformed mesh proportions. The new `VoxelModel` API parses GLB
+or OBJ once, returns an allocation-checked size plan, and exports an
+origin-aligned schematic. Optional directional Lambert lighting shades texture
+colours before palette matching; strength zero preserves the original colours.
+
+Hollow imports through this API use a sparse triangle surface raster rather
+than a dense triangle grid and interior fill. This makes large landscape
+surfaces practical: a synthetic 512 × 384 × 512 sloping surface exported
+654,336 blocks through WASM during validation. The output buffer remains dense;
+explicit volume, dimension, surface-block and raster-work limits reject oversized
+requests. The legacy voxelizer entry points retain their existing behaviour.
+
+All generated bindings expose the configured importer. PHP can load GLB bytes
+via base64 to avoid expanding every byte into an integer array. Regression tests
+cover axis sizing at height 384, transformed GLB textures, lighting direction,
+zero-strength identity, hollow/filled interiors, sparse/dense surface membership,
+and bridge errors. Browser/PHP integration checks agree on the shaded output.
+
 # Nucleation v0.10.20
 
 `Region::merge` now refreshes its occupied bounds after combining block data.

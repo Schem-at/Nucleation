@@ -7,11 +7,15 @@
 //! any brush via the building tool or run [`voxelize_textured`] to sample the
 //! model's textures into palette blocks.
 
+mod configured;
+mod material;
 mod model;
 mod shape;
 #[doc(hidden)]
 pub mod test_meshes;
 
+pub use configured::{VoxelLight, VoxelizeOptions, VoxelizePlan};
+pub use material::{AlphaMode, MaterialTexture, MeshMaterial, SurfaceSample};
 pub use model::{MeshModel, MeshTriangle, TextureImage};
 pub use shape::MeshShape;
 
@@ -59,8 +63,16 @@ pub fn voxelize_textured(
     // Sample every voxel's surface colour, packed as 24 bit RGB. O(1) per
     // voxel since the surface field landed, and on native it runs on rayon.
     let sample = |&(x, y, z): &(i32, i32, i32)| -> u32 {
-        let rgb = model_shape.surface_color(x, y, z).unwrap_or(FALLBACK_RGB);
-        ((rgb[0] as u32) << 16) | ((rgb[1] as u32) << 8) | rgb[2] as u32
+        let sample = model_shape.surface_sample(x, y, z);
+        let rgb = sample
+            .filter(|s| s.textured)
+            .map(|s| s.rgb(1.0))
+            .unwrap_or(FALLBACK_RGB);
+        ((rgb[0] as u32) << 16)
+            | ((rgb[1] as u32) << 8)
+            | rgb[2] as u32
+            | (u32::from(sample.is_some_and(|s| s.translucent)) << 24)
+            | (u32::from(sample.is_some_and(|s| !s.visible)) << 25)
     };
     let colors: Vec<u32> = if use_parallel() {
         points.par_iter().map(sample).collect()
@@ -95,9 +107,29 @@ pub fn voxelize_textured(
     // One palette scan per distinct colour, in parallel on native. The scan
     // itself is unchanged, so every voxel still gets the entry the per voxel
     // loop would have given it, ties included.
+    let materials = [palette.for_material(false), palette.for_material(true)];
+    let indices: Vec<Vec<usize>> = materials
+        .iter()
+        .map(|p| {
+            p.block_ids()
+                .map(|id| {
+                    palette
+                        .block_ids()
+                        .position(|original| original == id)
+                        .unwrap()
+                })
+                .collect()
+        })
+        .collect();
     let match_color = |&key: &u32| -> Option<usize> {
+        if key & (1 << 25) != 0 {
+            return None;
+        }
+        let material = ((key >> 24) & 1) as usize;
         let target = ExtendedColorData::from_rgb((key >> 16) as u8, (key >> 8) as u8, key as u8);
-        palette.find_closest_index(&target)
+        materials[material]
+            .find_closest_index(&target)
+            .map(|i| indices[material][i])
     };
     let matched: Vec<Option<usize>> = if use_parallel() {
         distinct.par_iter().map(match_color).collect()

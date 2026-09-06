@@ -54,3 +54,76 @@ open island of sand, dirt track, cliffs, palms, and a central lagoon. The same
 voxelizer call handles it, with a color-matched beach palette:
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mk64-koopa-beach.png?v=2" width="760" alt="Mario Kart 64 Koopa Troopa Beach voxelized: sand island, cyan shallows and central lagoon in an endless sea">
+
+## Size a particular axis and bake light
+
+The configured importer parses once, estimates the output before allocation, and
+preserves the transformed model's proportions. Unlike the older shape helpers,
+its output is anchored at (0, 0, 0), so there is no negative-origin padding.
+
+```javascript
+const model = Voxelizer.loadGlb(glbBytes); // Uint8Array; loadObj(text) also works
+const options = JSON.stringify({
+  target_size: 384,
+  axis: 'y',                         // height; x=width, z=depth, longest=default
+  hollow: true,
+  lighting: { direction: [-1, 1, -1], strength: 0.65 },
+});
+const plan = JSON.parse(model.planJson(options));
+if (plan.error) throw new Error(plan.error);
+console.log(plan.dimensions);         // [width, height, depth]
+const schematic = model.toSchematic(options, Palette.solid(), 'landscape');
+```
+
+`lighting` is optional. It multiplies sampled texture RGB by
+`1 - strength + strength * max(0, normal · direction)` with normalized vectors,
+then matches the shaded colour to the selected palette. Strength zero preserves
+colours. This is baked Lambert lighting, without cast shadows. An untextured
+model uses light grey; `untextured_block` optionally selects its unlit material.
+The surface normal comes from the transformed triangle winding.
+
+The hollow path projects triangles onto their dominant plane and tests a narrow
+band using exact point-to-triangle distance. It keeps voxel centres within one
+block of the surface, without allocating the dense triangle grid or filling the
+interior. The resulting schematic still needs a dense block buffer: working
+limits are 128 million bounding cells for hollow output, 16 million for filled
+output, 8 million surface blocks, 200 million raster candidates/columns, and
+8192 blocks per calculated axis. `planJson` returns a readable error for sizing
+failures; conversion failures expose a reason through `Voxelizer.lastErrorDetail()`.
+These limits do not alter the legacy shape/textured entry points.
+
+PHP can use `Voxelizer::loadGlbBase64(base64_encode($bytes))` to avoid expanding
+an entire GLB into a PHP integer array. All target bindings are generated from
+the same bridge, including these configured import methods.
+
+### Materials and transparency (0.10.21)
+
+Use `BlockPalette::new_materials()` (bridge: `Palette.materials()`) for mixed
+opaque/glass models. The configured voxelizer filters the chosen palette by
+surface type; opaque texture colours never select glass, leaves or grates.
+Glass surfaces use full glass blocks, with neutral white mapped to clear glass.
+It never silently re-adds excluded blocks. A palette missing a needed surface
+type returns an error; add glass/opaque blocks to that palette before retrying.
+
+The GLB loader follows glTF alpha coverage: OPAQUE ignores alpha, MASK discards
+below its cutoff, BLEND discards zero coverage and maps surviving partial
+coverage to glass. KHR_materials_transmission (including its linear red-channel
+texture) also selects glass, independently of alpha mode. Masked samples are
+rejected before competing for a surface voxel, preserving backing geometry.
+
+Base textures are sRGB; factors and vertex colours multiply in linear light.
+Emissive textures/factors and KHR_materials_emissive_strength are added after
+lighting, clipped to the available sRGB/block palette gamut. Transmission and
+emissive textures use their declared UV set and sampler wrapping. Directional
+light shades reflected colour, preserving glass tint. Four-influence skinning
+uses the default joint pose and inverse bind matrices; animations are not played.
+The default scene (or first scene) is imported rather than all alternative scenes.
+Hollow is recommended for glass lenses and cutout surfaces; filled mode uses
+nearest-surface appearance for interior voxels. Materials approximate appearance
+with Minecraft blocks; no refraction, shadows or metallic/roughness BRDF is baked.
+
+The same material filtering is available to any colour tool through
+`palette.for_material(false)` / `palette.forMaterial(false)`. Filter once, then
+use ordinary nearest-colour or dithered lookups. Check for an empty result.
+
+Reference: [glTF material specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#materials).

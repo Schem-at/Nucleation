@@ -8,7 +8,7 @@ resolver = "2"
 
 [package]
 name = "nucleation"
-version = "0.10.20"
+version = "0.10.21"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -216,7 +216,7 @@ pollster = { version = "0.4", optional = true }
 # of the tree. NOTE: do not enable gltf's "names" feature — it toggles a `name`
 # field onto every gltf-json struct crate-tree-wide and breaks schematic-mesher's
 # struct literals (feature unification).
-gltf = { version = "1.4", default-features = false, features = ["utils"], optional = true }
+gltf = { version = "1.4", default-features = false, features = ["utils", "KHR_materials_transmission", "KHR_materials_emissive_strength"], optional = true }
 
 # Simulation (MCHPRS) dependencies - optional
 # Note: These are git dependencies and will be excluded from crates.io publish

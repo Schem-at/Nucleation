@@ -99,6 +99,17 @@ pub struct BlockState {
 }
 
 impl BlockFacts {
+    /// Full glass geometry, classified by the vanilla block definition rather
+    /// than light propagation. Leaves and grates are also `transparent`, but
+    /// are not substitutes for a transmissive surface.
+    pub fn is_glass(&self) -> bool {
+        self.full_cube
+            && matches!(
+                self.kind,
+                "minecraft:transparent" | "minecraft:stained_glass" | "minecraft:tinted_glass"
+            )
+    }
+
     pub fn id(&self) -> &str {
         self.id
     }

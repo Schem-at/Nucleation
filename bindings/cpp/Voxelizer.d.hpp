@@ -17,6 +17,8 @@ namespace diplomat::capi { struct Schematic; }
 class Schematic;
 namespace diplomat::capi { struct Shape; }
 class Shape;
+namespace diplomat::capi { struct VoxelModel; }
+class VoxelModel;
 class NucleationError;
 
 
@@ -34,6 +36,29 @@ namespace capi {
  */
 class Voxelizer {
 public:
+
+  /**
+   * Reason the last configured model import failed; cleared on success.
+   */
+  inline static std::string last_error_detail();
+  template<typename W>
+  inline static void last_error_detail_write(W& writeable_output);
+
+  /**
+   * PHP-friendly GLB input: avoids expanding every byte into a boxed
+   * integer array before copying it over FFI.
+   */
+  inline static diplomat::result<std::unique_ptr<VoxelModel>, NucleationError> load_glb_base64(std::string_view data);
+
+  /**
+   * Parse a GLB once for axis-based size estimates and lit voxelization.
+   */
+  inline static diplomat::result<std::unique_ptr<VoxelModel>, NucleationError> load_glb(diplomat::span<const uint8_t> data);
+
+  /**
+   * Parse an OBJ once for axis-based size estimates and lit voxelization.
+   */
+  inline static diplomat::result<std::unique_ptr<VoxelModel>, NucleationError> load_obj(std::string_view text);
 
   /**
    * Load a binary glTF (`.glb`, embedded buffers/images) and voxelize

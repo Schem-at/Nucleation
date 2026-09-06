@@ -14,6 +14,16 @@ final class Palette {
         $this->borrowedFrom = $borrowedFrom;
     }
 
+    public static function materials() {
+        $ret = Lib::ffi()->Palette_materials();
+        return new Palette($ret, true);
+    }
+
+    public function forMaterial( $translucent) {
+        $ret = Lib::ffi()->Palette_for_material($this->ptr, $translucent);
+        return new Palette($ret, true);
+    }
+
     public static function all() {
         $ret = Lib::ffi()->Palette_all();
         return new Palette($ret, true);

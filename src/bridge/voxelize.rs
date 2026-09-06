@@ -12,7 +12,112 @@ pub mod ffi {
     #[diplomat::opaque]
     pub struct Voxelizer;
 
+    /// A parsed GLB/OBJ, reusable for size estimates and configured imports.
+    #[diplomat::opaque]
+    pub struct VoxelModel(pub(crate) crate::voxelize::MeshModel);
+
+    impl VoxelModel {
+        /// Return {dimensions:[width,height,depth],volume} or {error:message}.
+        /// Options: target_size, axis (longest/x/y/z), hollow, optional lighting
+        /// {direction:[x,y,z],strength:0..1}, optional untextured_block.
+        /// Estimates preserve proportions and run before voxel-grid allocation.
+        pub fn plan_json(
+            &self,
+            options_json: &DiplomatStr,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            use std::fmt::Write;
+            crate::bridge::clear_last_error_detail();
+            let options: crate::voxelize::VoxelizeOptions = serde_json::from_slice(options_json)
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e.to_string());
+                    NucleationError::InvalidArgument
+                })?;
+            let value = match self.0.voxelize_plan(&options) {
+                Ok(plan) => serde_json::to_value(plan).unwrap(),
+                Err(error) => serde_json::json!({"error": error}),
+            };
+            write!(out, "{value}").map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Import using plan_json's options. Anchored at (0,0,0), with exact
+        /// axis-based uniform scaling. Hollow uses a sparse surface raster;
+        /// lighting darkens sampled texture colours before palette matching.
+        /// Rejects oversized/over-complex output with InvalidArgument.
+        pub fn to_schematic(
+            &self,
+            options_json: &DiplomatStr,
+            palette: &Palette,
+            name: &DiplomatStr,
+        ) -> Result<Box<Schematic>, NucleationError> {
+            crate::bridge::clear_last_error_detail();
+            let options: crate::voxelize::VoxelizeOptions = serde_json::from_slice(options_json)
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e.to_string());
+                    NucleationError::InvalidArgument
+                })?;
+            let name = std::str::from_utf8(name).map_err(|e| {
+                crate::bridge::set_last_error_detail(e.to_string());
+                NucleationError::InvalidArgument
+            })?;
+            let schematic = self
+                .0
+                .voxelize_with_options(&options, &palette.0, name)
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e.to_string());
+                    NucleationError::InvalidArgument
+                })?;
+            Ok(Box::new(Schematic(schematic)))
+        }
+    }
+
     impl Voxelizer {
+        /// Reason the last configured model import failed; cleared on success.
+        pub fn last_error_detail(out: &mut DiplomatWrite) {
+            use std::fmt::Write;
+            let _ = write!(out, "{}", crate::bridge::last_error_detail());
+        }
+
+        /// PHP-friendly GLB input: avoids expanding every byte into a boxed
+        /// integer array before copying it over FFI.
+        pub fn load_glb_base64(data: &DiplomatStr) -> Result<Box<VoxelModel>, NucleationError> {
+            use base64::Engine;
+            crate::bridge::clear_last_error_detail();
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(data)
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e.to_string());
+                    NucleationError::Parse
+                })?;
+            Self::load_glb(&bytes)
+        }
+
+        /// Parse a GLB once for axis-based size estimates and lit voxelization.
+        pub fn load_glb(data: &[u8]) -> Result<Box<VoxelModel>, NucleationError> {
+            crate::bridge::clear_last_error_detail();
+            crate::voxelize::MeshModel::from_glb_bytes(data)
+                .map(|model| Box::new(VoxelModel(model)))
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e.to_string());
+                    NucleationError::Parse
+                })
+        }
+
+        /// Parse an OBJ once for axis-based size estimates and lit voxelization.
+        pub fn load_obj(text: &DiplomatStr) -> Result<Box<VoxelModel>, NucleationError> {
+            crate::bridge::clear_last_error_detail();
+            let text = std::str::from_utf8(text).map_err(|e| {
+                crate::bridge::set_last_error_detail(e.to_string());
+                NucleationError::InvalidArgument
+            })?;
+            crate::voxelize::MeshModel::from_obj_str(text)
+                .map(|model| Box::new(VoxelModel(model)))
+                .map_err(|e| {
+                    crate::bridge::set_last_error_detail(e.to_string());
+                    NucleationError::Parse
+                })
+        }
+
         /// Load a binary glTF (`.glb`, embedded buffers/images) and voxelize
         /// it into a fillable Shape: the model is uniformly scaled so its
         /// largest dimension equals `target_size` voxels, centered on x/z

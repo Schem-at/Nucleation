@@ -19,6 +19,10 @@ namespace diplomat {
 namespace capi {
     extern "C" {
 
+    diplomat::capi::Palette* Palette_materials(void);
+
+    diplomat::capi::Palette* Palette_for_material(const diplomat::capi::Palette* self, bool translucent);
+
     diplomat::capi::Palette* Palette_all(void);
 
     diplomat::capi::Palette* Palette_solid(void);
@@ -68,6 +72,17 @@ namespace capi {
     } // extern "C"
 } // namespace capi
 } // namespace
+
+inline std::unique_ptr<Palette> Palette::materials() {
+    auto result = diplomat::capi::Palette_materials();
+    return std::unique_ptr<Palette>(Palette::FromFFI(result));
+}
+
+inline std::unique_ptr<Palette> Palette::for_material(bool translucent) const {
+    auto result = diplomat::capi::Palette_for_material(this->AsFFI(),
+        translucent);
+    return std::unique_ptr<Palette>(Palette::FromFFI(result));
+}
 
 inline std::unique_ptr<Palette> Palette::all() {
     auto result = diplomat::capi::Palette_all();

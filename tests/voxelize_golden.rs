@@ -1,16 +1,12 @@
 #![cfg(feature = "voxelize")]
-//! Byte identity of the voxelizer output against the v0.10.16 baseline.
+//! Voxelizer geometry and appearance regression hashes.
 //!
-//! The fixture is generated once from unchanged code by the ignored test at
-//! the bottom of this file, then committed. Every later change must keep
-//! these hashes.
-//!
-//! Three of the four cases (`sphere_solid_32`, `sphere_shell_32`,
-//! `textured_cube_32`) are the v0.10.16 baseline and have not moved since.
-//! The fourth, `sphere_shaded_32`, did not exist in v0.10.16: it is a fresh
-//! pin taken at the head of the v0.10.17 work, and it is the only case that
-//! runs a brush whose `uses_normal()` is true, so it is the one that covers
-//! `MeshShape::normal_at` on curved geometry.
+//! Sphere geometry hashes retain the v0.10.16/17 baselines. In v0.10.21 only
+//! textured_cube_32 intentionally changes: bilinear sampling now wraps both
+//! sides of a repeat seam and interpolates sRGB textures in linear light.
+//! Its block count/geometry stay identical. Material semantics are independently
+//! exercised by material unit tests and voxelize_materials.rs, so regenerating
+//! these hashes is not a substitute for checking a behavioural change.
 
 use nucleation::building::{BlockPalette, BuildingTool, ShadedBrush, SolidBrush};
 use nucleation::voxelize::{test_meshes::sphere_5k, voxelize_textured, MeshModel, MeshShape};

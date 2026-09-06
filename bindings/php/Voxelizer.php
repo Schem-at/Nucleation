@@ -14,6 +14,66 @@ final class Voxelizer {
         $this->borrowedFrom = $borrowedFrom;
     }
 
+    public static function lastErrorDetail() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->Voxelizer_last_error_detail($write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public static function loadGlbBase64(string $data) {
+        $__n0 = strlen($data);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $data, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Voxelizer_load_glb_base64($__view0);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new VoxelModel($result->ok, true);
+    }
+
+    public static function loadGlb(array $data) {
+        $__n0 = count($data);
+        $__view0 = Lib::ffi()->new('DiplomatU8View');
+        if ($__n0 > 0) {
+            $__arr0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            foreach ($data as $__i0 => $__v0) { $__arr0[$__i0] = $__v0; }
+            $__view0->data = \FFI::addr($__arr0[0]);
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Voxelizer_load_glb($__view0);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new VoxelModel($result->ok, true);
+    }
+
+    public static function loadObj(string $text) {
+        $__n0 = strlen($text);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $text, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Voxelizer_load_obj($__view0);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new VoxelModel($result->ok, true);
+    }
+
     public static function shapeFromGlb(array $data,  $target_size,  $shell) {
         $__n0 = count($data);
         $__view0 = Lib::ffi()->new('DiplomatU8View');

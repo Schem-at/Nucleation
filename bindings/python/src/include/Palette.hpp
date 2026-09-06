@@ -19,6 +19,10 @@ namespace nucleation {
 namespace capi {
     extern "C" {
 
+    nucleation::capi::Palette* Palette_materials(void);
+
+    nucleation::capi::Palette* Palette_for_material(const nucleation::capi::Palette* self, bool translucent);
+
     nucleation::capi::Palette* Palette_all(void);
 
     nucleation::capi::Palette* Palette_solid(void);
@@ -68,6 +72,17 @@ namespace capi {
     } // extern "C"
 } // namespace capi
 } // namespace
+
+inline std::unique_ptr<nucleation::Palette> nucleation::Palette::materials() {
+    auto result = nucleation::capi::Palette_materials();
+    return std::unique_ptr<nucleation::Palette>(nucleation::Palette::FromFFI(result));
+}
+
+inline std::unique_ptr<nucleation::Palette> nucleation::Palette::for_material(bool translucent) const {
+    auto result = nucleation::capi::Palette_for_material(this->AsFFI(),
+        translucent);
+    return std::unique_ptr<nucleation::Palette>(nucleation::Palette::FromFFI(result));
+}
 
 inline std::unique_ptr<nucleation::Palette> nucleation::Palette::all() {
     auto result = nucleation::capi::Palette_all();

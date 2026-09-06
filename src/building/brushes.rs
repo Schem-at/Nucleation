@@ -192,6 +192,58 @@ fn is_buildable(facts: &BlockFacts) -> bool {
 }
 
 impl BlockPalette {
+    /// Opaque building blocks plus full glass blocks. Pair with `for_material`
+    /// so a close colour never substitutes glass for an opaque surface.
+    pub fn new_materials() -> Self {
+        let mut palette = Self::new_solid();
+        for facts in all_blocks().filter(|f| f.is_glass()) {
+            if let Some(color) = &facts.extras.color {
+                palette
+                    .blocks
+                    .push((color.to_extended(), facts.id.to_string()));
+            }
+        }
+        palette
+    }
+
+    /// Restrict matching (including dithering) to the requested surface type.
+    /// Never adds blocks or falls back to the opposite material. Callers can
+    /// detect an empty result and explain which palette choice is missing.
+    pub fn for_material(&self, translucent: bool) -> Self {
+        let mut palette = Self {
+            blocks: self
+                .blocks
+                .iter()
+                .filter(|(_, id)| {
+                    crate::blockpedia::get_block(id).is_some_and(|f| {
+                        if translucent {
+                            f.is_glass()
+                        } else {
+                            !f.transparent
+                        }
+                    })
+                })
+                .map(|(color, id)| {
+                    let color = if translucent && id == "minecraft:glass" {
+                        ExtendedColorData::from_rgb(255, 255, 255)
+                    } else {
+                        *color
+                    };
+                    (color, id.clone())
+                })
+                .collect(),
+            dither: self.dither,
+        };
+        if translucent {
+            // Neutral white is clear glass, even if white stained glass has
+            // the same measured colour and appeared earlier in a custom list.
+            palette
+                .blocks
+                .sort_by_key(|(_, id)| id != "minecraft:glass");
+        }
+        palette
+    }
+
     /// Every colored block except the technical non-buildables
     /// (portals, fluids, fire, piston internals, ...).
     pub fn new_all() -> Self {

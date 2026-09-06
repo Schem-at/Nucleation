@@ -3,6 +3,7 @@ import type { NucleationError } from "./NucleationError.mjs"
 import type { Palette } from "./Palette.mjs"
 import type { Schematic } from "./Schematic.mjs"
 import type { Shape } from "./Shape.mjs"
+import type { VoxelModel } from "./VoxelModel.mjs"
 import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
 
@@ -17,6 +18,27 @@ export class Voxelizer {
     /** @internal */
     constructor();
 
+
+    /**
+     * Reason the last configured model import failed; cleared on success.
+     */
+    static lastErrorDetail(): string;
+
+    /**
+     * PHP-friendly GLB input: avoids expanding every byte into a boxed
+     * integer array before copying it over FFI.
+     */
+    static loadGlbBase64(data: string): VoxelModel;
+
+    /**
+     * Parse a GLB once for axis-based size estimates and lit voxelization.
+     */
+    static loadGlb(data: Array<number>): VoxelModel;
+
+    /**
+     * Parse an OBJ once for axis-based size estimates and lit voxelization.
+     */
+    static loadObj(text: string): VoxelModel;
 
     /**
      * Load a binary glTF (`.glb`, embedded buffers/images) and voxelize

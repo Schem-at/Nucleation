@@ -35,6 +35,18 @@ class Palette {
 public:
 
   /**
+   * Opaque building blocks and full glass blocks, for material-aware imports.
+   */
+  inline static std::unique_ptr<nucleation::Palette> materials();
+
+  /**
+   * Keep only opaque blocks (`false`) or full glass blocks (`true`).
+   * Includes/excludes remain respected. Returns an empty palette when
+   * no suitable block exists; check `len()` before matching colours.
+   */
+  inline std::unique_ptr<nucleation::Palette> for_material(bool translucent) const;
+
+  /**
    * Every block blockpedia knows a color for (the default palette
    * brushes use when none is set).
    */

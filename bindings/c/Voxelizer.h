@@ -11,6 +11,7 @@
 #include "Palette.d.h"
 #include "Schematic.d.h"
 #include "Shape.d.h"
+#include "VoxelModel.d.h"
 
 #include "Voxelizer.d.h"
 
@@ -18,6 +19,17 @@
 
 
 
+
+void Voxelizer_last_error_detail(DiplomatWrite* write);
+
+typedef struct Voxelizer_load_glb_base64_result {union {VoxelModel* ok; NucleationError err;}; bool is_ok;} Voxelizer_load_glb_base64_result;
+Voxelizer_load_glb_base64_result Voxelizer_load_glb_base64(DiplomatStringView data);
+
+typedef struct Voxelizer_load_glb_result {union {VoxelModel* ok; NucleationError err;}; bool is_ok;} Voxelizer_load_glb_result;
+Voxelizer_load_glb_result Voxelizer_load_glb(DiplomatU8View data);
+
+typedef struct Voxelizer_load_obj_result {union {VoxelModel* ok; NucleationError err;}; bool is_ok;} Voxelizer_load_obj_result;
+Voxelizer_load_obj_result Voxelizer_load_obj(DiplomatStringView text);
 
 typedef struct Voxelizer_shape_from_glb_result {union {Shape* ok; NucleationError err;}; bool is_ok;} Voxelizer_shape_from_glb_result;
 Voxelizer_shape_from_glb_result Voxelizer_shape_from_glb(DiplomatU8View data, float target_size, float shell);
