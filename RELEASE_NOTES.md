@@ -1,3 +1,24 @@
+# Nucleation v0.10.21
+
+Model imports can target height, width, depth, or the longest side while
+preserving transformed mesh proportions. The new `VoxelModel` API parses GLB
+or OBJ once, returns an allocation-checked size plan, and exports an
+origin-aligned schematic. Optional directional Lambert lighting shades texture
+colours before palette matching; strength zero preserves the original colours.
+
+Hollow imports through this API use a sparse triangle surface raster rather
+than a dense triangle grid and interior fill. This makes large landscape
+surfaces practical: a synthetic 512 × 384 × 512 sloping surface exported
+654,336 blocks through WASM during validation. The output buffer remains dense;
+explicit volume, dimension, surface-block and raster-work limits reject oversized
+requests. The legacy voxelizer entry points retain their existing behaviour.
+
+All generated bindings expose the configured importer. PHP can load GLB bytes
+via base64 to avoid expanding every byte into an integer array. Regression tests
+cover axis sizing at height 384, transformed GLB textures, lighting direction,
+zero-strength identity, hollow/filled interiors, sparse/dense surface membership,
+and bridge errors. Browser/PHP integration checks agree on the shaded output.
+
 # Nucleation v0.10.20
 
 `Region::merge` now refreshes its occupied bounds after combining block data.
