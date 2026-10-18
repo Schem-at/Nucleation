@@ -10,8 +10,10 @@ use crate::entity::Entity;
 use crate::formats::error::Result;
 use crate::region::Region;
 use crate::{BlockState, UniversalSchematic};
+use crate::nbt::{NbtMap, NbtValue};
 #[cfg(test)]
 use flate2::read::GzDecoder;
+#[cfg(test)]
 use flate2::write::GzEncoder;
 use flate2::Compression;
 #[cfg(test)]
@@ -229,14 +231,7 @@ fn to_schematic_v3(schematic: &UniversalSchematic, compression: Compression) -> 
     }
 
     crate::nbt::canonicalize_compound(&mut root);
-    let mut encoder = GzEncoder::new(Vec::new(), compression);
-    quartz_nbt::io::write_nbt(
-        &mut encoder,
-        None,
-        &root,
-        quartz_nbt::io::Flavor::Uncompressed,
-    )?;
-    Ok(encoder.finish()?)
+    super::gzip_nbt(&root, compression)
 }
 
 // Version 2 format (legacy compatibility)
@@ -335,14 +330,7 @@ fn to_schematic_v2(schematic: &UniversalSchematic, compression: Compression) -> 
     }
 
     crate::nbt::canonicalize_compound(&mut root);
-    let mut encoder = GzEncoder::new(Vec::new(), compression);
-    quartz_nbt::io::write_nbt(
-        &mut encoder,
-        None,
-        &root,
-        quartz_nbt::io::Flavor::Uncompressed,
-    )?;
-    Ok(encoder.finish()?)
+    super::gzip_nbt(&root, compression)
 }
 
 // Palette conversion for v3 (creates clean sequential indices)
@@ -460,7 +448,12 @@ pub fn from_schematic_bounded(
     data: &[u8],
     limits: &crate::formats::limits::DecodeLimits,
 ) -> Result<UniversalSchematic> {
-    let root = crate::formats::limits::parse_gzip_nbt(data, limits)?;
+    let mut raw = crate::formats::limits::parse_gzip_nbt_map(data, limits)?;
+    // Block entities are most of the tree in container-heavy builds. Take
+    // them out of the raw tree and build them from its maps by value, instead
+    // of converting them to quartz and back.
+    let raw_block_entities = take_raw_block_entities(&mut raw);
+    let root = raw.into_quartz_nbt();
 
     let schem = root.get::<_, &NbtCompound>("Schematic").unwrap_or(&root);
     let schem_version = schem.get::<_, i32>("Version")?;
@@ -528,10 +521,7 @@ pub fn from_schematic_bounded(
     if palette_len > limits.max_palette_entries {
         return Err("palette limit exceeded".into());
     }
-    if block_container
-        .get::<_, &NbtList>("BlockEntities")
-        .is_ok_and(|values| values.len() > limits.max_block_entities)
-    {
+    if raw_block_entities.len() > limits.max_block_entities {
         return Err("block-entity limit exceeded".into());
     }
     if schem
@@ -565,7 +555,7 @@ pub fn from_schematic_bounded(
     region.rebuild_air_index();
     region.rescan_content();
 
-    let block_entities = parse_block_entities(block_container)?;
+    let block_entities = block_entities_from_raw(raw_block_entities);
     for block_entity in block_entities {
         region.add_block_entity(block_entity);
     }
@@ -585,11 +575,11 @@ pub fn from_schematic_bounded(
 fn convert_block_entities(region: &Region) -> NbtList {
     let mut block_entities = NbtList::new();
 
-    for (_, block_entity) in region.block_entities.iter() {
+    for (position, block_entity) in region.block_entities.iter() {
         let mut nbt = block_entity.to_nbt();
-        let rel_x = block_entity.position.0 - region.position.0;
-        let rel_y = block_entity.position.1 - region.position.1;
-        let rel_z = block_entity.position.2 - region.position.2;
+        let rel_x = position.0 - region.position.0;
+        let rel_y = position.1 - region.position.1;
+        let rel_z = position.2 - region.position.2;
         nbt.insert("Pos", NbtTag::IntArray(vec![rel_x, rel_y, rel_z]));
         block_entities.push(nbt);
     }
@@ -603,11 +593,13 @@ fn convert_block_entities(region: &Region) -> NbtList {
 fn convert_block_entities_v3(region: &Region, data_version: Option<i32>) -> NbtList {
     let mut block_entities = NbtList::new();
 
-    for (_, block_entity) in region.block_entities.iter() {
+    for (position, block_entity) in region.block_entities.iter() {
         let mut nbt = block_entity.to_nbt_v3(data_version);
-        let rel_x = block_entity.position.0 - region.position.0;
-        let rel_y = block_entity.position.1 - region.position.1;
-        let rel_z = block_entity.position.2 - region.position.2;
+        // The storage key, not `block_entity.position`, which is stale for
+        // templates shared across positions.
+        let rel_x = position.0 - region.position.0;
+        let rel_y = position.1 - region.position.1;
+        let rel_z = position.2 - region.position.2;
         nbt.insert("Pos", NbtTag::IntArray(vec![rel_x, rel_y, rel_z]));
         block_entities.push(nbt);
     }
@@ -830,10 +822,26 @@ fn parse_block_data(
     block_data
         .try_reserve_exact(expected_length)
         .map_err(|error| format!("Cannot allocate schematic block data: {error}"))?;
-    for _ in 0..expected_length {
+    // Indices below 128 (air, and every index of a small palette) are one
+    // byte. Widen each run of them in bulk, which vectorizes, and decode only
+    // the multi-byte varints between runs individually.
+    let mut remaining = expected_length;
+    while remaining > 0 {
+        let limit = remaining.min(block_data_u8.len());
+        let run = block_data_u8[..limit]
+            .iter()
+            .position(|&b| b >= 0x80)
+            .unwrap_or(limit);
+        block_data.extend(block_data_u8[..run].iter().map(|&b| b as u32));
+        block_data_u8 = &block_data_u8[run..];
+        remaining -= run;
+        if remaining == 0 {
+            break;
+        }
         let id = read_varint(&mut block_data_u8)
             .ok_or("Block data contains a truncated or invalid varint")?;
         block_data.push(id);
+        remaining -= 1;
     }
     if !block_data_u8.is_empty() {
         return Err("Block data length mismatch: excess indices".into());
@@ -842,42 +850,56 @@ fn parse_block_data(
     Ok(block_data)
 }
 
-fn parse_block_entities(region_tag: &NbtCompound) -> Result<Vec<BlockEntity>> {
-    if !region_tag.contains_key("BlockEntities") {
-        return Ok(Vec::new());
-    }
-    let block_entities_list = region_tag.get::<_, &NbtList>("BlockEntities")?;
-    let mut block_entities = Vec::new();
-
-    for tag in block_entities_list.iter() {
-        if let NbtTag::Compound(compound) = tag {
-            // Sponge Schematic v3 wraps block-specific data in a "Data" compound.
-            // Flatten it so consumers (e.g. MCHPRS) can find fields like "Items"
-            // at the top level, matching the vanilla block entity NBT layout.
-            let flattened = if compound.contains_key("Data") {
-                let mut flat = NbtCompound::new();
-                // Copy top-level fields (Id, Pos)
-                for (key, value) in compound.inner() {
-                    if key != "Data" {
-                        flat.insert(key, value.clone());
-                    }
-                }
-                // Merge Data contents into top level
-                if let Ok(data) = compound.get::<_, &NbtCompound>("Data") {
-                    for (key, value) in data.inner() {
-                        flat.insert(key, value.clone());
-                    }
-                }
-                flat
-            } else {
-                compound.clone()
-            };
-            let block_entity = BlockEntity::from_nbt(&flattened);
-            block_entities.push(block_entity);
+/// Remove the `BlockEntities` list from a raw Sponge tree: under `Blocks` in
+/// v3, at the schematic level in v2.
+fn take_raw_block_entities(root: &mut NbtMap) -> Vec<NbtValue> {
+    let schem = if matches!(root.get("Schematic"), Some(NbtValue::Compound(_))) {
+        match root.get_mut("Schematic") {
+            Some(NbtValue::Compound(schem)) => schem,
+            _ => return Vec::new(),
         }
+    } else {
+        root
+    };
+    let version = schem.get("Version").and_then(NbtValue::as_i32);
+    let container = if version == Some(2) {
+        schem
+    } else {
+        match schem.get_mut("Blocks") {
+            Some(NbtValue::Compound(blocks)) => blocks,
+            _ => return Vec::new(),
+        }
+    };
+    match container.remove("BlockEntities") {
+        Some(NbtValue::List(list)) => list,
+        Some(other) => {
+            container.insert("BlockEntities".to_string(), other);
+            Vec::new()
+        }
+        None => Vec::new(),
     }
+}
 
-    Ok(block_entities)
+fn block_entities_from_raw(list: Vec<NbtValue>) -> Vec<BlockEntity> {
+    list.into_iter()
+        .filter_map(|tag| match tag {
+            NbtValue::Compound(mut map) => {
+                // Sponge Schematic v3 wraps block-specific data in a "Data"
+                // compound. Flatten it so consumers (e.g. MCHPRS) can find
+                // fields like "Items" at the top level, matching the vanilla
+                // block entity NBT layout.
+                if let Some(data) = map.remove("Data") {
+                    if let NbtValue::Compound(data) = data {
+                        for (key, value) in data {
+                            map.insert(key, value);
+                        }
+                    }
+                }
+                Some(BlockEntity::from_nbt_map(map))
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 fn parse_entities(region_tag: &NbtCompound) -> Result<Vec<Entity>> {

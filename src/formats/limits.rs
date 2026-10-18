@@ -2,7 +2,7 @@
 
 use crate::formats::error::{FormatError, Result};
 use crate::nbt::io::{read_nbt_with_limits, NbtReadLimits};
-use crate::nbt::{Endian, NbtValue};
+use crate::nbt::{Endian, NbtMap, NbtValue};
 use crate::UniversalSchematic;
 use flate2::read::GzDecoder;
 use quartz_nbt::NbtCompound;
@@ -147,6 +147,12 @@ impl DecodeLimits {
 }
 
 pub(crate) fn parse_gzip_nbt(data: &[u8], limits: &DecodeLimits) -> Result<NbtCompound> {
+    Ok(parse_gzip_nbt_map(data, limits)?.into_quartz_nbt())
+}
+
+/// [`parse_gzip_nbt`] without the conversion to quartz, for readers that
+/// take parts of the raw tree by value.
+pub(crate) fn parse_gzip_nbt_map(data: &[u8], limits: &DecodeLimits) -> Result<NbtMap> {
     limits.check_input(data)?;
     let mut decoder = GzDecoder::new(data);
     let mut raw = Vec::new();
@@ -169,18 +175,14 @@ pub(crate) fn parse_gzip_nbt(data: &[u8], limits: &DecodeLimits) -> Result<NbtCo
             .map_err(|error| FormatError::Parse(error.to_string()))?;
         raw.extend_from_slice(&chunk[..read]);
     }
-    parse_raw_nbt(&raw, Endian::Big, limits)
+    parse_raw_nbt_map(&raw, Endian::Big, limits)
 }
 
-pub(crate) fn parse_raw_nbt(
-    data: &[u8],
-    endian: Endian,
-    limits: &DecodeLimits,
-) -> Result<NbtCompound> {
+fn parse_raw_nbt_map(data: &[u8], endian: Endian, limits: &DecodeLimits) -> Result<NbtMap> {
     limits.check_input(data)?;
     let root = read_nbt_with_limits(&mut Cursor::new(data), endian, limits.nbt())?;
     match root {
-        NbtValue::Compound(value) => Ok(value.to_quartz_nbt()),
+        NbtValue::Compound(value) => Ok(value),
         _ => Err(FormatError::Parse("root NBT is not a compound".into())),
     }
 }

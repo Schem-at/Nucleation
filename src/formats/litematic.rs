@@ -132,14 +132,7 @@ pub fn to_litematic_with_compression(
 
     // Compress and return the NBT data
     crate::nbt::canonicalize_compound(&mut root);
-    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), compression);
-    quartz_nbt::io::write_nbt(
-        &mut encoder,
-        None,
-        &root,
-        quartz_nbt::io::Flavor::Uncompressed,
-    )?;
-    Ok(encoder.finish()?)
+    super::gzip_nbt(&root, compression)
 }
 
 pub fn from_litematic(data: &[u8]) -> Result<UniversalSchematic> {
@@ -150,8 +143,13 @@ pub fn from_litematic_bounded(
     data: &[u8],
     limits: &crate::formats::limits::DecodeLimits,
 ) -> Result<UniversalSchematic> {
-    let root = crate::formats::limits::parse_gzip_nbt(data, limits)?;
-    preflight_litematic(&root, limits)?;
+    let mut raw = crate::formats::limits::parse_gzip_nbt_map(data, limits)?;
+    // Tile entities are most of the tree in container-heavy builds. Take them
+    // out of the raw tree and build them from its maps by value, instead of
+    // converting them to quartz and back.
+    let mut tile_entities = take_raw_tile_entities(&mut raw);
+    let root = raw.into_quartz_nbt();
+    preflight_litematic(&root, limits, &tile_entities)?;
 
     let mut schematic = UniversalSchematic::new("Unnamed".to_string());
 
@@ -159,15 +157,41 @@ pub fn from_litematic_bounded(
     parse_metadata(&root, &mut schematic)?;
 
     // Parse Regions
-    parse_regions(&root, &mut schematic)?;
+    parse_regions_with_tiles(&root, &mut schematic, &mut tile_entities)?;
 
     limits.validate_schematic(&schematic)?;
     Ok(schematic)
 }
 
+/// Remove every region's `TileEntities` list from a raw litematic tree,
+/// keyed by region name.
+fn take_raw_tile_entities(
+    root: &mut crate::nbt::NbtMap,
+) -> std::collections::HashMap<String, Vec<crate::nbt::NbtValue>> {
+    use crate::nbt::NbtValue;
+    let mut taken = std::collections::HashMap::new();
+    if let Some(NbtValue::Compound(regions)) = root.get_mut("Regions") {
+        for (name, region) in regions.iter_mut() {
+            if let NbtValue::Compound(region) = region {
+                match region.remove("TileEntities") {
+                    Some(NbtValue::List(list)) => {
+                        taken.insert(name.clone(), list);
+                    }
+                    Some(other) => {
+                        region.insert("TileEntities".to_string(), other);
+                    }
+                    None => {}
+                }
+            }
+        }
+    }
+    taken
+}
+
 fn preflight_litematic(
     root: &NbtCompound,
     limits: &crate::formats::limits::DecodeLimits,
+    raw_tile_entities: &std::collections::HashMap<String, Vec<crate::nbt::NbtValue>>,
 ) -> Result<()> {
     let regions = root.get::<_, &NbtCompound>("Regions")?;
     if regions.len() > limits.max_regions {
@@ -175,7 +199,7 @@ fn preflight_litematic(
     }
     let mut total_volume = 0usize;
     let mut total_entities = 0usize;
-    let mut total_block_entities = 0usize;
+    let mut total_block_entities = raw_tile_entities.values().map(Vec::len).sum::<usize>();
     for value in regions.inner().values() {
         let NbtTag::Compound(region) = value else {
             continue;
@@ -559,7 +583,18 @@ fn parse_metadata(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Res
     Ok(())
 }
 
+#[cfg(test)]
 fn parse_regions(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Result<()> {
+    parse_regions_with_tiles(root, schematic, &mut std::collections::HashMap::new())
+}
+
+/// Parse the regions; a region's tile entities come from `raw_tile_entities`
+/// when they were taken out of the raw tree, else from its `TileEntities`.
+fn parse_regions_with_tiles(
+    root: &NbtCompound,
+    schematic: &mut UniversalSchematic,
+    raw_tile_entities: &mut std::collections::HashMap<String, Vec<crate::nbt::NbtValue>>,
+) -> Result<()> {
     let regions = root.get::<_, &NbtCompound>("Regions")?;
     let mut loop_count = 0;
     for (name, region_tag) in regions.inner() {
@@ -646,17 +681,25 @@ fn parse_regions(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Resu
             }
 
             // Parse TileEntities - positions relative to the region min corner.
-            if let Ok(tile_entities_list) = region_nbt.get::<_, &NbtList>("TileEntities") {
+            let mut add_tile = |mut block_entity: BlockEntity| {
+                // Convert from relative to absolute position
+                block_entity.position.0 += min_corner.0;
+                block_entity.position.1 += min_corner.1;
+                block_entity.position.2 += min_corner.2;
+                region
+                    .block_entities
+                    .set(block_entity.position, block_entity);
+            };
+            if let Some(list) = raw_tile_entities.remove(name.as_str()) {
+                for tag in list {
+                    if let crate::nbt::NbtValue::Compound(map) = tag {
+                        add_tile(BlockEntity::from_nbt_map(map));
+                    }
+                }
+            } else if let Ok(tile_entities_list) = region_nbt.get::<_, &NbtList>("TileEntities") {
                 for tag in tile_entities_list.iter() {
                     if let NbtTag::Compound(compound) = tag {
-                        let mut block_entity = BlockEntity::from_nbt(compound);
-                        // Convert from relative to absolute position
-                        block_entity.position.0 += min_corner.0;
-                        block_entity.position.1 += min_corner.1;
-                        block_entity.position.2 += min_corner.2;
-                        region
-                            .block_entities
-                            .insert(block_entity.position, block_entity);
+                        add_tile(BlockEntity::from_nbt(compound));
                     }
                 }
             }

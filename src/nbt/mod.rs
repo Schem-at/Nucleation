@@ -102,6 +102,18 @@ impl NbtMap {
         compound
     }
 
+    /// Consuming [`Self::to_quartz_nbt`]: moves strings and arrays into the
+    /// quartz tree instead of cloning them.
+    pub fn into_quartz_nbt(self) -> NbtCompound {
+        let mut entries: Vec<(String, NbtValue)> = self.0.into_iter().collect();
+        entries.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        let mut compound = NbtCompound::new();
+        for (key, value) in entries {
+            compound.insert(key, value.into_quartz_nbt());
+        }
+        compound
+    }
+
     fn sorted_entries(&self) -> Vec<(&String, &NbtValue)> {
         let mut entries: Vec<_> = self.iter().collect();
         entries.sort_unstable_by(|a, b| a.0.cmp(b.0));
@@ -175,6 +187,28 @@ impl NbtValue {
             NbtValue::Compound(v) => NbtTag::Compound(v.to_quartz_nbt()),
             NbtValue::IntArray(v) => NbtTag::IntArray(v.clone()),
             NbtValue::LongArray(v) => NbtTag::LongArray(v.clone()),
+        }
+    }
+
+    /// Consuming [`Self::to_quartz_nbt`]: moves strings and arrays.
+    pub fn into_quartz_nbt(self) -> NbtTag {
+        match self {
+            NbtValue::Byte(v) => NbtTag::Byte(v),
+            NbtValue::Short(v) => NbtTag::Short(v),
+            NbtValue::Int(v) => NbtTag::Int(v),
+            NbtValue::Long(v) => NbtTag::Long(v),
+            NbtValue::Float(v) => NbtTag::Float(v),
+            NbtValue::Double(v) => NbtTag::Double(v),
+            NbtValue::ByteArray(v) => NbtTag::ByteArray(v),
+            NbtValue::String(v) => NbtTag::String(v),
+            NbtValue::List(v) => NbtTag::List(quartz_nbt::NbtList::from(
+                v.into_iter()
+                    .map(NbtValue::into_quartz_nbt)
+                    .collect::<Vec<_>>(),
+            )),
+            NbtValue::Compound(v) => NbtTag::Compound(v.into_quartz_nbt()),
+            NbtValue::IntArray(v) => NbtTag::IntArray(v),
+            NbtValue::LongArray(v) => NbtTag::LongArray(v),
         }
     }
 
@@ -403,6 +437,19 @@ pub mod io {
         String::from_utf8(buf).map_err(|e| Error::new(ErrorKind::InvalidData, e))
     }
 
+    /// Read `len` elements of `width` bytes in one `read_exact`.
+    fn read_array_bytes<R: Read>(r: &mut R, len: usize, width: usize) -> IoResult<Vec<u8>> {
+        let bytes = len
+            .checked_mul(width)
+            .ok_or_else(|| Error::new(ErrorKind::InvalidData, "NBT array size overflow"))?;
+        let mut buf = Vec::new();
+        buf.try_reserve_exact(bytes)
+            .map_err(|error| Error::other(error.to_string()))?;
+        buf.resize(bytes, 0);
+        r.read_exact(&mut buf)?;
+        Ok(buf)
+    }
+
     fn read_payload<R: Read>(
         r: &mut R,
         type_id: u8,
@@ -424,9 +471,10 @@ pub mod io {
                 let mut buf = Vec::new();
                 buf.try_reserve_exact(len)
                     .map_err(|error| Error::other(error.to_string()))?;
-                buf.resize(len, 0);
+                buf.resize(len, 0u8);
                 r.read_exact(&mut buf)?;
-                Ok(NbtValue::ByteArray(buf.iter().map(|&b| b as i8).collect()))
+                // Same size and alignment: this collect reuses the buffer.
+                Ok(NbtValue::ByteArray(buf.into_iter().map(|b| b as i8).collect()))
             }
             8 => Ok(NbtValue::String(read_string(r, endian, budget)?)),
             9 => {
@@ -458,24 +506,34 @@ pub mod io {
             11 => {
                 // IntArray
                 let len = budget.collection_len(read_i32(r, endian)?)?;
-                let mut buf = Vec::new();
-                buf.try_reserve_exact(len)
-                    .map_err(|error| Error::other(error.to_string()))?;
-                for _ in 0..len {
-                    buf.push(read_i32(r, endian)?);
-                }
-                Ok(NbtValue::IntArray(buf))
+                let raw = read_array_bytes(r, len, 4)?;
+                Ok(NbtValue::IntArray(
+                    raw.chunks_exact(4)
+                        .map(|c| {
+                            let b = [c[0], c[1], c[2], c[3]];
+                            match endian {
+                                Endian::Big => i32::from_be_bytes(b),
+                                Endian::Little => i32::from_le_bytes(b),
+                            }
+                        })
+                        .collect(),
+                ))
             }
             12 => {
                 // LongArray
                 let len = budget.collection_len(read_i32(r, endian)?)?;
-                let mut buf = Vec::new();
-                buf.try_reserve_exact(len)
-                    .map_err(|error| Error::other(error.to_string()))?;
-                for _ in 0..len {
-                    buf.push(read_i64(r, endian)?);
-                }
-                Ok(NbtValue::LongArray(buf))
+                let raw = read_array_bytes(r, len, 8)?;
+                Ok(NbtValue::LongArray(
+                    raw.chunks_exact(8)
+                        .map(|c| {
+                            let b = [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]];
+                            match endian {
+                                Endian::Big => i64::from_be_bytes(b),
+                                Endian::Little => i64::from_le_bytes(b),
+                            }
+                        })
+                        .collect(),
+                ))
             }
             _ => Err(Error::new(
                 ErrorKind::InvalidData,

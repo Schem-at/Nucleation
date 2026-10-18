@@ -92,7 +92,11 @@ impl BlockEntity {
     }
 
     pub fn from_nbt(nbt: &NbtCompound) -> Self {
-        let nbt_map = NbtMap::from_quartz_nbt(nbt);
+        Self::from_nbt_map(NbtMap::from_quartz_nbt(nbt))
+    }
+
+    /// [`Self::from_nbt`] for an already-converted map, taken by value.
+    pub fn from_nbt_map(nbt_map: NbtMap) -> Self {
         // The id key is `Id` in Sponge v3 / Nucleation's own litematic writer, but
         // vanilla and Litematica use lowercase `id` — accept both.
         let id = nbt_map
@@ -108,7 +112,10 @@ impl BlockEntity {
         let position = nbt_map
             .get("Pos")
             .and_then(|v| v.as_int_array())
-            .map(|v| (v[0], v[1], v[2]))
+            .and_then(|v| match v.as_slice() {
+                [x, y, z, ..] => Some((*x, *y, *z)),
+                _ => None,
+            })
             .or_else(|| {
                 match (
                     nbt_map.get("x").and_then(|v| v.as_i32()),
