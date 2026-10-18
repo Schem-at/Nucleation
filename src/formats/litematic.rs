@@ -322,8 +322,15 @@ fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
     let mut regions = NbtCompound::new();
 
     for (name, region) in &schematic.get_all_regions() {
-        // Use compact region to avoid huge empty space
-        let compact_region = region.to_compact();
+        // Use compact region to avoid huge empty space; borrow it when the
+        // allocation is already exactly the content.
+        let compact_storage;
+        let compact_region = if region.is_content_compact() {
+            *region
+        } else {
+            compact_storage = region.to_compact();
+            &compact_storage
+        };
 
         let mut region_nbt = NbtCompound::new();
 
@@ -465,13 +472,15 @@ fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
         let tile_entities = NbtList::from(
             compact_region
                 .block_entities
-                .values()
-                .map(|block_entity| {
+                .iter()
+                .map(|(position, block_entity)| {
                     let mut block_entity_nbt = block_entity.to_nbt();
 
-                    let rel_x = block_entity.position.0 - compact_region.position.0;
-                    let rel_y = block_entity.position.1 - compact_region.position.1;
-                    let rel_z = block_entity.position.2 - compact_region.position.2;
+                    // The storage key, not `block_entity.position`, which is
+                    // stale for templates shared across positions.
+                    let rel_x = position.0 - compact_region.position.0;
+                    let rel_y = position.1 - compact_region.position.1;
+                    let rel_z = position.2 - compact_region.position.2;
 
                     block_entity_nbt.insert("x", NbtTag::Int(rel_x));
                     block_entity_nbt.insert("y", NbtTag::Int(rel_y));
@@ -575,7 +584,12 @@ fn parse_regions(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Resu
                 size.get::<_, i32>("z")?,
             );
 
-            let mut region = Region::new(name.to_string(), position, size);
+            // Normalize the signed Litematica extent without allocating the
+            // volume: the unpacked block array replaces it below.
+            let bounds = crate::BoundingBox::try_from_position_and_size(position, size)?;
+            let mut region = Region::new(name.to_string(), bounds.min, (1, 1, 1));
+            region.size = bounds.get_dimensions();
+            region.rebuild_bbox();
 
             // Parse BlockStatePalette
             let palette = region_nbt.get::<_, &NbtList>("BlockStatePalette")?;
@@ -592,8 +606,7 @@ fn parse_regions(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Resu
 
             // Parse BlockStates
             let block_states = region_nbt.get::<_, &[i64]>("BlockStates")?;
-            // region.unpack_block_states(block_states);
-            region.blocks = region.unpack_block_states(block_states);
+            region.blocks = region.try_unpack_block_states(block_states)?;
 
             // Rebuild caches after directly setting palette and blocks
             region.rebuild_palette_index();
@@ -1304,8 +1317,9 @@ mod tests {
         ]);
         region.insert("BlockStatePalette", NbtTag::List(palette));
 
-        // 2x2x2 region with 2 stone blocks and 6 air blocks
-        region.insert("BlockStates", NbtTag::LongArray(vec![0b10000001]));
+        // 2x2x2 region with 2 stone blocks (cells 0 and 3, 2 bits each) and
+        // 6 air blocks
+        region.insert("BlockStates", NbtTag::LongArray(vec![0b01000001]));
 
         regions.insert("TestRegion", NbtTag::Compound(region));
         root.insert("Regions", NbtTag::Compound(regions));

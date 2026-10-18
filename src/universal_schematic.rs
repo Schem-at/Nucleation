@@ -1742,12 +1742,10 @@ impl UniversalSchematic {
         };
 
         // Process default region - skip air blocks for consistency with split_into_chunks_indices
-        for (index, &palette_index) in self.default_region.blocks.iter().enumerate() {
+        for ((x, y, z), palette_index) in self.default_region.content_cells() {
             if palette_index == 0 {
                 continue; // Skip air blocks
             }
-
-            let (x, y, z) = self.default_region.index_to_coords(index);
             let chunk_x = get_chunk_coord(x, chunk_width);
             let chunk_y = get_chunk_coord(y, chunk_height);
             let chunk_z = get_chunk_coord(z, chunk_length);
@@ -1761,12 +1759,10 @@ impl UniversalSchematic {
 
         // Process other regions - skip air blocks for consistency with split_into_chunks_indices
         for region in self.other_regions.values() {
-            for (index, &palette_index) in region.blocks.iter().enumerate() {
+            for ((x, y, z), palette_index) in region.content_cells() {
                 if palette_index == 0 {
                     continue; // Skip air blocks
                 }
-
-                let (x, y, z) = region.index_to_coords(index);
                 let chunk_x = get_chunk_coord(x, chunk_width);
                 let chunk_y = get_chunk_coord(y, chunk_height);
                 let chunk_z = get_chunk_coord(z, chunk_length);
@@ -1790,64 +1786,32 @@ impl UniversalSchematic {
             .collect()
     }
 
+    /// Every cell inside each region's content bounds, default region first.
+    ///
+    /// Cells outside a region's tight bounds are allocation padding and
+    /// always air, so they are not visited; air inside the bounds is still
+    /// yielded. Rows are walked as slices (x fastest, then z, then y), with
+    /// no per-cell coordinate division.
     pub fn iter_blocks(&self) -> impl Iterator<Item = (BlockPosition, &BlockState)> {
-        // Create an iterator that chains default region and other regions
-        let default_iter = self.default_region.blocks.iter().enumerate().filter_map(
-            move |(index, block_index)| {
-                let (x, y, z) = self.default_region.index_to_coords(index);
-                Some((
-                    BlockPosition { x, y, z },
-                    &self.default_region.palette[*block_index as usize],
-                ))
-            },
-        );
-
-        let other_iter = self.other_regions.values().flat_map(|region| {
-            region
-                .blocks
-                .iter()
-                .enumerate()
-                .filter_map(move |(index, block_index)| {
-                    let (x, y, z) = region.index_to_coords(index);
-                    Some((
-                        BlockPosition { x, y, z },
-                        &region.palette[*block_index as usize],
-                    ))
-                })
-        });
-
-        default_iter.chain(other_iter)
+        std::iter::once(&self.default_region)
+            .chain(self.other_regions.values())
+            .flat_map(|region| {
+                region
+                    .content_cells()
+                    .map(move |((x, y, z), index)| {
+                        (BlockPosition { x, y, z }, &region.palette[index as usize])
+                    })
+            })
     }
 
     pub fn iter_blocks_indices(&self) -> impl Iterator<Item = (BlockPosition, usize)> + '_ {
-        // Iterator for default region - returns palette indices directly
-        let default_iter = self.default_region.blocks.iter().enumerate().filter_map(
-            move |(index, &palette_index)| {
-                // Skip air blocks (usually index 0) to reduce data transfer
-                if palette_index == 0 {
-                    return None;
-                }
-                let (x, y, z) = self.default_region.index_to_coords(index);
-                Some((BlockPosition { x, y, z }, palette_index as usize))
-            },
-        );
-
-        // Iterator for other regions
-        let other_iter = self.other_regions.values().flat_map(|region| {
-            region
-                .blocks
-                .iter()
-                .enumerate()
-                .filter_map(move |(index, &palette_index)| {
-                    if palette_index == 0 {
-                        return None;
-                    }
-                    let (x, y, z) = region.index_to_coords(index);
-                    Some((BlockPosition { x, y, z }, palette_index as usize))
-                })
-        });
-
-        default_iter.chain(other_iter)
+        // Palette indices directly, skipping index 0 (air) to reduce data
+        // transfer.
+        std::iter::once(&self.default_region)
+            .chain(self.other_regions.values())
+            .flat_map(|region| region.content_cells())
+            .filter(|&(_, palette_index)| palette_index != 0)
+            .map(|((x, y, z), palette_index)| (BlockPosition { x, y, z }, palette_index as usize))
     }
 
     pub fn iter_chunks_indices(
@@ -1951,12 +1915,10 @@ impl UniversalSchematic {
         };
 
         // Process default region
-        for (index, &palette_index) in self.default_region.blocks.iter().enumerate() {
+        for ((x, y, z), palette_index) in self.default_region.content_cells() {
             if palette_index == 0 {
                 continue; // Skip air blocks
             }
-
-            let (x, y, z) = self.default_region.index_to_coords(index);
             let chunk_x = get_chunk_coord(x, chunk_width);
             let chunk_y = get_chunk_coord(y, chunk_height);
             let chunk_z = get_chunk_coord(z, chunk_length);
@@ -1970,12 +1932,10 @@ impl UniversalSchematic {
 
         // Process other regions
         for region in self.other_regions.values() {
-            for (index, &palette_index) in region.blocks.iter().enumerate() {
+            for ((x, y, z), palette_index) in region.content_cells() {
                 if palette_index == 0 {
                     continue; // Skip air blocks
                 }
-
-                let (x, y, z) = region.index_to_coords(index);
                 let chunk_x = get_chunk_coord(x, chunk_width);
                 let chunk_y = get_chunk_coord(y, chunk_height);
                 let chunk_z = get_chunk_coord(z, chunk_length);

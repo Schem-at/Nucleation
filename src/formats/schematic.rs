@@ -544,6 +544,12 @@ pub fn from_schematic_bounded(
     let block_palette = parse_block_palette(block_container)?;
 
     let block_data = parse_block_data(block_container, width, height, length)?;
+    if block_data
+        .iter()
+        .any(|&index| index as usize >= block_palette.len())
+    {
+        return Err("Block data references a missing palette entry".into());
+    }
 
     // Adopt the decoded indices directly. Constructing a full zero-filled
     // region and converting a second u32 vector used three volume-sized
@@ -706,8 +712,11 @@ fn parse_block_palette(region_tag: &NbtCompound) -> Result<Vec<BlockState>> {
 
     for (block_state_str, value) in palette_compound.inner() {
         if let NbtTag::Int(id) = value {
-            let block_state = parse_block_state(block_state_str);
-            palette[*id as usize] = block_state;
+            let slot = usize::try_from(*id)
+                .ok()
+                .and_then(|id| palette.get_mut(id))
+                .ok_or_else(|| format!("Palette id {id} is outside PaletteMax {palette_max}"))?;
+            *slot = parse_block_state(block_state_str);
         }
     }
 

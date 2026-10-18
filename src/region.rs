@@ -1189,28 +1189,64 @@ impl Region {
         region_nbt
     }
 
+    /// Unpack a Litematica `BlockStates` long array for this region's volume
+    /// and palette. Missing longs read as zero; use
+    /// [`Self::try_unpack_block_states`] for untrusted input.
     pub fn unpack_block_states(&self, packed_states: &[i64]) -> Vec<u32> {
         let bits_per_block = self.calculate_bits_per_block();
-        let mask: u64 = (1u64 << bits_per_block) - 1;
         let volume = self.volume();
+        let needed = (volume * bits_per_block).div_ceil(64);
+        if packed_states.len() >= needed {
+            return Self::unpack_exact(packed_states, bits_per_block, volume);
+        }
+        let mut padded = packed_states.to_vec();
+        padded.resize(needed, 0);
+        Self::unpack_exact(&padded, bits_per_block, volume)
+    }
 
-        let mut blocks = Vec::with_capacity(volume);
+    /// Like [`Self::unpack_block_states`], but rejects a long array too short
+    /// for the volume, or cells that reference a missing palette entry.
+    pub fn try_unpack_block_states(&self, packed_states: &[i64]) -> Result<Vec<u32>, String> {
+        let bits_per_block = self.calculate_bits_per_block();
+        let volume = self.volume();
+        let needed = volume
+            .checked_mul(bits_per_block)
+            .map(|bits| bits.div_ceil(64))
+            .ok_or("BlockStates volume overflow")?;
+        if packed_states.len() < needed {
+            return Err(format!(
+                "BlockStates has {} longs, {needed} needed for the region volume",
+                packed_states.len()
+            ));
+        }
+        let blocks = Self::unpack_exact(packed_states, bits_per_block, volume);
+        let palette_len = self.palette.len();
+        if blocks.iter().any(|&b| b as usize >= palette_len) {
+            return Err("BlockStates references a missing palette entry".to_string());
+        }
+        Ok(blocks)
+    }
+
+    /// Unpack `volume` cells; `packed_states` must hold at least
+    /// `ceil(volume * bits / 64)` longs.
+    fn unpack_exact(packed_states: &[i64], bits_per_block: usize, volume: usize) -> Vec<u32> {
+        let mask: u64 = (1u64 << bits_per_block) - 1;
+        let mut blocks = vec![0u32; volume];
 
         if 64 % bits_per_block == 0 {
-            // Fast path: entries never cross i64 boundaries (bits_per_block = 2, 4, 8, 16, 32)
-            let entries_per_long = 64 / bits_per_block;
-            let mut remaining = volume;
-            for &packed in packed_states {
-                let packed_u64 = packed as u64;
-                let count = remaining.min(entries_per_long);
-                for i in 0..count {
-                    blocks.push(((packed_u64 >> (i * bits_per_block)) & mask) as u32);
+            // Entries never cross i64 boundaries (bits_per_block = 2, 4, 8,
+            // 16, 32): a fixed number of cells per long, so the inner loop
+            // has a constant trip count.
+            let per_long = 64 / bits_per_block;
+            for (cells, &packed) in blocks.chunks_mut(per_long).zip(packed_states) {
+                let packed = packed as u64;
+                for (i, cell) in cells.iter_mut().enumerate() {
+                    *cell = ((packed >> (i * bits_per_block)) & mask) as u32;
                 }
-                remaining -= count;
             }
         } else {
-            // Slow path: entries may cross i64 boundaries
-            for index in 0..volume {
+            // Entries may cross i64 boundaries.
+            for (index, cell) in blocks.iter_mut().enumerate() {
                 let bit_index = index * bits_per_block;
                 let start_long_index = bit_index / 64;
                 let start_offset = bit_index % 64;
@@ -1218,14 +1254,12 @@ impl Region {
                 let value = if start_offset + bits_per_block <= 64 {
                     ((packed_states[start_long_index] as u64) >> start_offset) & mask
                 } else {
-                    let low_bits = ((packed_states[start_long_index] as u64) >> start_offset)
-                        & ((1u64 << (64 - start_offset)) - 1);
+                    let low_bits = (packed_states[start_long_index] as u64) >> start_offset;
                     let high_bits = (packed_states[start_long_index + 1] as u64)
                         & ((1u64 << (bits_per_block - (64 - start_offset))) - 1);
                     low_bits | (high_bits << (64 - start_offset))
                 };
-
-                blocks.push(value as u32);
+                *cell = value as u32;
             }
         }
 
@@ -1402,12 +1436,10 @@ impl Region {
         let wl = self.cached_width_x_length as usize;
         let (_, h, _) = self.bbox.get_dimensions();
         let h = h as usize;
-        let mut new_blocks = self.blocks.clone();
-
         for dy in 0..h {
             for dz in 0..l {
                 let start = dy * wl + dz * w;
-                new_blocks[start..start + w].reverse();
+                self.blocks[start..start + w].reverse();
             }
         }
 
@@ -1417,11 +1449,12 @@ impl Region {
             new_palette.push(transform_block_state_flip(block_state, Axis::X));
         }
 
-        self.blocks = new_blocks;
         self.palette = new_palette;
         self.rebuild_palette_index();
         self.rebuild_air_index();
-        self.rescan_content();
+        // A flip permutes cells: the air count is unchanged and the content
+        // bounds mirror within the allocation.
+        self.mirror_tight_bounds(0);
 
         // Transform block entities — pure position remap, no palette work.
         let max_x = self.bbox.max.0;
@@ -1436,6 +1469,46 @@ impl Region {
         }
     }
 
+    /// `(position, palette index)` for every cell inside the content (tight)
+    /// bounds, x fastest, then z, then y. Cells outside the tight bounds are
+    /// allocation padding and always air, so they are not visited; air inside
+    /// is. Rows are walked as slices, with no per-cell coordinate division.
+    pub fn content_cells(&self) -> impl Iterator<Item = ((i32, i32, i32), u32)> + '_ {
+        self.tight_bounds.clone().into_iter().flat_map(move |b| {
+            let (x0, x1) = (b.min.0, b.max.0);
+            let z_range = b.min.2..=b.max.2;
+            (b.min.1..=b.max.1).flat_map(move |y| {
+                z_range.clone().flat_map(move |z| {
+                    let start = self.coords_to_index(x0, y, z);
+                    self.blocks[start..start + (x1 - x0 + 1) as usize]
+                        .iter()
+                        .zip(x0..)
+                        .map(move |(&index, x)| ((x, y, z), index))
+                })
+            })
+        })
+    }
+
+    /// Mirror the cached tight bounds within the allocation along `axis`
+    /// (0 = x, 1 = y, 2 = z), as a flip does to the content.
+    fn mirror_tight_bounds(&mut self, axis: usize) {
+        let (lo, hi) = match axis {
+            0 => (self.bbox.min.0, self.bbox.max.0),
+            1 => (self.bbox.min.1, self.bbox.max.1),
+            _ => (self.bbox.min.2, self.bbox.max.2),
+        };
+        if let Some(bounds) = &mut self.tight_bounds {
+            let (min, max) = match axis {
+                0 => (&mut bounds.min.0, &mut bounds.max.0),
+                1 => (&mut bounds.min.1, &mut bounds.max.1),
+                _ => (&mut bounds.min.2, &mut bounds.max.2),
+            };
+            let (old_min, old_max) = (*min, *max);
+            *min = hi - (old_max - lo);
+            *max = hi - (old_min - lo);
+        }
+    }
+
     /// Flip the region along the Y axis
     pub fn flip_y(&mut self) {
         use crate::transforms::{transform_block_state_flip, Axis};
@@ -1444,18 +1517,12 @@ impl Region {
         let wl = self.cached_width_x_length as usize;
         let (_, h, _) = self.bbox.get_dimensions();
         let h = h as usize;
-        let mut new_blocks = self.blocks.clone();
-
         // Swap layer dy with layer (h-1-dy)
-        let ptr = new_blocks.as_mut_ptr();
         for dy in 0..h / 2 {
-            let mirror_dy = h - 1 - dy;
             let off_a = dy * wl;
-            let off_b = mirror_dy * wl;
-            // Safety: non-overlapping because dy < h/2 < mirror_dy
-            unsafe {
-                std::ptr::swap_nonoverlapping(ptr.add(off_a), ptr.add(off_b), wl);
-            }
+            let off_b = (h - 1 - dy) * wl;
+            let (low, high) = self.blocks.split_at_mut(off_b);
+            low[off_a..off_a + wl].swap_with_slice(&mut high[..wl]);
         }
 
         let mut new_palette = Vec::with_capacity(self.palette.len());
@@ -1463,11 +1530,12 @@ impl Region {
             new_palette.push(transform_block_state_flip(block_state, Axis::Y));
         }
 
-        self.blocks = new_blocks;
         self.palette = new_palette;
         self.rebuild_palette_index();
         self.rebuild_air_index();
-        self.rescan_content();
+        // A flip permutes cells: the air count is unchanged and the content
+        // bounds mirror within the allocation.
+        self.mirror_tight_bounds(1);
 
         let max_y = self.bbox.max.1;
         let min_y = self.bbox.min.1;
@@ -1490,18 +1558,13 @@ impl Region {
         let wl = self.cached_width_x_length as usize;
         let (_, h, _) = self.bbox.get_dimensions();
         let h = h as usize;
-        let mut new_blocks = self.blocks.clone();
-
-        let ptr = new_blocks.as_mut_ptr();
         for dy in 0..h {
             let layer_off = dy * wl;
             for dz in 0..l / 2 {
-                let mirror_dz = l - 1 - dz;
                 let off_a = layer_off + dz * w;
-                let off_b = layer_off + mirror_dz * w;
-                unsafe {
-                    std::ptr::swap_nonoverlapping(ptr.add(off_a), ptr.add(off_b), w);
-                }
+                let off_b = layer_off + (l - 1 - dz) * w;
+                let (low, high) = self.blocks.split_at_mut(off_b);
+                low[off_a..off_a + w].swap_with_slice(&mut high[..w]);
             }
         }
 
@@ -1510,11 +1573,12 @@ impl Region {
             new_palette.push(transform_block_state_flip(block_state, Axis::Z));
         }
 
-        self.blocks = new_blocks;
         self.palette = new_palette;
         self.rebuild_palette_index();
         self.rebuild_air_index();
-        self.rescan_content();
+        // A flip permutes cells: the air count is unchanged and the content
+        // bounds mirror within the allocation.
+        self.mirror_tight_bounds(2);
 
         let max_z = self.bbox.max.2;
         let min_z = self.bbox.min.2;
@@ -1612,26 +1676,32 @@ impl Region {
         let new_size = (old_size_z, size_y, old_size_x);
         let new_bbox = BoundingBox::try_from_position_and_size(position, new_size)?;
 
-        let new_volume = new_bbox.volume() as usize;
-        let air_index = self.cached_air_index;
-        let mut new_blocks = vec![air_index; new_volume];
-
-        // Transform each block position
-        for index in 0..self.blocks.len() {
-            let (x, y, z) = old_bbox.index_to_coords(index);
-
-            let rel_x = x - old_bbox.min.0;
-            let rel_z = z - old_bbox.min.2;
-
-            let new_rel_x = old_size_z - 1 - rel_z;
-            let new_rel_z = rel_x;
-
-            let new_x = new_bbox.min.0 + new_rel_x;
-            let new_z = new_bbox.min.2 + new_rel_z;
-
-            let new_index = new_bbox.coords_to_index(new_x, y, new_z);
-            new_blocks[new_index] = self.blocks[index];
+        // (dx, dy, dz) -> (sz-1-dz, dy, dx). Every cell is written, so the
+        // zeroed allocation's contents never survive.
+        let (w, h, l) = (old_size_x as usize, size_y as usize, old_size_z as usize);
+        let (new_w, new_l) = (l, w);
+        let mut new_blocks = try_zeroed_blocks(w * h * l)?;
+        let mut src = 0;
+        for dy in 0..h {
+            let layer = dy * new_w * new_l;
+            for dz in 0..l {
+                let column = layer + (l - 1 - dz);
+                for (dx, &block) in self.blocks[src..src + w].iter().enumerate() {
+                    new_blocks[column + dx * new_w] = block;
+                }
+                src += w;
+            }
         }
+        let new_tight = self.tight_bounds.as_ref().map(|b| {
+            let map = |x: i32, z: i32| {
+                (
+                    new_bbox.min.0 + (old_size_z - 1 - (z - old_bbox.min.2)),
+                    new_bbox.min.2 + (x - old_bbox.min.0),
+                )
+            };
+            let ((ax, az), (bx, bz)) = (map(b.min.0, b.min.2), map(b.max.0, b.max.2));
+            BoundingBox::new((ax.min(bx), b.min.1, az.min(bz)), (ax.max(bx), b.max.1, az.max(bz)))
+        });
 
         let mut new_palette = Vec::with_capacity(self.palette.len());
         for block_state in &self.palette {
@@ -1647,7 +1717,8 @@ impl Region {
         self.rebuild_bbox();
         self.rebuild_palette_index();
         self.rebuild_air_index();
-        self.rescan_content();
+        // A rotation permutes cells: the air count is unchanged.
+        self.tight_bounds = new_tight;
 
         // Transform block entities — pure position remap.
         let old_min_x = old_bbox.min.0;
@@ -1702,25 +1773,28 @@ impl Region {
         let new_size = (size_x, old_size_z, old_size_y);
         let new_bbox = BoundingBox::try_from_position_and_size(position, new_size)?;
 
-        let new_volume = new_bbox.volume() as usize;
-        let air_index = self.cached_air_index;
-        let mut new_blocks = vec![air_index; new_volume];
-
-        for index in 0..self.blocks.len() {
-            let (x, y, z) = old_bbox.index_to_coords(index);
-
-            let rel_y = y - old_bbox.min.1;
-            let rel_z = z - old_bbox.min.2;
-
-            let new_rel_y = old_size_z - 1 - rel_z;
-            let new_rel_z = rel_y;
-
-            let new_y = new_bbox.min.1 + new_rel_y;
-            let new_z = new_bbox.min.2 + new_rel_z;
-
-            let new_index = new_bbox.coords_to_index(x, new_y, new_z);
-            new_blocks[new_index] = self.blocks[index];
+        // (dx, dy, dz) -> (dx, sz-1-dz, dy): x-rows stay contiguous.
+        let (w, h, l) = (size_x as usize, old_size_y as usize, old_size_z as usize);
+        let new_l = h;
+        let mut new_blocks = try_zeroed_blocks(w * h * l)?;
+        let mut src = 0;
+        for dy in 0..h {
+            for dz in 0..l {
+                let dst = dy * w + (l - 1 - dz) * w * new_l;
+                new_blocks[dst..dst + w].copy_from_slice(&self.blocks[src..src + w]);
+                src += w;
+            }
         }
+        let new_tight = self.tight_bounds.as_ref().map(|b| {
+            let map = |y: i32, z: i32| {
+                (
+                    new_bbox.min.1 + (old_size_z - 1 - (z - old_bbox.min.2)),
+                    new_bbox.min.2 + (y - old_bbox.min.1),
+                )
+            };
+            let ((ay, az), (by, bz)) = (map(b.min.1, b.min.2), map(b.max.1, b.max.2));
+            BoundingBox::new((b.min.0, ay.min(by), az.min(bz)), (b.max.0, ay.max(by), az.max(bz)))
+        });
 
         let mut new_palette = Vec::with_capacity(self.palette.len());
         for block_state in &self.palette {
@@ -1736,7 +1810,8 @@ impl Region {
         self.rebuild_bbox();
         self.rebuild_palette_index();
         self.rebuild_air_index();
-        self.rescan_content();
+        // A rotation permutes cells: the air count is unchanged.
+        self.tight_bounds = new_tight;
 
         let old_min_y = old_bbox.min.1;
         let old_min_z = old_bbox.min.2;
@@ -1789,25 +1864,30 @@ impl Region {
         let new_size = (old_size_y, old_size_x, size_z);
         let new_bbox = BoundingBox::try_from_position_and_size(position, new_size)?;
 
-        let new_volume = new_bbox.volume() as usize;
-        let air_index = self.cached_air_index;
-        let mut new_blocks = vec![air_index; new_volume];
-
-        for index in 0..self.blocks.len() {
-            let (x, y, z) = old_bbox.index_to_coords(index);
-
-            let rel_x = x - old_bbox.min.0;
-            let rel_y = y - old_bbox.min.1;
-
-            let new_rel_x = old_size_y - 1 - rel_y;
-            let new_rel_y = rel_x;
-
-            let new_x = new_bbox.min.0 + new_rel_x;
-            let new_y = new_bbox.min.1 + new_rel_y;
-
-            let new_index = new_bbox.coords_to_index(new_x, new_y, z);
-            new_blocks[new_index] = self.blocks[index];
+        // (dx, dy, dz) -> (sy-1-dy, dx, dz).
+        let (w, h, l) = (old_size_x as usize, old_size_y as usize, size_z as usize);
+        let (new_w, new_l) = (h, l);
+        let mut new_blocks = try_zeroed_blocks(w * h * l)?;
+        let mut src = 0;
+        for dy in 0..h {
+            for dz in 0..l {
+                let base = (h - 1 - dy) + dz * new_w;
+                for (dx, &block) in self.blocks[src..src + w].iter().enumerate() {
+                    new_blocks[base + dx * new_w * new_l] = block;
+                }
+                src += w;
+            }
         }
+        let new_tight = self.tight_bounds.as_ref().map(|b| {
+            let map = |x: i32, y: i32| {
+                (
+                    new_bbox.min.0 + (old_size_y - 1 - (y - old_bbox.min.1)),
+                    new_bbox.min.1 + (x - old_bbox.min.0),
+                )
+            };
+            let ((ax, ay), (bx, by)) = (map(b.min.0, b.min.1), map(b.max.0, b.max.1));
+            BoundingBox::new((ax.min(bx), ay.min(by), b.min.2), (ax.max(bx), ay.max(by), b.max.2))
+        });
 
         let mut new_palette = Vec::with_capacity(self.palette.len());
         for block_state in &self.palette {
@@ -1823,7 +1903,8 @@ impl Region {
         self.rebuild_bbox();
         self.rebuild_palette_index();
         self.rebuild_air_index();
-        self.rescan_content();
+        // A rotation permutes cells: the air count is unchanged.
+        self.tight_bounds = new_tight;
 
         let old_min_x = old_bbox.min.0;
         let old_min_y = old_bbox.min.1;
@@ -2252,6 +2333,67 @@ mod tests {
             let unpacked = region.unpack_block_states(&packed);
             let values: Vec<u32> = values.iter().map(|&v| v as u32).collect();
             assert_eq!(unpacked, values, "unpack mismatch at bits={}", bits);
+        }
+    }
+
+    /// Flips and rotations update the air count and tight bounds
+    /// analytically instead of rescanning; they must agree with a rescan, and
+    /// four quarter turns (or two flips) must restore the cells.
+    #[test]
+    fn transforms_keep_cached_content_consistent() {
+        let mut seed = 0x2545_f491_4f6c_dd1du64;
+        let mut next = |n: u64| {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed % n) as i32
+        };
+        let states = [
+            BlockState::new("minecraft:stone".to_string()),
+            BlockState::new("minecraft:glass".to_string()),
+        ];
+        for _ in 0..200 {
+            let origin = (next(9) - 4, next(9) - 4, next(9) - 4);
+            let size = (next(7) + 1, next(7) + 1, next(7) + 1);
+            let mut region = Region::new("T".to_string(), origin, size);
+            for _ in 0..next(12) {
+                let p = (
+                    origin.0 + next(size.0 as u64),
+                    origin.1 + next(size.1 as u64),
+                    origin.2 + next(size.2 as u64),
+                );
+                region.set_block(p.0, p.1, p.2, &states[next(2) as usize]);
+            }
+            let before: Vec<u32> = region.blocks.clone();
+            let check = |r: &Region| {
+                let mut fresh = r.clone();
+                fresh.rescan_content();
+                assert_eq!(r.non_air_count, fresh.non_air_count);
+                assert_eq!(r.tight_bounds, fresh.tight_bounds);
+            };
+            for flip in 0..3 {
+                for _ in 0..2 {
+                    match flip {
+                        0 => region.flip_x(),
+                        1 => region.flip_y(),
+                        _ => region.flip_z(),
+                    }
+                    check(&region);
+                }
+                assert_eq!(region.blocks, before);
+            }
+            for axis in 0..3 {
+                for _ in 0..4 {
+                    let at = region.position;
+                    match axis {
+                        0 => region.rotate_x_90_at(at).unwrap(),
+                        1 => region.rotate_y_90_at(at).unwrap(),
+                        _ => region.rotate_z_90_at(at).unwrap(),
+                    }
+                    check(&region);
+                }
+                assert_eq!(region.blocks, before);
+            }
         }
     }
 
