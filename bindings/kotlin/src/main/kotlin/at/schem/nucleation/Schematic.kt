@@ -1636,7 +1636,7 @@ class Schematic internal constructor (
     *intermediate Rust allocation. JS bindings copy the borrowed slice before
     *returning, so callers may mutate the schematic or grow WASM memory safely.
     */
-    fun regionBlockIndices(regionName: String, start: UInt, count: UInt): Result<ULongArray> {
+    fun regionBlockIndices(regionName: String, start: UInt, count: UInt): Result<UIntArray> {
         // This lifetime edge depends on lifetimes: 'a
         val aEdges: MutableList<Any> = mutableListOf(this);
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
@@ -1645,7 +1645,7 @@ class Schematic internal constructor (
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                    return PrimitiveArrayTools.getULongArray(nativeOkVal).ok()
+                    return PrimitiveArrayTools.getUIntArray(nativeOkVal).ok()
             } else {
                 return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
             }

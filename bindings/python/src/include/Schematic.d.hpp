@@ -635,7 +635,7 @@ public:
    * intermediate Rust allocation. JS bindings copy the borrowed slice before
    * returning, so callers may mutate the schematic or grow WASM memory safely.
    */
-  inline nucleation::diplomat::result<nucleation::diplomat::result<nucleation::diplomat::span<const size_t>, nucleation::NucleationError>, nucleation::diplomat::Utf8Error> region_block_indices(std::string_view region_name, uint32_t start, uint32_t count) const;
+  inline nucleation::diplomat::result<nucleation::diplomat::result<nucleation::diplomat::span<const uint32_t>, nucleation::NucleationError>, nucleation::diplomat::Utf8Error> region_block_indices(std::string_view region_name, uint32_t start, uint32_t count) const;
 
   /**
    * Split the schematic into chunks (default bottom-up strategy). Writes a

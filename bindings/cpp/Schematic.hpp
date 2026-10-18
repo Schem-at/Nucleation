@@ -237,7 +237,7 @@ namespace capi {
 
     void Schematic_render_regions_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
 
-    typedef struct Schematic_region_block_indices_result {union {diplomat::capi::DiplomatUsizeView ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_region_block_indices_result;
+    typedef struct Schematic_region_block_indices_result {union {diplomat::capi::DiplomatU32View ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_region_block_indices_result;
     Schematic_region_block_indices_result Schematic_region_block_indices(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView region_name, uint32_t start, uint32_t count);
 
     void Schematic_get_chunks_json(const diplomat::capi::Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, diplomat::capi::DiplomatWrite* write);
@@ -1351,7 +1351,7 @@ inline void Schematic::render_regions_json_write(W& writeable) const {
         &write);
 }
 
-inline diplomat::result<diplomat::result<diplomat::span<const size_t>, NucleationError>, diplomat::Utf8Error> Schematic::region_block_indices(std::string_view region_name, uint32_t start, uint32_t count) const {
+inline diplomat::result<diplomat::result<diplomat::span<const uint32_t>, NucleationError>, diplomat::Utf8Error> Schematic::region_block_indices(std::string_view region_name, uint32_t start, uint32_t count) const {
     if (!diplomat::capi::diplomat_is_str(region_name.data(), region_name.size())) {
     return diplomat::Err<diplomat::Utf8Error>();
   }
@@ -1359,7 +1359,7 @@ inline diplomat::result<diplomat::result<diplomat::span<const size_t>, Nucleatio
         {region_name.data(), region_name.size()},
         start,
         count);
-    return diplomat::Ok<diplomat::result<diplomat::span<const size_t>, NucleationError>>(result.is_ok ? diplomat::result<diplomat::span<const size_t>, NucleationError>(diplomat::Ok<diplomat::span<const size_t>>(diplomat::span<const size_t>(result.ok.data, result.ok.len))) : diplomat::result<diplomat::span<const size_t>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err))));
+    return diplomat::Ok<diplomat::result<diplomat::span<const uint32_t>, NucleationError>>(result.is_ok ? diplomat::result<diplomat::span<const uint32_t>, NucleationError>(diplomat::Ok<diplomat::span<const uint32_t>>(diplomat::span<const uint32_t>(result.ok.data, result.ok.len))) : diplomat::result<diplomat::span<const uint32_t>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err))));
 }
 
 inline std::string Schematic::get_chunks_json(int32_t chunk_width, int32_t chunk_height, int32_t chunk_length) const {
