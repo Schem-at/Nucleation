@@ -837,12 +837,14 @@ impl Region {
                     if row_start >= old_len {
                         break 'rows;
                     }
-                    let row = &mut self.blocks[row_start..][..new_w];
+                    // Clip to the old length: cells past it are already air.
+                    let row = &mut self.blocks[row_start..][..new_w.min(old_len - row_start)];
                     let holds_old_row =
                         (y_off..y_off + old_h).contains(&dy) && (z_off..z_off + old_l).contains(&dz);
                     if holds_old_row {
-                        row[..x_off].fill(air_id);
-                        row[x_off + old_w..].fill(air_id);
+                        let end = row.len();
+                        row[..x_off.min(end)].fill(air_id);
+                        row[(x_off + old_w).min(end)..].fill(air_id);
                     } else {
                         row.fill(air_id);
                     }
