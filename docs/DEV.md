@@ -6,7 +6,7 @@ measured, not guessed, and they were mostly not "the compiler is slow".
 ## TL;DR
 
 ```bash
-brew install sccache            # prerequisite: .cargo/config.toml wires it as rustc-wrapper
+brew install sccache            # recommended: tools/rustc-wrapper.sh uses it when installed
 tools/dev.sh fast               # the loop — seconds
 tools/dev.sh fast mc-tick       # ...plus tests for just the crate you touched
 tools/dev.sh pre-land           # before handing work over — minutes
@@ -125,7 +125,8 @@ so it shares artifacts with your loop instead of doubling them.
 
 ### 3. No compiler cache across feature sets
 
-`sccache` (wired as `build.rustc-wrapper` in `.cargo/config.toml`) caches
+`sccache` (used by `tools/rustc-wrapper.sh`, the `build.rustc-wrapper` in
+`.cargo/config.toml`, whenever it is installed; plain rustc otherwise) caches
 dependency compilations keyed by the exact rustc invocation. Switching feature
 sets, or recovering from a `cargo clean`, now pulls the 159 dependencies out of
 the cache instead of rebuilding them. Workspace crates compile *incrementally*

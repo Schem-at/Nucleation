@@ -69,7 +69,7 @@ fi
 head_ "Compiler cache"
 if command -v sccache >/dev/null 2>&1; then
   # `cargo config get` is nightly-only, so read the committed config directly.
-  if grep -qE '^\s*rustc-wrapper\s*=\s*"[^"]*sccache"' .cargo/config.toml 2>/dev/null \
+  if grep -qE '^\s*rustc-wrapper\s*=\s*"[^"]*(sccache|rustc-wrapper\.sh)"' .cargo/config.toml 2>/dev/null \
      || [[ -n "${RUSTC_WRAPPER:-}" ]]; then
     ok "sccache active ($(sccache --version))"
     if ((!QUIET)); then
@@ -80,7 +80,7 @@ if command -v sccache >/dev/null 2>&1; then
     warn "sccache installed but NOT wired up — expected build.rustc-wrapper in .cargo/config.toml"
   fi
 else
-  warn "sccache missing — install: brew install sccache (caches the 159 dependency builds across feature sets)"
+  warn "sccache missing — building with plain rustc; install: brew install sccache (caches the 159 dependency builds across feature sets)"
 fi
 
 # ----------------------------------------------------------------- linker

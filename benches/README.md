@@ -39,11 +39,14 @@ from different machines or power modes as if they were a regression series.
 cargo bench --bench block_placement
 cargo bench --bench block_placement -- realistic_sparse_placement
 cargo bench --bench block_placement -- content_shorthands
+cargo bench --bench block_placement -- chest_batch_phases
 ```
 
 These Criterion benchmarks remove the Python boundary and isolate palette,
 region, block-state parsing, block-entity, fill, transformation, copy, and
-export costs.
+export costs. `chest_batch_phases` compares the batch API
+(`UniversalSchematic::set_blocks_from_string`) with the per-call loop in
+`set_block_chest_nbt`.
 
 ## Mesh voxelization
 
@@ -57,6 +60,29 @@ voxels, plus the textured `BoxTextured.glb` cube at the same sizes. Size 128
 is behind `NUCLEATION_BENCH_LARGE=1`. Every case rebuilds the mask and the
 surface field per iteration (`MeshShape::clone_uncached`), so the numbers are
 cold fill times, not cache hit times.
+
+## Baselines and regression checks
+
+Criterion compares against a named baseline recorded on the same machine:
+
+```bash
+git switch main && tools/bench.sh save main
+git switch my-branch && tools/bench.sh compare main
+tools/bench.sh compare main block_placement region_bench   # a subset
+```
+
+`tools/bench.sh` runs every root bench with the features they need
+(`voxelize`, `scripting`) and passes `--save-baseline` / `--baseline` through.
+Criterion then reports each case as improved, regressed or unchanged with a
+confidence interval. Results are only comparable for the same machine, power
+mode and toolchain; never compare numbers across machines as a regression
+series.
+
+`block_placement` runs 60 samples in an 8 s window, so every case gets a
+stable estimate without Criterion extending the window. Cases that would only
+read a cached value (`Region::count_blocks`, `is_empty`) are deliberately not
+benchmarked; `region_bench/rescan_content` times the scan that maintains
+those caches instead.
 
 ## Redstone tick engine
 

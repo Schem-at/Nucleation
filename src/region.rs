@@ -2139,6 +2139,54 @@ impl Region {
         }
     }
 
+    /// Write one palette index at many positions, all inside the allocation.
+    ///
+    /// The air count and tight bounds are maintained in bulk: clearing cells
+    /// rescans at most once (only if a cleared cell was on the old edge),
+    /// instead of once per edge cell as repeated single writes would.
+    pub(crate) fn fill_positions(&mut self, palette_index: usize, positions: &[(i32, i32, i32)]) {
+        let palette_index = palette_index as u32;
+        let air = self.cached_air_index;
+        let new_is_air = palette_index == air;
+        let old_bounds = self.tight_bounds.clone();
+        let mut air_delta: i64 = 0;
+        let mut cleared_edge = false;
+        let mut added: Option<BoundingBox> = None;
+        for &(x, y, z) in positions {
+            let index = self.coords_to_index(x, y, z);
+            let old = std::mem::replace(&mut self.blocks[index], palette_index);
+            if new_is_air {
+                if old != air {
+                    air_delta -= 1;
+                    cleared_edge |= old_bounds.as_ref().is_some_and(|b| {
+                        x == b.min.0 || x == b.max.0 || y == b.min.1 || y == b.max.1 || z == b.min.2
+                            || z == b.max.2
+                    });
+                }
+            } else {
+                if old == air {
+                    air_delta += 1;
+                }
+                added = Some(match added {
+                    Some(b) => BoundingBox::new(
+                        (b.min.0.min(x), b.min.1.min(y), b.min.2.min(z)),
+                        (b.max.0.max(x), b.max.1.max(y), b.max.2.max(z)),
+                    ),
+                    None => BoundingBox::new((x, y, z), (x, y, z)),
+                });
+            }
+        }
+        self.non_air_count = (self.non_air_count as i64 + air_delta) as usize;
+        if cleared_edge {
+            self.rescan_content();
+        } else if let Some(added) = added {
+            self.tight_bounds = Some(match self.tight_bounds.take() {
+                Some(bounds) => bounds.union(&added),
+                None => added,
+            });
+        }
+    }
+
     /// Direct array write with air-count and tight-bounds bookkeeping.
     /// Caller must ensure (x, y, z) is within region bounds.
     #[inline(always)]

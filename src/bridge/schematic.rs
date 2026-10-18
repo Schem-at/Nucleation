@@ -614,31 +614,16 @@ pub mod ffi {
                 return Ok(0);
             }
             let count_i32 = i32::try_from(count).map_err(|_| NucleationError::InvalidArgument)?;
-            let s = &mut self.0;
-
-            let (mut min_x, mut min_y, mut min_z) = (positions[0], positions[1], positions[2]);
-            let (mut max_x, mut max_y, mut max_z) = (min_x, min_y, min_z);
-            for i in 1..count {
-                let (x, y, z) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
-                min_x = min_x.min(x);
-                min_y = min_y.min(y);
-                min_z = min_z.min(z);
-                max_x = max_x.max(x);
-                max_y = max_y.max(y);
-                max_z = max_z.max(z);
-            }
-
-            // Validate before mutating any position. The shared setter caches the
-            // parsed result after the first placement, while keeping replacement,
-            // jukebox-state, and block-entity behavior identical to set_block.
-            crate::UniversalSchematic::parse_block_string(block_name_str)
+            let positions: Vec<(i32, i32, i32)> = positions
+                .chunks_exact(3)
+                .map(|p| (p[0], p[1], p[2]))
+                .collect();
+            // Parses (and so validates) before mutating any position; keeps
+            // replacement, jukebox-state and block-entity behavior identical
+            // to per-position set_block.
+            self.0
+                .set_blocks_from_string(&positions, block_name_str)
                 .map_err(|_| NucleationError::InvalidArgument)?;
-            s.default_region
-                .ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
-            for position in positions.chunks_exact(3) {
-                s.set_block_from_string(position[0], position[1], position[2], block_name_str)
-                    .map_err(|_| NucleationError::InvalidArgument)?;
-            }
             Ok(count_i32)
         }
 

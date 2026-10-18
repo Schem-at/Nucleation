@@ -89,12 +89,19 @@ fn bench_coords_to_index(c: &mut Criterion) {
     let mut group = c.benchmark_group("coords_to_index");
     group.measurement_time(Duration::from_secs(2));
 
+    // Every cell of a black-boxed region: constant coordinates let the
+    // compiler hoist the whole computation out of the loop.
     let region = make_region_solid(32);
-    group.bench_function("32_1M", |b| {
+    group.bench_function("32_all_cells", |b| {
         b.iter(|| {
+            let region = black_box(&region);
             let mut sum = 0usize;
-            for _ in 0..1_000_000 {
-                sum += region.coords_to_index(16, 16, 16);
+            for y in 0..32 {
+                for z in 0..32 {
+                    for x in 0..32 {
+                        sum = sum.wrapping_add(region.coords_to_index(x, y, z));
+                    }
+                }
             }
             black_box(sum);
         });
@@ -230,30 +237,26 @@ fn bench_merge(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_count_blocks(c: &mut Criterion) {
-    let mut group = c.benchmark_group("count_blocks");
-    group.measurement_time(Duration::from_secs(2));
+// `count_blocks` and `is_empty` read cached counters (O(1)); timing them
+// measures nothing. The work behind those counters is the content rescan
+// after bulk edits and loads, so time that instead.
+fn bench_rescan(c: &mut Criterion) {
+    let mut group = c.benchmark_group("rescan_content");
+    group.measurement_time(Duration::from_secs(3));
 
-    let solid = make_region_solid(32);
-    group.bench_function("32_solid", |b| {
-        b.iter(|| black_box(solid.count_blocks()));
-    });
-    group.finish();
-}
-
-fn bench_is_empty(c: &mut Criterion) {
-    let mut group = c.benchmark_group("is_empty");
-    group.measurement_time(Duration::from_secs(2));
-
-    let empty = Region::new("bench".to_string(), (0, 0, 0), (32, 32, 32));
-    group.bench_function("32_empty", |b| {
-        b.iter(|| black_box(empty.is_empty()));
-    });
-
-    let non_empty = make_region_solid(32);
-    group.bench_function("32_non_empty", |b| {
-        b.iter(|| black_box(non_empty.is_empty()));
-    });
+    for (name, pct) in [("64_sparse10", 0.1), ("64_solid", 1.0)] {
+        let region = make_region_sparse(64, pct);
+        group.bench_function(name, |b| {
+            b.iter_batched(
+                || region.clone(),
+                |mut r| {
+                    r.rebuild_tight_bounds();
+                    black_box(r);
+                },
+                criterion::BatchSize::LargeInput,
+            );
+        });
+    }
     group.finish();
 }
 
@@ -267,7 +270,6 @@ criterion_group!(
     bench_to_compact,
     bench_expand_to_fit,
     bench_merge,
-    bench_count_blocks,
-    bench_is_empty,
+    bench_rescan,
 );
 criterion_main!(benches);

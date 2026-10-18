@@ -2186,6 +2186,64 @@ impl UniversalSchematic {
         Ok(&cache[block_string])
     }
 
+    /// Place one block string at many positions. Equivalent to calling
+    /// [`Self::set_block_from_string`] for each position in order, but the
+    /// string is parsed once, the bounds grow once, the palette is looked up
+    /// once, and an NBT-carrying string shares one parsed NBT payload across
+    /// every position. Returns the number of positions written.
+    pub fn set_blocks_from_string(
+        &mut self,
+        positions: &[(i32, i32, i32)],
+        block_string: &str,
+    ) -> Result<usize, String> {
+        let Some(&first) = positions.first() else {
+            return Ok(0);
+        };
+        // Simulated placement settles each block before the next.
+        if Self::strip_simulate_tag(block_string)?.is_some() {
+            for &(x, y, z) in positions {
+                self.set_block_from_string(x, y, z, block_string)?;
+            }
+            return Ok(positions.len());
+        }
+        let (state, nbt) = Self::cached_block_string(&mut self.block_string_cache, block_string)?;
+        let (state, nbt) = (state.clone(), nbt.clone());
+
+        let (mut min, mut max) = (first, first);
+        for &(x, y, z) in &positions[1..] {
+            min = (min.0.min(x), min.1.min(y), min.2.min(z));
+            max = (max.0.max(x), max.1.max(y), max.2.max(z));
+        }
+        self.ensure_bounds(min, max);
+        let region = &mut self.default_region;
+        let palette_index = region.get_or_insert_palette_by_state(&state);
+        region.fill_positions(palette_index, positions);
+        match nbt {
+            // One entity per position (so `position` is always right), all
+            // sharing the parsed NBT.
+            Some(nbt) => {
+                region.block_entities.reserve(positions.len());
+                for &position in positions {
+                    region.block_entities.set(
+                        position,
+                        BlockEntity {
+                            id: state.name.to_string(),
+                            position,
+                            nbt: std::sync::Arc::clone(&nbt),
+                        },
+                    );
+                }
+            }
+            None if !region.block_entities.is_empty() => {
+                for position in positions {
+                    region.block_entities.discard(position);
+                }
+            }
+            None => {}
+        }
+        Ok(positions.len())
+    }
+
     /// Write a parsed block string into `region`. Replacement is
     /// transactional with respect to block-entity state: a block string
     /// without NBT must not retain the previous entity. The NbtMap stays
@@ -3565,11 +3623,11 @@ mod tests {
     }
 
     #[test]
-    fn copy_region_fast_path_matches_slow_path() {
-        // The single-region source takes the palette-mapped fast path; adding
-        // a dummy other-region forces the per-block slow path. Both must
-        // produce identical targets, including exclusions, air overwrites,
-        // and cells outside the source region staying untouched.
+    fn copy_region_single_and_multi_region_sources_agree() {
+        // A source with an extra, far-away named region adds a second
+        // stamping layer. Both sources must produce identical targets,
+        // including exclusions, air overwrites, and cells outside the source
+        // region staying untouched.
         let build_source = |extra_region: bool| {
             let mut src = UniversalSchematic::new("src".to_string());
             src.set_block_str(0, 0, 0, "minecraft:stone");
@@ -4030,15 +4088,70 @@ mod tests {
             assert_eq!(got.count_non_air_blocks(), want.count_non_air_blocks(), "case {case}");
             assert_eq!(got.get_tight_bounds(), want.get_tight_bounds(), "case {case}");
             let entities = |r: &Region| {
-                let mut v: Vec<_> = r
-                    .block_entities
+                r.block_entities
                     .iter()
-                    .map(|(p, be)| (p, be.id.clone(), format!("{:?}", be.nbt)))
-                    .collect();
-                v.sort();
-                v
+                    .map(|(p, be)| (p, (be.id.clone(), (*be.nbt).clone())))
+                    .collect::<std::collections::BTreeMap<_, _>>()
             };
-            assert_eq!(entities(got), entities(want), "case {case}");
+            assert!(entities(got) == entities(want), "case {case}");
+        }
+    }
+
+    #[test]
+    fn set_blocks_from_string_matches_per_position_calls() {
+        let mut seed = 0x51_7cc1_b727_220au64;
+        let mut next = |n: u64| {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            ((seed >> 33) % n) as i32
+        };
+        let strings = [
+            "minecraft:air",
+            "minecraft:stone",
+            "minecraft:repeater[delay=3,facing=north]",
+            "minecraft:chest[facing=west]{Items:[{Slot:0b,id:\"minecraft:diamond\",Count:1b}]}",
+            "minecraft:jukebox{RecordItem:{id:\"minecraft:music_disc_cat\",Count:1b}}",
+        ];
+        for case in 0..200 {
+            let mut base = UniversalSchematic::new("b".into());
+            for _ in 0..next(30) {
+                let s = strings[next(strings.len() as u64) as usize];
+                base.set_block_from_string(next(10), next(10), next(10), s).unwrap();
+            }
+            let positions: Vec<(i32, i32, i32)> = (0..next(40))
+                .map(|_| (next(14) - 2, next(14) - 2, next(14) - 2))
+                .collect();
+            let s = strings[next(strings.len() as u64) as usize];
+
+            let mut batched = base.clone();
+            batched.set_blocks_from_string(&positions, s).unwrap();
+            let mut looped = base;
+            for &(x, y, z) in &positions {
+                looped.set_block_from_string(x, y, z, s).unwrap();
+            }
+
+            let (a, b) = (&batched.default_region, &looped.default_region);
+            let span = a.get_bounding_box().union(&b.get_bounding_box());
+            for x in span.min.0..=span.max.0 {
+                for y in span.min.1..=span.max.1 {
+                    for z in span.min.2..=span.max.2 {
+                        let read = |r: &Region| {
+                            r.get_block(x, y, z)
+                                .map(|b| b.to_string())
+                                .unwrap_or_else(|| "minecraft:air".to_string())
+                        };
+                        assert_eq!(read(a), read(b), "case {case} at {:?}", (x, y, z));
+                    }
+                }
+            }
+            assert_eq!(a.count_non_air_blocks(), b.count_non_air_blocks(), "case {case}");
+            assert_eq!(a.get_tight_bounds(), b.get_tight_bounds(), "case {case}");
+            let entities = |r: &Region| {
+                r.block_entities
+                    .iter()
+                    .map(|(p, be)| (p, (be.position, be.id.clone(), (*be.nbt).clone())))
+                    .collect::<std::collections::BTreeMap<_, _>>()
+            };
+            assert!(entities(a) == entities(b), "case {case}");
         }
     }
 

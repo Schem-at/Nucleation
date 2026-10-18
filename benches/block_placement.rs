@@ -422,16 +422,25 @@ fn bench_chest_batch_components(c: &mut Criterion) {
         )
     });
 
-    group.bench_function("set_blocks_full_batch_chest", |b| {
+    // The batch API: one parse, one bounds growth, one palette lookup, and
+    // one shared NBT payload for all positions. Compare with the per-call
+    // loop in `set_block_chest_nbt/per_call_set_block_from_string`.
+    group.bench_function("set_blocks_from_string_chest", |b| {
         b.iter(|| {
             let mut s = UniversalSchematic::new("bench".into());
             let chest =
                 "minecraft:chest[facing=west]{Items:[{Slot:0b,id:\"minecraft:diamond\",Count:64b}]}";
-            // Use UniversalSchematic's parse-once batch at the core API
-            // by going through set_block_from_string repeatedly.
-            for &(x, y, z) in &positions {
-                let _ = s.set_block_from_string(black_box(x), y, z, chest);
-            }
+            s.set_blocks_from_string(black_box(&positions), chest).unwrap();
+            black_box(s);
+        })
+    });
+
+    group.bench_function("set_blocks_from_string_stone", |b| {
+        b.iter(|| {
+            let mut s = UniversalSchematic::new("bench".into());
+            s.set_blocks_from_string(black_box(&positions), "minecraft:stone")
+                .unwrap();
+            black_box(s);
         })
     });
 
@@ -439,8 +448,9 @@ fn bench_chest_batch_components(c: &mut Criterion) {
 }
 
 fn bench_copy_region(c: &mut Criterion) {
-    // Palette-mapped fast path (single-region source) vs the per-block
-    // set_block slow path (forced by adding a second source region).
+    // Row copy with a palette remap, from a single-region source and from a
+    // source with a second (precedence-checked) named region. Both run the
+    // same path; the second measures the per-layer ownership cost.
     use nucleation::BoundingBox;
 
     const SIZE: i32 = 64;
@@ -472,10 +482,9 @@ fn bench_copy_region(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("copy_region_64cubed");
     group.throughput(Throughput::Elements(n));
-    group.sample_size(10);
 
     let single = build_source(false);
-    group.bench_function("fast_path_palette_mapped", |b| {
+    group.bench_function("single_region_source", |b| {
         b.iter(|| {
             let mut target = UniversalSchematic::new("target".into());
             target
@@ -486,7 +495,7 @@ fn bench_copy_region(c: &mut Criterion) {
     });
 
     let multi = build_source(true);
-    group.bench_function("slow_path_per_block", |b| {
+    group.bench_function("multi_region_source", |b| {
         b.iter(|| {
             let mut target = UniversalSchematic::new("target".into());
             target
@@ -498,8 +507,19 @@ fn bench_copy_region(c: &mut Criterion) {
     group.finish();
 }
 
+// 60 samples in an 8 s window: every case here fits without Criterion
+// stretching the window, and the slowest still gets enough samples for a
+// stable estimate.
+fn config() -> Criterion {
+    Criterion::default()
+        .sample_size(60)
+        .measurement_time(std::time::Duration::from_secs(8))
+}
+
 criterion_group!(
-    benches,
+    name = benches;
+    config = config();
+    targets =
     bench_set_block_plain,
     bench_set_block_complex_state,
     bench_set_block_chest_per_call,

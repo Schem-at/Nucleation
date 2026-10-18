@@ -18,11 +18,13 @@ rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
 # feature sets pull those out of the cache instead of rebuilding them, and a
 # `cargo clean` stops being a punishment.
 #
-# REQUIRED TOOL: `brew install sccache`. Cargo hard-fails if the wrapper is
-# missing, so this is a prerequisite for building the repo — `tools/doctor.sh`
-# checks for it and CI installs it. Workspace crates compile *incrementally*
-# and so bypass the cache by design; the win is entirely on dependencies.
-rustc-wrapper = "sccache"
+# Install it (`brew install sccache`) to get the cache. The wrapper script uses
+# sccache when it is on PATH and plain rustc otherwise, so a machine without it
+# still builds; `tools/doctor.sh` reports which one is active. Workspace crates
+# compile *incrementally* and so bypass the cache by design; the win is
+# entirely on dependencies. Native Windows shells cannot run the script: set
+# RUSTC_WRAPPER (to `sccache`, or empty for plain rustc), which overrides this.
+rustc-wrapper = "tools/rustc-wrapper.sh"
 
 # One canonical loop feature set, one warm artifact set. See docs/DEV.md.
 #   cargo ck        — canonical check (what tools/dev.sh fast runs)
