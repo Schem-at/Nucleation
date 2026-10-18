@@ -10,19 +10,19 @@ is to the default path; there are no new opt-in fast modes.
 - **Growth.** Regions grow geometrically per axis (by `max(extent/2, 16)`,
   exactly for a fresh region) and in place, instead of padding by 64 and
   copying into a second buffer. 10k blocks across 32 named regions now
-  allocate 3.6 MB instead of 425 MB.
+  allocate 2.4 MB instead of 425 MB.
 - **Block entities.** Overwriting or removing a block entity releases it
   (overwriting one chest 1M times used to retain 118 MB). Replacing one no
   longer deep-clones the old NBT. New batch API
   `UniversalSchematic::set_blocks_from_string`, also behind the bridge's
   `set_blocks`.
 - **Copy/stamp, flips, rotations.** `copy_region`/`stamp_box` copy whole rows
-  with a palette remap (about 9x faster on 64³). Flips run 23-39x faster and
-  quarter turns about 20x faster; neither rescans the region any more.
+  with a palette remap (about 10x faster on 64³). Flips run 23-34x faster and
+  quarter turns 15-17x faster; neither rescans the region any more.
 - **Snapshots (`.nusn`) v4.** Blocks are stored as a narrow byte blob
   (u8/u16/u32 by palette size) and named regions are written in sorted order.
-  Writing is 6-36x faster and reading 3-12x faster. v1-v3 still load.
-- **Formats.** `.schem`/`.litematic` loading is 2-5x faster (block entities
+  Writing is 6-32x faster and reading 3-12x faster. v1-v3 still load.
+- **Formats.** `.schem`/`.litematic` loading is 1.6-5x faster (block entities
   are built from the raw NBT tree by value, the NBT tree moves instead of
   cloning, and varints decode in runs). Exports buffer NBT writes in front of
   gzip; output bytes are unchanged.
