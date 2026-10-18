@@ -102,14 +102,16 @@ fn masking_follows_tight_bounds_not_the_allocated_envelope() {
         "air a region surrounds must still mask the layer below it"
     );
 
-    // Half B — the phantom envelope. A region's storage is padded when it GROWS,
-    // so two blocks at (0,0,0) and (80,40,80) allocate out to (144,104,144)
-    // while the true extent stops at (80,40,80). (100,50,100) is inside the
-    // allocated envelope and outside the content: pure phantom.
+    // Half B — the phantom envelope. A region's storage is padded when it GROWS:
+    // a fresh region grows exactly to (0,0,0)..(80,40,80), and the next write
+    // past that edge pads every overflowing axis by half its extent, out to
+    // (121,61,121), while the true extent stops at (81,41,81). (100,50,100) is
+    // inside the allocated envelope and outside the content: pure phantom.
     let phantom_cell = (100, 50, 100);
     let mut phantom = UniversalSchematic::new("phantom".to_string());
     phantom.set_block_from_string(0, 0, 0, STONE).unwrap();
     phantom.set_block_from_string(80, 40, 80, STONE).unwrap();
+    phantom.set_block_from_string(81, 41, 81, STONE).unwrap();
     assert!(phantom.set_block_in_region_str(
         "bus:net",
         phantom_cell.0,

@@ -145,10 +145,10 @@ fn region_flip_uses_its_exact_symmetry_plane() {
         .unwrap()
         .apply([4.0, 0.0, 0.0]);
     // Named-region transforms use the allocated region bounds, not tight
-    // occupied bounds. Small dynamic regions expand in 64-block chunks, so
-    // this region's X plane is (2 + 68) / 2 = 35.
+    // occupied bounds. A fresh region grows exactly to its first two writes,
+    // so this region is allocated over x = 2..=4 and its X plane is 3.
     assert!(close(start, [4.0, 0.0, 0.0]));
-    assert!(close(end, [66.0, 0.0, 0.0]));
+    assert!(close(end, [2.0, 0.0, 0.0]));
     assert_eq!(animation.frame_at(400.0).pose(0).unwrap().opacity, 0.0);
     assert_eq!(animation.frame_at(400.0).pose(1).unwrap().opacity, 1.0);
 }

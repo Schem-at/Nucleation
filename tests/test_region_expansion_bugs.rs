@@ -38,11 +38,9 @@ fn test_basic_dimension_expansion_bug() {
         assert_eq!(tight_dims, (1, 3, 1), "Tight bounds should be (1, 3, 1)");
     }
 
-    // The allocated dimensions should be much larger
-    assert!(
-        dims2.1 > 10,
-        "Allocated dimensions should be large due to expansion"
-    );
+    // A fresh region grows exactly to its first request, so the allocation
+    // matches the content here instead of being padded.
+    assert_eq!(dims2, (1, 3, 1), "Allocation should not be padded");
 
     // Now export to schematic and check what dimensions are exported
     let schematic_bytes = schematic::to_schematic(&schematic).expect("Failed to export");
@@ -183,19 +181,10 @@ fn test_tight_bounds_vs_allocated_bounds() {
         "Tight dimensions should be (11, 11, 11)"
     );
 
-    // Allocated dimensions should be much larger
-    assert!(
-        allocated_dims_after.0 >= 64,
-        "Allocated X should be at least 64 due to expansion"
-    );
-    assert!(
-        allocated_dims_after.1 >= 64,
-        "Allocated Y should be at least 64 due to expansion"
-    );
-    assert!(
-        allocated_dims_after.2 >= 64,
-        "Allocated Z should be at least 64 due to expansion"
-    );
+    // The allocation covers the content. X had already grown once, so it
+    // grows geometrically (with headroom); Y and Z were single-cell axes and
+    // grow exactly to the request.
+    assert_eq!(allocated_dims_after, (18, 11, 11));
 
     println!("\nBUG: get_dimensions() returns allocated size, not actual content size!");
     println!("Should potentially default to tight_dimensions for user-facing API");

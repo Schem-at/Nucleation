@@ -5,6 +5,16 @@ not share one headline number because they answer different questions.
 
 ## Public Python API
 
+The wheel targets CPython 3.12+ (stable ABI) and builds with CMake and
+nanobind. A self-contained environment, independent of the system Python:
+
+```bash
+uv venv -p 3.12 .venv-bench          # uv downloads 3.12 if it is missing
+uv pip install -p .venv-bench/bin/python build mcschematic
+.venv-bench/bin/python -m build --wheel bindings/python --outdir target/python-wheels
+uv pip install -p .venv-bench/bin/python target/python-wheels/nucleation-*.whl
+```
+
 Comparable operations against `mcschematic`:
 
 ```bash
@@ -32,6 +42,9 @@ an invalid or inert workload fails instead of publishing a fast number.
 Both scripts accept `--json PATH` for machine-readable results. Run them from
 an otherwise idle host against a freshly built wheel. Do not compare results
 from different machines or power modes as if they were a regression series.
+On virtual machines, pin both runs to one CPU (`taskset -c 3 python ...`):
+migrations between vCPUs make whole runs bimodal (2-3x apart), which swamps
+the differences being measured.
 
 ## Rust schematic core
 
