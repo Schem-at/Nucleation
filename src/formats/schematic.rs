@@ -168,7 +168,10 @@ fn to_schematic_v3(schematic: &UniversalSchematic, compression: Compression) -> 
     // second u32 buffer proportional to the schematic volume.
     let mut block_data: Vec<u8> = Vec::with_capacity(compact_region.blocks.len() * 2);
     for &original_id in &compact_region.blocks {
-        let block_id = palette_mapping.get(original_id).copied().unwrap_or(0) as u32;
+        let block_id = palette_mapping
+            .get(original_id as usize)
+            .copied()
+            .unwrap_or(0) as u32;
         encode_varint_into(block_id, &mut block_data);
     }
 
@@ -554,8 +557,7 @@ pub fn from_schematic_bounded(
     region.rebuild_bbox();
     region.rebuild_palette_index();
     region.rebuild_air_index();
-    region.rebuild_non_air_count();
-    region.rebuild_tight_bounds();
+    region.rescan_content();
 
     let block_entities = parse_block_entities(block_container)?;
     for block_entity in block_entities {
@@ -776,7 +778,7 @@ fn parse_block_data(
     width: u32,
     height: u32,
     length: u32,
-) -> Result<Vec<usize>> {
+) -> Result<Vec<u32>> {
     // V2 = BlockData, V3 = Data
     let block_data_i8 = region_tag
         .get::<_, &Vec<i8>>("BlockData")
@@ -822,7 +824,7 @@ fn parse_block_data(
     for _ in 0..expected_length {
         let id = read_varint(&mut block_data_u8)
             .ok_or("Block data contains a truncated or invalid varint")?;
-        block_data.push(id as usize);
+        block_data.push(id);
     }
     if !block_data_u8.is_empty() {
         return Err("Block data length mismatch: excess indices".into());

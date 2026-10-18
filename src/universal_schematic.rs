@@ -129,14 +129,24 @@ impl UniversalSchematic {
         all_regions
     }
 
+    /// The named region `name`, created at `origin` on first use. Looks the
+    /// region up by `&str`, so the key is only allocated on creation.
+    fn named_region_mut(&mut self, name: &str, origin: (i32, i32, i32)) -> &mut Region {
+        if !self.other_regions.contains_key(name) {
+            self.other_regions.insert(
+                name.to_string(),
+                Region::new(name.to_string(), origin, (1, 1, 1)),
+            );
+        }
+        self.other_regions
+            .get_mut(name)
+            .expect("named region was just ensured")
+    }
+
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, block: &BlockState) -> bool {
         // Check if the default region is empty and needs repositioning
         // Optimization: Only check if region is small (1x1x1), otherwise assume it's initialized
-        if self.default_region.size == (1, 1, 1) && self.default_region.is_empty() {
-            // Reposition the default region to the first block's location
-            self.default_region =
-                Region::new(self.default_region_name.clone(), (x, y, z), (1, 1, 1));
-        }
+        self.default_region.recenter_if_empty_unit((x, y, z));
 
         self.default_region.set_block(x, y, z, block)
     }
@@ -157,8 +167,8 @@ impl UniversalSchematic {
         // Any delimiter routes through the strict parser, including unmatched
         // closing delimiters that must fail instead of becoming part of an id.
         if block_name
-            .chars()
-            .any(|c| matches!(c, '[' | ']' | '{' | '}'))
+            .bytes()
+            .any(|c| matches!(c, b'[' | b']' | b'{' | b'}'))
         {
             self.set_block_from_string(x, y, z, block_name)
         } else {
@@ -167,10 +177,7 @@ impl UniversalSchematic {
             // indexed write path. This is the dominant Python `set_block`
             // workload and keeps complex property/NBT strings on the strict
             // parser above.
-            if self.default_region.size == (1, 1, 1) && self.default_region.is_empty() {
-                self.default_region =
-                    Region::new(self.default_region_name.clone(), (x, y, z), (1, 1, 1));
-            }
+            self.default_region.recenter_if_empty_unit((x, y, z));
             if !self.default_region.is_in_region(x, y, z) {
                 self.default_region.expand_to_fit(x, y, z);
             }
@@ -180,7 +187,7 @@ impl UniversalSchematic {
             self.default_region
                 .set_block_at_index_unchecked(palette_index, x, y, z);
             if !self.default_region.block_entities.is_empty() {
-                self.default_region.remove_block_entity((x, y, z));
+                self.default_region.block_entities.discard(&(x, y, z));
             }
             Ok(true)
         }
@@ -195,27 +202,20 @@ impl UniversalSchematic {
         block: &BlockState,
     ) -> bool {
         if region_name == self.default_region_name {
-            if self.default_region.size == (1, 1, 1) && self.default_region.is_empty() {
-                self.default_region =
-                    Region::new(self.default_region_name.clone(), (x, y, z), (1, 1, 1));
-            }
+            self.default_region.recenter_if_empty_unit((x, y, z));
             self.default_region.set_block(x, y, z, block)
         } else {
-            let region = self
-                .other_regions
-                .entry(region_name.to_string())
-                .or_insert_with(|| Region::new(region_name.to_string(), (x, y, z), (1, 1, 1)));
-            if region.size == (1, 1, 1) && region.is_empty() {
-                *region = Region::new(region_name.to_string(), (x, y, z), (1, 1, 1));
-            }
+            let region = self.named_region_mut(region_name, (x, y, z));
+            region.recenter_if_empty_unit((x, y, z));
             region.set_block(x, y, z, block)
         }
     }
 
     /// Ensure the default region covers the given bounds.
     pub fn ensure_bounds(&mut self, min: (i32, i32, i32), max: (i32, i32, i32)) {
-        if self.default_region.is_empty() {
-            // If empty, just set it to the bounds
+        let region = &self.default_region;
+        if region.is_empty() && region.entities.is_empty() && region.block_entities.is_empty() {
+            // Nothing to keep: allocate exactly the requested bounds.
             let size = (
                 (max.0 - min.0 + 1).max(1),
                 (max.1 - min.1 + 1).max(1),
@@ -274,43 +274,34 @@ impl UniversalSchematic {
         }
 
         if !block_name
-            .chars()
-            .any(|c| matches!(c, '[' | ']' | '{' | '}'))
+            .bytes()
+            .any(|c| matches!(c, b'[' | b']' | b'{' | b'}'))
         {
-            let region = self
-                .other_regions
-                .entry(region_name.to_string())
-                .or_insert_with(|| Region::new(region_name.to_string(), (x, y, z), (1, 1, 1)));
-            if region.size == (1, 1, 1) && region.is_empty() {
-                *region = Region::new(region_name.to_string(), (x, y, z), (1, 1, 1));
-            }
+            let region = self.named_region_mut(region_name, (x, y, z));
+            region.recenter_if_empty_unit((x, y, z));
             if !region.is_in_region(x, y, z) {
                 region.expand_to_fit(x, y, z);
             }
             let palette_index = region.get_or_insert_palette_by_name(block_name);
             region.set_block_at_index_unchecked(palette_index, x, y, z);
             if !region.block_entities.is_empty() {
-                region.remove_block_entity((x, y, z));
+                region.block_entities.discard(&(x, y, z));
             }
             return Ok(true);
         }
 
-        let (block_state, nbt) = self.parse_block_string_cached(block_name)?;
-        if !self.set_block_in_region(region_name, x, y, z, &block_state) {
-            return Ok(false);
+        let (state, nbt) = Self::cached_block_string(&mut self.block_string_cache, block_name)?;
+        if !self.other_regions.contains_key(region_name) {
+            self.other_regions.insert(
+                region_name.to_string(),
+                Region::new(region_name.to_string(), (x, y, z), (1, 1, 1)),
+            );
         }
-
-        self.remove_block_entity_in_region(region_name, (x, y, z));
-        if let Some(nbt) = nbt {
-            let block_entity = BlockEntity {
-                id: block_state.name.to_string(),
-                position: (x, y, z),
-                nbt,
-            };
-            self.set_block_entity_in_region(region_name, BlockPosition { x, y, z }, block_entity);
-        }
-
-        Ok(true)
+        let region = self
+            .other_regions
+            .get_mut(region_name)
+            .expect("named region was just ensured");
+        Ok(Self::write_parsed_block(region, (x, y, z), state, nbt))
     }
 
     pub fn set_block_in_region_str(
@@ -576,16 +567,7 @@ impl UniversalSchematic {
         if region_name == self.default_region_name {
             self.default_region.set_block_entity(position, block_entity)
         } else {
-            let region = self
-                .other_regions
-                .entry(region_name.to_string())
-                .or_insert_with(|| {
-                    Region::new(
-                        region_name.to_string(),
-                        (position.x, position.y, position.z),
-                        (1, 1, 1),
-                    )
-                });
+            let region = self.named_region_mut(region_name, (position.x, position.y, position.z));
             region.set_block_entity(position, block_entity)
         }
     }
@@ -596,14 +578,14 @@ impl UniversalSchematic {
         // Add blocks from default region
         let default_palette = self.default_region.get_palette();
         for block_index in &self.default_region.blocks {
-            blocks.push(default_palette[*block_index].clone());
+            blocks.push(default_palette[*block_index as usize].clone());
         }
 
         // Add blocks from named regions in stable order.
         for region in Self::sorted_named_regions(self) {
             let region_palette = region.get_palette();
             for block_index in &region.blocks {
-                blocks.push(region_palette[*block_index].clone());
+                blocks.push(region_palette[*block_index as usize].clone());
             }
         }
         blocks
@@ -1063,12 +1045,7 @@ impl UniversalSchematic {
             self.default_region.add_block_entity(block_entity);
             true
         } else {
-            let region = self
-                .other_regions
-                .entry(region_name.to_string())
-                .or_insert_with(|| {
-                    Region::new(region_name.to_string(), block_entity.position, (1, 1, 1))
-                });
+            let region = self.named_region_mut(region_name, block_entity.position);
             region.add_block_entity(block_entity);
             true
         }
@@ -1608,27 +1585,6 @@ impl UniversalSchematic {
         regions.into_iter().map(|(_, region)| region).collect()
     }
 
-    fn source_region_at<'a>(
-        source: &'a UniversalSchematic,
-        named_regions: &[&'a Region],
-        x: i32,
-        y: i32,
-        z: i32,
-    ) -> Option<&'a Region> {
-        fn contains_visible_content(region: &Region, x: i32, y: i32, z: i32) -> bool {
-            region
-                .get_tight_bounds()
-                .is_some_and(|bounds| bounds.contains((x, y, z)))
-        }
-
-        if contains_visible_content(&source.default_region, x, y, z) {
-            return Some(&source.default_region);
-        }
-        named_regions
-            .iter()
-            .copied()
-            .find(|region| contains_visible_content(region, x, y, z))
-    }
 
     pub(crate) fn region_stamp_bounds(region: &Region) -> Option<BoundingBox> {
         let mut bounds = region.get_tight_bounds();
@@ -1672,37 +1628,6 @@ impl UniversalSchematic {
         ))
     }
 
-    fn stamp_cell_from_region(
-        &mut self,
-        source_region: &Region,
-        source: (i32, i32, i32),
-        destination: (i32, i32, i32),
-        excluded_blocks: &[BlockState],
-    ) {
-        let Some(block) = source_region.get_block(source.0, source.1, source.2) else {
-            return;
-        };
-        if excluded_blocks.contains(block) {
-            return;
-        }
-        let destination = BlockPosition {
-            x: destination.0,
-            y: destination.1,
-            z: destination.2,
-        };
-        self.set_block(destination.x, destination.y, destination.z, block);
-        self.remove_block_entity((destination.x, destination.y, destination.z));
-        let source = BlockPosition {
-            x: source.0,
-            y: source.1,
-            z: source.2,
-        };
-        if let Some(block_entity) = source_region.get_block_entity(source) {
-            let mut copied = block_entity.clone();
-            copied.position = (destination.x, destination.y, destination.z);
-            self.set_block_entity(destination, copied);
-        }
-    }
 
     /// Stamp a merged schematic box into the default region. Excluded source blocks are skipped,
     /// preserving the destination. Written cells, including air, clear stale block entities.
@@ -1717,23 +1642,22 @@ impl UniversalSchematic {
         Self::stamp_destination(bounds.min, offset)?;
         Self::stamp_destination(bounds.max, offset)?;
         let named_regions = Self::sorted_named_regions(source);
-        for x in bounds.min.0..=bounds.max.0 {
-            for y in bounds.min.1..=bounds.max.1 {
-                for z in bounds.min.2..=bounds.max.2 {
-                    let Some(source_region) =
-                        Self::source_region_at(source, &named_regions, x, y, z)
-                    else {
-                        continue;
-                    };
-                    let destination = Self::stamp_destination((x, y, z), offset)?;
-                    self.stamp_cell_from_region(
-                        source_region,
-                        (x, y, z),
-                        destination,
-                        excluded_blocks,
-                    );
-                }
+        // A cell belongs to the first region, in precedence order (default,
+        // then named regions by name), whose visible content contains it.
+        let mut layers: Vec<(&Region, BoundingBox)> = Vec::new();
+        for region in std::iter::once(&source.default_region).chain(named_regions.iter().copied())
+        {
+            if let Some(clip) = region
+                .get_tight_bounds()
+                .and_then(|visible| visible.intersection(bounds))
+            {
+                layers.push((region, clip));
             }
+        }
+        let clips: Vec<BoundingBox> = layers.iter().map(|(_, clip)| clip.clone()).collect();
+        for (index, (region, clip)) in layers.iter().enumerate() {
+            self.default_region
+                .stamp_from(region, clip, offset, excluded_blocks, &clips[..index]);
         }
         for entity in source.default_region.entities.iter().chain(
             named_regions
@@ -1775,18 +1699,10 @@ impl UniversalSchematic {
         let offset = Self::stamp_offset(&bounds, target);
         Self::stamp_destination(bounds.min, offset)?;
         Self::stamp_destination(bounds.max, offset)?;
-        for x in bounds.min.0..=bounds.max.0 {
-            for y in bounds.min.1..=bounds.max.1 {
-                for z in bounds.min.2..=bounds.max.2 {
-                    let destination = Self::stamp_destination((x, y, z), offset)?;
-                    self.stamp_cell_from_region(
-                        source_region,
-                        (x, y, z),
-                        destination,
-                        excluded_blocks,
-                    );
-                }
-            }
+        // Cells outside the source allocation have no block to stamp.
+        if let Some(clip) = bounds.intersection(&source_region.get_bounding_box()) {
+            self.default_region
+                .stamp_from(source_region, &clip, offset, excluded_blocks, &[]);
         }
         for entity in &source_region.entities {
             let mut copied = entity.clone();
@@ -1881,7 +1797,7 @@ impl UniversalSchematic {
                 let (x, y, z) = self.default_region.index_to_coords(index);
                 Some((
                     BlockPosition { x, y, z },
-                    &self.default_region.palette[*block_index],
+                    &self.default_region.palette[*block_index as usize],
                 ))
             },
         );
@@ -1893,7 +1809,10 @@ impl UniversalSchematic {
                 .enumerate()
                 .filter_map(move |(index, block_index)| {
                     let (x, y, z) = region.index_to_coords(index);
-                    Some((BlockPosition { x, y, z }, &region.palette[*block_index]))
+                    Some((
+                        BlockPosition { x, y, z },
+                        &region.palette[*block_index as usize],
+                    ))
                 })
         });
 
@@ -1909,7 +1828,7 @@ impl UniversalSchematic {
                     return None;
                 }
                 let (x, y, z) = self.default_region.index_to_coords(index);
-                Some((BlockPosition { x, y, z }, palette_index))
+                Some((BlockPosition { x, y, z }, palette_index as usize))
             },
         );
 
@@ -1924,7 +1843,7 @@ impl UniversalSchematic {
                         return None;
                     }
                     let (x, y, z) = region.index_to_coords(index);
-                    Some((BlockPosition { x, y, z }, palette_index))
+                    Some((BlockPosition { x, y, z }, palette_index as usize))
                 })
         });
 
@@ -2046,7 +1965,7 @@ impl UniversalSchematic {
             chunk_map
                 .entry(chunk_key)
                 .or_default()
-                .push((BlockPosition { x, y, z }, palette_index));
+                .push((BlockPosition { x, y, z }, palette_index as usize));
         }
 
         // Process other regions
@@ -2065,7 +1984,7 @@ impl UniversalSchematic {
                 chunk_map
                     .entry(chunk_key)
                     .or_default()
-                    .push((BlockPosition { x, y, z }, palette_index));
+                    .push((BlockPosition { x, y, z }, palette_index as usize));
             }
         }
 
@@ -2136,12 +2055,12 @@ impl UniversalSchematic {
                             if let Some(&palette_index) = region.blocks.get(index) {
                                 // Skip if it matches the air index
                                 let is_air = match air_index {
-                                    Some(idx) => palette_index == idx,
+                                    Some(idx) => palette_index as usize == idx,
                                     None => false, // If no air in palette, assume no blocks are air
                                 };
 
                                 if !is_air {
-                                    blocks.push((BlockPosition { x, y, z }, palette_index));
+                                    blocks.push((BlockPosition { x, y, z }, palette_index as usize));
                                 }
                             }
                         }
@@ -2280,32 +2199,61 @@ impl UniversalSchematic {
         self.iter_chunks(chunk_width, chunk_height, chunk_length, None)
     }
 
-    fn parse_block_string_cached(
-        &mut self,
+    /// Parse `block_string` through the per-schematic cache and borrow the
+    /// entry. Hits cost one string hash; nothing is cloned.
+    fn cached_block_string<'c>(
+        cache: &'c mut FxHashMap<String, (BlockState, Option<std::sync::Arc<NbtMap>>)>,
         block_string: &str,
-    ) -> Result<(BlockState, Option<std::sync::Arc<NbtMap>>), String> {
-        if let Some((state, nbt)) = self.block_string_cache.get(block_string) {
-            return Ok((state.clone(), nbt.clone()));
-        }
-
-        let (mut block_state, nbt_data) = Self::parse_block_string(block_string)?;
-        if block_state.name == "minecraft:jukebox" {
-            let has_record = nbt_data
-                .as_ref()
-                .is_some_and(|nbt| nbt.contains_key("RecordItem"));
-            block_state.set_property("has_record", has_record.to_string());
-        }
-
-        let nbt = nbt_data.map(|data| {
-            let mut map = NbtMap::new();
-            for (key, value) in data {
-                map.insert(key, value);
+    ) -> Result<&'c (BlockState, Option<std::sync::Arc<NbtMap>>), String> {
+        if !cache.contains_key(block_string) {
+            let (mut block_state, nbt_data) = Self::parse_block_string(block_string)?;
+            if block_state.name == "minecraft:jukebox" {
+                let has_record = nbt_data
+                    .as_ref()
+                    .is_some_and(|nbt| nbt.contains_key("RecordItem"));
+                block_state.set_property("has_record", has_record.to_string());
             }
-            std::sync::Arc::new(map)
-        });
-        self.block_string_cache
-            .insert(block_string.to_string(), (block_state.clone(), nbt.clone()));
-        Ok((block_state, nbt))
+
+            let nbt = nbt_data.map(|data| {
+                let mut map = NbtMap::new();
+                for (key, value) in data {
+                    map.insert(key, value);
+                }
+                std::sync::Arc::new(map)
+            });
+            cache.insert(block_string.to_string(), (block_state, nbt));
+        }
+        Ok(&cache[block_string])
+    }
+
+    /// Write a parsed block string into `region`. Replacement is
+    /// transactional with respect to block-entity state: a block string
+    /// without NBT must not retain the previous entity. The NbtMap stays
+    /// Arc-shared with the cache (copy-on-write via nbt_mut).
+    fn write_parsed_block(
+        region: &mut Region,
+        (x, y, z): (i32, i32, i32),
+        state: &BlockState,
+        nbt: &Option<std::sync::Arc<NbtMap>>,
+    ) -> bool {
+        region.recenter_if_empty_unit((x, y, z));
+        if !region.set_block(x, y, z, state) {
+            return false;
+        }
+        match nbt {
+            Some(nbt) => region.block_entities.set(
+                (x, y, z),
+                BlockEntity {
+                    id: state.name.to_string(),
+                    position: (x, y, z),
+                    nbt: std::sync::Arc::clone(nbt),
+                },
+            ),
+            None => {
+                region.block_entities.discard(&(x, y, z));
+            }
+        }
+        true
     }
 
     pub fn set_block_from_string(
@@ -2344,29 +2292,13 @@ impl UniversalSchematic {
                 );
             }
         }
-        let (block_state, nbt) = self.parse_block_string_cached(block_string)?;
-
-        // Set the basic block first
-        if !self.set_block(x, y, z, &block_state) {
-            return Ok(false);
-        }
-
-        // Replacement is transactional with respect to block-entity state:
-        // a new block string with no NBT must not retain the previous entity.
-        self.remove_block_entity((x, y, z));
-
-        // If we have NBT data, create and set the block entity. The NbtMap
-        // stays Arc-shared with the cache (copy-on-write via nbt_mut).
-        if let Some(nbt) = nbt {
-            let block_entity = BlockEntity {
-                id: block_state.name.to_string(),
-                position: (x, y, z),
-                nbt,
-            };
-            self.set_block_entity(BlockPosition { x, y, z }, block_entity);
-        }
-
-        Ok(true)
+        let (state, nbt) = Self::cached_block_string(&mut self.block_string_cache, block_string)?;
+        Ok(Self::write_parsed_block(
+            &mut self.default_region,
+            (x, y, z),
+            state,
+            nbt,
+        ))
     }
 
     /// Detects and strips `{simulate=true}` (local) or `{simulate=world}`.
@@ -2377,6 +2309,11 @@ impl UniversalSchematic {
     /// know about inventories mid-placement, and half-honouring a string is
     /// worse than refusing it.
     fn strip_simulate_tag(block_string: &str) -> Result<Option<(String, bool)>, String> {
+        // Nearly every block string has no simulate tag; reject those without
+        // splitting the brace contents into a Vec.
+        if !block_string.contains("simulate=") {
+            return Ok(None);
+        }
         let Some((head, tag)) = block_string.split_once('{') else {
             return Ok(None);
         };
@@ -3902,9 +3839,9 @@ mod tests {
 
         let bbox = schematic.get_bounding_box();
 
-        // With hybrid approach, expect aggressive expansion
+        // A fresh single-cell region grows exactly to the first request.
         assert_eq!(bbox.min, (0, 0, 0));
-        assert_eq!(bbox.max, (68, 68, 68)); // Now expects 68 instead of 4
+        assert_eq!(bbox.max, (4, 4, 4));
 
         // Don't test exact dimensions as they depend on expansion strategy
         let dimensions = schematic.get_dimensions();
@@ -4013,6 +3950,136 @@ mod tests {
             target.default_region.entities[0].position,
             (11.5, 11.0, 11.5)
         );
+    }
+
+    /// `stamp_box` copies whole rows per source layer; check it against the
+    /// straightforward per-cell definition on randomized inputs: overlapping
+    /// named regions (precedence), air inside visible bounds, excluded
+    /// states, and block entities on both sides.
+    #[test]
+    fn stamp_box_matches_per_cell_reference() {
+        fn reference_stamp(
+            target: &mut UniversalSchematic,
+            source: &UniversalSchematic,
+            bounds: &BoundingBox,
+            dest: (i32, i32, i32),
+            excluded: &[BlockState],
+        ) {
+            let mut named: Vec<_> = source.other_regions.iter().collect();
+            named.sort_by(|a, b| a.0.cmp(b.0));
+            let layers: Vec<&Region> = std::iter::once(&source.default_region)
+                .chain(named.into_iter().map(|(_, r)| r))
+                .collect();
+            for x in bounds.min.0..=bounds.max.0 {
+                for y in bounds.min.1..=bounds.max.1 {
+                    for z in bounds.min.2..=bounds.max.2 {
+                        let Some(owner) = layers.iter().find(|r| {
+                            r.get_tight_bounds().is_some_and(|b| b.contains((x, y, z)))
+                        }) else {
+                            continue;
+                        };
+                        let block = owner.get_block(x, y, z).unwrap().clone();
+                        if excluded.contains(&block) {
+                            continue;
+                        }
+                        let d = (
+                            x - bounds.min.0 + dest.0,
+                            y - bounds.min.1 + dest.1,
+                            z - bounds.min.2 + dest.2,
+                        );
+                        target.set_block(d.0, d.1, d.2, &block);
+                        target.remove_block_entity(d);
+                        if let Some(be) = owner.get_block_entity(BlockPosition { x, y, z }) {
+                            let mut be = be.clone();
+                            be.position = d;
+                            target.set_block_entity(BlockPosition { x: d.0, y: d.1, z: d.2 }, be);
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut seed = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = |n: u64| {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            ((seed >> 33) % n) as i32
+        };
+        let states = [
+            "minecraft:air",
+            "minecraft:stone",
+            "minecraft:dirt",
+            "minecraft:glass",
+            "minecraft:repeater[delay=2,facing=east]",
+            "minecraft:chest[facing=west]{Items:[{Slot:0b,id:\"minecraft:diamond\",Count:1b}]}",
+            "minecraft:barrel{Items:[{Slot:1b,id:\"minecraft:stick\",Count:3b}]}",
+        ];
+        for case in 0..300 {
+            let mut source = UniversalSchematic::new("src".into());
+            for _ in 0..next(60) {
+                let s = states[next(states.len() as u64) as usize];
+                let (x, y, z) = (next(8) - 1, next(8) - 1, next(8) - 1);
+                source.set_block_from_string(x, y, z, s).unwrap();
+            }
+            for name in ["b_named", "a_named"] {
+                for _ in 0..next(30) {
+                    let s = states[next(states.len() as u64) as usize];
+                    let (x, y, z) = (next(10) - 2, next(10) - 2, next(10) - 2);
+                    source.try_set_block_in_region_str(name, x, y, z, s).unwrap();
+                }
+            }
+
+            let mut target = UniversalSchematic::new("dst".into());
+            for _ in 0..next(40) {
+                let s = states[next(states.len() as u64) as usize];
+                let (x, y, z) = (next(12) + 2, next(12) + 2, next(12) + 2);
+                target.set_block_from_string(x, y, z, s).unwrap();
+            }
+            let mut expected = target.clone();
+
+            let min = (next(10) - 3, next(10) - 3, next(10) - 3);
+            let max = (min.0 + next(9), min.1 + next(9), min.2 + next(9));
+            let bounds = BoundingBox::new(min, max);
+            let dest = (next(10), next(10), next(10));
+            let excluded: Vec<BlockState> = if case % 3 == 0 {
+                vec![BlockState::new("minecraft:dirt".to_string())]
+            } else if case % 3 == 1 {
+                vec![BlockState::new("minecraft:air".to_string())]
+            } else {
+                Vec::new()
+            };
+
+            target.stamp_box(&source, &bounds, dest, &excluded).unwrap();
+            reference_stamp(&mut expected, &source, &bounds, dest, &excluded);
+
+            let (got, want) = (&target.default_region, &expected.default_region);
+            let span = got.get_bounding_box().union(&want.get_bounding_box());
+            for x in span.min.0..=span.max.0 {
+                for y in span.min.1..=span.max.1 {
+                    for z in span.min.2..=span.max.2 {
+                        let read = |r: &Region| {
+                            r.get_block(x, y, z)
+                                .map(|b| b.to_string())
+                                .unwrap_or_else(|| "minecraft:air".to_string())
+                        };
+                        assert_eq!(read(got), read(want), "case {case} cell {:?}", (x, y, z));
+                    }
+                }
+            }
+            assert_eq!(got.count_non_air_blocks(), want.count_non_air_blocks(), "case {case}");
+            assert_eq!(got.get_tight_bounds(), want.get_tight_bounds(), "case {case}");
+            let entities = |r: &Region| {
+                let mut v: Vec<_> = r
+                    .block_entities
+                    .iter()
+                    .map(|(p, be)| (p, be.id.clone(), format!("{:?}", be.nbt)))
+                    .collect();
+                v.sort();
+                v
+            };
+            assert_eq!(entities(got), entities(want), "case {case}");
+        }
     }
 
     #[test]

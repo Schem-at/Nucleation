@@ -338,8 +338,7 @@ fn rebuild_region(region: &mut crate::region::Region) {
     region.rebuild_bbox();
     region.rebuild_palette_index();
     region.rebuild_air_index();
-    region.rebuild_non_air_count();
-    region.rebuild_tight_bounds();
+    region.rescan_content();
 }
 
 #[cfg(test)]

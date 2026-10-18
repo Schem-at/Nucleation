@@ -408,14 +408,15 @@ fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
             for (chunk_idx, chunk) in compact_region.blocks.chunks(entries_per_long).enumerate() {
                 let mut packed: u64 = 0;
                 for (i, &block_state) in chunk.iter().enumerate() {
-                    packed |= (index_mapping[block_state] as u64 & mask) << (i * bits_per_block);
+                    packed |= (index_mapping[block_state as usize] as u64 & mask)
+                        << (i * bits_per_block);
                 }
                 packed_states[chunk_idx] = packed as i64;
             }
         } else {
             // Slow path: entries may cross i64 boundaries (bits_per_block = 3, 5, 6, 7, etc.)
             for (index, &block_state) in compact_region.blocks.iter().enumerate() {
-                let mapped_state = index_mapping[block_state];
+                let mapped_state = index_mapping[block_state as usize];
                 let bit_index = index * bits_per_block;
                 let start_long_index = bit_index / 64;
                 let end_long_index = (bit_index + bits_per_block - 1) / 64;
@@ -597,8 +598,7 @@ fn parse_regions(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Resu
             // Rebuild caches after directly setting palette and blocks
             region.rebuild_palette_index();
             region.rebuild_air_index();
-            region.rebuild_non_air_count();
-            region.rebuild_tight_bounds();
+            region.rescan_content();
 
             // Litematic entity/tile-entity coordinates are relative to the region's
             // MIN CORNER, which is NOT `Position` when `Size` is negative (Litematica

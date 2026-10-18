@@ -1,18 +1,22 @@
 //! Storage layer for tile entities (BlockEntity) within a region.
 //!
-//! Replaces the previous `FxHashMap<(i32,i32,i32), BlockEntity>` with a
-//! palette-indexed layout: a `Vec<Arc<BlockEntity>>` holds the unique
-//! templates, and a `FxHashMap<(i32,i32,i32), u32>` maps each position to
-//! a palette index.
+//! A `FxHashMap<(i32,i32,i32), Arc<BlockEntity>>`: each position owns a
+//! reference-counted entity.
 //!
 //! ## Why
 //!
 //! When placing many copies of the same tile entity (chests with identical
-//! contents, signs with the same text), the previous storage paid the full
-//! per-position cost of `BlockEntity::clone()` and a HashMap insert keyed
-//! by an owned BlockEntity value. The palette layout collapses repeated
-//! templates: `insert_template(positions, Arc<BE>)` performs ONE palette
-//! push and N small u32 inserts.
+//! contents, signs with the same text), a plain `BlockEntity` map pays the
+//! full per-position cost of `BlockEntity::clone()`. Sharing one `Arc`
+//! across positions makes `insert_template(positions, Arc<BE>)` N reference
+//! count increments instead of N deep NBT clones.
+//!
+//! Entries are freed as soon as no position references them. (An earlier
+//! palette-indexed layout appended a template on every insert and never
+//! reclaimed it, so overwriting one chest a million times kept a million
+//! dead templates alive.) `insert` and `remove` hand back the previous
+//! entity by moving it out of its `Arc` when it was not shared, so replacing
+//! or clearing a block entity does not deep-clone its NBT.
 //!
 //! ## Position invariant
 //!
@@ -36,12 +40,14 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, Default)]
 pub struct BlockEntityStore {
-    /// Palette of unique BlockEntity templates. Each insert (without
-    /// `insert_template`) appends a fresh entry; templates inserted via
-    /// `insert_template` are shared by all positions referencing them.
-    palette: Vec<Arc<BlockEntity>>,
-    /// Position -> palette index lookup.
-    by_pos: FxHashMap<(i32, i32, i32), u32>,
+    by_pos: FxHashMap<(i32, i32, i32), Arc<BlockEntity>>,
+}
+
+/// Take ownership of a stored entity, cloning only if another position
+/// still shares it.
+#[inline]
+fn into_owned(be: Arc<BlockEntity>) -> BlockEntity {
+    Arc::try_unwrap(be).unwrap_or_else(|shared| (*shared).clone())
 }
 
 impl BlockEntityStore {
@@ -49,36 +55,32 @@ impl BlockEntityStore {
         Self::default()
     }
 
-    /// Insert a tile entity at the given position. Each call appends a new
-    /// palette entry — use `insert_template` if you want template sharing.
+    /// Insert a tile entity at the given position.
     /// Returns the previously-stored BlockEntity at this position, if any.
     #[inline]
     pub fn insert(&mut self, pos: (i32, i32, i32), be: BlockEntity) -> Option<BlockEntity> {
-        let idx = self.palette.len() as u32;
-        self.palette.push(Arc::new(be));
-        let prev = self.by_pos.insert(pos, idx);
-        prev.map(|old_idx| (*self.palette[old_idx as usize]).clone())
+        self.by_pos.insert(pos, Arc::new(be)).map(into_owned)
+    }
+
+    /// Insert a tile entity, dropping (not materializing) any previous one.
+    /// Use this instead of `insert` when the old value is not needed.
+    #[inline]
+    pub fn set(&mut self, pos: (i32, i32, i32), be: BlockEntity) {
+        self.by_pos.insert(pos, Arc::new(be));
     }
 
     /// Hot batch path: store ONE shared template at all `positions`.
-    /// Skips the per-position BlockEntity clone and palette push entirely.
+    /// Skips the per-position BlockEntity clone entirely.
     pub fn insert_template(&mut self, positions: &[(i32, i32, i32)], template: Arc<BlockEntity>) {
-        if positions.is_empty() {
-            return;
-        }
-        let idx = self.palette.len() as u32;
-        self.palette.push(template);
         self.by_pos.reserve(positions.len());
         for &pos in positions {
-            self.by_pos.insert(pos, idx);
+            self.by_pos.insert(pos, Arc::clone(&template));
         }
     }
 
     #[inline]
     pub fn get(&self, pos: &(i32, i32, i32)) -> Option<&BlockEntity> {
-        self.by_pos
-            .get(pos)
-            .map(|&idx| self.palette[idx as usize].as_ref())
+        self.by_pos.get(pos).map(Arc::as_ref)
     }
 
     #[inline]
@@ -96,14 +98,27 @@ impl BlockEntityStore {
         self.by_pos.is_empty()
     }
 
+    #[inline]
     pub fn remove(&mut self, pos: &(i32, i32, i32)) -> Option<BlockEntity> {
-        self.by_pos
-            .remove(pos)
-            .map(|idx| (*self.palette[idx as usize]).clone())
+        self.by_pos.remove(pos).map(into_owned)
+    }
+
+    /// Remove the entity at `pos` without materializing it. Returns whether
+    /// one was present. Use this when the old value is not needed.
+    #[inline]
+    pub fn discard(&mut self, pos: &(i32, i32, i32)) -> bool {
+        self.by_pos.remove(pos).is_some()
+    }
+
+    /// Keep only the entries for which `keep` returns true.
+    pub fn retain<F>(&mut self, mut keep: F)
+    where
+        F: FnMut((i32, i32, i32), &BlockEntity) -> bool,
+    {
+        self.by_pos.retain(|&pos, be| keep(pos, be));
     }
 
     pub fn clear(&mut self) {
-        self.palette.clear();
         self.by_pos.clear();
     }
 
@@ -115,36 +130,30 @@ impl BlockEntityStore {
     /// iterator is the canonical position; do not use `be.position` for
     /// serialization** — it may be stale on shared templates.
     pub fn iter(&self) -> impl Iterator<Item = ((i32, i32, i32), &BlockEntity)> + '_ {
-        self.by_pos
-            .iter()
-            .map(|(&pos, &idx)| (pos, self.palette[idx as usize].as_ref()))
+        self.by_pos.iter().map(|(&pos, be)| (pos, be.as_ref()))
     }
 
     /// Iterate just the values. Templates shared across positions are
     /// yielded once per position.
     pub fn values(&self) -> impl Iterator<Item = &BlockEntity> + '_ {
-        self.by_pos
-            .values()
-            .map(|&idx| self.palette[idx as usize].as_ref())
+        self.by_pos.values().map(Arc::as_ref)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &(i32, i32, i32)> + '_ {
         self.by_pos.keys()
     }
 
-    /// Remap every stored position via `f` without touching the palette.
-    /// Far cheaper than `drain` + `insert` when transforms only shuffle
-    /// coordinates (flip, rotate, translate). Templates remain shared and
-    /// no NBT cloning happens.
+    /// Remap every stored position via `f`. Far cheaper than `drain` +
+    /// `insert` when transforms only shuffle coordinates (flip, rotate,
+    /// translate). Templates remain shared and no NBT cloning happens.
     pub fn remap_positions<F>(&mut self, f: F)
     where
         F: Fn((i32, i32, i32)) -> (i32, i32, i32),
     {
         let old = std::mem::take(&mut self.by_pos);
         self.by_pos.reserve(old.len());
-        for (pos, idx) in old {
-            let new_pos = f(pos);
-            self.by_pos.insert(new_pos, idx);
+        for (pos, be) in old {
+            self.by_pos.insert(f(pos), be);
         }
     }
 
@@ -152,20 +161,17 @@ impl BlockEntityStore {
     /// its position field set from the storage key. Used by transforms
     /// (rotate/flip) that need ownership to mutate.
     pub fn drain(&mut self) -> Vec<((i32, i32, i32), BlockEntity)> {
-        let palette = std::mem::take(&mut self.palette);
-        let by_pos = std::mem::take(&mut self.by_pos);
-        by_pos
+        std::mem::take(&mut self.by_pos)
             .into_iter()
-            .map(|(pos, idx)| {
-                let mut be = (*palette[idx as usize]).clone();
+            .map(|(pos, be)| {
+                let mut be = into_owned(be);
                 be.position = pos;
                 (pos, be)
             })
             .collect()
     }
 
-    /// Bulk-insert. Each entry adds a new palette template — use
-    /// `insert_template` for template-shared batches.
+    /// Bulk-insert. Use `insert_template` for template-shared batches.
     pub fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = ((i32, i32, i32), BlockEntity)>,
@@ -173,9 +179,8 @@ impl BlockEntityStore {
         let iter = iter.into_iter();
         let (lo, _) = iter.size_hint();
         self.by_pos.reserve(lo);
-        self.palette.reserve(lo);
         for (pos, be) in iter {
-            self.insert(pos, be);
+            self.by_pos.insert(pos, Arc::new(be));
         }
     }
 }
@@ -201,13 +206,9 @@ impl<'de> Deserialize<'de> for BlockEntityStore {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let entries: Vec<BlockEntity> = Vec::deserialize(deserializer)?;
         let mut store = BlockEntityStore::new();
-        store.palette.reserve(entries.len());
         store.by_pos.reserve(entries.len());
         for be in entries {
-            let pos = be.position;
-            let idx = store.palette.len() as u32;
-            store.palette.push(Arc::new(be));
-            store.by_pos.insert(pos, idx);
+            store.by_pos.insert(be.position, Arc::new(be));
         }
         Ok(store)
     }

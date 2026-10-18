@@ -1286,7 +1286,7 @@ pub mod ffi {
                 .iter()
                 .enumerate()
                 .filter_map(|(index, block_index)| {
-                    let block = &region.palette[*block_index];
+                    let block = &region.palette[*block_index as usize];
                     if block.name == "minecraft:air" {
                         return None;
                     }
@@ -1629,7 +1629,7 @@ pub mod ffi {
         /// returning, so callers may mutate the schematic or grow WASM memory safely.
         pub fn region_block_indices<'a>(
             &'a self, region_name: &str, start: u32, count: u32,
-        ) -> Result<&'a [usize], NucleationError> {
+        ) -> Result<&'a [u32], NucleationError> {
             if count > 65_536 { return Err(NucleationError::InvalidArgument); }
             let region = self.0.get_region(region_name).ok_or(NucleationError::NotFound)?;
             let start = start as usize;

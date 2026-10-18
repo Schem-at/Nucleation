@@ -173,8 +173,7 @@ pub fn from_classic_schematic_bounded(
         }
     }
 
-    region.rebuild_non_air_count();
-    region.rebuild_tight_bounds();
+    region.rescan_content();
 
     let name = root
         .get::<_, &str>("Name")
