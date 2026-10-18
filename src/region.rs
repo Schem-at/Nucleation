@@ -569,7 +569,9 @@ impl Region {
                 });
         }
 
-        compact.rebuild_non_air_count();
+        // Compaction copies every occupied cell, so the cached count carries
+        // over unchanged.
+        compact.non_air_count = self.non_air_count;
         compact.tight_bounds = Some(tight_bounds.clone());
 
         for (pos, be) in self.block_entities.iter() {
@@ -669,7 +671,9 @@ impl Region {
             }
         }
 
-        compact.rebuild_non_air_count();
+        // Compaction copies every occupied cell, so the cached count carries
+        // over unchanged.
+        compact.non_air_count = self.non_air_count;
         compact.tight_bounds = self.tight_bounds.clone();
 
         for (pos, be) in self.block_entities.iter() {
@@ -682,6 +686,7 @@ impl Region {
         compact
     }
 
+    #[inline]
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> Option<&BlockState> {
         if !self.is_in_region(x, y, z) {
             return None;
@@ -788,6 +793,7 @@ impl Region {
         let y_off = (self.bbox.min.1 - new_bounding_box.min.1) as usize;
         let z_off = (self.bbox.min.2 - new_bounding_box.min.2) as usize;
 
+        let old_len = self.blocks.len();
         self.blocks
             .resize(new_bounding_box.volume() as usize, air_id);
 
@@ -802,15 +808,22 @@ impl Region {
                 for dz in (0..old_l).rev() {
                     let src_start = dy * old_w * old_l + dz * old_w;
                     let dst_start = (dy + y_off) * new_w * new_l + (dz + z_off) * new_w + x_off;
-                    self.blocks
-                        .copy_within(src_start..src_start + old_w, dst_start);
+                    if dst_start != src_start {
+                        self.blocks
+                            .copy_within(src_start..src_start + old_w, dst_start);
+                    }
                 }
             }
-            // Every cell outside the moved rows becomes air (it may still
-            // hold a stale value from before the move).
-            for dy in 0..new_h {
+            // Every cell outside the moved rows becomes air. Only cells below
+            // the old length can hold a stale value: `resize` already wrote
+            // air past it.
+            'rows: for dy in 0..new_h {
                 for dz in 0..new_l {
-                    let row = &mut self.blocks[(dy * new_l + dz) * new_w..][..new_w];
+                    let row_start = (dy * new_l + dz) * new_w;
+                    if row_start >= old_len {
+                        break 'rows;
+                    }
+                    let row = &mut self.blocks[row_start..][..new_w];
                     let holds_old_row =
                         (y_off..y_off + old_h).contains(&dy) && (z_off..z_off + old_l).contains(&dz);
                     if holds_old_row {
