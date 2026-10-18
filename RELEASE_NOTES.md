@@ -1,38 +1,20 @@
-# Unreleased
+# Nucleation v0.10.25
 
-Performance and memory pass over the core engine and formats. Every change
-is to the default path; there are no new opt-in fast modes.
+Faster and leaner defaults across the core engine and formats, with no
+opt-in modes.
 
-- **Storage.** Region voxels are `u32` (was `usize`): half the memory and
-  bandwidth. `Region::blocks` is `Vec<u32>` and `unpack_block_states`
-  returns `Vec<u32>`; the bridge `region_block_indices` returns a `u32` view
-  (C/C++/Python `uint32_t`, Kotlin `UIntArray`; JS was already `Uint32Array`).
-- **Growth.** Regions grow geometrically per axis (by `max(extent/2, 16)`,
-  exactly for a fresh region) and in place, instead of padding by 64 and
-  copying into a second buffer. 10k blocks across 32 named regions now
-  allocate 2.4 MB instead of 425 MB.
-- **Block entities.** Overwriting or removing a block entity releases it
-  (overwriting one chest 1M times used to retain 118 MB). Replacing one no
-  longer deep-clones the old NBT. New batch API
-  `UniversalSchematic::set_blocks_from_string`, also behind the bridge's
-  `set_blocks`.
-- **Copy/stamp, flips, rotations.** `copy_region`/`stamp_box` copy whole rows
-  with a palette remap (about 10x faster on 64³). Flips run 23-34x faster and
-  quarter turns 15-17x faster; neither rescans the region any more.
-- **Snapshots (`.nusn`) v4.** Blocks are stored as a narrow byte blob
-  (u8/u16/u32 by palette size) and named regions are written in sorted order.
-  Writing is 6-32x faster and reading 3-12x faster. v1-v3 still load.
-- **Formats.** `.schem`/`.litematic` loading is 1.6-5x faster (block entities
-  are built from the raw NBT tree by value, the NBT tree moves instead of
-  cloning, and varints decode in runs). Exports buffer NBT writes in front of
-  gzip; output bytes are unchanged.
-- **Robustness.** Malformed `.nusn`, `.litematic` and `.schem` files that
-  could panic (short block arrays, out-of-palette indices, bad palette ids,
-  short `Pos` arrays) are now rejected with errors. Sponge and Litematica
-  block-entity export uses the storage position (template positions could be
-  stale).
-- **Tooling.** `tools/bench.sh save|compare` manages Criterion baselines.
-  `sccache` is used when installed and no longer required to build.
+- Region voxels are `u32`, and regions grow geometrically and in place.
+  10k blocks across 32 named regions: 32 ms / 425 MB -> 1.5 ms / 2.4 MB.
+- `copy_region` is about 10x faster, flips 23-34x and rotations 15-17x.
+  Snapshots (`.nusn` v4, still reads v1-v3) write 6-32x and read 3-12x
+  faster. `.schem`/`.litematic` load 1.6-5x faster.
+- Overwriting or removing a block entity frees its memory (it used to
+  leak). New batch API `set_blocks_from_string`.
+- Malformed `.nusn`/`.litematic`/`.schem` files return errors instead of
+  panicking. Block-entity export always uses the stored position.
+- Breaking for Rust and Kotlin: `Region::blocks` is `Vec<u32>`, and
+  `region_block_indices` returns a u32 view (`UIntArray` in Kotlin).
+- `tools/bench.sh` manages Criterion baselines; `sccache` is now optional.
 
 # Nucleation v0.10.24
 
