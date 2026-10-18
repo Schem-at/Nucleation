@@ -754,6 +754,15 @@ impl Region {
         ));
     }
 
+    /// Grow the allocation to `new_bounding_box`, which must contain the
+    /// current one.
+    ///
+    /// Works in place: the vector is extended (a realloc, which for large
+    /// buffers remaps the existing pages instead of copying them), the old
+    /// rows are moved back-to-front to their new offsets, and only the cells
+    /// that were not part of the old allocation are set to air. Compared with
+    /// allocating a second full buffer, this halves peak memory during growth
+    /// and avoids faulting in a fresh copy of every resident page.
     fn expand_to_bounding_box(&mut self, new_bounding_box: BoundingBox) {
         let new_size = new_bounding_box.get_dimensions();
         let new_position = new_bounding_box.min;
@@ -761,37 +770,61 @@ impl Region {
         if new_size == self.size && new_position == self.position {
             return;
         }
+        debug_assert!(
+            new_bounding_box.contains(self.bbox.min) && new_bounding_box.contains(self.bbox.max)
+        );
 
         let air_id = self.cached_air_index;
-        let mut new_blocks = vec![air_id; new_bounding_box.volume() as usize];
-
-        // Phase 2: Row-level copy instead of per-element coords
         let old_w = self.cached_width as usize;
         let old_l = self.cached_length as usize;
         let (_, old_h, _) = self.bbox.get_dimensions();
         let old_h = old_h as usize;
 
-        let (new_w, _, new_l) = new_bounding_box.get_dimensions();
-        let new_w = new_w as usize;
-        let new_l = new_l as usize;
+        let (new_w, new_h, new_l) = new_bounding_box.get_dimensions();
+        let (new_w, new_h, new_l) = (new_w as usize, new_h as usize, new_l as usize);
 
         // Offset of old min within new coordinate system
         let x_off = (self.bbox.min.0 - new_bounding_box.min.0) as usize;
         let y_off = (self.bbox.min.1 - new_bounding_box.min.1) as usize;
         let z_off = (self.bbox.min.2 - new_bounding_box.min.2) as usize;
 
-        for dy in 0..old_h {
-            for dz in 0..old_l {
-                let src_start = dy * old_w * old_l + dz * old_w;
-                let dst_start = (dy + y_off) * new_w * new_l + (dz + z_off) * new_w + x_off;
-                new_blocks[dst_start..dst_start + old_w]
-                    .copy_from_slice(&self.blocks[src_start..src_start + old_w]);
+        self.blocks
+            .resize(new_bounding_box.volume() as usize, air_id);
+
+        // Growing only towards +y appends whole layers: the old cells are
+        // already in place.
+        let in_place = x_off == 0 && y_off == 0 && z_off == 0 && new_w == old_w && new_l == old_l;
+        if !in_place {
+            // Every old row moves to an equal or higher index, and rows keep
+            // their order, so moving the last row first never overwrites a
+            // row that has not been moved yet.
+            for dy in (0..old_h).rev() {
+                for dz in (0..old_l).rev() {
+                    let src_start = dy * old_w * old_l + dz * old_w;
+                    let dst_start = (dy + y_off) * new_w * new_l + (dz + z_off) * new_w + x_off;
+                    self.blocks
+                        .copy_within(src_start..src_start + old_w, dst_start);
+                }
+            }
+            // Every cell outside the moved rows becomes air (it may still
+            // hold a stale value from before the move).
+            for dy in 0..new_h {
+                for dz in 0..new_l {
+                    let row = &mut self.blocks[(dy * new_l + dz) * new_w..][..new_w];
+                    let holds_old_row =
+                        (y_off..y_off + old_h).contains(&dy) && (z_off..z_off + old_l).contains(&dz);
+                    if holds_old_row {
+                        row[..x_off].fill(air_id);
+                        row[x_off + old_w..].fill(air_id);
+                    } else {
+                        row.fill(air_id);
+                    }
+                }
             }
         }
 
         self.position = new_position;
         self.size = new_size;
-        self.blocks = new_blocks;
         self.rebuild_bbox();
     }
     fn calculate_bits_per_block(&self) -> usize {
