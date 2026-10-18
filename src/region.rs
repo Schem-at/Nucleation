@@ -717,9 +717,9 @@ impl Region {
     /// Ensure the region covers the given bounds, expanding if necessary.
     ///
     /// Growth is geometric and per axis, and only in the direction that
-    /// overflowed: an axis of extent `e > 1` grows by at least `max(e / 2, 16)`
-    /// cells. A single-cell axis (a fresh region) grows exactly to the
-    /// request, so a one-shot fill or stamp allocates just its footprint. Reallocations are therefore O(log n) per axis however the
+    /// overflowed: an axis of extent `e` grows by at least `max(e / 2, 16)`
+    /// cells. A range request into an untouched region (a fill or stamp into
+    /// a fresh schematic) allocates exactly its footprint instead. Reallocations are therefore O(log n) per axis however the
     /// region is grown (cell by cell, or by repeated stamps), and the
     /// allocation is never more than ~1.5× the touched extent on any axis.
     /// (A fixed ±64 pad used to turn a few hundred scattered blocks into a
@@ -730,12 +730,26 @@ impl Region {
         if current.contains(min) && current.contains(max) {
             return;
         }
+        let untouched = self.size == (1, 1, 1)
+            && self.is_empty()
+            && self.block_entities.is_empty()
+            && self.entities.is_empty();
+        let well_formed = min.0 <= max.0 && min.1 <= max.1 && min.2 <= max.2;
+        if untouched && well_formed && min != max && self.cached_air_index == 0 {
+            let bounds = BoundingBox::new(min, max);
+            if let Ok(blocks) = try_zeroed_blocks(bounds.volume() as usize) {
+                self.position = bounds.min;
+                self.size = bounds.get_dimensions();
+                self.blocks = blocks;
+                self.rebuild_bbox();
+                return;
+            }
+        }
 
         fn grow(cur_min: i32, cur_max: i32, req_min: i32, req_max: i32) -> (i32, i32) {
             const MIN_STEP: i64 = 16;
             let (cur_min, cur_max) = (cur_min as i64, cur_max as i64);
-            let extent = cur_max - cur_min + 1;
-            let step = if extent > 1 { (extent / 2).max(MIN_STEP) } else { 0 };
+            let step = ((cur_max - cur_min + 1) / 2).max(MIN_STEP);
             let clamp = |v: i64| v.clamp(i32::MIN as i64, i32::MAX as i64) as i32;
             let new_min = if (req_min as i64) < cur_min {
                 (req_min as i64).min(cur_min - step)

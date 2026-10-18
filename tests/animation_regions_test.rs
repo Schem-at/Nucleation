@@ -145,10 +145,10 @@ fn region_flip_uses_its_exact_symmetry_plane() {
         .unwrap()
         .apply([4.0, 0.0, 0.0]);
     // Named-region transforms use the allocated region bounds, not tight
-    // occupied bounds. A fresh region grows exactly to its first two writes,
-    // so this region is allocated over x = 2..=4 and its X plane is 3.
+    // occupied bounds. The second write grows the region by the 16-cell
+    // minimum step to x = 2..=18, so its X plane is 10.
     assert!(close(start, [4.0, 0.0, 0.0]));
-    assert!(close(end, [2.0, 0.0, 0.0]));
+    assert!(close(end, [16.0, 0.0, 0.0]));
     assert_eq!(animation.frame_at(400.0).pose(0).unwrap().opacity, 0.0);
     assert_eq!(animation.frame_at(400.0).pose(1).unwrap().opacity, 1.0);
 }

@@ -103,7 +103,8 @@ fn masking_follows_tight_bounds_not_the_allocated_envelope() {
     );
 
     // Half B — the phantom envelope. A region's storage is padded when it GROWS:
-    // a fresh region grows exactly to (0,0,0)..(80,40,80), and the next write
+    // the second block is past the minimum step, so the region grows exactly
+    // to (0,0,0)..(80,40,80), and the next write
     // past that edge pads every overflowing axis by half its extent, out to
     // (121,61,121), while the true extent stops at (81,41,81). (100,50,100) is
     // inside the allocated envelope and outside the content: pure phantom.

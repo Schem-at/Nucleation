@@ -38,9 +38,9 @@ fn test_basic_dimension_expansion_bug() {
         assert_eq!(tight_dims, (1, 3, 1), "Tight bounds should be (1, 3, 1)");
     }
 
-    // A fresh region grows exactly to its first request, so the allocation
-    // matches the content here instead of being padded.
-    assert_eq!(dims2, (1, 3, 1), "Allocation should not be padded");
+    // Only the overflowing axis grows, by the 16-cell minimum step (it was
+    // padded by 64 cells on every growth before).
+    assert_eq!(dims2, (1, 17, 1), "Only Y grows, by the minimum step");
 
     // Now export to schematic and check what dimensions are exported
     let schematic_bytes = schematic::to_schematic(&schematic).expect("Failed to export");
@@ -181,10 +181,9 @@ fn test_tight_bounds_vs_allocated_bounds() {
         "Tight dimensions should be (11, 11, 11)"
     );
 
-    // The allocation covers the content. X had already grown once, so it
-    // grows geometrically (with headroom); Y and Z were single-cell axes and
-    // grow exactly to the request.
-    assert_eq!(allocated_dims_after, (18, 11, 11));
+    // The allocation covers the content with geometric headroom: each axis
+    // grew once, by the 16-cell minimum step.
+    assert_eq!(allocated_dims_after, (17, 17, 17));
 
     println!("\nBUG: get_dimensions() returns allocated size, not actual content size!");
     println!("Should potentially default to tight_dimensions for user-facing API");

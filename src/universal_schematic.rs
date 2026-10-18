@@ -3857,9 +3857,9 @@ mod tests {
 
         let bbox = schematic.get_bounding_box();
 
-        // A fresh single-cell region grows exactly to the first request.
+        // Each axis grows past the second block by the 16-cell minimum step.
         assert_eq!(bbox.min, (0, 0, 0));
-        assert_eq!(bbox.max, (4, 4, 4));
+        assert_eq!(bbox.max, (16, 16, 16));
 
         // Don't test exact dimensions as they depend on expansion strategy
         let dimensions = schematic.get_dimensions();
