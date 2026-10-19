@@ -1266,8 +1266,9 @@ impl Region {
         Self::unpack_exact(&padded, bits_per_block, volume)
     }
 
-    /// Like [`Self::unpack_block_states`], but rejects a long array too short
-    /// for the volume, or cells that reference a missing palette entry.
+    /// Like [`Self::unpack_block_states`], but rejects a long array of the
+    /// wrong length for the volume, or cells that reference a missing palette
+    /// entry.
     pub fn try_unpack_block_states(&self, packed_states: &[i64]) -> Result<Vec<u32>, String> {
         let bits_per_block = self.calculate_bits_per_block();
         let volume = self.volume();
@@ -1275,9 +1276,9 @@ impl Region {
             .checked_mul(bits_per_block)
             .map(|bits| bits.div_ceil(64))
             .ok_or("BlockStates volume overflow")?;
-        if packed_states.len() < needed {
+        if packed_states.len() != needed {
             return Err(format!(
-                "BlockStates has {} longs, {needed} needed for the region volume",
+                "BlockStates has {} longs, expected {needed} for the region volume",
                 packed_states.len()
             ));
         }
@@ -2505,6 +2506,15 @@ mod tests {
                 assert_eq!(region.blocks, before);
             }
         }
+    }
+
+    #[test]
+    fn try_unpack_block_states_requires_the_exact_length() {
+        // 4 cells at 2 bits each: exactly one long.
+        let region = Region::new("t".to_string(), (0, 0, 0), (2, 1, 2));
+        assert!(region.try_unpack_block_states(&[0]).is_ok());
+        assert!(region.try_unpack_block_states(&[]).is_err());
+        assert!(region.try_unpack_block_states(&[0, 0]).is_err());
     }
 
     #[test]

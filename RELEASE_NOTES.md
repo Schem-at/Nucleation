@@ -1,3 +1,8 @@
+# Unreleased
+
+- `.litematic` loading rejects a `BlockStates` array longer than the region
+  needs (trailing longs were silently ignored).
+
 # Nucleation v0.10.25
 
 Faster and leaner defaults across the core engine and formats, with no
