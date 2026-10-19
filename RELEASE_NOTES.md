@@ -1,9 +1,7 @@
 # Unreleased
 
-- `.litematic` loading rejects a `BlockStates` array with more longs than the
-  region volume and palette need, as it already rejected one with fewer.
-  Trailing longs used to be ignored silently, hiding corrupt or hand-edited
-  files from callers that validate untrusted input.
+- `.litematic` loading rejects a `BlockStates` array longer than the region
+  needs (trailing longs were silently ignored).
 
 # Nucleation v0.10.25
 

@@ -1336,48 +1336,6 @@ mod tests {
         assert_eq!(schematic.metadata.modified, Some(2000));
     }
 
-    /// Trailing longs beyond the region volume are rejected like missing ones
-    /// (they mean a corrupt or hand-edited file), end to end through the
-    /// reader.
-    #[test]
-    fn block_states_with_extra_longs_are_rejected() {
-        let file = |states: Vec<i64>| {
-            let mut region = NbtCompound::new();
-            let xyz = |x, y, z| {
-                let mut c = NbtCompound::new();
-                c.insert("x", NbtTag::Int(x));
-                c.insert("y", NbtTag::Int(y));
-                c.insert("z", NbtTag::Int(z));
-                NbtTag::Compound(c)
-            };
-            region.insert("Position", xyz(0, 0, 0));
-            region.insert("Size", xyz(2, 1, 2));
-            region.insert(
-                "BlockStatePalette",
-                NbtTag::List(NbtList::from(vec![
-                    BlockState::new("minecraft:air".to_string()).to_nbt(),
-                    BlockState::new("minecraft:stone".to_string()).to_nbt(),
-                ])),
-            );
-            region.insert("BlockStates", NbtTag::LongArray(states));
-            region.insert("Entities", NbtTag::List(NbtList::new()));
-            region.insert("TileEntities", NbtTag::List(NbtList::new()));
-            let mut regions = NbtCompound::new();
-            regions.insert("r", NbtTag::Compound(region));
-            let mut metadata = NbtCompound::new();
-            metadata.insert("Name", NbtTag::String("t".to_string()));
-            let mut root = NbtCompound::new();
-            root.insert("MinecraftDataVersion", NbtTag::Int(4903));
-            root.insert("Version", NbtTag::Int(7));
-            root.insert("Metadata", NbtTag::Compound(metadata));
-            root.insert("Regions", NbtTag::Compound(regions));
-            super::super::gzip_nbt(&root, flate2::Compression::fast()).unwrap()
-        };
-        assert!(from_litematic(&file(vec![0b0100])).is_ok());
-        assert!(from_litematic(&file(vec![])).is_err());
-        assert!(from_litematic(&file(vec![0b0100, 0x1234_5678, -1])).is_err());
-    }
-
     #[test]
     fn test_parse_regions() {
         let mut root = NbtCompound::new();

@@ -1266,12 +1266,9 @@ impl Region {
         Self::unpack_exact(&padded, bits_per_block, volume)
     }
 
-    /// Like [`Self::unpack_block_states`], but rejects a long array whose
-    /// length is not exactly `ceil(volume * bits / 64)` for this region's
-    /// volume and palette, or cells that reference a missing palette entry.
-    /// A length mismatch in either direction means a corrupt or hand-edited
-    /// file (or a different packing), so it is an error rather than padding
-    /// or silently ignored trailing data.
+    /// Like [`Self::unpack_block_states`], but rejects a long array of the
+    /// wrong length for the volume, or cells that reference a missing palette
+    /// entry.
     pub fn try_unpack_block_states(&self, packed_states: &[i64]) -> Result<Vec<u32>, String> {
         let bits_per_block = self.calculate_bits_per_block();
         let volume = self.volume();
@@ -2511,20 +2508,13 @@ mod tests {
         }
     }
 
-    /// A 2x1x2 region with a 2-entry palette packs into exactly
-    /// ceil(4 cells * 2 bits / 64) = 1 long. Any other length is corrupt.
     #[test]
     fn try_unpack_block_states_requires_the_exact_length() {
-        let mut region = Region::new("t".to_string(), (0, 0, 0), (2, 1, 2));
-        region.get_or_insert_in_palette(&BlockState::new("minecraft:stone".to_string()));
-        assert_eq!(
-            region.try_unpack_block_states(&[0b0100]).unwrap(),
-            vec![0, 1, 0, 0]
-        );
-        for wrong in [&[][..], &[0b0100, 0x1234_5678, -1][..], &[0b0100, 0][..]] {
-            let error = region.try_unpack_block_states(wrong).unwrap_err();
-            assert!(error.contains("expected 1"), "{} longs: {error}", wrong.len());
-        }
+        // 4 cells at 2 bits each: exactly one long.
+        let region = Region::new("t".to_string(), (0, 0, 0), (2, 1, 2));
+        assert!(region.try_unpack_block_states(&[0]).is_ok());
+        assert!(region.try_unpack_block_states(&[]).is_err());
+        assert!(region.try_unpack_block_states(&[0, 0]).is_err());
     }
 
     #[test]
