@@ -1,3 +1,8 @@
+# Unreleased
+
+- Block data updated to Minecraft 26.3 (90 new blocks; Bedrock mappings now
+  carry stair shape). The `wool` and `concrete` palettes keep to full blocks.
+
 # Nucleation v0.10.26
 
 - `.litematic` loading rejects a `BlockStates` array longer than the region

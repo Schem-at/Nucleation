@@ -24,12 +24,14 @@ fn test_bedrock_mapping_count_and_known_blocks() {
         Some("minecraft:stone[]")
     );
 
-    // Property translation: Java stairs facing/half -> Bedrock weirdo_direction/upside_down_bit
+    // Property translation: Java stairs facing/half/shape -> Bedrock
+    // weirdo_direction/upside_down_bit/minecraft:corner (the corner state
+    // arrived with the GeyserMC/mappings 26.3 refresh)
     assert_eq!(
         BedrockBlockStateMapper::java_to_bedrock(
             "minecraft:oak_stairs[facing=north,half=top,shape=straight,waterlogged=true]"
         ),
-        Some("minecraft:oak_stairs[upside_down_bit=true,weirdo_direction=3]")
+        Some("minecraft:oak_stairs[minecraft:corner=none,upside_down_bit=true,weirdo_direction=3]")
     );
 
     // 26.2-only block, gained with the GeyserMC/mappings 26.2 refresh
