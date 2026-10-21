@@ -483,15 +483,19 @@ class CountingRouter(router_mod.Router):
     def _find_checked(self, src, dst, label, friendly):
         """find(), rejecting self-conflicting paths: a path that crosses
         directly above its own earlier segment lays the flyover's support
-        ON the lower dust (emit is sequential and cannot know the future)."""
+        ON the lower dust (emit is sequential and cannot know the future).
+        Also rejects paths with a stretch no refresh can keep alive, falling
+        back to the first such path (with a warning) if no alternative is
+        found."""
         self.veto = set()
+        fallback = None
         for _attempt in range(6):
             path = self.find(src, dst, label, friendly)
             if path is None:
                 path = self.find(src, dst, label, friendly,
                                  max_iter=10_000_000)
             if path is None:
-                return None
+                break
             cells_ = {p for p, _mv in path}
             dsts = {dst} if isinstance(dst, tuple) else set(dst)
             # (a) support collision: a flyover's support lands ON a lower
@@ -503,11 +507,18 @@ class CountingRouter(router_mod.Router):
                     if (p[0], p[1] - 2, p[2]) in cells_
                     or (p[0], p[1] - 2, p[2]) in dsts]
             if not bad:
-                self.veto = set()
-                return path
+                dead = self.dead_stretch(path)
+                if dead is None:
+                    self.veto = set()
+                    return path
+                fallback = fallback or path
+                self.veto |= set(dead)
+                continue
             self.veto |= set(bad)
         self.veto = set()
-        return None
+        if fallback is not None:
+            print("WARNING: %s route has a stretch no refresh can keep alive" % label)
+        return fallback
 
     def explain(self, p, label):
         """Why can this cell not take dust for `label`?  (debug aid)"""

@@ -332,6 +332,12 @@ fn main() -> Result<()> {
 ///   derived by joining the `minecraft:block_entity_type` registry
 ///   (`generated/reports/registries.json`) to the blocks report's
 ///   `definition.type` kinds (see `block_entity_kinds`).
+///
+/// Since 26.3 the blocks report omits `definition` (no kind, no base state).
+/// Without it, kind and base carry over from the committed snapshot for
+/// blocks it already knows, and new blocks take the kind of their closest
+/// existing analogue (see `analogue_kind`); new bases still come from model
+/// textures.
 fn generate_semantics(
     report: &Map<String, Value>,
     server_jar: &Path,
@@ -344,6 +350,38 @@ fn generate_semantics(
     let tags_by_block = extract_block_tags(server_jar)?;
     let entity_kinds = block_entity_kinds(gen_dir)?;
 
+    let has_definitions = report.values().any(|entry| entry.get("definition").is_some());
+    let previous: Map<String, Value> = if has_definitions {
+        Map::new()
+    } else {
+        println!("Blocks report has no definitions: carrying kind/base over from {SEMANTICS_PATH}");
+        serde_json::from_str(&read_gz(Path::new(SEMANTICS_PATH))?)
+            .context("Failed to parse the committed block semantics")?
+    };
+    let previous_field = |id: &str, field: &str| -> Option<String> {
+        previous.get(id)?.get(field)?.as_str().map(String::from)
+    };
+    let mut inferred: Vec<String> = Vec::new();
+    let mut kind_of: HashMap<&str, String> = HashMap::new();
+    for (id, entry) in report {
+        let kind = match entry["definition"]["type"].as_str() {
+            Some(kind) => kind.to_string(),
+            None if has_definitions => "minecraft:block".to_string(),
+            None => previous_field(id, "kind").unwrap_or_else(|| {
+                let kind = analogue_kind(id, &previous);
+                inferred.push(format!("{id} -> {kind}"));
+                kind
+            }),
+        };
+        kind_of.insert(id.as_str(), kind);
+    }
+    if !inferred.is_empty() {
+        println!("Inferred kinds for {} new blocks (review):", inferred.len());
+        for line in &inferred {
+            println!("  {line}");
+        }
+    }
+
     // Pass 1: kind + full_cube for every block; collect texture ownership of
     // full cubes for the base linkage below.
     let mut kinds: HashMap<&str, &str> = HashMap::new();
@@ -351,10 +389,7 @@ fn generate_semantics(
     let mut cube_textures: HashMap<&str, BTreeSet<String>> = HashMap::new();
     for (id, entry) in report {
         let name = id.strip_prefix("minecraft:").unwrap_or(id);
-        let kind = entry["definition"]["type"]
-            .as_str()
-            .unwrap_or("minecraft:block");
-        kinds.insert(id.as_str(), kind);
+        kinds.insert(id.as_str(), kind_of[id.as_str()].as_str());
         let full_cube = full_cube_override(name).unwrap_or_else(|| classifier.is_full_cube(name));
         if full_cube {
             full_cubes.insert(id.as_str());
@@ -389,7 +424,8 @@ fn generate_semantics(
 
         let mut base: Option<String> = entry["definition"]["base_state"]["Name"]
             .as_str()
-            .map(String::from);
+            .map(String::from)
+            .or_else(|| previous_field(id, "base"));
         if base.is_some() {
             base_from_report += 1;
         } else if !full_cube {
@@ -449,6 +485,40 @@ fn generate_semantics(
     write_gz(Path::new(SEMANTICS_PATH), &pretty)?;
     println!("Wrote {SEMANTICS_PATH}.");
     Ok(())
+}
+
+/// The kind of the existing block most like `id`, for a block the committed
+/// snapshot does not know: same number of `_`-separated words, same last word
+/// (the block's noun), then the most other words in the same positions. Ties
+/// go to the most common kind among the best matches, then alphabetically.
+/// `potted_poplar_sapling` matches `potted_oak_sapling` (flower pot), not
+/// `oak_sapling`; `black_concrete_slab` matches the slab family.
+fn analogue_kind(id: &str, previous: &Map<String, Value>) -> String {
+    let words: Vec<&str> = id.trim_start_matches("minecraft:").split('_').collect();
+    let mut best = 0usize;
+    let mut votes: HashMap<&str, usize> = HashMap::new();
+    for (other, facts) in previous {
+        let other_words: Vec<&str> = other.trim_start_matches("minecraft:").split('_').collect();
+        if other_words.len() != words.len() || other_words.last() != words.last() {
+            continue;
+        }
+        let Some(kind) = facts["kind"].as_str() else {
+            continue;
+        };
+        let score = words.iter().zip(&other_words).filter(|(a, b)| a == b).count();
+        if score > best {
+            best = score;
+            votes.clear();
+        }
+        if score == best {
+            *votes.entry(kind).or_default() += 1;
+        }
+    }
+    votes
+        .into_iter()
+        .max_by(|a, b| a.1.cmp(&b.1).then(b.0.cmp(a.0)))
+        .map(|(kind, _)| kind.to_string())
+        .unwrap_or_else(|| "minecraft:block".to_string())
 }
 
 /// Explicit full-cube overrides for blocks whose render geometry cannot be

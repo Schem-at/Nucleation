@@ -375,6 +375,73 @@ class Router:
     # `strong` sentinel that equals no net label: claims a cell against
     # EVERY net, own included.
     LADDER_ENTRY = "#ladder_entry"
+    # Dust at ss1 still fires a repeater (probe_station A15), so no laid dust
+    # may be more than 14 cells past its last refresh.
+    MAX_SINCE = 14
+
+    def can_refresh(self, path, i):
+        """May emit put a refresh at path cell i?  Only a straight run on one
+        level: dust powers a repeater only along its own line."""
+        if i < 1 or i + 1 >= len(path):
+            return False
+        prev, (x, y, z), nxt = path[i - 1][0], path[i][0], path[i + 1][0]
+        return (prev[1] == y == nxt[1]
+                and (prev[0] == x == nxt[0] or prev[2] == z == nxt[2])
+                and not isinstance(path[i + 1][1], tuple))
+
+    def refresh_gap(self, path, i):
+        """New dust cells after cell i before the next cell that can host a
+        refresh, the path end, or a cell that resets the budget anyway (a
+        climb, or reused trunk)."""
+        gap = 0
+        for k in range(i + 1, len(path)):
+            p, mv = path[k]
+            if isinstance(mv, tuple) or "redstone_wire" in self.b.cells.get(p, ""):
+                break
+            if self.can_refresh(path, k):
+                break
+            gap += 1
+        return gap
+
+    def refresh_due(self, path, i, since):
+        """emit's refresh policy for cell i, `since` cells after the last
+        refresh: full pitch on long straights, an early bank before a
+        stair/climb tail (the tail cannot host repeaters and must not start a
+        long descent on a nearly-spent budget), and always when the dust up
+        to the next refresh opportunity would otherwise run dead."""
+        if not self.can_refresh(path, i):
+            return False
+        x, y, z = path[i][0]
+        nxt = path[i + 1][0]
+        nxt2 = path[i + 2][0] if i + 2 < len(path) else None
+        cont = (nxt2 is not None and nxt[1] == y == nxt2[1]
+                and (nxt[0] == x == nxt2[0] or nxt[2] == z == nxt2[2])
+                and not isinstance(path[i + 2][1], tuple))
+        return (since >= (self.REFRESH if cont else self.REFRESH - 6)
+                or since + self.refresh_gap(path, i) > self.MAX_SINCE)
+
+    def dead_stretch(self, path):
+        """Dry-run emit's strength budget: the cells of the first stretch that
+        no refresh could keep above ss0, or None if the path stays alive.
+        Zig-zag stairs (stair, flat, stair, ...) never form a straight cell,
+        so the stair cap alone does not bound them."""
+        since = self.REFRESH - self.FIRST
+        stretch = []
+        for i, (p, mv) in enumerate(path):
+            if isinstance(mv, tuple):
+                since, stretch = 0, []
+                continue
+            if "redstone_wire" in self.b.cells.get(p, ""):
+                since, stretch = 15 - self.ss.get(p, 1), []
+                continue
+            since += 1
+            if self.refresh_due(path, i, since):
+                since, stretch = 0, []
+                continue
+            if since > self.MAX_SINCE:
+                return stretch + [p]
+            stretch.append(p)
+        return None
 
     def station_ok(self, path, i, label, friendly=None):
         """May a block-sandwich station (block/repeater/block) replace path
@@ -484,20 +551,8 @@ class Router:
                 i += 1
                 continue
             prev = path[i - 1][0] if i else None
-            nxt = path[i + 1][0] if i + 1 < len(path) else None
-            straight = (prev is not None and nxt is not None
-                        and prev[1] == y == nxt[1]
-                        and (prev[0] == x == nxt[0] or prev[2] == z == nxt[2])
-                        and not isinstance(path[i + 1][1], tuple))
-            # bank a refresh at the last straight cell before a stair/climb
-            # tail: the tail cannot host repeaters and must not start a long
-            # descent on a nearly-spent budget
-            nxt2 = path[i + 2][0] if i + 2 < len(path) else None
-            cont = (nxt2 is not None and nxt[1] == y == nxt2[1]
-                    and (nxt[0] == x == nxt2[0] or nxt[2] == z == nxt2[2])
-                    and not isinstance(path[i + 2][1], tuple))
             since += 1
-            if straight and since >= (self.REFRESH if cont else self.REFRESH - 6):
+            if self.refresh_due(path, i, since):
                 d = {(-1, 0): "west", (1, 0): "east",
                      (0, -1): "north", (0, 1): "south"}[(prev[0] - x, prev[2] - z)]
                 if self.station_ok(path, i, label, friendly):

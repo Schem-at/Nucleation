@@ -28,7 +28,9 @@ fn s3_contract_against_minio_container() {
     // and waits for "API:" on stdout, but current MinIO logs that banner to
     // stderr. Build it as a GenericImage pinned to a current release so
     // `If-None-Match` is enforced like real S3 (required by `put_if_absent`).
-    let node = GenericImage::new("minio/minio", "RELEASE.2025-09-07T16-13-09Z")
+    // MinIO no longer publishes community images (`minio/minio` is gone from
+    // Docker Hub); `pgsty/minio` is a maintained build of the same server.
+    let node = GenericImage::new("pgsty/minio", "RELEASE.2026-08-04T00-00-00Z")
         .with_wait_for(WaitFor::message_on_stderr("API:"))
         .with_exposed_port(9000.tcp())
         .with_env_var("MINIO_ROOT_USER", "minioadmin")
