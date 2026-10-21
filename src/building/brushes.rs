@@ -293,14 +293,18 @@ impl BlockPalette {
         }
     }
 
-    /// Create a palette containing only concrete blocks
+    /// Create a palette containing only concrete blocks (full cubes: not
+    /// powder, slabs or stairs)
     pub fn new_concrete() -> Self {
-        Self::new_filtered(|f| f.id.contains("concrete") && !f.id.contains("powder"))
+        Self::new_filtered(|f| {
+            f.id.contains("concrete") && !f.id.contains("powder") && f.is_full_cube()
+        })
     }
 
-    /// Create a palette containing only wool blocks
+    /// Create a palette containing only wool blocks (full cubes: not slabs
+    /// or stairs)
     pub fn new_wool() -> Self {
-        Self::new_filtered(|f| f.id.contains("wool"))
+        Self::new_filtered(|f| f.id.contains("wool") && f.is_full_cube())
     }
 
     /// Create a palette containing only terracotta blocks
