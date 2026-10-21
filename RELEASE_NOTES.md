@@ -1,4 +1,4 @@
-# Unreleased
+# Nucleation v0.10.27
 
 - Block data updated to Minecraft 26.3 (90 new blocks; Bedrock mappings now
   carry stair shape). The `wool` and `concrete` palettes keep to full blocks.
