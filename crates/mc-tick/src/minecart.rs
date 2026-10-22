@@ -240,6 +240,7 @@ pub fn cart_container_slots(kind: &str) -> Option<u32> {
     }
 }
 
+/// A minecart's collision box, from its bottom-centre position.
 pub fn cart_aabb(pos: [f64; 3]) -> ([f64; 3], [f64; 3]) {
     (
         [pos[0] - CART_HALF_WIDTH, pos[1], pos[2] - CART_HALF_WIDTH],

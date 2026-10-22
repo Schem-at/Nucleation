@@ -1,3 +1,4 @@
+#[cfg(feature = "simulation")]
 use nucleation::UniversalSchematic;
 
 #[cfg(feature = "simulation")]

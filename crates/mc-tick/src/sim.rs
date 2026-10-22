@@ -675,6 +675,7 @@ impl Simulation {
         self.item_entities.contents.get(&id).map(Vec::as_slice)
     }
 
+    /// Every item entity ever spawned as `(id, item)`, removed ones included.
     pub fn item_name_log(&self) -> &[(u32, String)] {
         &self.item_entities.name_log
     }
@@ -719,6 +720,7 @@ impl Simulation {
         self.lava_kinds = lava_kinds;
     }
 
+    /// Set the per-state rail and rail-conductor tables, indexed by `StateId`.
     pub fn set_rail_tables(
         &mut self,
         rails: Vec<Option<crate::minecart::Rail>>,
@@ -728,8 +730,6 @@ impl Simulation {
         self.conductors = conductors;
     }
 
-    /// Spawn a minecart. Ids come from the shared entity counter, so carts
-    /// and items interleave exactly as a placed structure's entity list does.
     /// Seed the vanilla random source (`LegacyRandomSource`'s LCG).
     ///
     /// Behaviours that jitter — dispense trajectories, dispenser slot choice,
@@ -757,6 +757,8 @@ impl Simulation {
         self.random_tick_speed = speed;
     }
 
+    /// Spawn a minecart. Ids come from the shared entity counter, so carts
+    /// and items interleave exactly as a placed structure's entity list does.
     pub fn spawn_minecart(&mut self, kind: String, pos: [f64; 3], vel: [f64; 3]) -> u32 {
         let id = self.item_entities.next_id;
         self.item_entities.next_id += 1;
@@ -1805,7 +1807,7 @@ impl Simulation {
                     );
                 }
                 let mut current = (min, max);
-                let mut apply = |sim: &mut Self, from: ([f64; 3], [f64; 3]), travel, amount| {
+                let apply = |sim: &mut Self, from: ([f64; 3], [f64; 3]), travel, amount| {
                     let moved = sim.shove(from.0, from.1, travel, amount, id, is_cart, shover);
                     if std::env::var_os("MC_TICK_TRACE_SHOVE").is_some() {
                         eprintln!(
@@ -1865,7 +1867,7 @@ impl Simulation {
                     ) {
                         let out = sweep.travel.opposite();
                         if let Some(amount) = self.limit_piston_movement(id, out, fix) {
-                            current = apply(self, current, out, amount);
+                            apply(self, current, out, amount);
                         }
                     }
                 }
@@ -2538,6 +2540,7 @@ impl Simulation {
         self.events.peek().iter().map(|e| (e.pos, e.id)).collect()
     }
 
+    /// The number of ticks run so far.
     pub fn tick_count(&self) -> u64 {
         self.tick
     }
@@ -2828,6 +2831,8 @@ impl Simulation {
         self.commands.insert(pos, program);
     }
 
+    /// Set the stored output signal of the comparator at `pos` (its
+    /// `OutputSignal` block-entity value).
     pub fn set_comparator_output(&mut self, pos: Pos, strength: u8) {
         self.comparator_out.insert(pos, strength);
     }

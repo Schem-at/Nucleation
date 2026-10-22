@@ -1,6 +1,8 @@
 use crate::metadata::Metadata;
 use crate::region::Region;
-use crate::{BlockState, UniversalSchematic};
+use crate::UniversalSchematic;
+#[cfg(test)]
+use crate::BlockState;
 
 impl std::fmt::Debug for UniversalSchematic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -25,18 +27,11 @@ pub fn format_schematic(schematic: &UniversalSchematic) -> String {
     output
 }
 
+#[cfg(test)]
 pub fn get_schematic_json(schematic: &UniversalSchematic) -> String {
     schematic
         .get_json_string()
         .unwrap_or_else(|e| format!("Failed to serialize: {}", e))
-}
-
-pub fn format_palette(palette: &Vec<BlockState>) -> String {
-    let mut output = String::from("Palette:\n");
-    for (i, block) in palette.iter().enumerate() {
-        output.push_str(&format!("  {}: {}\n", i, block.name));
-    }
-    output
 }
 
 pub fn format_region(name: &str, region: &Region) -> String {
@@ -90,6 +85,7 @@ pub fn format_json_schematic(schematic: &UniversalSchematic) -> String {
     }
 }
 
+#[cfg(test)]
 pub fn format_block_state(block: &BlockState) -> String {
     let mut output = format!("Block: {}\n", block.name);
     if !block.properties.is_empty() {

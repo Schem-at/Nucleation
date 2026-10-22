@@ -864,6 +864,8 @@ pub fn blast_resistance(name: &str) -> Option<f32> {
     })
 }
 
+/// Parse a command block's command, or `None` for anything this engine does
+/// not run.
 pub fn parse_command(text: &str) -> Option<ParsedCommand> {
     let mut words = text.trim().trim_start_matches('/').split_whitespace();
     match words.next()? {
@@ -3813,15 +3815,15 @@ fn face_name(dir: Dir) -> &'static str {
     }
 }
 
+/// The values a wire's four side properties take — `RedstoneSide`.
+const WIRE_SIDE_VALUES: [&str; 3] = ["none", "side", "up"];
+
 /// Intern every state a block needs, including the ones it transitions into.
 ///
 /// A structure only contains the states it was saved with: an unextended piston
 /// has no reason to mention `extended=true`, and a build never mentions
 /// `moving_piston` at all. Without their counterparts a block cannot change state,
 /// so a simulation would silently freeze.
-/// The values a wire's four side properties take — `RedstoneSide`.
-const WIRE_SIDE_VALUES: [&str; 3] = ["none", "side", "up"];
-
 pub fn intern_companions(registry: &mut StateRegistry) {
     let existing: Vec<String> = (0..registry.len())
         .filter_map(|i| registry.descriptor(StateId(i as u16)).map(str::to_string))

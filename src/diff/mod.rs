@@ -299,12 +299,15 @@ fn raw_score(raw: &RawDiff) -> usize {
 }
 
 /// Hard cap on the candidates in a single refinement grid (7³ — the
-/// exhaustive grid for a ±3 window).
+/// exhaustive grid for a ±3 window). Documents the bound `refinement_offsets`
+/// keeps; the tests assert it.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) const REFINE_MAX_PASSES: usize = 343;
 
 /// Hard cap on total `compare` passes for a whole `refine_offset` call: the
 /// coarse grid plus, when that grid was strided, one exhaustive sweep of the
-/// gap around its winner.
+/// gap around its winner. Asserted in tests.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) const REFINE_MAX_TOTAL_PASSES: usize = 2 * REFINE_MAX_PASSES;
 
 /// Candidate offsets for [`refine_offset`]: `base` plus a symmetric grid of

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::fmt;
 #[cfg(test)]
 use std::io::BufReader;
+#[cfg(test)]
 use std::io::Read;
 
 use crate::block_entity::BlockEntity;
@@ -334,6 +335,7 @@ fn to_schematic_v2(schematic: &UniversalSchematic, compression: Compression) -> 
 }
 
 // Palette conversion for v3 (creates clean sequential indices)
+#[cfg(test)]
 fn convert_palette(palette: &Vec<BlockState>) -> (NbtCompound, i32) {
     let (nbt_palette, _) = convert_palette_with_mapping(palette);
     let max_id = nbt_palette.len() as i32 - 1;
@@ -757,6 +759,7 @@ fn encode_varint_into(value: u32, buf: &mut Vec<u8>) {
     }
 }
 
+#[cfg(test)]
 fn decode_varint<R: Read>(reader: &mut R) -> Result<u32> {
     let mut result = 0u32;
     let mut shift = 0;
