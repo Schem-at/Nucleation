@@ -530,6 +530,9 @@ fn render(schematic: &crate::UniversalSchematic, data_version: i32) -> String {
         nbt_at.insert(be.position, compound_snbt(&be.nbt));
     }
 
+    // Block-state field names follow the stamped version: `Name`/`Properties`
+    // before 26.3's data version 5006, `id`/`properties` from it on.
+    let (name_key, props_key) = crate::dataconverter::block_state_keys(data_version);
     let mut palette: Vec<String> = Vec::new();
     let mut palette_index: HashMap<String, usize> = HashMap::new();
     let mut blocks = String::new();
@@ -543,9 +546,9 @@ fn render(schematic: &crate::UniversalSchematic, data_version: i32) -> String {
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
         props.sort();
-        let mut entry = format!("{{Name:\"{}\"", state.name);
+        let mut entry = format!("{{{name_key}:\"{}\"", state.name);
         if !props.is_empty() {
-            entry.push_str(", Properties:{");
+            let _ = write!(entry, ", {props_key}:{{");
             for (i, (k, v)) in props.iter().enumerate() {
                 if i > 0 {
                     entry.push_str(", ");
