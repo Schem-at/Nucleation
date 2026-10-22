@@ -232,7 +232,7 @@ mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "2e62496"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # mc-data-refresh tooling only (never in normal builds; see the feature note)
-reqwest = { version = "0.12", features = ["blocking", "json"], optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"], optional = true }
 
 [build-dependencies]
 # build.rs gunzips data/blockpedia/*.json.gz and generates the PHF block
