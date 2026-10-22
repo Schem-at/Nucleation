@@ -500,8 +500,6 @@ fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
                 .map(|(position, block_entity)| {
                     let mut block_entity_nbt = block_entity.to_nbt();
 
-                    // The storage key, not `block_entity.position`, which is
-                    // stale for templates shared across positions.
                     let rel_x = position.0 - compact_region.position.0;
                     let rel_y = position.1 - compact_region.position.1;
                     let rel_z = position.2 - compact_region.position.2;

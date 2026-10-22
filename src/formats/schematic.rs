@@ -595,8 +595,6 @@ fn convert_block_entities_v3(region: &Region, data_version: Option<i32>) -> NbtL
 
     for (position, block_entity) in region.block_entities.iter() {
         let mut nbt = block_entity.to_nbt_v3(data_version);
-        // The storage key, not `block_entity.position`, which is stale for
-        // templates shared across positions.
         let rel_x = position.0 - region.position.0;
         let rel_y = position.1 - region.position.1;
         let rel_z = position.2 - region.position.2;
