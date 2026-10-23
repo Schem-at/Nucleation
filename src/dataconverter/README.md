@@ -9,8 +9,9 @@ version can be edited and re-saved for another.
 ## Model
 
 - **Canonical version** — all loaded data is forward-converted to a single
-  in-memory data version, `CANONICAL_DATA_VERSION` (currently `4790`). Editing
-  always happens at canonical; "save as current" stamps this version.
+  in-memory data version, `CANONICAL_DATA_VERSION` (currently `5023`,
+  Minecraft 26.3). Editing always happens at canonical; "save as current"
+  stamps this version.
 - **Forward conversion** (old → new) mirrors the Java engine exactly and is
   lossless.
 - **Reverse conversion** (new → old) is needed to save for an older version. It
@@ -28,6 +29,10 @@ The entry points most callers use live on `UniversalSchematic`
 `canonicalDataVersion`, …). Directly from this module:
 
 - `CANONICAL_DATA_VERSION` / `DATACONVERTER_FORWARD_MAX` — version constants.
+- `block_state_keys(data_version)` / `BLOCK_STATE_FIELD_NAMES_VERSION` — the
+  block-state compound field names at a data version (`Name`/`Properties`
+  before 5006, `id`/`properties` from 26.3's V5006 on). Anything that writes a
+  block-state compound into a file stamped with a data version must use them.
 - `apply::convert_schematic` / `apply::convert_schematic_reverse` — convert a
   `UniversalSchematic` in place; the reverse form returns a `LossReport`.
 - `loss::{LossReport, LossEntry, LossKind, Severity}` — the loss model. Each
@@ -47,6 +52,16 @@ The entry points most callers use live on `UniversalSchematic`
 | `types.rs`, `components.rs`, `helpers.rs`, `walker.rs` | Shared NBT type defs + helpers. |
 | `flattening/` | The 1.13 "flattening" block/item tables. |
 | `versions/vXXXX.rs` | One file per data-version step; each registers its forward (and, where written, reverse) converters into the registry. |
+
+## Sources past upstream
+
+Upstream DataConverter stops at V4892 (26.2 is 4903). The 26.3 steps
+(`v4996.rs` … `v5016.rs`) are ported directly from Mojang's own datafixer in the
+unobfuscated 26.3 server jar (`net.minecraft.util.datafix.DataFixers` and the
+`fixes/` / `schemas/` classes it registers); each file cites the Mojang class
+it ports. Mojang schema versions with nothing in scope get no file: 5000
+(cushion, a simple entity), 5001 (debug profiles), 5009 / 5013 (chunk
+blending / status), and the CHUNK half of 4997 (blending).
 
 ## Authoring reverse converters
 

@@ -19,27 +19,42 @@ use super::registry::{
     registry,
 };
 use super::types::{MapExt, ValueExt};
+use super::versions::block_state_keys;
 
 /// Convert one palette [`BlockState`] in place through the BLOCK_STATE converter
 /// chain (block renames + per-block property fixers). Round-trips the struct
-/// through the `{Name, Properties}` NBT shape the engine expects.
+/// through the BLOCK_STATE NBT shape the engine expects at each end
+/// (`{Name, Properties}`, or `{id, properties}` from V5006 on).
 pub fn convert_block_state_struct(bs: &mut BlockState, from: i32, to: i32) {
+    let mut map = block_state_to_map(bs, from);
+    convert_block_state(&mut map, from, to);
+    block_state_from_map(bs, &map, to);
+}
+
+/// Present a [`BlockState`] as the BLOCK_STATE compound of data version `dv`:
+/// `{Name, Properties}` before V5006, `{id, properties}` from V5006 on
+/// (`versions/v5006.rs`).
+fn block_state_to_map(bs: &BlockState, dv: i32) -> NbtMap {
+    let (name_key, props_key) = block_state_keys(dv);
     let mut map = NbtMap::new();
-    map.set_string("Name", bs.get_name());
+    map.set_string(name_key, bs.get_name());
     if !bs.properties.is_empty() {
         let mut props = NbtMap::new();
         for (k, v) in &bs.properties {
             props.set_string(k.as_str(), v.as_str());
         }
-        map.set_map("Properties", props);
+        map.set_map(props_key, props);
     }
+    map
+}
 
-    convert_block_state(&mut map, from, to);
-
-    if let Some(name) = map.get_string("Name") {
+/// Read a converted BLOCK_STATE compound of data version `dv` back into `bs`.
+fn block_state_from_map(bs: &mut BlockState, map: &NbtMap, dv: i32) {
+    let (name_key, props_key) = block_state_keys(dv);
+    if let Some(name) = map.get_string(name_key) {
         bs.name = SmolStr::from(name);
     }
-    let mut entries: Vec<(SmolStr, SmolStr)> = match map.get_map("Properties") {
+    let mut entries: Vec<(SmolStr, SmolStr)> = match map.get_map(props_key) {
         Some(props) => props
             .iter()
             .filter_map(|(k, v)| {
@@ -160,12 +175,27 @@ pub fn convert_region(region: &mut Region, from: i32, to: i32) {
     let entries = region.block_entities.drain();
     for (pos, mut be) in entries {
         convert_block_entity_struct(&mut be, from, to);
+        if block_entity_removed(&be.id, from, to) {
+            continue;
+        }
         region.block_entities.insert(pos, be);
     }
 
     for entity in &mut region.entities {
         convert_entity_struct(entity, from, to);
     }
+}
+
+/// The schematic analogue of upstream's CHUNK `block_entities` removal in
+/// `ConverterAbstractTileEntityRemove` (see `versions/v4885.rs`): a block
+/// entity whose (converted) id was removed from the game at a version this
+/// forward conversion crosses is dropped from the region. The removed block
+/// entities carry no data beyond their id, so the reverse direction does not
+/// recreate them.
+fn block_entity_removed(id: &str, from: i32, to: i32) -> bool {
+    super::versions::REMOVED_BLOCK_ENTITIES
+        .iter()
+        .any(|&(version, removed)| from < version && version <= to && id == removed)
 }
 
 /// Convert an entire schematic's blocks + block entities from `from` to `to`.
@@ -185,33 +215,9 @@ pub fn convert_schematic(schematic: &mut UniversalSchematic, from: i32, to: i32)
 /// the caller's reverse session (does not open its own).
 fn convert_block_state_struct_reverse(bs: &mut BlockState, from: i32, to: i32) {
     let reg = registry();
-    let mut map = NbtMap::new();
-    map.set_string("Name", bs.get_name());
-    if !bs.properties.is_empty() {
-        let mut props = NbtMap::new();
-        for (k, v) in &bs.properties {
-            props.set_string(k.as_str(), v.as_str());
-        }
-        map.set_map("Properties", props);
-    }
-
+    let mut map = block_state_to_map(bs, from);
     convert_reverse_under_session(&reg.block_state, &mut map, from, to);
-
-    if let Some(name) = map.get_string("Name") {
-        bs.name = SmolStr::from(name);
-    }
-    let mut entries: Vec<(SmolStr, SmolStr)> = match map.get_map("Properties") {
-        Some(props) => props
-            .iter()
-            .filter_map(|(k, v)| {
-                v.as_str()
-                    .map(|s| (SmolStr::from(k.as_str()), SmolStr::from(s)))
-            })
-            .collect(),
-        None => Vec::new(),
-    };
-    entries.sort_by(|a, b| a.0.cmp(&b.0));
-    bs.properties = entries;
+    block_state_from_map(bs, &map, to);
 }
 
 /// Reverse-convert one [`BlockEntity`] in place (new -> old), under the caller's
@@ -356,6 +362,36 @@ mod tests {
         convert_palette(&mut palette, 1489, 2680);
         assert_eq!(palette[0].get_name(), "minecraft:melon");
         assert_eq!(palette[1].get_name(), "minecraft:dirt_path");
+    }
+
+    #[test]
+    fn palette_bridge_handles_v5006_field_names_both_ways() {
+        // V2680 grass_path -> dirt_path runs on the pre-V5006 `Name` field; the
+        // bridge must read the post-V5006 `id`/`properties` back at 5023.
+        let mut palette = vec![
+            BlockState::new("minecraft:grass_path"),
+            BlockState::new("minecraft:furnace").with_property("facing", "east"),
+        ];
+        convert_palette(&mut palette, 2679, 5023);
+        assert_eq!(palette[0].get_name(), "minecraft:dirt_path");
+        assert_eq!(palette[1].get_name(), "minecraft:furnace");
+        assert_eq!(
+            palette[1].get_property("facing").map(|s| s.as_str()),
+            Some("east")
+        );
+
+        let mut schem = UniversalSchematic::new("p".to_string());
+        schem.default_region.palette = palette;
+        let report = convert_schematic_reverse(&mut schem, 5023, 2679);
+        assert!(report.is_empty(), "{report:?}");
+        let names: Vec<&str> = schem
+            .default_region
+            .palette
+            .iter()
+            .map(|b| b.get_name())
+            .collect();
+        assert!(names.contains(&"minecraft:grass_path"));
+        assert!(names.contains(&"minecraft:furnace"));
     }
 
     #[test]
