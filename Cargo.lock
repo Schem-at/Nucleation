@@ -3443,7 +3443,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.10.27"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "aws-sdk-s3",

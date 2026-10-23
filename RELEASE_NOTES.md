@@ -1,3 +1,23 @@
+# Nucleation v0.11.0
+
+- The data converter targets Minecraft 26.3 (data version 5023) by default.
+  From 5006 on, block states are written with `id`/`properties`; both
+  spellings load.
+- `.schem`/`.litematic` export streams block entities instead of building a
+  tree per entity: large `.schem` export 2.8x faster, output unchanged.
+- Block entities always carry their own position. Breaking for Rust:
+  `BlockEntity::id` is a `SmolStr`.
+- Sponge v2 `.schem` files that store entities in world coordinates load
+  them in place.
+- `.mcstructure` import is deterministic, and converting below 1.17 turns
+  water cauldrons back into cauldrons.
+- Python: `Schematic.set_blocks_indexed`, plus `nucleation.set_blocks_array`
+  and `region_array` for NumPy bulk I/O (100k mixed blocks: 25 ms -> 1 ms).
+- redstone-eda: the router searches within the signal-strength budget, so it
+  never returns a route that runs dead.
+- No compiler warnings; the data-refresh tools use rustls; the S3 store test
+  runs on RustFS.
+
 # Nucleation v0.10.27
 
 - Block data updated to Minecraft 26.3 (90 new blocks; Bedrock mappings now
