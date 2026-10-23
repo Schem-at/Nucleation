@@ -95,8 +95,7 @@ public:
   inline std::unique_ptr<nucleation::SchematicSplitResult> split_connected_attach_nearby(uint32_t min_standalone_blocks, uint32_t max_air_gap) const;
 
   /**
-   * The allocated dimensions (width, height, length) of the schematic's
-   * bounding box.
+   * The dimensions (width, height, length) of the schematic's bounding box.
    */
   inline nucleation::Dimensions dimensions() const;
 
@@ -1067,8 +1066,9 @@ public:
   inline nucleation::Dimensions tight_dimensions() const;
 
   /**
-   * The allocated dimensions (same as `dimensions`; named for parity with
-   * the old `schematic_get_allocated_dimensions`).
+   * The default region's storage dimensions: its bounds plus growth
+   * padding (named for parity with the old
+   * `schematic_get_allocated_dimensions`).
    */
   inline nucleation::Dimensions allocated_dimensions() const;
 

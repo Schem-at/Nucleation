@@ -1122,11 +1122,12 @@ cc
         // Gap at (2,0,0) and (2,0,1)
         assert!(result.get_block(2, 0, 0).is_some()); // Air block
 
-        // Second sub-schematic at (4,0,0), (4,0,1), (5,0,0), (5,0,1)
+        // Second sub-schematic at (3,0,0), (3,0,1), (4,0,0), (4,0,1)
+        assert!(result.get_block(3, 0, 0).is_some());
         assert!(result.get_block(4, 0, 0).is_some());
-        assert!(result.get_block(5, 0, 0).is_some());
+        assert!(result.get_block(3, 0, 1).is_some());
         assert!(result.get_block(4, 0, 1).is_some());
-        assert!(result.get_block(5, 0, 1).is_some());
+        assert!(result.get_block(5, 0, 0).is_none());
     }
 
     #[test]

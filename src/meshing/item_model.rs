@@ -633,7 +633,7 @@ fn build_face_planes(
         let offset = direction_offset(dir);
 
         for index in 0..region.volume() {
-            let (x, y, z) = region.index_to_coords(index);
+            let (x, y, z) = region.bounds_cell(index);
             if x < min.0 || x >= max.0 || y < min.1 || y >= max.1 || z < min.2 || z >= max.2 {
                 continue;
             }
@@ -1476,7 +1476,7 @@ fn build_individual_elements(
     let mut generated_textures: HashSet<String> = HashSet::new();
 
     for index in 0..region.volume() {
-        let (x, y, z) = region.index_to_coords(index);
+        let (x, y, z) = region.bounds_cell(index);
         if x < min.0 || x >= max.0 || y < min.1 || y >= max.1 || z < min.2 || z >= max.2 {
             continue;
         }
@@ -2088,7 +2088,7 @@ impl UniversalSchematic {
 
         for region in std::iter::once(&self.default_region).chain(self.other_regions.values()) {
             for index in 0..region.volume() {
-                let (x, y, z) = region.index_to_coords(index);
+                let (x, y, z) = region.bounds_cell(index);
                 if let Some(block) = region.get_block(x, y, z) {
                     if block.name != "minecraft:air" {
                         min.0 = min.0.min(x);

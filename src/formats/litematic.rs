@@ -631,8 +631,8 @@ fn parse_regions_with_tiles(
             // volume: the unpacked block array replaces it below.
             let bounds = crate::BoundingBox::try_from_position_and_size(position, size)?;
             let mut region = Region::new(name.to_string(), bounds.min, (1, 1, 1));
+            // The unpacker sizes itself from `size`; storage is adopted below.
             region.size = bounds.get_dimensions();
-            region.rebuild_bbox();
 
             // Parse BlockStatePalette
             let palette = region_nbt.get::<_, &NbtList>("BlockStatePalette")?;
@@ -649,7 +649,8 @@ fn parse_regions_with_tiles(
 
             // Parse BlockStates
             let block_states = region_nbt.get::<_, &[i64]>("BlockStates")?;
-            region.blocks = region.try_unpack_block_states(block_states)?;
+            let blocks = region.try_unpack_block_states(block_states)?;
+            region.set_storage(bounds.min, bounds.get_dimensions(), blocks);
 
             // Rebuild caches after directly setting palette and blocks
             region.rebuild_palette_index();

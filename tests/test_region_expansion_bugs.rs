@@ -38,9 +38,8 @@ fn test_basic_dimension_expansion_bug() {
         assert_eq!(tight_dims, (1, 3, 1), "Tight bounds should be (1, 3, 1)");
     }
 
-    // Only the overflowing axis grows, by the 16-cell minimum step (it was
-    // padded by 64 cells on every growth before).
-    assert_eq!(dims2, (1, 17, 1), "Only Y grows, by the minimum step");
+    // Dimensions are the region's bounds; storage padding is not visible.
+    assert_eq!(dims2, (1, 3, 1));
 
     // Now export to schematic and check what dimensions are exported
     let schematic_bytes = schematic::to_schematic(&schematic).expect("Failed to export");
@@ -181,12 +180,8 @@ fn test_tight_bounds_vs_allocated_bounds() {
         "Tight dimensions should be (11, 11, 11)"
     );
 
-    // The allocation covers the content with geometric headroom: each axis
-    // grew once, by the 16-cell minimum step.
-    assert_eq!(allocated_dims_after, (17, 17, 17));
-
-    println!("\nBUG: get_dimensions() returns allocated size, not actual content size!");
-    println!("Should potentially default to tight_dimensions for user-facing API");
+    // Dimensions are the region's bounds; storage padding is not visible.
+    assert_eq!(allocated_dims_after, (11, 11, 11));
 }
 
 #[test]
@@ -292,10 +287,7 @@ fn test_negative_coordinate_expansion_issue() {
         tight_dims.1, 11,
         "Tight Y dimension should be 11 (from -5 to 5 inclusive)"
     );
-    assert!(
-        allocated_dims.1 > 20,
-        "Allocated Y should be much larger due to expansion strategy"
-    );
+    assert_eq!(allocated_dims.1, 11, "Dimensions are the region's bounds");
 }
 
 #[test]

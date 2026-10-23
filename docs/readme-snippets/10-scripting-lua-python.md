@@ -40,4 +40,4 @@ palette:    ["minecraft:air","minecraft:red_concrete","minecraft:orange_concrete
 
 _Environment: CPython 3.14.6 + nucleation 0.3.6 wheel (bridge-full, cp312-abi3), macOS arm64._
 
-<!-- `Scripting.run_lua_script` is file-path-only (no run-from-string entry point in the bridge), hence the tempfile dance. On the returned schematic `dimensions()` reports the allocated (region-padded) box (66, 66, 1) -- `tight_dimensions()` is the real content size. -->
+<!-- `Scripting.run_lua_script` is file-path-only (no run-from-string entry point in the bridge), hence the tempfile dance. -->

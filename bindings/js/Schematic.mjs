@@ -217,8 +217,7 @@ export class Schematic {
     }
 
     /**
-     * The allocated dimensions (width, height, length) of the schematic's
-     * bounding box.
+     * The dimensions (width, height, length) of the schematic's bounding box.
      */
     dimensions() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 12, 4, false);
@@ -3552,8 +3551,9 @@ export class Schematic {
     }
 
     /**
-     * The allocated dimensions (same as `dimensions`; named for parity with
-     * the old `schematic_get_allocated_dimensions`).
+     * The default region's storage dimensions: its bounds plus growth
+     * padding (named for parity with the old
+     * `schematic_get_allocated_dimensions`).
      */
     allocatedDimensions() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 12, 4, false);

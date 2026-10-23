@@ -561,12 +561,10 @@ pub fn from_schematic_bounded(
     // region and converting a second u32 vector used three volume-sized
     // buffers simultaneously (over 3 GiB for a large wasm32 schematic).
     let mut region = Region::new("Main".to_string(), (0, 0, 0), (1, 1, 1));
-    region.size = (width as i32, height as i32, length as i32);
     region.palette = block_palette;
-    region.blocks = block_data;
+    region.set_storage((0, 0, 0), (width as i32, height as i32, length as i32), block_data);
 
     // Rebuild caches after directly setting palette and blocks
-    region.rebuild_bbox();
     region.rebuild_palette_index();
     region.rebuild_air_index();
     region.rescan_content();
