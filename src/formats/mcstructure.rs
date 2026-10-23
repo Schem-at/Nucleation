@@ -165,7 +165,7 @@ pub fn from_mcstructure_bounded(
                 .map(|(k, v): &(SmolStr, SmolStr)| (k.to_string(), v.to_string()))
                 .collect();
 
-            let translated_state = if let Ok(bp_state) =
+            let mut translated_state = if let Ok(bp_state) =
                 crate::blockpedia::BlockState::from_bedrock(&name, bp_props)
             {
                 let translated_props: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = bp_state
@@ -185,6 +185,8 @@ pub fn from_mcstructure_bounded(
                 }
             };
 
+            // Both property sources are hash maps: sort for a stable palette.
+            translated_state.properties.sort_unstable();
             palette.push(translated_state);
         }
     }
@@ -261,8 +263,14 @@ pub fn from_mcstructure_bounded(
     if let Some(NbtValue::Compound(block_position_data)) =
         default_palette.get("block_position_data")
     {
-        for (index_str, data) in block_position_data.iter() {
-            if let Ok(index) = index_str.parse::<i32>() {
+        // In cell order, so block entities do not follow hash-map order.
+        let mut entries: Vec<(i32, &NbtValue)> = block_position_data
+            .iter()
+            .filter_map(|(index_str, data)| Some((index_str.parse::<i32>().ok()?, data)))
+            .collect();
+        entries.sort_unstable_by_key(|&(index, _)| index);
+        for (index, data) in entries {
+            {
                 if let NbtValue::Compound(data_compound) = data {
                     if let Some(NbtValue::Compound(be_data)) =
                         data_compound.get("block_entity_data")

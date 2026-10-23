@@ -132,3 +132,16 @@ fn test_sample_files() {
         assert_eq!(tile_count, re_tile_count, "Block entity count mismatch");
     }
 }
+
+#[test]
+fn import_is_deterministic() {
+    let data = std::fs::read("tests/samples/8-bit_alu.mcstructure").unwrap();
+    let export = || {
+        let schematic = from_mcstructure(&data).unwrap();
+        nucleation::formats::schematic::to_schematic(&schematic).unwrap()
+    };
+    let first = export();
+    for _ in 0..4 {
+        assert!(export() == first);
+    }
+}
