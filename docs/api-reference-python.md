@@ -101,7 +101,7 @@ Exporters return base64 strings: `to_litematic_b64()`, `to_schematic_b64()`,
 `to_litematic_for_version_json(data_version)`). `save_to_file(path)` writes
 bytes directly and infers the format from the extension.
 
-## Dimensions: allocated vs tight
+## Dimensions: bounds vs tight
 
 Two different questions, two different methods:
 
@@ -111,16 +111,17 @@ for x in range(3):
     for y in range(4):
         s.set_block(x, y, 0, "minecraft:stone")
 
-d = s.dimensions()          # allocated region-buffer extent — chunk-sized,
-(d.x, d.y, d.z)             # e.g. (66, 66, 1): NOT the content size
-t = s.tight_dimensions()    # content extent
+d = s.dimensions()          # the schematic's bounds: everything written or
+(d.x, d.y, d.z)             # declared, air included -> (3, 4, 1)
+t = s.tight_dimensions()    # non-air content extent
 (t.x, t.y, t.z)             # (3, 4, 1)
 ```
 
-`dimensions()` and `allocated_dimensions()` both report the allocated buffer —
-storage grows in chunks, so this can exceed the content extent by a wide
-margin. **For "how big is this build", use `tight_dimensions()`** (issue #5).
-`volume()` is the allocated volume; `block_count()` counts non-air blocks.
+`dimensions()` covers every cell that was written (or declared, e.g. by a
+loaded file or a fill), so clearing blocks never shrinks it;
+`tight_dimensions()` follows the non-air content. `allocated_dimensions()`
+reports the default region's storage, which includes growth padding.
+`volume()` is the bounds' volume; `block_count()` counts non-air blocks.
 Tight bounds follow current content, not mutation history: replacing a boundary
 block with air shrinks them, and `tight_bounds_min()` / `tight_bounds_max()`
 raise `NucleationError` with code `NucleationErrorCode.NotFound` once the final non-air block is removed.

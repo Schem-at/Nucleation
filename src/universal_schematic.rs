@@ -576,16 +576,10 @@ impl UniversalSchematic {
         let mut blocks: Vec<BlockState> = Vec::new();
 
         // Add blocks from default region
-        let default_palette = self.default_region.get_palette();
-        for block_index in &self.default_region.blocks {
-            blocks.push(default_palette[*block_index as usize].clone());
-        }
-
-        // Add blocks from named regions in stable order.
-        for region in Self::sorted_named_regions(self) {
-            let region_palette = region.get_palette();
-            for block_index in &region.blocks {
-                blocks.push(region_palette[*block_index as usize].clone());
+        let regions = std::iter::once(&self.default_region).chain(Self::sorted_named_regions(self));
+        for region in regions {
+            for (_, _, row) in region.bounded_rows() {
+                blocks.extend(row.iter().map(|&i| region.palette[i as usize].clone()));
             }
         }
         blocks
@@ -3897,9 +3891,8 @@ mod tests {
 
         let bbox = schematic.get_bounding_box();
 
-        // Each axis grows past the second block by the 16-cell minimum step.
         assert_eq!(bbox.min, (0, 0, 0));
-        assert_eq!(bbox.max, (16, 16, 16));
+        assert_eq!(bbox.max, (4, 4, 4));
 
         // Don't test exact dimensions as they depend on expansion strategy
         let dimensions = schematic.get_dimensions();

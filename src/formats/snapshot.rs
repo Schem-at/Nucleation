@@ -141,7 +141,7 @@ impl<'a> RegionV4Ref<'a> {
             position: region.position,
             size: region.size,
             palette: &region.palette,
-            blocks: PackedBlocks::encode(&region.blocks, region.palette.len()),
+            blocks: PackedBlocks::encode(&region.dense_blocks(), region.palette.len()),
             entities: &region.entities,
             block_entities: &region.block_entities,
         }
@@ -448,9 +448,7 @@ fn schematic_from_v4(snapshot: SnapshotV4) -> Result<UniversalSchematic> {
             .iter()
             .try_fold(1usize, |acc, &d| usize::try_from(d).ok().and_then(|d| acc.checked_mul(d)))
             .ok_or("Snapshot region size is invalid")?;
-        region.blocks = wire.blocks.decode(volume)?;
-        region.position = wire.position;
-        region.size = wire.size;
+        region.set_storage(wire.position, wire.size, wire.blocks.decode(volume)?);
         region.palette = wire.palette;
         region.entities = wire.entities;
         region.block_entities = wire.block_entities;
@@ -551,7 +549,7 @@ fn rebuild_region(region: &mut Region) -> Result<()> {
     if max_index.is_some_and(|max| max as usize >= region.palette.len()) {
         return Err("Snapshot block data references a missing palette entry".into());
     }
-    region.rebuild_bbox();
+    region.adopt_storage();
     region.rebuild_palette_index();
     region.rebuild_air_index();
     region.rescan_content();

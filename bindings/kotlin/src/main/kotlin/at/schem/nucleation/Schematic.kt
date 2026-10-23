@@ -663,8 +663,7 @@ class Schematic internal constructor (
         return returnOpaque
     }
 
-    /** The allocated dimensions (width, height, length) of the schematic's
-    *bounding box.
+    /** The dimensions (width, height, length) of the schematic's bounding box.
     */
     fun dimensions(): Dimensions {
 
@@ -2619,8 +2618,9 @@ class Schematic internal constructor (
         return returnStruct
     }
 
-    /** The allocated dimensions (same as `dimensions`; named for parity with
-    *the old `schematic_get_allocated_dimensions`).
+    /** The default region's storage dimensions: its bounds plus growth
+    *padding (named for parity with the old
+    *`schematic_get_allocated_dimensions`).
     */
     fun allocatedDimensions(): Dimensions {
 

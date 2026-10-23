@@ -74,16 +74,77 @@ pub(crate) fn try_zeroed_blocks(len: usize) -> Result<Vec<u32>, String> {
     }
 }
 
+/// Serde form of [`Region`]: the bounds and their dense blocks, field for
+/// field what snapshot versions 1–3 and `get_json_string` have always held.
+#[derive(Serialize, Deserialize)]
+struct RegionWire {
+    name: String,
+    position: (i32, i32, i32),
+    size: (i32, i32, i32),
+    #[serde(with = "blocks_wire")]
+    blocks: Vec<u32>,
+    palette: Vec<BlockState>,
+    entities: Vec<Entity>,
+    block_entities: BlockEntityStore,
+}
+
+impl From<Region> for RegionWire {
+    fn from(region: Region) -> Self {
+        let blocks = region.dense_blocks().into_owned();
+        RegionWire {
+            name: region.name,
+            position: region.position,
+            size: region.size,
+            blocks,
+            palette: region.palette,
+            entities: region.entities,
+            block_entities: region.block_entities,
+        }
+    }
+}
+
+impl From<RegionWire> for Region {
+    /// Caches are rebuilt by the loader, after it has validated the blocks
+    /// against the bounds and the palette.
+    fn from(wire: RegionWire) -> Self {
+        let bbox = BoundingBox::from_position_and_size(wire.position, wire.size);
+        let mut region = Region {
+            name: wire.name,
+            position: wire.position,
+            size: wire.size,
+            blocks: wire.blocks,
+            palette: wire.palette,
+            entities: wire.entities,
+            block_entities: wire.block_entities,
+            palette_index: FxHashMap::default(),
+            bbox: bbox.clone(),
+            alloc: bbox,
+            tight_bounds: None,
+            cached_width: 0,
+            cached_length: 0,
+            cached_width_x_length: 0,
+            cached_air_index: 0,
+            non_air_count: 0,
+        };
+        region.rebuild_storage_cache();
+        region
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(into = "RegionWire", from = "RegionWire")]
 pub struct Region {
     pub name: String,
+    /// The region's extent: what it was created or loaded with, grown by
+    /// every write outside it. Storage may extend further (growth padding),
+    /// but nothing outside these bounds is observable.
     pub position: (i32, i32, i32),
     pub size: (i32, i32, i32),
-    /// Palette index per voxel, x fastest, then z, then y. `u32` rather than
-    /// `usize`: half the memory and bandwidth for every fill, copy, transform
-    /// and export, while still holding any palette a region can produce.
-    #[serde(with = "blocks_wire")]
-    pub blocks: Vec<u32>,
+    /// Palette index per voxel of the storage box `alloc`, x fastest, then
+    /// z, then y. `u32` rather than `usize`: half the memory and bandwidth
+    /// for every fill, copy, transform and export, while still holding any
+    /// palette a region can produce. Cells outside the region's bounds are air.
+    pub(crate) blocks: Vec<u32>,
     pub(crate) palette: Vec<BlockState>,
     pub entities: Vec<Entity>,
     pub block_entities: BlockEntityStore,
@@ -93,8 +154,13 @@ pub struct Region {
     #[serde(skip, default = "FxHashMap::default")]
     palette_index: FxHashMap<BlockState, usize>,
 
+    /// The region's bounds (`position`/`size`).
     #[serde(skip)]
     bbox: BoundingBox,
+
+    /// The storage box `blocks` is laid out over; contains `bbox`.
+    #[serde(skip)]
+    alloc: BoundingBox,
 
     /// Tracks the actual min/max coordinates of non-air blocks placed in this region
     /// Unlike bbox (which is pre-allocated for performance), tight_bounds only covers
@@ -168,7 +234,8 @@ impl Region {
             palette_index,
             entities: Vec::new(),
             block_entities: BlockEntityStore::default(),
-            bbox: bounding_box,
+            bbox: bounding_box.clone(),
+            alloc: bounding_box,
             tight_bounds: None,
             cached_width: 0,
             cached_length: 0,
@@ -176,15 +243,46 @@ impl Region {
             cached_air_index: 0,
             non_air_count: 0,
         };
-        region.rebuild_bbox();
+        region.rebuild_storage_cache();
         region.rebuild_air_index();
         Ok(region)
     }
 
-    #[inline(always)]
+    /// Re-derive the bounds after `position`/`size` were changed directly,
+    /// growing the storage if they no longer fit in it.
     pub fn rebuild_bbox(&mut self) {
         self.bbox = BoundingBox::from_position_and_size(self.position, self.size);
-        let (w, _, l) = self.bbox.get_dimensions();
+        if !(self.alloc.contains(self.bbox.min) && self.alloc.contains(self.bbox.max)) {
+            self.expand_to_bounding_box(self.alloc.union(&self.bbox));
+        }
+    }
+
+    /// `blocks` was just replaced by a buffer laid out over exactly
+    /// `position`/`size`: make that both the bounds and the storage box.
+    pub(crate) fn adopt_storage(&mut self) {
+        self.bbox = BoundingBox::from_position_and_size(self.position, self.size);
+        self.alloc = self.bbox.clone();
+        self.rebuild_storage_cache();
+    }
+
+    /// Replace the storage with `blocks`, laid out over `position`/`size`,
+    /// which also become the bounds. Caches derived from the content are the
+    /// caller's to rebuild.
+    pub(crate) fn set_storage(
+        &mut self,
+        position: (i32, i32, i32),
+        size: (i32, i32, i32),
+        blocks: Vec<u32>,
+    ) {
+        self.position = position;
+        self.size = size;
+        self.blocks = blocks;
+        self.adopt_storage();
+    }
+
+    #[inline(always)]
+    fn rebuild_storage_cache(&mut self) {
+        let (w, _, l) = self.alloc.get_dimensions();
         let w64 = w as i64;
         let l64 = l as i64;
         self.cached_width = w64;
@@ -245,7 +343,7 @@ impl Region {
         }
         self.non_air_count = count;
         self.tight_bounds = (count > 0).then(|| {
-            let (bx, by, bz) = self.bbox.min;
+            let (bx, by, bz) = self.alloc.min;
             BoundingBox::new(
                 (bx + lo_x as i32, by + lo_y as i32, bz + lo_z as i32),
                 (bx + hi_x as i32, by + hi_y as i32, bz + hi_z as i32),
@@ -274,9 +372,13 @@ impl Region {
     /// the palette, entities and block entities are kept.
     #[inline]
     pub(crate) fn recenter_if_empty_unit(&mut self, position: (i32, i32, i32)) {
-        if self.size == (1, 1, 1) && self.position != position && self.is_empty() {
+        if self.size == (1, 1, 1)
+            && self.alloc == self.bbox
+            && self.position != position
+            && self.is_empty()
+        {
             self.position = position;
-            self.rebuild_bbox();
+            self.adopt_storage();
         }
     }
 
@@ -350,6 +452,8 @@ impl Region {
         self.bbox.clone()
     }
 
+    /// Index of `(x, y, z)` in the storage. The cell must lie in the storage
+    /// box, which always contains the region's bounds.
     #[inline(always)]
     pub fn coords_to_index(&self, x: i32, y: i32, z: i32) -> usize {
         // Promote to i64 before the multiplications: for a 600M-block region
@@ -357,12 +461,13 @@ impl Region {
         // overflows i32 silently and wraps to a negative — the resulting
         // `as usize` cast then produced a near-`usize::MAX` index and an OOB
         // panic in `set_block`. See nucleation issue #__ for the repro.
-        let dx = (x - self.bbox.min.0) as i64;
-        let dy = (y - self.bbox.min.1) as i64;
-        let dz = (z - self.bbox.min.2) as i64;
+        let dx = (x - self.alloc.min.0) as i64;
+        let dy = (y - self.alloc.min.1) as i64;
+        let dz = (z - self.alloc.min.2) as i64;
         (dx + dz * self.cached_width + dy * self.cached_width_x_length) as usize
     }
 
+    /// Inverse of [`Self::coords_to_index`].
     #[inline(always)]
     pub fn index_to_coords(&self, index: usize) -> (i32, i32, i32) {
         let w = self.cached_width as usize;
@@ -371,9 +476,9 @@ impl Region {
         let dy = (index / wl) as i32;
         let dz = ((index / w) % self.cached_length as usize) as i32;
         (
-            dx + self.bbox.min.0,
-            dy + self.bbox.min.1,
-            dz + self.bbox.min.2,
+            dx + self.alloc.min.0,
+            dy + self.alloc.min.1,
+            dz + self.alloc.min.2,
         )
     }
 
@@ -384,6 +489,59 @@ impl Region {
 
     pub fn get_dimensions(&self) -> (i32, i32, i32) {
         self.bbox.get_dimensions()
+    }
+
+    /// Position of the `index`-th cell of the region's bounds, x fastest,
+    /// then z, then y (`index < self.volume()`).
+    #[inline]
+    pub fn bounds_cell(&self, index: usize) -> (i32, i32, i32) {
+        let w = self.size.0 as usize;
+        let wl = w * self.size.2 as usize;
+        (
+            self.position.0 + (index % w) as i32,
+            self.position.1 + (index / wl) as i32,
+            self.position.2 + ((index / w) % self.size.2 as usize) as i32,
+        )
+    }
+
+    /// The box `blocks` is laid out over: the bounds plus growth padding.
+    pub(crate) fn storage_bounds(&self) -> BoundingBox {
+        self.alloc.clone()
+    }
+
+    /// `(y, z, row)` for every y/z of the region's bounds, `row` being the
+    /// storage slice over the bounds' x range.
+    pub(crate) fn bounded_rows(&self) -> impl Iterator<Item = (i32, i32, &[u32])> + '_ {
+        let (min, max) = (self.bbox.min, self.bbox.max);
+        let w = (max.0 - min.0 + 1) as usize;
+        (min.1..=max.1).flat_map(move |y| {
+            (min.2..=max.2).map(move |z| {
+                let start = self.coords_to_index(min.0, y, z);
+                (y, z, &self.blocks[start..start + w])
+            })
+        })
+    }
+
+    /// The palette indices of the region's bounds, laid out x fastest, then
+    /// z, then y. Borrowed when the storage is exactly the bounds.
+    pub(crate) fn dense_blocks(&self) -> std::borrow::Cow<'_, [u32]> {
+        if self.alloc == self.bbox {
+            std::borrow::Cow::Borrowed(&self.blocks)
+        } else {
+            let mut dense = Vec::with_capacity(self.volume());
+            for (_, _, row) in self.bounded_rows() {
+                dense.extend_from_slice(row);
+            }
+            std::borrow::Cow::Owned(dense)
+        }
+    }
+
+    /// Shrink the storage to exactly the region's bounds.
+    pub(crate) fn fit_storage(&mut self) {
+        if self.alloc != self.bbox {
+            self.blocks = self.dense_blocks().into_owned();
+            self.adopt_storage();
+        }
     }
 
     /// Update the tight bounds to include the given coordinate
@@ -457,7 +615,7 @@ impl Region {
     /// blocks and entities. Exporters use this to borrow the region directly
     /// instead of cloning and compacting an already-compact input.
     pub(crate) fn is_content_compact(&self) -> bool {
-        self.get_content_bounds().as_ref() == Some(&self.bbox)
+        self.alloc == self.bbox && self.get_content_bounds().as_ref() == Some(&self.bbox)
     }
 
     /// Create a compacted region sized to cover all content: non-air blocks,
@@ -517,16 +675,16 @@ impl Region {
         let tb_max_y = tight_bounds.max.1;
         let tb_max_z = tight_bounds.max.2;
 
-        let x_off_src = (tb_min_x - self.bbox.min.0) as usize;
+        let x_off_src = (tb_min_x - self.alloc.min.0) as usize;
         let row_len = compact_w;
 
         #[cfg(target_arch = "wasm32")]
         {
             for y in tb_min_y..=tb_max_y {
-                let dy_src = (y - self.bbox.min.1) as usize;
+                let dy_src = (y - self.alloc.min.1) as usize;
                 let dy_dst = (y - tb_min_y) as usize;
                 for z in tb_min_z..=tb_max_z {
-                    let dz_src = (z - self.bbox.min.2) as usize;
+                    let dz_src = (z - self.alloc.min.2) as usize;
                     let dz_dst = (z - tb_min_z) as usize;
                     let src_start = dy_src * old_w * old_l + dz_src * old_w + x_off_src;
                     let dst_start = dy_dst * compact_w * compact_l + dz_dst * compact_w;
@@ -542,8 +700,8 @@ impl Region {
             use rayon::slice::ParallelSliceMut;
             let y_slice_size = compact_w * compact_l;
             let src_blocks = &self.blocks;
-            let bbox_min_y = self.bbox.min.1;
-            let bbox_min_z = self.bbox.min.2;
+            let bbox_min_y = self.alloc.min.1;
+            let bbox_min_z = self.alloc.min.2;
 
             compact
                 .blocks
@@ -612,16 +770,16 @@ impl Region {
             let (tight_w, _, _) = tight_bounds.get_dimensions();
             let row_len = tight_w as usize;
 
-            let x_off_src = (tb_min_x - self.bbox.min.0) as usize;
+            let x_off_src = (tb_min_x - self.alloc.min.0) as usize;
             let x_off_dst = (tb_min_x - content_pos.0) as usize;
 
             #[cfg(target_arch = "wasm32")]
             {
                 for y in tb_min_y..=tb_max_y {
-                    let dy_src = (y - self.bbox.min.1) as usize;
+                    let dy_src = (y - self.alloc.min.1) as usize;
                     let dy_dst = (y - content_pos.1) as usize;
                     for z in tb_min_z..=tb_max_z {
-                        let dz_src = (z - self.bbox.min.2) as usize;
+                        let dz_src = (z - self.alloc.min.2) as usize;
                         let dz_dst = (z - content_pos.2) as usize;
                         let src_start = dy_src * old_w * old_l + dz_src * old_w + x_off_src;
                         let dst_start =
@@ -638,8 +796,8 @@ impl Region {
                 use rayon::slice::ParallelSliceMut;
                 let y_slice_size = compact_w * compact_l;
                 let src_blocks = &self.blocks;
-                let bbox_min_y = self.bbox.min.1;
-                let bbox_min_z = self.bbox.min.2;
+                let bbox_min_y = self.alloc.min.1;
+                let bbox_min_z = self.alloc.min.2;
                 let content_min_y = content_pos.1;
                 let content_min_z = content_pos.2;
 
@@ -706,14 +864,16 @@ impl Region {
         self.size.0 as usize * self.size.1 as usize * self.size.2 as usize
     }
 
-    /// Grow the allocation so it contains `(x, y, z)`. See [`Self::ensure_bounds`].
+    /// Grow the region so it contains `(x, y, z)`. See [`Self::ensure_bounds`].
+    #[inline]
     pub fn expand_to_fit(&mut self, x: i32, y: i32, z: i32) {
         self.ensure_bounds((x, y, z), (x, y, z));
     }
 
     /// Ensure the region covers the given bounds, expanding if necessary.
     ///
-    /// Growth is geometric and per axis, and only in the direction that
+    /// The bounds grow exactly to cover the request; the storage behind them
+    /// grows geometrically and per axis, and only in the direction that
     /// overflowed: an axis of extent `e` grows by at least `max(e / 2, 16)`
     /// cells. A range request into an untouched region (a fill or stamp into
     /// a fresh schematic) allocates exactly its footprint instead. Reallocations are therefore O(log n) per axis however the
@@ -722,12 +882,42 @@ impl Region {
     /// (A fixed ±64 pad used to turn a few hundred scattered blocks into a
     /// 1.6M-voxel region, while `size / 2` on a thin axis grew it one cell at
     /// a time.)
+    #[inline]
     pub fn ensure_bounds(&mut self, min: (i32, i32, i32), max: (i32, i32, i32)) {
-        let current = self.get_bounding_box();
-        if current.contains(min) && current.contains(max) {
+        let (lo, hi) = (self.bbox.min, self.bbox.max);
+        if self.bbox.contains(min) && self.bbox.contains(max) {
             return;
         }
+        let wanted = BoundingBox::new(
+            (lo.0.min(min.0).min(max.0), lo.1.min(min.1).min(max.1), lo.2.min(min.2).min(max.2)),
+            (hi.0.max(min.0).max(max.0), hi.1.max(min.1).max(max.1), hi.2.max(min.2).max(max.2)),
+        );
+        if self.alloc.contains(wanted.min) && self.alloc.contains(wanted.max) {
+            // The common case: the write lands in growth padding.
+            self.set_bounds(wanted);
+        } else {
+            self.ensure_bounds_slow(min, max, wanted);
+        }
+    }
+
+    #[inline]
+    fn set_bounds(&mut self, bounds: BoundingBox) {
+        self.position = bounds.min;
+        self.size = bounds.get_dimensions();
+        self.bbox = bounds;
+    }
+
+    /// [`Self::ensure_bounds`] when the storage must change.
+    #[cold]
+    #[inline(never)]
+    fn ensure_bounds_slow(
+        &mut self,
+        min: (i32, i32, i32),
+        max: (i32, i32, i32),
+        wanted: BoundingBox,
+    ) {
         let untouched = self.size == (1, 1, 1)
+            && self.alloc == self.bbox
             && self.is_empty()
             && self.block_entities.is_empty()
             && self.entities.is_empty();
@@ -735,10 +925,7 @@ impl Region {
         if untouched && well_formed && min != max && self.cached_air_index == 0 {
             let bounds = BoundingBox::new(min, max);
             if let Ok(blocks) = try_zeroed_blocks(bounds.volume() as usize) {
-                self.position = bounds.min;
-                self.size = bounds.get_dimensions();
-                self.blocks = blocks;
-                self.rebuild_bbox();
+                self.set_storage(bounds.min, bounds.get_dimensions(), blocks);
                 return;
             }
         }
@@ -761,13 +948,15 @@ impl Region {
             (clamp(new_min), clamp(new_max))
         }
 
-        let (min_x, max_x) = grow(current.min.0, current.max.0, min.0, max.0);
-        let (min_y, max_y) = grow(current.min.1, current.max.1, min.1, max.1);
-        let (min_z, max_z) = grow(current.min.2, current.max.2, min.2, max.2);
+        let alloc = self.alloc.clone();
+        let (min_x, max_x) = grow(alloc.min.0, alloc.max.0, wanted.min.0, wanted.max.0);
+        let (min_y, max_y) = grow(alloc.min.1, alloc.max.1, wanted.min.1, wanted.max.1);
+        let (min_z, max_z) = grow(alloc.min.2, alloc.max.2, wanted.min.2, wanted.max.2);
         self.expand_to_bounding_box(BoundingBox::new(
             (min_x, min_y, min_z),
             (max_x, max_y, max_z),
         ));
+        self.set_bounds(wanted);
     }
 
     /// Grow the allocation to `new_bounding_box`, which must contain the
@@ -780,29 +969,26 @@ impl Region {
     /// allocating a second full buffer, this halves peak memory during growth
     /// and avoids faulting in a fresh copy of every resident page.
     fn expand_to_bounding_box(&mut self, new_bounding_box: BoundingBox) {
-        let new_size = new_bounding_box.get_dimensions();
-        let new_position = new_bounding_box.min;
-
-        if new_size == self.size && new_position == self.position {
+        if new_bounding_box == self.alloc {
             return;
         }
         debug_assert!(
-            new_bounding_box.contains(self.bbox.min) && new_bounding_box.contains(self.bbox.max)
+            new_bounding_box.contains(self.alloc.min) && new_bounding_box.contains(self.alloc.max)
         );
 
         let air_id = self.cached_air_index;
         let old_w = self.cached_width as usize;
         let old_l = self.cached_length as usize;
-        let (_, old_h, _) = self.bbox.get_dimensions();
+        let (_, old_h, _) = self.alloc.get_dimensions();
         let old_h = old_h as usize;
 
         let (new_w, new_h, new_l) = new_bounding_box.get_dimensions();
         let (new_w, new_h, new_l) = (new_w as usize, new_h as usize, new_l as usize);
 
         // Offset of old min within new coordinate system
-        let x_off = (self.bbox.min.0 - new_bounding_box.min.0) as usize;
-        let y_off = (self.bbox.min.1 - new_bounding_box.min.1) as usize;
-        let z_off = (self.bbox.min.2 - new_bounding_box.min.2) as usize;
+        let x_off = (self.alloc.min.0 - new_bounding_box.min.0) as usize;
+        let y_off = (self.alloc.min.1 - new_bounding_box.min.1) as usize;
+        let z_off = (self.alloc.min.2 - new_bounding_box.min.2) as usize;
 
         let old_len = self.blocks.len();
         self.blocks
@@ -849,9 +1035,8 @@ impl Region {
             }
         }
 
-        self.position = new_position;
-        self.size = new_size;
-        self.rebuild_bbox();
+        self.alloc = new_bounding_box;
+        self.rebuild_storage_cache();
     }
     fn calculate_bits_per_block(&self) -> usize {
         let palette_size = self.palette.len();
@@ -881,26 +1066,14 @@ impl Region {
             reverse_new_palette.insert(block.clone(), index);
         }
 
-        // Phase 5: Pre-build remap table for self (identity since palette is same)
-        // For self, palette indices are identity, so just row-copy with offset
-        {
-            let old_w = self.cached_width as usize;
-            let old_l = self.cached_length as usize;
-            let (_, old_h, _) = self.bbox.get_dimensions();
-            let old_h = old_h as usize;
-
-            let x_off = (self.bbox.min.0 - combined_bounding_box.min.0) as usize;
-            let y_off = (self.bbox.min.1 - combined_bounding_box.min.1) as usize;
-            let z_off = (self.bbox.min.2 - combined_bounding_box.min.2) as usize;
-
-            for dy in 0..old_h {
-                for dz in 0..old_l {
-                    let src_start = dy * old_w * old_l + dz * old_w;
-                    let dst_start = (dy + y_off) * new_w * new_l + (dz + z_off) * new_w + x_off;
-                    new_blocks[dst_start..dst_start + old_w]
-                        .copy_from_slice(&self.blocks[src_start..src_start + old_w]);
-                }
-            }
+        // Rows of `self` keep their palette indices.
+        let (cx, cy, cz) = combined_bounding_box.min;
+        let combined_index = |x: i32, y: i32, z: i32| {
+            (y - cy) as usize * new_w * new_l + (z - cz) as usize * new_w + (x - cx) as usize
+        };
+        for (y, z, row) in self.bounded_rows() {
+            let dst = combined_index(self.bbox.min.0, y, z);
+            new_blocks[dst..dst + row.len()].copy_from_slice(row);
         }
 
         // Phase 5: Pre-build remap table for other palette
@@ -918,39 +1091,20 @@ impl Region {
         }
 
         // Copy other blocks using remap table, row by row
-        {
-            let other_w = other.cached_width as usize;
-            let other_l = other.cached_length as usize;
-            let (_, other_h, _) = other.bbox.get_dimensions();
-            let other_h = other_h as usize;
-
-            let x_off = (other.bbox.min.0 - combined_bounding_box.min.0) as usize;
-            let y_off = (other.bbox.min.1 - combined_bounding_box.min.1) as usize;
-            let z_off = (other.bbox.min.2 - combined_bounding_box.min.2) as usize;
-
-            for dy in 0..other_h {
-                for dz in 0..other_l {
-                    let src_start = dy * other_w * other_l + dz * other_w;
-                    let dst_start = (dy + y_off) * new_w * new_l + (dz + z_off) * new_w + x_off;
-                    for dx in 0..other_w {
-                        let src_idx = other.blocks[src_start + dx];
-                        if src_idx == other_air_index {
-                            continue; // Skip air from other region
-                        }
-                        new_blocks[dst_start + dx] = other_remap[src_idx as usize];
-                    }
+        for (y, z, row) in other.bounded_rows() {
+            let dst = combined_index(other.bbox.min.0, y, z);
+            for (dx, &src_idx) in row.iter().enumerate() {
+                if src_idx != other_air_index {
+                    new_blocks[dst + dx] = other_remap[src_idx as usize];
                 }
             }
         }
 
         // Update region properties
-        self.position = new_position;
-        self.size = new_size;
-        self.blocks = new_blocks;
+        self.set_storage(new_position, new_size, new_blocks);
         self.palette = new_palette;
 
         // Rebuild all caches
-        self.rebuild_bbox();
         self.rebuild_palette_index();
         self.rebuild_air_index();
         // Compaction must include blocks added outside the original region.
@@ -1074,12 +1228,13 @@ impl Region {
         );
 
         let mut blocks_tag = NbtCompound::new();
-        for (index, &block_index) in self.blocks.iter().enumerate() {
-            let (x, y, z) = self.index_to_coords(index);
-            blocks_tag.insert(
-                format!("{},{},{}", x, y, z),
-                NbtTag::Int(block_index as i32),
-            );
+        for (y, z, row) in self.bounded_rows() {
+            for (x, &block_index) in (self.bbox.min.0..).zip(row) {
+                blocks_tag.insert(
+                    format!("{},{},{}", x, y, z),
+                    NbtTag::Int(block_index as i32),
+                );
+            }
         }
         tag.insert("Blocks", NbtTag::Compound(blocks_tag));
 
@@ -1146,9 +1301,18 @@ impl Region {
             if let NbtTag::Int(index) = value {
                 let coords: Vec<i32> = key.split(',').map(|s| s.parse::<i32>().unwrap()).collect();
                 if coords.len() == 3 {
-                    let block_index =
-                        (coords[1] * size.0 * size.2 + coords[2] * size.0 + coords[0]) as usize;
-                    blocks[block_index] = *index as u32;
+                    // Keys are absolute coordinates, as `to_nbt` writes them.
+                    let (x, y, z) = (
+                        coords[0] - position.0,
+                        coords[1] - position.1,
+                        coords[2] - position.2,
+                    );
+                    if (0..size.0).contains(&x)
+                        && (0..size.1).contains(&y)
+                        && (0..size.2).contains(&z)
+                    {
+                        blocks[(y * size.0 * size.2 + z * size.0 + x) as usize] = *index as u32;
+                    }
                 }
             }
         }
@@ -1191,6 +1355,7 @@ impl Region {
             block_entities,
             palette_index: FxHashMap::default(),
             bbox: BoundingBox::from_position_and_size(position, size),
+            alloc: BoundingBox::from_position_and_size(position, size),
             tight_bounds: None,
             cached_width: 0,
             cached_length: 0,
@@ -1200,7 +1365,7 @@ impl Region {
         };
 
         region.rebuild_palette_index();
-        region.rebuild_bbox();
+        region.adopt_storage();
         region.rebuild_air_index();
         region.rescan_content();
 
@@ -1328,7 +1493,8 @@ impl Region {
 
     pub(crate) fn create_packed_block_states(&self) -> Vec<i64> {
         let bits_per_block = self.calculate_bits_per_block();
-        let size = self.blocks.len();
+        let blocks = self.dense_blocks();
+        let size = blocks.len();
         let expected_len = (size * bits_per_block).div_ceil(64);
 
         let mut packed_states = vec![0i64; expected_len];
@@ -1337,7 +1503,7 @@ impl Region {
         if 64 % bits_per_block == 0 {
             // Fast path: entries never cross i64 boundaries (bits_per_block = 2, 4, 8, 16, 32)
             let entries_per_long = 64 / bits_per_block;
-            for (chunk_idx, chunk) in self.blocks.chunks(entries_per_long).enumerate() {
+            for (chunk_idx, chunk) in blocks.chunks(entries_per_long).enumerate() {
                 let mut packed: u64 = 0;
                 for (i, &block_state) in chunk.iter().enumerate() {
                     packed |= (block_state as u64 & mask) << (i * bits_per_block);
@@ -1346,7 +1512,7 @@ impl Region {
             }
         } else {
             // Slow path: entries may cross i64 boundaries
-            for (index, &block_state) in self.blocks.iter().enumerate() {
+            for (index, &block_state) in blocks.iter().enumerate() {
                 let bit_index = index * bits_per_block;
                 let start_long_index = bit_index / 64;
                 let end_long_index = (bit_index + bits_per_block - 1) / 64;
@@ -1463,11 +1629,19 @@ impl Region {
         palette
     }
 
+    /// Cells per block state within the region's bounds (air included).
     pub fn count_block_types(&self) -> HashMap<BlockState, usize> {
+        let mut per_index = vec![0usize; self.palette.len()];
+        for (_, _, row) in self.bounded_rows() {
+            for &block_index in row {
+                per_index[block_index as usize] += 1;
+            }
+        }
         let mut block_counts = HashMap::new();
-        for block_index in &self.blocks {
-            let block_state = &self.palette[*block_index as usize];
-            *block_counts.entry(block_state.clone()).or_insert(0) += 1;
+        for (block_state, count) in self.palette.iter().zip(per_index) {
+            if count > 0 {
+                *block_counts.entry(block_state.clone()).or_insert(0) += count;
+            }
         }
         block_counts
     }
@@ -1491,15 +1665,12 @@ impl Region {
     pub fn flip_x(&mut self) {
         use crate::transforms::{transform_block_state_flip, Axis};
 
-        // Phase 3: Reverse each X-row in-place
-        let w = self.cached_width as usize;
-        let l = self.cached_length as usize;
-        let wl = self.cached_width_x_length as usize;
-        let (_, h, _) = self.bbox.get_dimensions();
-        let h = h as usize;
-        for dy in 0..h {
-            for dz in 0..l {
-                let start = dy * wl + dz * w;
+        // Reverse the bounds' span of each X-row in place.
+        let (min, max) = (self.bbox.min, self.bbox.max);
+        let w = (max.0 - min.0 + 1) as usize;
+        for y in min.1..=max.1 {
+            for z in min.2..=max.2 {
+                let start = self.coords_to_index(min.0, y, z);
                 self.blocks[start..start + w].reverse();
             }
         }
@@ -1514,7 +1685,7 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         // A flip permutes cells: the air count is unchanged and the content
-        // bounds mirror within the allocation.
+        // bounds mirror within the region's bounds.
         self.mirror_tight_bounds(0);
 
         // Transform block entities — pure position remap, no palette work.
@@ -1532,8 +1703,7 @@ impl Region {
 
     /// `(position, palette index)` for every cell inside the content (tight)
     /// bounds, x fastest, then z, then y. Cells outside the tight bounds are
-    /// allocation padding and always air, so they are not visited; air inside
-    /// is. Rows are walked as slices, with no per-cell coordinate division.
+    /// always air, so they are not visited; air inside is. Rows are walked as slices, with no per-cell coordinate division.
     pub fn content_cells(&self) -> impl Iterator<Item = ((i32, i32, i32), u32)> + '_ {
         self.tight_bounds.clone().into_iter().flat_map(move |b| {
             let (x0, x1) = (b.min.0, b.max.0);
@@ -1550,7 +1720,7 @@ impl Region {
         })
     }
 
-    /// Mirror the cached tight bounds within the allocation along `axis`
+    /// Mirror the cached tight bounds within the region's bounds along `axis`
     /// (0 = x, 1 = y, 2 = z), as a flip does to the content.
     fn mirror_tight_bounds(&mut self, axis: usize) {
         let (lo, hi) = match axis {
@@ -1574,14 +1744,13 @@ impl Region {
     pub fn flip_y(&mut self) {
         use crate::transforms::{transform_block_state_flip, Axis};
 
-        // Phase 3: Swap Y-layers using swap_nonoverlapping
+        // Swap whole storage layers across the bounds' mid-plane: cells
+        // outside the bounds are air in both layers.
         let wl = self.cached_width_x_length as usize;
-        let (_, h, _) = self.bbox.get_dimensions();
-        let h = h as usize;
-        // Swap layer dy with layer (h-1-dy)
-        for dy in 0..h / 2 {
-            let off_a = dy * wl;
-            let off_b = (h - 1 - dy) * wl;
+        let (min_y, max_y) = (self.bbox.min.1, self.bbox.max.1);
+        let layer = |y: i32| (y - self.alloc.min.1) as usize * wl;
+        for k in 0..(max_y - min_y + 1) / 2 {
+            let (off_a, off_b) = (layer(min_y + k), layer(max_y - k));
             let (low, high) = self.blocks.split_at_mut(off_b);
             low[off_a..off_a + wl].swap_with_slice(&mut high[..wl]);
         }
@@ -1595,7 +1764,7 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         // A flip permutes cells: the air count is unchanged and the content
-        // bounds mirror within the allocation.
+        // bounds mirror within the region's bounds.
         self.mirror_tight_bounds(1);
 
         let max_y = self.bbox.max.1;
@@ -1613,17 +1782,14 @@ impl Region {
     pub fn flip_z(&mut self) {
         use crate::transforms::{transform_block_state_flip, Axis};
 
-        // Phase 3: Swap Z-rows within each Y-layer
+        // Swap whole storage rows across the bounds' mid-plane within each
+        // layer of the bounds: cells outside the bounds are air in both rows.
         let w = self.cached_width as usize;
-        let l = self.cached_length as usize;
-        let wl = self.cached_width_x_length as usize;
-        let (_, h, _) = self.bbox.get_dimensions();
-        let h = h as usize;
-        for dy in 0..h {
-            let layer_off = dy * wl;
-            for dz in 0..l / 2 {
-                let off_a = layer_off + dz * w;
-                let off_b = layer_off + (l - 1 - dz) * w;
+        let (min, max) = (self.bbox.min, self.bbox.max);
+        for y in min.1..=max.1 {
+            for k in 0..(max.2 - min.2 + 1) / 2 {
+                let off_a = self.coords_to_index(self.alloc.min.0, y, min.2 + k);
+                let off_b = self.coords_to_index(self.alloc.min.0, y, max.2 - k);
                 let (low, high) = self.blocks.split_at_mut(off_b);
                 low[off_a..off_a + w].swap_with_slice(&mut high[..w]);
             }
@@ -1638,7 +1804,7 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         // A flip permutes cells: the air count is unchanged and the content
-        // bounds mirror within the allocation.
+        // bounds mirror within the region's bounds.
         self.mirror_tight_bounds(2);
 
         let max_z = self.bbox.max.2;
@@ -1665,9 +1831,18 @@ impl Region {
             shifted(self.position.1, dy)?,
             shifted(self.position.2, dz)?,
         );
-        shifted(self.bbox.max.0, dx)?;
-        shifted(self.bbox.max.1, dy)?;
-        shifted(self.bbox.max.2, dz)?;
+        let new_alloc = BoundingBox::new(
+            (
+                shifted(self.alloc.min.0, dx)?,
+                shifted(self.alloc.min.1, dy)?,
+                shifted(self.alloc.min.2, dz)?,
+            ),
+            (
+                shifted(self.alloc.max.0, dx)?,
+                shifted(self.alloc.max.1, dy)?,
+                shifted(self.alloc.max.2, dz)?,
+            ),
+        );
         for &(x, y, z) in self.block_entities.keys() {
             shifted(x, dx)?;
             shifted(y, dy)?;
@@ -1702,7 +1877,8 @@ impl Region {
             entity.position.1 += dy as f64;
             entity.position.2 += dz as f64;
         }
-        self.rebuild_bbox();
+        self.bbox = BoundingBox::from_position_and_size(self.position, self.size);
+        self.alloc = new_alloc;
         Ok(())
     }
 
@@ -1724,6 +1900,8 @@ impl Region {
     }
 
     pub(crate) fn rotate_y_90_at(&mut self, position: (i32, i32, i32)) -> Result<(), String> {
+        // The loops below read `blocks` as laid out over exactly the bounds.
+        self.fit_storage();
         use crate::transforms::{transform_block_state_rotate, Axis};
 
         // For 90-degree rotation around Y:
@@ -1775,7 +1953,7 @@ impl Region {
         self.size = new_bbox.to_position_and_size().1;
         self.blocks = new_blocks;
         self.palette = new_palette;
-        self.rebuild_bbox();
+        self.adopt_storage();
         self.rebuild_palette_index();
         self.rebuild_air_index();
         // A rotation permutes cells: the air count is unchanged.
@@ -1825,6 +2003,8 @@ impl Region {
     }
 
     pub(crate) fn rotate_x_90_at(&mut self, position: (i32, i32, i32)) -> Result<(), String> {
+        // The loops below read `blocks` as laid out over exactly the bounds.
+        self.fit_storage();
         use crate::transforms::{transform_block_state_rotate, Axis};
 
         let old_bbox = self.bbox.clone();
@@ -1868,7 +2048,7 @@ impl Region {
         self.size = new_bbox.to_position_and_size().1;
         self.blocks = new_blocks;
         self.palette = new_palette;
-        self.rebuild_bbox();
+        self.adopt_storage();
         self.rebuild_palette_index();
         self.rebuild_air_index();
         // A rotation permutes cells: the air count is unchanged.
@@ -1916,6 +2096,8 @@ impl Region {
     }
 
     pub(crate) fn rotate_z_90_at(&mut self, position: (i32, i32, i32)) -> Result<(), String> {
+        // The loops below read `blocks` as laid out over exactly the bounds.
+        self.fit_storage();
         use crate::transforms::{transform_block_state_rotate, Axis};
 
         let old_bbox = self.bbox.clone();
@@ -1961,7 +2143,7 @@ impl Region {
         self.size = new_bbox.to_position_and_size().1;
         self.blocks = new_blocks;
         self.palette = new_palette;
-        self.rebuild_bbox();
+        self.adopt_storage();
         self.rebuild_palette_index();
         self.rebuild_air_index();
         // A rotation permutes cells: the air count is unchanged.
@@ -2306,7 +2488,7 @@ impl Region {
         // Whole-region fills know the final count and bounds without reading
         // the previous contents. This is the common path for newly-created
         // cuboids and turns the operation into one contiguous slice fill.
-        if min == self.bbox.min && max == self.bbox.max {
+        if min == self.alloc.min && max == self.alloc.max && self.alloc == self.bbox {
             self.blocks.fill(palette_index);
             if new_is_air {
                 self.non_air_count = 0;
@@ -2320,9 +2502,9 @@ impl Region {
 
         let w = self.cached_width;
         let wl = self.cached_width_x_length;
-        let base_x = self.bbox.min.0;
-        let base_y = self.bbox.min.1;
-        let base_z = self.bbox.min.2;
+        let base_x = self.alloc.min.0;
+        let base_y = self.alloc.min.1;
+        let base_z = self.alloc.min.2;
 
         let dx_min = (min.0 - base_x) as i64;
         let dx_max = (max.0 - base_x) as i64;
@@ -2540,6 +2722,7 @@ mod tests {
             block_entities: BlockEntityStore::default(),
             palette_index: FxHashMap::default(),
             bbox: BoundingBox::from_position_and_size((0, 0, 0), (16, 1, 1)),
+            alloc: BoundingBox::from_position_and_size((0, 0, 0), (16, 1, 1)),
             tight_bounds: None,
             cached_width: 16,
             cached_length: 1,
@@ -2583,6 +2766,7 @@ mod tests {
             block_entities: BlockEntityStore::default(),
             palette_index: FxHashMap::default(),
             bbox: BoundingBox::new((-47472, -64, -5216), (34975, 319, 13727)),
+            alloc: BoundingBox::new((-47472, -64, -5216), (34975, 319, 13727)),
             tight_bounds: None,
             cached_width: width,
             cached_length: length,
@@ -2800,8 +2984,8 @@ mod tests {
         // Place a block at a negative coordinate to trigger resizing
         region.set_block(-1, -1, -1, &dirt);
 
-        // Geometric growth: an extent-2 axis grows by the 16-cell minimum step.
-        assert_eq!(region.position, (-16, -16, -16));
+        // The bounds grow exactly to the write (storage padding is invisible).
+        assert_eq!(region.position, (-1, -1, -1));
         assert_eq!(region.get_block(-1, -1, -1), Some(&dirt));
         assert_eq!(
             region.get_block(0, 0, 0),
@@ -3192,14 +3376,39 @@ mod tests {
         // Force expansion by placing a block far away
         region.set_block(10, 10, 10, &stone);
 
-        // Allocation grows past the request by the minimum step (16 cells),
-        // so the next few writes in that direction do not reallocate.
+        // The bounds grow exactly to the far block; storage padding is not
+        // visible in them.
         let allocated_dims = region.get_dimensions();
-        assert_eq!(allocated_dims, (18, 18, 18));
+        assert_eq!(allocated_dims, (11, 11, 11));
 
         // Tight dimensions should reflect actual structure (min to max of placed blocks)
         let tight_dims = region.get_tight_dimensions();
         assert_eq!(tight_dims, (11, 11, 11)); // From (0,0,0) to (10,10,10) inclusive
+    }
+
+    #[test]
+    fn results_do_not_depend_on_storage_padding() {
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let log = BlockState::new("minecraft:oak_log".to_string());
+        // Same blocks, same declared box; `grown` gets padding from growth.
+        let mut exact = Region::new("R".to_string(), (0, 0, 0), (5, 3, 4));
+        let mut grown = Region::new("R".to_string(), (0, 0, 0), (1, 1, 1));
+        for region in [&mut exact, &mut grown] {
+            region.set_block(4, 2, 3, &stone);
+            region.set_block(0, 0, 0, &stone);
+            region.set_block(1, 0, 2, &log);
+        }
+        assert_ne!(grown.storage_bounds(), grown.get_bounding_box());
+        assert_eq!(exact.get_bounding_box(), grown.get_bounding_box());
+        assert_eq!(exact.count_block_types(), grown.count_block_types());
+        assert_eq!(grown.get_block(5, 0, 0), None);
+        exact.flip_x();
+        grown.flip_x();
+        exact.flip_z();
+        grown.flip_z();
+        assert_eq!(exact.dense_blocks(), grown.dense_blocks());
+        assert_eq!(exact.get_tight_bounds(), grown.get_tight_bounds());
+        assert_eq!(grown.get_block(3, 0, 1).map(|b| b.name.as_str()), Some("minecraft:oak_log"));
     }
 
     #[test]

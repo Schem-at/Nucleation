@@ -1694,7 +1694,7 @@ fn collect_region_blocks(
     let collected: Vec<(MesherBlockPosition, u32, i32, i32, i32)> = (0..region.volume())
         .into_par_iter()
         .filter_map(|index| {
-            let (x, y, z) = region.index_to_coords(index);
+            let (x, y, z) = region.bounds_cell(index);
             let idx = region.get_block_index(x, y, z)?;
             if is_air[idx] {
                 return None;
@@ -1743,7 +1743,7 @@ fn collect_region_blocks_by_chunk(
     chunk_size: i32,
 ) {
     for index in 0..region.volume() {
-        let (x, y, z) = region.index_to_coords(index);
+        let (x, y, z) = region.bounds_cell(index);
         if let Some(block_state) = region.get_block(x, y, z) {
             if block_state.name != "minecraft:air" {
                 let chunk_x = x.div_euclid(chunk_size);

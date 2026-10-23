@@ -102,12 +102,10 @@ fn masking_follows_tight_bounds_not_the_allocated_envelope() {
         "air a region surrounds must still mask the layer below it"
     );
 
-    // Half B — the phantom envelope. A region's storage is padded when it GROWS:
-    // the second block is past the minimum step, so the region grows exactly
-    // to (0,0,0)..(80,40,80), and the next write
-    // past that edge pads every overflowing axis by half its extent, out to
-    // (121,61,121), while the true extent stops at (81,41,81). (100,50,100) is
-    // inside the allocated envelope and outside the content: pure phantom.
+    // Half B — the phantom envelope. A region's storage is padded when it
+    // grows: after these writes it extends past (81,41,81), the true extent.
+    // (100,50,100) lies in that padding. Padding is not part of the region's
+    // bounds, so it must not mask the named layer there.
     let phantom_cell = (100, 50, 100);
     let mut phantom = UniversalSchematic::new("phantom".to_string());
     phantom.set_block_from_string(0, 0, 0, STONE).unwrap();
@@ -121,12 +119,11 @@ fn masking_follows_tight_bounds_not_the_allocated_envelope() {
         STONE
     ));
     assert!(
-        phantom
+        !phantom
             .default_region
             .get_bounding_box()
             .contains(phantom_cell),
-        "precondition: the allocated envelope must cover the queried cell, or \
-         this test is not exercising the defect"
+        "the region's bounds must stop at its extent, not its storage"
     );
     assert_eq!(
         phantom

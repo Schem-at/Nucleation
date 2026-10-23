@@ -46,6 +46,5 @@ Output: 48×11×1, 287 blocks, red/orange/yellow concrete: the verified
 run lives in
 [`docs/readme-snippets/10-scripting-lua-python.md`](../readme-snippets/10-scripting-lua-python.md).
 
-Current quirks: the entry points are file-path-only (no run-from-string in
-the bridge yet), and `dimensions()` on a script's schematic reports the
-allocated region: use `tight_dimensions()` for the content size.
+Current quirk: the entry points are file-path-only (no run-from-string in
+the bridge yet).

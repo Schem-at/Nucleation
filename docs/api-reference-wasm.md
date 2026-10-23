@@ -248,7 +248,7 @@ Flip and rotate the entire schematic or a named region. Rotation values must be 
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `getDimensions` | `getDimensions() → number[]` | Tight dimensions `[width, height, length]` of actual content. |
-| `getAllocatedDimensions` | `getAllocatedDimensions() → number[]` | Full allocated buffer dimensions. |
+| `getAllocatedDimensions` | `getAllocatedDimensions() → number[]` | Storage dimensions of the default region (bounds plus growth padding). |
 | `getTightDimensions` | `getTightDimensions() → number[]` | Alias for content-only dimensions. |
 | `getTightBoundsMin` | `getTightBoundsMin() → number[] \| undefined` | Minimum corner `[x, y, z]` of content bounds. |
 | `getTightBoundsMax` | `getTightBoundsMax() → number[] \| undefined` | Maximum corner `[x, y, z]` of content bounds. |

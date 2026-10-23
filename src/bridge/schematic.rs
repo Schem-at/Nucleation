@@ -198,8 +198,7 @@ pub mod ffi {
             )))
         }
 
-        /// The allocated dimensions (width, height, length) of the schematic's
-        /// bounding box.
+        /// The dimensions (width, height, length) of the schematic's bounding box.
         pub fn dimensions(&self) -> Dimensions {
             let (x, y, z) = self.0.get_dimensions();
             Dimensions { x, y, z }
@@ -1616,7 +1615,7 @@ pub mod ffi {
             let names = self.0.get_region_names();
             let regions: Vec<serde_json::Value> = names.iter().map(|name| {
                 let region = self.0.get_region(name).unwrap();
-                let bounds = region.get_bounding_box();
+                let bounds = region.storage_bounds();
                 let content = region.get_tight_bounds().map(|b| serde_json::json!({
                     "min": [b.min.0, b.min.1, b.min.2],
                     "max": [b.max.0, b.max.1, b.max.2]
@@ -2415,10 +2414,11 @@ pub mod ffi {
             Dimensions { x, y, z }
         }
 
-        /// The allocated dimensions (same as `dimensions`; named for parity with
-        /// the old `schematic_get_allocated_dimensions`).
+        /// The default region's storage dimensions: its bounds plus growth
+        /// padding (named for parity with the old
+        /// `schematic_get_allocated_dimensions`).
         pub fn allocated_dimensions(&self) -> Dimensions {
-            let (x, y, z) = self.0.get_dimensions();
+            let (x, y, z) = self.0.default_region.storage_bounds().get_dimensions();
             Dimensions { x, y, z }
         }
 

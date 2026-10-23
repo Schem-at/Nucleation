@@ -30,7 +30,7 @@ def region_array(schematic, region="Main"):
     """A region's blocks as ``(indices, palette, origin)``.
 
     ``indices[x, y, z]`` indexes ``palette`` (block strings) for the block at
-    ``origin + (x, y, z)``. The array covers the region's allocated storage,
+    ``origin + (x, y, z)``. The array covers the region's storage,
     so it can extend past the placed blocks (as air).
     """
     import numpy as np
