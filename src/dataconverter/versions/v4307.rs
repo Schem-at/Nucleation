@@ -379,7 +379,7 @@ fn walk_block_predicates(
     }
 }
 
-fn data_components_walker(
+pub(super) fn data_components_walker(
     reg: &Registry,
     root: &mut NbtMap,
     from: EncodedVersion,

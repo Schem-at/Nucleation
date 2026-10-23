@@ -10,7 +10,6 @@
 //! their stored `OutputSignal`, which is what a comparator actually emits until
 //! it next re-evaluates. Both are carried through here.
 use nucleation::block_position::BlockPosition;
-use nucleation::UniversalSchematic;
 use std::collections::BTreeMap;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

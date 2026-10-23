@@ -78,7 +78,7 @@ impl<'a> BuildingTool<'a> {
     /// The operation is transactional: callback errors leave the destination
     /// schematic unchanged. `normal` may return an analytic vector or `None`
     /// to request a central-difference estimate from `eval`.
-    #[cfg(any(test, not(target_arch = "wasm32")))]
+    #[cfg(any(test, all(feature = "bridge", not(target_arch = "wasm32"))))]
     pub(crate) fn fill_sdf_function<E, F, N>(
         &mut self,
         bounds: (i32, i32, i32, i32, i32, i32),

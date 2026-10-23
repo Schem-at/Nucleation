@@ -181,8 +181,6 @@ pub trait PowerSource: Send + Sync {
         false
     }
 
-    /// An item's max stack size — 64 unless the rules know better. Hopper
-    /// merges and comparator fullness both depend on it (shears stop at 1).
     /// Whether the block at `pos` offers the sturdy top face a rail's
     /// `canSurvive` wants. Defaults to `false`: a rule set that never
     /// registers rails never asks.
@@ -190,6 +188,8 @@ pub trait PowerSource: Send + Sync {
         false
     }
 
+    /// An item's max stack size — 64 unless the rules know better. Hopper
+    /// merges and comparator fullness both depend on it (shears stop at 1).
     fn max_stack_of(&self, _id: &str) -> u8 {
         64
     }

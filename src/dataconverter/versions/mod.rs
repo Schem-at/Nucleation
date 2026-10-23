@@ -5,6 +5,9 @@
 
 use super::registry::RegistryBuilder;
 
+pub(super) use v4885::REMOVED_BLOCK_ENTITIES;
+pub use v5006::{block_state_keys, BLOCK_STATE_FIELD_NAMES_VERSION};
+
 mod v100;
 mod v101;
 mod v102;
@@ -168,6 +171,17 @@ mod v4535;
 mod v4541;
 mod v4649;
 mod v4763;
+mod v4885;
+mod v4888;
+mod v4996;
+mod v4997;
+mod v5002;
+mod v5006;
+mod v5007;
+mod v5008;
+mod v5012;
+mod v5014;
+mod v5016;
 mod v502;
 mod v700;
 mod v701;
@@ -366,4 +380,15 @@ pub fn register_all(reg: &mut RegistryBuilder) {
     v4541::register(reg);
     v4649::register(reg);
     v4763::register(reg);
+    v4885::register(reg);
+    v4888::register(reg);
+    v4996::register(reg);
+    v4997::register(reg);
+    v5002::register(reg);
+    v5006::register(reg);
+    v5007::register(reg);
+    v5008::register(reg);
+    v5012::register(reg);
+    v5014::register(reg);
+    v5016::register(reg);
 }

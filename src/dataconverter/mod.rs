@@ -12,15 +12,15 @@
 //! See `src/dataconverter/README.md` for the design overview and module map,
 //! and `REVERSE_CHEATSHEET.md` for authoring reverse converters.
 
-/// The in-memory canonical Minecraft data version — MC "26.1.2". All loaded data
+/// The in-memory canonical Minecraft data version — MC "26.3". All loaded data
 /// is forward-converted to here; "save as current" stamps this. (See
 /// `src/dataconverter/README.md`.)
-pub const CANONICAL_DATA_VERSION: i32 = 4790;
+pub const CANONICAL_DATA_VERSION: i32 = 5023;
 
 /// The highest data version with a registered forward converter in this port
 /// (the DataConverter handoff seam). Conversion within `(this, CANONICAL]` is a
 /// no-op shape-wise — nothing changed between it and the canonical target.
-pub const DATACONVERTER_FORWARD_MAX: i32 = 4763;
+pub const DATACONVERTER_FORWARD_MAX: i32 = 5016;
 
 pub mod apply;
 pub mod components;
@@ -45,6 +45,7 @@ pub use registry::{
     convert_item_stack_reverse, convert_structure, convert_structure_reverse, registry,
 };
 pub use version::{encode_versions, get_step, get_version, EncodedVersion};
+pub use versions::{block_state_keys, BLOCK_STATE_FIELD_NAMES_VERSION};
 
 #[cfg(test)]
 mod tests {

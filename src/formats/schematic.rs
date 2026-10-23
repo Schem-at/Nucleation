@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::fmt;
 #[cfg(test)]
 use std::io::BufReader;
+#[cfg(test)]
 use std::io::Read;
 
 use crate::block_entity::BlockEntity;
@@ -334,6 +335,7 @@ fn to_schematic_v2(schematic: &UniversalSchematic, compression: Compression) -> 
 }
 
 // Palette conversion for v3 (creates clean sequential indices)
+#[cfg(test)]
 fn convert_palette(palette: &Vec<BlockState>) -> (NbtCompound, i32) {
     let (nbt_palette, _) = convert_palette_with_mapping(palette);
     let max_id = nbt_palette.len() as i32 - 1;
@@ -560,7 +562,8 @@ pub fn from_schematic_bounded(
         region.add_block_entity(block_entity);
     }
 
-    let entities = parse_entities(schem)?;
+    let mut entities = parse_entities(schem)?;
+    shift_world_space_entities(schem, (width, height, length), &mut entities);
     for entity in entities {
         region.add_entity(entity);
     }
@@ -595,8 +598,6 @@ fn convert_block_entities_v3(region: &Region, data_version: Option<i32>) -> NbtL
 
     for (position, block_entity) in region.block_entities.iter() {
         let mut nbt = block_entity.to_nbt_v3(data_version);
-        // The storage key, not `block_entity.position`, which is stale for
-        // templates shared across positions.
         let rel_x = position.0 - region.position.0;
         let rel_y = position.1 - region.position.1;
         let rel_z = position.2 - region.position.2;
@@ -757,6 +758,7 @@ fn encode_varint_into(value: u32, buf: &mut Vec<u8>) {
     }
 }
 
+#[cfg(test)]
 fn decode_varint<R: Read>(reader: &mut R) -> Result<u32> {
     let mut result = 0u32;
     let mut shift = 0;
@@ -902,6 +904,36 @@ fn block_entities_from_raw(list: Vec<NbtValue>) -> Vec<BlockEntity> {
         .collect()
 }
 
+/// Entity positions are relative to the schematic per the Sponge spec, but some
+/// writers (WorldEdit's v2 output) store them in world coordinates. When every
+/// entity lies outside the schematic's box and inside the box at `Offset`, the
+/// file used world coordinates: shift them back by `Offset`.
+fn shift_world_space_entities(schem: &NbtCompound, size: (u32, u32, u32), entities: &mut [Entity]) {
+    let Ok(offset) = schem.get::<_, &[i32]>("Offset") else {
+        return;
+    };
+    let [ox, oy, oz] = match offset {
+        [x, y, z] => [*x as f64, *y as f64, *z as f64],
+        _ => return,
+    };
+    let (w, h, l) = (size.0 as f64, size.1 as f64, size.2 as f64);
+    let inside = |(x, y, z): (f64, f64, f64)| {
+        (0.0..=w).contains(&x) && (0.0..=h).contains(&y) && (0.0..=l).contains(&z)
+    };
+    let world_space = !entities.is_empty()
+        && entities.iter().all(|e| {
+            let (x, y, z) = e.position;
+            !inside((x, y, z)) && inside((x - ox, y - oy, z - oz))
+        });
+    if world_space {
+        for entity in entities {
+            entity.position.0 -= ox;
+            entity.position.1 -= oy;
+            entity.position.2 -= oz;
+        }
+    }
+}
+
 fn parse_entities(region_tag: &NbtCompound) -> Result<Vec<Entity>> {
     if !region_tag.contains_key("Entities") {
         return Ok(Vec::new());
@@ -1003,6 +1035,31 @@ impl SchematicExporter for SchematicFormat {
 
 #[cfg(test)]
 mod tests {
+
+    /// WorldEdit's v2 writer stores entity positions in world coordinates;
+    /// they must come back relative to the schematic, like its blocks.
+    #[test]
+    fn world_space_v2_entities_are_made_relative() {
+        let data = std::fs::read("tests/samples/Evaluator.schem").unwrap();
+        let schematic = from_schematic(&data).unwrap();
+        let region = &schematic.default_region;
+        assert_eq!(region.entities.len(), 8);
+        let (w, h, l) = region.get_dimensions();
+        for entity in &region.entities {
+            let (x, y, z) = entity.position;
+            assert!(
+                (0.0..=w as f64).contains(&x)
+                    && (0.0..=h as f64).contains(&y)
+                    && (0.0..=l as f64).contains(&z),
+                "entity at {:?} outside {:?}",
+                entity.position,
+                (w, h, l)
+            );
+        }
+        // Compaction no longer stretches to reach far-away entities.
+        assert_eq!(region.to_compact().size, region.get_tight_dimensions());
+    }
+
     use std::fs;
     use std::fs::File;
     use std::io::{Cursor, Write};

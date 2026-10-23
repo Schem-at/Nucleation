@@ -43,7 +43,7 @@ const DATA_VERSION_1_20_5: i32 = 3837; // item Components → Version 7
 // format whose writer preserves the tag — see `formats::NUCLEATION_TEST_FORMAT`.
 use super::NUCLEATION_TEST_FORMAT;
 /// Default target data version when a schematic carries none (latest canonical).
-const DEFAULT_TARGET_DATA_VERSION: i32 = 4790; // 26.1.2
+const DEFAULT_TARGET_DATA_VERSION: i32 = crate::dataconverter::CANONICAL_DATA_VERSION;
 
 /// The `.litematic` `Version` (and optional `SubVersion`) that Litematica writes
 /// for a given Minecraft data version. v4 (1.12) < 1631 ≤ v5 (1.13–1.17) < 2860 ≤
@@ -110,7 +110,7 @@ pub fn to_litematic_with_compression(
     root.insert("Metadata", NbtTag::Compound(metadata));
 
     // Add Regions
-    let regions = create_regions(schematic, version);
+    let regions = create_regions(schematic, version, data_version);
     root.insert("Regions", NbtTag::Compound(regions));
 
     // A test the build carries with it, at the *root* beside `Metadata`.
@@ -342,7 +342,7 @@ fn create_metadata(schematic: &UniversalSchematic, version: i32) -> NbtCompound 
 
     metadata
 }
-fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
+fn create_regions(schematic: &UniversalSchematic, version: i32, data_version: i32) -> NbtCompound {
     let mut regions = NbtCompound::new();
 
     for (name, region) in &schematic.get_all_regions() {
@@ -407,11 +407,13 @@ fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
             }
         }
 
-        // Create the NBT list for the reordered palette
+        // Create the NBT list for the reordered palette. Litematica stores
+        // palette entries with vanilla's `NbtUtils.writeBlockState`, whose field
+        // names change at data version 5006 (26.3): `id`/`properties`.
         let palette = NbtList::from(
             reordered_palette
                 .iter()
-                .map(|block_state| block_state.to_nbt())
+                .map(|block_state| block_state.to_nbt_for_data_version(data_version))
                 .collect::<Vec<NbtTag>>(),
         );
         region_nbt.insert("BlockStatePalette", NbtTag::List(palette));
@@ -500,8 +502,6 @@ fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
                 .map(|(position, block_entity)| {
                     let mut block_entity_nbt = block_entity.to_nbt();
 
-                    // The storage key, not `block_entity.position`, which is
-                    // stale for templates shared across positions.
                     let rel_x = position.0 - compact_region.position.0;
                     let rel_y = position.1 - compact_region.position.1;
                     let rel_z = position.2 - compact_region.position.2;
@@ -1294,7 +1294,7 @@ mod tests {
 
         schematic.add_region(region);
 
-        let regions = create_regions(&schematic, 7);
+        let regions = create_regions(&schematic, 7, 4189);
 
         assert!(regions.contains_key("TestRegion"));
         let region_nbt = regions.get::<_, &NbtCompound>("TestRegion").unwrap();

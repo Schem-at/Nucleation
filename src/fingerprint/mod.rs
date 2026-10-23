@@ -437,9 +437,7 @@ pub fn fingerprint(schem: &UniversalSchematic, spec: &FingerprintSpec) -> Finger
 
     // Block-entity NBT tokens per occupied cell, computed once (they are
     // rotation-invariant). Serializations are memoized by NBT identity so
-    // template-shared entities hash once. Positions come from the store keys
-    // (via `get_block_entity`), never from `BlockEntity::position`, which is
-    // stale for template-shared entities.
+    // entities sharing one NBT payload hash once.
     let mut nbt_memo: HashMap<*const NbtMap, Option<Token>> = HashMap::new();
     let mut nbt_by_pos: HashMap<(i32, i32, i32), Token> = HashMap::new();
     // Rotation-tolerant specs must not hash facing/rotation fields (see
@@ -548,7 +546,7 @@ fn fingerprint_single_orbit(
     let mut toks: Vec<Option<Token>> = Vec::new();
 
     // Block-entity NBT tokens are rotation-invariant; serializations are
-    // memoized by NBT identity so template-shared entities hash once.
+    // memoized by NBT identity so entities sharing one NBT payload hash once.
     let mut nbt_memo: HashMap<*const NbtMap, Option<Token>> = HashMap::new();
     let mut nbt_tokens: Vec<Token> = Vec::new();
 

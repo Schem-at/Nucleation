@@ -569,6 +569,7 @@ impl BlockBehaviour for PistonHead {
     }
 }
 
+/// The behaviour of a piston or sticky piston.
 pub struct Piston<P: PowerSource, M: Movability> {
     /// The direction the piston pushes.
     pub facing: Dir,

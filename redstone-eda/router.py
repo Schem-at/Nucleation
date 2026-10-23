@@ -26,6 +26,7 @@ climbs refresh or preserve level by construction (the climb's output is a
 strongly powered cap block: a fresh 15).
 """
 import heapq
+import itertools
 import re
 
 import rs
@@ -272,33 +273,89 @@ class Router:
             return 1.3 * min(abs(p[0] - q[0]) + abs(p[2] - q[2]) + abs(p[1] - q[1])
                              for q in dsts)
 
-        # state = (cell, consecutive-stair count, previous stair direction).
-        # Stairs cannot carry repeaters (chain capped at 4), and a stair may
-        # not exactly REVERSE the previous stair: a switchback's support block
-        # lands on the cell that cuts the previous diagonal.
-        openq, came, gbest = [], {}, {}
+        # state = (cell, consecutive-stair count, previous stair direction,
+        # previous flat direction, strength budget).  Stairs cannot carry
+        # repeaters (chain capped at 4), and a stair may not exactly REVERSE
+        # the previous stair: a switchback's support block lands on the cell
+        # that cuts the previous diagonal.
+        #
+        # The budget is emit's `since` assuming a refresh at every cell that
+        # could host one (a flat cell between two collinear flat steps).
+        # emit refreshes at the latest such cell that keeps the dust alive,
+        # so a path is live (dead_stretch is None) exactly when no laid dust
+        # exceeds MAX_SINCE under this assumption.  States trade cost against
+        # budget, so each (cell, stair, flat) key keeps a Pareto front.
+        def legal(p, q, mv):
+            """May the path step p -> q by mv?  Independent of the rest of
+            the search state, so cached per find."""
+            x, y, z = p
+            if not self.in_bounds(q):
+                return False
+            if not self.dust_ok(q, label, friendly):
+                return False
+            if not self.move_ok(p, q, label, friendly):
+                return False
+            if mv == "up" and self.b.solid_at(x, y + 1, z):
+                return False        # solid corner above the lower dust cuts the diagonal
+            if mv == "down" and self.b.solid_at(q[0], y, q[2]):
+                return False        # same rule, descending
+            # NOTE (probed diode, probe_materials.py): a step whose upper
+            # dust sits on a TRANSPARENT support conducts up only.  The
+            # router never places transparent supports and today's builds
+            # never route over them, so descent stays legal; when glass
+            # exploitation lands, "down" moves must check the current
+            # cell's support for conductivity (a naive guard here changes
+            # A* paths in ways the emitter was never verified for).
+            if isinstance(mv, tuple):
+                dx, dz = mv[1], mv[2]
+                entry = (x + dx, y, z + dz)
+                if not (self.dust_ok(entry, label, friendly)
+                        and self.move_ok(p, entry, label, friendly)
+                        and self.climb_entry_ok(p, entry, (q[0], y, q[2]))
+                        and self.col_free(q[0], q[2], y, y + 4)
+                        and self.ladder_clear(q[0], q[2], y, label,
+                                              friendly)):
+                    return False    # entry cell + ladder column must be free
+            return True
+
+        openq, came, front = [], {}, {}
+        legal_cache = {}
+        tie = itertools.count(len(srcs))   # FIFO among equal (f, g, cell)
+
+        def since_at(q, prev_since):
+            if "redstone_wire" in self.b.cells.get(q, ""):
+                return self.trunk_since(q)      # reused trunk: its strength
+            return prev_since + 1
+
+        def dominated(key, g, since, strict=False):
+            return any(g2 <= g and s2 <= since and (not strict or (g2, s2) != (g, since))
+                       for g2, s2 in front.get(key, ()))
+
         for s0 in srcs:
-            start = (s0, 0, None)
-            openq.append((h(s0), 0, start))
+            start = (s0, 0, None, None, since_at(s0, self.REFRESH - self.FIRST))
+            openq.append((h(s0), 0, s0, 0, len(openq), start))
             came[start] = (None, None)
-            gbest[start] = 0
+            front.setdefault(start[:4], []).append((0, start[4]))
         heapq.heapify(openq)
         it = 0
         while openq:
             it += 1
             if it > max_iter:
                 break
-            _, g, s = heapq.heappop(openq)
-            p, d, pdir = s
+            g, s = heapq.heappop(openq)[1::4]
+            p, d, pdir, hdir, since = s
             if p in dsts:
+                if since > self.MAX_SINCE:
+                    continue                # the final dust would be dead
                 path = []
                 while s is not None:
                     prev, mv = came[s]
                     path.append((s[0], mv))
                     s = prev
                 return list(reversed(path))
-            if g > gbest.get(s, 1e18):
+            if dominated(s[:4], g, since, strict=True):
                 continue
+            reused = "redstone_wire" in self.b.cells.get(p, "")
             x, y, z = p
             cand = []
             for dx, dz in ((m[0], m[2]) for m in H_MOVES):
@@ -316,48 +373,38 @@ class Router:
                 exit_p = (x + 2 * dx, y + 5, z + 2 * dz)
                 cand.append((exit_p, 9, ("climb", dx, dz)))
             for q, cost, mv in cand:
-                if not self.in_bounds(q):
+                ok = legal_cache.get((p, q, mv))
+                if ok is None:
+                    ok = legal_cache[(p, q, mv)] = legal(p, q, mv)
+                if not ok:
                     continue
-                if not self.dust_ok(q, label, friendly):
-                    continue
-                if not self.move_ok(p, q, label, friendly):
-                    continue
-                if mv == "up" and self.b.solid_at(x, y + 1, z):
-                    continue        # solid corner above the lower dust cuts the diagonal
-                if mv == "down" and self.b.solid_at(q[0], y, q[2]):
-                    continue        # same rule, descending
-                # NOTE (probed diode, probe_materials.py): a step whose upper
-                # dust sits on a TRANSPARENT support conducts up only.  The
-                # router never places transparent supports and today's builds
-                # never route over them, so descent stays legal; when glass
-                # exploitation lands, "down" moves must check the current
-                # cell's support for conductivity (a naive guard here changes
-                # A* paths in ways the emitter was never verified for).
-                if isinstance(mv, tuple):
-                    dx, dz = mv[1], mv[2]
-                    entry = (x + dx, y, z + dz)
-                    if not (self.dust_ok(entry, label, friendly)
-                            and self.move_ok(p, entry, label, friendly)
-                            and self.climb_entry_ok(p, entry, (q[0], y, q[2]))
-                            and self.col_free(q[0], q[2], y, y + 4)
-                            and self.ladder_clear(q[0], q[2], y, label,
-                                                  friendly)):
-                        continue    # entry cell + ladder column must be free
                 stair = mv in ("up", "down")
                 if stair and pdir is not None:
                     if (q[0] - x, q[2] - z) == (-pdir[0], -pdir[1]):
                         continue                  # switchback cuts own diagonal
+                step = (q[0] - x, q[2] - z)
+                if mv == "h" and step == hdir and not reused:
+                    base = 0                # p can host a refresh
+                elif since > self.MAX_SINCE:
+                    continue                # p is dead unless it refreshes
+                else:
+                    base = since
+                nsince = 0 if isinstance(mv, tuple) else since_at(q, base)
                 nd = d + 1 if stair else 0
-                nq = (q, nd, (q[0] - x, q[2] - z) if stair else None)
+                nq = (q, nd, step if stair else None, step if mv == "h" else None,
+                      nsince)
                 ng = g + cost
                 if q in self.soft:
                     slab, spen = self.soft[q]
                     if slab not in friendly:
                         ng += spen
-                if ng < gbest.get(nq, 1e18):
-                    gbest[nq] = ng
+                if not dominated(nq[:4], ng, nsince):
+                    key = nq[:4]
+                    front[key] = [(g2, s2) for g2, s2 in front.get(key, ())
+                                  if not (ng <= g2 and nsince <= s2)]
+                    front[key].append((ng, nsince))
                     came[nq] = (s, mv)
-                    heapq.heappush(openq, (ng + h(q), ng, nq))
+                    heapq.heappush(openq, (ng + h(q), ng, q, nd, next(tie), nq))
         return None
 
     # -- emission -----------------------------------------------------------
@@ -378,6 +425,15 @@ class Router:
     # Dust at ss1 still fires a repeater (probe_station A15), so no laid dust
     # may be more than 14 cells past its last refresh.
     MAX_SINCE = 14
+    # Strength assumed by the search for existing dust it has no record of (a
+    # hand-built cell's port or rail).  None: like a fresh path source, with
+    # FIRST spacing; those ports are driven, not decayed trunk ends.
+    UNKNOWN_SS = None
+
+    def trunk_since(self, p):
+        """The refresh budget resuming on existing own-net dust at p."""
+        ss = self.ss.get(p, self.UNKNOWN_SS)
+        return self.REFRESH - self.FIRST if ss is None else 15 - ss
 
     def can_refresh(self, path, i):
         """May emit put a refresh at path cell i?  Only a straight run on one
@@ -432,7 +488,7 @@ class Router:
                 since, stretch = 0, []
                 continue
             if "redstone_wire" in self.b.cells.get(p, ""):
-                since, stretch = 15 - self.ss.get(p, 1), []
+                since, stretch = self.trunk_since(p), []
                 continue
             since += 1
             if self.refresh_due(path, i, since):

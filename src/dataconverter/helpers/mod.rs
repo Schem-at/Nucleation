@@ -111,12 +111,15 @@ fn value_rename_converter(renamer: Renamer) -> super::engine::ValueConverter {
     })
 }
 
-/// Build a `{Name}`-field rename converter closure (for BLOCK_STATE).
-fn name_field_rename_converter(renamer: Renamer) -> super::engine::Converter {
+/// Build a block-name-field rename converter closure (for BLOCK_STATE). The
+/// field is `Name` for a rename registered before V5006 and `id` from V5006 on
+/// (Mojang `BlockStateFieldNamesFix`, see `versions/v5006.rs`).
+fn name_field_rename_converter(version: i32, renamer: Renamer) -> super::engine::Converter {
+    let key = super::versions::block_state_keys(version).0;
     Box::new(move |data: &mut NbtMap, _from, _to| {
-        if let Some(name) = data.get_string("Name").map(|s| s.to_string()) {
+        if let Some(name) = data.get_string(key).map(|s| s.to_string()) {
             if let Some(new) = renamer(&name) {
-                data.set_string("Name", new);
+                data.set_string(key, new);
             }
         }
     })
@@ -185,7 +188,7 @@ pub fn register_entity_rename(
 }
 
 /// `ConverterAbstractBlockRename.register` — rename BLOCK_NAME, the BLOCK_STATE
-/// `Name` field, and the FLAT_BLOCK_STATE string prefix, plus the inverses.
+/// `Name` (`id` from V5006) field, and the FLAT_BLOCK_STATE string prefix, plus the inverses.
 pub fn register_block_rename(reg: &mut RegistryBuilder, version: i32, spec: impl Into<RenameSpec>) {
     let spec = spec.into();
 
@@ -199,10 +202,13 @@ pub fn register_block_rename(reg: &mut RegistryBuilder, version: i32, spec: impl
     reg.block_state.add_structure_converter(
         version,
         0,
-        name_field_rename_converter(spec.forward()),
+        name_field_rename_converter(version, spec.forward()),
     );
-    reg.block_state
-        .add_reverse_converter(version, 0, name_field_rename_converter(spec.reverse()));
+    reg.block_state.add_reverse_converter(
+        version,
+        0,
+        name_field_rename_converter(version, spec.reverse()),
+    );
 
     reg.flat_block_state
         .add_converter(version, 0, flat_state_rename_converter(spec.forward()));

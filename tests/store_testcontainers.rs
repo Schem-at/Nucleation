@@ -17,39 +17,39 @@
 
 use nucleation::store::contract::run_contract;
 use nucleation::store::{PgConfig, PgStore, RedisConfig, RedisStore, S3Config, S3Store};
-use testcontainers_modules::testcontainers::core::{IntoContainerPort, WaitFor};
+use testcontainers_modules::testcontainers::core::IntoContainerPort;
 use testcontainers_modules::testcontainers::runners::SyncRunner;
 use testcontainers_modules::testcontainers::{GenericImage, ImageExt};
 use testcontainers_modules::{postgres, redis};
 
 #[test]
-fn s3_contract_against_minio_container() {
-    // The `minio` module pins RELEASE.2022-02-07 (predates conditional writes)
-    // and waits for "API:" on stdout, but current MinIO logs that banner to
-    // stderr. Build it as a GenericImage pinned to a current release so
-    // `If-None-Match` is enforced like real S3 (required by `put_if_absent`).
-    // MinIO no longer publishes community images (`minio/minio` is gone from
-    // Docker Hub); `pgsty/minio` is a maintained build of the same server.
-    let node = GenericImage::new("pgsty/minio", "RELEASE.2026-08-04T00-00-00Z")
-        .with_wait_for(WaitFor::message_on_stderr("API:"))
+fn s3_contract_against_rustfs_container() {
+    // RustFS: an S3-compatible server that enforces `If-None-Match` like real
+    // S3 (required by `put_if_absent`). MinIO no longer publishes community
+    // images. Its default log level prints no readiness line, so wait for the
+    // API itself to answer instead of matching log output.
+    let node = GenericImage::new("rustfs/rustfs", "1.0.3")
         .with_exposed_port(9000.tcp())
-        .with_env_var("MINIO_ROOT_USER", "minioadmin")
-        .with_env_var("MINIO_ROOT_PASSWORD", "minioadmin")
-        .with_cmd(["server", "/data", "--console-address", ":9001"])
+        .with_env_var("RUSTFS_ACCESS_KEY", "rustfsadmin")
+        .with_env_var("RUSTFS_SECRET_KEY", "rustfsadmin")
         .start()
-        .expect("start MinIO");
-    let port = node.get_host_port_ipv4(9000.tcp()).expect("minio port");
+        .expect("start RustFS");
+    let port = node.get_host_port_ipv4(9000.tcp()).expect("rustfs port");
     let store = S3Store::connect(S3Config {
         bucket: "nucleation-test".to_string(),
         prefix: "tc/".to_string(),
         region: Some("us-east-1".to_string()),
         endpoint: Some(format!("http://127.0.0.1:{port}")),
-        access_key: Some("minioadmin".to_string()),
-        secret_key: Some("minioadmin".to_string()),
+        access_key: Some("rustfsadmin".to_string()),
+        secret_key: Some("rustfsadmin".to_string()),
         force_path_style: true,
     })
     .expect("connect S3");
-    store.ensure_bucket().expect("ensure bucket");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    while let Err(error) = store.ensure_bucket() {
+        assert!(std::time::Instant::now() < deadline, "RustFS never became ready: {error}");
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
     run_contract(&store);
 }
 
