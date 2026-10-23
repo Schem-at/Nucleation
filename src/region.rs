@@ -865,6 +865,7 @@ impl Region {
     }
 
     /// Grow the region so it contains `(x, y, z)`. See [`Self::ensure_bounds`].
+    #[inline]
     pub fn expand_to_fit(&mut self, x: i32, y: i32, z: i32) {
         self.ensure_bounds((x, y, z), (x, y, z));
     }
@@ -881,11 +882,40 @@ impl Region {
     /// (A fixed ±64 pad used to turn a few hundred scattered blocks into a
     /// 1.6M-voxel region, while `size / 2` on a thin axis grew it one cell at
     /// a time.)
+    #[inline]
     pub fn ensure_bounds(&mut self, min: (i32, i32, i32), max: (i32, i32, i32)) {
-        let current = self.get_bounding_box();
-        if current.contains(min) && current.contains(max) {
+        let (lo, hi) = (self.bbox.min, self.bbox.max);
+        if self.bbox.contains(min) && self.bbox.contains(max) {
             return;
         }
+        let wanted = BoundingBox::new(
+            (lo.0.min(min.0).min(max.0), lo.1.min(min.1).min(max.1), lo.2.min(min.2).min(max.2)),
+            (hi.0.max(min.0).max(max.0), hi.1.max(min.1).max(max.1), hi.2.max(min.2).max(max.2)),
+        );
+        if self.alloc.contains(wanted.min) && self.alloc.contains(wanted.max) {
+            // The common case: the write lands in growth padding.
+            self.set_bounds(wanted);
+        } else {
+            self.ensure_bounds_slow(min, max, wanted);
+        }
+    }
+
+    #[inline]
+    fn set_bounds(&mut self, bounds: BoundingBox) {
+        self.position = bounds.min;
+        self.size = bounds.get_dimensions();
+        self.bbox = bounds;
+    }
+
+    /// [`Self::ensure_bounds`] when the storage must change.
+    #[cold]
+    #[inline(never)]
+    fn ensure_bounds_slow(
+        &mut self,
+        min: (i32, i32, i32),
+        max: (i32, i32, i32),
+        wanted: BoundingBox,
+    ) {
         let untouched = self.size == (1, 1, 1)
             && self.alloc == self.bbox
             && self.is_empty()
@@ -918,22 +948,15 @@ impl Region {
             (clamp(new_min), clamp(new_max))
         }
 
-        let wanted = current
-            .union(&BoundingBox::new(min, min))
-            .union(&BoundingBox::new(max, max));
         let alloc = self.alloc.clone();
-        if !(alloc.contains(wanted.min) && alloc.contains(wanted.max)) {
-            let (min_x, max_x) = grow(alloc.min.0, alloc.max.0, wanted.min.0, wanted.max.0);
-            let (min_y, max_y) = grow(alloc.min.1, alloc.max.1, wanted.min.1, wanted.max.1);
-            let (min_z, max_z) = grow(alloc.min.2, alloc.max.2, wanted.min.2, wanted.max.2);
-            self.expand_to_bounding_box(BoundingBox::new(
-                (min_x, min_y, min_z),
-                (max_x, max_y, max_z),
-            ));
-        }
-        self.position = wanted.min;
-        self.size = wanted.get_dimensions();
-        self.bbox = wanted;
+        let (min_x, max_x) = grow(alloc.min.0, alloc.max.0, wanted.min.0, wanted.max.0);
+        let (min_y, max_y) = grow(alloc.min.1, alloc.max.1, wanted.min.1, wanted.max.1);
+        let (min_z, max_z) = grow(alloc.min.2, alloc.max.2, wanted.min.2, wanted.max.2);
+        self.expand_to_bounding_box(BoundingBox::new(
+            (min_x, min_y, min_z),
+            (max_x, max_y, max_z),
+        ));
+        self.set_bounds(wanted);
     }
 
     /// Grow the allocation to `new_bounding_box`, which must contain the
