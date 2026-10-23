@@ -237,8 +237,8 @@ Schematic_get_chunk_non_air_blocks_json_result Schematic_get_chunk_non_air_block
 
 void Schematic_render_regions_json(const Schematic* self, DiplomatWrite* write);
 
-typedef struct Schematic_region_block_indices_result {union {DiplomatU32View ok; NucleationError err;}; bool is_ok;} Schematic_region_block_indices_result;
-Schematic_region_block_indices_result Schematic_region_block_indices(const Schematic* self, DiplomatStringView region_name, uint32_t start, uint32_t count);
+typedef struct Schematic_region_block_indices_result {union {uint32_t ok; NucleationError err;}; bool is_ok;} Schematic_region_block_indices_result;
+Schematic_region_block_indices_result Schematic_region_block_indices(const Schematic* self, DiplomatStringView region_name, uint32_t start, DiplomatU32ViewMut out);
 
 void Schematic_get_chunks_json(const Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, DiplomatWrite* write);
 

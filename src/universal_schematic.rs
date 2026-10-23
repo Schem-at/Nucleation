@@ -578,8 +578,8 @@ impl UniversalSchematic {
         // Add blocks from default region
         let regions = std::iter::once(&self.default_region).chain(Self::sorted_named_regions(self));
         for region in regions {
-            for (_, _, row) in region.bounded_rows() {
-                blocks.extend(row.iter().map(|&i| region.palette[i as usize].clone()));
+            for (_, _, _, cells) in region.bounded_rows() {
+                blocks.extend(cells.iter().map(|&i| region.palette[i as usize].clone()));
             }
         }
         blocks
@@ -2005,8 +2005,7 @@ impl UniversalSchematic {
                 for y in start_y..end_y {
                     for z in start_z..end_z {
                         for x in start_x..end_x {
-                            let index = region.coords_to_index(x, y, z);
-                            if let Some(&palette_index) = region.blocks.get(index) {
+                            if let Some(palette_index) = region.get_block_index(x, y, z) {
                                 // Skip if it matches the air index
                                 let is_air = match air_index {
                                     Some(idx) => palette_index as usize == idx,

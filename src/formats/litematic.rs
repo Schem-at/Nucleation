@@ -456,7 +456,8 @@ fn create_regions(
                 2,
             )
         };
-        let block_count = compact_region.blocks.len();
+        let blocks = compact_region.dense_blocks();
+        let block_count = blocks.len();
         let expected_len = (block_count * bits_per_block).div_ceil(64);
 
         let mut packed_states = vec![0i64; expected_len];
@@ -466,7 +467,7 @@ fn create_regions(
             // Fast path: entries never cross i64 boundaries (bits_per_block = 2, 4, 8, 16, 32)
             // Batch-pack without per-block division or branching
             let entries_per_long = 64 / bits_per_block;
-            for (chunk_idx, chunk) in compact_region.blocks.chunks(entries_per_long).enumerate() {
+            for (chunk_idx, chunk) in blocks.chunks(entries_per_long).enumerate() {
                 let mut packed: u64 = 0;
                 for (i, &block_state) in chunk.iter().enumerate() {
                     packed |= (index_mapping[block_state as usize] as u64 & mask)
@@ -476,7 +477,7 @@ fn create_regions(
             }
         } else {
             // Slow path: entries may cross i64 boundaries (bits_per_block = 3, 5, 6, 7, etc.)
-            for (index, &block_state) in compact_region.blocks.iter().enumerate() {
+            for (index, &block_state) in blocks.iter().enumerate() {
                 let mapped_state = index_mapping[block_state as usize];
                 let bit_index = index * bits_per_block;
                 let start_long_index = bit_index / 64;

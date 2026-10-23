@@ -1140,7 +1140,7 @@ final class Schematic {
         return Lib::readAndFreeWrite($write);
     }
 
-    public function regionBlockIndices(string $region_name,  $start,  $count) {
+    public function regionBlockIndices(string $region_name,  $start, array $out) {
         $__n0 = strlen($region_name);
         $__view0 = Lib::ffi()->new('DiplomatStringView');
         if ($__n0 > 0) {
@@ -1151,7 +1151,17 @@ final class Schematic {
             $__view0->data = null;
         }
         $__view0->len = $__n0;
-        $result = Lib::ffi()->Schematic_region_block_indices($this->ptr, $__view0, $start, $count);
+        $__n2 = count($out);
+        $__view2 = Lib::ffi()->new('DiplomatU32View');
+        if ($__n2 > 0) {
+            $__arr2 = Lib::ffi()->new("uint32_t[" . $__n2 . "]", false);
+            foreach ($out as $__i2 => $__v2) { $__arr2[$__i2] = $__v2; }
+            $__view2->data = \FFI::addr($__arr2[0]);
+        } else {
+            $__view2->data = null;
+        }
+        $__view2->len = $__n2;
+        $result = Lib::ffi()->Schematic_region_block_indices($this->ptr, $__view0, $start, $__view2);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }

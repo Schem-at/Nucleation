@@ -2009,8 +2009,8 @@ export class Schematic {
 
     /**
      * Storage metadata and full block states for palette-index streaming. Region order
-     * is default first, then sorted names (highest precedence first); indices are LOCAL to each region. Bounds
-     * describe allocated storage, never tight bounds. x is fastest, then z, then y.
+     * is default first, then sorted names (highest precedence first); indices are LOCAL to each region. `min`
+     * and `size` are the region's bounds (never tight bounds); `length` cells, x fastest, then z, then y.
      * No block buffer is cloned or serialized here.
      */
     renderRegionsJson() {
@@ -2029,29 +2029,29 @@ export class Schematic {
     }
 
     /**
-     * A bounded window of a region's dense palette indices (including air).
-     * At most 65,536 cells per call; no full-world scan, coordinate tuples, or
-     * intermediate Rust allocation. JS bindings copy the borrowed slice before
-     * returning, so callers may mutate the schematic or grow WASM memory safely.
+     * Copy a window of a region's palette indices (air included) into `out`:
+     * cells `start..start + out.len()` of its bounds, in `render_regions_json`
+     * order. Returns the number of cells written (fewer than `out.len()` at the
+     * end of the region). No coordinate tuples or intermediate allocation.
      */
     regionBlockIndices(regionName, start, count) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
         const regionNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, regionName)));
-        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 9, 4, true);
+        const outBuf = diplomatRuntime.DiplomatBuf.slice(wasm, new Uint32Array(count), "u32");
+        const outSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, outBuf));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
-        // This lifetime edge depends on lifetimes 'a
-        let aEdges = [this];
 
-
-        const result = wasm.Schematic_region_block_indices(diplomatReceive.buffer, this.ffiValue, regionNameSlice.ptr, start, count);
+        const result = wasm.Schematic_region_block_indices(diplomatReceive.buffer, this.ffiValue, regionNameSlice.ptr, start, outSlice.ptr);
 
         try {
             if (!diplomatReceive.resultFlag) {
                 const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
                 throw new globalThis.Error('NucleationError.' + cause.value, { cause });
             }
-            return new diplomatRuntime.DiplomatSlicePrimitive(wasm, diplomatReceive.buffer, "u32", aEdges).getValue().slice();
+            const written = (new Uint32Array(wasm.memory.buffer, diplomatReceive.buffer, 1))[0];
+            return new Uint32Array(wasm.memory.buffer, outBuf.ptr, written).slice();
         }
 
         finally {

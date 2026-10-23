@@ -30,6 +30,7 @@ pub mod nbt;
 mod print_utils;
 pub mod processing;
 mod region;
+mod region_storage;
 pub mod registry_pipeline;
 pub mod schematic_builder;
 pub mod sdf;

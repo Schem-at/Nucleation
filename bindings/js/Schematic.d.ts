@@ -518,17 +518,17 @@ export class Schematic {
 
     /**
      * Storage metadata and full block states for palette-index streaming. Region order
-     * is default first, then sorted names (highest precedence first); indices are LOCAL to each region. Bounds
-     * describe allocated storage, never tight bounds. x is fastest, then z, then y.
+     * is default first, then sorted names (highest precedence first); indices are LOCAL to each region. `min`
+     * and `size` are the region's bounds (never tight bounds); `length` cells, x fastest, then z, then y.
      * No block buffer is cloned or serialized here.
      */
     renderRegionsJson(): string;
 
     /**
-     * A bounded window of a region's dense palette indices (including air).
-     * At most 65,536 cells per call; no full-world scan, coordinate tuples, or
-     * intermediate Rust allocation. JS bindings copy the borrowed slice before
-     * returning, so callers may mutate the schematic or grow WASM memory safely.
+     * Copy a window of a region's palette indices (air included) into `out`:
+     * cells `start..start + out.len()` of its bounds, in `render_regions_json`
+     * order. Returns the number of cells written (fewer than `out.len()` at the
+     * end of the region). No coordinate tuples or intermediate allocation.
      */
     regionBlockIndices(regionName: string, start: number, count: number): Uint32Array;
 

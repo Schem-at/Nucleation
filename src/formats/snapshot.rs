@@ -448,8 +448,12 @@ fn schematic_from_v4(snapshot: SnapshotV4) -> Result<UniversalSchematic> {
             .iter()
             .try_fold(1usize, |acc, &d| usize::try_from(d).ok().and_then(|d| acc.checked_mul(d)))
             .ok_or("Snapshot region size is invalid")?;
-        region.set_storage(wire.position, wire.size, wire.blocks.decode(volume)?);
+        let blocks = wire.blocks.decode(volume)?;
+        if blocks.iter().any(|&b| b as usize >= wire.palette.len()) {
+            return Err("Snapshot block data references a missing palette entry".into());
+        }
         region.palette = wire.palette;
+        region.set_storage(wire.position, wire.size, blocks);
         region.entities = wire.entities;
         region.block_entities = wire.block_entities;
         Ok(region)
@@ -536,20 +540,9 @@ fn schematic_from_v3(snapshot: SnapshotV3) -> Result<UniversalSchematic> {
     ))
 }
 
-/// Rebuild the `#[serde(skip)]` caches, after checking that the decoded block
-/// array matches the region volume and only references palette entries.
+/// Rebuild the `#[serde(skip)]` caches. The block data was validated against
+/// the region volume and palette when the region was decoded.
 fn rebuild_region(region: &mut Region) -> Result<()> {
-    let volume = [region.size.0, region.size.1, region.size.2]
-        .iter()
-        .try_fold(1usize, |acc, &d| usize::try_from(d).ok().and_then(|d| acc.checked_mul(d)));
-    if volume != Some(region.blocks.len()) {
-        return Err("Snapshot block data does not match the region volume".into());
-    }
-    let max_index = region.blocks.iter().copied().max();
-    if max_index.is_some_and(|max| max as usize >= region.palette.len()) {
-        return Err("Snapshot block data references a missing palette entry".into());
-    }
-    region.adopt_storage();
     region.rebuild_palette_index();
     region.rebuild_air_index();
     region.rescan_content();
@@ -690,7 +683,10 @@ mod tests {
         // An index past the palette (writable through v3's u64 cells) must be
         // rejected at load instead of panicking on first access.
         let mut schematic = sample();
-        schematic.default_region.blocks[0] = 10_000;
+        let region = &mut schematic.default_region;
+        let mut cells = region.dense_blocks().into_owned();
+        cells[0] = 10_000;
+        region.set_storage(region.position, region.size, cells);
         assert!(from_snapshot(&v3_bytes(&schematic)).is_err());
     }
 }
