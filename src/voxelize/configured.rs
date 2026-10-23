@@ -555,7 +555,7 @@ mod texture_tests {
         let zero = model
             .voxelize_with_options(&options, &palette, "zero")
             .unwrap();
-        assert_eq!(plain.default_region.blocks, zero.default_region.blocks);
+        assert_eq!(plain.default_region.dense_blocks(), zero.default_region.dense_blocks());
         options.lighting.as_mut().unwrap().strength = 0.8;
         let lit = model
             .voxelize_with_options(&options, &palette, "lit")

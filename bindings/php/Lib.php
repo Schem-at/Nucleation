@@ -1048,6 +1048,8 @@ void Schematic_get_chunk_blocks_json(Schematic* self, int32_t offset_x, int32_t 
 typedef struct Schematic_get_chunk_non_air_blocks_json_result { union { NucleationError err; }; bool is_ok; } Schematic_get_chunk_non_air_blocks_json_result;
 Schematic_get_chunk_non_air_blocks_json_result Schematic_get_chunk_non_air_blocks_json(Schematic* self, int32_t offset_x, int32_t offset_y, int32_t offset_z, int32_t width, int32_t height, int32_t length, DiplomatWrite* write);
 void Schematic_render_regions_json(Schematic* self, DiplomatWrite* write);
+typedef struct Schematic_region_block_indices_result { union { uint32_t ok; NucleationError err; }; bool is_ok; } Schematic_region_block_indices_result;
+Schematic_region_block_indices_result Schematic_region_block_indices(Schematic* self, DiplomatStringView region_name, uint32_t start, DiplomatU32View out);
 void Schematic_get_chunks_json(Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, DiplomatWrite* write);
 void Schematic_get_chunks_with_strategy_json(Schematic* self, int32_t chunk_width, int32_t chunk_height, int32_t chunk_length, DiplomatStringView strategy, float camera_x, float camera_y, float camera_z, DiplomatWrite* write);
 int32_t Schematic_block_count(Schematic* self);

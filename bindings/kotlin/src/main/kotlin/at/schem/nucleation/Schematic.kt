@@ -87,7 +87,7 @@ internal interface SchematicLib: Library {
     fun Schematic_get_chunk_blocks_json(handle: Pointer, offsetX: Int, offsetY: Int, offsetZ: Int, width: Int, height: Int, length: Int, write: Pointer): Unit
     fun Schematic_get_chunk_non_air_blocks_json(handle: Pointer, offsetX: Int, offsetY: Int, offsetZ: Int, width: Int, height: Int, length: Int, write: Pointer): ResultUnitInt
     fun Schematic_render_regions_json(handle: Pointer, write: Pointer): Unit
-    fun Schematic_region_block_indices(handle: Pointer, regionName: Slice, start: FFIUint32, count: FFIUint32): ResultSliceInt
+    fun Schematic_region_block_indices(handle: Pointer, regionName: Slice, start: FFIUint32, out: Slice): ResultFFIUint32Int
     fun Schematic_get_chunks_json(handle: Pointer, chunkWidth: Int, chunkHeight: Int, chunkLength: Int, write: Pointer): Unit
     fun Schematic_get_chunks_with_strategy_json(handle: Pointer, chunkWidth: Int, chunkHeight: Int, chunkLength: Int, strategy: Slice, cameraX: Float, cameraY: Float, cameraZ: Float, write: Pointer): Unit
     fun Schematic_block_count(handle: Pointer): Int
@@ -1645,8 +1645,8 @@ class Schematic internal constructor (
     }
 
     /** Storage metadata and full block states for palette-index streaming. Region order
-    *is default first, then sorted names (highest precedence first); indices are LOCAL to each region. Bounds
-    *describe allocated storage, never tight bounds. x is fastest, then z, then y.
+    *is default first, then sorted names (highest precedence first); indices are LOCAL to each region. `min`
+    *and `size` are the region's bounds (never tight bounds); `length` cells, x fastest, then z, then y.
     *No block buffer is cloned or serialized here.
     */
     fun renderRegionsJson(): String {
@@ -1657,26 +1657,26 @@ class Schematic internal constructor (
         return returnString
     }
 
-    /** A bounded window of a region's dense palette indices (including air).
-    *At most 65,536 cells per call; no full-world scan, coordinate tuples, or
-    *intermediate Rust allocation. JS bindings copy the borrowed slice before
-    *returning, so callers may mutate the schematic or grow WASM memory safely.
+    /** Copy a window of a region's palette indices (air included) into `out`:
+    *cells `start..start + out.len()` of its bounds, in `render_regions_json`
+    *order. Returns the number of cells written (fewer than `out.len()` at the
+    *end of the region). No coordinate tuples or intermediate allocation.
     */
     fun regionBlockIndices(regionName: String, start: UInt, count: UInt): Result<UIntArray> {
-        // This lifetime edge depends on lifetimes: 'a
-        val aEdges: MutableList<Any> = mutableListOf(this);
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
+        val outSliceMemory = PrimitiveArrayTools.borrow(UIntArray(count.toInt()))
 
-        val returnVal = lib.Schematic_region_block_indices(handle, regionNameSliceMemory.slice, FFIUint32(start), FFIUint32(count));
+        val returnVal = lib.Schematic_region_block_indices(handle, regionNameSliceMemory.slice, FFIUint32(start), outSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                    return PrimitiveArrayTools.getUIntArray(nativeOkVal).ok()
+                return PrimitiveArrayTools.getUIntArray(outSliceMemory.slice).copyOf(nativeOkVal.toUInt().toInt()).ok()
             } else {
                 return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
             }
         } finally {
             regionNameSliceMemory.close()
+            outSliceMemory.close()
         }
     }
 

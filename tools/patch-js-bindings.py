@@ -98,21 +98,41 @@ def main() -> None:
     if remaining:
         raise SystemExit("extensionless imports remain:\n" + "\n".join(remaining))
 
-    # Return a packed owned copy for renderer transfer windows. A borrowed WASM
-    # view cannot survive memory.grow or schematic mutation; Array.from boxes it.
+    # `region_block_indices` fills a caller buffer (`&mut [u32]`), but the
+    # generated JS copies the array into WASM memory and never back. Keep the
+    # JS shape `regionBlockIndices(name, start, count) -> Uint32Array`: hand
+    # Rust a WASM buffer of `count` cells and return an owned copy of the
+    # cells written (a WASM view would not survive memory.grow).
     schematic = ROOT / "Schematic.mjs"
     source = schematic.read_text()
-    start = source.index("    regionBlockIndices(")
+    start = source.index("    regionBlockIndices(regionName, start, out) {")
     end = source.index("\n    }", start)
     method = source[start:end]
-    old = 'Array.from(new diplomatRuntime.DiplomatSlicePrimitive(wasm, diplomatReceive.buffer, "u32", aEdges).getValue())'
-    new = 'new diplomatRuntime.DiplomatSlicePrimitive(wasm, diplomatReceive.buffer, "u32", aEdges).getValue().slice()'
-    if old not in method:
-        raise SystemExit("regionBlockIndices slice conversion changed")
-    schematic.write_text(source[:start] + method.replace(old, new) + source[end:])
+    replacements = [
+        ("regionBlockIndices(regionName, start, out) {", "regionBlockIndices(regionName, start, count) {"),
+        (
+            'const outSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, out, "u32")));',
+            'const outBuf = diplomatRuntime.DiplomatBuf.slice(wasm, new Uint32Array(count), "u32");\n'
+            "        const outSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, outBuf));",
+        ),
+        (
+            "return (new Uint32Array(wasm.memory.buffer, diplomatReceive.buffer, 1))[0];",
+            "const written = (new Uint32Array(wasm.memory.buffer, diplomatReceive.buffer, 1))[0];\n"
+            "            return new Uint32Array(wasm.memory.buffer, outBuf.ptr, written).slice();",
+        ),
+    ]
+    for old, new in replacements:
+        if old not in method:
+            raise SystemExit(f"regionBlockIndices binding changed: {old!r} not found")
+        method = method.replace(old, new)
+    schematic.write_text(source[:start] + method + source[end:])
     declaration = ROOT / "Schematic.d.ts"
-    declaration.write_text(declaration.read_text().replace(
-        "regionBlockIndices(regionName: string, start: number, count: number): Array<number>",
+    old_decl = "regionBlockIndices(regionName: string, start: number, out: Array<number>): number"
+    text = declaration.read_text()
+    if old_decl not in text:
+        raise SystemExit("regionBlockIndices declaration changed")
+    declaration.write_text(text.replace(
+        old_decl,
         "regionBlockIndices(regionName: string, start: number, count: number): Uint32Array",
     ))
 

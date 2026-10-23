@@ -1006,12 +1006,8 @@ impl BuildAnimation {
             let Some(source_region) = self.schematic.get_region(&name) else {
                 continue;
             };
-            for index in 0..source_region.blocks.len() {
-                let position = source_region.index_to_coords(index);
-                if source_region
-                    .get_block(position.0, position.1, position.2)
-                    .is_some_and(|block| !crate::fingerprint::is_air(block.get_name()))
-                {
+            for (position, index) in source_region.content_cells() {
+                if !crate::fingerprint::is_air(source_region.palette[index as usize].get_name()) {
                     actual.insert((name.clone(), position));
                 }
             }

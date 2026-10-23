@@ -170,8 +170,9 @@ fn to_schematic_v3(schematic: &UniversalSchematic, compression: Compression) -> 
 
     // Remap directly into the encoded stream instead of materializing a
     // second u32 buffer proportional to the schematic volume.
-    let mut block_data: Vec<u8> = Vec::with_capacity(compact_region.blocks.len() * 2);
-    for &original_id in &compact_region.blocks {
+    let blocks = compact_region.dense_blocks();
+    let mut block_data: Vec<u8> = Vec::with_capacity(blocks.len() * 2);
+    for &original_id in blocks.iter() {
         let block_id = palette_mapping
             .get(original_id as usize)
             .copied()
@@ -287,8 +288,9 @@ fn to_schematic_v2(schematic: &UniversalSchematic, compression: Compression) -> 
     schematic_data.insert("PaletteMax", max_id + 1);
 
     // Encode block data — preallocated to avoid per-block Vec allocations
-    let mut block_data: Vec<u8> = Vec::with_capacity(compact_region.blocks.len() * 2);
-    for &block_id in &compact_region.blocks {
+    let blocks = compact_region.dense_blocks();
+    let mut block_data: Vec<u8> = Vec::with_capacity(blocks.len() * 2);
+    for &block_id in blocks.iter() {
         encode_varint_into(block_id as u32, &mut block_data);
     }
 

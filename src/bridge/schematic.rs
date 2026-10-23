@@ -1295,15 +1295,12 @@ pub mod ffi {
                 NucleationError::NotFound
             })?;
             let items: Vec<serde_json::Value> = region
-                .blocks
-                .iter()
-                .enumerate()
-                .filter_map(|(index, block_index)| {
-                    let block = &region.palette[*block_index as usize];
+                .content_cells()
+                .filter_map(|((x, y, z), block_index)| {
+                    let block = &region.palette[block_index as usize];
                     if block.name == "minecraft:air" {
                         return None;
                     }
-                    let (x, y, z) = region.index_to_coords(index);
                     Some(block_json(
                         &crate::block_position::BlockPosition { x, y, z },
                         block,
@@ -1608,14 +1605,14 @@ pub mod ffi {
         }
 
         /// Storage metadata and full block states for palette-index streaming. Region order
-        /// is default first, then sorted names (highest precedence first); indices are LOCAL to each region. Bounds
-        /// describe allocated storage, never tight bounds. x is fastest, then z, then y.
+        /// is default first, then sorted names (highest precedence first); indices are LOCAL to each region. `min`
+        /// and `size` are the region's bounds (never tight bounds); `length` cells, x fastest, then z, then y.
         /// No block buffer is cloned or serialized here.
         pub fn render_regions_json(&self, out: &mut DiplomatWrite) {
             let names = self.0.get_region_names();
             let regions: Vec<serde_json::Value> = names.iter().map(|name| {
                 let region = self.0.get_region(name).unwrap();
-                let bounds = region.storage_bounds();
+                let bounds = region.get_bounding_box();
                 let content = region.get_tight_bounds().map(|b| serde_json::json!({
                     "min": [b.min.0, b.min.1, b.min.2],
                     "max": [b.max.0, b.max.1, b.max.2]
@@ -1626,7 +1623,7 @@ pub mod ffi {
                     "size": [bounds.max.0 as i64 - bounds.min.0 as i64 + 1,
                              bounds.max.1 as i64 - bounds.min.1 as i64 + 1,
                              bounds.max.2 as i64 - bounds.min.2 as i64 + 1],
-                    "length": region.blocks.len(),
+                    "length": region.volume(),
                     "contentBounds": content,
                     "palette": region.palette.iter().map(|b| serde_json::json!({
                         "name": b.name, "properties": b.properties
@@ -1636,18 +1633,16 @@ pub mod ffi {
             let _ = write!(out, "{}", serde_json::to_string(&regions).unwrap());
         }
 
-        /// A bounded window of a region's dense palette indices (including air).
-        /// At most 65,536 cells per call; no full-world scan, coordinate tuples, or
-        /// intermediate Rust allocation. JS bindings copy the borrowed slice before
-        /// returning, so callers may mutate the schematic or grow WASM memory safely.
-        pub fn region_block_indices<'a>(
-            &'a self, region_name: &str, start: u32, count: u32,
-        ) -> Result<&'a [u32], NucleationError> {
-            if count > 65_536 { return Err(NucleationError::InvalidArgument); }
+        /// Copy a window of a region's palette indices (air included) into `out`:
+        /// cells `start..start + out.len()` of its bounds, in `render_regions_json`
+        /// order. Returns the number of cells written (fewer than `out.len()` at the
+        /// end of the region). No coordinate tuples or intermediate allocation.
+        pub fn region_block_indices(
+            &self, region_name: &str, start: u32, out: &mut [u32],
+        ) -> Result<u32, NucleationError> {
             let region = self.0.get_region(region_name).ok_or(NucleationError::NotFound)?;
-            let start = start as usize;
-            let end = start.checked_add(count as usize).ok_or(NucleationError::InvalidArgument)?;
-            region.blocks.get(start..end).ok_or(NucleationError::InvalidArgument)
+            if start as usize > region.volume() { return Err(NucleationError::InvalidArgument); }
+            Ok(region.copy_cells(start as usize, out) as u32)
         }
 
         // --- Chunking ---

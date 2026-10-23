@@ -107,7 +107,7 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("print_schematic_string", &nucleation::Schematic::print_schematic_string)
         .def("print_string", &nucleation::Schematic::print_string)
         .def("provenance_json", &nucleation::Schematic::provenance_json)
-        .def("region_block_indices", &nucleation::Schematic::region_block_indices, "region_name"_a, "start"_a, "count"_a)
+        .def("region_block_indices", &nucleation::Schematic::region_block_indices, "region_name"_a, "start"_a, "out"_a)
         .def("region_bounding_box_json", &nucleation::Schematic::region_bounding_box_json, "region_name"_a)
         .def("region_names_json", &nucleation::Schematic::region_names_json)
         .def("region_palette_json", &nucleation::Schematic::region_palette_json, "region_name"_a)

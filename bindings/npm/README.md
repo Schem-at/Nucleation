@@ -62,6 +62,6 @@ available from the main `nucleation` entry point. Each entry owns a separate WAS
 instance; import only the entry needed by a worker.
 
 Use `renderRegionsJson()` for region bounds and palettes, then
-`regionBlockIndices(name, start, count)` for owned `Uint32Array` windows of at most
-65,536 cells. Indices use x-fastest, then z, then y order. Call `clearContents()`
+`regionBlockIndices(name, start, count)` for owned `Uint32Array` windows of any
+size (shorter at the end of the region). Indices use x-fastest, then z, then y order. Call `clearContents()`
 when done to release schematic storage immediately.

@@ -3,6 +3,7 @@ use crate::block_entity_store::BlockEntityStore;
 use crate::block_position::BlockPosition;
 use crate::bounding_box::BoundingBox;
 use crate::entity::Entity;
+use crate::region_storage::Storage;
 use crate::BlockState;
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
 use rustc_hash::FxHashMap;
@@ -103,36 +104,40 @@ impl From<Region> for RegionWire {
     }
 }
 
-impl From<RegionWire> for Region {
-    /// Caches are rebuilt by the loader, after it has validated the blocks
-    /// against the bounds and the palette.
-    fn from(wire: RegionWire) -> Self {
-        let bbox = BoundingBox::from_position_and_size(wire.position, wire.size);
+impl TryFrom<RegionWire> for Region {
+    type Error = String;
+
+    /// Content caches are rebuilt by the loader.
+    fn try_from(wire: RegionWire) -> Result<Self, String> {
+        let bbox = BoundingBox::try_from_position_and_size(wire.position, wire.size)?;
+        if wire.blocks.len() as u64 != bbox.volume() {
+            return Err("Region block data does not match the region volume".into());
+        }
+        if wire.blocks.iter().any(|&b| b as usize >= wire.palette.len()) {
+            return Err("Region block data references a missing palette entry".into());
+        }
         let mut region = Region {
             name: wire.name,
             position: wire.position,
             size: wire.size,
-            blocks: wire.blocks,
+            storage: Storage::empty(),
             palette: wire.palette,
             entities: wire.entities,
             block_entities: wire.block_entities,
             palette_index: FxHashMap::default(),
             bbox: bbox.clone(),
-            alloc: bbox,
             tight_bounds: None,
-            cached_width: 0,
-            cached_length: 0,
-            cached_width_x_length: 0,
             cached_air_index: 0,
             non_air_count: 0,
         };
-        region.rebuild_storage_cache();
-        region
+        region.rebuild_air_index();
+        region.storage = Storage::from_dense(bbox, wire.blocks, region.background());
+        Ok(region)
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(into = "RegionWire", from = "RegionWire")]
+#[serde(into = "RegionWire", try_from = "RegionWire")]
 pub struct Region {
     pub name: String,
     /// The region's extent: what it was created or loaded with, grown by
@@ -140,11 +145,9 @@ pub struct Region {
     /// but nothing outside these bounds is observable.
     pub position: (i32, i32, i32),
     pub size: (i32, i32, i32),
-    /// Palette index per voxel of the storage box `alloc`, x fastest, then
-    /// z, then y. `u32` rather than `usize`: half the memory and bandwidth
-    /// for every fill, copy, transform and export, while still holding any
-    /// palette a region can produce. Cells outside the region's bounds are air.
-    pub(crate) blocks: Vec<u32>,
+    /// Palette index per cell of a storage box that contains the bounds.
+    /// Cells outside the bounds are air.
+    storage: Storage,
     pub(crate) palette: Vec<BlockState>,
     pub entities: Vec<Entity>,
     pub block_entities: BlockEntityStore,
@@ -158,27 +161,12 @@ pub struct Region {
     #[serde(skip)]
     bbox: BoundingBox,
 
-    /// The storage box `blocks` is laid out over; contains `bbox`.
-    #[serde(skip)]
-    alloc: BoundingBox,
-
     /// Tracks the actual min/max coordinates of non-air blocks placed in this region
     /// Unlike bbox (which is pre-allocated for performance), tight_bounds only covers
     /// the space that actually contains blocks
     #[serde(skip)]
     tight_bounds: Option<BoundingBox>,
 
-    // ── Cached fields for hot-path performance ──
-    // i64 (not i32) so that index arithmetic doesn't overflow for large
-    // regions. `cached_width_x_length` alone exceeds i32::MAX once a region
-    // is roughly 50k × 50k, and multiplying it by a Y offset overflows much
-    // sooner; the resulting wrap caused a `blocks[index]` OOB panic.
-    #[serde(skip)]
-    cached_width: i64,
-    #[serde(skip)]
-    cached_length: i64,
-    #[serde(skip)]
-    cached_width_x_length: i64,
     #[serde(skip)]
     cached_air_index: u32,
     #[serde(skip)]
@@ -209,11 +197,6 @@ impl Region {
             dimension(bounding_box.min.1, bounding_box.max.1, "Y")?,
             dimension(bounding_box.min.2, bounding_box.max.2, "Z")?,
         );
-        let volume = usize::try_from(dimensions.0)
-            .ok()
-            .and_then(|x| x.checked_mul(dimensions.1 as usize))
-            .and_then(|xy| xy.checked_mul(dimensions.2 as usize))
-            .ok_or_else(|| "Region volume exceeds addressable memory".to_string())?;
         let position_and_size = (bounding_box.min, dimensions);
 
         let mut palette = Vec::new();
@@ -223,27 +206,22 @@ impl Region {
         palette.push(air.clone());
         palette_index.insert(air, 0);
 
-        let blocks = try_zeroed_blocks(volume)?;
+        let storage = Storage::new(bounding_box.clone(), 0)?;
 
         let mut region = Region {
             name,
             position: position_and_size.0,
             size: position_and_size.1,
-            blocks,
+            storage,
             palette,
             palette_index,
             entities: Vec::new(),
             block_entities: BlockEntityStore::default(),
-            bbox: bounding_box.clone(),
-            alloc: bounding_box,
+            bbox: bounding_box,
             tight_bounds: None,
-            cached_width: 0,
-            cached_length: 0,
-            cached_width_x_length: 0,
             cached_air_index: 0,
             non_air_count: 0,
         };
-        region.rebuild_storage_cache();
         region.rebuild_air_index();
         Ok(region)
     }
@@ -252,22 +230,27 @@ impl Region {
     /// growing the storage if they no longer fit in it.
     pub fn rebuild_bbox(&mut self) {
         self.bbox = BoundingBox::from_position_and_size(self.position, self.size);
-        if !(self.alloc.contains(self.bbox.min) && self.alloc.contains(self.bbox.max)) {
-            self.expand_to_bounding_box(self.alloc.union(&self.bbox));
+        let storage = self.storage.bounds();
+        if !(storage.contains(self.bbox.min) && storage.contains(self.bbox.max)) {
+            let grown = storage.union(&self.bbox);
+            self.storage.grow(grown);
         }
     }
 
-    /// `blocks` was just replaced by a buffer laid out over exactly
-    /// `position`/`size`: make that both the bounds and the storage box.
-    pub(crate) fn adopt_storage(&mut self) {
-        self.bbox = BoundingBox::from_position_and_size(self.position, self.size);
-        self.alloc = self.bbox.clone();
-        self.rebuild_storage_cache();
+    /// The value cells take when nothing was written to them: the air index
+    /// (index 0 if the palette has no air).
+    fn background(&self) -> u32 {
+        if self.cached_air_index == u32::MAX {
+            0
+        } else {
+            self.cached_air_index
+        }
     }
 
-    /// Replace the storage with `blocks`, laid out over `position`/`size`,
-    /// which also become the bounds. Caches derived from the content are the
-    /// caller's to rebuild.
+    /// Replace the storage with `blocks`, laid out over `position`/`size`
+    /// x fastest, then z, then y; they also become the bounds. Set the
+    /// palette first. Caches derived from the content are the caller's to
+    /// rebuild.
     pub(crate) fn set_storage(
         &mut self,
         position: (i32, i32, i32),
@@ -276,19 +259,9 @@ impl Region {
     ) {
         self.position = position;
         self.size = size;
-        self.blocks = blocks;
-        self.adopt_storage();
-    }
-
-    #[inline(always)]
-    fn rebuild_storage_cache(&mut self) {
-        let (w, _, l) = self.alloc.get_dimensions();
-        let w64 = w as i64;
-        let l64 = l as i64;
-        self.cached_width = w64;
-        self.cached_length = l64;
-        // i64 multiplication: w × l can exceed i32::MAX (e.g. 50k × 50k = 2.5e9).
-        self.cached_width_x_length = w64 * l64;
+        self.bbox = BoundingBox::from_position_and_size(position, size);
+        self.rebuild_air_index();
+        self.storage = Storage::from_dense(self.bbox.clone(), blocks, self.background());
     }
 
     /// Recompute cached_air_index from the palette.
@@ -312,43 +285,10 @@ impl Region {
     }
 
     /// Recompute `non_air_count` and `tight_bounds` together in one pass.
-    ///
-    /// Scans x-rows as slices, so there is no per-voxel coordinate division
-    /// and the air comparisons vectorize; each occupied row touches the
-    /// bounds once.
     pub(crate) fn rescan_content(&mut self) {
-        let air = self.cached_air_index;
-        let w = self.cached_width as usize;
-        let l = self.cached_length as usize;
-        let mut count = 0usize;
-        let (mut lo_x, mut lo_y, mut lo_z) = (usize::MAX, usize::MAX, usize::MAX);
-        let (mut hi_x, mut hi_y, mut hi_z) = (0usize, 0usize, 0usize);
-        if w > 0 && l > 0 {
-            for (row_index, row) in self.blocks.chunks_exact(w).enumerate() {
-                let row_count = row.iter().filter(|&&b| b != air).count();
-                if row_count == 0 {
-                    continue;
-                }
-                count += row_count;
-                let first = row.iter().position(|&b| b != air).unwrap_or(0);
-                let last = row.iter().rposition(|&b| b != air).unwrap_or(0);
-                let (dy, dz) = (row_index / l, row_index % l);
-                lo_x = lo_x.min(first);
-                hi_x = hi_x.max(last);
-                lo_y = lo_y.min(dy);
-                hi_y = hi_y.max(dy);
-                lo_z = lo_z.min(dz);
-                hi_z = hi_z.max(dz);
-            }
-        }
+        let (count, bounds) = self.storage.content(self.cached_air_index);
         self.non_air_count = count;
-        self.tight_bounds = (count > 0).then(|| {
-            let (bx, by, bz) = self.alloc.min;
-            BoundingBox::new(
-                (bx + lo_x as i32, by + lo_y as i32, bz + lo_z as i32),
-                (bx + hi_x as i32, by + hi_y as i32, bz + hi_z as i32),
-            )
-        });
+        self.tight_bounds = bounds;
     }
 
     pub fn get_or_insert_in_palette(&mut self, block: &BlockState) -> usize {
@@ -373,12 +313,18 @@ impl Region {
     #[inline]
     pub(crate) fn recenter_if_empty_unit(&mut self, position: (i32, i32, i32)) {
         if self.size == (1, 1, 1)
-            && self.alloc == self.bbox
+            && *self.storage.bounds() == self.bbox
             && self.position != position
             && self.is_empty()
         {
+            let (dx, dy, dz) = (
+                position.0 - self.position.0,
+                position.1 - self.position.1,
+                position.2 - self.position.2,
+            );
+            self.storage.translate(dx, dy, dz);
             self.position = position;
-            self.adopt_storage();
+            self.bbox = BoundingBox::from_position_and_size(position, self.size);
         }
     }
 
@@ -414,10 +360,8 @@ impl Region {
             self.expand_to_fit(x, y, z);
         }
 
-        let index = self.coords_to_index(x, y, z);
         let palette_index = self.get_or_insert_in_palette(block) as u32;
-        let old_palette_index = self.blocks[index];
-        self.blocks[index] = palette_index;
+        let old_palette_index = self.storage.set(x, y, z, palette_index);
 
         // Update non_air_count based on old vs new block
         let old_is_air = old_palette_index == self.cached_air_index;
@@ -452,36 +396,6 @@ impl Region {
         self.bbox.clone()
     }
 
-    /// Index of `(x, y, z)` in the storage. The cell must lie in the storage
-    /// box, which always contains the region's bounds.
-    #[inline(always)]
-    pub fn coords_to_index(&self, x: i32, y: i32, z: i32) -> usize {
-        // Promote to i64 before the multiplications: for a 600M-block region
-        // the Y-axis term `dy * cached_width_x_length` is ~5e11, which
-        // overflows i32 silently and wraps to a negative — the resulting
-        // `as usize` cast then produced a near-`usize::MAX` index and an OOB
-        // panic in `set_block`. See nucleation issue #__ for the repro.
-        let dx = (x - self.alloc.min.0) as i64;
-        let dy = (y - self.alloc.min.1) as i64;
-        let dz = (z - self.alloc.min.2) as i64;
-        (dx + dz * self.cached_width + dy * self.cached_width_x_length) as usize
-    }
-
-    /// Inverse of [`Self::coords_to_index`].
-    #[inline(always)]
-    pub fn index_to_coords(&self, index: usize) -> (i32, i32, i32) {
-        let w = self.cached_width as usize;
-        let wl = self.cached_width_x_length as usize;
-        let dx = (index % w) as i32;
-        let dy = (index / wl) as i32;
-        let dz = ((index / w) % self.cached_length as usize) as i32;
-        (
-            dx + self.alloc.min.0,
-            dy + self.alloc.min.1,
-            dz + self.alloc.min.2,
-        )
-    }
-
     #[inline(always)]
     pub fn is_in_region(&self, x: i32, y: i32, z: i32) -> bool {
         self.bbox.contains((x, y, z))
@@ -504,44 +418,48 @@ impl Region {
         )
     }
 
-    /// The box `blocks` is laid out over: the bounds plus growth padding.
+    /// The storage box: the bounds plus growth padding.
+    #[cfg_attr(not(feature = "bridge"), allow(dead_code))]
     pub(crate) fn storage_bounds(&self) -> BoundingBox {
-        self.alloc.clone()
+        self.storage.bounds().clone()
     }
 
-    /// `(y, z, row)` for every y/z of the region's bounds, `row` being the
-    /// storage slice over the bounds' x range.
-    pub(crate) fn bounded_rows(&self) -> impl Iterator<Item = (i32, i32, &[u32])> + '_ {
+    /// `(x, y, z, cells)` segments covering every row of the region's
+    /// bounds, x fastest, then z, then y; `x` is the segment's first column.
+    pub(crate) fn bounded_rows(&self) -> impl Iterator<Item = (i32, i32, i32, &[u32])> + '_ {
         let (min, max) = (self.bbox.min, self.bbox.max);
-        let w = (max.0 - min.0 + 1) as usize;
         (min.1..=max.1).flat_map(move |y| {
-            (min.2..=max.2).map(move |z| {
-                let start = self.coords_to_index(min.0, y, z);
-                (y, z, &self.blocks[start..start + w])
+            (min.2..=max.2).flat_map(move |z| {
+                self.storage
+                    .row(y, z, min.0, max.0)
+                    .map(move |(x, cells)| (x, y, z, cells))
             })
         })
     }
 
-    /// The palette indices of the region's bounds, laid out x fastest, then
-    /// z, then y. Borrowed when the storage is exactly the bounds.
-    pub(crate) fn dense_blocks(&self) -> std::borrow::Cow<'_, [u32]> {
-        if self.alloc == self.bbox {
-            std::borrow::Cow::Borrowed(&self.blocks)
-        } else {
-            let mut dense = Vec::with_capacity(self.volume());
-            for (_, _, row) in self.bounded_rows() {
-                dense.extend_from_slice(row);
+    /// Copy cells `start..start + out.len()` of the bounds (x fastest, then z,
+    /// then y) into `out`, stopping at the end of the bounds. Returns the
+    /// number of cells copied.
+    #[cfg_attr(not(feature = "bridge"), allow(dead_code))]
+    pub(crate) fn copy_cells(&self, start: usize, out: &mut [u32]) -> usize {
+        let total = self.volume().saturating_sub(start).min(out.len());
+        let mut copied = 0;
+        while copied < total {
+            let (x, y, z) = self.bounds_cell(start + copied);
+            let run = (total - copied).min((self.bbox.max.0 - x + 1) as usize);
+            let x_end = x + run as i32 - 1;
+            for (_, cells) in self.storage.row(y, z, x, x_end) {
+                out[copied..copied + cells.len()].copy_from_slice(cells);
+                copied += cells.len();
             }
-            std::borrow::Cow::Owned(dense)
         }
+        total
     }
 
-    /// Shrink the storage to exactly the region's bounds.
-    pub(crate) fn fit_storage(&mut self) {
-        if self.alloc != self.bbox {
-            self.blocks = self.dense_blocks().into_owned();
-            self.adopt_storage();
-        }
+    /// The palette indices of the region's bounds, laid out x fastest, then
+    /// z, then y. Borrowed when the storage holds exactly the bounds densely.
+    pub(crate) fn dense_blocks(&self) -> std::borrow::Cow<'_, [u32]> {
+        self.storage.dense(&self.bbox)
     }
 
     /// Update the tight bounds to include the given coordinate
@@ -615,7 +533,7 @@ impl Region {
     /// blocks and entities. Exporters use this to borrow the region directly
     /// instead of cloning and compacting an already-compact input.
     pub(crate) fn is_content_compact(&self) -> bool {
-        self.alloc == self.bbox && self.get_content_bounds().as_ref() == Some(&self.bbox)
+        *self.storage.bounds() == self.bbox && self.get_content_bounds().as_ref() == Some(&self.bbox)
     }
 
     /// Create a compacted region sized to cover all content: non-air blocks,
@@ -633,197 +551,29 @@ impl Region {
             return empty;
         };
 
-        // Fast path: when content_bounds == tight_bounds (no entities or
-        // block entities outside the block envelope — the common case), the
-        // compact region is exactly tight_bounds and the block copy needs no
-        // extra offsets. Preserves the original row-copy layout.
-        if let Some(tight_bounds) = self.tight_bounds.clone() {
-            if tight_bounds == content_bounds {
-                return self.to_compact_tight(&tight_bounds);
-            }
-        }
-
-        // General path: content_bounds may be larger than tight_bounds
-        // because entities or block_entities sit outside the block envelope.
-        // Compact is sized to content_bounds; block-copy rows are written at
-        // (tight.min - content.min) offsets.
         self.to_compact_with_content_bounds(&content_bounds)
     }
 
-    /// Fast-path compaction: tight_bounds and content_bounds are identical,
-    /// so the compact region has the same dims as tight_bounds.
-    fn to_compact_tight(&self, tight_bounds: &BoundingBox) -> Region {
-        let tight_dims = tight_bounds.get_dimensions();
-        let tight_pos = tight_bounds.min;
-
-        let mut compact = Region::new(self.name.clone(), tight_pos, tight_dims);
-        compact.palette = self.palette.clone();
-        compact.rebuild_palette_index();
-        compact.rebuild_air_index();
-
-        let old_w = self.cached_width as usize;
-        let old_l = self.cached_length as usize;
-        let (compact_w, _, compact_l) = compact.bbox.get_dimensions();
-        let compact_w = compact_w as usize;
-        let compact_l = compact_l as usize;
-
-        let tb_min_x = tight_bounds.min.0;
-        let tb_min_y = tight_bounds.min.1;
-        let tb_min_z = tight_bounds.min.2;
-        // Only read on the wasm32 path below; keep the name so that path compiles.
-        #[allow(unused_variables)]
-        let tb_max_y = tight_bounds.max.1;
-        let tb_max_z = tight_bounds.max.2;
-
-        let x_off_src = (tb_min_x - self.alloc.min.0) as usize;
-        let row_len = compact_w;
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            for y in tb_min_y..=tb_max_y {
-                let dy_src = (y - self.alloc.min.1) as usize;
-                let dy_dst = (y - tb_min_y) as usize;
-                for z in tb_min_z..=tb_max_z {
-                    let dz_src = (z - self.alloc.min.2) as usize;
-                    let dz_dst = (z - tb_min_z) as usize;
-                    let src_start = dy_src * old_w * old_l + dz_src * old_w + x_off_src;
-                    let dst_start = dy_dst * compact_w * compact_l + dz_dst * compact_w;
-                    compact.blocks[dst_start..dst_start + row_len]
-                        .copy_from_slice(&self.blocks[src_start..src_start + row_len]);
-                }
-            }
+    /// An empty region over `bounds` sharing this region's name and palette.
+    fn empty_like(&self, bounds: &BoundingBox) -> Region {
+        let (position, size) = bounds.to_position_and_size();
+        let mut region = Region::new(self.name.clone(), position, size);
+        region.palette = self.palette.clone();
+        region.rebuild_palette_index();
+        region.rebuild_air_index();
+        if region.background() != 0 {
+            region.storage = Storage::new(bounds.clone(), region.background())
+                .expect("bounds were just allocated");
         }
-
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            use rayon::prelude::*;
-            use rayon::slice::ParallelSliceMut;
-            let y_slice_size = compact_w * compact_l;
-            let src_blocks = &self.blocks;
-            let bbox_min_y = self.alloc.min.1;
-            let bbox_min_z = self.alloc.min.2;
-
-            compact
-                .blocks
-                .par_chunks_mut(y_slice_size)
-                .enumerate()
-                .for_each(|(dy_dst, dst_y_slice)| {
-                    let y = tb_min_y + dy_dst as i32;
-                    let dy_src = (y - bbox_min_y) as usize;
-
-                    for z in tb_min_z..=tb_max_z {
-                        let dz_src = (z - bbox_min_z) as usize;
-                        let dz_dst = (z - tb_min_z) as usize;
-
-                        let src_start = dy_src * old_w * old_l + dz_src * old_w + x_off_src;
-                        let dst_start_in_slice = dz_dst * compact_w;
-
-                        dst_y_slice[dst_start_in_slice..dst_start_in_slice + row_len]
-                            .copy_from_slice(&src_blocks[src_start..src_start + row_len]);
-                    }
-                });
-        }
-
-        // Compaction copies every occupied cell, so the cached count carries
-        // over unchanged.
-        compact.non_air_count = self.non_air_count;
-        compact.tight_bounds = Some(tight_bounds.clone());
-
-        for (pos, be) in self.block_entities.iter() {
-            compact.block_entities.insert(pos, be.clone());
-        }
-        for entity in &self.entities {
-            compact.entities.push(entity.clone());
-        }
-
-        compact
+        region
     }
 
-    /// General-path compaction: content_bounds is the union of tight_bounds
-    /// plus entity and block-entity positions. The compact region is sized
-    /// to content_bounds; block-copy rows are written at offsets relative to
-    /// content_bounds.min. Cells outside tight_bounds stay at palette index 0
-    /// (air — guaranteed by `Region::new`).
+    /// Compaction to `content_bounds`: the tight bounds plus any entity and
+    /// block-entity positions. Cells outside the tight bounds are air.
     fn to_compact_with_content_bounds(&self, content_bounds: &BoundingBox) -> Region {
-        let content_dims = content_bounds.get_dimensions();
-        let content_pos = content_bounds.min;
-
-        let mut compact = Region::new(self.name.clone(), content_pos, content_dims);
-        compact.palette = self.palette.clone();
-        compact.rebuild_palette_index();
-        compact.rebuild_air_index();
-
-        let (compact_w, _, compact_l) = compact.bbox.get_dimensions();
-        let compact_w = compact_w as usize;
-        let compact_l = compact_l as usize;
-
+        let mut compact = self.empty_like(content_bounds);
         if let Some(tight_bounds) = &self.tight_bounds {
-            let old_w = self.cached_width as usize;
-            let old_l = self.cached_length as usize;
-
-            let tb_min_x = tight_bounds.min.0;
-            let tb_min_y = tight_bounds.min.1;
-            let tb_min_z = tight_bounds.min.2;
-            let tb_max_y = tight_bounds.max.1;
-            let tb_max_z = tight_bounds.max.2;
-
-            let (tight_w, _, _) = tight_bounds.get_dimensions();
-            let row_len = tight_w as usize;
-
-            let x_off_src = (tb_min_x - self.alloc.min.0) as usize;
-            let x_off_dst = (tb_min_x - content_pos.0) as usize;
-
-            #[cfg(target_arch = "wasm32")]
-            {
-                for y in tb_min_y..=tb_max_y {
-                    let dy_src = (y - self.alloc.min.1) as usize;
-                    let dy_dst = (y - content_pos.1) as usize;
-                    for z in tb_min_z..=tb_max_z {
-                        let dz_src = (z - self.alloc.min.2) as usize;
-                        let dz_dst = (z - content_pos.2) as usize;
-                        let src_start = dy_src * old_w * old_l + dz_src * old_w + x_off_src;
-                        let dst_start =
-                            dy_dst * compact_w * compact_l + dz_dst * compact_w + x_off_dst;
-                        compact.blocks[dst_start..dst_start + row_len]
-                            .copy_from_slice(&self.blocks[src_start..src_start + row_len]);
-                    }
-                }
-            }
-
-            #[cfg(not(target_arch = "wasm32"))]
-            {
-                use rayon::prelude::*;
-                use rayon::slice::ParallelSliceMut;
-                let y_slice_size = compact_w * compact_l;
-                let src_blocks = &self.blocks;
-                let bbox_min_y = self.alloc.min.1;
-                let bbox_min_z = self.alloc.min.2;
-                let content_min_y = content_pos.1;
-                let content_min_z = content_pos.2;
-
-                compact
-                    .blocks
-                    .par_chunks_mut(y_slice_size)
-                    .enumerate()
-                    .for_each(|(dy_dst, dst_y_slice)| {
-                        let y = content_min_y + dy_dst as i32;
-                        if y < tb_min_y || y > tb_max_y {
-                            return;
-                        }
-                        let dy_src = (y - bbox_min_y) as usize;
-
-                        for z in tb_min_z..=tb_max_z {
-                            let dz_src = (z - bbox_min_z) as usize;
-                            let dz_dst = (z - content_min_z) as usize;
-
-                            let src_start = dy_src * old_w * old_l + dz_src * old_w + x_off_src;
-                            let dst_start_in_slice = dz_dst * compact_w + x_off_dst;
-
-                            dst_y_slice[dst_start_in_slice..dst_start_in_slice + row_len]
-                                .copy_from_slice(&src_blocks[src_start..src_start + row_len]);
-                        }
-                    });
-            }
+            compact.storage.copy_box_from(&self.storage, tight_bounds);
         }
 
         // Compaction copies every occupied cell, so the cached count carries
@@ -846,18 +596,14 @@ impl Region {
         if !self.is_in_region(x, y, z) {
             return None;
         }
-
-        let index = self.coords_to_index(x, y, z);
-        self.palette.get(self.blocks[index] as usize)
+        self.palette.get(self.storage.get(x, y, z) as usize)
     }
 
     pub fn get_block_index(&self, x: i32, y: i32, z: i32) -> Option<usize> {
         if !self.is_in_region(x, y, z) {
             return None;
         }
-
-        let index = self.coords_to_index(x, y, z);
-        Some(self.blocks[index] as usize)
+        Some(self.storage.get(x, y, z) as usize)
     }
 
     pub fn volume(&self) -> usize {
@@ -892,7 +638,8 @@ impl Region {
             (lo.0.min(min.0).min(max.0), lo.1.min(min.1).min(max.1), lo.2.min(min.2).min(max.2)),
             (hi.0.max(min.0).max(max.0), hi.1.max(min.1).max(max.1), hi.2.max(min.2).max(max.2)),
         );
-        if self.alloc.contains(wanted.min) && self.alloc.contains(wanted.max) {
+        let storage = self.storage.bounds();
+        if storage.contains(wanted.min) && storage.contains(wanted.max) {
             // The common case: the write lands in growth padding.
             self.set_bounds(wanted);
         } else {
@@ -917,15 +664,16 @@ impl Region {
         wanted: BoundingBox,
     ) {
         let untouched = self.size == (1, 1, 1)
-            && self.alloc == self.bbox
+            && *self.storage.bounds() == self.bbox
             && self.is_empty()
             && self.block_entities.is_empty()
             && self.entities.is_empty();
         let well_formed = min.0 <= max.0 && min.1 <= max.1 && min.2 <= max.2;
         if untouched && well_formed && min != max && self.cached_air_index == 0 {
             let bounds = BoundingBox::new(min, max);
-            if let Ok(blocks) = try_zeroed_blocks(bounds.volume() as usize) {
-                self.set_storage(bounds.min, bounds.get_dimensions(), blocks);
+            if let Ok(storage) = Storage::new(bounds.clone(), 0) {
+                self.storage = storage;
+                self.set_bounds(bounds);
                 return;
             }
         }
@@ -948,96 +696,17 @@ impl Region {
             (clamp(new_min), clamp(new_max))
         }
 
-        let alloc = self.alloc.clone();
+        let alloc = self.storage.bounds().clone();
         let (min_x, max_x) = grow(alloc.min.0, alloc.max.0, wanted.min.0, wanted.max.0);
         let (min_y, max_y) = grow(alloc.min.1, alloc.max.1, wanted.min.1, wanted.max.1);
         let (min_z, max_z) = grow(alloc.min.2, alloc.max.2, wanted.min.2, wanted.max.2);
-        self.expand_to_bounding_box(BoundingBox::new(
+        self.storage.grow(BoundingBox::new(
             (min_x, min_y, min_z),
             (max_x, max_y, max_z),
         ));
         self.set_bounds(wanted);
     }
 
-    /// Grow the allocation to `new_bounding_box`, which must contain the
-    /// current one.
-    ///
-    /// Works in place: the vector is extended (a realloc, which for large
-    /// buffers remaps the existing pages instead of copying them), the old
-    /// rows are moved back-to-front to their new offsets, and only the cells
-    /// that were not part of the old allocation are set to air. Compared with
-    /// allocating a second full buffer, this halves peak memory during growth
-    /// and avoids faulting in a fresh copy of every resident page.
-    fn expand_to_bounding_box(&mut self, new_bounding_box: BoundingBox) {
-        if new_bounding_box == self.alloc {
-            return;
-        }
-        debug_assert!(
-            new_bounding_box.contains(self.alloc.min) && new_bounding_box.contains(self.alloc.max)
-        );
-
-        let air_id = self.cached_air_index;
-        let old_w = self.cached_width as usize;
-        let old_l = self.cached_length as usize;
-        let (_, old_h, _) = self.alloc.get_dimensions();
-        let old_h = old_h as usize;
-
-        let (new_w, new_h, new_l) = new_bounding_box.get_dimensions();
-        let (new_w, new_h, new_l) = (new_w as usize, new_h as usize, new_l as usize);
-
-        // Offset of old min within new coordinate system
-        let x_off = (self.alloc.min.0 - new_bounding_box.min.0) as usize;
-        let y_off = (self.alloc.min.1 - new_bounding_box.min.1) as usize;
-        let z_off = (self.alloc.min.2 - new_bounding_box.min.2) as usize;
-
-        let old_len = self.blocks.len();
-        self.blocks
-            .resize(new_bounding_box.volume() as usize, air_id);
-
-        // Growing only towards +y appends whole layers: the old cells are
-        // already in place.
-        let in_place = x_off == 0 && y_off == 0 && z_off == 0 && new_w == old_w && new_l == old_l;
-        if !in_place {
-            // Every old row moves to an equal or higher index, and rows keep
-            // their order, so moving the last row first never overwrites a
-            // row that has not been moved yet.
-            for dy in (0..old_h).rev() {
-                for dz in (0..old_l).rev() {
-                    let src_start = dy * old_w * old_l + dz * old_w;
-                    let dst_start = (dy + y_off) * new_w * new_l + (dz + z_off) * new_w + x_off;
-                    if dst_start != src_start {
-                        self.blocks
-                            .copy_within(src_start..src_start + old_w, dst_start);
-                    }
-                }
-            }
-            // Every cell outside the moved rows becomes air. Only cells below
-            // the old length can hold a stale value: `resize` already wrote
-            // air past it.
-            'rows: for dy in 0..new_h {
-                for dz in 0..new_l {
-                    let row_start = (dy * new_l + dz) * new_w;
-                    if row_start >= old_len {
-                        break 'rows;
-                    }
-                    // Clip to the old length: cells past it are already air.
-                    let row = &mut self.blocks[row_start..][..new_w.min(old_len - row_start)];
-                    let holds_old_row =
-                        (y_off..y_off + old_h).contains(&dy) && (z_off..z_off + old_l).contains(&dz);
-                    if holds_old_row {
-                        let end = row.len();
-                        row[..x_off.min(end)].fill(air_id);
-                        row[(x_off + old_w).min(end)..].fill(air_id);
-                    } else {
-                        row.fill(air_id);
-                    }
-                }
-            }
-        }
-
-        self.alloc = new_bounding_box;
-        self.rebuild_storage_cache();
-    }
     fn calculate_bits_per_block(&self) -> usize {
         let palette_size = self.palette.len();
         if palette_size <= 1 {
@@ -1071,9 +740,9 @@ impl Region {
         let combined_index = |x: i32, y: i32, z: i32| {
             (y - cy) as usize * new_w * new_l + (z - cz) as usize * new_w + (x - cx) as usize
         };
-        for (y, z, row) in self.bounded_rows() {
-            let dst = combined_index(self.bbox.min.0, y, z);
-            new_blocks[dst..dst + row.len()].copy_from_slice(row);
+        for (x, y, z, cells) in self.bounded_rows() {
+            let dst = combined_index(x, y, z);
+            new_blocks[dst..dst + cells.len()].copy_from_slice(cells);
         }
 
         // Phase 5: Pre-build remap table for other palette
@@ -1091,9 +760,9 @@ impl Region {
         }
 
         // Copy other blocks using remap table, row by row
-        for (y, z, row) in other.bounded_rows() {
-            let dst = combined_index(other.bbox.min.0, y, z);
-            for (dx, &src_idx) in row.iter().enumerate() {
+        for (x, y, z, cells) in other.bounded_rows() {
+            let dst = combined_index(x, y, z);
+            for (dx, &src_idx) in cells.iter().enumerate() {
                 if src_idx != other_air_index {
                     new_blocks[dst + dx] = other_remap[src_idx as usize];
                 }
@@ -1138,8 +807,7 @@ impl Region {
                         .get_block(x, y, z)
                         .is_some_and(|block| block.name == "minecraft:air")
                     {
-                        let index = self.coords_to_index(x, y, z);
-                        self.blocks[index] = air_index;
+                        self.storage.set(x, y, z, air_index);
                     }
                 }
             }
@@ -1228,8 +896,8 @@ impl Region {
         );
 
         let mut blocks_tag = NbtCompound::new();
-        for (y, z, row) in self.bounded_rows() {
-            for (x, &block_index) in (self.bbox.min.0..).zip(row) {
+        for (start, y, z, cells) in self.bounded_rows() {
+            for (x, &block_index) in (start..).zip(cells) {
                 blocks_tag.insert(
                     format!("{},{},{}", x, y, z),
                     NbtTag::Int(block_index as i32),
@@ -1349,24 +1017,19 @@ impl Region {
             name,
             position,
             size,
-            blocks,
+            storage: Storage::empty(),
             palette,
             entities,
             block_entities,
             palette_index: FxHashMap::default(),
             bbox: BoundingBox::from_position_and_size(position, size),
-            alloc: BoundingBox::from_position_and_size(position, size),
             tight_bounds: None,
-            cached_width: 0,
-            cached_length: 0,
-            cached_width_x_length: 0,
             cached_air_index: 0,
             non_air_count: 0,
         };
 
         region.rebuild_palette_index();
-        region.adopt_storage();
-        region.rebuild_air_index();
+        region.set_storage(position, size, blocks);
         region.rescan_content();
 
         Ok(region)
@@ -1551,10 +1214,17 @@ impl Region {
         }
 
         let air = BlockState::new("minecraft:air");
-        let mut used: Vec<BlockState> = self
-            .blocks
+        let mut in_use = vec![false; normalized.len()];
+        for (_, _, _, cells) in self.bounded_rows() {
+            for &index in cells {
+                in_use[index as usize] = true;
+            }
+        }
+        let mut used: Vec<BlockState> = normalized
             .iter()
-            .filter_map(|&index| normalized.get(index as usize).cloned())
+            .zip(&in_use)
+            .filter(|(_, &used)| used)
+            .map(|(state, _)| state.clone())
             .collect();
         used.push(air.clone());
         used.sort_by(|a, b| {
@@ -1572,16 +1242,19 @@ impl Region {
             .enumerate()
             .map(|(index, state)| (state, index as u32))
             .collect();
-        let mut rewritten = 0;
-        for index in &mut self.blocks {
-            if let Some(state) = normalized.get(*index as usize) {
-                let next = lookup[state];
-                if next != *index {
-                    rewritten += 1;
-                }
-                *index = next;
-            }
-        }
+        // Unused entries map to air: no cell inside the bounds holds them.
+        let air_index = lookup[&air];
+        let table: Vec<u32> = normalized
+            .iter()
+            .map(|state| lookup.get(state).copied().unwrap_or(air_index))
+            .collect();
+        let rewritten = self
+            .bounded_rows()
+            .flat_map(|(_, _, _, cells)| cells)
+            .filter(|&&index| table[index as usize] != index)
+            .count();
+        self.storage
+            .map_values(|index| table.get(index as usize).copied().unwrap_or(air_index));
         self.palette = used;
         self.rebuild_palette_index();
         self.rebuild_air_index();
@@ -1604,8 +1277,8 @@ impl Region {
             .map(|(before, after)| before != after)
             .collect();
         let changed_cells = self
-            .blocks
-            .iter()
+            .bounded_rows()
+            .flat_map(|(_, _, _, cells)| cells)
             .filter(|&&index| {
                 changed_indices
                     .get(index as usize)
@@ -1632,8 +1305,8 @@ impl Region {
     /// Cells per block state within the region's bounds (air included).
     pub fn count_block_types(&self) -> HashMap<BlockState, usize> {
         let mut per_index = vec![0usize; self.palette.len()];
-        for (_, _, row) in self.bounded_rows() {
-            for &block_index in row {
+        for (_, _, _, cells) in self.bounded_rows() {
+            for &block_index in cells {
                 per_index[block_index as usize] += 1;
             }
         }
@@ -1667,11 +1340,9 @@ impl Region {
 
         // Reverse the bounds' span of each X-row in place.
         let (min, max) = (self.bbox.min, self.bbox.max);
-        let w = (max.0 - min.0 + 1) as usize;
         for y in min.1..=max.1 {
             for z in min.2..=max.2 {
-                let start = self.coords_to_index(min.0, y, z);
-                self.blocks[start..start + w].reverse();
+                self.storage.reverse_row(y, z, min.0, max.0);
             }
         }
 
@@ -1710,11 +1381,12 @@ impl Region {
             let z_range = b.min.2..=b.max.2;
             (b.min.1..=b.max.1).flat_map(move |y| {
                 z_range.clone().flat_map(move |z| {
-                    let start = self.coords_to_index(x0, y, z);
-                    self.blocks[start..start + (x1 - x0 + 1) as usize]
-                        .iter()
-                        .zip(x0..)
-                        .map(move |(&index, x)| ((x, y, z), index))
+                    self.storage.row(y, z, x0, x1).flat_map(move |(start, cells)| {
+                        cells
+                            .iter()
+                            .zip(start..)
+                            .map(move |(&index, x)| ((x, y, z), index))
+                    })
                 })
             })
         })
@@ -1746,13 +1418,9 @@ impl Region {
 
         // Swap whole storage layers across the bounds' mid-plane: cells
         // outside the bounds are air in both layers.
-        let wl = self.cached_width_x_length as usize;
         let (min_y, max_y) = (self.bbox.min.1, self.bbox.max.1);
-        let layer = |y: i32| (y - self.alloc.min.1) as usize * wl;
         for k in 0..(max_y - min_y + 1) / 2 {
-            let (off_a, off_b) = (layer(min_y + k), layer(max_y - k));
-            let (low, high) = self.blocks.split_at_mut(off_b);
-            low[off_a..off_a + wl].swap_with_slice(&mut high[..wl]);
+            self.storage.swap_layers(min_y + k, max_y - k);
         }
 
         let mut new_palette = Vec::with_capacity(self.palette.len());
@@ -1784,14 +1452,10 @@ impl Region {
 
         // Swap whole storage rows across the bounds' mid-plane within each
         // layer of the bounds: cells outside the bounds are air in both rows.
-        let w = self.cached_width as usize;
         let (min, max) = (self.bbox.min, self.bbox.max);
         for y in min.1..=max.1 {
             for k in 0..(max.2 - min.2 + 1) / 2 {
-                let off_a = self.coords_to_index(self.alloc.min.0, y, min.2 + k);
-                let off_b = self.coords_to_index(self.alloc.min.0, y, max.2 - k);
-                let (low, high) = self.blocks.split_at_mut(off_b);
-                low[off_a..off_a + w].swap_with_slice(&mut high[..w]);
+                self.storage.swap_rows((y, min.2 + k), (y, max.2 - k));
             }
         }
 
@@ -1831,18 +1495,12 @@ impl Region {
             shifted(self.position.1, dy)?,
             shifted(self.position.2, dz)?,
         );
-        let new_alloc = BoundingBox::new(
-            (
-                shifted(self.alloc.min.0, dx)?,
-                shifted(self.alloc.min.1, dy)?,
-                shifted(self.alloc.min.2, dz)?,
-            ),
-            (
-                shifted(self.alloc.max.0, dx)?,
-                shifted(self.alloc.max.1, dy)?,
-                shifted(self.alloc.max.2, dz)?,
-            ),
-        );
+        let storage = self.storage.bounds();
+        for corner in [storage.min, storage.max] {
+            shifted(corner.0, dx)?;
+            shifted(corner.1, dy)?;
+            shifted(corner.2, dz)?;
+        }
         for &(x, y, z) in self.block_entities.keys() {
             shifted(x, dx)?;
             shifted(y, dy)?;
@@ -1878,7 +1536,7 @@ impl Region {
             entity.position.2 += dz as f64;
         }
         self.bbox = BoundingBox::from_position_and_size(self.position, self.size);
-        self.alloc = new_alloc;
+        self.storage.translate(dx, dy, dz);
         Ok(())
     }
 
@@ -1900,8 +1558,6 @@ impl Region {
     }
 
     pub(crate) fn rotate_y_90_at(&mut self, position: (i32, i32, i32)) -> Result<(), String> {
-        // The loops below read `blocks` as laid out over exactly the bounds.
-        self.fit_storage();
         use crate::transforms::{transform_block_state_rotate, Axis};
 
         // For 90-degree rotation around Y:
@@ -1920,12 +1576,14 @@ impl Region {
         let (w, h, l) = (old_size_x as usize, size_y as usize, old_size_z as usize);
         let (new_w, new_l) = (l, w);
         let mut new_blocks = try_zeroed_blocks(w * h * l)?;
+        let old_storage = std::mem::replace(&mut self.storage, Storage::empty());
+        let old_cells = old_storage.dense(&self.bbox);
         let mut src = 0;
         for dy in 0..h {
             let layer = dy * new_w * new_l;
             for dz in 0..l {
                 let column = layer + (l - 1 - dz);
-                for (dx, &block) in self.blocks[src..src + w].iter().enumerate() {
+                for (dx, &block) in old_cells[src..src + w].iter().enumerate() {
                     new_blocks[column + dx * new_w] = block;
                 }
                 src += w;
@@ -1951,9 +1609,9 @@ impl Region {
 
         self.position = new_bbox.to_position_and_size().0;
         self.size = new_bbox.to_position_and_size().1;
-        self.blocks = new_blocks;
         self.palette = new_palette;
-        self.adopt_storage();
+        drop(old_cells);
+        self.set_storage(self.position, self.size, new_blocks);
         self.rebuild_palette_index();
         self.rebuild_air_index();
         // A rotation permutes cells: the air count is unchanged.
@@ -2003,8 +1661,6 @@ impl Region {
     }
 
     pub(crate) fn rotate_x_90_at(&mut self, position: (i32, i32, i32)) -> Result<(), String> {
-        // The loops below read `blocks` as laid out over exactly the bounds.
-        self.fit_storage();
         use crate::transforms::{transform_block_state_rotate, Axis};
 
         let old_bbox = self.bbox.clone();
@@ -2018,11 +1674,13 @@ impl Region {
         let (w, h, l) = (size_x as usize, old_size_y as usize, old_size_z as usize);
         let new_l = h;
         let mut new_blocks = try_zeroed_blocks(w * h * l)?;
+        let old_storage = std::mem::replace(&mut self.storage, Storage::empty());
+        let old_cells = old_storage.dense(&self.bbox);
         let mut src = 0;
         for dy in 0..h {
             for dz in 0..l {
                 let dst = dy * w + (l - 1 - dz) * w * new_l;
-                new_blocks[dst..dst + w].copy_from_slice(&self.blocks[src..src + w]);
+                new_blocks[dst..dst + w].copy_from_slice(&old_cells[src..src + w]);
                 src += w;
             }
         }
@@ -2046,9 +1704,9 @@ impl Region {
 
         self.position = new_bbox.to_position_and_size().0;
         self.size = new_bbox.to_position_and_size().1;
-        self.blocks = new_blocks;
         self.palette = new_palette;
-        self.adopt_storage();
+        drop(old_cells);
+        self.set_storage(self.position, self.size, new_blocks);
         self.rebuild_palette_index();
         self.rebuild_air_index();
         // A rotation permutes cells: the air count is unchanged.
@@ -2096,8 +1754,6 @@ impl Region {
     }
 
     pub(crate) fn rotate_z_90_at(&mut self, position: (i32, i32, i32)) -> Result<(), String> {
-        // The loops below read `blocks` as laid out over exactly the bounds.
-        self.fit_storage();
         use crate::transforms::{transform_block_state_rotate, Axis};
 
         let old_bbox = self.bbox.clone();
@@ -2111,11 +1767,13 @@ impl Region {
         let (w, h, l) = (old_size_x as usize, old_size_y as usize, size_z as usize);
         let (new_w, new_l) = (h, l);
         let mut new_blocks = try_zeroed_blocks(w * h * l)?;
+        let old_storage = std::mem::replace(&mut self.storage, Storage::empty());
+        let old_cells = old_storage.dense(&self.bbox);
         let mut src = 0;
         for dy in 0..h {
             for dz in 0..l {
                 let base = (h - 1 - dy) + dz * new_w;
-                for (dx, &block) in self.blocks[src..src + w].iter().enumerate() {
+                for (dx, &block) in old_cells[src..src + w].iter().enumerate() {
                     new_blocks[base + dx * new_w * new_l] = block;
                 }
                 src += w;
@@ -2141,9 +1799,9 @@ impl Region {
 
         self.position = new_bbox.to_position_and_size().0;
         self.size = new_bbox.to_position_and_size().1;
-        self.blocks = new_blocks;
         self.palette = new_palette;
-        self.adopt_storage();
+        drop(old_cells);
+        self.set_storage(self.position, self.size, new_blocks);
         self.rebuild_palette_index();
         self.rebuild_air_index();
         // A rotation permutes cells: the air count is unchanged.
@@ -2262,6 +1920,7 @@ impl Region {
         let mut cleared_edge = false;
         let mut added: Option<BoundingBox> = None;
         let mut intervals: Vec<(i32, i32)> = Vec::new();
+        let mut mapped_row: Vec<u32> = Vec::new();
 
         for y in clip.min.1..=clip.max.1 {
             for z in clip.min.2..=clip.max.2 {
@@ -2289,42 +1948,49 @@ impl Region {
                 }
 
                 for &(x0, x1) in &intervals {
-                    let src_start = src.coords_to_index(x0, y, z);
                     let (dx0, dy, dz) = translate((x0, y, z));
-                    let dst_start = self.coords_to_index(dx0, dy, dz);
-                    let len = (x1 - x0 + 1) as usize;
-                    let (mut lo, mut hi) = (usize::MAX, 0usize);
-                    for i in 0..len {
-                        let state = src.blocks[src_start + i] as usize;
-                        let mut mapped = remap[state];
-                        if mapped == UNRESOLVED {
-                            let block = &src.palette[state];
-                            mapped = if excluded.contains(block) {
-                                SKIP
-                            } else {
-                                self.get_or_insert_in_palette(block) as u32
-                            };
-                            remap[state] = mapped;
-                        }
-                        if mapped == SKIP {
-                            continue;
-                        }
-                        let cell = &mut self.blocks[dst_start + i];
-                        let old = *cell;
-                        *cell = mapped;
-                        if mapped == air {
-                            if old != air {
-                                air_delta -= 1;
-                                cleared_edge |= on_old_edge((dx0 + i as i32, dy, dz));
+                    mapped_row.clear();
+                    for (_, cells) in src.storage.row(y, z, x0, x1) {
+                        for &state in cells {
+                            let state = state as usize;
+                            let mut mapped = remap[state];
+                            if mapped == UNRESOLVED {
+                                let block = &src.palette[state];
+                                mapped = if excluded.contains(block) {
+                                    SKIP
+                                } else {
+                                    self.get_or_insert_in_palette(block) as u32
+                                };
+                                remap[state] = mapped;
                             }
-                        } else {
-                            if old == air {
-                                air_delta += 1;
-                            }
-                            lo = lo.min(i);
-                            hi = hi.max(i);
+                            mapped_row.push(mapped);
                         }
                     }
+                    let (mut lo, mut hi) = (usize::MAX, 0usize);
+                    let dx1 = dx0 + (x1 - x0);
+                    self.storage.row_mut(dy, dz, dx0, dx1, |seg_x, cells| {
+                        let base = (seg_x - dx0) as usize;
+                        for (j, cell) in cells.iter_mut().enumerate() {
+                            let i = base + j;
+                            let mapped = mapped_row[i];
+                            if mapped == SKIP {
+                                continue;
+                            }
+                            let old = std::mem::replace(cell, mapped);
+                            if mapped == air {
+                                if old != air {
+                                    air_delta -= 1;
+                                    cleared_edge |= on_old_edge((dx0 + i as i32, dy, dz));
+                                }
+                            } else {
+                                if old == air {
+                                    air_delta += 1;
+                                }
+                                lo = lo.min(i);
+                                hi = hi.max(i);
+                            }
+                        }
+                    });
                     if lo <= hi {
                         let row = BoundingBox::new(
                             (dx0 + lo as i32, dy, dz),
@@ -2355,8 +2021,7 @@ impl Region {
         let written_from = |src_pos: (i32, i32, i32)| {
             clip.contains(src_pos)
                 && !shadowed(src_pos)
-                && remap[src.blocks[src.coords_to_index(src_pos.0, src_pos.1, src_pos.2)] as usize]
-                    != SKIP
+                && remap[src.storage.get(src_pos.0, src_pos.1, src_pos.2) as usize] != SKIP
         };
         if !self.block_entities.is_empty() {
             self.block_entities.retain(|(x, y, z), _| {
@@ -2402,8 +2067,7 @@ impl Region {
         let mut cleared_edge = false;
         let mut added: Option<BoundingBox> = None;
         for ((x, y, z), palette_index) in cells {
-            let index = self.coords_to_index(x, y, z);
-            let old = std::mem::replace(&mut self.blocks[index], palette_index);
+            let old = self.storage.set(x, y, z, palette_index);
             if palette_index == air {
                 if old != air {
                     air_delta -= 1;
@@ -2442,9 +2106,7 @@ impl Region {
     #[inline(always)]
     pub fn set_block_at_index_unchecked(&mut self, palette_index: usize, x: i32, y: i32, z: i32) {
         let palette_index = palette_index as u32;
-        let index = self.coords_to_index(x, y, z);
-        let old_palette_index = self.blocks[index];
-        self.blocks[index] = palette_index;
+        let old_palette_index = self.storage.set(x, y, z, palette_index);
 
         let old_is_air = old_palette_index == self.cached_air_index;
         let new_is_air = palette_index == self.cached_air_index;
@@ -2467,9 +2129,8 @@ impl Region {
         if !self.is_in_region(x, y, z) {
             return None;
         }
-        let index = self.coords_to_index(x, y, z);
         self.palette
-            .get(self.blocks[index] as usize)
+            .get(self.storage.get(x, y, z) as usize)
             .map(|bs| bs.name.as_str())
     }
 
@@ -2488,70 +2149,33 @@ impl Region {
         // Whole-region fills know the final count and bounds without reading
         // the previous contents. This is the common path for newly-created
         // cuboids and turns the operation into one contiguous slice fill.
-        if min == self.alloc.min && max == self.alloc.max && self.alloc == self.bbox {
-            self.blocks.fill(palette_index);
+        let storage = self.storage.bounds();
+        if min == storage.min && max == storage.max && *storage == self.bbox {
+            self.storage.fill(palette_index);
             if new_is_air {
                 self.non_air_count = 0;
                 self.tight_bounds = None;
             } else {
-                self.non_air_count = self.blocks.len();
+                self.non_air_count = self.bbox.volume() as usize;
                 self.tight_bounds = Some(self.bbox.clone());
             }
             return;
         }
 
-        let w = self.cached_width;
-        let wl = self.cached_width_x_length;
-        let base_x = self.alloc.min.0;
-        let base_y = self.alloc.min.1;
-        let base_z = self.alloc.min.2;
-
-        let dx_min = (min.0 - base_x) as i64;
-        let dx_max = (max.0 - base_x) as i64;
-        let row_len = (dx_max - dx_min + 1) as usize;
-
+        let air = self.cached_air_index;
         let mut air_delta: i64 = 0;
-
         for y in min.1..=max.1 {
-            let dy = (y - base_y) as i64;
             for z in min.2..=max.2 {
-                let dz = (z - base_z) as i64;
-                let row_start = (dx_min + dz * w + dy * wl) as usize;
-                let row_end = row_start + row_len;
-                let row = &mut self.blocks[row_start..row_end];
-
-                // Count air blocks being replaced/created for delta tracking
-                // Phase 2: Manual SIMD-style chunking (8 elements at a time)
-                let mut chunks = row.chunks_exact(8);
-                for chunk in &mut chunks {
-                    let mut is_air_count = 0;
-                    is_air_count += (chunk[0] == self.cached_air_index) as i64;
-                    is_air_count += (chunk[1] == self.cached_air_index) as i64;
-                    is_air_count += (chunk[2] == self.cached_air_index) as i64;
-                    is_air_count += (chunk[3] == self.cached_air_index) as i64;
-                    is_air_count += (chunk[4] == self.cached_air_index) as i64;
-                    is_air_count += (chunk[5] == self.cached_air_index) as i64;
-                    is_air_count += (chunk[6] == self.cached_air_index) as i64;
-                    is_air_count += (chunk[7] == self.cached_air_index) as i64;
-
-                    if !new_is_air {
-                        air_delta += is_air_count;
+                self.storage.row_mut(y, z, min.0, max.0, |_, cells| {
+                    // Air cells being replaced, counted before the fill.
+                    let was_air = cells.iter().filter(|&&old| old == air).count() as i64;
+                    air_delta += if new_is_air {
+                        was_air - cells.len() as i64
                     } else {
-                        air_delta -= 8 - is_air_count;
-                    }
-                }
-
-                // Handle remainder
-                for &old in chunks.remainder() {
-                    let old_is_air = old == self.cached_air_index;
-                    if old_is_air && !new_is_air {
-                        air_delta += 1;
-                    } else if !old_is_air && new_is_air {
-                        air_delta -= 1;
-                    }
-                }
-
-                row.fill(palette_index);
+                        was_air
+                    };
+                    cells.fill(palette_index);
+                });
             }
         }
 
@@ -2662,7 +2286,7 @@ mod tests {
                 );
                 region.set_block(p.0, p.1, p.2, &states[next(2) as usize]);
             }
-            let before: Vec<u32> = region.blocks.clone();
+            let before: Vec<u32> = region.dense_blocks().into_owned();
             let check = |r: &Region| {
                 let mut fresh = r.clone();
                 fresh.rescan_content();
@@ -2678,7 +2302,7 @@ mod tests {
                     }
                     check(&region);
                 }
-                assert_eq!(region.blocks, before);
+                assert_eq!(region.dense_blocks().into_owned(), before);
             }
             for axis in 0..3 {
                 for _ in 0..4 {
@@ -2690,7 +2314,7 @@ mod tests {
                     }
                     check(&region);
                 }
-                assert_eq!(region.blocks, before);
+                assert_eq!(region.dense_blocks().into_owned(), before);
             }
         }
     }
@@ -2712,24 +2336,9 @@ mod tests {
         for i in 1..=16 {
             palette.push(BlockState::new(format!("minecraft:wool{}", i)));
         }
-        let region = Region {
-            name: "Test".to_string(),
-            position: (0, 0, 0),
-            size: (16, 1, 1),
-            blocks: blocks.clone(),
-            palette,
-            entities: Vec::new(),
-            block_entities: BlockEntityStore::default(),
-            palette_index: FxHashMap::default(),
-            bbox: BoundingBox::from_position_and_size((0, 0, 0), (16, 1, 1)),
-            alloc: BoundingBox::from_position_and_size((0, 0, 0), (16, 1, 1)),
-            tight_bounds: None,
-            cached_width: 16,
-            cached_length: 1,
-            cached_width_x_length: 16,
-            cached_air_index: 0,
-            non_air_count: 16,
-        };
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (16, 1, 1));
+        region.palette = palette;
+        region.set_storage((0, 0, 0), (16, 1, 1), blocks.clone());
         let packed_states = region.create_packed_block_states();
         assert_eq!(packed_states.len(), 2);
         assert_eq!(packed_states, vec![-3013672028691362751, 33756]);
@@ -2738,66 +2347,13 @@ mod tests {
         assert_eq!(unpacked_blocks, blocks);
     }
 
-    /// Regression: with the old i32-typed `cached_width_x_length` and
-    /// i32 multiplication in `coords_to_index`, asking for an index inside
-    /// a region whose footprint exceeded 50k × 19k blocks would silently
-    /// overflow and wrap to a negative i32. `as usize` then produced a
-    /// near-`usize::MAX` value and `blocks[index]` panicked OOB.
-    ///
-    /// We construct a `Region` with tiny `blocks` but cached fields that
-    /// match a real >500M-block region observed in the wild. The math
-    /// must produce a sane (large) index, not a wrapped one.
-    #[test]
-    fn coords_to_index_does_not_overflow_for_huge_regions() {
-        // Dimensions from the build-extractor mega-terrain repro:
-        // bounds (-47472, -64, -5216) .. (34975, 319, 13727)
-        let width: i64 = 82448;
-        let length: i64 = 18944;
-        let wl: i64 = width * length; // 1_561_754_112 — just barely fits i32
-        assert!(wl > 0 && wl < i64::from(i32::MAX));
-
-        let region = Region {
-            name: "huge".to_string(),
-            position: (-47472, -64, -5216),
-            size: (82448, 384, 18944),
-            blocks: Vec::new(), // we never actually index into this
-            palette: vec![BlockState::new("minecraft:air".to_string())],
-            entities: Vec::new(),
-            block_entities: BlockEntityStore::default(),
-            palette_index: FxHashMap::default(),
-            bbox: BoundingBox::new((-47472, -64, -5216), (34975, 319, 13727)),
-            alloc: BoundingBox::new((-47472, -64, -5216), (34975, 319, 13727)),
-            tight_bounds: None,
-            cached_width: width,
-            cached_length: length,
-            cached_width_x_length: wl,
-            cached_air_index: 0,
-            non_air_count: 0,
-        };
-
-        // The problematic point: dy=300 makes `dy * wl ≈ 4.7e11` — well past
-        // i32::MAX. Pre-fix this returned ~usize::MAX-N; post-fix the index
-        // is the expected linear position.
-        let idx = region.coords_to_index(-47472, 236, -5216);
-        let expected: usize = (300i64 * wl) as usize;
-        assert_eq!(
-            idx, expected,
-            "coords_to_index overflowed (got {idx}, expected {expected})"
-        );
-
-        // Spot-check the opposite corner of the bbox: every term contributes.
-        let idx_far = region.coords_to_index(34975, 319, 13727);
-        let expected_far: usize = ((width - 1) + (length - 1) * width + (384i64 - 1) * wl) as usize;
-        assert_eq!(idx_far, expected_far);
-    }
-
     #[test]
     fn test_region_creation() {
         let region = Region::new("Test".to_string(), (0, 0, 0), (2, 2, 2));
         assert_eq!(region.name, "Test");
         assert_eq!(region.position, (0, 0, 0));
         assert_eq!(region.size, (2, 2, 2));
-        assert_eq!(region.blocks.len(), 8);
+        assert_eq!(region.volume(), 8);
         assert_eq!(region.palette.len(), 1);
         assert_eq!(region.palette[0].name, "minecraft:air");
     }
@@ -3149,36 +2705,15 @@ mod tests {
     }
 
     #[test]
-    fn test_coords_to_index() {
+    fn test_bounds_cell() {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (2, 2, 2));
-
-        let volume1 = region.volume();
-        for i in 0..8 {
-            let coords = region.index_to_coords(i);
-            let index = region.coords_to_index(coords.0, coords.1, coords.2);
-            assert!(index < volume1);
-            assert_eq!(index, i);
-        }
-
         let region2 = Region::new("Test".to_string(), (0, 0, 0), (-2, -2, -2));
-
-        let volume2 = region2.volume();
-        for i in 0..8 {
-            let coords = region2.index_to_coords(i);
-            let index = region2.coords_to_index(coords.0, coords.1, coords.2);
-            assert!(index < volume2);
-            assert_eq!(index, i);
-        }
-
         region.merge(&region2);
-
-        let volume3 = region.volume();
-        for i in 0..27 {
-            let coords = region.index_to_coords(i);
-            let index = region.coords_to_index(coords.0, coords.1, coords.2);
-            assert!(index < volume3);
-            assert_eq!(index, i);
-        }
+        let cells: std::collections::HashSet<_> =
+            (0..region.volume()).map(|i| region.bounds_cell(i)).collect();
+        assert_eq!(cells.len(), 27);
+        assert!(cells.iter().all(|&(x, y, z)| region.is_in_region(x, y, z)));
+        assert_eq!(region.bounds_cell(1), (region.position.0 + 1, region.position.1, region.position.2));
     }
 
     #[test]
@@ -3333,12 +2868,12 @@ mod tests {
         region.fill_uniform(bounds.min, bounds.max, stone_index);
         assert_eq!(region.count_non_air_blocks(), 24);
         assert_eq!(region.get_tight_bounds(), Some(bounds.clone()));
-        assert!(region.blocks.iter().all(|&index| index as usize == stone_index));
+        assert!(region.dense_blocks().iter().all(|&index| index as usize == stone_index));
 
         region.fill_uniform(bounds.min, bounds.max, air_index);
         assert_eq!(region.count_non_air_blocks(), 0);
         assert_eq!(region.get_tight_bounds(), None);
-        assert!(region.blocks.iter().all(|&index| index as usize == air_index));
+        assert!(region.dense_blocks().iter().all(|&index| index as usize == air_index));
     }
 
     #[test]
@@ -3384,6 +2919,53 @@ mod tests {
         // Tight dimensions should reflect actual structure (min to max of placed blocks)
         let tight_dims = region.get_tight_dimensions();
         assert_eq!(tight_dims, (11, 11, 11)); // From (0,0,0) to (10,10,10) inclusive
+    }
+
+    #[test]
+    fn chunked_storage_matches_a_reference_model() {
+        // Bounds of ~17.6M cells: past the dense limit, so storage is chunked.
+        let states: Vec<BlockState> = ["minecraft:air", "minecraft:stone", "minecraft:dirt"]
+            .iter()
+            .map(|n| BlockState::new(n.to_string()))
+            .collect();
+        let mut region = Region::new("R".to_string(), (-130, 0, -130), (260, 260, 260));
+        assert!(matches!(region.storage, Storage::Chunked(_)));
+        let mut model = std::collections::HashMap::new();
+        let mut seed = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = |n: i32| {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            ((seed >> 33) % n as u64) as i32
+        };
+        for _ in 0..2000 {
+            let p = (next(260) - 130, next(260), next(260) - 130);
+            let state = next(3) as usize;
+            region.set_block(p.0, p.1, p.2, &states[state]);
+            model.insert(p, state);
+        }
+        let mirror = |v: i32, lo: i32, hi: i32| hi - (v - lo);
+        region.flip_x();
+        region.flip_y();
+        region.flip_z();
+        region.translate(5, -3, 2).unwrap();
+        let moved: std::collections::HashMap<_, _> = model
+            .into_iter()
+            .map(|((x, y, z), s)| {
+                let p = (mirror(x, -130, 129), mirror(y, 0, 259), mirror(z, -130, 129));
+                ((p.0 + 5, p.1 - 3, p.2 + 2), s)
+            })
+            .collect();
+        for (&(x, y, z), &state) in &moved {
+            assert_eq!(region.get_block(x, y, z), Some(&states[state]), "at {:?}", (x, y, z));
+        }
+        let solid: Vec<_> = moved.iter().filter(|(_, &s)| s != 0).map(|(&p, _)| p).collect();
+        assert_eq!(region.count_non_air_blocks(), solid.len());
+        let mut fresh = region.clone();
+        fresh.rescan_content();
+        assert_eq!(fresh.get_tight_bounds(), region.get_tight_bounds());
+        let compact = region.to_compact();
+        for &(x, y, z) in &solid {
+            assert_eq!(compact.get_block(x, y, z), region.get_block(x, y, z));
+        }
     }
 
     #[test]
@@ -3648,12 +3230,12 @@ mod tests {
         region.set_block(4, 2, 3, &dirt);
         region.set_block(2, 1, 2, &stone);
 
-        let original_blocks = region.blocks.clone();
+        let original_blocks = region.dense_blocks().into_owned();
 
         region.flip_x();
         region.flip_x();
 
-        assert_eq!(region.blocks, original_blocks);
+        assert_eq!(region.dense_blocks().into_owned(), original_blocks);
     }
 
     #[test]
@@ -3666,12 +3248,12 @@ mod tests {
         region.set_block(4, 2, 3, &dirt);
         region.set_block(2, 1, 2, &stone);
 
-        let original_blocks = region.blocks.clone();
+        let original_blocks = region.dense_blocks().into_owned();
 
         region.flip_y();
         region.flip_y();
 
-        assert_eq!(region.blocks, original_blocks);
+        assert_eq!(region.dense_blocks().into_owned(), original_blocks);
     }
 
     #[test]
@@ -3684,12 +3266,12 @@ mod tests {
         region.set_block(4, 2, 3, &dirt);
         region.set_block(2, 1, 2, &stone);
 
-        let original_blocks = region.blocks.clone();
+        let original_blocks = region.dense_blocks().into_owned();
 
         region.flip_z();
         region.flip_z();
 
-        assert_eq!(region.blocks, original_blocks);
+        assert_eq!(region.dense_blocks().into_owned(), original_blocks);
     }
 
     #[test]
@@ -3760,9 +3342,9 @@ mod tests {
         region.set_block(0, 0, 0, &stone);
         region.set_block(0, 3, 3, &stone);
 
-        let original_blocks = region.blocks.clone();
+        let original_blocks = region.dense_blocks().into_owned();
         region.flip_x();
-        assert_eq!(region.blocks, original_blocks);
+        assert_eq!(region.dense_blocks().into_owned(), original_blocks);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -3913,17 +3495,11 @@ mod tests {
         let dims = region.get_dimensions();
         assert_eq!(dims, (7, 5, 3));
 
-        // coords_to_index should still work correctly
-        let vol = region.volume();
-        for i in 0..vol {
-            let (x, y, z) = region.index_to_coords(i);
-            let roundtrip = region.coords_to_index(x, y, z);
-            assert_eq!(i, roundtrip, "roundtrip failed for index {}", i);
-        }
+        assert_eq!(region.get_block(6, 0, 0), Some(&stone));
     }
 
     #[test]
-    fn test_index_roundtrip_after_expand() {
+    fn test_blocks_survive_expand() {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (3, 3, 3));
         let stone = BlockState::new("minecraft:stone".to_string());
         region.set_block(0, 0, 0, &stone);
@@ -3931,16 +3507,8 @@ mod tests {
         // Trigger expansion
         region.set_block(20, 20, 20, &stone);
 
-        let vol = region.volume();
-        for i in 0..vol {
-            let (x, y, z) = region.index_to_coords(i);
-            let roundtrip = region.coords_to_index(x, y, z);
-            assert_eq!(
-                i, roundtrip,
-                "roundtrip failed for index {} -> ({},{},{}) -> {}",
-                i, x, y, z, roundtrip
-            );
-        }
+        assert_eq!(region.get_block(0, 0, 0), Some(&stone));
+        assert_eq!(region.get_block(20, 20, 20), Some(&stone));
     }
 
     #[test]
