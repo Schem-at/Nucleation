@@ -1,3 +1,22 @@
+# Nucleation v0.12.0
+
+- A region's bounds are now what it was created or loaded with, grown by
+  every write outside it; storage growth padding is no longer observable.
+  Dimensions, `get_block`, block counts, flips, `stack` spacing, exports and
+  simulation sizing no longer depend on how a region grew (blocks at 0 and 4
+  used to report a 0..16 box). `allocated_dimensions()` reports storage.
+- Large regions use chunked storage: past 16M cells, empty and uniform 16³
+  chunks cost one value. Two blocks 600 apart take a few MB instead of
+  870 MB; 10k scattered blocks in 512³ 149 MB instead of 1.4 GB. Smaller
+  regions keep the dense layout and its speed.
+- `region_block_indices` copies any window of a region into a caller buffer
+  (no 65,536-cell cap); JS/Kotlin keep `regionBlockIndices(name, start,
+  count)`, Python's `region_array` fills one NumPy array.
+- Breaking for Rust: `Region::blocks`, `coords_to_index` and
+  `index_to_coords` are gone (use `get_block_index` / `bounds_cell`).
+- Fixed: `Region::to_nbt`/`from_nbt` round trips for regions away from the
+  origin.
+
 # Nucleation v0.11.0
 
 - The data converter targets Minecraft 26.3 (data version 5023) by default.
