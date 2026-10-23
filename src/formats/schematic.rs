@@ -6,6 +6,7 @@ use std::io::BufReader;
 #[cfg(test)]
 use std::io::Read;
 
+use super::nbt_stream;
 use crate::block_entity::BlockEntity;
 use crate::entity::Entity;
 use crate::formats::error::Result;
@@ -186,9 +187,8 @@ fn to_schematic_v3(schematic: &UniversalSchematic, compression: Compression) -> 
     };
     blocks_container.insert("Data", NbtTag::ByteArray(block_data_i8));
 
-    // Add block entities from compact region (using v3 format)
-    let block_entities = convert_block_entities_v3(&compact_region, schematic.metadata.mc_version);
-    blocks_container.insert("BlockEntities", NbtTag::List(block_entities));
+    // Block entities are streamed into this list by `gzip_nbt` below.
+    blocks_container.insert("BlockEntities", NbtTag::List(NbtList::new()));
 
     // Entities are stored at root (Schematic) level in v3 per Sponge spec.
     let entities = convert_entities_v3(&compact_region);
@@ -232,7 +232,16 @@ fn to_schematic_v3(schematic: &UniversalSchematic, compression: Compression) -> 
     }
 
     crate::nbt::canonicalize_compound(&mut root);
-    super::gzip_nbt(&root, compression)
+    let data_version = schematic.metadata.mc_version;
+    super::gzip_nbt(&root, compression, |path, w| {
+        if path != ["Schematic", "Blocks", "BlockEntities"] {
+            return Ok(false);
+        }
+        write_block_entities(w, &compact_region, |w, be, pos| {
+            nbt_stream::write_block_entity_v3(w, be, pos, data_version)
+        })?;
+        Ok(true)
+    })
 }
 
 // Version 2 format (legacy compatibility)
@@ -290,11 +299,10 @@ fn to_schematic_v2(schematic: &UniversalSchematic, compression: Compression) -> 
     };
     schematic_data.insert("BlockData", NbtTag::ByteArray(block_data_i8));
 
-    // Use block entities and entities from compact region
-    let block_entities = convert_block_entities(&compact_region);
+    // Block entities are streamed into this list by `gzip_nbt` below.
     let entities = convert_entities_v2(&compact_region);
 
-    schematic_data.insert("BlockEntities", NbtTag::List(block_entities));
+    schematic_data.insert("BlockEntities", NbtTag::List(NbtList::new()));
     schematic_data.insert("Entities", NbtTag::List(entities));
 
     // Add metadata
@@ -331,7 +339,13 @@ fn to_schematic_v2(schematic: &UniversalSchematic, compression: Compression) -> 
     }
 
     crate::nbt::canonicalize_compound(&mut root);
-    super::gzip_nbt(&root, compression)
+    super::gzip_nbt(&root, compression, |path, w| {
+        if path != ["Schematic", "BlockEntities"] {
+            return Ok(false);
+        }
+        write_block_entities(w, &compact_region, nbt_stream::write_block_entity_v2)?;
+        Ok(true)
+    })
 }
 
 // Palette conversion for v3 (creates clean sequential indices)
@@ -573,39 +587,26 @@ pub fn from_schematic_bounded(
     Ok(schematic)
 }
 
-// Sponge Schematic spec: block entity positions are relative to [0,0,0] of the schematic
-// (without the offset applied). We subtract the region position (which becomes the offset).
-fn convert_block_entities(region: &Region) -> NbtList {
-    let mut block_entities = NbtList::new();
-
-    for (position, block_entity) in region.block_entities.iter() {
-        let mut nbt = block_entity.to_nbt();
-        let rel_x = position.0 - region.position.0;
-        let rel_y = position.1 - region.position.1;
-        let rel_z = position.2 - region.position.2;
-        nbt.insert("Pos", NbtTag::IntArray(vec![rel_x, rel_y, rel_z]));
-        block_entities.push(nbt);
-    }
-
-    block_entities
-}
-
-// Convert block entities for Sponge Schematic v3 format
-// Uses to_nbt_v3() which wraps block-specific data in a "Data" compound
-// Positions are relative to [0,0,0] of the schematic (without offset applied)
-fn convert_block_entities_v3(region: &Region, data_version: Option<i32>) -> NbtList {
-    let mut block_entities = NbtList::new();
-
-    for (position, block_entity) in region.block_entities.iter() {
-        let mut nbt = block_entity.to_nbt_v3(data_version);
-        let rel_x = position.0 - region.position.0;
-        let rel_y = position.1 - region.position.1;
-        let rel_z = position.2 - region.position.2;
-        nbt.insert("Pos", NbtTag::IntArray(vec![rel_x, rel_y, rel_z]));
-        block_entities.push(nbt);
-    }
-
-    block_entities
+// Sponge Schematic spec: block entity positions are relative to [0,0,0] of the
+// schematic (without the offset applied), so the region position is subtracted.
+fn write_block_entities<W: std::io::Write>(
+    w: &mut W,
+    region: &Region,
+    mut write: impl FnMut(&mut W, &BlockEntity, [i32; 3]) -> std::io::Result<()>,
+) -> std::io::Result<()> {
+    let origin = region.position;
+    nbt_stream::write_compound_list(
+        w,
+        region.block_entities.len(),
+        region.block_entities.iter(),
+        |w, (pos, be)| {
+            write(
+                w,
+                be,
+                [pos.0 - origin.0, pos.1 - origin.1, pos.2 - origin.2],
+            )
+        },
+    )
 }
 
 // Sponge Schematic spec: entity positions are relative to [0,0,0] of the
