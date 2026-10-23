@@ -62,6 +62,17 @@ print("net check: %d shorts" % len(shorts))
 for s in shorts[:4]:
     print("   ", s)
 
+# Strength-aware search: a trunk cell at ss1 cannot feed a corner, so the
+# 3-cell route to the diagonal neighbour is dead; find must detour through a
+# straight cell that can host a repeater.
+b2 = rs.Build("strength")
+b2.stone(0, 0, 0)
+b2.put(0, 1, 0, rs.DUST)
+r2 = router.Router(b2, {(0, 1, 0): "n"})
+r2.ss[(0, 1, 0)] = 1
+path = r2.find((0, 1, 0), (1, 1, 1), "n")
+assert path is not None and len(path) > 3 and r2.dead_stretch(path) is None, path
+
 sim = b.sim()
 lv = rs.Levers(sim, [(0, 1, 0), (0, 1, 4), (0, 1, 12)])
 ok = True
