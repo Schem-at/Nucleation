@@ -1350,6 +1350,8 @@ struct ElementInfo {
     y_rotation: i32,
     x_rotation: i32,
     /// Whether UVs are locked (don't rotate with the block transform).
+    /// Parsed but not applied yet.
+    #[allow(dead_code)]
     uvlock: bool,
     /// Faces: (direction, texture_key_suffix, PNG data).
     faces: Vec<(Direction, String, Vec<u8>)>,

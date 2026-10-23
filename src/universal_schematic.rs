@@ -2227,7 +2227,7 @@ impl UniversalSchematic {
                     region.block_entities.set(
                         position,
                         BlockEntity {
-                            id: state.name.to_string(),
+                            id: state.name.clone(),
                             position,
                             nbt: std::sync::Arc::clone(&nbt),
                         },
@@ -2262,7 +2262,7 @@ impl UniversalSchematic {
             Some(nbt) => region.block_entities.set(
                 (x, y, z),
                 BlockEntity {
-                    id: state.name.to_string(),
+                    id: state.name.clone(),
                     position: (x, y, z),
                     nbt: std::sync::Arc::clone(nbt),
                 },
@@ -2356,6 +2356,7 @@ impl UniversalSchematic {
     }
 
     /// Parses a block string into its components (block state and optional NBT data)
+    #[cfg(test)]
     fn calculate_items_for_signal(signal_strength: u8) -> u32 {
         if signal_strength == 0 {
             return 0;
@@ -2372,33 +2373,6 @@ impl UniversalSchematic {
         std::cmp::max(signal_strength as u32, items_needed)
     }
 
-    /// Creates Items NBT data for a barrel to achieve desired signal strength
-    /// Uses modern format (1.20.5+): lowercase 'count' as Int
-    fn create_barrel_items_nbt(signal_strength: u8) -> Vec<NbtValue> {
-        let total_items = Self::calculate_items_for_signal(signal_strength);
-        let mut items = Vec::new();
-        let mut remaining_items = total_items;
-        let mut slot: u8 = 0;
-
-        while remaining_items > 0 {
-            let stack_size = std::cmp::min(remaining_items, 64);
-            let mut item_nbt = NbtMap::new(); // Using NbtMap instead of HashMap
-                                              // Modern format (1.20.5+): lowercase 'count' as Int
-            item_nbt.insert("count".to_string(), NbtValue::Int(stack_size as i32));
-            item_nbt.insert("Slot".to_string(), NbtValue::Byte(slot as i8));
-            item_nbt.insert(
-                "id".to_string(),
-                NbtValue::String("minecraft:redstone_block".to_string()),
-            );
-
-            items.push(NbtValue::Compound(item_nbt));
-
-            remaining_items -= stack_size;
-            slot += 1;
-        }
-
-        items
-    }
     /// Parse a block string into its components, handling special signal strength case
     pub fn parse_block_string(
         block_string: &str,

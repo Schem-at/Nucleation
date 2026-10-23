@@ -102,7 +102,7 @@ pub fn to_structure_snbt(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
                 {
                     let mut nbt = block_entity.nbt.to_quartz_nbt();
                     if !nbt.contains_key("id") && !nbt.contains_key("Id") {
-                        nbt.insert("id", NbtTag::String(block_entity.id));
+                        nbt.insert("id", NbtTag::String(block_entity.id.to_string()));
                     }
                     entry.insert("nbt", NbtTag::Compound(nbt));
                 }

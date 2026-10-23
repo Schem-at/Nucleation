@@ -21,7 +21,7 @@ use std::sync::Arc;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BlockEntity {
     pub nbt: Arc<NbtMap>,
-    pub id: String,
+    pub id: smol_str::SmolStr,
     pub position: (i32, i32, i32),
 }
 
@@ -29,7 +29,7 @@ impl BlockEntity {
     pub fn new(id: String, position: (i32, i32, i32)) -> Self {
         BlockEntity {
             nbt: Arc::new(NbtMap::new()),
-            id,
+            id: id.into(),
             position,
         }
     }
@@ -55,7 +55,7 @@ impl BlockEntity {
 
     pub fn to_hashmap(&self) -> HashMap<String, NbtValue> {
         let mut map = HashMap::new();
-        map.insert("Id".to_string(), NbtValue::String(self.id.clone()));
+        map.insert("Id".to_string(), NbtValue::String(self.id.to_string()));
         map.insert(
             "Pos".to_string(),
             NbtValue::IntArray(vec![self.position.0, self.position.1, self.position.2]),
@@ -129,7 +129,7 @@ impl BlockEntity {
             .unwrap_or((0, 0, 0));
         BlockEntity {
             nbt: Arc::new(nbt_map),
-            id,
+            id: id.into(),
             position,
         }
     }
@@ -137,7 +137,7 @@ impl BlockEntity {
     pub fn to_nbt(&self) -> NbtCompound {
         let mut nbt = NbtCompound::new();
         // Store the core BlockEntity fields
-        nbt.insert("Id", NbtValue::String(self.id.clone()).to_quartz_nbt());
+        nbt.insert("Id", NbtValue::String(self.id.to_string()).to_quartz_nbt());
         nbt.insert(
             "Pos",
             NbtValue::IntArray(vec![self.position.0, self.position.1, self.position.2])
@@ -184,7 +184,7 @@ impl BlockEntity {
         let mut nbt = NbtCompound::new();
 
         // Required fields at root level
-        nbt.insert("Id", NbtValue::String(self.id.clone()).to_quartz_nbt());
+        nbt.insert("Id", NbtValue::String(self.id.to_string()).to_quartz_nbt());
         nbt.insert(
             "Pos",
             NbtValue::IntArray(vec![self.position.0, self.position.1, self.position.2])
@@ -204,7 +204,7 @@ impl BlockEntity {
                     NbtValue::Compound(NbtMap::new()).to_quartz_nbt(),
                 );
                 // Add id field (matches the block entity type)
-                data_compound.insert("id", NbtValue::String(self.id.clone()).to_quartz_nbt());
+                data_compound.insert("id", NbtValue::String(self.id.to_string()).to_quartz_nbt());
             }
 
             // Add all NBT data

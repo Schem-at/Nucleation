@@ -1451,48 +1451,6 @@ fn modal_gap(gaps: &[u32]) -> u32 {
     }
 }
 
-/// One kicked flight, mirroring the app's `evalCore.fly` exactly: quiet
-/// settle at construction, redstone-block kick at tick 2 removed at tick 4,
-/// the same probe schedule (must-move deadline, mid-window centre of mass),
-/// optional in-eval gait detection over the last 120 ticks, and an optional
-/// early exit for machines that are provably frozen — quiescent and unmoved
-/// at tick 40, where every later scalar equals the tick-40 scalar, so the
-/// shortcut changes wall time and nothing else.
-///
-/// Row layout: `[n0, startCom, startMinX, startMaxX, comAtMoveCheck(NaN =
-/// no deadline), comAtMid, period, n1, endCom, endMinX, endMaxX]`.
-#[allow(clippy::too_many_arguments)]
-fn fly_metrics(
-    structure: &mc_tick::Structure,
-    extras: &[&str],
-    kick: (i32, i32, i32),
-    eval_ticks: u32,
-    seed: i64,
-    must_move_by_tick: i32,
-    need_period: bool,
-    early_exit: bool,
-) -> Result<[f64; 11], String> {
-    let mut sim = wire_simulation(
-        structure,
-        mc_tick::Pos::new(0, 0, 0),
-        ffi::TickSettleMode::Quiet,
-        extras,
-        // SNBT in, and the bridge emits the canonical DataVersion — there is no
-        // source version to read here. `None` keeps the engine's default,
-        // which is the version every captured trace came from.
-        None,
-    )?;
-    fly_on(
-        &mut sim,
-        kick,
-        eval_ticks,
-        seed,
-        must_move_by_tick,
-        need_period,
-        early_exit,
-    )
-}
-
 /// The flight itself, on an already-wired sim (fresh, quiet-settled).
 #[allow(clippy::too_many_arguments)]
 fn fly_on(

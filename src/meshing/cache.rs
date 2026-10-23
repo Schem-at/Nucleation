@@ -879,6 +879,7 @@ fn read_animated_texture(r: &mut impl Read) -> Result<AnimatedTextureExport, Cac
 
 // ─── Byte ↔ typed-array conversions ─────────────────────────────────────────
 
+#[cfg(test)]
 fn bytes_to_f32x3(data: &[u8]) -> Vec<[f32; 3]> {
     data.chunks_exact(12)
         .map(|chunk| {
@@ -891,6 +892,7 @@ fn bytes_to_f32x3(data: &[u8]) -> Vec<[f32; 3]> {
         .collect()
 }
 
+#[cfg(test)]
 fn bytes_to_f32x2(data: &[u8]) -> Vec<[f32; 2]> {
     data.chunks_exact(8)
         .map(|chunk| {
@@ -902,6 +904,7 @@ fn bytes_to_f32x2(data: &[u8]) -> Vec<[f32; 2]> {
         .collect()
 }
 
+#[cfg(test)]
 fn bytes_to_f32x4(data: &[u8]) -> Vec<[f32; 4]> {
     data.chunks_exact(16)
         .map(|chunk| {
@@ -915,6 +918,7 @@ fn bytes_to_f32x4(data: &[u8]) -> Vec<[f32; 4]> {
         .collect()
 }
 
+#[cfg(test)]
 fn bytes_to_u32(data: &[u8]) -> Vec<u32> {
     data.chunks_exact(4)
         .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))

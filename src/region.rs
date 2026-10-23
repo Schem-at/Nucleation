@@ -9,9 +9,6 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Re-exported alias kept for downstream Rust crates that referenced the
-/// previous concrete map type. New code should use `BlockEntityStore`.
-pub type BlockEntityMap = BlockEntityStore;
 
 /// Serde form of `Region::blocks`. The field was `Vec<usize>` when snapshot
 /// versions 1–3 were written, and bincode encodes it positionally as u64
@@ -1457,6 +1454,7 @@ impl Region {
         changed_cells
     }
 
+    #[cfg(test)]
     pub(crate) fn get_palette_nbt(&self) -> NbtList {
         let mut palette = NbtList::new();
         for block in &self.palette {
@@ -2724,58 +2722,6 @@ mod tests {
         let mut region1 = Region::new("Test1".to_string(), (0, 0, 0), (2, 2, 2));
         let mut region2 = Region::new("Test2".to_string(), (2, 2, 2), (2, 2, 2));
         let stone = BlockState::new("minecraft:stone".to_string());
-        #[test]
-        fn test_region_merge() {
-            let mut region1 = Region::new("Test1".to_string(), (0, 0, 0), (2, 2, 2));
-            let mut region2 = Region::new("Test2".to_string(), (2, 2, 2), (2, 2, 2));
-            let stone = BlockState::new("minecraft:stone".to_string());
-
-            region1.set_block(0, 0, 0, &stone);
-            region2.set_block(2, 2, 2, &stone);
-
-            region1.merge(&region2);
-
-            assert_eq!(region1.size, (4, 4, 4));
-            assert_eq!(region1.get_block(0, 0, 0), Some(&stone));
-            assert_eq!(region1.get_block(2, 2, 2), Some(&stone));
-        }
-
-        #[test]
-        fn test_region_merge_different_palettes() {
-            let mut region1 = Region::new("Test1".to_string(), (0, 0, 0), (2, 2, 2));
-            let mut region2 = Region::new("Test2".to_string(), (2, 2, 2), (2, 2, 2));
-            let stone = BlockState::new("minecraft:stone".to_string());
-            let dirt = BlockState::new("minecraft:dirt".to_string());
-
-            region1.set_block(0, 0, 0, &stone);
-            region2.set_block(2, 2, 2, &dirt);
-
-            region1.merge(&region2);
-
-            assert_eq!(region1.size, (4, 4, 4));
-            assert_eq!(region1.get_block(0, 0, 0), Some(&stone));
-            assert_eq!(region1.get_block(2, 2, 2), Some(&dirt));
-        }
-
-        #[test]
-        fn test_region_merge_different_overlapping_palettes() {
-            let mut region1 = Region::new("Test1".to_string(), (0, 0, 0), (2, 2, 2));
-            let mut region2 = Region::new("Test2".to_string(), (1, 1, 1), (2, 2, 2));
-            let stone = BlockState::new("minecraft:stone".to_string());
-            let dirt = BlockState::new("minecraft:dirt".to_string());
-
-            region1.set_block(0, 0, 0, &stone);
-            region1.set_block(1, 1, 1, &dirt);
-
-            region2.set_block(2, 2, 2, &dirt);
-
-            region1.merge(&region2);
-
-            assert_eq!(region1.size, (3, 3, 3));
-            assert_eq!(region1.get_block(0, 0, 0), Some(&stone));
-            assert_eq!(region1.get_block(1, 1, 1), Some(&dirt));
-            assert_eq!(region1.get_block(2, 2, 2), Some(&dirt));
-        }
         region1.set_block(0, 0, 0, &stone);
         region2.set_block(2, 2, 2, &stone);
 

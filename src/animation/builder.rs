@@ -71,6 +71,7 @@ impl From<Clip> for AnimationEffect {
 struct RecordedStep {
     blocks: Vec<(i32, i32, i32)>,
     region: String,
+    #[cfg_attr(not(feature = "meshing"), allow(dead_code))]
     mesh_region: Option<String>,
     effect: Option<Clip>,
     effect_offset_ms: Option<f32>,
@@ -2235,6 +2236,7 @@ impl BuildAnimation {
     }
 
     /// Blocks recorded per group, in group order.
+    #[cfg(feature = "meshing")]
     pub(super) fn group_block_counts(&self) -> Vec<usize> {
         self.steps.iter().map(|step| step.blocks.len()).collect()
     }

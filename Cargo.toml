@@ -25,7 +25,7 @@ include = [
     "build.rs",
     "data/blockpedia/**",
     "tools/mc-data/**",
-    "examples/segment_world.rs",
+    "tools/segment_world.rs",
     "Cargo.toml",
     "README.md",
     "LICENSE",
@@ -192,7 +192,6 @@ redis = { version = "0.27", features = ["tokio-comp"], optional = true }
 tokio-postgres = { version = "0.7", optional = true }
 # Test-only (behind store-testkit): spin real backends in integration tests.
 testcontainers-modules = { version = "0.11", features = [
-    "minio",
     "redis",
     "postgres",
     "blocking",
@@ -233,7 +232,7 @@ mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "2e62496"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # mc-data-refresh tooling only (never in normal builds; see the feature note)
-reqwest = { version = "0.12", features = ["blocking", "json"], optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"], optional = true }
 
 [build-dependencies]
 # build.rs gunzips data/blockpedia/*.json.gz and generates the PHF block
@@ -266,7 +265,7 @@ required-features = ["mc-data-refresh"]
 
 [[bin]]
 name = "segment_world"
-path = "examples/segment_world.rs"
+path = "tools/segment_world.rs"
 required-features = ["world-segment", "store-fs"]
 
 [dev-dependencies]
@@ -319,10 +318,6 @@ required-features = ["voxelize"]
 [[example]]
 name = "wol_extract"
 required-features = ["world-segment"]
-
-[[example]]
-name = "segment_world"
-required-features = ["world-segment", "store-fs"]
 
 [[example]]
 name = "wol_pack"

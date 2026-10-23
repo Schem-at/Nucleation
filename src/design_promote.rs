@@ -694,7 +694,6 @@ fn lay_pivot(
         let w = wires[i as usize];
         let mut y = w.1;
         let mut t = 1i32;
-        let mut since = 0usize;
         // A repeater right at the mouth, so every bit starts at full strength
         // whatever the bus delivered.
         let sgn = if flow_out { -1 } else { 1 };
@@ -705,7 +704,7 @@ fn lay_pivot(
         t += 1;
         // Dust must follow a repeater before the staircase may climb.
         p.dust(add(w, mul(out, t)), "stub run")?;
-        since = 1;
+        let mut since = 1usize;
         t += 1;
         let mut climb = 2 * i;
         while climb > 0 {
