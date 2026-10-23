@@ -1275,8 +1275,10 @@ impl<'a> Parser<'a> {
             let key = self.key()?;
             self.eat(b':')?;
             match key.as_str() {
-                "Name" => name = self.string()?,
-                "Properties" => {
+                // `Name`/`Properties` up to 26.2; 26.3 (data version 5006+)
+                // spells them `id`/`properties` (Mojang BlockStateFieldNamesFix).
+                "Name" | "id" => name = self.string()?,
+                "Properties" | "properties" => {
                     self.eat(b'{')?;
                     loop {
                         if self.peek() == Some(b'}') {
@@ -1520,6 +1522,19 @@ mod tests {
         ],
         entities: []
     }"#;
+
+    #[test]
+    fn parses_26_3_block_state_field_names() {
+        // 26.3 (data version 5006+) writes block states as `{id, properties}`.
+        let modern = SAMPLE
+            .replace("DataVersion: 4903", "DataVersion: 5023")
+            .replace("Name:", "id:")
+            .replace("Properties:", "properties:");
+        assert_eq!(
+            Structure::parse(&modern).expect("parses").palette,
+            Structure::parse(SAMPLE).expect("parses").palette
+        );
+    }
 
     #[test]
     fn parses_the_structure_format() {

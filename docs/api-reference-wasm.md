@@ -135,13 +135,13 @@ Export schematics to binary data.
 
 #### Version Conversion (Datafixers)
 
-Convert a schematic's block, block-entity, item, and entity data **between Minecraft data versions**, using a Rust port of PaperMC's DataConverter. Forward conversion (old → new) is lossless; reverse conversion (new → old, e.g. saving for an older version) approximates where it must and returns a **JSON loss report** so you can warn before writing. The canonical in-memory version is `4790`.
+Convert a schematic's block, block-entity, item, and entity data **between Minecraft data versions**, using a Rust port of PaperMC's DataConverter. Forward conversion (old → new) is lossless; reverse conversion (new → old, e.g. saving for an older version) approximates where it must and returns a **JSON loss report** so you can warn before writing. The canonical in-memory version is `5023` (Minecraft 26.3).
 
 Importers capture the file's source data version automatically — `getSourceDataVersion` reads it; set it manually for versionless formats (raw imports, classic `.schematic` ≈ `1343`).
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `canonicalDataVersion` | `static canonicalDataVersion() → number` | The canonical in-memory data version (the forward-conversion target, `4790`). |
+| `canonicalDataVersion` | `static canonicalDataVersion() → number` | The canonical in-memory data version (the forward-conversion target, `5023`). |
 | `getSourceDataVersion` | `getSourceDataVersion() → number \| undefined` | The data version this schematic was loaded from (captured by importers), or `undefined`. |
 | `setSourceDataVersion` | `setSourceDataVersion(version: number) → void` | Override the source data version for formats that carry none. |
 | `convertToDataVersion` | `convertToDataVersion(target: number, source: number) → string` | Convert from `source` to `target`. Returns a JSON loss array (`"[]"` when lossless). |

@@ -801,7 +801,10 @@ fn build_chunk_nbt(chunk: &ChunkData) -> NbtCompound {
     // Build sections
     let mut section_list = Vec::new();
     for section in &chunk.sections {
-        section_list.push(NbtTag::Compound(build_section_nbt(section)));
+        section_list.push(NbtTag::Compound(build_section_nbt(
+            section,
+            chunk.data_version,
+        )));
     }
     root.insert("sections", NbtTag::List(NbtList::from(section_list)));
 
@@ -894,15 +897,19 @@ fn pack_heightmap(values: &[i32]) -> Vec<i64> {
     packed
 }
 
-fn build_section_nbt(section: &ChunkSection) -> NbtCompound {
+fn build_section_nbt(section: &ChunkSection, data_version: i32) -> NbtCompound {
     let mut section_nbt = NbtCompound::new();
     section_nbt.insert("Y", NbtTag::Byte(section.y));
 
     // Block states
     let mut block_states_compound = NbtCompound::new();
 
-    // Palette
-    let palette_nbt: Vec<NbtTag> = section.palette.iter().map(|bs| bs.to_nbt()).collect();
+    // Palette (`Name`/`Properties`, or `id`/`properties` from data version 5006)
+    let palette_nbt: Vec<NbtTag> = section
+        .palette
+        .iter()
+        .map(|bs| bs.to_nbt_for_data_version(data_version))
+        .collect();
     block_states_compound.insert("palette", NbtTag::List(NbtList::from(palette_nbt)));
 
     // Packed data (only if palette has more than 1 entry)
@@ -1476,7 +1483,7 @@ mod tests {
             block_states: vec![0u16; 4096],
             biomes: None,
         };
-        let nbt = build_section_nbt(&section);
+        let nbt = build_section_nbt(&section, 4671);
 
         // Spec: Y byte, block_states compound, biomes compound
         assert_eq!(nbt.get::<_, i8>("Y").unwrap(), 4);
@@ -1498,7 +1505,7 @@ mod tests {
             block_states: vec![0u16; 4096],
             biomes: None,
         };
-        let nbt = build_section_nbt(&section);
+        let nbt = build_section_nbt(&section, 4671);
         let bs = nbt.get::<_, &NbtCompound>("block_states").unwrap();
         assert!(
             bs.get::<_, &[i64]>("data").is_err(),
@@ -1521,7 +1528,7 @@ mod tests {
             block_states: vec![0u16; 4096],
             biomes: None,
         };
-        let nbt = build_section_nbt(&section);
+        let nbt = build_section_nbt(&section, 4671);
         let bs = nbt.get::<_, &NbtCompound>("block_states").unwrap();
         let palette = bs.get::<_, &NbtList>("palette").unwrap();
 

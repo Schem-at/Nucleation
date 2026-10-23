@@ -116,29 +116,51 @@ impl BlockState {
         }
         None
     }
+    /// The block state as a `{Name, Properties}` compound — the field names
+    /// Minecraft used up to 26.2. For a file stamped with a data version, use
+    /// [`BlockState::to_nbt_for_data_version`].
     pub fn to_nbt(&self) -> NbtTag {
+        self.to_nbt_with_keys("Name", "Properties")
+    }
+
+    /// The block state as the compound Minecraft writes at `data_version`:
+    /// `{Name, Properties}` before 26.3's data version 5006, `{id, properties}`
+    /// from it on (Mojang `BlockStateFieldNamesFix`; see
+    /// `dataconverter::block_state_keys`).
+    pub fn to_nbt_for_data_version(&self, data_version: i32) -> NbtTag {
+        let (name_key, props_key) = crate::dataconverter::block_state_keys(data_version);
+        self.to_nbt_with_keys(name_key, props_key)
+    }
+
+    fn to_nbt_with_keys(&self, name_key: &str, props_key: &str) -> NbtTag {
         let mut compound = NbtCompound::new();
-        compound.insert("Name", self.name.to_string());
+        compound.insert(name_key, self.name.to_string());
 
         if !self.properties.is_empty() {
             let mut properties = NbtCompound::new();
             for (key, value) in &self.properties {
                 properties.insert(key.to_string(), value.to_string());
             }
-            compound.insert("Properties", properties);
+            compound.insert(props_key, properties);
         }
 
         NbtTag::Compound(compound)
     }
 
+    /// Read a block-state compound in either spelling: `{Name, Properties}`
+    /// (up to 26.2) or `{id, properties}` (26.3, data version 5006+).
     pub fn from_nbt(compound: &NbtCompound) -> Result<Self, String> {
-        let name: SmolStr = compound
-            .get::<_, &String>("Name")
-            .map_err(|e| format!("Failed to get Name: {}", e))?
-            .into();
+        let (name, props_key) = match compound.get::<_, &String>("Name") {
+            Ok(name) => (name, "Properties"),
+            Err(e) => match compound.get::<_, &String>("id") {
+                Ok(id) => (id, "properties"),
+                Err(_) => return Err(format!("Failed to get Name: {}", e)),
+            },
+        };
+        let name: SmolStr = name.into();
 
         let mut properties: Vec<(SmolStr, SmolStr)> = Vec::new();
-        if let Ok(props) = compound.get::<_, &NbtCompound>("Properties") {
+        if let Ok(props) = compound.get::<_, &NbtCompound>(props_key) {
             for (key, value) in props.inner() {
                 if let NbtTag::String(value_str) = value {
                     properties.push((key.into(), value_str.into()));
@@ -154,6 +176,22 @@ impl BlockState {
 #[cfg(test)]
 mod tests {
     use super::BlockState;
+
+    #[test]
+    fn nbt_field_names_follow_data_version() {
+        let block = BlockState::new("minecraft:furnace").with_property("facing", "east");
+
+        for (dv, name_key, props_key) in [(4903, "Name", "Properties"), (5023, "id", "properties")]
+        {
+            let quartz_nbt::NbtTag::Compound(c) = block.to_nbt_for_data_version(dv) else {
+                panic!("compound");
+            };
+            assert_eq!(c.get::<_, &str>(name_key).unwrap(), "minecraft:furnace");
+            assert!(c.get::<_, &quartz_nbt::NbtCompound>(props_key).is_ok());
+            // Both spellings read back to the same state.
+            assert_eq!(BlockState::from_nbt(&c).unwrap(), block);
+        }
+    }
 
     #[test]
     fn test_block_state_creation() {

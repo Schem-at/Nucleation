@@ -14,7 +14,7 @@ use crate::nbt::NbtMap;
 use super::super::engine::Walker;
 use super::super::helpers::{enforce_namespaced_id_hook, enforce_namespaced_value_hook};
 use super::super::registry::RegistryBuilder;
-use super::super::types::MapExt;
+use super::super::types::{MapExt, ValueExt};
 use super::super::version::EncodedVersion;
 use super::super::walker::{
     block_names, convert, convert_list, convert_list_path, convert_value, convert_value_list,
@@ -252,6 +252,24 @@ pub fn register(reg: &mut RegistryBuilder) {
             convert_list_path(reg, &reg.entity, root, "entities", "nbt", from, to);
             convert_list_path(reg, &reg.tile_entity, root, "blocks", "nbt", from, to);
             convert_list(reg, &reg.block_state, root, "palette", from, to);
+            // `palettes`: a list of alternative palettes (structures with
+            // several palette variants). Upstream DataConverter does not walk
+            // it; Mojang added it to the STRUCTURE type in 26.3
+            // (`schemas/V99.java` and `schemas/V1460.java`:
+            // `"palettes", DSL.list(DSL.list(References.BLOCK_STATE))`).
+            if let Some(palettes) = root.get_list_mut("palettes") {
+                for (i, palette) in palettes.iter_mut().enumerate() {
+                    if let Some(states) = palette.as_list_mut() {
+                        for (j, state) in states.iter_mut().enumerate() {
+                            if let Some(state) = state.as_compound_mut() {
+                                let _scope =
+                                    super::super::loss::path_scope(format!("palettes[{i}][{j}]"));
+                                reg.block_state.convert(reg, state, from, to);
+                            }
+                        }
+                    }
+                }
+            }
         }),
     );
 
