@@ -130,6 +130,9 @@ Schematic_place_result Schematic_place(Schematic* self, int32_t x, int32_t y, in
 typedef struct Schematic_set_blocks_result {union {int32_t ok; NucleationError err;}; bool is_ok;} Schematic_set_blocks_result;
 Schematic_set_blocks_result Schematic_set_blocks(Schematic* self, DiplomatI32View positions, DiplomatStringView block_name);
 
+typedef struct Schematic_set_blocks_indexed_result {union {int32_t ok; NucleationError err;}; bool is_ok;} Schematic_set_blocks_indexed_result;
+Schematic_set_blocks_indexed_result Schematic_set_blocks_indexed(Schematic* self, DiplomatI32View positions, DiplomatU32View indices, DiplomatStringView palette_json);
+
 typedef struct Schematic_set_blocks_simulated_result {union {int32_t ok; NucleationError err;}; bool is_ok;} Schematic_set_blocks_simulated_result;
 Schematic_set_blocks_simulated_result Schematic_set_blocks_simulated(Schematic* self, DiplomatI32View positions, DiplomatStringView block_name);
 

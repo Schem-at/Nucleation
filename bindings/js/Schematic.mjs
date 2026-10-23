@@ -974,6 +974,40 @@ export class Schematic {
     }
 
     /**
+     * Place many different blocks in one call: position `i` gets
+     * `palette[indices[i]]`. `positions` is flat `[x0,y0,z0, ...]`,
+     * `indices` has one entry per position, and `palette_json` is a JSON
+     * array of block strings (properties and NBT allowed, `simulate` not).
+     * Returns the number of blocks set.
+     */
+    setBlocksIndexed(positions, indices, paletteJson) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const positionsSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, positions, "i32")));
+        const indicesSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, indices, "u32")));
+        const paletteJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, paletteJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_set_blocks_indexed(diplomatReceive.buffer, this.ffiValue, positionsSlice.ptr, indicesSlice.ptr, paletteJsonSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return (new Int32Array(wasm.memory.buffer, diplomatReceive.buffer, 1))[0];
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
      * Sequentially hand-place the same block at many positions in one
      * local simulated component. `positions` is flat
      * `[x0,y0,z0, x1,y1,z1, ...]`; placements run in that order and each

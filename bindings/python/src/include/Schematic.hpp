@@ -133,6 +133,9 @@ namespace capi {
     typedef struct Schematic_set_blocks_result {union {int32_t ok; nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_set_blocks_result;
     Schematic_set_blocks_result Schematic_set_blocks(nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatI32View positions, nucleation::diplomat::capi::DiplomatStringView block_name);
 
+    typedef struct Schematic_set_blocks_indexed_result {union {int32_t ok; nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_set_blocks_indexed_result;
+    Schematic_set_blocks_indexed_result Schematic_set_blocks_indexed(nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatI32View positions, nucleation::diplomat::capi::DiplomatU32View indices, nucleation::diplomat::capi::DiplomatStringView palette_json);
+
     typedef struct Schematic_set_blocks_simulated_result {union {int32_t ok; nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_set_blocks_simulated_result;
     Schematic_set_blocks_simulated_result Schematic_set_blocks_simulated(nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatI32View positions, nucleation::diplomat::capi::DiplomatStringView block_name);
 
@@ -811,6 +814,14 @@ inline nucleation::diplomat::result<int32_t, nucleation::NucleationError> nuclea
     auto result = nucleation::capi::Schematic_set_blocks(this->AsFFI(),
         {positions.data(), positions.size()},
         {block_name.data(), block_name.size()});
+    return result.is_ok ? nucleation::diplomat::result<int32_t, nucleation::NucleationError>(nucleation::diplomat::Ok<int32_t>(result.ok)) : nucleation::diplomat::result<int32_t, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<int32_t, nucleation::NucleationError> nucleation::Schematic::set_blocks_indexed(nucleation::diplomat::span<const int32_t> positions, nucleation::diplomat::span<const uint32_t> indices, std::string_view palette_json) {
+    auto result = nucleation::capi::Schematic_set_blocks_indexed(this->AsFFI(),
+        {positions.data(), positions.size()},
+        {indices.data(), indices.size()},
+        {palette_json.data(), palette_json.size()});
     return result.is_ok ? nucleation::diplomat::result<int32_t, nucleation::NucleationError>(nucleation::diplomat::Ok<int32_t>(result.ok)) : nucleation::diplomat::result<int32_t, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 

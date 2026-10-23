@@ -39,6 +39,7 @@ from .curation import (  # noqa: F401 — pure-Python corpus curation layer
     write_registry_archives,
     write_top_owner_archives,
 )
+from .arrays import region_array, set_blocks_array  # noqa: F401 — NumPy bulk I/O
 from .processing import (  # noqa: F401 — typed facade over the shared JSON policy contract
     ContentPolicy,
     DecodeLimits,

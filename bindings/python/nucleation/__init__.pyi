@@ -2,6 +2,10 @@
 
 from . import nucleation as core
 from .nucleation import *
+from .arrays import (
+    region_array as region_array,
+    set_blocks_array as set_blocks_array,
+)
 from .curation import (
     CuratedCorpus as CuratedCorpus,
     CurationDecision as CurationDecision,

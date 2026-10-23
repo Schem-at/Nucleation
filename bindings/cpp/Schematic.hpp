@@ -133,6 +133,9 @@ namespace capi {
     typedef struct Schematic_set_blocks_result {union {int32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_set_blocks_result;
     Schematic_set_blocks_result Schematic_set_blocks(diplomat::capi::Schematic* self, diplomat::capi::DiplomatI32View positions, diplomat::capi::DiplomatStringView block_name);
 
+    typedef struct Schematic_set_blocks_indexed_result {union {int32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_set_blocks_indexed_result;
+    Schematic_set_blocks_indexed_result Schematic_set_blocks_indexed(diplomat::capi::Schematic* self, diplomat::capi::DiplomatI32View positions, diplomat::capi::DiplomatU32View indices, diplomat::capi::DiplomatStringView palette_json);
+
     typedef struct Schematic_set_blocks_simulated_result {union {int32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_set_blocks_simulated_result;
     Schematic_set_blocks_simulated_result Schematic_set_blocks_simulated(diplomat::capi::Schematic* self, diplomat::capi::DiplomatI32View positions, diplomat::capi::DiplomatStringView block_name);
 
@@ -811,6 +814,14 @@ inline diplomat::result<int32_t, NucleationError> Schematic::set_blocks(diplomat
     auto result = diplomat::capi::Schematic_set_blocks(this->AsFFI(),
         {positions.data(), positions.size()},
         {block_name.data(), block_name.size()});
+    return result.is_ok ? diplomat::result<int32_t, NucleationError>(diplomat::Ok<int32_t>(result.ok)) : diplomat::result<int32_t, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<int32_t, NucleationError> Schematic::set_blocks_indexed(diplomat::span<const int32_t> positions, diplomat::span<const uint32_t> indices, std::string_view palette_json) {
+    auto result = diplomat::capi::Schematic_set_blocks_indexed(this->AsFFI(),
+        {positions.data(), positions.size()},
+        {indices.data(), indices.size()},
+        {palette_json.data(), palette_json.size()});
     return result.is_ok ? diplomat::result<int32_t, NucleationError>(diplomat::Ok<int32_t>(result.ok)) : diplomat::result<int32_t, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 

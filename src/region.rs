@@ -2201,24 +2201,31 @@ impl Region {
     }
 
     /// Write one palette index at many positions, all inside the allocation.
-    ///
-    /// The air count and tight bounds are maintained in bulk: clearing cells
-    /// rescans at most once (only if a cleared cell was on the old edge),
-    /// instead of once per edge cell as repeated single writes would.
     pub(crate) fn fill_positions(&mut self, palette_index: usize, positions: &[(i32, i32, i32)]) {
         let palette_index = palette_index as u32;
+        self.fill_cells(positions.iter().map(|&position| (position, palette_index)));
+    }
+
+    /// Write `(position, palette index)` cells, all inside the allocation.
+    ///
+    /// The air count and tight bounds are maintained in bulk: clearing cells
+    /// rescans at most once (only if a cleared cell was on the old edge, or
+    /// the same batch also wrote blocks), instead of once per edge cell as
+    /// repeated single writes would.
+    pub(crate) fn fill_cells(&mut self, cells: impl IntoIterator<Item = ((i32, i32, i32), u32)>) {
         let air = self.cached_air_index;
-        let new_is_air = palette_index == air;
         let old_bounds = self.tight_bounds.clone();
         let mut air_delta: i64 = 0;
+        let mut cleared = false;
         let mut cleared_edge = false;
         let mut added: Option<BoundingBox> = None;
-        for &(x, y, z) in positions {
+        for ((x, y, z), palette_index) in cells {
             let index = self.coords_to_index(x, y, z);
             let old = std::mem::replace(&mut self.blocks[index], palette_index);
-            if new_is_air {
+            if palette_index == air {
                 if old != air {
                     air_delta -= 1;
+                    cleared = true;
                     cleared_edge |= old_bounds.as_ref().is_some_and(|b| {
                         x == b.min.0 || x == b.max.0 || y == b.min.1 || y == b.max.1 || z == b.min.2
                             || z == b.max.2
@@ -2238,7 +2245,7 @@ impl Region {
             }
         }
         self.non_air_count = (self.non_air_count as i64 + air_delta) as usize;
-        if cleared_edge {
+        if cleared_edge || (cleared && added.is_some()) {
             self.rescan_content();
         } else if let Some(added) = added {
             self.tight_bounds = Some(match self.tight_bounds.take() {

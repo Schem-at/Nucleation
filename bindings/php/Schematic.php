@@ -619,6 +619,44 @@ final class Schematic {
         return $result->ok;
     }
 
+    public function setBlocksIndexed(array $positions, array $indices, string $palette_json) {
+        $__n0 = count($positions);
+        $__view0 = Lib::ffi()->new('DiplomatI32View');
+        if ($__n0 > 0) {
+            $__arr0 = Lib::ffi()->new("int32_t[" . $__n0 . "]", false);
+            foreach ($positions as $__i0 => $__v0) { $__arr0[$__i0] = $__v0; }
+            $__view0->data = \FFI::addr($__arr0[0]);
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $__n1 = count($indices);
+        $__view1 = Lib::ffi()->new('DiplomatU32View');
+        if ($__n1 > 0) {
+            $__arr1 = Lib::ffi()->new("uint32_t[" . $__n1 . "]", false);
+            foreach ($indices as $__i1 => $__v1) { $__arr1[$__i1] = $__v1; }
+            $__view1->data = \FFI::addr($__arr1[0]);
+        } else {
+            $__view1->data = null;
+        }
+        $__view1->len = $__n1;
+        $__n2 = strlen($palette_json);
+        $__view2 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n2 > 0) {
+            $__buf2 = Lib::ffi()->new("uint8_t[" . $__n2 . "]", false);
+            \FFI::memcpy($__buf2, $palette_json, $__n2);
+            $__view2->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf2[0]));
+        } else {
+            $__view2->data = null;
+        }
+        $__view2->len = $__n2;
+        $result = Lib::ffi()->Schematic_set_blocks_indexed($this->ptr, $__view0, $__view1, $__view2);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return $result->ok;
+    }
+
     public function setBlocksSimulated(array $positions, string $block_name) {
         $__n0 = count($positions);
         $__view0 = Lib::ffi()->new('DiplomatI32View');

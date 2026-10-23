@@ -627,6 +627,35 @@ pub mod ffi {
             Ok(count_i32)
         }
 
+        /// Place many different blocks in one call: position `i` gets
+        /// `palette[indices[i]]`. `positions` is flat `[x0,y0,z0, ...]`,
+        /// `indices` has one entry per position, and `palette_json` is a JSON
+        /// array of block strings (properties and NBT allowed, `simulate` not).
+        /// Returns the number of blocks set.
+        pub fn set_blocks_indexed(
+            &mut self,
+            positions: &[i32],
+            indices: &[u32],
+            palette_json: &DiplomatStr,
+        ) -> Result<i32, NucleationError> {
+            let palette: Vec<String> = serde_json::from_slice(palette_json)
+                .map_err(|_| NucleationError::InvalidArgument)?;
+            if positions.len() % 3 != 0 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            let count =
+                i32::try_from(positions.len() / 3).map_err(|_| NucleationError::InvalidArgument)?;
+            let positions: Vec<(i32, i32, i32)> = positions
+                .chunks_exact(3)
+                .map(|p| (p[0], p[1], p[2]))
+                .collect();
+            let palette: Vec<&str> = palette.iter().map(String::as_str).collect();
+            self.0
+                .set_blocks_indexed(&positions, indices, &palette)
+                .map_err(|_| NucleationError::InvalidArgument)?;
+            Ok(count)
+        }
+
         /// Sequentially hand-place the same block at many positions in one
         /// local simulated component. `positions` is flat
         /// `[x0,y0,z0, x1,y1,z1, ...]`; placements run in that order and each

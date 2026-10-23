@@ -2244,6 +2244,72 @@ impl UniversalSchematic {
         Ok(positions.len())
     }
 
+    /// Place many different blocks in one call: position `i` gets
+    /// `palette[indices[i]]`. Equivalent to calling
+    /// [`Self::set_block_from_string`] for each position in order, with each
+    /// palette string parsed once and the bounds grown once. Simulated
+    /// placement (`{simulate=true}`) is not supported here; use
+    /// [`Self::set_blocks_from_string`]. Returns the number of positions written.
+    pub fn set_blocks_indexed(
+        &mut self,
+        positions: &[(i32, i32, i32)],
+        indices: &[u32],
+        palette: &[&str],
+    ) -> Result<usize, String> {
+        if indices.len() != positions.len() {
+            return Err(format!(
+                "{} positions but {} palette indices",
+                positions.len(),
+                indices.len()
+            ));
+        }
+        if let Some(&bad) = indices.iter().find(|&&i| i as usize >= palette.len()) {
+            return Err(format!("palette index {bad} out of range (palette has {})", palette.len()));
+        }
+        let Some(&first) = positions.first() else {
+            return Ok(0);
+        };
+        let mut parsed = Vec::with_capacity(palette.len());
+        for block_string in palette {
+            if Self::strip_simulate_tag(block_string)?.is_some() {
+                return Err("simulated placement is not supported in an indexed batch".into());
+            }
+            parsed.push(Self::cached_block_string(&mut self.block_string_cache, block_string)?.clone());
+        }
+
+        let (mut min, mut max) = (first, first);
+        for &(x, y, z) in &positions[1..] {
+            min = (min.0.min(x), min.1.min(y), min.2.min(z));
+            max = (max.0.max(x), max.1.max(y), max.2.max(z));
+        }
+        self.ensure_bounds(min, max);
+        let region = &mut self.default_region;
+        let region_indices: Vec<u32> = parsed
+            .iter()
+            .map(|(state, _)| region.get_or_insert_palette_by_state(state) as u32)
+            .collect();
+        let cells = positions.iter().zip(indices);
+        region.fill_cells(cells.clone().map(|(&p, &i)| (p, region_indices[i as usize])));
+        if parsed.iter().any(|(_, nbt)| nbt.is_some()) || !region.block_entities.is_empty() {
+            for (&position, &i) in cells {
+                match &parsed[i as usize] {
+                    (state, Some(nbt)) => region.block_entities.set(
+                        position,
+                        BlockEntity {
+                            id: state.name.as_str().into(),
+                            position,
+                            nbt: std::sync::Arc::clone(nbt),
+                        },
+                    ),
+                    (_, None) => {
+                        region.block_entities.discard(&position);
+                    }
+                }
+            }
+        }
+        Ok(positions.len())
+    }
+
     /// Write a parsed block string into `region`. Replacement is
     /// transactional with respect to block-entity state: a block string
     /// without NBT must not retain the previous entity. The NbtMap stays
@@ -4098,35 +4164,48 @@ mod tests {
 
             let mut batched = base.clone();
             batched.set_blocks_from_string(&positions, s).unwrap();
-            let mut looped = base;
+            let mut looped = base.clone();
             for &(x, y, z) in &positions {
                 looped.set_block_from_string(x, y, z, s).unwrap();
             }
+            assert_same_default_region(&batched, &looped, case);
 
-            let (a, b) = (&batched.default_region, &looped.default_region);
-            let span = a.get_bounding_box().union(&b.get_bounding_box());
-            for x in span.min.0..=span.max.0 {
-                for y in span.min.1..=span.max.1 {
-                    for z in span.min.2..=span.max.2 {
-                        let read = |r: &Region| {
-                            r.get_block(x, y, z)
-                                .map(|b| b.to_string())
-                                .unwrap_or_else(|| "minecraft:air".to_string())
-                        };
-                        assert_eq!(read(a), read(b), "case {case} at {:?}", (x, y, z));
-                    }
+            let indices: Vec<u32> =
+                positions.iter().map(|_| next(strings.len() as u64) as u32).collect();
+            let mut indexed = base.clone();
+            indexed.set_blocks_indexed(&positions, &indices, &strings).unwrap();
+            let mut looped = base;
+            for (&(x, y, z), &i) in positions.iter().zip(&indices) {
+                looped.set_block_from_string(x, y, z, strings[i as usize]).unwrap();
+            }
+            assert_same_default_region(&indexed, &looped, case);
+        }
+    }
+
+    fn assert_same_default_region(a: &UniversalSchematic, b: &UniversalSchematic, case: i32) {
+        let (a, b) = (&a.default_region, &b.default_region);
+        let span = a.get_bounding_box().union(&b.get_bounding_box());
+        for x in span.min.0..=span.max.0 {
+            for y in span.min.1..=span.max.1 {
+                for z in span.min.2..=span.max.2 {
+                    let read = |r: &Region| {
+                        r.get_block(x, y, z)
+                            .map(|b| b.to_string())
+                            .unwrap_or_else(|| "minecraft:air".to_string())
+                    };
+                    assert_eq!(read(a), read(b), "case {case} at {:?}", (x, y, z));
                 }
             }
-            assert_eq!(a.count_non_air_blocks(), b.count_non_air_blocks(), "case {case}");
-            assert_eq!(a.get_tight_bounds(), b.get_tight_bounds(), "case {case}");
-            let entities = |r: &Region| {
-                r.block_entities
-                    .iter()
-                    .map(|(p, be)| (p, (be.position, be.id.clone(), (*be.nbt).clone())))
-                    .collect::<std::collections::BTreeMap<_, _>>()
-            };
-            assert!(entities(a) == entities(b), "case {case}");
         }
+        assert_eq!(a.count_non_air_blocks(), b.count_non_air_blocks(), "case {case}");
+        assert_eq!(a.get_tight_bounds(), b.get_tight_bounds(), "case {case}");
+        let entities = |r: &Region| {
+            r.block_entities
+                .iter()
+                .map(|(p, be)| (p, (be.position, be.id.clone(), (*be.nbt).clone())))
+                .collect::<std::collections::BTreeMap<_, _>>()
+        };
+        assert!(entities(a) == entities(b), "case {case}");
     }
 
     #[test]
