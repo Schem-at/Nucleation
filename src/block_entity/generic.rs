@@ -151,6 +151,19 @@ impl BlockEntity {
         nbt
     }
 
+    /// Whether the v3 `Data` compound gets the empty `components` and `id`
+    /// of a 1.20.5+ container or jukebox (see [`Self::to_nbt_v3`]).
+    pub(crate) fn v3_injects_components(&self, data_version: Option<i32>) -> bool {
+        const COMPONENTS_VERSION: i32 = 3837; // 1.20.5
+        let is_container = self.id.contains("barrel")
+            || self.id.contains("chest")
+            || self.id.contains("hopper")
+            || self.id.contains("dropper")
+            || self.id.contains("dispenser")
+            || self.id.contains("jukebox");
+        is_container && data_version.is_none_or(|dv| dv >= COMPONENTS_VERSION)
+    }
+
     /// Converts BlockEntity to NBT format for Sponge Schematic v3
     ///
     /// According to the Sponge Schematic v3 spec, block entities should have:
@@ -168,9 +181,6 @@ impl BlockEntity {
     /// they are omitted so the export does not re-introduce shape the converter
     /// deliberately removed.
     pub fn to_nbt_v3(&self, data_version: Option<i32>) -> NbtCompound {
-        const COMPONENTS_VERSION: i32 = 3837; // 1.20.5
-        let inject_components = data_version.is_none_or(|dv| dv >= COMPONENTS_VERSION);
-
         let mut nbt = NbtCompound::new();
 
         // Required fields at root level
@@ -187,15 +197,7 @@ impl BlockEntity {
         if has_nbt_data {
             let mut data_compound = NbtCompound::new();
 
-            // Add modern format fields for containers and jukeboxes (1.20.5+)
-            let is_container = self.id.contains("barrel")
-                || self.id.contains("chest")
-                || self.id.contains("hopper")
-                || self.id.contains("dropper")
-                || self.id.contains("dispenser")
-                || self.id.contains("jukebox");
-
-            if is_container && inject_components {
+            if self.v3_injects_components(data_version) {
                 // Add empty components compound (required in 1.20.5+)
                 data_compound.insert(
                     "components",

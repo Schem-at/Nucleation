@@ -3505,6 +3505,7 @@ dependencies = [
  "bincode",
  "blake3",
  "bytemuck",
+ "cesu8",
  "chrono",
  "console",
  "criterion",

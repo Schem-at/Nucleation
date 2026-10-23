@@ -11,6 +11,7 @@ pub mod limits;
 pub mod litematic;
 pub mod manager;
 pub mod mcstructure;
+mod nbt_stream;
 pub mod schematic;
 pub mod snapshot;
 pub mod structure_snbt;
@@ -19,17 +20,24 @@ pub mod world;
 pub mod world_pack;
 pub mod world_stream;
 
-/// Write `root` as uncompressed NBT through a gzip encoder.
+pub(crate) type GzWriter = std::io::BufWriter<flate2::write::GzEncoder<Vec<u8>>>;
+
+/// Write a canonicalized `root` as uncompressed NBT through a gzip encoder;
+/// `fill_list` streams the lists it claims (see [`nbt_stream::write_root`]).
 ///
 /// The NBT writer issues one small write per tag; buffering them in front of
 /// the encoder hands deflate large blocks instead of per-tag calls.
-pub(crate) fn gzip_nbt(
+pub(crate) fn gzip_nbt<F>(
     root: &quartz_nbt::NbtCompound,
     compression: flate2::Compression,
-) -> error::Result<Vec<u8>> {
+    fill_list: F,
+) -> error::Result<Vec<u8>>
+where
+    F: FnMut(&[&str], &mut GzWriter) -> std::io::Result<bool>,
+{
     let encoder = flate2::write::GzEncoder::new(Vec::new(), compression);
     let mut writer = std::io::BufWriter::with_capacity(1 << 16, encoder);
-    quartz_nbt::io::write_nbt(&mut writer, None, root, quartz_nbt::io::Flavor::Uncompressed)?;
+    nbt_stream::write_root(&mut writer, root, fill_list)?;
     // `into_inner` writes out the buffer without flushing the encoder (a
     // gzip flush would emit an extra sync block into the stream).
     let encoder = writer

@@ -1,3 +1,4 @@
+use super::nbt_stream;
 use crate::block_entity::BlockEntity;
 use crate::entity::Entity;
 use crate::formats::error::Result;
@@ -8,6 +9,8 @@ use flate2::read::GzDecoder;
 #[cfg(test)]
 use quartz_nbt::io::Flavor;
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
+use std::borrow::Cow;
+use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn is_litematic(data: &[u8]) -> bool {
@@ -110,7 +113,7 @@ pub fn to_litematic_with_compression(
     root.insert("Metadata", NbtTag::Compound(metadata));
 
     // Add Regions
-    let regions = create_regions(schematic, version);
+    let (regions, compact_regions) = create_regions(schematic, version);
     root.insert("Regions", NbtTag::Compound(regions));
 
     // A test the build carries with it, at the *root* beside `Metadata`.
@@ -132,7 +135,24 @@ pub fn to_litematic_with_compression(
 
     // Compress and return the NBT data
     crate::nbt::canonicalize_compound(&mut root);
-    super::gzip_nbt(&root, compression)
+    super::gzip_nbt(&root, compression, |path, w| {
+        let region = match path {
+            ["Regions", name, "TileEntities"] => &compact_regions[*name],
+            _ => return Ok(false),
+        };
+        // Litematic stores tile entity coordinates relative to the region Position.
+        let origin = region.position;
+        nbt_stream::write_compound_list(
+            w,
+            region.block_entities.len(),
+            region.block_entities.iter(),
+            |w, (pos, be)| {
+                let pos = [pos.0 - origin.0, pos.1 - origin.1, pos.2 - origin.2];
+                nbt_stream::write_tile_entity_litematic(w, be, pos)
+            },
+        )?;
+        Ok(true)
+    })
 }
 
 pub fn from_litematic(data: &[u8]) -> Result<UniversalSchematic> {
@@ -342,19 +362,26 @@ fn create_metadata(schematic: &UniversalSchematic, version: i32) -> NbtCompound 
 
     metadata
 }
-fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
+/// The `Regions` compound with empty `TileEntities` lists, and the compact
+/// regions the exporter streams those lists from.
+fn create_regions(
+    schematic: &UniversalSchematic,
+    version: i32,
+) -> (NbtCompound, HashMap<String, Cow<'_, Region>>) {
     let mut regions = NbtCompound::new();
+    let mut compact_regions = HashMap::new();
 
-    for (name, region) in &schematic.get_all_regions() {
+    for (name, region) in schematic.get_all_regions() {
         // Use compact region to avoid huge empty space; borrow it when the
         // allocation is already exactly the content.
-        let compact_storage;
         let compact_region = if region.is_content_compact() {
-            *region
+            Cow::Borrowed(region)
         } else {
-            compact_storage = region.to_compact();
-            &compact_storage
+            Cow::Owned(region.to_compact())
         };
+        let compact_region = &*compact_regions
+            .entry(name.clone())
+            .or_insert(compact_region);
 
         let mut region_nbt = NbtCompound::new();
 
@@ -492,30 +519,8 @@ fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
         );
         region_nbt.insert("Entities", NbtTag::List(entities));
 
-        // TileEntities - Litematic stores block entity coordinates relative to region Position
-        let tile_entities = NbtList::from(
-            compact_region
-                .block_entities
-                .iter()
-                .map(|(position, block_entity)| {
-                    let mut block_entity_nbt = block_entity.to_nbt();
-
-                    // The storage key, not `block_entity.position`, which is
-                    // stale for templates shared across positions.
-                    let rel_x = position.0 - compact_region.position.0;
-                    let rel_y = position.1 - compact_region.position.1;
-                    let rel_z = position.2 - compact_region.position.2;
-
-                    block_entity_nbt.insert("x", NbtTag::Int(rel_x));
-                    block_entity_nbt.insert("y", NbtTag::Int(rel_y));
-                    block_entity_nbt.insert("z", NbtTag::Int(rel_z));
-                    block_entity_nbt.insert("Pos", NbtTag::IntArray(vec![rel_x, rel_y, rel_z]));
-
-                    NbtTag::Compound(block_entity_nbt)
-                })
-                .collect::<Vec<NbtTag>>(),
-        );
-        region_nbt.insert("TileEntities", NbtTag::List(tile_entities));
+        // Streamed by the exporter from `compact_regions`.
+        region_nbt.insert("TileEntities", NbtTag::List(NbtList::new()));
 
         // PendingBlockTicks (since schematic v3) and PendingFluidTicks (since v5 /
         // MC 1.13 — fluids did not exist in 1.12, so a v4 file must NOT carry it).
@@ -528,7 +533,7 @@ fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
         regions.insert(name, NbtTag::Compound(region_nbt));
     }
 
-    regions
+    (regions, compact_regions)
 }
 
 fn parse_metadata(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Result<()> {
@@ -1294,7 +1299,7 @@ mod tests {
 
         schematic.add_region(region);
 
-        let regions = create_regions(&schematic, 7);
+        let (regions, _) = create_regions(&schematic, 7);
 
         assert!(regions.contains_key("TestRegion"));
         let region_nbt = regions.get::<_, &NbtCompound>("TestRegion").unwrap();
