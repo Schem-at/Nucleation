@@ -191,7 +191,6 @@ redis = { version = "0.27", features = ["tokio-comp"], optional = true }
 tokio-postgres = { version = "0.7", optional = true }
 # Test-only (behind store-testkit): spin real backends in integration tests.
 testcontainers-modules = { version = "0.11", features = [
-    "minio",
     "redis",
     "postgres",
     "blocking",
