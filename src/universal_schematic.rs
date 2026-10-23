@@ -2227,7 +2227,7 @@ impl UniversalSchematic {
                     region.block_entities.set(
                         position,
                         BlockEntity {
-                            id: state.name.to_string(),
+                            id: state.name.clone(),
                             position,
                             nbt: std::sync::Arc::clone(&nbt),
                         },
@@ -2262,7 +2262,7 @@ impl UniversalSchematic {
             Some(nbt) => region.block_entities.set(
                 (x, y, z),
                 BlockEntity {
-                    id: state.name.to_string(),
+                    id: state.name.clone(),
                     position: (x, y, z),
                     nbt: std::sync::Arc::clone(nbt),
                 },

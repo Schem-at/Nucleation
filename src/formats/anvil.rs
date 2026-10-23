@@ -812,7 +812,7 @@ fn build_chunk_nbt(chunk: &ChunkData) -> NbtCompound {
         be_nbt.insert("x", NbtTag::Int(be.position.0));
         be_nbt.insert("y", NbtTag::Int(be.position.1));
         be_nbt.insert("z", NbtTag::Int(be.position.2));
-        be_nbt.insert("id", NbtTag::String(be.id.clone()));
+        be_nbt.insert("id", NbtTag::String(be.id.to_string()));
         be_list.push(NbtTag::Compound(be_nbt));
     }
     root.insert("block_entities", NbtTag::List(NbtList::from(be_list)));

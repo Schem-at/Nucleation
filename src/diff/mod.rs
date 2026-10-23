@@ -145,7 +145,7 @@ use crate::universal_schematic::UniversalSchematic;
 /// Tokenize a build under a rotation: B-frame positions + tokens + rotated blocks.
 pub(crate) fn cells(schem: &UniversalSchematic, g: &RigidOp, spec: &FingerprintSpec) -> Vec<Cell> {
     // Memoize block-entity NBT serializations by NBT identity so
-    // template-shared entities are hashed once, not once per cell.
+    // entities sharing one NBT payload are hashed once, not once per cell.
     let mut nbt_memo: HashMap<*const crate::utils::NbtMap, Option<Token>> = HashMap::new();
     // Only content-exact specs fold block-entity NBT into the token; the fuzzy
     // presets deliberately ignore block identity. Rotation-tolerant specs also

@@ -77,7 +77,7 @@ pub fn convert_block_entity_struct(be: &mut BlockEntity, from: i32, to: i32) {
     convert_block_entity(&mut map, from, to);
 
     if let Some(new_id) = map.get_string("id").map(str::to_string) {
-        be.id = new_id;
+        be.id = new_id.into();
     }
     map.take("id");
     be.set_nbt(map);
@@ -226,7 +226,7 @@ fn convert_block_entity_struct_reverse(be: &mut BlockEntity, from: i32, to: i32)
     convert_reverse_under_session(&reg.tile_entity, &mut map, from, to);
 
     if let Some(new_id) = map.get_string("id").map(str::to_string) {
-        be.id = new_id;
+        be.id = new_id.into();
     }
     map.take("id");
     be.set_nbt(map);
