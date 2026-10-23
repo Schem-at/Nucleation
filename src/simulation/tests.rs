@@ -820,7 +820,6 @@ mod tests {
     fn test_custom_io_sync_to_schematic_preserves_power() {
         // This test verifies that sync_to_schematic() correctly syncs custom IO node power
         use super::super::SimulationOptions;
-        use mchprs_world::World;
 
         let mut schematic = UniversalSchematic::new("Custom IO Sync Test".to_string());
 
@@ -883,7 +882,6 @@ mod tests {
     fn test_custom_io_with_adjacent_wires() {
         // This test verifies that wires ADJACENT to custom IO also update correctly
         use super::super::SimulationOptions;
-        use mchprs_world::World;
 
         let mut schematic = UniversalSchematic::new("Custom IO Adjacent Test".to_string());
 
@@ -1799,7 +1797,6 @@ mod tests {
 
     #[test]
     fn test_comparator_reading_hopper_signal_strengths() {
-        use mchprs_world::World;
         // Test with hoppers as well (different container type)
         for signal in 0..=15 {
             let mut schematic = UniversalSchematic::new(format!("Hopper Signal {}", signal));

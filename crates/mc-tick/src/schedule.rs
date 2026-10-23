@@ -247,15 +247,15 @@ impl EventQueue {
         self.events.push(event);
     }
 
-    /// Take everything currently queued, leaving the queue empty.
-    ///
-    /// Callers loop on this: handling a batch may enqueue the next batch, and
-    /// the phase is over only when a drain comes back empty.
     /// The queued events without draining them.
     pub fn peek(&self) -> &[BlockEvent] {
         &self.events
     }
 
+    /// Take everything currently queued, leaving the queue empty.
+    ///
+    /// Callers loop on this: handling a batch may enqueue the next batch, and
+    /// the phase is over only when a drain comes back empty.
     pub fn take(&mut self) -> Vec<BlockEvent> {
         std::mem::take(&mut self.events)
     }

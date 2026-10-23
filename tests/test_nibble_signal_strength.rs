@@ -137,6 +137,7 @@ fn test_nibble_data_type_signal_strength() {
 }
 
 // Helper function to get block state
+#[cfg(feature = "simulation")]
 fn get_block_state(schematic: &nucleation::UniversalSchematic, x: i32, y: i32, z: i32) -> String {
     if let Some(block) = schematic.get_block(x, y, z) {
         block.to_string()
@@ -146,6 +147,7 @@ fn get_block_state(schematic: &nucleation::UniversalSchematic, x: i32, y: i32, z
 }
 
 // Helper function to extract power level from redstone wire block string
+#[cfg(feature = "simulation")]
 fn extract_power_level(block_string: &str) -> u8 {
     if !block_string.contains("redstone_wire") {
         return 0;

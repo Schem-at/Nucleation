@@ -325,6 +325,8 @@ pub struct UpdateRecord {
     pub state: StateId,
 }
 
+/// Everything a behaviour may read or change while it handles one tick,
+/// update or event.
 pub struct TickCtx<'a> {
     /// The driver's update pump, when this dispatch is allowed to run it.
     ///
