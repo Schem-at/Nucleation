@@ -85,8 +85,8 @@ fn bench_get_block(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_coords_to_index(c: &mut Criterion) {
-    let mut group = c.benchmark_group("coords_to_index");
+fn bench_cell_access(c: &mut Criterion) {
+    let mut group = c.benchmark_group("cell_access");
     group.measurement_time(Duration::from_secs(2));
 
     // Every cell of a black-boxed region: constant coordinates let the
@@ -99,7 +99,7 @@ fn bench_coords_to_index(c: &mut Criterion) {
             for y in 0..32 {
                 for z in 0..32 {
                     for x in 0..32 {
-                        sum = sum.wrapping_add(region.coords_to_index(x, y, z));
+                        sum = sum.wrapping_add(region.get_block_index(x, y, z).unwrap_or(0));
                     }
                 }
             }
@@ -264,7 +264,7 @@ criterion_group!(
     benches,
     bench_set_block,
     bench_get_block,
-    bench_coords_to_index,
+    bench_cell_access,
     bench_flips,
     bench_rotate_y,
     bench_to_compact,

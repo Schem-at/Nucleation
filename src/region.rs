@@ -611,6 +611,7 @@ impl Region {
     }
 
     /// Grow the region so it contains `(x, y, z)`. See [`Self::ensure_bounds`].
+    #[inline]
     pub fn expand_to_fit(&mut self, x: i32, y: i32, z: i32) {
         self.ensure_bounds((x, y, z), (x, y, z));
     }
@@ -627,11 +628,41 @@ impl Region {
     /// (A fixed ±64 pad used to turn a few hundred scattered blocks into a
     /// 1.6M-voxel region, while `size / 2` on a thin axis grew it one cell at
     /// a time.)
+    #[inline]
     pub fn ensure_bounds(&mut self, min: (i32, i32, i32), max: (i32, i32, i32)) {
-        let current = self.get_bounding_box();
-        if current.contains(min) && current.contains(max) {
+        let (lo, hi) = (self.bbox.min, self.bbox.max);
+        if self.bbox.contains(min) && self.bbox.contains(max) {
             return;
         }
+        let wanted = BoundingBox::new(
+            (lo.0.min(min.0).min(max.0), lo.1.min(min.1).min(max.1), lo.2.min(min.2).min(max.2)),
+            (hi.0.max(min.0).max(max.0), hi.1.max(min.1).max(max.1), hi.2.max(min.2).max(max.2)),
+        );
+        let storage = self.storage.bounds();
+        if storage.contains(wanted.min) && storage.contains(wanted.max) {
+            // The common case: the write lands in growth padding.
+            self.set_bounds(wanted);
+        } else {
+            self.ensure_bounds_slow(min, max, wanted);
+        }
+    }
+
+    #[inline]
+    fn set_bounds(&mut self, bounds: BoundingBox) {
+        self.position = bounds.min;
+        self.size = bounds.get_dimensions();
+        self.bbox = bounds;
+    }
+
+    /// [`Self::ensure_bounds`] when the storage must change.
+    #[cold]
+    #[inline(never)]
+    fn ensure_bounds_slow(
+        &mut self,
+        min: (i32, i32, i32),
+        max: (i32, i32, i32),
+        wanted: BoundingBox,
+    ) {
         let untouched = self.size == (1, 1, 1)
             && *self.storage.bounds() == self.bbox
             && self.is_empty()
@@ -642,9 +673,7 @@ impl Region {
             let bounds = BoundingBox::new(min, max);
             if let Ok(storage) = Storage::new(bounds.clone(), 0) {
                 self.storage = storage;
-                self.position = bounds.min;
-                self.size = bounds.get_dimensions();
-                self.bbox = bounds;
+                self.set_bounds(bounds);
                 return;
             }
         }
@@ -667,22 +696,15 @@ impl Region {
             (clamp(new_min), clamp(new_max))
         }
 
-        let wanted = current
-            .union(&BoundingBox::new(min, min))
-            .union(&BoundingBox::new(max, max));
         let alloc = self.storage.bounds().clone();
-        if !(alloc.contains(wanted.min) && alloc.contains(wanted.max)) {
-            let (min_x, max_x) = grow(alloc.min.0, alloc.max.0, wanted.min.0, wanted.max.0);
-            let (min_y, max_y) = grow(alloc.min.1, alloc.max.1, wanted.min.1, wanted.max.1);
-            let (min_z, max_z) = grow(alloc.min.2, alloc.max.2, wanted.min.2, wanted.max.2);
-            self.storage.grow(BoundingBox::new(
-                (min_x, min_y, min_z),
-                (max_x, max_y, max_z),
-            ));
-        }
-        self.position = wanted.min;
-        self.size = wanted.get_dimensions();
-        self.bbox = wanted;
+        let (min_x, max_x) = grow(alloc.min.0, alloc.max.0, wanted.min.0, wanted.max.0);
+        let (min_y, max_y) = grow(alloc.min.1, alloc.max.1, wanted.min.1, wanted.max.1);
+        let (min_z, max_z) = grow(alloc.min.2, alloc.max.2, wanted.min.2, wanted.max.2);
+        self.storage.grow(BoundingBox::new(
+            (min_x, min_y, min_z),
+            (max_x, max_y, max_z),
+        ));
+        self.set_bounds(wanted);
     }
 
     fn calculate_bits_per_block(&self) -> usize {
@@ -2897,6 +2919,53 @@ mod tests {
         // Tight dimensions should reflect actual structure (min to max of placed blocks)
         let tight_dims = region.get_tight_dimensions();
         assert_eq!(tight_dims, (11, 11, 11)); // From (0,0,0) to (10,10,10) inclusive
+    }
+
+    #[test]
+    fn chunked_storage_matches_a_reference_model() {
+        // Bounds of ~17.6M cells: past the dense limit, so storage is chunked.
+        let states: Vec<BlockState> = ["minecraft:air", "minecraft:stone", "minecraft:dirt"]
+            .iter()
+            .map(|n| BlockState::new(n.to_string()))
+            .collect();
+        let mut region = Region::new("R".to_string(), (-130, 0, -130), (260, 260, 260));
+        assert!(matches!(region.storage, Storage::Chunked(_)));
+        let mut model = std::collections::HashMap::new();
+        let mut seed = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = |n: i32| {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            ((seed >> 33) % n as u64) as i32
+        };
+        for _ in 0..2000 {
+            let p = (next(260) - 130, next(260), next(260) - 130);
+            let state = next(3) as usize;
+            region.set_block(p.0, p.1, p.2, &states[state]);
+            model.insert(p, state);
+        }
+        let mirror = |v: i32, lo: i32, hi: i32| hi - (v - lo);
+        region.flip_x();
+        region.flip_y();
+        region.flip_z();
+        region.translate(5, -3, 2).unwrap();
+        let moved: std::collections::HashMap<_, _> = model
+            .into_iter()
+            .map(|((x, y, z), s)| {
+                let p = (mirror(x, -130, 129), mirror(y, 0, 259), mirror(z, -130, 129));
+                ((p.0 + 5, p.1 - 3, p.2 + 2), s)
+            })
+            .collect();
+        for (&(x, y, z), &state) in &moved {
+            assert_eq!(region.get_block(x, y, z), Some(&states[state]), "at {:?}", (x, y, z));
+        }
+        let solid: Vec<_> = moved.iter().filter(|(_, &s)| s != 0).map(|(&p, _)| p).collect();
+        assert_eq!(region.count_non_air_blocks(), solid.len());
+        let mut fresh = region.clone();
+        fresh.rescan_content();
+        assert_eq!(fresh.get_tight_bounds(), region.get_tight_bounds());
+        let compact = region.to_compact();
+        for &(x, y, z) in &solid {
+            assert_eq!(compact.get_block(x, y, z), region.get_block(x, y, z));
+        }
     }
 
     #[test]

@@ -1,15 +1,11 @@
-//! A region's voxel storage: one palette index per cell of a storage box.
-//!
-//! Cells are addressed by world coordinates inside [`Storage::bounds`]; rows
-//! run along x and are handed out as segments, so callers never assume one
-//! contiguous buffer. Cells that were never written hold the background value
-//! (the region's air index).
+//! Dense layout: one contiguous buffer over the storage box, x fastest,
+//! then z, then y.
 
 use crate::bounding_box::BoundingBox;
 use crate::region::try_zeroed_blocks;
 
 #[derive(Debug, Clone)]
-pub(crate) struct Storage {
+pub(crate) struct Dense {
     bounds: BoundingBox,
     background: u32,
     width: i64,
@@ -18,9 +14,9 @@ pub(crate) struct Storage {
     cells: Vec<u32>,
 }
 
-impl Storage {
+impl Dense {
     /// Storage over `bounds`, every cell `background`.
-    pub fn new(bounds: BoundingBox, background: u32) -> Result<Self, String> {
+    pub(super) fn new(bounds: BoundingBox, background: u32) -> Result<Self, String> {
         let volume = usize::try_from(bounds.volume())
             .map_err(|_| "Region volume exceeds addressable memory".to_string())?;
         let mut cells = try_zeroed_blocks(volume)?;
@@ -32,10 +28,10 @@ impl Storage {
 
     /// Storage adopting `cells`, laid out over `bounds` x fastest, then z,
     /// then y. `cells.len()` must be the volume of `bounds`.
-    pub fn from_dense(bounds: BoundingBox, cells: Vec<u32>, background: u32) -> Self {
+    pub(super) fn from_dense(bounds: BoundingBox, cells: Vec<u32>, background: u32) -> Self {
         let (w, _, l) = bounds.get_dimensions();
         let (width, length) = (w as i64, l as i64);
-        Storage {
+        Dense {
             bounds,
             background,
             width,
@@ -46,7 +42,7 @@ impl Storage {
         }
     }
 
-    pub fn bounds(&self) -> &BoundingBox {
+    pub(super) fn bounds(&self) -> &BoundingBox {
         &self.bounds
     }
 
@@ -62,13 +58,13 @@ impl Storage {
 
     /// The value at a cell inside the bounds.
     #[inline(always)]
-    pub fn get(&self, x: i32, y: i32, z: i32) -> u32 {
+    pub(super) fn get(&self, x: i32, y: i32, z: i32) -> u32 {
         self.cells[self.index(x, y, z)]
     }
 
     /// Write a cell inside the bounds, returning its previous value.
     #[inline(always)]
-    pub fn set(&mut self, x: i32, y: i32, z: i32, value: u32) -> u32 {
+    pub(super) fn set(&mut self, x: i32, y: i32, z: i32, value: u32) -> u32 {
         let index = self.index(x, y, z);
         std::mem::replace(&mut self.cells[index], value)
     }
@@ -76,25 +72,25 @@ impl Storage {
     /// The cells `x0..=x1` of row `(y, z)` as `(first x, slice)` segments, in
     /// x order. The row must lie inside the bounds.
     #[inline]
-    pub fn row(&self, y: i32, z: i32, x0: i32, x1: i32) -> impl Iterator<Item = (i32, &[u32])> {
+    pub(super) fn row(&self, y: i32, z: i32, x0: i32, x1: i32) -> std::iter::Once<(i32, &[u32])> {
         let start = self.index(x0, y, z);
         std::iter::once((x0, &self.cells[start..start + (x1 - x0 + 1) as usize]))
     }
 
     /// Mutable counterpart of [`Self::row`], visiting each segment.
     #[inline]
-    pub fn row_mut(&mut self, y: i32, z: i32, x0: i32, x1: i32, mut f: impl FnMut(i32, &mut [u32])) {
+    pub(super) fn row_mut(&mut self, y: i32, z: i32, x0: i32, x1: i32, mut f: impl FnMut(i32, &mut [u32])) {
         let start = self.index(x0, y, z);
         f(x0, &mut self.cells[start..start + (x1 - x0 + 1) as usize]);
     }
 
     /// Reverse the cells `x0..=x1` of row `(y, z)`.
-    pub fn reverse_row(&mut self, y: i32, z: i32, x0: i32, x1: i32) {
+    pub(super) fn reverse_row(&mut self, y: i32, z: i32, x0: i32, x1: i32) {
         self.row_mut(y, z, x0, x1, |_, cells| cells.reverse());
     }
 
     /// Swap the full-width rows `(ya, za)` and `(yb, zb)`.
-    pub fn swap_rows(&mut self, (ya, za): (i32, i32), (yb, zb): (i32, i32)) {
+    pub(super) fn swap_rows(&mut self, (ya, za): (i32, i32), (yb, zb): (i32, i32)) {
         let w = self.width as usize;
         let (a, b) = (self.index(self.bounds.min.0, ya, za), self.index(self.bounds.min.0, yb, zb));
         if a == b {
@@ -106,7 +102,7 @@ impl Storage {
     }
 
     /// Swap the full layers `ya` and `yb`.
-    pub fn swap_layers(&mut self, ya: i32, yb: i32) {
+    pub(super) fn swap_layers(&mut self, ya: i32, yb: i32) {
         let l = self.layer as usize;
         let (a, b) = (
             (ya - self.bounds.min.1) as usize * l,
@@ -121,12 +117,12 @@ impl Storage {
     }
 
     /// Set every cell to `value`.
-    pub fn fill(&mut self, value: u32) {
+    pub(super) fn fill(&mut self, value: u32) {
         self.cells.fill(value);
     }
 
     /// Apply `f` to every stored value, and to the background.
-    pub fn map_values(&mut self, mut f: impl FnMut(u32) -> u32) {
+    pub(super) fn map_values(&mut self, mut f: impl FnMut(u32) -> u32) {
         self.background = f(self.background);
         for cell in &mut self.cells {
             *cell = f(*cell);
@@ -134,7 +130,7 @@ impl Storage {
     }
 
     /// The cells of `area` (inside the bounds), x fastest, then z, then y.
-    pub fn dense(&self, area: &BoundingBox) -> std::borrow::Cow<'_, [u32]> {
+    pub(super) fn dense(&self, area: &BoundingBox) -> std::borrow::Cow<'_, [u32]> {
         if *area == self.bounds {
             return std::borrow::Cow::Borrowed(&self.cells);
         }
@@ -158,7 +154,7 @@ impl Storage {
     /// that were not part of the old box are reset. Compared with allocating
     /// a second full buffer, this halves peak memory during growth and avoids
     /// faulting in a fresh copy of every resident page.
-    pub fn grow(&mut self, new_bounds: BoundingBox) {
+    pub(super) fn grow(&mut self, new_bounds: BoundingBox) {
         if new_bounds == self.bounds {
             return;
         }
@@ -217,7 +213,7 @@ impl Storage {
     }
 
     /// Copy the cells of `area` (inside both boxes) from `src`.
-    pub fn copy_box_from(&mut self, src: &Storage, area: &BoundingBox) {
+    pub(super) fn copy_box_from(&mut self, src: &Dense, area: &BoundingBox) {
         let (min, max) = (area.min, area.max);
         let row_len = (max.0 - min.0 + 1) as usize;
         #[cfg(not(target_arch = "wasm32"))]
@@ -252,13 +248,18 @@ impl Storage {
         }
     }
 
-    /// Placeholder with no cells, for moving a storage out temporarily.
-    pub fn empty() -> Self {
-        Self::from_dense(BoundingBox::new((0, 0, 0), (0, 0, 0)), vec![0], 0)
+    /// Write `values` into row `(y, z)` from `x0`.
+    pub(super) fn write_row(&mut self, y: i32, z: i32, x0: i32, values: &[u32]) {
+        let start = self.index(x0, y, z);
+        self.cells[start..start + values.len()].copy_from_slice(values);
+    }
+
+    pub(super) fn into_parts(self) -> (BoundingBox, Vec<u32>, u32) {
+        (self.bounds, self.cells, self.background)
     }
 
     /// Move the box by an offset; cells keep their values.
-    pub fn translate(&mut self, dx: i32, dy: i32, dz: i32) {
+    pub(super) fn translate(&mut self, dx: i32, dy: i32, dz: i32) {
         let (min, max) = (self.bounds.min, self.bounds.max);
         self.bounds = BoundingBox::new(
             (min.0 + dx, min.1 + dy, min.2 + dz),
@@ -271,7 +272,7 @@ impl Storage {
     /// Scans x-rows as slices, so there is no per-voxel coordinate division
     /// and the comparisons vectorize; each occupied row touches the bounds
     /// once.
-    pub fn content(&self, air: u32) -> (usize, Option<BoundingBox>) {
+    pub(super) fn content(&self, air: u32) -> (usize, Option<BoundingBox>) {
         let w = self.width as usize;
         let l = self.length as usize;
         let mut count = 0usize;
@@ -319,7 +320,7 @@ mod tests {
         // The build-extractor mega-terrain repro. No cells are allocated:
         // only the index arithmetic is under test.
         let bounds = BoundingBox::new((-47472, -64, -5216), (34975, 319, 13727));
-        let storage = Storage::from_dense(bounds, Vec::new(), 0);
+        let storage = Dense::from_dense(bounds, Vec::new(), 0);
         let (width, length) = (82448i64, 18944i64);
         let layer = width * length;
         assert_eq!(storage.index(-47472, 236, -5216), (300 * layer) as usize);
