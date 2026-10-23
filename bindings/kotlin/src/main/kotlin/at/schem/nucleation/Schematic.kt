@@ -46,6 +46,7 @@ internal interface SchematicLib: Library {
     fun Schematic_prepare_block(handle: Pointer, blockName: Slice): ResultIntInt
     fun Schematic_place(handle: Pointer, x: Int, y: Int, z: Int, paletteIndex: Int): ResultUnitInt
     fun Schematic_set_blocks(handle: Pointer, positions: Slice, blockName: Slice): ResultIntInt
+    fun Schematic_set_blocks_indexed(handle: Pointer, positions: Slice, indices: Slice, paletteJson: Slice): ResultIntInt
     fun Schematic_set_blocks_simulated(handle: Pointer, positions: Slice, blockName: Slice): ResultIntInt
     fun Schematic_set_blocks_simulated_full_world(handle: Pointer, positions: Slice, blockName: Slice): ResultIntInt
     fun Schematic_get_blocks_json(handle: Pointer, positions: Slice, write: Pointer): ResultUnitInt
@@ -965,6 +966,32 @@ class Schematic internal constructor (
         } finally {
             positionsSliceMemory.close()
             blockNameSliceMemory.close()
+        }
+    }
+
+    /** Place many different blocks in one call: position `i` gets
+    *`palette[indices[i]]`. `positions` is flat `[x0,y0,z0, ...]`,
+    *`indices` has one entry per position, and `palette_json` is a JSON
+    *array of block strings (properties and NBT allowed, `simulate` not).
+    *Returns the number of blocks set.
+    */
+    fun setBlocksIndexed(positions: IntArray, indices: UIntArray, paletteJson: String): Result<Int> {
+        val positionsSliceMemory = PrimitiveArrayTools.borrow(positions)
+        val indicesSliceMemory = PrimitiveArrayTools.borrow(indices)
+        val paletteJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(paletteJson)
+
+        val returnVal = lib.Schematic_set_blocks_indexed(handle, positionsSliceMemory.slice, indicesSliceMemory.slice, paletteJsonSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return (nativeOkVal).ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            positionsSliceMemory.close()
+            indicesSliceMemory.close()
+            paletteJsonSliceMemory.close()
         }
     }
 

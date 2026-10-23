@@ -293,6 +293,15 @@ public:
   inline nucleation::diplomat::result<int32_t, nucleation::NucleationError> set_blocks(nucleation::diplomat::span<const int32_t> positions, std::string_view block_name);
 
   /**
+   * Place many different blocks in one call: position `i` gets
+   * `palette[indices[i]]`. `positions` is flat `[x0,y0,z0, ...]`,
+   * `indices` has one entry per position, and `palette_json` is a JSON
+   * array of block strings (properties and NBT allowed, `simulate` not).
+   * Returns the number of blocks set.
+   */
+  inline nucleation::diplomat::result<int32_t, nucleation::NucleationError> set_blocks_indexed(nucleation::diplomat::span<const int32_t> positions, nucleation::diplomat::span<const uint32_t> indices, std::string_view palette_json);
+
+  /**
    * Sequentially hand-place the same block at many positions in one
    * local simulated component. `positions` is flat
    * `[x0,y0,z0, x1,y1,z1, ...]`; placements run in that order and each
