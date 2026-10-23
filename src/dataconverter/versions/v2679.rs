@@ -57,12 +57,42 @@ pub fn register(reg: &mut RegistryBuilder) {
     // `minecraft:cauldron`) needs no reverse: old `minecraft:cauldron` with an
     // absent `level` is exactly level 0 (the old `getString("level", "0")`
     // default), so the empty-cauldron state already round-trips.
-    reg.block_state.add_reverse_converter_for_id(
-        "minecraft:water_cauldron",
+    // Block states carry their id in `Name`, so this cannot use
+    // `add_reverse_converter_for_id` (which matches `id`).
+    reg.block_state.add_reverse_converter(
         VERSION,
         0,
         Box::new(|data: &mut NbtMap, _from, _to| {
-            data.set_string("Name", "minecraft:cauldron");
+            if data.get_string("Name") == Some("minecraft:water_cauldron") {
+                data.set_string("Name", "minecraft:cauldron");
+            }
         }),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::dataconverter::loss;
+    use crate::dataconverter::registry::registry;
+    use crate::dataconverter::version::{encode_versions, MAX_STEP};
+    use crate::nbt::{NbtMap, NbtValue};
+
+    #[test]
+    fn reverse_turns_water_cauldron_back_into_cauldron() {
+        let mut state = NbtMap::new();
+        state.insert("Name".into(), NbtValue::String("minecraft:water_cauldron".into()));
+        let reg = registry();
+        loss::run_reverse(|| {
+            reg.block_state.convert(
+                reg,
+                &mut state,
+                encode_versions(2679, MAX_STEP),
+                encode_versions(2678, MAX_STEP),
+            );
+        });
+        assert_eq!(
+            state.get("Name"),
+            Some(&NbtValue::String("minecraft:cauldron".into()))
+        );
+    }
 }
