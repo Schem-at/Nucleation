@@ -65,6 +65,7 @@ use schematic_mesher::{
 
 pub mod cache;
 pub mod item_model;
+pub mod player_heads;
 mod resource_pack_compat;
 
 // Re-export the real MeshOutput and MeshLayer types from schematic-mesher.
@@ -310,6 +311,35 @@ impl ResourcePackSource {
         let texture = TextureData::new(width, height, pixels);
         self.pack.add_texture(&namespace, &path, texture);
         Ok(())
+    }
+
+    /// Register a downloaded player skin so player heads using it render with
+    /// it. `url_or_hash` is a skin URL from
+    /// [`UniversalSchematic::player_skin_urls`] (or just its hash); `png` is the
+    /// skin PNG served at that URL. Returns the texture's resource location,
+    /// `nucleation:skins/<hash>`.
+    pub fn add_player_skin(&mut self, url_or_hash: &str, png: &[u8]) -> Result<String> {
+        let hash = player_heads::skin_hash(url_or_hash).ok_or_else(|| {
+            MeshError::ResourcePack(format!("not a skin URL or texture hash: {url_or_hash:?}"))
+        })?;
+        let mut texture = schematic_mesher::resource_pack::texture::load_texture_from_bytes(png)
+            .map_err(|e| MeshError::ResourcePack(format!("skin {hash} is not a readable image: {e}")))?;
+        match (texture.width, texture.height) {
+            (64, 64) => {}
+            // Legacy skin: vanilla pads it to 64x64 on load. The head and hat
+            // live in the top half, which keeps its layout.
+            (64, 32) => {
+                texture.pixels.resize(64 * 64 * 4, 0);
+                texture.height = 64;
+            }
+            (w, h) => {
+                return Err(MeshError::ResourcePack(format!(
+                    "skin {hash} is {w}x{h}; player skins are 64x64 (or legacy 64x32)"
+                )))
+            }
+        }
+        self.pack.add_texture(player_heads::SKIN_NAMESPACE, &format!("skins/{hash}"), texture);
+        Ok(player_heads::skin_texture_location(&hash))
     }
 
     /// Get statistics about the loaded resource pack.
@@ -955,6 +985,21 @@ pub fn build_global_atlas(
         blocks.insert(pos, input);
         pos_idx += 1; // Spread blocks apart so they don't cull each other
     }
+    // Player heads' skins come from block entities, not palette states.
+    let mut seen_heads = std::collections::HashSet::new();
+    for region in std::iter::once(&schematic.default_region).chain(schematic.other_regions.values()) {
+        for (_, input) in player_heads::player_head_inputs(region) {
+            let key: Vec<(String, String)> = {
+                let mut v: Vec<_> = input.properties.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                v.sort();
+                v
+            };
+            if seen_heads.insert((input.name.clone(), key)) {
+                blocks.insert(MesherBlockPosition::new(pos_idx, 0, 0), input);
+                pos_idx += 1;
+            }
+        }
+    }
 
     if blocks.is_empty() {
         return Ok(TextureAtlas::empty());
@@ -977,7 +1022,9 @@ pub fn build_global_atlas(
         AtlasBuilder::new(mesher_config.atlas_max_size, mesher_config.atlas_padding);
 
     for texture_ref in &texture_refs {
-        if let Some(texture) = pack.pack.get_texture(texture_ref) {
+        // Player skins are keyed `_skin/pack/<resource location used>` by the mesher.
+        let lookup = texture_ref.strip_prefix("_skin/pack/").unwrap_or(texture_ref);
+        if let Some(texture) = pack.pack.get_texture(lookup) {
             atlas_builder.add_texture(texture_ref.clone(), texture.first_frame());
         }
     }
@@ -1688,6 +1735,17 @@ fn collect_region_blocks(
         palette.push(block_state_to_input_block(state));
     }
 
+    // Player heads carry their skin in the block entity, so each one with a
+    // profile gets its own palette entry that the scan below swaps in.
+    let head_overrides: HashMap<(i32, i32, i32), u32> = player_heads::player_head_inputs(region)
+        .into_iter()
+        .map(|(pos, input)| {
+            let idx = palette.len() as u32;
+            palette.push(input);
+            (pos, idx)
+        })
+        .collect();
+
     // Parallel volume scan: emit (pos, global_palette_index) for each non-air
     // block. No per-block InputBlock construction — just an index lookup.
     let t_scan = prof_now();
@@ -1717,6 +1775,11 @@ fn collect_region_blocks(
     let t_ins = prof_now();
     blocks.reserve(collected.len());
     for (pos, gidx, x, y, z) in collected {
+        let gidx = if head_overrides.is_empty() {
+            gidx
+        } else {
+            head_overrides.get(&(x, y, z)).copied().unwrap_or(gidx)
+        };
         blocks.push((pos, gidx));
 
         min[0] = min[0].min(x as f32);
@@ -1756,6 +1819,15 @@ fn collect_region_blocks_by_chunk(
                 chunk_blocks.insert(pos, input_block);
             }
         }
+    }
+
+    // Player heads with a profile replace their plain block-state input.
+    for ((x, y, z), input) in player_heads::player_head_inputs(region) {
+        let chunk = (x.div_euclid(chunk_size), y.div_euclid(chunk_size), z.div_euclid(chunk_size));
+        chunks
+            .entry(chunk)
+            .or_default()
+            .insert(MesherBlockPosition::new(x, y, z), input);
     }
 
     // Also collect entities into their respective chunks

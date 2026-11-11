@@ -235,6 +235,41 @@ final class ResourcePack {
         }
     }
 
+    public static function playerSkinUrlsJson( $schematic) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->ResourcePack_player_skin_urls_json($schematic->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function addPlayerSkin(string $url_or_hash, array $png) {
+        $__n0 = strlen($url_or_hash);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $url_or_hash, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $__n1 = count($png);
+        $__view1 = Lib::ffi()->new('DiplomatU8View');
+        if ($__n1 > 0) {
+            $__arr1 = Lib::ffi()->new("uint8_t[" . $__n1 . "]", false);
+            foreach ($png as $__i1 => $__v1) { $__arr1[$__i1] = $__v1; }
+            $__view1->data = \FFI::addr($__arr1[0]);
+        } else {
+            $__view1->data = null;
+        }
+        $__view1->len = $__n1;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->ResourcePack_add_player_skin($this->ptr, $__view0, $__view1, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function registerMeshExporter() {
         $result = Lib::ffi()->ResourcePack_register_mesh_exporter($this->ptr);
         if (!$result->is_ok) {

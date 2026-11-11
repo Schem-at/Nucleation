@@ -250,6 +250,34 @@ pub mod ffi {
                 .map_err(|_| NucleationError::InvalidArgument)
         }
 
+        /// Skin URLs the player heads in `schematic` need, as a sorted JSON
+        /// array string. Nucleation never downloads skins: fetch each URL and
+        /// pass the PNG to `add_player_skin`. Heads whose skin is not
+        /// registered render with vanilla's default skin for their owner.
+        pub fn player_skin_urls_json(schematic: &Schematic, out: &mut DiplomatWrite) {
+            super::write_string_list_json(&schematic.0.player_skin_urls(), out);
+        }
+
+        /// Register a downloaded player skin: `url_or_hash` is a URL from
+        /// `player_skin_urls_json` (or its texture hash), `png` the 64x64 (or
+        /// legacy 64x32) skin image. Writes the texture's resource location,
+        /// `nucleation:skins/<hash>`. `InvalidArgument` if the URL has no hash
+        /// or the PNG is not a skin.
+        pub fn add_player_skin(
+            &mut self,
+            url_or_hash: &DiplomatStr,
+            png: &[u8],
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let url = std::str::from_utf8(url_or_hash).map_err(|_| NucleationError::InvalidArgument)?;
+            let location = self
+                .0
+                .add_player_skin(url, png)
+                .map_err(|_| NucleationError::InvalidArgument)?;
+            let _ = write!(out, "{}", location);
+            Ok(())
+        }
+
         /// Register a MeshExporter with the FormatManager so `save_as("mesh", ...)`
         /// works. (Old ABI: `schematic_register_mesh_exporter`.)
         pub fn register_mesh_exporter(&self) -> Result<(), NucleationError> {

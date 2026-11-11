@@ -23,6 +23,8 @@ internal interface ResourcePackLib: Library {
     fun ResourcePack_add_blockstate_json(handle: Pointer, name: Slice, json: Slice): ResultUnitInt
     fun ResourcePack_add_model_json(handle: Pointer, name: Slice, json: Slice): ResultUnitInt
     fun ResourcePack_add_texture(handle: Pointer, name: Slice, width: FFIUint32, height: FFIUint32, pixels: Slice): ResultUnitInt
+    fun ResourcePack_player_skin_urls_json(schematic: Pointer, write: Pointer): Unit
+    fun ResourcePack_add_player_skin(handle: Pointer, urlOrHash: Slice, png: Slice, write: Pointer): ResultUnitInt
     fun ResourcePack_register_mesh_exporter(handle: Pointer): ResultUnitInt
 }
 /** A loaded (possibly merged) Minecraft resource pack.
@@ -92,6 +94,20 @@ class ResourcePack internal constructor (
             } else {
                 return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
             }
+        }
+        @JvmStatic
+
+        /** Skin URLs the player heads in `schematic` need, as a sorted JSON
+        *array string. Nucleation never downloads skins: fetch each URL and
+        *pass the PNG to `add_player_skin`. Heads whose skin is not
+        *registered render with vanilla's default skin for their owner.
+        */
+        fun playerSkinUrlsJson(schematic: Schematic): String {
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.ResourcePack_player_skin_urls_json(schematic.handle, write);
+
+            val returnString = DW.writeToString(write)
+            return returnString
         }
     }
 
@@ -295,6 +311,32 @@ class ResourcePack internal constructor (
         } finally {
             nameSliceMemory.close()
             pixelsSliceMemory.close()
+        }
+    }
+
+    /** Register a downloaded player skin: `url_or_hash` is a URL from
+    *`player_skin_urls_json` (or its texture hash), `png` the 64x64 (or
+    *legacy 64x32) skin image. Writes the texture's resource location,
+    *`nucleation:skins/<hash>`. `InvalidArgument` if the URL has no hash
+    *or the PNG is not a skin.
+    */
+    fun addPlayerSkin(urlOrHash: String, png: UByteArray): Result<String> {
+        val urlOrHashSliceMemory = PrimitiveArrayTools.borrowUtf8(urlOrHash)
+        val pngSliceMemory = PrimitiveArrayTools.borrow(png)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.ResourcePack_add_player_skin(handle, urlOrHashSliceMemory.slice, pngSliceMemory.slice, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            urlOrHashSliceMemory.close()
+            pngSliceMemory.close()
         }
     }
 

@@ -127,6 +127,37 @@ replace earlier blockstates, models, or textures on the same key, matching
 Minecraft pack ordering. Parse a pack once and reuse its `ResourcePack` handle
 across many meshes or renders.
 
+Model elements may rotate about one axis (`axis` and `angle`) or, from
+Minecraft 1.21.11, about several (`x`, `y`, `z` in degrees, applied X then Y
+then Z, each defaulting to 0). Both forms load; `axis`/`angle` wins when an
+element has both, as in vanilla.
+
+## Player heads and skins
+
+A player head's skin is in its block entity: the `profile` (or pre-1.20.5
+`SkullOwner`) holds the owner's UUID and a `textures` property pointing at the
+skin on `textures.minecraft.net`. Nucleation does not download skins. Ask the
+pack which skins a schematic needs, fetch them, and register the PNGs:
+
+```python
+import json, urllib.request
+from nucleation import ResourcePack, Renderer, RenderConfig
+
+pack = ResourcePack.from_bytes(open("client.jar", "rb").read())
+for url in json.loads(ResourcePack.player_skin_urls_json(schematic)):
+    png = urllib.request.urlopen(url).read()
+    pack.add_player_skin(url, png)   # returns "nucleation:skins/<hash>"
+png = Renderer.render_png_b64_with_pack(schematic, pack, RenderConfig.create(512, 512))
+```
+
+`add_player_skin` takes a 64x64 skin, or a legacy 64x32 one padded the way the
+game pads it. A head whose skin is not registered gets vanilla's default skin
+for its owner's UUID (one of the nine default characters, chosen as
+`DefaultPlayerSkin` does); a head with no owner shows Steve. A profile's own
+`texture` override (1.21.9+) names a pack texture and needs no download.
+Heads sharing a skin share one atlas entry. Shared-atlas chunk meshing picks
+up registered skins too.
+
 ## Choose one mesh, regions, or chunks
 
 | Work unit | API | Use when |

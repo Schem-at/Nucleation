@@ -3,6 +3,7 @@
 
 #include "ResourcePack.hpp"
 #include "ResourcePackList.hpp"
+#include "Schematic.hpp"
 
 namespace nucleation {
 void add_ResourcePack_binding(nb::module_ mod) {
@@ -15,6 +16,7 @@ void add_ResourcePack_binding(nb::module_ mod) {
     opaque
         .def("add_blockstate_json", &nucleation::ResourcePack::add_blockstate_json, "name"_a, "json"_a)
         .def("add_model_json", &nucleation::ResourcePack::add_model_json, "name"_a, "json"_a)
+        .def("add_player_skin", &nucleation::ResourcePack::add_player_skin, "url_or_hash"_a, "png"_a)
         .def("add_texture", &nucleation::ResourcePack::add_texture, "name"_a, "width"_a, "height"_a, "pixels"_a)
         .def("blockstate_count", &nucleation::ResourcePack::blockstate_count)
         .def_static("from_bytes", std::move(maybe_op_unwrap(&nucleation::ResourcePack::from_bytes)), "data"_a)
@@ -28,6 +30,7 @@ void add_ResourcePack_binding(nb::module_ mod) {
         .def("list_textures_json", &nucleation::ResourcePack::list_textures_json)
         .def("model_count", &nucleation::ResourcePack::model_count)
         .def("namespaces_json", &nucleation::ResourcePack::namespaces_json)
+        .def_static("player_skin_urls_json", &nucleation::ResourcePack::player_skin_urls_json, "schematic"_a)
         .def("register_mesh_exporter", &nucleation::ResourcePack::register_mesh_exporter)
         .def("texture_count", &nucleation::ResourcePack::texture_count);
 }

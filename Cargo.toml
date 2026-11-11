@@ -110,7 +110,7 @@ world-segment = ["dep:tar", "dep:zstd"]
 # Mesh voxelization: GLB/OBJ models -> building Shapes + textured schematics
 voxelize = ["dep:gltf", "dep:image"]
 # Meshing support - generate 3D meshes from schematics
-meshing = ["schematic-mesher"]
+meshing = ["schematic-mesher", "dep:base64"]
 # GPU rendering support - render schematics to images
 rendering = ["meshing", "dep:wgpu", "dep:image", "dep:pollster"]
 # Embedded scripting engines
@@ -202,7 +202,7 @@ testcontainers-modules = { version = "0.11", features = [
 # release was published from (253d2b6 + manifest-only packaging fixes; same
 # source). cargo publish keeps the version and drops the git side, so the
 # published nucleation crate keeps meshing/rendering.
-schematic-mesher = { version = "0.2.0", git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "286323e472cd8a5363b66a035a3be02ecdd4f164", optional = true }
+schematic-mesher = { version = "0.2.1", git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "dcc0e0aad6133109448f21a5c568236b48b3d967", optional = true }
 
 # Rendering dependencies - optional
 wgpu = { version = "30", optional = true }

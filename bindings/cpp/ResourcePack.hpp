@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include "NucleationError.hpp"
 #include "ResourcePackList.hpp"
+#include "Schematic.hpp"
 #include "TextureInfo.hpp"
 #include "diplomat_runtime.hpp"
 
@@ -61,6 +62,11 @@ namespace capi {
 
     typedef struct ResourcePack_add_texture_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} ResourcePack_add_texture_result;
     ResourcePack_add_texture_result ResourcePack_add_texture(diplomat::capi::ResourcePack* self, diplomat::capi::DiplomatStringView name, uint32_t width, uint32_t height, diplomat::capi::DiplomatU8View pixels);
+
+    void ResourcePack_player_skin_urls_json(const diplomat::capi::Schematic* schematic, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct ResourcePack_add_player_skin_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} ResourcePack_add_player_skin_result;
+    ResourcePack_add_player_skin_result ResourcePack_add_player_skin(diplomat::capi::ResourcePack* self, diplomat::capi::DiplomatStringView url_or_hash, diplomat::capi::DiplomatU8View png, diplomat::capi::DiplomatWrite* write);
 
     typedef struct ResourcePack_register_mesh_exporter_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} ResourcePack_register_mesh_exporter_result;
     ResourcePack_register_mesh_exporter_result ResourcePack_register_mesh_exporter(const diplomat::capi::ResourcePack* self);
@@ -229,6 +235,39 @@ inline diplomat::result<std::monostate, NucleationError> ResourcePack::add_textu
         width,
         height,
         {pixels.data(), pixels.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline std::string ResourcePack::player_skin_urls_json(const Schematic& schematic) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::ResourcePack_player_skin_urls_json(schematic.AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void ResourcePack::player_skin_urls_json_write(const Schematic& schematic, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::ResourcePack_player_skin_urls_json(schematic.AsFFI(),
+        &write);
+}
+
+inline diplomat::result<std::string, NucleationError> ResourcePack::add_player_skin(std::string_view url_or_hash, diplomat::span<const uint8_t> png) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::ResourcePack_add_player_skin(this->AsFFI(),
+        {url_or_hash.data(), url_or_hash.size()},
+        {png.data(), png.size()},
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> ResourcePack::add_player_skin_write(std::string_view url_or_hash, diplomat::span<const uint8_t> png, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::ResourcePack_add_player_skin(this->AsFFI(),
+        {url_or_hash.data(), url_or_hash.size()},
+        {png.data(), png.size()},
+        &write);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 

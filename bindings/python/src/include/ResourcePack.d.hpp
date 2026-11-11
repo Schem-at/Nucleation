@@ -15,6 +15,8 @@ namespace capi { struct ResourcePack; }
 class ResourcePack;
 namespace capi { struct ResourcePackList; }
 class ResourcePackList;
+namespace capi { struct Schematic; }
+class Schematic;
 struct TextureInfo;
 class NucleationError;
 } // namespace nucleation
@@ -128,6 +130,27 @@ public:
    * Add a raw RGBA texture (`pixels` length must be `width * height * 4`).
    */
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> add_texture(std::string_view name, uint32_t width, uint32_t height, nucleation::diplomat::span<const uint8_t> pixels);
+
+  /**
+   * Skin URLs the player heads in `schematic` need, as a sorted JSON
+   * array string. Nucleation never downloads skins: fetch each URL and
+   * pass the PNG to `add_player_skin`. Heads whose skin is not
+   * registered render with vanilla's default skin for their owner.
+   */
+  inline static std::string player_skin_urls_json(const nucleation::Schematic& schematic);
+  template<typename W>
+  inline static void player_skin_urls_json_write(const nucleation::Schematic& schematic, W& writeable_output);
+
+  /**
+   * Register a downloaded player skin: `url_or_hash` is a URL from
+   * `player_skin_urls_json` (or its texture hash), `png` the 64x64 (or
+   * legacy 64x32) skin image. Writes the texture's resource location,
+   * `nucleation:skins/<hash>`. `InvalidArgument` if the URL has no hash
+   * or the PNG is not a skin.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> add_player_skin(std::string_view url_or_hash, nucleation::diplomat::span<const uint8_t> png);
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> add_player_skin_write(std::string_view url_or_hash, nucleation::diplomat::span<const uint8_t> png, W& writeable_output);
 
   /**
    * Register a MeshExporter with the FormatManager so `save_as("mesh", ...)`

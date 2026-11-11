@@ -9,6 +9,7 @@
 
 #include "NucleationError.d.h"
 #include "ResourcePackList.d.h"
+#include "Schematic.d.h"
 #include "TextureInfo.d.h"
 
 #include "ResourcePack.d.h"
@@ -58,6 +59,11 @@ ResourcePack_add_model_json_result ResourcePack_add_model_json(ResourcePack* sel
 
 typedef struct ResourcePack_add_texture_result {union { NucleationError err;}; bool is_ok;} ResourcePack_add_texture_result;
 ResourcePack_add_texture_result ResourcePack_add_texture(ResourcePack* self, DiplomatStringView name, uint32_t width, uint32_t height, DiplomatU8View pixels);
+
+void ResourcePack_player_skin_urls_json(const Schematic* schematic, DiplomatWrite* write);
+
+typedef struct ResourcePack_add_player_skin_result {union { NucleationError err;}; bool is_ok;} ResourcePack_add_player_skin_result;
+ResourcePack_add_player_skin_result ResourcePack_add_player_skin(ResourcePack* self, DiplomatStringView url_or_hash, DiplomatU8View png, DiplomatWrite* write);
 
 typedef struct ResourcePack_register_mesh_exporter_result {union { NucleationError err;}; bool is_ok;} ResourcePack_register_mesh_exporter_result;
 ResourcePack_register_mesh_exporter_result ResourcePack_register_mesh_exporter(const ResourcePack* self);

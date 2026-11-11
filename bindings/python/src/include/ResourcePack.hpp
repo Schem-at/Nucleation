@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include "NucleationError.hpp"
 #include "ResourcePackList.hpp"
+#include "Schematic.hpp"
 #include "TextureInfo.hpp"
 #include "diplomat_runtime.hpp"
 
@@ -61,6 +62,11 @@ namespace capi {
 
     typedef struct ResourcePack_add_texture_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} ResourcePack_add_texture_result;
     ResourcePack_add_texture_result ResourcePack_add_texture(nucleation::capi::ResourcePack* self, nucleation::diplomat::capi::DiplomatStringView name, uint32_t width, uint32_t height, nucleation::diplomat::capi::DiplomatU8View pixels);
+
+    void ResourcePack_player_skin_urls_json(const nucleation::capi::Schematic* schematic, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    typedef struct ResourcePack_add_player_skin_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} ResourcePack_add_player_skin_result;
+    ResourcePack_add_player_skin_result ResourcePack_add_player_skin(nucleation::capi::ResourcePack* self, nucleation::diplomat::capi::DiplomatStringView url_or_hash, nucleation::diplomat::capi::DiplomatU8View png, nucleation::diplomat::capi::DiplomatWrite* write);
 
     typedef struct ResourcePack_register_mesh_exporter_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} ResourcePack_register_mesh_exporter_result;
     ResourcePack_register_mesh_exporter_result ResourcePack_register_mesh_exporter(const nucleation::capi::ResourcePack* self);
@@ -229,6 +235,39 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
         width,
         height,
         {pixels.data(), pixels.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline std::string nucleation::ResourcePack::player_skin_urls_json(const nucleation::Schematic& schematic) {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::ResourcePack_player_skin_urls_json(schematic.AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void nucleation::ResourcePack::player_skin_urls_json_write(const nucleation::Schematic& schematic, W& writeable) {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::ResourcePack_player_skin_urls_json(schematic.AsFFI(),
+        &write);
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::ResourcePack::add_player_skin(std::string_view url_or_hash, nucleation::diplomat::span<const uint8_t> png) {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::ResourcePack_add_player_skin(this->AsFFI(),
+        {url_or_hash.data(), url_or_hash.size()},
+        {png.data(), png.size()},
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::ResourcePack::add_player_skin_write(std::string_view url_or_hash, nucleation::diplomat::span<const uint8_t> png, W& writeable) {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::ResourcePack_add_player_skin(this->AsFFI(),
+        {url_or_hash.data(), url_or_hash.size()},
+        {png.data(), png.size()},
+        &write);
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
