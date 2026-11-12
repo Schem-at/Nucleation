@@ -884,6 +884,7 @@ void RenderConfig_clear_grid(RenderConfig* self);
 void RenderConfig_set_orthographic(RenderConfig* self, bool orthographic);
 void RenderConfig_set_isometric(RenderConfig* self);
 void RenderConfig_destroy(RenderConfig* self);
+void Renderer_last_error_detail(DiplomatWrite* write);
 typedef struct Renderer_render_pixels_b64_result { union { NucleationError err; }; bool is_ok; } Renderer_render_pixels_b64_result;
 Renderer_render_pixels_b64_result Renderer_render_pixels_b64(Schematic* schematic, DiplomatU8View pack_zip, RenderConfig* config, DiplomatWrite* write);
 typedef struct Renderer_render_png_b64_result { union { NucleationError err; }; bool is_ok; } Renderer_render_png_b64_result;

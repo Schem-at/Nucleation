@@ -22,6 +22,8 @@ namespace diplomat {
 namespace capi {
     extern "C" {
 
+    void Renderer_last_error_detail(diplomat::capi::DiplomatWrite* write);
+
     typedef struct Renderer_render_pixels_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Renderer_render_pixels_b64_result;
     Renderer_render_pixels_b64_result Renderer_render_pixels_b64(const diplomat::capi::Schematic* schematic, diplomat::capi::DiplomatU8View pack_zip, const diplomat::capi::RenderConfig* config, diplomat::capi::DiplomatWrite* write);
 
@@ -45,6 +47,18 @@ namespace capi {
     } // extern "C"
 } // namespace capi
 } // namespace
+
+inline std::string Renderer::last_error_detail() {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::Renderer_last_error_detail(&write);
+    return output;
+}
+template<typename W>
+inline void Renderer::last_error_detail_write(W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::Renderer_last_error_detail(&write);
+}
 
 inline diplomat::result<std::string, NucleationError> Renderer::render_pixels_b64(const Schematic& schematic, diplomat::span<const uint8_t> pack_zip, const RenderConfig& config) {
     std::string output;

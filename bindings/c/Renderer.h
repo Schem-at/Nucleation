@@ -19,6 +19,8 @@
 
 
 
+void Renderer_last_error_detail(DiplomatWrite* write);
+
 typedef struct Renderer_render_pixels_b64_result {union { NucleationError err;}; bool is_ok;} Renderer_render_pixels_b64_result;
 Renderer_render_pixels_b64_result Renderer_render_pixels_b64(const Schematic* schematic, DiplomatU8View pack_zip, const RenderConfig* config, DiplomatWrite* write);
 

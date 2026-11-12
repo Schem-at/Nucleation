@@ -36,6 +36,16 @@ class Renderer {
 public:
 
   /**
+   * Why the last render on this thread failed, in words; empty after
+   * a successful render. A render that is refused because a resource
+   * limit is too small for the software Vulkan driver says which limit
+   * and how much it needs.
+   */
+  inline static std::string last_error_detail();
+  template<typename W>
+  inline static void last_error_detail_write(W& writeable_output);
+
+  /**
    * Render a schematic to raw RGBA pixel bytes, written as base64
    * (PORTING rule 6). `pack_zip` is a resource-pack zip in memory.
    */

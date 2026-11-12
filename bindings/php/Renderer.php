@@ -14,6 +14,12 @@ final class Renderer {
         $this->borrowedFrom = $borrowedFrom;
     }
 
+    public static function lastErrorDetail() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->Renderer_last_error_detail($write);
+        return Lib::readAndFreeWrite($write);
+    }
+
     public static function renderPixelsB64( $schematic, array $pack_zip,  $config) {
         $__n1 = count($pack_zip);
         $__view1 = Lib::ffi()->new('DiplomatU8View');

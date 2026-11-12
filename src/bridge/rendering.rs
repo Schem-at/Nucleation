@@ -12,6 +12,12 @@
 //! Omitted from port: `render_pixels_free` — buffer memory management is
 //! obsolete; pixel/PNG bytes cross as base64 strings (PORTING rule 6).
 
+/// Record a render failure's message for `Renderer::last_error_detail`.
+fn render_failed(e: impl std::fmt::Display) -> super::shared::ffi::NucleationError {
+    crate::bridge::set_last_error_detail(e.to_string());
+    super::shared::ffi::NucleationError::Render
+}
+
 #[diplomat::bridge]
 pub mod ffi {
     use super::super::meshing::ffi::ResourcePack;
@@ -178,6 +184,14 @@ pub mod ffi {
     pub struct Renderer;
 
     impl Renderer {
+        /// Why the last render on this thread failed, in words; empty after
+        /// a successful render. A render that is refused because a resource
+        /// limit is too small for the software Vulkan driver says which limit
+        /// and how much it needs.
+        pub fn last_error_detail(out: &mut DiplomatWrite) {
+            let _ = write!(out, "{}", crate::bridge::last_error_detail());
+        }
+
         fn mesh(
             schematic: &Schematic,
             pack_zip: &[u8],
@@ -209,9 +223,10 @@ pub mod ffi {
             config: &RenderConfig,
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
+            crate::bridge::clear_last_error_detail();
             let mesh = Self::mesh(schematic, pack_zip)?;
             let pixels = crate::rendering::render_meshes(&[mesh], &config.0, None)
-                .map_err(|_| NucleationError::Render)?;
+                .map_err(super::render_failed)?;
             let _ = write!(
                 out,
                 "{}",
@@ -228,9 +243,10 @@ pub mod ffi {
             config: &RenderConfig,
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
+            crate::bridge::clear_last_error_detail();
             let mesh = Self::mesh(schematic, pack_zip)?;
             let png = crate::rendering::render_meshes_png(&[mesh], &config.0, None)
-                .map_err(|_| NucleationError::Render)?;
+                .map_err(super::render_failed)?;
             let _ = write!(
                 out,
                 "{}",
@@ -246,13 +262,14 @@ pub mod ffi {
             config: &RenderConfig,
             path: &DiplomatStr,
         ) -> Result<(), NucleationError> {
+            crate::bridge::clear_last_error_detail();
             let path = std::str::from_utf8(path).map_err(|_| NucleationError::InvalidArgument)?;
             let pack = crate::meshing::ResourcePackSource::from_bytes(pack_zip)
                 .map_err(|_| NucleationError::Parse)?;
             schematic
                 .0
                 .render_to_file(&pack, path, &config.0)
-                .map_err(|_| NucleationError::Render)
+                .map_err(super::render_failed)
         }
         /// Render with an already parsed resource pack, avoiding repeated ZIP parsing.
         pub fn render_to_file_with_pack(
@@ -261,11 +278,12 @@ pub mod ffi {
             config: &RenderConfig,
             path: &DiplomatStr,
         ) -> Result<(), NucleationError> {
+            crate::bridge::clear_last_error_detail();
             let path = std::str::from_utf8(path).map_err(|_| NucleationError::InvalidArgument)?;
             schematic
                 .0
                 .render_to_file(&pack.0, path, &config.0)
-                .map_err(|_| NucleationError::Render)
+                .map_err(super::render_failed)
         }
 
         /// Render raw RGBA pixels with an already parsed resource pack.
@@ -275,9 +293,10 @@ pub mod ffi {
             config: &RenderConfig,
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
+            crate::bridge::clear_last_error_detail();
             let mesh = Self::mesh_with_pack(schematic, pack)?;
             let pixels = crate::rendering::render_meshes(&[mesh], &config.0, None)
-                .map_err(|_| NucleationError::Render)?;
+                .map_err(super::render_failed)?;
             let _ = write!(
                 out,
                 "{}",
@@ -293,9 +312,10 @@ pub mod ffi {
             config: &RenderConfig,
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
+            crate::bridge::clear_last_error_detail();
             let mesh = Self::mesh_with_pack(schematic, pack)?;
             let png = crate::rendering::render_meshes_png(&[mesh], &config.0, None)
-                .map_err(|_| NucleationError::Render)?;
+                .map_err(super::render_failed)?;
             let _ = write!(
                 out,
                 "{}",

@@ -7,6 +7,7 @@ import com.sun.jna.Structure
 
 internal interface RendererLib: Library {
     fun Renderer_destroy(handle: Pointer)
+    fun Renderer_last_error_detail(write: Pointer): Unit
     fun Renderer_render_pixels_b64(schematic: Pointer, packZip: Slice, config: Pointer, write: Pointer): ResultUnitInt
     fun Renderer_render_png_b64(schematic: Pointer, packZip: Slice, config: Pointer, write: Pointer): ResultUnitInt
     fun Renderer_render_to_file(schematic: Pointer, packZip: Slice, config: Pointer, path: Slice): ResultUnitInt
@@ -42,6 +43,20 @@ class Renderer internal constructor (
     companion object {
         internal val libClass: Class<RendererLib> = RendererLib::class.java
         internal val lib: RendererLib = Native.load("nucleation", libClass)
+        @JvmStatic
+
+        /** Why the last render on this thread failed, in words; empty after
+        *a successful render. A render that is refused because a resource
+        *limit is too small for the software Vulkan driver says which limit
+        *and how much it needs.
+        */
+        fun lastErrorDetail(): String {
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.Renderer_last_error_detail(write);
+
+            val returnString = DW.writeToString(write)
+            return returnString
+        }
         @JvmStatic
 
         /** Render a schematic to raw RGBA pixel bytes, written as base64

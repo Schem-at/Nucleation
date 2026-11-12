@@ -22,6 +22,8 @@ namespace nucleation {
 namespace capi {
     extern "C" {
 
+    void Renderer_last_error_detail(nucleation::diplomat::capi::DiplomatWrite* write);
+
     typedef struct Renderer_render_pixels_b64_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Renderer_render_pixels_b64_result;
     Renderer_render_pixels_b64_result Renderer_render_pixels_b64(const nucleation::capi::Schematic* schematic, nucleation::diplomat::capi::DiplomatU8View pack_zip, const nucleation::capi::RenderConfig* config, nucleation::diplomat::capi::DiplomatWrite* write);
 
@@ -45,6 +47,18 @@ namespace capi {
     } // extern "C"
 } // namespace capi
 } // namespace
+
+inline std::string nucleation::Renderer::last_error_detail() {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::Renderer_last_error_detail(&write);
+    return output;
+}
+template<typename W>
+inline void nucleation::Renderer::last_error_detail_write(W& writeable) {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::Renderer_last_error_detail(&write);
+}
 
 inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Renderer::render_pixels_b64(const nucleation::Schematic& schematic, nucleation::diplomat::span<const uint8_t> pack_zip, const nucleation::RenderConfig& config) {
     std::string output;

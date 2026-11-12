@@ -43,6 +43,27 @@ export class Renderer {
 
 
     /**
+     * Why the last render on this thread failed, in words; empty after
+     * a successful render. A render that is refused because a resource
+     * limit is too small for the software Vulkan driver says which limit
+     * and how much it needs.
+     */
+    static lastErrorDetail() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Renderer_last_error_detail(write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
      * Render a schematic to raw RGBA pixel bytes, written as base64
      * (PORTING rule 6). `pack_zip` is a resource-pack zip in memory.
      */

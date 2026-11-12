@@ -227,8 +227,9 @@ Without a GPU, wgpu falls back to Mesa's lavapipe CPU driver. When the process
 has `RLIMIT_FSIZE` (`ulimit -f`) or `RLIMIT_AS` (`ulimit -v`) set, lavapipe can
 kill it with SIGBUS or SIGSEGV instead of returning an error. On Linux the
 renderer checks both limits before creating the device. If either is too
-small, the render fails with a `ResourceLimit` error (`NucleationError` with
-code `Render` in Python) and the process keeps running.
+small, the render fails with a `ResourceLimit` error and the process keeps
+running. Bindings raise a `Render` error; `Renderer.last_error_detail()` says
+which limit was too small and what it needs.
 
 `RLIMIT_AS` is the limit most likely to be too small. glibc reserves about
 128 MiB of address space for each lavapipe worker thread, and lavapipe starts
