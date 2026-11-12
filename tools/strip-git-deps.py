@@ -90,7 +90,7 @@ for marker in (
         sys.exit(f"strip-git-deps: marker still present after rewrite: {marker!r}")
 # Positive checks: meshing/rendering must survive, with a versioned mesher dep.
 for marker in (
-    'meshing = ["schematic-mesher"]',
+    'meshing = ["schematic-mesher"',
     "rendering = [",
     'schematic-mesher = { version = "',
 ):
