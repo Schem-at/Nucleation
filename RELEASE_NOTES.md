@@ -1,3 +1,28 @@
+# Nucleation v0.12.1
+
+- Resource packs: model elements may use the multi-axis rotation from
+  Minecraft 1.21.11 (`x`/`y`/`z`, applied X then Y then Z, rescaled per
+  axis as vanilla does). These models used to be skipped with "missing field
+  `axis`" (#64).
+- Player heads render with their owner's skin. `ResourcePack.player_skin_urls_json`
+  lists the skin URLs a schematic needs, and `ResourcePack.add_player_skin`
+  registers a downloaded PNG (64x64, or legacy 64x32). A head without a
+  registered skin gets vanilla's default skin for its UUID. Both `profile` and
+  pre-1.20.5 `SkullOwner` are read.
+- Fixed: player heads sat in the wrong place and faced the wrong way. Wall
+  heads now sit against their wall and floor heads follow `rotation`, the
+  same as mob skulls.
+- Dragon and piglin heads use their vanilla models (jaw, nostrils, horns,
+  ears, snout) instead of a plain cube.
+- schematic-mesher 0.2.1.
+- Rendering without a GPU (Mesa lavapipe) no longer crashes the process when
+  `RLIMIT_FSIZE` or `RLIMIT_AS` is set (#63). CPU adapters allocate device
+  memory in small blocks, so a 64 px render needs about 6 MiB of file-size
+  limit instead of 72 MiB. On Linux, limits too small for lavapipe fail the
+  render with `RenderError::ResourceLimit` instead of SIGBUS/SIGSEGV;
+  `NUCLEATION_SKIP_RLIMIT_CHECK=1` skips the check.
+- `Renderer.last_error_detail()` says why a render failed in every binding.
+
 # Nucleation v0.12.0
 
 - A region's bounds are now what it was created or loaded with, grown by
