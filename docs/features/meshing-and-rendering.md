@@ -221,6 +221,24 @@ A transparent PNG needs an RGBA background with alpha below 1. The fixture uses
 placing the horizontal grid just below `y = -0.5` keeps it under blocks centered
 at integer Y.
 
+### Software rendering under resource limits
+
+Without a GPU, wgpu falls back to Mesa's lavapipe CPU driver. When the process
+has `RLIMIT_FSIZE` (`ulimit -f`) or `RLIMIT_AS` (`ulimit -v`) set, lavapipe can
+kill it with SIGBUS or SIGSEGV instead of returning an error. On Linux the
+renderer checks both limits before creating the device. If either is too
+small, the render fails with a `ResourceLimit` error (`NucleationError` with
+code `Render` in Python) and the process keeps running.
+
+`RLIMIT_AS` is the limit most likely to be too small. glibc reserves about
+128 MiB of address space for each lavapipe worker thread, and lavapipe starts
+one per CPU. With 12 CPUs the check asks for about 3 GiB. Setting
+`MALLOC_ARENA_MAX=2` brings that down to about 750 MiB, and `LP_NUM_THREADS`
+starts fewer workers. `RLIMIT_FSIZE` must cover the device memory for one
+render: about 12 MiB plus 12 bytes per output pixel, so a 2048×2048 render needs
+about 60 MiB. If the check rejects limits that work on your host, set
+`NUCLEATION_SKIP_RLIMIT_CHECK=1` to skip it.
+
 ## Verify the guide
 
 The verifier executes all three mesh sources against the same pack, checks

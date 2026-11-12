@@ -415,6 +415,27 @@ impl GpuRenderer {
             }
         };
 
+        // A CPU adapter (lavapipe/llvmpipe) backs every allocation with one
+        // growing memfd. The default `Performance` hints reserve 64-128 MiB
+        // host blocks, which is most of a small RLIMIT_FSIZE before anything
+        // is drawn; `MemoryUsage` starts at 4 MiB blocks (issue #63).
+        let cpu_adapter = adapter.get_info().device_type == wgpu::DeviceType::Cpu;
+        let memory_hints = if cpu_adapter {
+            wgpu::MemoryHints::MemoryUsage
+        } else {
+            wgpu::MemoryHints::default()
+        };
+
+        // lavapipe does not check its own allocations: past RLIMIT_FSIZE it
+        // touches memory beyond the end of its memfd (SIGBUS), and past
+        // RLIMIT_AS it writes through a NULL malloc result while starting its
+        // worker threads (SIGSEGV). Neither can be caught after the fact, so
+        // refuse before `request_device` when the limits are visibly too small.
+        #[cfg(target_os = "linux")]
+        if cpu_adapter {
+            cpu_driver_limits::preflight(meshes, width, height, hdri)?;
+        }
+
         // wgpu 30: single-argument `request_device` (the trace path moved into
         // the descriptor), and `DeviceDescriptor` has no `Default`.
         let (device, queue) = adapter
@@ -423,7 +444,7 @@ impl GpuRenderer {
                 required_features: wgpu::Features::FLOAT32_FILTERABLE,
                 required_limits: wgpu::Limits::default(),
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
-                memory_hints: wgpu::MemoryHints::default(),
+                memory_hints,
                 trace: wgpu::Trace::Off,
             })
             .await
@@ -1542,6 +1563,382 @@ impl GpuRenderer {
         }
 
         Ok(pixels)
+    }
+}
+
+/// Preflight for the software Vulkan driver's resource needs (issue #63).
+///
+/// lavapipe (Mesa's CPU Vulkan driver) fails in two ways under a tight
+/// `setrlimit`, and neither returns an error:
+///
+/// - It backs all device memory with one memfd that it grows with
+///   `ftruncate`. Past `RLIMIT_FSIZE` the `ftruncate` fails with `EFBIG`
+///   (Python ignores the accompanying SIGXFSZ, other processes die from it),
+///   lavapipe maps the region anyway, and the first write is a SIGBUS.
+/// - `vkCreateDevice` starts one rasterizer thread per allowed CPU plus
+///   helpers. Each thread's first `malloc` makes glibc reserve a 128 MiB
+///   arena. Past `RLIMIT_AS` those reservations fail, `malloc` returns NULL,
+///   and lavapipe writes through it: a SIGSEGV.
+///
+/// Under `RLIMIT_AS` the outcome is not monotonic in the limit: a limit can
+/// crash (SIGSEGV, SIGABRT or a hang in lavapipe) while a slightly smaller one
+/// happens to work. The constants below were fitted to the highest limit that
+/// still failed, on Mesa 25.0.7 / Debian 13 with 4, 8 and 12 CPUs, with and
+/// without `MALLOC_ARENA_MAX=2` and `LP_NUM_THREADS=1`; the estimate lands
+/// 80-190 MiB above it. Set `NUCLEATION_SKIP_RLIMIT_CHECK=1` to bypass the
+/// check if it is wrong for a host.
+#[cfg(target_os = "linux")]
+mod cpu_driver_limits {
+    use super::{HdriData, MeshLayer, MeshOutput, RenderError};
+
+    const MIB: u64 = 1024 * 1024;
+    /// Environment variable that disables the preflight.
+    pub(super) const SKIP_ENV: &str = "NUCLEATION_SKIP_RLIMIT_CHECK";
+    /// memfd growth that is independent of scene size: wgpu's internal
+    /// buffers plus the first `MemoryUsage` blocks.
+    const FILE_BASE: u64 = 12 * MIB;
+    /// Address space lavapipe maps during device creation beyond its threads
+    /// (LLVM JIT state, command pools).
+    const AS_BASE: u64 = 32 * MIB;
+    /// Per-thread stack plus guard and thread-local state (measured: about
+    /// 18 MiB per CPU with `MALLOC_ARENA_MAX=2`).
+    const AS_PER_THREAD: u64 = 18 * MIB;
+    /// A new glibc per-thread arena. glibc maps 2 x HEAP_MAX_SIZE (128 MiB on
+    /// 64-bit) and trims it to an aligned 64 MiB heap; with threads starting
+    /// together the measured cost is about 123 MiB each.
+    const AS_PER_ARENA: u64 = 125 * MIB;
+    /// llvmpipe never starts more rasterizer threads than this.
+    const LP_MAX_THREADS: u64 = 32;
+
+    /// What the driver will need, beyond what the process already maps.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(super) struct Need {
+        /// Largest size the driver's memfd will reach.
+        pub file_bytes: u64,
+        /// Address space the driver will add to the current `VmSize`.
+        pub address_space_bytes: u64,
+        /// Threads the estimate assumes the driver starts.
+        pub threads: u64,
+    }
+
+    /// The parts of the environment that change lavapipe's appetite.
+    #[derive(Debug, Clone, Copy)]
+    pub(super) struct DriverEnv {
+        /// CPUs this process may run on (lavapipe sizes its pools from it).
+        pub cpus: u64,
+        /// `LP_NUM_THREADS`, if set.
+        pub lp_num_threads: Option<u64>,
+        /// glibc's arena cap: `MALLOC_ARENA_MAX`, the
+        /// `glibc.malloc.arena_max` tunable, or 8 per CPU.
+        pub arena_max: u64,
+    }
+
+    impl DriverEnv {
+        fn from_process(cpus: u64) -> Self {
+            let num = |name: &str| std::env::var(name).ok().and_then(|v| v.trim().parse().ok());
+            let tunable = std::env::var("GLIBC_TUNABLES").ok().and_then(|t| {
+                t.split(':')
+                    .find_map(|kv| kv.strip_prefix("glibc.malloc.arena_max="))
+                    .and_then(|v| v.parse().ok())
+            });
+            Self {
+                cpus,
+                lp_num_threads: num("LP_NUM_THREADS"),
+                arena_max: tunable
+                    .or_else(|| num("MALLOC_ARENA_MAX"))
+                    .filter(|&n| n > 0)
+                    .unwrap_or(8 * cpus),
+            }
+        }
+    }
+
+    /// Bytes of device memory one render allocates: mesh buffers, atlases,
+    /// the HDRI, and the colour, depth and readback targets.
+    pub(super) fn device_bytes(
+        meshes: &[MeshOutput],
+        width: u32,
+        height: u32,
+        hdri: Option<&HdriData>,
+    ) -> u64 {
+        let layer = |l: &MeshLayer| -> u64 {
+            [
+                l.positions_bytes().len(),
+                l.normals_bytes().len(),
+                l.uvs_bytes().len(),
+                l.colors_bytes().len(),
+                l.indices_bytes().len(),
+            ]
+            .iter()
+            .map(|&n| n as u64)
+            .sum()
+        };
+        let meshes: u64 = meshes
+            .iter()
+            .map(|m| {
+                layer(&m.opaque)
+                    + layer(&m.cutout)
+                    + layer(&m.transparent)
+                    + u64::from(m.atlas.width) * u64::from(m.atlas.height) * 4
+            })
+            .sum();
+        let hdri = hdri.map_or(0, |h| u64::from(h.width) * u64::from(h.height) * 16);
+        let padded_row = (u64::from(width) * 4).next_multiple_of(256);
+        let frame = u64::from(width) * u64::from(height) * 8 + padded_row * u64::from(height);
+        // Uploads pass through a staging copy of the same size.
+        2 * (meshes + hdri) + frame
+    }
+
+    pub(super) fn estimate(device_bytes: u64, env: &DriverEnv) -> Need {
+        let cpus = env.cpus.max(1);
+        let rasterizers = env.lp_num_threads.unwrap_or(cpus).min(LP_MAX_THREADS);
+        // Queue and fence threads.
+        let helpers = 2;
+        let threads = rasterizers + helpers;
+        // The main thread already owns the main arena. Earlier threads (the
+        // mesher's pool) may have used up a small cap already, but assuming
+        // they did not keeps the estimate on the safe side.
+        let arenas = threads.min(env.arena_max.saturating_sub(1));
+        let file_bytes = FILE_BASE + device_bytes;
+        Need {
+            file_bytes,
+            address_space_bytes: AS_BASE
+                + threads * AS_PER_THREAD
+                + arenas * AS_PER_ARENA
+                + file_bytes,
+            threads,
+        }
+    }
+
+    /// The soft limit on a `/proc/self/limits` row; `None` when unlimited
+    /// or absent.
+    pub(super) fn soft_limit(limits: &str, row: &str) -> Option<u64> {
+        let rest = limits.lines().find_map(|l| l.strip_prefix(row))?;
+        rest.split_whitespace().next()?.parse().ok()
+    }
+
+    /// A `kB` field of `/proc/self/status`, in bytes.
+    pub(super) fn status_kib(status: &str, field: &str) -> Option<u64> {
+        let rest = status.lines().find_map(|l| l.strip_prefix(field))?;
+        let kib: u64 = rest
+            .trim_start_matches(':')
+            .split_whitespace()
+            .next()?
+            .parse()
+            .ok()?;
+        Some(kib * 1024)
+    }
+
+    /// Count of CPUs in `Cpus_allowed_list` (e.g. `0-3,8,10-11` is 7).
+    pub(super) fn allowed_cpus(status: &str) -> Option<u64> {
+        let rest = status
+            .lines()
+            .find_map(|l| l.strip_prefix("Cpus_allowed_list:"))?;
+        let mut count = 0;
+        for part in rest.trim().split(',').filter(|p| !p.is_empty()) {
+            count += match part.split_once('-') {
+                Some((a, b)) => b.parse::<u64>().ok()? + 1 - a.parse::<u64>().ok()?,
+                None => {
+                    part.parse::<u64>().ok()?;
+                    1
+                }
+            };
+        }
+        (count > 0).then_some(count)
+    }
+
+    fn mib(bytes: u64) -> u64 {
+        bytes.div_ceil(MIB)
+    }
+
+    /// Compare the limits with the estimate; `Err` carries the message.
+    pub(super) fn check(
+        file_limit: Option<u64>,
+        as_limit: Option<u64>,
+        vm_size: u64,
+        need: &Need,
+        reduced: &Need,
+    ) -> Result<(), String> {
+        let skip = format!("set {SKIP_ENV}=1 to skip this check");
+        if let Some(limit) = file_limit {
+            if limit < need.file_bytes {
+                return Err(format!(
+                    "RLIMIT_FSIZE is {} MiB, but the software Vulkan driver (lavapipe) keeps \
+                     device memory in one file that will reach about {} MiB for this render; \
+                     past the limit it crashes with SIGBUS. Raise RLIMIT_FSIZE \
+                     (`ulimit -f`) or render at a smaller size, or {skip}.",
+                    limit / MIB,
+                    mib(need.file_bytes),
+                ));
+            }
+        }
+        if let Some(limit) = as_limit {
+            let total = vm_size + need.address_space_bytes;
+            if limit < total {
+                return Err(format!(
+                    "RLIMIT_AS is {} MiB, but the software Vulkan driver (lavapipe) needs about \
+                     {} MiB: {} MiB already mapped plus about {} MiB for its {} threads and \
+                     device memory; past the limit it crashes with SIGSEGV. Raise RLIMIT_AS to \
+                     at least {} MiB, or lower the driver's need to about {} MiB with \
+                     MALLOC_ARENA_MAX=2 and LP_NUM_THREADS=1, or {skip}.",
+                    limit / MIB,
+                    mib(total),
+                    mib(vm_size),
+                    mib(need.address_space_bytes),
+                    need.threads,
+                    mib(total),
+                    mib(vm_size + reduced.address_space_bytes),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn preflight(
+        meshes: &[MeshOutput],
+        width: u32,
+        height: u32,
+        hdri: Option<&HdriData>,
+    ) -> Result<(), RenderError> {
+        if std::env::var_os(SKIP_ENV).is_some_and(|v| !v.is_empty() && v != "0") {
+            return Ok(());
+        }
+        let Ok(limits) = std::fs::read_to_string("/proc/self/limits") else {
+            return Ok(());
+        };
+        let file_limit = soft_limit(&limits, "Max file size");
+        let as_limit = soft_limit(&limits, "Max address space");
+        if file_limit.is_none() && as_limit.is_none() {
+            return Ok(());
+        }
+        let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
+        let vm_size = status_kib(&status, "VmSize").unwrap_or(0);
+        let cpus = allowed_cpus(&status)
+            .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get() as u64));
+        let env = DriverEnv::from_process(cpus);
+        let bytes = device_bytes(meshes, width, height, hdri);
+        let need = estimate(bytes, &env);
+        let reduced = estimate(
+            bytes,
+            &DriverEnv {
+                lp_num_threads: Some(1),
+                arena_max: 2,
+                ..env
+            },
+        );
+        check(file_limit, as_limit, vm_size, &need, &reduced).map_err(RenderError::ResourceLimit)
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod cpu_driver_limits_tests {
+    use super::cpu_driver_limits::*;
+
+    const MIB: u64 = 1024 * 1024;
+
+    const LIMITS: &str = "\
+Limit                     Soft Limit           Hard Limit           Units
+Max cpu time              unlimited            unlimited            seconds
+Max file size             67108864             unlimited            bytes
+Max data size             unlimited            unlimited            bytes
+Max address space         unlimited            unlimited            bytes
+";
+
+    fn env(cpus: u64) -> DriverEnv {
+        DriverEnv {
+            cpus,
+            lp_num_threads: None,
+            arena_max: 8 * cpus,
+        }
+    }
+
+    #[test]
+    fn parses_soft_limits_and_treats_unlimited_as_none() {
+        assert_eq!(soft_limit(LIMITS, "Max file size"), Some(64 * MIB));
+        assert_eq!(soft_limit(LIMITS, "Max address space"), None);
+        assert_eq!(soft_limit(LIMITS, "Max nonexistent"), None);
+    }
+
+    #[test]
+    fn parses_status_fields() {
+        let status = "Name:\tpython\nVmPeak:\t  70000 kB\nVmSize:\t   67584 kB\n\
+                      Cpus_allowed_list:\t0-3,8,10-11\n";
+        assert_eq!(status_kib(status, "VmSize"), Some(67584 * 1024));
+        assert_eq!(allowed_cpus(status), Some(7));
+        assert_eq!(allowed_cpus("Cpus_allowed_list:\t5\n"), Some(1));
+        assert_eq!(allowed_cpus("Name:\tx\n"), None);
+    }
+
+    #[test]
+    fn address_space_grows_with_cpus_and_arenas_dominate() {
+        let small = estimate(0, &env(4));
+        let large = estimate(0, &env(12));
+        assert!(large.address_space_bytes > small.address_space_bytes);
+        assert!(large.threads > small.threads);
+
+        let capped = estimate(
+            0,
+            &DriverEnv {
+                arena_max: 2,
+                ..env(12)
+            },
+        );
+        assert!(capped.address_space_bytes * 3 < large.address_space_bytes);
+        // Arena and thread counts do not change the file the driver grows.
+        assert_eq!(capped.file_bytes, large.file_bytes);
+    }
+
+    #[test]
+    fn lp_num_threads_is_capped_like_llvmpipe() {
+        let a = estimate(
+            0,
+            &DriverEnv {
+                lp_num_threads: Some(32),
+                ..env(12)
+            },
+        );
+        let b = estimate(
+            0,
+            &DriverEnv {
+                lp_num_threads: Some(500),
+                ..env(12)
+            },
+        );
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn frame_size_drives_file_need() {
+        let small = device_bytes(&[], 64, 64, None);
+        let large = device_bytes(&[], 2048, 2048, None);
+        assert!(large >= 2048 * 2048 * 12);
+        assert!(estimate(large, &env(4)).file_bytes > estimate(small, &env(4)).file_bytes);
+    }
+
+    #[test]
+    fn check_reports_the_limit_that_is_too_small() {
+        let need = estimate(device_bytes(&[], 64, 64, None), &env(12));
+        let reduced = estimate(
+            0,
+            &DriverEnv {
+                lp_num_threads: Some(1),
+                arena_max: 2,
+                ..env(12)
+            },
+        );
+        assert!(check(None, None, 0, &need, &reduced).is_ok());
+        assert!(check(Some(u64::MAX), Some(u64::MAX), 0, &need, &reduced).is_ok());
+
+        let fsize = check(Some(MIB), None, 0, &need, &reduced).unwrap_err();
+        assert!(fsize.contains("RLIMIT_FSIZE is 1 MiB"), "{fsize}");
+        assert!(fsize.contains("NUCLEATION_SKIP_RLIMIT_CHECK=1"), "{fsize}");
+
+        let vm = 300 * MIB;
+        let address = check(None, Some(1024 * MIB), vm, &need, &reduced).unwrap_err();
+        assert!(address.contains("RLIMIT_AS is 1024 MiB"), "{address}");
+        assert!(address.contains("MALLOC_ARENA_MAX=2"), "{address}");
+        // Exactly enough passes.
+        let exact = vm + need.address_space_bytes;
+        assert!(check(None, Some(exact), vm, &need, &reduced).is_ok());
     }
 }
 

@@ -190,6 +190,11 @@ pub enum RenderError {
     VideoEncode(String),
     /// I/O error.
     Io(std::io::Error),
+    /// A process resource limit (`RLIMIT_FSIZE` or `RLIMIT_AS`) is too small
+    /// for the software (CPU) Vulkan driver. Checked before device creation
+    /// on Linux, because lavapipe does not check its own allocations and
+    /// would otherwise kill the process with SIGBUS or SIGSEGV.
+    ResourceLimit(String),
 }
 
 impl std::fmt::Display for RenderError {
@@ -204,6 +209,7 @@ impl std::fmt::Display for RenderError {
             Self::PngEncode(e) => write!(f, "PNG encoding failed: {}", e),
             Self::VideoEncode(e) => write!(f, "Video encoding failed: {}", e),
             Self::Io(e) => write!(f, "I/O error: {}", e),
+            Self::ResourceLimit(e) => write!(f, "Resource limit too small for rendering: {}", e),
         }
     }
 }
