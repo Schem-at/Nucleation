@@ -5,10 +5,18 @@ name: Nucleation CI/CD
 on:
   push:
     tags: [ 'v*' ]
+    # Retry publication without moving a release tag or rebuilding artifacts.
+    branches: [ 'release-recovery/*' ]
   workflow_dispatch:
+    inputs:
+      resume_run_id:
+        description: "Resume publishing an existing tag run whose builds all passed (leave empty to build)"
+        required: false
+        type: string
 
 permissions:
   contents: write
+  actions: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -29,14 +37,67 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       should_release: ${{ steps.version.outputs.should_release }}
+      artifact_run_id: ${{ steps.resume.outputs.run_id || github.run_id }}
+      release_sha: ${{ steps.resume.outputs.sha || github.sha }}
+      resuming: ${{ steps.resume.outputs.run_id != '' }}
     steps:
+      - name: Validate artifacts for release recovery
+        if: inputs.resume_run_id != '' || startsWith(github.ref, 'refs/heads/release-recovery/')
+        id: resume
+        uses: actions/github-script@v7
+        env:
+          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+        with:
+          script: |
+            const input = process.env.RESUME_RUN_ID || context.ref.replace('refs/heads/release-recovery/', '');
+            if (!/^[1-9][0-9]*$/.test(input) || !Number.isSafeInteger(Number(input))) {
+              throw new Error('resume_run_id must be a numeric workflow run ID');
+            }
+            const run_id = Number(input);
+            const repo = context.repo;
+            const {data: run} = await github.rest.actions.getWorkflowRun({...repo, run_id});
+            if (run.event !== 'push' || run.path !== '.github/workflows/ci.yml' ||
+                run.status !== 'completed' || !/^v[0-9]+\.[0-9]+\.[0-9]+$/.test(run.head_branch)) {
+              throw new Error('Recovery requires a completed ci.yml release tag run in this repository');
+            }
+            const {data: tag} = await github.rest.git.getRef({...repo, ref: `tags/${run.head_branch}`});
+            let object = tag.object;
+            for (let depth = 0; object.type === 'tag' && depth < 10; depth++) {
+              const {data: annotated} = await github.rest.git.getTag({...repo, tag_sha: object.sha});
+              object = annotated.object;
+            }
+            if (object.type !== 'commit' || object.sha !== run.head_sha) {
+              throw new Error('The release tag no longer identifies the artifact source commit');
+            }
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun,
+              {...repo, run_id, filter: 'latest', per_page: 100});
+            const required = {
+              'check-version': 1, tests: 1, bindings: 1, smoke: 1,
+              'test-store-backends': 1, 'build-wasm': 1, 'build-nucleation': 5,
+              'build-python-wheels': 2, 'build-python-linux-wheel': 1,
+              'build-python-sdist': 1, 'assemble-jvm-jar': 1,
+            };
+            for (const [name, count] of Object.entries(required)) {
+              const matches = jobs.filter(job => job.name === name || job.name.startsWith(`${name} (`));
+              if (matches.length !== count || matches.some(job => job.conclusion !== 'success')) {
+                throw new Error(`Cannot recover: ${name} must have ${count} successful jobs`);
+              }
+            }
+            core.setOutput('run_id', String(run_id));
+            core.setOutput('sha', run.head_sha);
+            core.setOutput('tag', run.head_branch);
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resume.outputs.sha || github.sha }}
       - name: Determine version
         id: version
+        env:
+          RESUME_TAG: ${{ steps.resume.outputs.tag }}
         run: |
           CARGO_VERSION=$(grep -m1 'version = ' Cargo.toml | cut -d '"' -f2)
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$GITHUB_REF" == refs/tags/v* || -n "$RESUME_TAG" ]]; then
+            RELEASE_TAG="${RESUME_TAG:-$GITHUB_REF_NAME}"
+            TAG_VERSION="${RELEASE_TAG#v}"
             if [[ "$CARGO_VERSION" != "$TAG_VERSION" ]]; then
               echo "Tag $TAG_VERSION does not match Cargo.toml version $CARGO_VERSION" >&2
               exit 1
@@ -56,6 +117,8 @@ jobs:
           fi
 
   tests:
+    needs: check-version
+    if: needs.check-version.outputs.resuming != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -82,6 +145,8 @@ jobs:
   # bindings must regenerate byte-identically from src/bridge (fresh + deterministic),
   # and the bridge must cover the entire pre-migration FFI surface.
   bindings:
+    needs: check-version
+    if: needs.check-version.outputs.resuming != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -102,6 +167,8 @@ jobs:
         run: python3 tools/check_bridge_coverage.py
 
   smoke:
+    needs: check-version
+    if: needs.check-version.outputs.resuming != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -138,6 +205,8 @@ jobs:
   # services. testcontainers spins throwaway containers via the runner's docker,
   # so no service-container declarations are needed.
   test-store-backends:
+    needs: check-version
+    if: needs.check-version.outputs.resuming != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -510,31 +579,67 @@ jobs:
 
   publish:
     needs: [check-version, build-wasm, build-nucleation, build-python-wheels, build-python-linux-wheel, build-python-sdist, assemble-jvm-jar, smoke]
-    if: needs.check-version.outputs.should_release == 'true'
+    if: >-
+      !cancelled() && needs.check-version.result == 'success' &&
+      needs.check-version.outputs.should_release == 'true' &&
+      (needs.check-version.outputs.resuming == 'true' ||
+       (!contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') &&
+        !contains(needs.*.result, 'skipped')))
     runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check-version.outputs.release_sha }}
 
       - name: Download npm package
         uses: actions/download-artifact@v4
         with:
           name: nucleation-npm-v${{ needs.check-version.outputs.version }}
           path: npm-pkg
+          run-id: ${{ needs.check-version.outputs.artifact_run_id }}
+          github-token: ${{ github.token }}
       - name: Download all nucleation native libraries
         uses: actions/download-artifact@v4
         with:
           pattern: nucleation-v${{ needs.check-version.outputs.version }}-*
           path: release-artifacts
+          run-id: ${{ needs.check-version.outputs.artifact_run_id }}
+          github-token: ${{ github.token }}
       - name: Download JVM JAR
         uses: actions/download-artifact@v4
         with:
           name: nucleation-jvm-jar-v${{ needs.check-version.outputs.version }}
           path: release-artifacts
+          run-id: ${{ needs.check-version.outputs.artifact_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Check whether the Rust crate is already published
+        id: crate
+        env:
+          RELEASE_VERSION: ${{ needs.check-version.outputs.version }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.error, urllib.request
+          version = os.environ['RELEASE_VERSION']
+          try:
+              with urllib.request.urlopen(f'https://crates.io/api/v1/crates/nucleation/{version}', timeout=30) as response:
+                  published = json.load(response)['version']
+              assert published['num'] == version and not published['yanked'], 'Unexpected or yanked published crate'
+              exists = True
+          except urllib.error.HTTPError as error:
+              if error.code != 404:
+                  raise
+              exists = False
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'exists={str(exists).lower()}\n')
+          PY
 
       - name: Publish to crates.io (registry-incompatible features stripped)
+        if: steps.crate.outputs.exists != 'true'
         # crates.io can't take the MCHPRS git deps or unpublished workspace
         # crates, so the published crate ships without simulation, mc-tick,
         # routing, and hdl; use the git dependency to get them.
@@ -553,15 +658,22 @@ jobs:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
       - name: Publish npm package
+        id: npm
+        continue-on-error: true
         # Skip-if-published so a partially-failed release run can be retried
         # (npm hard-fails on republishing an existing version).
         run: |
+          set -o pipefail
           cd npm-pkg
           VERSION=$(node -p "require('./package.json').version")
           if npm view "nucleation@$VERSION" version >/dev/null 2>&1; then
             echo "nucleation@$VERSION already on npm; skipping"
           else
-            npm publish --provenance --access public
+            if ! npm publish --provenance --access public 2>&1 | tee "$RUNNER_TEMP/npm-publish.log"; then
+              error_code=$(sed -n 's/^npm error code //p' "$RUNNER_TEMP/npm-publish.log" | head -1)
+              echo "::error::npm publication failed (${error_code:-see npm step log}); remaining release uploads will still be attempted"
+              exit 1
+            fi
           fi
 
       - name: Download all Python wheels
@@ -570,16 +682,22 @@ jobs:
           pattern: python-wheels-*
           path: python-dist
           merge-multiple: true
+          run-id: ${{ needs.check-version.outputs.artifact_run_id }}
+          github-token: ${{ github.token }}
       - name: Download Python source distribution
         uses: actions/download-artifact@v4
         with:
           name: python-sdist
           path: python-dist
+          run-id: ${{ needs.check-version.outputs.artifact_run_id }}
+          github-token: ${{ github.token }}
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Publish Python wheels to PyPI
+        id: pypi
+        continue-on-error: true
         run: |
           python -m pip install --upgrade pip twine
           python -m twine upload --non-interactive --skip-existing python-dist/*
@@ -607,3 +725,9 @@ jobs:
           name: Release v${{ needs.check-version.outputs.version }}
           generate_release_notes: true
           files: release-assets/*
+
+      - name: Report registry publication failures
+        if: always() && (steps.npm.outcome == 'failure' || steps.pypi.outcome == 'failure')
+        run: |
+          echo "::error::A package registry upload failed. Successful uploads were retained; resume this release after resolving the error."
+          exit 1
