@@ -713,6 +713,26 @@ impl<'a> TickCtx<'a> {
         self.world.set(pos, state);
     }
 
+    /// Finish a moving piston: derive the landed state, run its placement hook,
+    /// then notify neighbors and finally the landed block itself. In particular,
+    /// a landed piston queues its power check before waking the piston below it.
+    pub(crate) fn land_moved_block(&mut self, pos: Pos, state: StateId) {
+        self.set_quiet(pos, state);
+        self.update_self_shapes(pos);
+        self.drain();
+        let state = self.world.get(pos);
+        if let Some(behaviour) = self.behaviours.and_then(|table| table.get(state)) {
+            behaviour.on_placed(self, pos);
+        }
+        self.drain();
+        self.updates.push(UpdateEntry::neighbors_at(pos));
+        self.drain();
+        self.updates.push(UpdateEntry::neighbor_shapes(pos));
+        self.drain();
+        self.notify(pos, Dir::Down);
+        self.drain();
+    }
+
     /// Set the state at `pos`, recording it, without notifying its neighbours.
     ///
     /// Vanilla's piston moves write their placeholders and vacated slots with
@@ -761,6 +781,28 @@ impl<'a> TickCtx<'a> {
         self.indirect_shapes(pos, previous);
         self.updates.push(UpdateEntry::neighbor_shapes(pos));
         self.indirect_shapes(pos, state);
+    }
+
+    /// Piston movement writes (flags 82/324). `UPDATE_MOVE_BY_PISTON` still
+    /// invokes the removed block's callback even without ordinary neighbor
+    /// updates. A moved, pulsing observer must withdraw its output here.
+    pub(crate) fn set_piston_moved(&mut self, pos: Pos, state: StateId, shapes: bool) {
+        let previous = self.world.get(pos);
+        if previous == state {
+            return;
+        }
+        self.set_quiet(pos, state);
+        if !self.states.same_block(previous, state) {
+            if let Some(behaviour) = self.behaviours.and_then(|table| table.get(previous)) {
+                behaviour.on_removed(self, pos);
+                self.drain();
+            }
+        }
+        if shapes {
+            self.indirect_shapes(pos, previous);
+            self.updates.push(UpdateEntry::neighbor_shapes(pos));
+            self.indirect_shapes(pos, state);
+        }
     }
 
     /// Keep the block-entity tick list in step with a write — see

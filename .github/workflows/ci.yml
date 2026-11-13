@@ -63,6 +63,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run tests
         run: cargo test
+      - name: Test tick engine and scenario regressions
+        run: cargo test --locked -p mc-tick -p mc-test
       - name: Test snapshot indexing and coverage-certified world extraction
         run: |
           cargo test --no-default-features --features world-segment,store-fs,store-ssh --lib world_segment

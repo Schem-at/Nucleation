@@ -224,6 +224,21 @@ pub trait PowerSource: Send + Sync {
             0
         }
     }
+
+    /// A comparator's side input (`SignalGetter.getControlInputSignal`).
+    /// Unlike ordinary power, this does not pass through solid conductors.
+    /// Implementations with directional emitters must read their direct signal;
+    /// dust contributes its stored level regardless of its connections.
+    /// Simple power models default to their ordinary signal reading.
+    fn control_input_signal(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        toward: Dir,
+    ) -> u8 {
+        self.signal_strength(world, outs, pos, toward)
+    }
 }
 
 /// How a comparator combines its rear and side inputs.
@@ -695,7 +710,7 @@ impl<P: PowerSource> Comparator<P> {
             .into_iter()
             .map(|dir| {
                 self.power
-                    .signal_strength(world, outs, pos.offset(dir), dir.opposite())
+                    .control_input_signal(world, outs, pos.offset(dir), dir.opposite())
             })
             .max()
             .unwrap_or(0);
@@ -1084,7 +1099,8 @@ impl<P: PowerSource> BlockBehaviour for Hopper<P> {
         });
         let enabled = !powered;
         if enabled != self.enabled {
-            ctx.set_quiet(pos, self.states.get(enabled));
+            // Flag 2 still notifies observers through updateShape.
+            ctx.set_shape_only(pos, self.states.get(enabled));
         }
     }
 
@@ -2124,7 +2140,7 @@ impl<P: PowerSource> BlockBehaviour for Door<P> {
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         let signal = self.signal_at(ctx, pos) || self.signal_at(ctx, pos.offset(self.other_half));
         if signal != self.powered {
-            ctx.set_quiet(pos, self.states.get(signal));
+            ctx.set_shape_only(pos, self.states.get(signal));
         }
     }
 

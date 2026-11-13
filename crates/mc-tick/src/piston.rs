@@ -925,9 +925,9 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     // the piston holds a placeholder, because that one resolves into
                     // the head rather than emptying.
                     if *from != head_slot && !destinations.contains(from) {
-                        ctx.set_quiet(*from, StateId::AIR);
+                        ctx.set_piston_moved(*from, StateId::AIR, false);
                     }
-                    ctx.set_shape_only(to, self.moving_block);
+                    ctx.set_piston_moved(to, self.moving_block, true);
                     // Each placeholder's shape updates run before the next one
                     // is written. `moveBlocks` is not itself dispatching a
                     // neighbour update, so `CollectingNeighborUpdater.addAndRun`
@@ -950,7 +950,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     );
                 }
                 // The head slot is itself in motion until the move completes.
-                ctx.set_shape_only(head_slot, self.moving);
+                ctx.set_piston_moved(head_slot, self.moving, true);
                 ctx.drain();
                 ctx.defer_source_arm(
                     head_slot,
@@ -1146,20 +1146,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     } else {
                         landed.state
                     };
-                    ctx.set(head, state);
-                    // `finalTick` lands through `setBlock`, so `onPlace` runs
-                    // for whatever landed — same hook as the short-pulse drop
-                    // below, and a no-op for the air a source piston leaves.
-                    if let Some(behaviour) = ctx.behaviours.and_then(|table| table.get(state)) {
-                        behaviour.on_placed(ctx, head);
-                    }
-                    ctx.drain();
-                    // `finalTick` ends with `neighborChanged` at its own
-                    // position, whether it runs from the block-entity phase or
-                    // from here inside `triggerEvent`. Same call, same place in
-                    // the sequence — after the write's own notifications.
-                    ctx.notify(head, Dir::Down);
-                    ctx.drain();
+                    ctx.land_moved_block(head, state);
                 }
                 ctx.set(pos, self.moving);
                 // The base is what *lands*; the head is what *travels*. Vanilla's
@@ -1206,40 +1193,14 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                         // head: it is finalised where it is and *not* pulled — the
                         // short-pulse drop.
                         let landed = ctx.moves.remove(index);
-                        ctx.set(target, landed.state);
-                        // `finalTick` opens with `updateFromNeighbourShapes` on
-                        // the state it is about to land — the same call the
-                        // ordinary two-tick landing makes. Skipping it here left
-                        // a dropped **observer** deaf to the world it woke up
-                        // in: `ObserverBlock.updateShape` is what calls
-                        // `startSignal`, and it fires for any observer that
-                        // lands unpowered, so a pushed observer pulses two ticks
-                        // after it settles. Without it the observer this piston
-                        // drops never signals, and a piston diagonal to it —
-                        // quasi-powered through the cell above — never fires.
-                        //
-                        // Drained before `onPlace`, not merely queued. The order
-                        // is load-bearing in the other direction too: an
-                        // observer dropped mid-pulse still carries `powered`
-                        // when the shape update reaches it, so it does *not*
-                        // re-schedule, and only then does `onPlace` clear the
-                        // flag. Clearing first would start a pulse vanilla never
-                        // starts.
-                        ctx.update_self_shapes(target);
-                        ctx.drain();
-                        // `finalTick` lands through `setBlock`, and `onPlace`
-                        // runs for the landed block exactly as for an ordinary
-                        // landing. A **piston** dropped in place re-checks its
-                        // power right here, inside the events phase, and a
-                        // queued extension chains into this same phase — the
-                        // record door's repositioned west piston lands at
-                        // (7,0) and fires the very same tick, which is what
-                        // closes the doorway's bottom-middle cell.
-                        if let Some(behaviour) =
-                            ctx.behaviours.and_then(|table| table.get(landed.state))
-                        {
-                            behaviour.on_placed(ctx, target);
-                        }
+                        ctx.land_moved_block(
+                            target,
+                            if landed.source_piston {
+                                StateId::AIR
+                            } else {
+                                landed.state
+                            },
+                        );
                         ctx.set(head, StateId::AIR);
                     } else if id == TRIGGER_CONTRACT {
                         // `moveBlocks` begins a retraction by silently clearing a
@@ -1303,7 +1264,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                                 // Flag 324, the same as a push: the placeholder
                                 // write propagates shape, and does so before the
                                 // next one is written.
-                                ctx.set_shape_only(to, self.moving_block);
+                                ctx.set_piston_moved(to, self.moving_block, true);
                                 ctx.drain();
                                 ctx.defer(
                                     to,
@@ -1317,7 +1278,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                             }
                             for (from, _) in &carried {
                                 if !destinations.contains(from) {
-                                    ctx.set_quiet(*from, StateId::AIR);
+                                    ctx.set_piston_moved(*from, StateId::AIR, false);
                                 }
                             }
                             // Flag 82 is silent, so `moveBlocks` runs the shape

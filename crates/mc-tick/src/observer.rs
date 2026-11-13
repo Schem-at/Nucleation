@@ -71,6 +71,14 @@ impl Observer {
 }
 
 impl BlockBehaviour for Observer {
+    /// A pulsing observer that is removed (including by a piston) must notify
+    /// its output immediately: its scheduled turn-off will no longer find it.
+    fn on_removed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if self.powered && ctx.ticks.is_pending(pos) {
+            self.update_neighbors_in_front(ctx, pos);
+        }
+    }
+
     fn on_neighbor_changed(&self, _ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
         // `ObserverBlock` has **no** neighborChanged override: an observer is
         // deaf to neighbour updates entirely. Its trigger is the *shape*

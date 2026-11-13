@@ -200,6 +200,8 @@ pub struct VanillaRules {
     /// `isSignalSource`: whether the block *can* emit, powered or not — which
     /// is what decides whether dust turns to face it.
     signal_sources: StateSet,
+    /// Redstone blocks bypass the direct-signal gate for comparator side inputs.
+    redstone_blocks: StateSet,
     /// Blocks dust can climb: `canSurviveOn`, i.e. a sturdy upward face.
     sturdy_up: StateSet,
     /// `PushReaction.DESTROY`: broken by a push rather than carried.
@@ -1285,6 +1287,27 @@ impl PowerSource for VanillaRules {
         }
         strength
     }
+
+    fn control_input_signal(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        toward: Dir,
+    ) -> u8 {
+        let state = world.get(pos);
+        if self.redstone_blocks.contains(&state) {
+            15
+        } else if let Some((power, _)) = self.wires.get(&state) {
+            *power
+        } else if self.signal_sources.contains(&state)
+            && self.strong_into.get(&state) == Some(&toward)
+        {
+            self.emitted(world, outs, pos, toward, false)
+        } else {
+            0
+        }
+    }
     fn is_diode(&self, world: &World, pos: Pos) -> bool {
         self.diodes.contains_key(&world.get(pos))
     }
@@ -1294,6 +1317,15 @@ impl PowerSource for VanillaRules {
 }
 
 impl PowerSource for Arc<VanillaRules> {
+    fn control_input_signal(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        toward: Dir,
+    ) -> u8 {
+        self.as_ref().control_input_signal(world, outs, pos, toward)
+    }
     fn leaf_distance(&self, world: &World, pos: Pos) -> u8 {
         <VanillaRules as PowerSource>::leaf_distance(self.as_ref(), world, pos)
     }
@@ -1767,7 +1799,10 @@ pub fn register_all_at(
     };
     for (id, descriptor) in &descriptors {
         match descriptor.name.as_str() {
-            n if CONSTANT_SOURCES.contains(&n) => rules.powered.push(*id),
+            n if CONSTANT_SOURCES.contains(&n) => {
+                rules.powered.push(*id);
+                rules.redstone_blocks.push(*id);
+            }
             "minecraft:slime_block" => {
                 rules.slime.push(*id);
             }
@@ -4391,6 +4426,70 @@ mod tests {
         assert!(
             !rules.is_powered(&world, &Default::default(), Pos::new(1, 0, 0), Dir::East),
             "glass does not conduct"
+        );
+    }
+
+    #[test]
+    fn comparator_side_inputs_use_direct_sources_and_ignore_wire_connections() {
+        let mut registry = StateRegistry::new();
+        let descriptors = [
+            ("minecraft:redstone_block", [15, 15, 15, 15, 15, 15]),
+            (
+                "minecraft:redstone_wire[east=none,north=none,power=7,south=none,west=none]",
+                [7, 7, 7, 7, 7, 7],
+            ),
+            (
+                "minecraft:lever[face=wall,facing=east,powered=true]",
+                [0, 0, 0, 0, 15, 0],
+            ),
+            ("minecraft:redstone_torch[lit=true]", [0, 15, 0, 0, 0, 0]),
+            (
+                "minecraft:observer[facing=west,powered=true]",
+                [0, 0, 0, 0, 0, 15],
+            ),
+            (
+                "minecraft:comparator[facing=west,mode=compare,powered=true]",
+                [0, 0, 0, 0, 0, 9],
+            ),
+            ("minecraft:observer[facing=west,powered=false]", [0; 6]),
+            ("minecraft:stone", [0; 6]),
+        ];
+        let states: Vec<_> = descriptors
+            .iter()
+            .map(|(name, _)| registry.intern(name).unwrap())
+            .collect();
+        let mut table = BehaviourTable::new();
+        let rules = register_all(&mut registry, &mut table);
+        let pos = Pos::new(0, 0, 0);
+        let mut world = World::new(crate::Bounds::new(Pos::new(-2, -2, -2), Pos::new(2, 2, 2)));
+        let mut outputs = crate::behaviour::ComparatorOutputs::new();
+        outputs.insert(pos, 9);
+        let directions = [
+            Dir::Down,
+            Dir::Up,
+            Dir::North,
+            Dir::South,
+            Dir::West,
+            Dir::East,
+        ];
+        for (state, (name, expected)) in states.iter().zip(descriptors) {
+            world.set(pos, *state);
+            for (direction, strength) in directions.into_iter().zip(expected) {
+                assert_eq!(
+                    rules.control_input_signal(&world, &outputs, pos, direction),
+                    strength,
+                    "{name} toward {direction:?}"
+                );
+            }
+        }
+        // Strongly powered stone emits ordinary power on every face, but is
+        // still not a comparator side source. This is the Hipster door's wool.
+        world.set(pos, *states.last().unwrap());
+        world.set(pos.offset(Dir::West), states[4]);
+        assert_eq!(rules.signal_strength(&world, &outputs, pos, Dir::East), 15);
+        assert_eq!(
+            rules.control_input_signal(&world, &outputs, pos, Dir::East),
+            0
         );
     }
 

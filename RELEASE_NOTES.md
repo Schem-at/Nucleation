@@ -1,3 +1,19 @@
+# Nucleation v0.12.2
+
+- Fixed piston landing callbacks running after neighbor updates, which could
+  make the lower piston move before the upper piston in compact doors.
+- Moving an active observer now immediately notifies its output that power
+  was removed, allowing dependent pistons to retract in the same tick.
+- Hopper and iron-door state changes now send the shape updates observers
+  listen to.
+- Comparator side inputs use direct-source power: powered solid blocks no
+  longer count, and redstone dust contributes its stored signal strength.
+- The supplied SpaceWalker/SoulBanished 3x3 Hipster door matches Minecraft
+  1.21.11 at every tick-end block snapshot across two complete close/open
+  cycles (640 ticks), with a captured vanilla regression fixture.
+- npm/WASM, Python, JVM, and native bindings are rebuilt with the corrected
+  tick engine. The public binding API is unchanged.
+
 # Nucleation v0.12.1
 
 - Resource packs: model elements may use the multi-axis rotation from
