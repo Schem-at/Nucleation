@@ -30,7 +30,7 @@ use crate::entity_kind::{EntityKind, EntityTable};
 use crate::observer::Observer;
 use crate::piston::{Movability, Piston, Sticky};
 use crate::pos::{Dir, Pos};
-use crate::state::{StateId, StateRegistry, StateSet};
+use crate::state::{StateId, StateRegistry, StateSet, StateTable};
 use crate::world::World;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -150,7 +150,7 @@ pub struct VanillaRules {
     /// (`WeightedPressurePlateBlock.getSignalStrength`), carried in its `power`
     /// property. Everything else in `powered` answers 15, so without this a
     /// plate holding one item would drive a full-strength line.
-    analog_emission: HashMap<StateId, u8>,
+    analog_emission: StateTable<u8>,
     /// Detector rails, for the comparator's container-cart read.
     detector_rails: StateSet,
     /// Double-chest halves: `(is_first, direction of the partner half)`.
@@ -159,7 +159,7 @@ pub struct VanillaRules {
     /// half's partner is clockwise of its facing, a RIGHT half's counter-
     /// clockwise), and `getBlockType` makes the RIGHT half FIRST in the
     /// combined container — its slots come before the left half's.
-    chest_halves: HashMap<StateId, (bool, Dir)>,
+    chest_halves: StateTable<(bool, Dir)>,
     /// Chest states whose lid a solid block can pin shut — a *blocked*
     /// chest's analog reads 0 (`ChestBlock.getContainer` answers null).
     lidded_chests: StateSet,
@@ -170,21 +170,21 @@ pub struct VanillaRules {
     /// omnidirectional source made a pulsing observer power the very note block
     /// it was watching, which re-triggered it forever. States absent from this
     /// map emit every way, like a redstone block.
-    emit_only: HashMap<StateId, Dir>,
+    emit_only: StateTable<Dir>,
     /// States that **strongly** power the block in the given direction.
     ///
     /// A strongly powered conductor re-emits weak power on every face —
     /// `Level.getSignal` falls back to `getDirectSignal` when the queried block
     /// `isRedstoneConductor`. This is how an observer drives a piston through a
     /// slime block (captured: `flying_machine.json`, tick 1).
-    strong_into: HashMap<StateId, Dir>,
+    strong_into: StateTable<Dir>,
     /// States that conduct strong power.
     ///
     /// Growing this list is capture-driven: slime is on it because the flying
     /// machine's trace proves the signal crossed it. Glass famously is not.
     conductors: StateSet,
     /// Container states and their slot counts, for the comparator's analog read.
-    containers: HashMap<StateId, u32>,
+    containers: StateTable<u32>,
     /// Crafter states use occupied-or-disabled slot count instead of ordinary
     /// container fullness for their comparator output.
     crafters: StateSet,
@@ -193,10 +193,10 @@ pub struct VanillaRules {
     /// Full-cube states, for hopper-suction blocking and item collision.
     full_cubes: StateSet,
     /// Wire states: power level and horizontal connections (true = side or up).
-    wires: HashMap<StateId, (u8, [crate::wire::WireSide; 4])>,
+    wires: StateTable<(u8, [crate::wire::WireSide; 4])>,
     /// `(power, connections)` -> the wire state with that shape, for the
     /// connection recompute in `RedStoneWireBlock.updateShape`.
-    wire_shapes: HashMap<(u8, [crate::wire::WireSide; 4]), StateId>,
+    wire_shapes: Vec<Option<StateId>>,
     /// `isSignalSource`: whether the block *can* emit, powered or not — which
     /// is what decides whether dust turns to face it.
     signal_sources: StateSet,
@@ -207,38 +207,46 @@ pub struct VanillaRules {
     /// `PushReaction.DESTROY`: broken by a push rather than carried.
     destroyed_by_push: StateSet,
     /// A leaf state's `distance`, and the log states that count as distance 0.
-    leaf_distance: HashMap<StateId, u8>,
+    leaf_distance: StateTable<u8>,
     logs: StateSet,
     /// Repeater states, which dust faces only along their axis.
     repeaters: StateSet,
     /// Observer states and the direction they look, which is the only face
     /// dust turns toward.
-    observer_facing: HashMap<StateId, Dir>,
-    /// `(wire state, power)` -> the same shape at that power.
-    wire_siblings: HashMap<(StateId, u8), StateId>,
+    observer_facing: StateTable<Dir>,
     immovable: StateSet,
     /// `PushReaction.PUSH_ONLY` — shoved, never dragged back. See
     /// [`crate::piston::Movability::push_only`].
     push_only: StateSet,
     slime: StateSet,
     honey: StateSet,
-    diodes: HashMap<StateId, Dir>,
+    diodes: StateTable<Dir>,
     /// Water per state: plain water blocks, waterlogged states and bubble
     /// columns (`getFluidState`).
-    waters: HashMap<StateId, crate::fluid::WaterKind>,
+    waters: StateTable<crate::fluid::WaterKind>,
     /// The plain `minecraft:water` state for each legacy `level` value.
     water_levels: HashMap<u8, StateId>,
     /// Bubble columns: `Some(drag_down)`.
-    bubbles: HashMap<StateId, bool>,
+    bubbles: StateTable<bool>,
     /// Comparator states, whose emission is their stored strength.
     comparators: StateSet,
     /// States that emit in every direction **except** one — a lit redstone
     /// torch, which powers everything but the block beneath it
     /// (`RedstoneTorchBlock.getSignal` returns 0 for a query from below).
-    emit_except: HashMap<StateId, Dir>,
+    emit_except: StateTable<Dir>,
     /// States whose comparator read comes from the block state itself —
     /// a composter's `level` (0-8).
-    state_analog: HashMap<StateId, u8>,
+    state_analog: StateTable<u8>,
+}
+
+fn wire_shape_index(power: u8, sides: [crate::wire::WireSide; 4]) -> usize {
+    sides.into_iter().fold(power as usize, |index, side| {
+        index * 3 + match side {
+            crate::wire::WireSide::None => 0,
+            crate::wire::WireSide::Side => 1,
+            crate::wire::WireSide::Up => 2,
+        }
+    })
 }
 
 impl VanillaRules {
@@ -256,7 +264,18 @@ impl VanillaRules {
         toward: Dir,
         with_wires: bool,
     ) -> u8 {
-        let state = world.get(pos);
+        self.emitted_state(world, outs, pos, world.get(pos), toward, with_wires)
+    }
+
+    fn emitted_state(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        state: StateId,
+        toward: Dir,
+        with_wires: bool,
+    ) -> u8 {
         if self.powered.contains(&state)
             && self
                 .emit_only
@@ -292,20 +311,13 @@ impl VanillaRules {
         // block once the dust it climbs toward exists, and until then the
         // block is dark. A torch beside it reads that darkness and books the
         // tick that vanilla books.
-        if let Some((power, _)) = self.wires.get(&state) {
+        if let Some((power, stored)) = self.wires.get(&state) {
             if *power > 0 {
-                let connections = {
-                    let stored = self
-                        .wires
-                        .get(&state)
-                        .map(|(_, c)| *c)
-                        .unwrap_or([crate::wire::WireSide::None; 4]);
-                    crate::wire::connection_state(self, world, pos, stored)
-                };
                 match toward {
                     Dir::Down => return *power,
-                    Dir::Up => {}
+                    Dir::Up => return 0,
                     side => {
+                        let connections = crate::wire::connection_state(self, world, pos, *stored);
                         let index = match side {
                             Dir::North => 0,
                             Dir::South => 1,
@@ -341,10 +353,9 @@ impl VanillaRules {
             let neighbour = pos.offset(dir);
             let toward = dir.opposite();
             let state = world.get(neighbour);
-            let strong = if self.wires.contains_key(&state) {
-                self.emitted(world, outs, neighbour, toward, with_wires)
-            } else if self.strong_into.get(&state) == Some(&toward) {
-                self.emitted(world, outs, neighbour, toward, with_wires)
+            let strong = if (with_wires && self.wires.contains_key(&state))
+                || self.strong_into.get(&state) == Some(&toward) {
+                self.emitted_state(world, outs, neighbour, state, toward, with_wires)
             } else {
                 0
             };
@@ -363,8 +374,9 @@ impl VanillaRules {
         pos: Pos,
         toward: Dir,
     ) -> u8 {
-        let mut strength = self.emitted(world, outs, pos, toward, false);
-        if self.conductors.contains(&world.get(pos)) {
+        let state = world.get(pos);
+        let mut strength = self.emitted_state(world, outs, pos, state, toward, false);
+        if self.conductors.contains(&state) {
             strength = strength.max(self.direct_signal_to(world, outs, pos, false));
         }
         strength
@@ -634,8 +646,9 @@ impl crate::wire::WireWorld for VanillaRules {
     }
 
     fn wire_with_power(&self, world: &World, pos: Pos, power: u8) -> Option<StateId> {
-        let state = world.get(pos);
-        self.wire_siblings.get(&(state, power)).copied()
+        if power > 15 { return None; }
+        let (_, sides) = self.wires.get(&world.get(pos))?;
+        self.wire_with_shape(power, *sides)
     }
 
     fn wire_shape(&self, world: &World, pos: Pos) -> Option<(u8, [crate::wire::WireSide; 4])> {
@@ -643,7 +656,7 @@ impl crate::wire::WireWorld for VanillaRules {
     }
 
     fn wire_with_shape(&self, power: u8, sides: [crate::wire::WireSide; 4]) -> Option<StateId> {
-        self.wire_shapes.get(&(power, sides)).copied()
+        self.wire_shapes.get(wire_shape_index(power, sides)).copied().flatten()
     }
 
     fn should_connect_to(&self, world: &World, pos: Pos, from: Option<Dir>) -> bool {
@@ -1269,7 +1282,17 @@ impl PowerSource for VanillaRules {
         pos: Pos,
         toward: Dir,
     ) -> bool {
-        self.signal_strength(world, outs, pos, toward) > 0
+        let state = world.get(pos);
+        if self.emitted_state(world, outs, pos, state, toward, true) > 0 {
+            return true;
+        }
+        self.conductors.contains(&state) && crate::pos::ALL_DIRS.into_iter().any(|dir| {
+            let neighbour = pos.offset(dir);
+            let state = world.get(neighbour);
+            let toward = dir.opposite();
+            (self.wires.contains_key(&state) || self.strong_into.get(&state) == Some(&toward))
+                && self.emitted_state(world, outs, neighbour, state, toward, true) > 0
+        })
     }
 
     /// `Level.getSignal`: the block's own emission, and — when it conducts —
@@ -1281,8 +1304,9 @@ impl PowerSource for VanillaRules {
         pos: Pos,
         toward: Dir,
     ) -> u8 {
-        let mut strength = self.emitted(world, outs, pos, toward, true);
-        if self.conductors.contains(&world.get(pos)) {
+        let state = world.get(pos);
+        let mut strength = self.emitted_state(world, outs, pos, state, toward, true);
+        if self.conductors.contains(&state) {
             strength = strength.max(self.direct_signal_to(world, outs, pos, true));
         }
         strength
@@ -1925,7 +1949,11 @@ pub fn register_all_at(
             };
             let sides = [side("north"), side("south"), side("west"), side("east")];
             rules.wires.insert(*id, (power, sides));
-            rules.wire_shapes.insert((power, sides), *id);
+            let index = wire_shape_index(power, sides);
+            if rules.wire_shapes.len() <= index {
+                rules.wire_shapes.resize(index + 1, None);
+            }
+            rules.wire_shapes[index] = Some(*id);
         }
         // A powered diode, torch or observer is itself a source.
         let emits = match descriptor.name.as_str() {
@@ -2191,21 +2219,6 @@ pub fn register_all_at(
         }
     }
 
-    // Wire sibling map: every wire state's 16 power variants (same shape).
-    {
-        let wire_states: Vec<(StateId, [crate::wire::WireSide; 4])> = rules
-            .wires
-            .iter()
-            .map(|(id, (_, sides))| (*id, *sides))
-            .collect();
-        for (id, sides) in wire_states {
-            for power in 0u8..16 {
-                if let Some(sibling) = rules.wire_shapes.get(&(power, sides)).copied() {
-                    rules.wire_siblings.insert((id, power), sibling);
-                }
-            }
-        }
-    }
     // Behaviours only read the completed rules. Share that immutable table
     // instead of deep-cloning every map into every registered state.
     let rules = Arc::new(rules);
@@ -4828,5 +4841,43 @@ mod tests {
             .flag("extended"),
             "the piston inside the decoration must still extend"
         );
+    }
+}
+
+#[cfg(test)]
+mod indexed_wire_tests {
+    use super::*;
+    use crate::wire::{WireSide, WireWorld};
+    #[test]
+    fn every_shape_index_and_api_domain() {
+        let mut rules = VanillaRules::default();
+        let mut seen = vec![false; 256 * 81];
+        let mut world = World::new(crate::Bounds::new(Pos::new(-2,-2,-2), Pos::new(2,2,2)));
+        let pos = Pos::new(0,0,0);
+        assert_eq!(rules.wire_with_power(&world, pos, 0), None);
+        for power in 0..=u8::MAX {
+            for n in [WireSide::None, WireSide::Side, WireSide::Up] {
+                for s in [WireSide::None, WireSide::Side, WireSide::Up] {
+                    for w in [WireSide::None, WireSide::Side, WireSide::Up] {
+                        for e in [WireSide::None, WireSide::Side, WireSide::Up] {
+                            let sides = [n,s,w,e];
+                            let index = wire_shape_index(power, sides);
+                            assert!(!seen[index]); seen[index] = true;
+                            assert_eq!(rules.wire_with_shape(power, sides), None);
+                            rules.wire_shapes.resize(index + 1, None);
+                            let id = StateId((index + 1) as u16);
+                            rules.wire_shapes[index] = Some(id);
+                            rules.wires.insert(id, (power, sides));
+                            world.set(pos, id);
+                            assert_eq!(rules.wire_with_shape(power, sides), Some(id));
+                            assert_eq!(rules.wire_with_power(&world, pos, power), if power <= 15 {Some(id)} else {None});
+                        }
+                    }
+                }
+            }
+        }
+        assert!(seen.into_iter().all(|v| v));
+        world.set(pos, StateId(u16::MAX));
+        assert_eq!(rules.wire_with_power(&world,pos,0),None);
     }
 }

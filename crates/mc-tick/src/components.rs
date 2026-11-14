@@ -573,7 +573,7 @@ impl<P: PowerSource> BlockBehaviour for Torch<P> {
         // `MC_TICK_TRACE_NOTIFY` covers torches too: whether a torch schedules
         // depends on the world *at the instant it is notified*, which during a
         // placement cascade is not the world anyone can see afterwards.
-        if let Some(filter) = std::env::var_os("MC_TICK_TRACE_NOTIFY") {
+        if let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_NOTIFY") {
             let key = format!("{},{},{}", pos.x, pos.y, pos.z);
             if filter
                 .to_string_lossy()
@@ -700,7 +700,7 @@ impl<P: PowerSource> Comparator<P> {
         }
         // `MC_TICK_DEBUG_COMPARATOR=1` — every strength evaluation, with the
         // rear redstone and analog readings split out.
-        if std::env::var_os("MC_TICK_DEBUG_COMPARATOR").is_some() {
+        if crate::diagnostics::var_os("MC_TICK_DEBUG_COMPARATOR").is_some() {
             eprintln!(
                 "[cmp] at {pos:?} rear_pos {rear_pos:?} redstone {redstone} analog {:?} rear {rear}",
                 self.power.analog_signal(world, inventories, carts, rear_pos)

@@ -554,6 +554,17 @@ impl Simulation {
         }
     }
 
+    /// Discard and disable ordinary recording and its timeline without changing
+    /// simulation state. Update recording remains independent. `record()` can
+    /// subsequently start fresh logs.
+    pub fn discard_recording(&mut self) {
+        self.timeline = None;
+        self.log = None;
+        self.inv_log = None;
+        self.ent_log = None;
+        self.entity_snapshot.clear();
+    }
+
     /// Start a rich run timeline, including block deltas, input markers,
     /// piston strokes, and a canonical visible-world fingerprint per tick.
     ///
@@ -1799,7 +1810,7 @@ impl Simulation {
                 else {
                     continue;
                 };
-                if std::env::var_os("MC_TICK_TRACE_SHOVE").is_some() {
+                if crate::diagnostics::var_os("MC_TICK_TRACE_SHOVE").is_some() {
                     eprintln!(
                         "t{tick} SHOVE id={id} cart={is_cart} dest={destination:?} \
                          sweep={sweep:?} progress={progress} src={source_piston} \
@@ -1809,7 +1820,7 @@ impl Simulation {
                 let mut current = (min, max);
                 let apply = |sim: &mut Self, from: ([f64; 3], [f64; 3]), travel, amount| {
                     let moved = sim.shove(from.0, from.1, travel, amount, id, is_cart, shover);
-                    if std::env::var_os("MC_TICK_TRACE_SHOVE").is_some() {
+                    if crate::diagnostics::var_os("MC_TICK_TRACE_SHOVE").is_some() {
                         eprintln!(
                             "        APPLY id={id} travel={travel:?} asked={amount} moved={moved:?}"
                         );
@@ -3497,7 +3508,7 @@ impl Simulation {
     /// Run one phase. `Some(stop)` aborts the tick.
     fn run_phase(&mut self, phase: Phase) -> Option<StopReason> {
         self.phase = Some(phase);
-        if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+        if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
             eprintln!("[t{}] --- phase {}", self.tick, phase.name());
         }
         match phase {
@@ -3520,7 +3531,7 @@ impl Simulation {
                 // this drain. Draining into a Vec is what keeps that boundary
                 // sharp.
                 let due = self.ticks.collect_due(self.tick);
-                if std::env::var("MC_TICK_TRACE_SCHEDULE").is_ok() {
+                if crate::diagnostics::var("MC_TICK_TRACE_SCHEDULE").is_ok() {
                     let names: Vec<String> = due
                         .iter()
                         .map(|e| {
@@ -3730,7 +3741,7 @@ impl Simulation {
                     if previous == entry.state {
                         continue;
                     }
-                    if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+                    if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
                         eprintln!(
                             "[t{}] land   ({}, {}, {}) -> {}",
                             self.tick,
@@ -4053,7 +4064,7 @@ impl Simulation {
                 // `doBlockEvent`: an event whose position no longer holds the
                 // block it was queued for is refused and dropped. Properties may
                 // differ; only the block has to match.
-                let trace_events = std::env::var("MC_TICK_TRACE_EVENTS").is_ok();
+                let trace_events = crate::diagnostics::var("MC_TICK_TRACE_EVENTS").is_ok();
                 if !self.registry.same_block(state, event.block) {
                     if trace_events {
                         eprintln!(
@@ -4161,6 +4172,33 @@ mod tests {
 
     fn sim() -> Simulation {
         Simulation::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(7, 7, 7)))
+    }
+
+    #[test]
+    fn discard_recording_preserves_state_updates_and_allows_restart() {
+        let mut s = sim();
+        let stone = s.registry_mut().intern("minecraft:stone").unwrap();
+        s.record_timeline();
+        s.record_updates(true);
+        s.place_block(Pos::new(1,1,1), stone);
+        s.run(2);
+        let saved = format!("{:?}", s.checkpoint());
+        let updates = s.recorded_updates().to_vec();
+        assert!(!s.recorded().is_empty());
+        s.discard_recording();
+        assert_eq!(format!("{:?}", s.checkpoint()), saved);
+        assert_eq!(s.recorded_updates(), updates);
+        assert!(s.recorded_timeline().is_none());
+        assert!(s.log.is_none() && s.inv_log.is_none() && s.ent_log.is_none());
+        assert!(s.entity_snapshot.is_empty());
+        s.place_block(Pos::new(2,1,1), stone);
+        s.run(2);
+        assert!(s.recorded().is_empty());
+        assert!(s.recorded_updates().len() > updates.len());
+        s.record();
+        s.place_block(Pos::new(3,1,1), stone);
+        s.run(2);
+        assert!(!s.recorded().is_empty());
     }
 
     #[test]

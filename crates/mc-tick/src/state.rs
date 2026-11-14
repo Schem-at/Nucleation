@@ -257,3 +257,53 @@ impl FromIterator<StateId> for StateSet {
         set
     }
 }
+
+/// Sparse-preserving immutable-rule lookup indexed by a bounded registry ID.
+#[derive(Debug, Clone)]
+pub(crate) struct StateTable<T> {
+    values: Vec<Option<T>>,
+}
+
+impl<T> Default for StateTable<T> {
+    fn default() -> Self { Self { values: Vec::new() } }
+}
+
+impl<T> StateTable<T> {
+    pub(crate) fn insert(&mut self, id: StateId, value: T) -> Option<T> {
+        let index = id.0 as usize;
+        if index >= self.values.len() {
+            self.values.resize_with(index + 1, || None);
+        }
+        self.values[index].replace(value)
+    }
+    pub(crate) fn get(&self, id: &StateId) -> Option<&T> {
+        self.values.get(id.0 as usize).and_then(Option::as_ref)
+    }
+    pub(crate) fn contains_key(&self, id: &StateId) -> bool {
+        self.get(id).is_some()
+    }
+}
+
+#[cfg(test)]
+mod table_tests {
+    use super::*;
+    #[test]
+    fn sparse_zero_overwrite_and_clone() {
+        let mut table = StateTable::default();
+        assert_eq!(table.get(&StateId(8)), None);
+        assert_eq!(table.insert(StateId(u16::MAX), 0), None);
+        assert_eq!(table.get(&StateId(u16::MAX)), Some(&0));
+        assert_eq!(table.get(&StateId(8)), None);
+        assert_eq!(table.insert(StateId(8), 12), None);
+        let copy = table.clone();
+        assert_eq!(table.insert(StateId(8), 0), Some(12));
+        assert_eq!(copy.get(&StateId(8)), Some(&12));
+        assert_eq!(table.get(&StateId(8)), Some(&0));
+        struct NoDefault;
+        let _: StateTable<NoDefault> = StateTable::default();
+        let mut flags = StateTable::default();
+        flags.insert(StateId(2), false);
+        assert_eq!(flags.get(&StateId(2)), Some(&false));
+        assert_eq!(flags.get(&StateId(1)), None);
+    }
+}

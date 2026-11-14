@@ -26,3 +26,21 @@ Planned checkpoints:
 The existing Minecraft 1.21.11 golden trace is the starting parity reference.
 Its hipster fixture retains save data version 2730. A fresh reference-server
 run requires the reference archive; it is not a prerequisite for reconstruction.
+
+## Reconstruction checkpoint
+
+Reconstructed all seven retained changes (A–G), with five new regression tests:
+sparse state tables, all 20,736 wire shape indices, Java dust ordering over 3,500
+coordinate/origin combinations, world layout at negative/extreme coordinates,
+and recording disable/restart without altering state or update recording.
+No update queue experiments are included. No derived-power cache is included yet.
+
+Fresh validation on harrison-work, Rust 1.98.0 (88d9e12ae):
+
+- Released engine: 410 tests passed, 7 ignored (including doctests).
+- Reconstructed engine: 415 tests passed, 7 ignored.
+- WebAssembly check: passed (`wasm32-unknown-unknown`).
+- Bridge: 30 tests passed.
+
+Full logs are in `validation/`. These counts reflect this reconstructed test
+suite, not the historical 446-pass suite whose additional tests were not recovered.

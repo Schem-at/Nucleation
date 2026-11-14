@@ -31,6 +31,8 @@ const GROWTH_STEP: i32 = 16;
 pub struct World {
     bounds: Bounds,
     states: Vec<StateId>,
+    size: [u32; 3],
+    layer_stride: usize,
     /// Ceiling on [`World::grow_to_include`]; see [`DEFAULT_GROWTH_LIMIT`].
     growth_limit: u64,
 }
@@ -38,7 +40,11 @@ pub struct World {
 impl World {
     /// An all-air world covering `bounds`.
     pub fn new(bounds: Bounds) -> Self {
+        let (x, y, z) = bounds.size();
+        let size = [x, y, z];
         Self {
+            size,
+            layer_stride: size[0] as usize * size[2] as usize,
             bounds,
             states: vec![StateId::AIR; bounds.volume() as usize],
             growth_limit: DEFAULT_GROWTH_LIMIT,
@@ -107,9 +113,23 @@ impl World {
                 states[index] = *state;
             }
         }
+        let (x, y, z) = grown.size();
+        self.size = [x, y, z];
+        self.layer_stride = self.size[0] as usize * self.size[2] as usize;
         self.bounds = grown;
         self.states = states;
         true
+    }
+
+    #[inline]
+    fn index(&self, pos: Pos) -> Option<usize> {
+        let x = pos.x.wrapping_sub(self.bounds.min.x) as u32;
+        let y = pos.y.wrapping_sub(self.bounds.min.y) as u32;
+        let z = pos.z.wrapping_sub(self.bounds.min.z) as u32;
+        if x >= self.size[0] || y >= self.size[1] || z >= self.size[2] {
+            return None;
+        }
+        Some(y as usize * self.layer_stride + z as usize * self.size[0] as usize + x as usize)
     }
 
     /// The region this world covers.
@@ -131,7 +151,7 @@ impl World {
     /// structures with a margin of padding, not to complicate this call — and it
     /// is the trace differ's job to catch it if we forget.
     pub fn get(&self, pos: Pos) -> StateId {
-        match self.bounds.index(pos) {
+        match self.index(pos) {
             Some(index) => self.states[index],
             None => StateId::AIR,
         }
@@ -165,7 +185,7 @@ impl World {
                 return None;
             }
         }
-        let index = self.bounds.index(pos)?;
+        let index = self.index(pos)?;
         let previous = self.states[index];
         self.states[index] = state;
         Some(previous)
@@ -342,5 +362,25 @@ mod tests {
         world.set(Pos::new(1, 1, 1), StateId(9));
         assert_eq!(snapshot.get(Pos::new(1, 1, 1)), StateId(5));
         assert_eq!(world.get(Pos::new(1, 1, 1)), StateId(9));
+    }
+}
+
+#[cfg(test)]
+mod layout_tests {
+    use super::*;
+    #[test]
+    fn cached_layout_matches_bounds_at_negative_and_extreme_coordinates() {
+        for start in [-20, i32::MIN, i32::MAX - 8] {
+            let bounds = Bounds::new(Pos::new(start, start, start), Pos::new(start+3, start+4, start+5));
+            let world = World::new(bounds);
+            for x in [i32::MIN, -21, -20, -18, 0, i32::MAX, start, start+3, start+4] {
+                for y in [start, start+4, start+5, i32::MIN, i32::MAX] {
+                    for z in [start, start+5, start+6, i32::MIN, i32::MAX] {
+                        let p = Pos::new(x,y,z);
+                        assert_eq!(world.index(p), bounds.index(p), "{p:?}");
+                    }
+                }
+            }
+        }
     }
 }

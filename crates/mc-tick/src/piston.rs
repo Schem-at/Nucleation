@@ -332,7 +332,7 @@ fn add_block_line(
             return true;
         }
         if movability.is_empty(world, next) {
-            if std::env::var_os("MC_TICK_TRACE_LINE").is_some() {
+            if crate::diagnostics::var_os("MC_TICK_TRACE_LINE").is_some() {
                 eprintln!(
                     "       line from {:?} dir={push_dir:?} stopped: {:?} is empty ({} collected)",
                     (origin.x, origin.y, origin.z),
@@ -343,7 +343,7 @@ fn add_block_line(
             return true;
         }
         if !movability.is_movable(world, next) || next == piston {
-            if std::env::var_os("MC_TICK_TRACE_LINE").is_some() {
+            if crate::diagnostics::var_os("MC_TICK_TRACE_LINE").is_some() {
                 eprintln!(
                     "       line from {:?} dir={push_dir:?} FAILED at {:?}: immovable ({} collected)",
                     (origin.x, origin.y, origin.z),
@@ -360,7 +360,7 @@ fn add_block_line(
         // capture: if the game never breaks it, either the line is longer than
         // the game's or the block is not breakable at all. It was the second —
         // rails were listed as `DESTROY` and the game plainly pushes them.
-        if std::env::var_os("MC_TICK_TRACE_REACH").is_some() && movability.destroys(world, next) {
+        if crate::diagnostics::var_os("MC_TICK_TRACE_REACH").is_some() && movability.destroys(world, next) {
             eprintln!(
                 "[reach] piston={:?} dir={:?} line_origin={:?} reached={:?} collected={:?}",
                 (piston.x, piston.y, piston.z),
@@ -482,7 +482,7 @@ pub fn resolve_pull(
         &mut to_push,
         &mut to_destroy,
     ) {
-        if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+        if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
             eprintln!(
                 "       pull-fail line {:?} had {} collected: {:?}",
                 (piston.x, piston.y, piston.z),
@@ -506,7 +506,7 @@ pub fn resolve_pull(
                 &mut to_destroy,
             )
         {
-            if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+            if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
                 eprintln!(
                     "       pull-fail branch {:?} at {:?}, {} collected: {:?}",
                     (piston.x, piston.y, piston.z),
@@ -663,7 +663,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
     }
 
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
-        if std::env::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
+        if crate::diagnostics::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
             f.to_string_lossy().split(';').any(|t| {
                 let c: Vec<i32> = t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
                 c.len() == 3 && c[0] == pos.x && c[1] == pos.y && c[2] == pos.z
@@ -732,7 +732,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // A piston that is powered, unextended, and still silent is
                 // always a refused resolve — and which block refused it is the
                 // only thing worth knowing.
-                if std::env::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
+                if crate::diagnostics::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
                     f.to_string_lossy().split(';').any(|t| {
                         let c: Vec<i32> =
                             t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
@@ -797,7 +797,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     return false;
                 }
                 let plan = resolve_push(ctx.world, &self.movability, pos, self.facing);
-                if std::env::var("MC_TICK_TRACE_EVENTS").is_ok() {
+                if crate::diagnostics::var("MC_TICK_TRACE_EVENTS").is_ok() {
                     let names: Vec<String> = plan
                         .to_push
                         .iter()
@@ -1023,7 +1023,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // at the instant a retract is dispatched, which is the instant
                 // vanilla decides whether to refuse it. Both halves separately,
                 // because "powered" and "quasi-powered" fail in different ways.
-                if std::env::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
+                if crate::diagnostics::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
                     f.to_string_lossy().split(';').any(|t| {
                         let c: Vec<i32> =
                             t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
@@ -1126,7 +1126,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // first instead — as this did — puts a solid block in the
                 // quasi-connectivity ring a tick early, and a piston below
                 // reads power vanilla never gives it.
-                if std::env::var_os("MC_TICK_TRACE_RETRACT").is_some() {
+                if crate::diagnostics::var_os("MC_TICK_TRACE_RETRACT").is_some() {
                     eprintln!(
                         "[t{}] [retract] {:?} id={id} head={:?} head_state={} pending_at_head={}",
                         ctx.tick,
@@ -1215,7 +1215,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                         // The retract stroke gets the same trace the push does.
                         // Without it a pull that silently resolves to nothing is
                         // invisible, which is exactly how a failed one hid.
-                        if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+                        if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
                             let names: Vec<String> = plan
                                 .to_push
                                 .iter()

@@ -121,7 +121,7 @@ pub struct UpdateEntry {
 /// own, so the two sequences line up call for call. Granularity is the call,
 /// not the notification: one `neighbors_at` covers six neighbours.
 pub(crate) fn trace_update(kind: &str, pos: Pos) {
-    if std::env::var_os("MC_TICK_TRACE_UPDATES").is_some() {
+    if crate::diagnostics::var_os("MC_TICK_TRACE_UPDATES").is_some() {
         eprintln!("[upd] {kind} {} {} {}", pos.x, pos.y, pos.z);
     }
 }
@@ -132,7 +132,7 @@ pub(crate) fn trace_update(kind: &str, pos: Pos) {
 /// event log and the notification log, and that is where these have been
 /// hiding. This says who touched a block and with which flags.
 pub(crate) fn trace_write(kind: &str, pos: Pos, states: &StateRegistry, to: StateId) {
-    let Some(filter) = std::env::var_os("MC_TICK_TRACE_WRITE") else {
+    let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_WRITE") else {
         return;
     };
     let wanted = filter.to_string_lossy().split(';').any(|t| {
@@ -488,7 +488,7 @@ impl<'a> TickCtx<'a> {
                     state,
                 });
             }
-            if let Some(filter) = std::env::var_os("MC_TICK_TRACE_NOTIFY") {
+            if let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_NOTIFY") {
                 let filter = filter.to_string_lossy().to_string();
                 let key = format!("{},{},{}", pos.x, pos.y, pos.z);
                 if filter.split(';').any(|want| want.trim() == key) {
@@ -522,7 +522,7 @@ impl<'a> TickCtx<'a> {
         // `MC_TICK_TRACE_SCHED=x,y,z[;...]` — who books a tick, and in what
         // order. Two blocks scheduled for the same tick fire in insertion
         // order, so this is what decides races between them.
-        if let Some(filter) = std::env::var_os("MC_TICK_TRACE_SCHED") {
+        if let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_SCHED") {
             let wanted = filter.to_string_lossy().split(';').any(|t| {
                 let c: Vec<i32> = t.split(',').filter_map(|n| n.trim().parse().ok()).collect();
                 matches!(c[..], [x, y, z] if Pos::new(x, y, z) == pos)
@@ -563,7 +563,7 @@ impl<'a> TickCtx<'a> {
     /// Queue a block event for this tick's block-events phase.
     pub fn queue_event(&mut self, pos: Pos, id: u8, param: u8) {
         let block = self.world.get(pos);
-        if std::env::var("MC_TICK_TRACE_EVENTS").is_ok() {
+        if crate::diagnostics::var("MC_TICK_TRACE_EVENTS").is_ok() {
             eprintln!(
                 "[t{}] queue  {:?} id={} on {}",
                 self.tick,

@@ -86,3 +86,11 @@ cargo run -p mc-tick --example sim_summary -- path/to/build.snbt
 - [`docs/history/`](docs/history/) — the engineering record: the project
   charter, the roadmap as it evolved, and the record-door investigation that
   drove the entity work. Valuable, but it is history, not documentation.
+
+### Diagnostic option lifetime
+
+The `MC_TICK_TRACE_*` options and `MC_TICK_DEBUG_COMPARATOR` are sampled once
+per process on first use. Set them before simulation; changing them requires a
+new process. Public recording controls remain dynamic. `discard_recording()`
+drops ordinary block, inventory, entity and timeline recording while preserving
+simulation state and independent update recording; `record()` starts fresh logs.

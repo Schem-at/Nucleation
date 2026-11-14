@@ -142,7 +142,7 @@ fn trace_side(
     can_connect_up: bool,
     climbed: bool,
 ) {
-    let Some(filter) = std::env::var_os("MC_TICK_TRACE_SIDE") else {
+    let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_SIDE") else {
         return;
     };
     let wanted = filter.to_string_lossy().split(';').any(|t| {
@@ -234,31 +234,24 @@ fn incoming(rules: &dyn WireWorld, world: &World, pos: Pos) -> u8 {
 /// `Vec3i.hashCode()` = `(y + z·31)·31 + x`, chains appended, iterated bucket
 /// by bucket.
 pub fn java_hash_order(pos: Pos, origin: Pos) -> Vec<Pos> {
-    let mut entries: Vec<Pos> = vec![pos];
-    for dir in crate::pos::JAVA_DIRECTIONS {
-        entries.push(pos.offset(dir));
+    java_hash_order_array(pos, origin).to_vec()
+}
+
+fn java_hash_order_array(pos: Pos, origin: Pos) -> [Pos; 7] {
+    let mut entries = [pos; 7];
+    for (i, dir) in crate::pos::JAVA_DIRECTIONS.into_iter().enumerate() {
+        entries[i + 1] = pos.offset(dir);
     }
-    let mut buckets: Vec<Vec<Pos>> = vec![Vec::new(); 16];
-    for p in entries {
-        // `BlockPos.hashCode` runs on the position the game holds, which is a
-        // *world* position. This engine's world is zero-based, so the two agree
-        // only when the build happens to sit at the origin. They differ by a
-        // constant offset, and a constant offset does not preserve the bucket:
-        // a dust cell at local y=2 and world y=102 hands `updateNeighborsAt`
-        // its seven positions in genuinely different orders.
-        let (x, y, z) = (
-            p.x.wrapping_add(origin.x),
-            p.y.wrapping_add(origin.y),
-            p.z.wrapping_add(origin.z),
-        );
-        let hash = y
-            .wrapping_add(z.wrapping_mul(31))
-            .wrapping_mul(31)
-            .wrapping_add(x);
-        let spread = hash ^ (((hash as u32) >> 16) as i32);
-        buckets[(spread & 15) as usize].push(p);
-    }
-    buckets.into_iter().flatten().collect()
+    // Stable sorting retains insertion order within a Java bucket collision.
+    // Seven entries cannot resize the sixteen-bucket table.
+    entries.sort_by_key(|p| {
+        let x = p.x.wrapping_add(origin.x);
+        let y = p.y.wrapping_add(origin.y);
+        let z = p.z.wrapping_add(origin.z);
+        let hash = y.wrapping_add(z.wrapping_mul(31)).wrapping_mul(31).wrapping_add(x);
+        (hash ^ (((hash as u32) >> 16) as i32)) & 15
+    });
+    entries
 }
 
 /// `DefaultRedstoneWireEvaluator.updatePowerStrength` for the wire at `pos`.
@@ -278,7 +271,7 @@ pub fn update_power_strength(rules: &dyn WireWorld, ctx: &mut TickCtx<'_>, pos: 
         ctx.set_shape_only(pos, state);
     }
     // Seven updateNeighborsAt entries, in the HashSet's iteration order.
-    for p in java_hash_order(pos, rules.hash_origin()) {
+    for p in java_hash_order_array(pos, rules.hash_origin()) {
         ctx.update_neighbors_at(p);
     }
 }
@@ -671,5 +664,47 @@ mod hash_origin_matters {
             ],
         );
         assert_ne!(at_origin, in_world, "the offset must not be a no-op");
+    }
+}
+
+#[cfg(test)]
+mod ordering_tests {
+    use super::*;
+fn bucket_reference(pos: Pos, origin: Pos) -> Vec<Pos> {
+    let mut entries: Vec<Pos> = vec![pos];
+    for dir in crate::pos::JAVA_DIRECTIONS {
+        entries.push(pos.offset(dir));
+    }
+    let mut buckets: Vec<Vec<Pos>> = vec![Vec::new(); 16];
+    for p in entries {
+        // `BlockPos.hashCode` runs on the position the game holds, which is a
+        // *world* position. This engine's world is zero-based, so the two agree
+        // only when the build happens to sit at the origin. They differ by a
+        // constant offset, and a constant offset does not preserve the bucket:
+        // a dust cell at local y=2 and world y=102 hands `updateNeighborsAt`
+        // its seven positions in genuinely different orders.
+        let (x, y, z) = (
+            p.x.wrapping_add(origin.x),
+            p.y.wrapping_add(origin.y),
+            p.z.wrapping_add(origin.z),
+        );
+        let hash = y
+            .wrapping_add(z.wrapping_mul(31))
+            .wrapping_mul(31)
+            .wrapping_add(x);
+        let spread = hash ^ (((hash as u32) >> 16) as i32);
+        buckets[(spread & 15) as usize].push(p);
+    }
+    buckets.into_iter().flatten().collect()
+}
+
+    #[test]
+    fn array_matches_java_bucket_reference() {
+        let origins = [Pos::new(0,0,0), Pos::new(0,100,0), Pos::new(-31,-19,63),
+            Pos::new(i32::MAX,i32::MIN,i32::MAX), Pos::new(i32::MIN,i32::MAX,i32::MIN)];
+        for x in -10..10 { for y in -3..4 { for z in -2..3 {
+            let p = Pos::new(x,y,z);
+            for origin in origins { assert_eq!(java_hash_order_array(p, origin).as_slice(), bucket_reference(p,origin)); }
+        } } }
     }
 }
