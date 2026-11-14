@@ -1,0 +1,633 @@
+   Compiling mc-tick v0.1.0 (/home/harrison/code/Nucleation-simulation-performance/crates/mc-tick)
+   Compiling mc-test v0.1.0 (/home/harrison/code/Nucleation-simulation-performance/crates/mc-test)
+warning: function `snbt_for` is never used
+  --> crates/mc-tick/tests/flying_search.rs:51:4
+   |
+51 | fn snbt_for(rows: &[&[Cell]]) -> String {
+   |    ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `evaluate` is never used
+  --> crates/mc-tick/tests/flying_search.rs:95:4
+   |
+95 | fn evaluate(snbt: &str, ticks: u64) -> (i32, i32, usize) {
+   |    ^^^^^^^^
+
+warning: `mc-tick` (test "flying_search") generated 2 warnings
+warning: unreachable pattern
+   --> crates/mc-tick/tests/conformance.rs:465:13
+    |
+465 |             other => panic!(
+    |             ^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/mc-tick/tests/conformance.rs:465:13
+    |
+432 | ...     mc_tick::structure::SpawnedEntity::Item(item) => match raw_id {
+    |         --------------------------------------------- matches some of the same values
+...
+442 | ...     mc_tick::structure::SpawnedEntity::Minecart(cart) => {
+    |         ------------------------------------------------- matches some of the same values
+...
+445 | ...     mc_tick::structure::SpawnedEntity::FurnaceMinecart(cart) => sim
+    |         -------------------------------------------------------- matches some of the same values
+...
+452 | ...     mc_tick::structure::SpawnedEntity::Body(body) => {
+    |         --------------------------------------------- matches some of the same values
+...
+465 | ...     other => panic!(
+    |         ^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Bounds`
+  --> crates/mc-tick/tests/piston_entity.rs:25:15
+   |
+25 | use mc_tick::{Bounds, Pos, Simulation};
+   |               ^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `mc-tick` (test "conformance") generated 1 warning
+warning: `mc-tick` (test "piston_entity") generated 1 warning (run `cargo fix --test "piston_entity" -p mc-tick` to apply 1 suggestion)
+warning: unused import: `WireWorld`
+    --> crates/mc-tick/src/vanilla.rs:4389:37
+     |
+4389 |         use crate::wire::{WireSide, WireWorld};
+     |                                     ^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `mc-tick` (lib test) generated 1 warning (run `cargo fix --lib -p mc-tick --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.86s
+     Running unittests src/lib.rs (target/debug/deps/mc_test-4ca85e01aef32c5d)
+
+running 4 tests
+test block_based::tests::a_plain_structure_synthesizes_nothing ... ok
+test block_based::tests::a_start_with_no_accepts_synthesizes_nothing ... ok
+test block_based::tests::a_block_based_rig_synthesizes_a_runnable_case ... ok
+test block_based::tests::the_synthesized_rig_actually_passes_its_own_run ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/events.rs (target/debug/deps/events-4354589a996a6c9b)
+
+running 7 tests
+test an_unknown_event_kind_is_refused_loudly ... ok
+test a_lit_lamp_is_a_recorded_block_change ... ok
+test a_failing_check_dumps_the_event_window ... ok
+test a_powered_command_block_runs_its_setblock ... ok
+test an_event_that_never_happened_fails_with_bounds ... ok
+test an_unstackable_item_reads_its_own_stack_limit_on_a_comparator ... ok
+test an_accept_test_block_latches_when_powered ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/result_model.rs (target/debug/deps/result_model-5b5c1babee5b0e8c)
+
+running 3 tests
+test a_failing_case_reports_the_diff_not_a_panic ... ok
+test a_case_may_assert_a_foreign_block_inert ... ok
+test a_passing_case_reports_pass_and_its_horizon ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/suite.rs (target/debug/deps/suite-cdc1fc78045848da)
+
+running 6 tests
+test a_bare_case_is_a_suite_of_one ... ok
+test a_typo_is_named_with_its_file ... ok
+test an_unknown_format_is_refused ... ok
+test an_empty_suite_is_refused ... ok
+test a_format_object_is_a_suite ... ok
+test an_array_is_a_suite ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/mc_tick-746c29b4a2c1f4e9)
+
+running 249 tests
+test behaviour::tests::air_is_registered_inert_from_the_start ... ok
+test behaviour::tests::a_clean_table_reports_nothing ... ok
+test behaviour::tests::ctx_schedule_and_event_helpers_reach_the_queues ... ok
+test behaviour::tests::default_methods_mean_a_block_implements_only_what_it_does ... ok
+test behaviour::tests::registering_clears_a_previously_unknown_state ... ok
+test behaviour::tests::registration_and_lookup_round_trip ... ok
+test behaviour::tests::unregistered_states_are_recorded_not_silently_inert ... ok
+test components::tests::a_comparator_emits_only_from_its_output_side ... ok
+test behaviour::tests::unknown_report_names_blocks_not_integers ... ok
+test components::tests::a_comparator_fed_by_a_diode_schedules_at_high ... ok
+test behaviour::tests::scanning_a_world_finds_every_unimplemented_block ... ok
+test components::tests::a_comparator_whose_output_is_unchanged_schedules_nothing ... ok
+test components::tests::a_comparator_schedules_on_a_strength_change_alone ... ok
+test components::tests::a_diode_above_or_below_cannot_lock ... ok
+test components::tests::a_diode_never_double_schedules ... ok
+test components::tests::a_lit_torch_powers_every_side_but_its_support ... ok
+test components::tests::a_powered_repeater_turning_off_schedules_at_very_high ... ok
+test components::tests::a_primed_comparator_resolves_after_every_repeater ... ok
+test components::tests::a_repeater_fed_by_another_diode_jumps_the_queue ... ok
+test components::tests::a_repeater_locked_from_the_side_schedules_nothing ... ok
+test components::tests::a_torch_burns_out_when_driven_too_hard ... ok
+test components::tests::a_repeater_schedules_at_high_when_turning_on ... ok
+test components::tests::a_torch_inverts_its_support ... ok
+test components::tests::a_torch_schedules_at_normal_so_it_runs_after_every_diode ... ok
+test components::tests::compare_mode_is_all_or_nothing ... ok
+test components::tests::a_torch_toggles_normally_below_the_burnout_threshold ... ok
+test components::tests::comparator_delay_is_fixed_at_two ... ok
+test components::tests::diode_priorities_order_correctly_against_each_other ... ok
+test components::tests::only_a_powered_side_diode_locks ... ok
+test components::tests::repeater_delay_is_the_property_times_two ... ok
+test components::tests::subtract_mode_passes_the_rear_signal_when_no_side_input ... ok
+test components::tests::toggles_outside_the_window_do_not_count_toward_burnout ... ok
+test components::tests::subtract_mode_reduces_by_the_side_signal ... ok
+test entity::hitbox_tests::a_dragon_fireball_spans_a_whole_block_and_a_small_one_does_not ... ok
+test entity::hitbox_tests::an_oak_boat_has_no_measured_seat ... ok
+test entity::hitbox_tests::an_unmeasured_entity_has_no_hitbox_rather_than_a_guessed_one ... ok
+test entity::hitbox_tests::every_minecart_variant_shares_the_plain_cart_box ... ok
+test entity::hitbox_tests::fireball_boxes_reproduce_the_captured_plate_probes ... ok
+test entity::hitbox_tests::every_registered_kind_agrees_with_itself ... ok
+test entity::hitbox_tests::the_armor_stand_box_is_the_registrys_float ... ok
+test entity::hitbox_tests::the_boat_box_reproduces_the_captured_cart_rests ... ok
+test fluid::tests::own_height_is_amount_over_nine ... ok
+test fluid::tests::legacy_levels_round_trip ... ok
+test entity::tests::resting_items_do_not_move ... ok
+test inventory::tests::a_crafter_counts_disabled_and_occupied_slots_once_each ... ok
+test entity::hitbox_tests::the_elevator_boat_has_its_measured_silverfish_seat ... ok
+test inventory::tests::a_full_container_reads_fifteen ... ok
+test entity::hitbox_tests::the_blaze_box_reproduces_the_captured_plate_probes ... ok
+test inventory::tests::a_single_item_already_reads_one ... ok
+test inventory::tests::an_empty_container_reads_zero ... ok
+test entity::hitbox_tests::living_is_refuted_as_the_cart_collision_rule ... ok
+test inventory::tests::the_formula_steps_where_vanillas_does ... ok
+test entity::tests::a_falling_item_accelerates_with_gravity_and_drag ... ok
+test minecart::tests::a_cart_is_stopped_by_a_cart_it_is_flush_against ... ok
+test entity::hitbox_tests::only_the_measured_bodies_stop_a_cart ... ok
+test minecart::tests::a_nan_position_skips_the_push_the_way_java_does ... ok
+test minecart::tests::a_squeezed_cart_moves_by_exactly_the_gap ... ok
+test minecart::tests::a_nan_cart_never_moves_and_stays_nan ... ok
+test entity::tests::an_item_lands_on_the_floor_and_stays ... ok
+test entity::tests::ids_are_assigned_in_spawn_order ... ok
+test entity::hitbox_tests::the_measured_seats_disagree_with_each_other ... ok
+test entity::tests::merging_prefers_the_larger_stack_and_discards_the_other ... ok
+test minecart::tests::an_ordinary_cart_on_that_same_rail_does_move ... ok
+test minecart::tests::exits_match_the_static_initialiser ... ok
+test minecart::tests::jmin_propagates_nan_where_rust_would_discard_it ... ok
+test minecart::tests::rail_shapes_parse_their_property_values ... ok
+test motion::tests::only_the_old_path_can_carry_a_nan_out_of_a_save ... ok
+test motion::tests::post_4671_drops_the_whole_vector_not_just_the_bad_component ... ok
+test motion::tests::pre_4671_keeps_nan_and_kills_infinity ... ok
+test motion::tests::the_doors_carts_load_intact_under_their_own_version ... ok
+test motion::tests::the_ten_clamp_is_not_carried_forward ... ok
+test motion::tests::the_version_boundary_is_where_the_bisect_put_it ... ok
+test observer::tests::a_change_in_front_schedules_a_pulse ... ok
+test observer::tests::a_powered_observer_landing_without_a_pending_tick_clears_itself ... ok
+test observer::tests::an_already_pulsing_observer_does_not_restart ... ok
+test observer::tests::an_observer_watches_the_block_it_faces ... ok
+test observer::tests::an_observer_powers_only_out_of_its_back ... ok
+test observer::tests::the_pulse_outlasts_the_block_dropping_threshold ... ok
+test observer::tests::changes_behind_or_beside_are_ignored ... ok
+test phase::tests::phase_names_are_unique ... ok
+test observer::tests::the_pulse_is_two_ticks_long ... ok
+test phase::tests::phase_order_matches_declared_discriminants ... ok
+test phase::tests::piston_motion_spans_three_ascending_phases ... ok
+test phase::tests::player_input_is_last_so_inputs_are_observed_next_tick ... ok
+test piston::sweep_tests::a_pulled_block_sweeps_entities_a_real_distance ... ok
+test piston::sweep_tests::a_retracting_arm_does_not_reach_an_entity_that_is_already_clear ... ok
+test piston::sweep_tests::a_retracting_head_does_not_reach_forward_out_of_its_own_block ... ok
+test piston::sweep_tests::an_entity_in_the_pistons_own_square_is_ejected_like_the_capture ... ok
+test piston::sweep_tests::extension_reproduces_the_capture_to_the_last_bit ... ok
+test piston::sweep_tests::head_ejection_gates_on_the_feet_across_the_axis_not_the_centre ... ok
+test piston::sweep_tests::head_ejection_is_gated_on_the_entity_centre_not_its_box ... ok
+test piston::sweep_tests::head_ejection_reproduces_piston_pull_to_the_last_bit ... ok
+test piston::sweep_tests::nothing_behind_the_arm_is_touched ... ok
+test piston::sweep_tests::the_gate_across_the_piston_is_the_arm_column ... ok
+test piston::sweep_tests::the_geometry_is_not_special_cased_per_axis ... ok
+test piston::sweep_tests::the_hand_over_between_targets_is_exactly_the_step_limit ... ok
+test piston::sweep_tests::the_third_geometry_is_the_same_law_on_the_vertical_axis ... ok
+test piston::tests::a_block_already_in_motion_is_immovable ... ok
+test piston::tests::a_column_longer_than_the_push_limit_refuses_to_move ... ok
+test piston::tests::a_dragged_block_pushes_whatever_it_runs_into ... ok
+test piston::tests::a_piston_with_no_signal_anywhere_stays_put ... ok
+test piston::tests::a_slime_branch_keeps_its_place_in_the_resolver_list ... ok
+test piston::tests::a_piston_queues_a_block_event_rather_than_scheduling_a_tick ... ok
+test piston::tests::a_plain_piston_leaves_the_block_behind_on_retract ... ok
+test piston::tests::a_sticky_piston_drops_its_block_on_a_short_pulse ... ok
+test piston::tests::a_sticky_piston_drags_its_block_back_on_retract ... ok
+test piston::tests::an_immovable_block_blocks_the_whole_push ... ok
+test piston::tests::a_sticky_piston_pulls_a_slime_structure_back_whole ... ok
+test piston::tests::an_immovable_block_beside_slime_is_simply_not_dragged ... ok
+test piston::tests::an_unknown_block_event_is_not_claimed ... ok
+test piston::tests::an_unpowered_retracted_piston_does_nothing ... ok
+test piston::tests::exactly_the_push_limit_still_moves ... ok
+test piston::tests::honey_drags_ordinary_blocks_just_like_slime ... ok
+test piston::tests::max_push_depth_is_twelve ... ok
+test piston::tests::extending_pushes_a_column_and_places_the_head ... ok
+test piston::tests::quasi_connectivity_powers_a_piston_nothing_touches ... ok
+test piston::tests::slime_and_honey_do_not_stick_to_each_other ... ok
+test piston::tests::slime_drags_blocks_on_every_face ... ok
+test piston::tests::slime_touching_the_same_kind_still_sticks ... ok
+test piston::tests::the_push_plan_is_ordered_nearest_first ... ok
+test pos::tests::bounds_accept_corners_in_any_order ... ok
+test pos::tests::direction_deltas_and_opposites_agree ... ok
+test pos::tests::direction_order_matches_the_games_declaration_order ... ok
+test pos::tests::index_round_trips_for_every_position_in_a_region ... ok
+test pos::tests::out_of_bounds_positions_have_no_index ... ok
+test power_cache::tests::collision_rollover_clone_and_rules_identity_cannot_reuse_stale_values ... ok
+test rng::tests::next_double_matches_java ... ok
+test redstone::tests::dust_with_no_source_stays_dark ... ok
+test rng::tests::next_float_matches_java ... ok
+test rng::tests::next_int_matches_java ... ok
+test redstone::tests::dust_attenuates_exactly_as_vanilla_did ... ok
+test redstone::tests::breaking_the_source_depowers_the_whole_line_at_once ... ok
+test rng::tests::next_long_matches_java ... ok
+test rng::tests::triangle_matches_java_composition ... ok
+test schedule::tests::a_position_holds_one_pending_tick ... ok
+test schedule::tests::duplicate_events_collapse_like_vanillas_set ... ok
+test schedule::tests::collecting_frees_the_position_but_still_ticks_this_tick ... ok
+test redstone::tests::settling_is_idempotent ... ok
+test schedule::tests::events_drain_in_insertion_order_and_support_chaining ... ok
+test redstone::tests::power_runs_out_after_fifteen_blocks ... ok
+test schedule::tests::overdue_ticks_are_not_stranded ... ok
+test schedule::tests::pending_lookup_sees_future_ticks_only ... ok
+test redstone::tests::two_sources_give_a_wire_the_stronger_signal ... ok
+test schedule::tests::priority_ordering_matches_the_games_numeric_values ... ok
+test schedule::tests::sequence_numbers_keep_identical_schedules_reproducible ... ok
+test schedule::tests::ticks_fire_in_target_then_priority_then_insertion_order ... ok
+test schedule::tests::zero_delay_scheduling_targets_the_current_tick ... ok
+test sim::tests::a_fresh_simulation_is_quiescent_at_tick_zero ... ok
+test sim::tests::a_block_event_reaches_its_behaviour_in_the_same_tick ... ok
+test sim::tests::a_rider_with_no_measured_seat_refuses_by_name ... ok
+test sim::tests::a_rider_follows_its_vehicle_and_a_frozen_body_does_not ... ok
+test sim::tests::a_parked_leashed_boat_accepts_only_the_measured_rest_residue ... ok
+test minecart::tests::a_nan_cart_stays_nan_and_does_not_infect_the_cart_that_hits_it ... ok
+test minecart::tests::a_touching_pair_pushes_itself_apart_by_the_float_impulse ... ok
+test minecart::tests::colliding_carts_amplify_momentum_by_exactly_a_fifth ... ok
+test minecart::tests::carts_only_push_along_their_facing ... ok
+test minecart::tests::a_striker_loses_a_fifth_of_its_speed_per_push_against_a_nan_cart ... ok
+test sim::tests::a_spawned_boat_reports_whether_it_is_leashed ... ok
+test sim::tests::a_scheduled_tick_dispatches_to_the_registered_behaviour ... ok
+test minecart::tests::the_push_search_reaches_exactly_one_hitbox_plus_two_tenths ... ok
+test sim::tests::checkpoint_restore_reproduces_state_exactly ... ok
+test sim::tests::an_unregistered_block_is_reported_rather_than_simulated_as_nothing ... ok
+test sim::tests::every_phase_is_walked_each_tick ... ok
+test sim::tests::checkpoints_carry_inventories ... ok
+test sim::tests::run_until_quiescent_stops_immediately_when_nothing_is_scheduled ... ok
+test sim::tests::restarting_the_recorder_starts_a_fresh_log ... ok
+test sim::tests::reset_returns_to_the_marked_baseline_not_an_empty_world ... ok
+test sim::tests::run_until_quiescent_drains_a_scheduled_tick ... ok
+test sim::tests::restore_keeps_interned_ids_valid ... ok
+test sim::tests::reset_without_marking_returns_to_an_empty_region ... ok
+test sim::tests::stopping_the_update_recorder_keeps_the_log ... ok
+test sim::tests::the_elevator_boat_seats_its_silverfish_and_rejects_real_travel ... ok
+test state::tests::a_fresh_registry_reports_empty ... ok
+test state::tests::air_is_zero_in_a_fresh_registry ... ok
+test sim::tests::stepping_n_times_equals_running_n ... ok
+test state::tests::states_differing_only_in_properties_are_distinct ... ok
+test state::tests::interning_is_stable_and_reversible ... ok
+test sim::tests::restore_clears_warm_power_cache_and_preserves_selected_mode ... ok
+test state::tests::unknown_descriptors_and_ids_return_none ... ok
+test structure::tests::a_bad_palette_reference_is_rejected ... ok
+test sim::tests::discard_recording_preserves_state_updates_and_allows_restart ... ok
+test structure::tests::a_carts_passengers_are_read_and_default_to_none ... ok
+test structure::tests::a_crafter_keeps_empty_disabled_slots_as_inventory_state ... ok
+test structure::tests::a_carts_rotation_is_read_and_defaults_to_zero ... ok
+test structure::tests::a_missing_key_names_itself ... ok
+test structure::tests::a_furnace_carts_rotation_is_read_and_defaults_to_zero ... ok
+test structure::tests::an_unrepresentable_rider_is_refused_by_name ... ok
+test structure::tests::an_unrepresentable_entity_type_is_refused_by_name ... ok
+test structure::tests::bounds_include_the_requested_margin ... ok
+test structure::tests::integer_type_suffixes_are_tolerated ... ok
+test structure::tests::an_entities_list_carries_carts_and_items_in_order ... ok
+test structure::tests::malformed_input_reports_where_it_failed ... ok
+test structure::tests::nan_infinity_and_exponents_survive_the_parser ... ok
+test structure::tests::parses_26_3_block_state_field_names ... ok
+test structure::tests::parses_the_structure_format ... ok
+test structure::tests::passengers_on_an_unmeasured_vehicle_refuse ... ok
+test structure::tests::properties_render_sorted_so_descriptors_are_canonical ... ok
+test structure::tests::placing_interns_states_and_writes_blocks ... ok
+test structure::tests::single_quoted_strings_parse ... ok
+test structure::tests::the_boat_fence_entity_keeps_its_leash_and_motion ... ok
+test structure::tests::the_elevator_boat_keeps_its_silverfish_passenger ... ok
+test structure::tests::the_record_doors_entity_cast_parses ... ok
+test structure::tests::unknown_keys_are_skipped_not_fatal ... ok
+test timeline::tests::a_frame_built_from_blocks_matches_one_captured_from_a_world ... ok
+test timeline::tests::a_timeline_knows_the_tick_its_run_ended_on ... ok
+test timeline::tests::fingerprints_distinguish_absolute_from_translated_states ... ok
+test timeline::tests::cycle_candidates_are_verified_and_stationary_ticks_are_ignored ... ok
+test timeline::tests::timeline_recording_does_not_change_simulation_results ... ok
+test vanilla::tests::a_descriptor_without_properties_still_parses ... ok
+test vanilla::derived_power_tests::comparator_outputs_stay_live_across_all_map_mutations_and_emission_gates ... ok
+test vanilla::tests::a_conduction_trace_walks_back_to_the_source ... ok
+test vanilla::tests::a_mushroom_stem_is_not_a_log_and_soft_decor_breaks_when_pushed ... ok
+test vanilla::tests::an_unrecognised_block_is_left_unregistered_rather_than_guessed ... ok
+test vanilla::tests::companions_are_interned_so_blocks_can_change_state ... ok
+test vanilla::tests::a_strongly_powered_conductor_re_emits_on_every_face ... ok
+test state::table_tests::sparse_zero_overwrite_and_clone ... ok
+test vanilla::tests::a_hopper_inserts_after_the_crafters_disabled_slot ... ok
+test vanilla::tests::ordinary_decoration_is_building_material ... ok
+test vanilla::tests::descriptors_split_into_name_and_properties ... ok
+test vanilla::tests::decoration_keeps_its_shape ... ok
+test vanilla::tests::implemented_blocks_outrank_the_decoration_families ... ok
+test vanilla::derived_power_tests::structural_changes_growth_and_wire_modes_invalidate_immediately ... ok
+test vanilla::tests::redstone_components_are_never_called_decoration ... ok
+test vanilla::tests::with_rebuilds_a_sorted_descriptor ... ok
+test vanilla::tests::powered_components_are_classified_as_sources ... ok
+test wire::hash_order_ground_truth::the_hash_order_matches_real_java ... ok
+test wire::hash_origin_matters::the_world_origin_changes_the_hash_order ... ok
+test vanilla::tests::comparator_side_inputs_use_direct_sources_and_ignore_wire_connections ... ok
+test vanilla::tests::the_elevators_idle_crafter_is_a_disabled_slot_analog_container ... ok
+test wire::tests::the_hash_order_matches_javas_buckets ... ok
+test vanilla::tests::a_whole_contraption_registers_without_gaps ... ok
+test world::layout_tests::cached_layout_matches_bounds_at_negative_and_extreme_coordinates ... ok
+test world::tests::a_new_world_is_entirely_air ... ok
+test world::tests::a_wild_coordinate_is_refused_rather_than_overflowing_the_extent ... ok
+test world::tests::air_written_outside_does_not_grow_the_region ... ok
+test world::tests::cloning_gives_an_independent_world ... ok
+test world::tests::growth_overshoots_so_travel_does_not_reallocate_every_block ... ok
+test world::tests::growth_stops_at_the_limit_and_changes_nothing_when_it_refuses ... ok
+test world::tests::iter_non_air_is_deterministic_and_complete ... ok
+test world::tests::neighbor_reads_follow_the_direction_deltas ... ok
+test world::tests::set_returns_the_previous_state ... ok
+test world::tests::out_of_bounds_reads_air ... ok
+test world::tests::growing_keeps_everything_already_placed ... ok
+test world::tests::a_block_written_outside_grows_the_region_to_hold_it ... ok
+test vanilla::tests::a_decorated_build_loads_and_its_piston_still_fires ... ok
+test wire::ordering_tests::array_matches_java_bucket_reference ... ok
+test vanilla::indexed_wire_tests::every_shape_index_and_api_domain ... ok
+test vanilla::tests::dust_climbs_a_full_block_and_only_leans_on_a_slab ... ok
+test vanilla::tests::dust_re_faces_itself_when_a_neighbour_leaves ... ok
+
+test result: ok. 249 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/cart_body.rs (target/debug/deps/cart_body-f932c05c860263cb)
+
+running 8 tests
+test a_cart_rests_on_a_living_body_and_falls_through_a_projectile ... ok
+test a_cart_rests_on_a_seated_passenger ... ok
+test a_cart_rests_on_a_cart ... ok
+test a_cart_beside_a_body_rather_than_over_it_falls ... ok
+test a_boat_holds_a_cart_up_and_an_armor_stand_does_not ... ok
+test a_cart_resting_on_a_body_is_on_the_ground ... ok
+test a_boat_stops_a_cart_sideways_and_an_armor_stand_is_transparent ... ok
+test a_body_stops_a_cart_sideways_at_its_own_face ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/cases.rs (target/debug/deps/cases-8c49ead48ddbaac0)
+
+running 1 test
+test every_bundled_case_passes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/circuit.rs (target/debug/deps/circuit-1cbc82cfe437d308)
+
+running 5 tests
+test the_piston_moves_in_the_same_tick_its_repeater_fires ... ok
+test a_lever_drives_a_repeater_which_drives_a_piston ... ok
+test releasing_the_lever_retracts_the_piston ... ok
+test reset_replays_the_circuit_identically ... ok
+test the_repeater_delay_sets_when_the_piston_fires ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/conformance.rs (target/debug/deps/conformance-2262c09f124ac100)
+
+running 81 tests
+test a_ceiling_button_strongly_powers_the_block_above_it ... ok
+test a_comparator_reads_a_container_through_its_rear ... ok
+test a_hopper_pulls_one_item_every_eight_ticks ... ok
+test a_comparator_follows_a_container_a_hopper_is_draining ... ok
+test a_dropper_facing_a_container_transfers_into_it ... ok
+test a_cart_hangs_off_a_ledge_whose_last_column_its_box_still_overlaps ... ok
+test a_dropper_with_no_container_ejects_into_the_world ... ok
+test a_hopper_vacuums_a_falling_item ... ok
+test a_slime_extender_drags_its_riders_and_the_floor ... ignored, isolated fixture: vanilla's slime drags the floor row and the side pistons; the engine only pushes the slime.
+test a_powered_hopper_is_locked_until_the_power_is_broken ... ok
+test a_falling_item_presses_a_wooden_plate ... ok
+test a_falling_item_follows_vanilla_gravity_and_drag_exactly ... ok
+test a_cart_turns_a_corner_without_losing_the_rail ... ok
+test a_cart_rolls_down_a_slope_and_gains_speed ... ok
+test a_stone_button_presses_for_twenty_ticks_and_the_lamp_follows ... ok
+test a_piston_pushes_a_trapdoor_intact ... ok
+test a_dispenser_empties_a_filled_bucket_into_the_cell_in_front ... ok
+test a_note_block_follows_neighbour_power_synchronously ... ok
+test a_wall_button_strongly_powers_the_block_it_hangs_on ... ok
+test a_cobweb_slows_a_falling_item_to_a_crawl ... ok
+test a_coasting_cart_decays_at_ninety_six_percent_and_flies_off_the_end ... ok
+test an_ejected_item_flies_the_mean_trajectory_within_jitter_bounds ... ok
+test a_trapdoor_toggles_open_and_shut_like_vanilla ... ok
+test an_empty_container_turns_a_lit_comparator_off ... ok
+test a_wooden_button_presses_for_thirty ... ok
+test an_item_rests_on_soul_sand_at_fourteen_sixteenths ... ok
+test a_redstone_block_lights_nine_golden_rails_and_no_more ... ok
+test a_furnace_cart_obeys_the_same_facing_gate_a_plain_one_does ... ok
+test a_dispenser_fills_an_empty_bucket_from_the_cell_in_front ... ok
+test an_extended_piston_base_still_holds_up_the_cart_standing_on_it ... ok
+test a_stream_carries_an_item_to_the_far_wall ... ok
+test flipping_a_lever_lights_a_lamp_through_its_support_block ... ok
+test carts_with_no_rail_under_them_still_shove_each_other ... ok
+test clicking_a_note_block_cycles_its_pitch_and_the_observer_sees_it ... ok
+test a_piston_destroys_a_door_and_takes_the_other_half_with_it ... ok
+test a_cart_only_pushes_along_its_facing_so_one_lane_moves_and_the_other_does_not ... ok
+test a_quietly_placed_engine_stays_still_until_clicked ... ok
+test piston_qc_matches_vanilla_tick_for_tick ... ok
+test opposed_pistons_race_for_one_gap ... ok
+test resting_items_merge_on_the_slow_interval ... ok
+test an_item_floats_up_through_still_water ... ok
+test released_water_spreads_down_a_channel_at_five_gt_a_block ... ok
+test blue_ice_lets_an_item_glide_and_stone_stops_it ... ok
+test slime_adhesion_matches_vanilla_tick_for_tick ... ok
+test a_cart_circulates_a_powered_loop_indefinitely ... ok
+test the_6x6_door_runs_a_full_close_open_cycle ... ignored, the standing target: a full close/open cycle, two lever clicks 70 ticks apart. Re-captured with its world origin, which moved it much closer — the old reference disagreed from tick 0 by dozens of events. It now diverges at tick 1 on two wire states, during the placement cascade rather than the door. See ROADMAP 'The door fixtures'.
+test powered_rails_accelerate_a_cart_past_the_movement_clamp ... ok
+test powering_the_rails_launches_a_parked_cart_off_the_wall ... ok
+test the_broken_flying_machine_breaks_the_same_way_vanilla_breaks_it ... ok
+test the_golden_traces_are_well_formed_and_from_the_right_version ... ok
+test the_first_placed_of_two_powered_pistons_takes_the_shared_gap ... ok
+test bubble_columns_lift_and_sink_items ... ok
+test two_hoppers_race_in_block_entity_order ... ok
+test two_pistons_extend_into_a_gap_each ... ok
+test the_shulker_pipeline_runs_as_vanilla_does ... ok
+test the_manual_engine_runs_its_placement_cycle_tick_for_tick ... ok
+test a_comparators_analog_strength_reaches_a_dust_line ... ok
+test unpowered_golden_rails_brake_a_cart_to_a_standstill ... ok
+test a_five_cart_chain_absorbs_a_rammed_cart ... ok
+test water_flows_only_toward_the_nearest_hole ... ok
+test two_touching_carts_shove_themselves_apart_and_a_third_amplifies_the_pair ... ok
+test a_squeezed_cart_creeps_by_exactly_the_room_it_has ... ok
+test clicking_the_manual_engine_advances_it_two_more_steps ... ok
+test a_piston_pulling_a_block_from_beside_a_dust_corner_reshapes_it ... ok
+test a_zero_tick_generator_teleports_its_redstone_block ... ok
+test dust_never_descends_past_glass_the_glass_diode ... ok
+test a_cart_powers_a_detector_rail_and_it_releases_twenty_ticks_later ... ok
+test triples_behave_differently_when_they_have_room_to_move ... ok
+test the_flying_machine_flies_as_vanilla_does ... ok
+test breaking_a_dust_lines_source_drops_the_whole_line_in_one_tick ... ok
+test dust_soft_powers_a_piston_through_the_block_it_sits_on ... ok
+test dust_descends_a_stone_step ... ok
+test a_detector_rail_strongly_powers_only_the_block_beneath_it ... ok
+test chains_of_touching_carts_hold_because_carts_block_each_other ... ok
+test a_weighted_plate_rechecks_every_ten_ticks_and_powers_the_block_it_stands_on ... ok
+test the_3x3_flush_synced_settles_like_vanilla ... ok
+test weighted_plates_count_entities_and_the_two_kinds_scale_differently ... ok
+test the_4x4_sliding_door_runs_a_full_close_open_cycle ... ok
+test the_4x4_vault_door_runs_a_full_cycle_in_the_world_it_was_built_in ... ok
+test the_4x4_vault_door_survives_interrupted_and_repeated_clicks ... ok
+test the_6x6_sliding_door_runs_a_cycle_in_the_world_it_was_built_in ... ok
+
+test result: ok. 79 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/corpus.rs (target/debug/deps/corpus-7244875887a9473a)
+
+running 6 tests
+test a_malformed_case_reports_its_line ... ok
+test expectation_failures_are_all_reported_not_just_the_first ... ok
+test load_reads_the_same_structures_the_oracle_runs ... ok
+test a_missing_structure_fails_loudly_rather_than_simulating_nothing ... ok
+test adding_a_case_requires_no_recompilation ... ok
+test corpus_cases_pass ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/flying_search.rs (target/debug/deps/flying_search-b0900ab348bf37f9)
+
+running 7 tests
+test engine_b_phase_probe ... ignored, phase probe
+test engine_b_variants ... ignored, exploratory probe; run with --ignored --nocapture
+test search_single_row_len6 ... ignored, exploratory search; run with --ignored --nocapture
+test search_two_rows ... ignored, exploratory search; run with --ignored --nocapture
+test a_placed_block_pulses_the_watching_observer ... ok
+test sticky_retraction_pulls_the_block_ahead ... ok
+test a_moved_observer_pulses_on_landing ... ok
+
+test result: ok. 3 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/hand_place.rs (target/debug/deps/hand_place-2cbf2636d523c592)
+
+running 3 tests
+test a_hand_placed_repeater_reads_its_input ... ok
+test a_hand_placed_wire_arrives_connected_and_powered ... ok
+test the_actuator_write_still_leaves_a_wire_as_authored ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/hipster_door.rs (target/debug/deps/hipster_door-84978445daa4f670)
+
+running 2 tests
+test saved_hipster_door_stays_idle_without_placement_updates ... ok
+test hipster_door_matches_every_vanilla_tick_and_repeats_the_cycle ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.99s
+
+     Running tests/machine_graph.rs (target/debug/deps/machine_graph-1ded163c6da9cced)
+
+running 11 tests
+test honey_and_slime_are_separate_groups ... ok
+test the_push_limit_is_inherited_not_reimplemented ... ok
+test a_pistonless_build_is_rejected ... ok
+test a_piston_facing_immovable_is_rejected ... ok
+test a_driverless_piston_is_rejected ... ok
+test canonical_engine_is_the_whole_six_block_machine ... ok
+test the_east_variant_classifies_as_one_engine_too ... ok
+test engine_holds_fixed_while_the_payload_grows ... ok
+test known_good_machines_survive_both_filters ... ok
+test no_rejection_ever_discards_a_machine_that_moves ... ok
+test the_sustained_filter_keeps_every_machine_that_sustains_flight ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.70s
+
+     Running tests/moving_blocks.rs (target/debug/deps/moving_blocks-d3cb816cc36dacd2)
+
+running 7 tests
+test an_extending_head_offers_one_too ... ok
+test a_flight_names_the_cell_its_block_left ... ok
+test an_ordinary_carried_block_travels_as_itself_and_leaves_nothing_behind ... ok
+test a_stroke_reports_every_block_it_carries_over_one_shared_flight_window ... ok
+test a_flight_lives_until_its_block_lands_and_not_past_it ... ok
+test a_retracting_piston_walks_its_head_home_and_leaves_its_body_where_it_is ... ok
+test a_moving_piston_head_offers_the_shortened_arm_drawn_next_to_the_body ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/perf_probe.rs (target/debug/deps/perf_probe-3f44ee3ced26f57e)
+
+running 1 test
+test growth_costs_little_and_the_engine_is_fast ... ignored, diagnostic, run by hand
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/piston_entity.rs (target/debug/deps/piston_entity-9a2a36c018ffb320)
+
+running 3 tests
+test a_piston_displaces_every_entity_by_the_depth_of_its_own_hitbox ... ok
+test retracting_past_an_entity_that_is_already_clear_moves_it_nowhere ... ok
+test a_nan_cart_sits_still_until_a_piston_touches_it ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/piston_plate_clip.rs (target/debug/deps/piston_plate_clip-ead54b8f367e8cf0)
+
+running 6 tests
+test wide_bodies::the_first_step_of_a_stroke_is_not_clipped ... ok
+test wide_bodies::every_wide_lane_agrees ... ok
+test the_clip_is_the_room_left_to_the_surface ... ok
+test with_nothing_in_the_way_the_sweep_is_not_clipped ... ok
+test the_replica_returns_the_fireball_flush_against_the_piston_base ... ok
+test every_lane_of_the_capture_agrees_with_vanilla ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/power_cache.rs (target/debug/deps/power_cache-d134510cf501a870)
+
+running 1 test
+test dynamic_circuits_match_uncached_state_and_ordered_deliveries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.64s
+
+     Running tests/timeline.rs (target/debug/deps/timeline-b0d341613b3a1325)
+
+running 4 tests
+test small_flyer_has_a_translated_cycle_east ... ok
+test settled_adder_does_not_claim_a_translated_cycle ... ok
+test door_has_an_exact_active_cycle ... ok
+test bb_fingerprint_tracks_westward_motion ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.77s
+
+     Running tests/timeline_replay.rs (target/debug/deps/timeline_replay-16b7f3c58d8e23f2)
+
+running 10 tests
+test cycles_found_by_replay_still_describe_the_flying_machine ... ok
+test a_rewind_ends_the_recording_instead_of_corrupting_it ... ok
+test a_recording_is_a_seed_and_a_log_not_a_world_per_tick ... ok
+test the_change_log_is_sorted_by_tick ... ok
+test stopping_a_recording_keeps_it_and_stops_the_log_growing ... ok
+test every_selection_yields_the_frame_at_its_own_start ... ok
+test digests_cover_every_tick_of_the_run_in_order ... ok
+test clear_recorded_refuses_during_a_run_timeline_and_replay_stays_correct ... ok
+test cycle_detection_is_unchanged_on_a_settled_build ... ok
+test a_replayed_frame_matches_the_world_the_simulation_had ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/water_place.rs (target/debug/deps/water_place-e7c04ac9a50d4ddd)
+
+running 1 test
+test a_placed_water_source_spreads_without_a_neighbour_poke ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests mc_test
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests mc_tick
+
+running 1 test
+test crates/mc-tick/src/embed.rs - embed (line 12) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

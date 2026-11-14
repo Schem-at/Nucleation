@@ -1,0 +1,594 @@
+diff --git a/crates/mc-tick/examples/bench_circuits.rs b/crates/mc-tick/examples/bench_circuits.rs
+index e5dd566c..59576da5 100644
+--- a/crates/mc-tick/examples/bench_circuits.rs
++++ b/crates/mc-tick/examples/bench_circuits.rs
+@@ -53,6 +53,12 @@ fn load(case: &str) -> Simulation {
+         },
+         case,
+     );
++    sim.world_mut().set_power_cache_mode(match std::env::var("MC_TICK_POWER_CACHE").as_deref() {
++        Ok("on") => mc_tick::PowerCacheMode::On,
++        Ok("shadow") => mc_tick::PowerCacheMode::Shadow,
++        Ok("off") | Err(_) => mc_tick::PowerCacheMode::Off,
++        Ok(other) => panic!("unknown cache mode {other}"),
++    });
+     sim.set_rng_seed(0);
+     assert!(sim.unknown_report().is_none());
+     sim
+diff --git a/crates/mc-tick/src/lib.rs b/crates/mc-tick/src/lib.rs
+index 04ddceb6..f20f0ae4 100644
+--- a/crates/mc-tick/src/lib.rs
++++ b/crates/mc-tick/src/lib.rs
+@@ -45,6 +45,8 @@ pub mod observer;
+ pub mod phase;
+ pub mod piston;
+ pub mod pos;
++mod power_cache;
++pub use power_cache::PowerCacheMode;
+ pub mod redstone;
+ pub mod rng;
+ pub mod schedule;
+diff --git a/crates/mc-tick/src/sim.rs b/crates/mc-tick/src/sim.rs
+index 28f1cdff..10856e44 100644
+--- a/crates/mc-tick/src/sim.rs
++++ b/crates/mc-tick/src/sim.rs
+@@ -2801,7 +2801,9 @@ impl Simulation {
+     pub fn restore(&mut self, checkpoint: &Checkpoint) {
+         self.timeline = None;
+         self.tick = checkpoint.tick;
++        let cache_mode = self.world.power_cache_mode();
+         self.world = checkpoint.world.clone();
++        self.world.set_power_cache_mode(cache_mode);
+         self.ticks = checkpoint.ticks.clone();
+         self.fluids = checkpoint.fluids.clone();
+         self.events = checkpoint.events.clone();
+@@ -4174,6 +4176,25 @@ mod tests {
+         Simulation::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(7, 7, 7)))
+     }
+ 
++    #[test]
++    fn restore_clears_warm_power_cache_and_preserves_selected_mode() {
++        let mut s = sim();
++        let stone = s.registry_mut().intern("minecraft:stone").unwrap();
++        let torch = s.registry_mut().intern("minecraft:redstone_torch[lit=true]").unwrap();
++        let mut table = BehaviourTable::default();
++        let rules = crate::vanilla::register_all(s.registry_mut(), &mut table);
++        let p = Pos::new(2,2,2);
++        s.world.set(p,stone);
++        let checkpoint = s.checkpoint();
++        s.world.set_power_cache_mode(crate::PowerCacheMode::Shadow);
++        s.world.set(p.offset(Dir::Down),torch);
++        use crate::components::PowerSource;
++        assert!(rules.signal_strength(&s.world,&s.comparator_out,p,Dir::East)>0);
++        s.restore(&checkpoint);
++        assert_eq!(s.world.power_cache_mode(),crate::PowerCacheMode::Shadow);
++        assert_eq!(rules.signal_strength(&s.world,&s.comparator_out,p,Dir::East),0);
++    }
++
+     #[test]
+     fn discard_recording_preserves_state_updates_and_allows_restart() {
+         let mut s = sim();
+diff --git a/crates/mc-tick/src/vanilla.rs b/crates/mc-tick/src/vanilla.rs
+index 788c8e11..a20c2df1 100644
+--- a/crates/mc-tick/src/vanilla.rs
++++ b/crates/mc-tick/src/vanilla.rs
+@@ -139,6 +139,7 @@ impl Descriptor {
+ /// power and which can be shoved.
+ #[derive(Debug, Clone, Default)]
+ pub struct VanillaRules {
++    cache_identity: crate::power_cache::RulesIdentity,
+     /// Where this world's `(0, 0, 0)` sits in the game's coordinates — see
+     /// [`crate::wire::WireWorld::hash_origin`]. Zero unless a capture says
+     /// otherwise.
+@@ -347,6 +348,51 @@ impl VanillaRules {
+         outs: &crate::behaviour::ComparatorOutputs,
+         pos: Pos,
+         with_wires: bool,
++    ) -> u8 {
++        let Some(contribution) = world.power_cache.get_or_compute(
++            &self.cache_identity, pos, with_wires,
++            || self.direct_contribution(world, outs, pos, with_wires),
++        ) else { return self.direct_signal_to_uncached(world, outs, pos, with_wires); };
++        let answer = contribution.value(pos, outs);
++        if world.power_cache_mode() == crate::PowerCacheMode::Shadow {
++            assert_eq!(answer, self.direct_signal_to_uncached(world, outs, pos, with_wires),
++                "derived power at {pos:?}, wires={with_wires}");
++        }
++        answer
++    }
++
++    fn direct_contribution(
++        &self, world: &World, outs: &crate::behaviour::ComparatorOutputs,
++        pos: Pos, with_wires: bool,
++    ) -> crate::power_cache::Contribution {
++        let mut contribution = crate::power_cache::Contribution::default();
++        for (i, dir) in crate::pos::ALL_DIRS.into_iter().enumerate() {
++            let neighbour = pos.offset(dir);
++            let toward = dir.opposite();
++            let state = world.get(neighbour);
++            if (with_wires && self.wires.contains_key(&state))
++                || self.strong_into.get(&state) == Some(&toward) {
++                // Even zero/missing comparator outputs are dependencies. All
++                // structural emission gates must hold before reading them live.
++                if self.comparators.contains(&state) && self.powered.contains(&state)
++                    && self.emit_only.get(&state).is_none_or(|d| *d == toward)
++                    && self.emit_except.get(&state).is_none_or(|d| *d != toward) {
++                    contribution.comparators |= 1 << i;
++                } else {
++                    contribution.fixed = contribution.fixed.max(
++                        self.emitted_state(world, outs, neighbour, state, toward, with_wires));
++                }
++            }
++        }
++        contribution
++    }
++
++    fn direct_signal_to_uncached(
++        &self,
++        world: &World,
++        outs: &crate::behaviour::ComparatorOutputs,
++        pos: Pos,
++        with_wires: bool,
+     ) -> u8 {
+         let mut best = 0u8;
+         for dir in crate::pos::ALL_DIRS {
+@@ -1286,6 +1332,9 @@ impl PowerSource for VanillaRules {
+         if self.emitted_state(world, outs, pos, state, toward, true) > 0 {
+             return true;
+         }
++        if self.conductors.contains(&state) && world.power_cache_mode() != crate::PowerCacheMode::Off {
++            return self.direct_signal_to(world, outs, pos, true) > 0;
++        }
+         self.conductors.contains(&state) && crate::pos::ALL_DIRS.into_iter().any(|dir| {
+             let neighbour = pos.offset(dir);
+             let state = world.get(neighbour);
+@@ -4881,3 +4930,75 @@ mod indexed_wire_tests {
+         assert_eq!(rules.wire_with_power(&world,pos,0),None);
+     }
+ }
++
++#[cfg(test)]
++mod derived_power_tests {
++    use super::*;
++    use crate::{Bounds, PowerCacheMode};
++    use crate::behaviour::ComparatorOutputs;
++    fn cached_world() -> World {
++        let mut world = World::new(Bounds::new(Pos::new(-5,-5,-5),Pos::new(5,5,5)));
++        world.set_power_cache_mode(PowerCacheMode::Shadow);
++        world
++    }
++    #[test]
++    fn comparator_outputs_stay_live_across_all_map_mutations_and_emission_gates() {
++        let mut rules = VanillaRules::default();
++        let id = StateId(8);
++        rules.comparators.insert(id); rules.powered.insert(id);
++        rules.strong_into.insert(id,Dir::West); rules.emit_only.insert(id,Dir::West);
++        let mut world = cached_world();
++        let pos = Pos::new(-2,0,0); let comparator = pos.offset(Dir::East);
++        world.set(comparator,id);
++        let mut outs = ComparatorOutputs::new();
++        let query = |outs: &ComparatorOutputs| rules.direct_signal_to(&world,outs,pos,true);
++        assert_eq!(query(&outs),0);
++        for n in [1,15,255,0,97,0] {
++            outs.insert(comparator,n); assert_eq!(query(&outs),n);
++        }
++        *outs.entry(comparator).or_default() = 244; assert_eq!(query(&outs),244);
++        outs.remove(&comparator); assert_eq!(query(&outs),0);
++        outs = [(comparator,231)].into_iter().collect(); assert_eq!(query(&outs),231);
++        // Distinct immutable rules (including clones) with overlapping IDs.
++        let mut excluded = rules.clone(); excluded.emit_except.insert(id,Dir::West);
++        assert_eq!(excluded.direct_signal_to(&world,&outs,pos,true),0);
++        let mut wrong_direction = rules.clone(); wrong_direction.strong_into.insert(id,Dir::East);
++        assert_eq!(wrong_direction.direct_signal_to(&world,&outs,pos,true),0);
++        let mut unpowered = rules.clone(); unpowered.powered = StateSet::default();
++        assert_eq!(unpowered.direct_signal_to(&world,&outs,pos,true),0);
++        assert_eq!(rules.direct_signal_to(&world,&outs,pos,true),231);
++        let other = cached_world();
++        assert_eq!(rules.direct_signal_to(&other,&outs,pos,true),0);
++    }
++    #[test]
++    fn structural_changes_growth_and_wire_modes_invalidate_immediately() {
++        use crate::wire::WireSide;
++        let mut rules = VanillaRules::default();
++        let wire = StateId(2); let low = StateId(3); let cube = StateId(4);
++        rules.wires.insert(wire,(15,[WireSide::Side;4]));
++        rules.wires.insert(low,(3,[WireSide::None;4]));
++        rules.conductors.insert(cube); rules.full_cubes.insert(cube); rules.sturdy_up.insert(cube);
++        let mut world = cached_world(); let pos = Pos::new(-2,-2,-2);
++        let outs = ComparatorOutputs::new();
++        world.set(pos.offset(Dir::Up),wire);
++        assert_eq!(rules.direct_signal_to(&world,&outs,pos,true),15);
++        assert_eq!(rules.direct_signal_to(&world,&outs,pos,false),0);
++        world.set(pos.offset(Dir::Up),low);
++        assert_eq!(rules.direct_signal_to(&world,&outs,pos,true),3);
++        world.set(pos.offset(Dir::Up),StateId::AIR);
++        assert_eq!(rules.direct_signal_to(&world,&outs,pos,true),0);
++        // Recompute horizontal connections against changing current-world blocks.
++        world.set(pos.offset(Dir::East),wire);
++        for state in [cube,wire,low,StateId::AIR] {
++            world.set(pos.offset(Dir::East).offset(Dir::North),state);
++            let expected = rules.direct_signal_to_uncached(&world,&outs,pos,true);
++            assert_eq!(rules.direct_signal_to(&world,&outs,pos,true),expected);
++            assert_eq!(rules.direct_signal_to(&world,&outs,pos,true),expected);
++        }
++        world.grow_to_include(Pos::new(80,0,0));
++        let far = Pos::new(79,0,0);
++        assert_eq!(rules.direct_signal_to(&world,&outs,far,true),0);
++        world.set(far.offset(Dir::Up),wire);
++        assert_eq!(rules.direct_signal_to(&world,&outs,far,true),15);
++    }
++}
+diff --git a/crates/mc-tick/src/world.rs b/crates/mc-tick/src/world.rs
+index 2bf88b60..1f3adc6b 100644
+--- a/crates/mc-tick/src/world.rs
++++ b/crates/mc-tick/src/world.rs
+@@ -35,6 +35,7 @@ pub struct World {
+     layer_stride: usize,
+     /// Ceiling on [`World::grow_to_include`]; see [`DEFAULT_GROWTH_LIMIT`].
+     growth_limit: u64,
++    pub(crate) power_cache: crate::power_cache::PowerCache,
+ }
+ 
+ impl World {
+@@ -48,9 +49,21 @@ impl World {
+             bounds,
+             states: vec![StateId::AIR; bounds.volume() as usize],
+             growth_limit: DEFAULT_GROWTH_LIMIT,
++            power_cache: Default::default(),
+         }
+     }
+ 
++    /// Configure derived power caching. Switching modes clears cached entries.
++    /// Cloning preserves the mode but starts with an empty cache.
++    pub fn set_power_cache_mode(&mut self, mode: crate::PowerCacheMode) {
++        self.power_cache.set_mode(mode);
++    }
++
++    /// The current derived power cache mode.
++    pub fn power_cache_mode(&self) -> crate::PowerCacheMode {
++        self.power_cache.mode()
++    }
++
+     /// Cap how far this world will enlarge itself, in cells.
+     ///
+     /// Zero pins the region to its current extent, restoring the original
+@@ -67,6 +80,7 @@ impl World {
+     /// Returns whether it now does: growth stops at [`World::set_growth_limit`],
+     /// and a refusal leaves the region exactly as it was.
+     pub fn grow_to_include(&mut self, pos: Pos) -> bool {
++        self.power_cache.invalidate();
+         if self.bounds.contains(pos) {
+             return true;
+         }
+@@ -180,6 +194,7 @@ impl World {
+     ///
+     /// [`get`]: World::get
+     pub fn set(&mut self, pos: Pos, state: StateId) -> Option<StateId> {
++        self.power_cache.invalidate();
+         if !self.bounds.contains(pos) {
+             if state == StateId::AIR || !self.grow_to_include(pos) {
+                 return None;
+--- /dev/null
++++ b/crates/mc-tick/src/power_cache.rs
+@@ -0,0 +1,196 @@
++//! Bounded, world-owned memoization of structural strong-power contributions.
++use crate::{Pos, ALL_DIRS};
++use std::sync::{Arc, Mutex};
++
++/// Control derived strong-power caching independently of simulation state.
++#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
++pub enum PowerCacheMode {
++    /// Recompute every query (the reference implementation).
++    #[default]
++    Off,
++    /// Cache structural contributions, reading comparator outputs live.
++    On,
++    /// Recompute cached results too, asserting exact equality. Not for timings.
++    Shadow,
++}
++
++/// Identity is retained by the cache so allocator address reuse cannot hit an
++/// old rules table. A cloned rules table gets a fresh identity.
++#[derive(Debug, Default)]
++pub(crate) struct RulesIdentity(Arc<()>);
++impl Clone for RulesIdentity {
++    fn clone(&self) -> Self {
++        Self::default()
++    }
++}
++
++#[derive(Debug, Default, Clone, Copy)]
++pub(crate) struct Contribution {
++    pub(crate) fixed: u8,
++    pub(crate) comparators: u8,
++}
++impl Contribution {
++    pub(crate) fn value(self, pos: Pos, outs: &crate::behaviour::ComparatorOutputs) -> u8 {
++        if self.comparators == 0 { return self.fixed; }
++        let mut best = self.fixed;
++        for (i, dir) in ALL_DIRS.into_iter().enumerate() {
++            if self.comparators & (1 << i) != 0 {
++                best = best.max(outs.get(&pos.offset(dir)).copied().unwrap_or(0));
++            }
++        }
++        best
++    }
++}
++
++const SLOTS: usize = 1024;
++#[derive(Debug, Clone, Copy)]
++struct Entry {
++    generation: u64,
++    pos: Pos,
++    wires: bool,
++    contribution: Contribution,
++}
++#[derive(Default)]
++struct Table {
++    generation: u64,
++    rules: Option<Arc<()>>,
++    entries: Vec<Option<Entry>>,
++}
++
++pub(crate) struct PowerCache {
++    mode: PowerCacheMode,
++    table: Mutex<Table>,
++}
++impl Default for PowerCache {
++    fn default() -> Self {
++        Self {
++            mode: PowerCacheMode::Off,
++            table: Mutex::default(),
++        }
++    }
++}
++impl Clone for PowerCache {
++    fn clone(&self) -> Self {
++        Self {
++            mode: self.mode,
++            ..Self::default()
++        }
++    }
++}
++// Cache contents/configuration are not physical world state.
++impl PartialEq for PowerCache {
++    fn eq(&self, _: &Self) -> bool {
++        true
++    }
++}
++impl Eq for PowerCache {}
++impl std::fmt::Debug for PowerCache {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        f.debug_struct("PowerCache")
++            .field("mode", &self.mode)
++            .finish_non_exhaustive()
++    }
++}
++impl PowerCache {
++    pub(crate) fn mode(&self) -> PowerCacheMode {
++        self.mode
++    }
++    pub(crate) fn set_mode(&mut self, mode: PowerCacheMode) {
++        *self = Self {
++            mode,
++            ..Self::default()
++        };
++    }
++    pub(crate) fn invalidate(&mut self) {
++        let table = self.table.get_mut().unwrap_or_else(|p| p.into_inner());
++        table.generation = table.generation.wrapping_add(1);
++        if table.generation == 0 {
++            table.entries.fill(None);
++        }
++    }
++    fn slot(pos: Pos, wires: bool) -> usize {
++        let hash = (pos.x as u32).wrapping_mul(0x9e3779b1)
++            ^ (pos.y as u32).wrapping_mul(0x85ebca77)
++            ^ (pos.z as u32).wrapping_mul(0xc2b2ae3d);
++        ((hash ^ (hash >> 16)).wrapping_mul(2) as usize + usize::from(wires)) & (SLOTS - 1)
++    }
++    pub(crate) fn get_or_compute(
++        &self,
++        rules: &RulesIdentity,
++        pos: Pos,
++        wires: bool,
++        compute: impl FnOnce() -> Contribution,
++    ) -> Option<Contribution> {
++        if self.mode == PowerCacheMode::Off {
++            return None;
++        }
++        // Contention or a poisoned mutex simply takes the uncached path.
++        let mut table = self.table.try_lock().ok()?;
++        if !table
++            .rules
++            .as_ref()
++            .is_some_and(|id| Arc::ptr_eq(id, &rules.0))
++        {
++            table.rules = Some(Arc::clone(&rules.0));
++            table.entries.clear();
++        }
++        if table.entries.is_empty() {
++            table.entries.resize(SLOTS, None);
++        }
++        let slot = Self::slot(pos, wires);
++        if let Some(entry) = table.entries[slot] {
++            if entry.generation == table.generation && entry.pos == pos && entry.wires == wires {
++                return Some(entry.contribution);
++            }
++        }
++        let contribution = compute();
++        table.entries[slot] = Some(Entry {
++            generation: table.generation,
++            pos,
++            wires,
++            contribution,
++        });
++        Some(contribution)
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn collision_rollover_clone_and_rules_identity_cannot_reuse_stale_values() {
++        fn send_sync<T: Send + Sync>() {}
++        send_sync::<crate::World>();
++        let mut cache = PowerCache::default();
++        cache.set_mode(PowerCacheMode::On);
++        let rules = RulesIdentity::default();
++        let p = Pos::new(-3, 2, -1);
++        let q = (0..10000)
++            .map(|x| Pos::new(x, 2, -1))
++            .find(|&q| PowerCache::slot(q, true) == PowerCache::slot(p, true))
++            .unwrap();
++        let get = |cache: &PowerCache, rules: &RulesIdentity, p, wires, n| {
++            cache
++                .get_or_compute(rules, p, wires, || Contribution {
++                    fixed: n,
++                    comparators: 0,
++                })
++                .unwrap()
++                .fixed
++        };
++        assert_eq!(get(&cache, &rules, p, true, 1), 1);
++        assert_eq!(get(&cache, &rules, p, true, 2), 1);
++        assert_eq!(get(&cache, &rules, q, true, 3), 3);
++        assert_eq!(get(&cache, &rules, p, true, 4), 4);
++        assert_eq!(get(&cache, &rules, p, false, 5), 5);
++        let copy = cache.clone();
++        assert_eq!(copy.mode(), PowerCacheMode::On);
++        assert_eq!(get(&copy, &rules, p, true, 6), 6);
++        assert_eq!(get(&cache, &rules.clone(), p, true, 7), 7);
++        cache.table.get_mut().unwrap().generation = u64::MAX;
++        assert_eq!(get(&cache, &rules, p, true, 8), 8);
++        cache.invalidate();
++        assert_eq!(get(&cache, &rules, p, true, 9), 9);
++        assert_eq!(cache.table.lock().unwrap().entries.len(), SLOTS);
++    }
++}
+--- /dev/null
++++ b/crates/mc-tick/tests/power_cache.rs
+@@ -0,0 +1,122 @@
++//! Tick-end state plus ordered intra-tick records, with shadow checks at every
++//! cached strong-power query (including mutations inside the same tick).
++use mc_test::{build_sim, SettleMode};
++use mc_tick::{Pos, PowerCacheMode, Simulation, StateId, Structure};
++
++fn make(name: &str, mode: PowerCacheMode) -> Simulation {
++    let source = std::fs::read_to_string(format!(
++        "{}/tests/corpus/structures/{name}.snbt",
++        env!("CARGO_MANIFEST_DIR")
++    ))
++    .unwrap();
++    let structure = Structure::parse(&source).unwrap();
++    let settle = match name {
++        "flying_machine_east" => SettleMode::Quiet,
++        "adder32" => SettleMode::Placement,
++        _ => SettleMode::InWorld,
++    };
++    let mut sim = build_sim(
++        &structure,
++        Pos::default(),
++        settle,
++        &["minecraft:redstone_block".to_owned()],
++        &[],
++        Some(2730),
++        name,
++    );
++    sim.world_mut().set_power_cache_mode(mode);
++    sim.set_rng_seed(0);
++    sim.record();
++    sim.record_updates(true);
++    sim
++}
++fn input(sim: &mut Simulation, name: &str, tick: u64) {
++    match name {
++        "hipster_door" if matches!(tick % 320, 10 | 170) => sim.use_block(Pos::new(12, 7, 13)),
++        "door_6x6_inworld" if tick == 0 => sim.use_block(Pos::new(10, 4, 1)),
++        "bb" if tick == 0 => {
++            sim.place_block(Pos::new(31, 7, 13), StateId::AIR);
++        }
++        "flying_machine_east" if tick == 2 => {
++            let id = sim.registry().get("minecraft:redstone_block").unwrap();
++            sim.place_block(Pos::new(2, 1, 1), id);
++        }
++        "flying_machine_east" if tick == 4 => {
++            sim.place_block(Pos::new(2, 1, 1), StateId::AIR);
++        }
++        _ => {}
++    }
++}
++#[test]
++fn dynamic_circuits_match_uncached_state_and_ordered_deliveries() {
++    for (name, ticks) in [
++        ("hipster_door", 640),
++        ("door_6x6_inworld", 100),
++        ("flying_machine_east", 244),
++        ("bb", 230),
++        ("adder32", 500),
++        ("comparator_drain", 80),
++        ("item_into_hopper", 80),
++    ] {
++        let mut off = make(name, PowerCacheMode::Off);
++        let mut cached = make(name, PowerCacheMode::Shadow);
++        let mut cursors = [0; 4];
++        for tick in 0..ticks {
++            input(&mut off, name, tick);
++            input(&mut cached, name, tick);
++            off.step();
++            cached.step();
++            assert_eq!(off.world(), cached.world(), "{name} tick {tick}");
++            assert_eq!(off.pending_ticks(), cached.pending_ticks());
++            assert_eq!(off.pending_events(), cached.pending_events());
++            assert_eq!(
++                &off.recorded()[cursors[0]..],
++                &cached.recorded()[cursors[0]..]
++            );
++            assert_eq!(
++                &off.recorded_updates()[cursors[1]..],
++                &cached.recorded_updates()[cursors[1]..]
++            );
++            assert_eq!(
++                format!("{:?}", &off.recorded_inventory()[cursors[2]..]),
++                format!("{:?}", &cached.recorded_inventory()[cursors[2]..])
++            );
++            assert_eq!(
++                format!("{:?}", &off.recorded_entities()[cursors[3]..]),
++                format!("{:?}", &cached.recorded_entities()[cursors[3]..])
++            );
++            cursors = [
++                off.recorded().len(),
++                off.recorded_updates().len(),
++                off.recorded_inventory().len(),
++                off.recorded_entities().len(),
++            ];
++            for (pos, _) in off.world().iter_non_air() {
++                assert_eq!(off.inventory(pos), cached.inventory(pos));
++            }
++            // Debug preserves NaN spellings in authored entities; float equality does not.
++            assert_eq!(
++                format!(
++                    "{:?}{:?}{:?}",
++                    off.item_entities(),
++                    off.minecarts(),
++                    off.entity_bodies()
++                ),
++                format!(
++                    "{:?}{:?}{:?}",
++                    cached.item_entities(),
++                    cached.minecarts(),
++                    cached.entity_bodies()
++                )
++            );
++        }
++        if name == "item_into_hopper" { assert!(cursors[2] > 0); assert!(cursors[3] > 0); }
++        if name == "comparator_drain" { assert!(cursors[0] > 0); assert!(cursors[2] > 0); }
++        if name == "hipster_door" {
++            assert_eq!(cursors[0], 17968);
++            assert_eq!(cursors[1], 659770);
++            assert!(cursors[2] > 0);
++
++        }
++    }
++}

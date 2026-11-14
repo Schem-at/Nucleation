@@ -1,0 +1,20 @@
+--- a/crates/mc-tick/src/sim.rs
++++ b/crates/mc-tick/src/sim.rs
+@@ -552,6 +552,17 @@
+         for cart in &self.minecarts {
+             self.entity_snapshot.insert(cart.id, cart.pos);
+         }
++    }
++
++    /// Discard and disable ordinary recording and its timeline without changing
++    /// simulation state. Update recording remains independent. `record()` can
++    /// subsequently start fresh logs.
++    pub fn discard_recording(&mut self) {
++        self.timeline = None;
++        self.log = None;
++        self.inv_log = None;
++        self.ent_log = None;
++        self.entity_snapshot.clear();
+     }
+ 
+     /// Start a rich run timeline, including block deltas, input markers,

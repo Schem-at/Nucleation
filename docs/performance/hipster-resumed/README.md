@@ -44,3 +44,72 @@ Fresh validation on harrison-work, Rust 1.98.0 (88d9e12ae):
 
 Full logs are in `validation/`. These counts reflect this reconstructed test
 suite, not the historical 446-pass suite whose additional tests were not recovered.
+
+## Workloads and timing boundaries
+
+All simulations use the shared `mc_test::build_sim` loader and RNG seed 0.
+Fixtures are committed under `crates/mc-tick/tests/corpus/structures`.
+
+| Case | Setup outside tick timer | Timed work |
+|---|---|---|
+| hipster | InWorld, save version 2730 | 320 ticks; lever (12,7,13) at 10 and 170 |
+| hipster_unrecorded | same, discard ordinary recording | same inputs/ticks |
+| hipster_updates | same, ordinary + update recording | same inputs/ticks |
+| hipster_timeline | same, timeline recording | same inputs/ticks |
+| door6 | InWorld | 100 ticks, lever (10,4,1) at 0 |
+| flyer | Quiet; run 2, redstone at (2,1,1), run 2, remove, run 40; assert x>5 | 200 ticks |
+| bb | InWorld; remove (31,7,13), run 30; assert activity | 200 ticks |
+| adder_idle | Placement; run 200; assert quiescence | 500 ticks |
+| hipster_load | embedded fixture text; no file I/O | parse, build, validate; destruction excluded |
+
+Each timed iteration includes inputs, stepping, and the selected recording.
+Checkpoint restoration, RNG reset, recording setup, verification, and export are
+outside the tick timer. Each subprocess performs one untimed warmup sample with
+the same iteration count as its measured sample. Loading is measured separately.
+
+The runner calibrates identical iterations per case from a baseline probe toward
+150 ms CPU time, randomizes variant order within each case/round with seed
+20261114, and retains all samples. Analysis uses ratios of medians with 10,000
+paired bootstrap resamples over rounds. CPU and elapsed time are both retained;
+CPU time removes descheduling but does not remove frequency/cache/host effects.
+Builds and profiles are excluded from final native timing periods.
+
+## Reproduction
+
+Use a clean checkout of this branch and Rust/Cargo 1.98.0, matching the fresh
+measurements. Production runtime dependencies are unchanged; `cpu-time = 1.0.0`
+is a development dependency. The lockfile adds only that dependency.
+
+```sh
+python3 tools/prepare_tick_variants.py --output /tmp/tick-patches
+python3 tools/build_tick_variants.py \
+  --worktree /tmp/nucleation-tick-stages \
+  --patches /tmp/tick-patches --output /tmp/tick-binaries \
+  --target /tmp/nucleation-tick-stage-target
+```
+
+The worktree must not exist. Use a distinct Cargo target directory for each
+independently changing checkout: sharing one across concurrent worktree builds
+can leave Cargo's output executable belonging to another checkout, even when
+its source-specific fingerprints are current. The stage builder builds and
+copies each variant sequentially and checks its complete differential fingerprint.
+It never resets an existing user checkout. Stage patches are cumulative against
+`ee89008d`; apply one selected patch, not all sequentially.
+
+```sh
+python3 tools/benchmark_tick.py \
+  --variant baseline=/tmp/tick-binaries/baseline \
+  --variant power=/tmp/tick-binaries/power \
+  --cpu 0 --rounds 21 --output /tmp/tick-timings.jsonl
+python3 tools/analyze_tick_followup.py /tmp/tick-timings.jsonl \
+  --output /tmp/tick-summary.json
+python3 tools/plot_tick_benchmarks.py /tmp/tick-summary.json \
+  --output /tmp/tick-speedups
+```
+
+Choose an actually allowed CPU. The full run adds diagnostics, tables, dust,
+wire, world, and cache variants with repeated `--variant` arguments. Cache
+experiment patches, bases, and hashes are recorded in `experiments/manifest.json`.
+Apply a cache patch in its own clean checkout, use its own target directory,
+and pass `--mode cache_on=on` for the named enabled-cache variant. Shadow mode is
+for verification only (`MC_TICK_POWER_CACHE=shadow binary --verify`).

@@ -1,0 +1,13 @@
+{
+  "baseline": "ee89008d085a8fb0088851dcac7221ab94d2b91c",
+  "optimized": "5a92c5be450ce4c2ea69fd9771c402de995e04ea",
+  "patches": {
+    "baseline.patch": "03292a127b540cacff13df9d5fe357a28776c72e6912189c85e71d813f04e6c4",
+    "diagnostics.patch": "f9114925ea19644916ad74c2ac87596e6a4a74c0792d9124b30224cde89a3e0c",
+    "dust.patch": "43caf878a4c5eafec9491c84fe65fa62b3b87d6ba98a997e18a77e41bd0aa839",
+    "power.patch": "058b8d5b15dd1ff1bf247ae4e94ab2a988bc1f7af7b803e1a5666bfe3ac686a5",
+    "tables.patch": "e71bb14d7f2929dc8a24ef0890e9613e2dbaff17b140cc20b01b82e62c89186b",
+    "wire.patch": "2e8c200a743a5d72d95b322ddcadad10063793804a0bff3345c2587c934f532c",
+    "world.patch": "3e223100953f93cd06d7eb6d77bc5f9f41fc8f486aeb88d34d576f8b83fb582d"
+  }
+}
