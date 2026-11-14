@@ -27,12 +27,15 @@ fn load(case: &str) -> Simulation {
         "adder_idle" => ("adder32", SettleMode::Placement),
         _ => panic!("unknown case {case}; choose {CASES:?}"),
     };
-    let path = format!(
-        "{}/tests/corpus/structures/{fixture}.snbt",
-        env!("CARGO_MANIFEST_DIR")
-    );
-    let source = std::fs::read_to_string(path).expect("read fixture");
-    let structure = Structure::parse(&source).expect("parse fixture");
+    let source = match fixture {
+        "hipster_door" => include_str!("../tests/corpus/structures/hipster_door.snbt"),
+        "door_6x6_inworld" => include_str!("../tests/corpus/structures/door_6x6_inworld.snbt"),
+        "flying_machine_east" => include_str!("../tests/corpus/structures/flying_machine_east.snbt"),
+        "bb" => include_str!("../tests/corpus/structures/bb.snbt"),
+        "adder32" => include_str!("../tests/corpus/structures/adder32.snbt"),
+        _ => unreachable!(),
+    };
+    let structure = Structure::parse(source).expect("parse fixture");
     let extra = [
         "minecraft:redstone_block".to_owned(),
         "minecraft:air".to_owned(),
