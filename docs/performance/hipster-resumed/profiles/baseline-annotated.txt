@@ -1,0 +1,123 @@
+--------------------------------------------------------------------------------
+Profile data file '/home/harrison/nucleation-perf/profiles/baseline.callgrind' (creator: callgrind-3.25.1)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 1553690371
+Trigger: Program termination
+Profiled target:  /home/harrison/nucleation-perf/final-stages/baseline hipster 1 2 (PID 3088545, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       95
+Include dirs:     
+User annotated:   
+Auto-annotation:  off
+
+--------------------------------------------------------------------------------
+Ir                     
+--------------------------------------------------------------------------------
+7,497,226,802 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                      file:function
+--------------------------------------------------------------------------------
+3,523,921,716 (47.00%)  ???:getenv [/usr/lib/libc.so.6]
+  454,200,124 ( 6.06%)  ???:0x000000000017a260 [/usr/lib/libc.so.6]
+  353,520,755 ( 4.72%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/hash/sip.rs:<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&mc_tick::state::StateId>
+  324,915,170 ( 4.33%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/hash/sip.rs:<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write [/home/harrison/nucleation-perf/final-stages/baseline]
+  242,414,232 ( 3.23%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/intrinsics/mod.rs:<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&mc_tick::state::StateId>
+  191,911,267 ( 2.56%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/uint_macros.rs:<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&mc_tick::state::StateId>
+  130,291,164 ( 1.74%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/pos.rs:<mc_tick::vanilla::VanillaRules>::direct_signal_to
+  128,504,916 ( 1.71%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/pos.rs:<mc_tick::vanilla::VanillaRules>::emitted
+  110,323,372 ( 1.47%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/memchr.rs:std::sys::env::unix::getenv
+   90,905,337 ( 1.21%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/hash/random.rs:<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&mc_tick::state::StateId>
+   90,212,640 ( 1.20%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/pos.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::wire_power
+   77,706,212 ( 1.04%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/pos.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::block_signal
+   73,137,008 ( 0.98%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/vanilla.rs:<mc_tick::vanilla::VanillaRules>::emitted [/home/harrison/nucleation-perf/final-stages/baseline]
+   59,881,412 ( 0.80%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/pos.rs:mc_tick::wire::update_power_strength
+   54,122,908 ( 0.72%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/vanilla.rs:<mc_tick::vanilla::VanillaRules>::direct_signal_to [/home/harrison/nucleation-perf/final-stages/baseline]
+   51,607,328 ( 0.69%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/behaviour.rs:<mc_tick::behaviour::TickCtx>::drain [/home/harrison/nucleation-perf/final-stages/baseline]
+   50,307,516 ( 0.67%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sys/env/unix.rs:std::sys::env::unix::getenv::{closure#0} [/home/harrison/nucleation-perf/final-stages/baseline]
+   50,142,520 ( 0.67%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/pos.rs:<mc_tick::behaviour::TickCtx>::drain
+   43,280,064 ( 0.58%)  /rust/deps/hashbrown-0.17.1/src/control/tag.rs:<mc_tick::vanilla::VanillaRules>::direct_signal_to
+   40,402,372 ( 0.54%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/hash/mod.rs:<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&mc_tick::state::StateId> [/home/harrison/nucleation-perf/final-stages/baseline]
+   35,933,940 ( 0.48%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sys/env/unix.rs:std::sys::env::unix::getenv [/home/harrison/nucleation-perf/final-stages/baseline]
+   35,374,368 ( 0.47%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/vanilla.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::block_signal [/home/harrison/nucleation-perf/final-stages/baseline]
+   33,539,827 ( 0.45%)  ???:0x0000000000179180 [/usr/lib/libc.so.6]
+   33,538,344 ( 0.45%)  ???:0x0000000004b962f0 [???]
+   31,160,656 ( 0.42%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/wire.rs:mc_tick::wire::connecting_side [/home/harrison/nucleation-perf/final-stages/baseline]
+   30,246,545 ( 0.40%)  ???:0x0000000000176400 [/usr/lib/libc.so.6]
+   29,582,904 ( 0.39%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/../../stdarch/crates/core_arch/src/x86/sse2.rs:<mc_tick::vanilla::VanillaRules>::direct_signal_to
+   29,297,544 ( 0.39%)  /rust/deps/hashbrown-0.17.1/src/map.rs:<mc_tick::vanilla::VanillaRules>::direct_signal_to
+   28,553,120 ( 0.38%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/pos.rs:<mc_tick::vanilla::VanillaRules as mc_tick::components::PowerSource>::is_powered
+   28,241,196 ( 0.38%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/pos.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::should_connect_to
+   27,884,031 ( 0.37%)  ???:free [/usr/lib/libc.so.6]
+   24,019,248 ( 0.32%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/wire.rs:mc_tick::wire::update_power_strength [/home/harrison/nucleation-perf/final-stages/baseline]
+   21,560,364 ( 0.29%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sys/sync/rwlock/futex.rs:std::sys::env::unix::getenv::{closure#0}
+   19,766,092 ( 0.26%)  /rust/deps/hashbrown-0.17.1/src/map.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::wire_power
+   19,705,520 ( 0.26%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/state.rs:<mc_tick::vanilla::VanillaRules>::emitted
+   19,590,776 ( 0.26%)  /rust/deps/hashbrown-0.17.1/src/raw.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::wire_power
+   18,847,643 ( 0.25%)  ???:0x00000000000a6e20 [/usr/lib/libc.so.6]
+   17,501,988 ( 0.23%)  ???:malloc [/usr/lib/libc.so.6]
+   17,382,468 ( 0.23%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/vanilla.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::wire_power [/home/harrison/nucleation-perf/final-stages/baseline]
+   15,091,920 ( 0.20%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/vanilla.rs:<mc_tick::vanilla::VanillaRules as mc_tick::components::PowerSource>::is_powered [/home/harrison/nucleation-perf/final-stages/baseline]
+   14,638,528 ( 0.20%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::behaviour::TickCtx>::drain
+   14,514,940 ( 0.19%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<mc_tick::behaviour::TickCtx>::drain
+   14,373,576 ( 0.19%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:std::sys::env::unix::getenv
+   13,738,064 ( 0.18%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<mc_tick::behaviour::TickCtx>::drain
+   12,881,472 ( 0.17%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<mc_tick::vanilla::VanillaRules>::emitted
+   12,436,320 ( 0.17%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/pos.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::conductor
+   11,977,980 ( 0.16%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/result.rs:std::sys::env::unix::getenv
+   11,880,480 ( 0.16%)  /rust/deps/hashbrown-0.17.1/src/control/bitmask.rs:<mc_tick::vanilla::VanillaRules>::direct_signal_to
+   11,851,504 ( 0.16%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/wire.rs:mc_tick::wire::trace_side [/home/harrison/nucleation-perf/final-stages/baseline]
+   11,763,700 ( 0.16%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::vanilla::VanillaRules>::direct_signal_to
+   11,719,680 ( 0.16%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/pos.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::sturdy_up
+   11,315,676 ( 0.15%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/vanilla.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::should_connect_to [/home/harrison/nucleation-perf/final-stages/baseline]
+   10,628,864 ( 0.14%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write
+   10,306,916 ( 0.14%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/../../stdarch/crates/core_arch/src/x86/sse2.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::wire_power
+   10,216,476 ( 0.14%)  /rust/deps/hashbrown-0.17.1/src/raw.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::should_connect_to
+   10,156,502 ( 0.14%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/const_ptr.rs:<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write
+   10,057,872 ( 0.13%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/intrinsics/mod.rs:<mc_tick::vanilla::VanillaRules>::direct_signal_to
+    9,624,516 ( 0.13%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/world.rs:<mc_tick::vanilla::VanillaRules>::emitted
+    9,582,384 ( 0.13%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ffi/c_str.rs:std::sys::env::unix::getenv
+    9,582,384 ( 0.13%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/sync/atomic.rs:std::sys::env::unix::getenv::{closure#0}
+    9,487,512 ( 0.13%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<mc_tick::vanilla::VanillaRules>::direct_signal_to
+    9,487,512 ( 0.13%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/world.rs:<mc_tick::vanilla::VanillaRules>::direct_signal_to
+    8,728,876 ( 0.12%)  /rust/deps/hashbrown-0.17.1/src/raw.rs:<mc_tick::vanilla::VanillaRules>::emitted
+    8,249,220 ( 0.11%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/cmp.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::block_signal
+    8,151,796 ( 0.11%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/wire.rs:mc_tick::wire::connection_state [/home/harrison/nucleation-perf/final-stages/baseline]
+    8,096,782 ( 0.11%)  ???:0x00000000000a4fe0 [/usr/lib/libc.so.6]
+    7,860,616 ( 0.10%)  /rust/deps/hashbrown-0.17.1/src/map.rs:<mc_tick::vanilla::VanillaRules>::emitted
+    7,796,400 ( 0.10%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::block_signal
+    7,633,492 ( 0.10%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/pos.rs:mc_tick::wire::connecting_side
+    7,179,384 ( 0.10%)  /rust/deps/hashbrown-0.17.1/src/map.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::should_connect_to
+    6,850,408 ( 0.09%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/cmp.rs:<mc_tick::vanilla::VanillaRules>::direct_signal_to
+    6,765,948 ( 0.09%)  /rust/deps/hashbrown-0.17.1/src/control/tag.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::wire_power
+    6,468,136 ( 0.09%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/mod.rs:<mc_tick::behaviour::TickCtx>::drain
+    6,440,608 ( 0.09%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::vanilla::VanillaRules>::emitted
+    6,416,344 ( 0.09%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/internal_macros.rs:<mc_tick::vanilla::VanillaRules>::emitted
+    6,363,488 ( 0.08%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::behaviour::TickCtx>::drain
+    6,325,008 ( 0.08%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/index_range.rs:<mc_tick::vanilla::VanillaRules>::direct_signal_to
+    6,061,680 ( 0.08%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/pos.rs:<alloc::vec::Vec<(mc_tick::pos::Pos, mc_tick::pos::Dir, mc_tick::behaviour::UpdateKind)> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<(mc_tick::pos::Pos, mc_tick::pos::Dir, mc_tick::behaviour::UpdateKind), core::iter::adapters::map::Map<core::slice::iter::Iter<mc_tick::pos::Dir>, <mc_tick::behaviour::UpdateEntry>::neighbors_at::{closure#0}>>>::from_iter
+    5,878,700 ( 0.08%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/state.rs:mc_tick::wire::update_power_strength
+    5,873,108 ( 0.08%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/wire.rs:<mc_tick::wire::Wire<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_shape_update [/home/harrison/nucleation-perf/final-stages/baseline]
+    5,845,572 ( 0.08%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:mc_tick::wire::update_power_strength
+    5,556,540 ( 0.07%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/iter/macros.rs:<alloc::vec::Vec<(mc_tick::pos::Pos, mc_tick::pos::Dir, mc_tick::behaviour::UpdateKind)> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<(mc_tick::pos::Pos, mc_tick::pos::Dir, mc_tick::behaviour::UpdateKind), core::iter::adapters::map::Map<core::slice::iter::Iter<mc_tick::pos::Dir>, <mc_tick::behaviour::UpdateEntry>::neighbors_at::{closure#0}>>>::from_iter
+    5,545,810 ( 0.07%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<alloc::raw_vec::RawVecInner>::finish_grow [/home/harrison/nucleation-perf/final-stages/baseline]
+    5,535,424 ( 0.07%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/../../stdarch/crates/core_arch/src/x86/sse2.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::should_connect_to
+    5,470,046 ( 0.07%)  ???:realloc [/usr/lib/libc.so.6]
+    5,329,852 ( 0.07%)  /rust/deps/hashbrown-0.17.1/src/control/bitmask.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::wire_power
+    5,278,160 ( 0.07%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/env.rs:<mc_tick::behaviour::TickCtx>::drain
+    5,278,160 ( 0.07%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/world.rs:<mc_tick::behaviour::TickCtx>::drain
+    5,206,056 ( 0.07%)  ???:0x00000000000a7f20 [/usr/lib/libc.so.6]
+    5,127,140 ( 0.07%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/vanilla.rs:mc_tick::wire::update_power_strength
+    4,865,920 ( 0.06%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/pos.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::wire_shape
+    4,828,040 ( 0.06%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:mc_tick::wire::java_hash_order
+    4,791,286 ( 0.06%)  ???:0x0000000004b96250 [???]
+    4,791,192 ( 0.06%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sys/helpers/small_c_string.rs:std::sys::env::unix::getenv
+    4,788,880 ( 0.06%)  /rust/deps/hashbrown-0.17.1/src/raw.rs:<mc_tick::vanilla::VanillaRules>::direct_signal_to
+    4,677,840 ( 0.06%)  code/Nucleation-simulation-stages-final/crates/mc-tick/src/state.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::block_signal
+    4,510,632 ( 0.06%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<mc_tick::vanilla::VanillaRules as mc_tick::wire::WireWorld>::wire_power
+

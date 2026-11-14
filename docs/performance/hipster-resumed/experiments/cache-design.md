@@ -42,4 +42,9 @@ flying machines, and two hipster cycles (17,968 changes, 659,770 updates).
 
 This is experimental code. The first nine-round pilot did not establish a
 hipster improvement. Its source patch and unfiltered measurements are retained;
-production retention will depend on the final comparison.
+the final 21-round comparison rejects both prototypes from production.
+
+Fresh prototype validation: 420 engine/scenario/doctests passed, seven ignored;
+WebAssembly check passed. Both prototype variants matched the baseline's eight
+verification rows. The seven dynamic differential scenarios include the hipster,
+6×6 door, small and large flyers, adder, comparator drain, and item-into-hopper.

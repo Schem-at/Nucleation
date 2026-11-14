@@ -1,0 +1,14 @@
+{
+  "tool": "Callgrind 3.25.1",
+  "command": "BINARY hipster 1 2",
+  "scope": "one load plus four 320-tick cycles, including warmup",
+  "instructions": {
+    "baseline": 7497226802,
+    "wire": 1515759348,
+    "power": 1057553398,
+    "cache": 972866000
+  },
+  "retained_reduction_vs_release": 0.8589407222257327,
+  "followup_reduction_vs_wire": 0.3022946555497674,
+  "cache_reduction_vs_retained": 0.08007860232888209
+}

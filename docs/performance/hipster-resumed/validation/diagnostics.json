@@ -1,0 +1,21 @@
+{
+  "args": [
+    "hipster",
+    "1",
+    "1"
+  ],
+  "env": {
+    "MC_TICK_TRACE_EVENTS": "1",
+    "MC_TICK_TRACE_WRITE": "12,7,13",
+    "MC_TICK_TRACE_NOTIFY": "12,7,13",
+    "MC_TICK_TRACE_SCHED": "1",
+    "MC_TICK_TRACE_POWER": "12,7,13"
+  },
+  "variants": [
+    "baseline",
+    "power"
+  ],
+  "byte_identical": true,
+  "lines": 17172,
+  "sha256": "4614c50446f79ae5c7b9933b419bc35ae5753ca6968b0905b3ea3783cab7b2c0"
+}

@@ -1,0 +1,11 @@
+==3095291== Callgrind, a call-graph generating cache profiler
+==3095291== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==3095291== Using Valgrind-3.25.1 and LibVEX; rerun with -h for copyright info
+==3095291== Command: /home/harrison/nucleation-perf/final-stages/wire hipster 1 2
+==3095291== 
+==3095291== For interactive control, run 'callgrind_control -h'.
+==3095291== 
+==3095291== Events    : Ir
+==3095291== Collected : 1515759348
+==3095291== 
+==3095291== I   refs:      1,515,759,348

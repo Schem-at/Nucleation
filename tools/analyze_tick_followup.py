@@ -3,7 +3,8 @@
 import argparse,json,random,statistics,pathlib
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('input',type=pathlib.Path)
 p.add_argument('--baseline',default='baseline');p.add_argument('--output',type=pathlib.Path,required=True)
-p.add_argument('--resamples',type=int,default=10000);a=p.parse_args()
+p.add_argument('--resamples',type=int,default=10000);p.add_argument('--compare',action='append',default=[],help='VARIANT=REFERENCE for selected paired comparisons');a=p.parse_args()
+references=dict(v.split('=',1) for v in a.compare)
 rows=[json.loads(x) for x in a.input.read_text().splitlines()]
 data={}
 for row in rows:
@@ -13,10 +14,14 @@ for row in rows:
             'wall':row['samples_ns'][0]/row['iterations']/1e6}
 rng=random.Random(20261114);result=[]
 for (case,variant),values in data.items():
-    baseline=data[(case,a.baseline)]
+    if references and variant not in references:continue
+    reference=references.get(variant,a.baseline)
+    baseline=data[(case,reference)]
     assert set(values)==set(baseline),'unpaired rounds'
     rounds=sorted(values);n=len(rounds)
-    row={'case':case,'variant':variant,'rounds':n}
+    row={'case':case,'variant':variant,'reference':reference,'rounds':n}
+    # Identical paired resamples for a comparison regardless of output ordering.
+    rng=random.Random(20261114)
     for metric in ['cpu','wall']:
         base=[baseline[r][metric] for r in rounds];test=[values[r][metric] for r in rounds]
         row[metric+'_ms']=statistics.median(test);row[metric+'_speedup']=statistics.median(base)/statistics.median(test)

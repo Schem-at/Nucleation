@@ -12,6 +12,7 @@ p.add_argument('--seed',type=int,default=20261114)
 p.add_argument('--cpu',type=int,default=None)
 p.add_argument('--target-ms',type=float,default=150)
 p.add_argument('--output',type=pathlib.Path,required=True)
+p.add_argument('--build-info',type=pathlib.Path,help='Producer metadata JSON; compiler/flags cannot be inferred from binaries')
 a=p.parse_args()
 variants=dict(v.split('=',1) for v in a.variant); modes=dict(v.split('=',1) for v in a.mode)
 assert a.rounds>0 and a.target_ms>0
@@ -33,7 +34,7 @@ metadata={'kind':'metadata','utc':datetime.datetime.now(datetime.timezone.utc).i
     'variants':{name:{'path':path,'sha256':hashlib.file_digest(open(path,'rb'),'sha256').hexdigest()}
                 for name,path in variants.items()},
     'method':'one warmup sample per subprocess; input+stepping+recording timed; restore/setup/drop excluded',
-    'build':'Rust 1.98.0; --locked --release; opt-level=3; LTO=true; debug=1; generic x86-64; no PGO'}
+    'build':json.loads(a.build_info.read_text()) if a.build_info else None}
 a.output.parent.mkdir(parents=True,exist_ok=True)
 rng=random.Random(a.seed)
 with a.output.open('w') as f:
