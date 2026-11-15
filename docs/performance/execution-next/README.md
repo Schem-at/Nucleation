@@ -200,7 +200,7 @@ that is not a promised wall-time gain. Separate Callgrind runs likewise count
 
 [Raw hardware counters](results/flyer-counters.jsonl),
 [paired counter ratios](results/flyer-counter-ratios.json), and
-[compressed Callgrind profiles](profiles/) preserve the evidence.
+[compressed Callgrind profiles](https://github.com/Schem-at/Nucleation/tree/v0.12.3/docs/performance/execution-next/profiles) preserve the evidence.
 
 ## New independent vanilla references
 
@@ -263,7 +263,7 @@ Separate Callgrind runs compare fresh previous-selected PGO and address+lazy PGO
 binaries using identical `hipster 1 2` commands: **587,409,228 →561,240,089
 instructions**, approximately **4.46% fewer**. This includes one load and four
 cycles including warmup; it is not a wall-time speedup estimate.
-[Compressed profiles and annotations](profiles/hipster/) retain the evidence.
+[Compressed profiles and annotations](https://github.com/Schem-at/Nucleation/tree/v0.12.3/docs/performance/execution-next/profiles/hipster) retain the evidence.
 
 The previous and selected standard builds also emit **17,172 byte-identical
 diagnostic lines** with EVENTS, WRITE, NOTIFY, SCHED and POWER enabled, SHA-256

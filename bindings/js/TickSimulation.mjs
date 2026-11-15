@@ -1036,7 +1036,8 @@ export class TickSimulation {
      * Live item entities and minecarts, as JSON:
      * `{"items":[{"id":N,"item":"...","count":N,"pos":[..],"vel":[..],
      * "on_ground":bool,"contents":[{"id":"...","count":N}]}],
-     * "minecarts":[{"id":N,"kind":"...","pos":[..],"vel":[..]}]}`.
+     * "minecarts":[{"id":N,"kind":"...","pos":[..],"vel":[..],"yaw":N}]}`.
+     * Cart yaw is the engine's polar XZ angle in degrees (0 = +X, 90 = +Z).
      */
     itemEntitiesJson() {
         const write = new diplomatRuntime.DiplomatWriteBuf(wasm);

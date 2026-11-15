@@ -44,7 +44,7 @@ GameTest environment or fail-block semantics.
 
 Lithium ports retain their existing LGPL-3.0 provenance at commit
 `c42972b6e9d21c8ff45559df6b271802050a22e2`; see the repository's
-[NOTICE](../../../tests/corpus/lithium-litematic/NOTICE.md). Current upstream
+[NOTICE](https://github.com/Schem-at/Nucleation/blob/v0.12.3/tests/corpus/lithium-litematic/NOTICE.md). Current upstream
 was also inspected at `2f3cbe1b42c4cbe4813afee8ed837ae7f54b7ac2`:
 [item sorter source](https://github.com/CaffeineMC/lithium/blob/2f3cbe1b42c4cbe4813afee8ed837ae7f54b7ac2/common/src/gametest/resources/data/lithium-gametest/gametest/structure/item_sorter.snbt).
 The benchmark uses the pinned repository ports, not a silent upstream upgrade.

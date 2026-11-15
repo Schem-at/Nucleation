@@ -2,7 +2,7 @@
 
 Prepared 15 November 2026. This is static curation, not a new simulator or vanilla test result. Separate execution reports determine whether a candidate is functional.
 
-The local [movement catalog](/Users/harrison/RustroverProjects/Nucleation-schematic-archive/curation/movement.json) covers all **117 schematic files** in the downloaded `slimestone-military` (46), `slimestone-ai` (63), and `casual-builds` (8) manifests. There are **111 distinct SHA-256 contents**, six byte-identical pairs, **12 source-labeled negatives**, and **20 prioritized test proposals**. Every entry joins the parent index by the exact `source` and `path` from its manifest. No downloaded schematic was changed.
+The local movement catalog (`curation/movement.json` in the local archive) covers all **117 schematic files** in the downloaded `slimestone-military` (46), `slimestone-ai` (63), and `casual-builds` (8) manifests. There are **111 distinct SHA-256 contents**, six byte-identical pairs, **12 source-labeled negatives**, and **20 prioritized test proposals**. Every entry joins the parent index by the exact `source` and `path` from its manifest. No downloaded schematic was changed.
 
 Each row records mechanism tags and their evidence, source claims separately from observations, actual saved DataVersion, dimensions and volume, decoded block counts, piston/head states, block entities and entity types, and import/test gates. All bytes were checked against their existing manifest SHA-256 before Python NBT inspection. No Rust compilation, remote command or Minecraft execution was performed.
 

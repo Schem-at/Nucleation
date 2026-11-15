@@ -1,6 +1,6 @@
 # Fresh Minecraft 1.21.11 probe
 
-The isolated driver is [`TraceCapture12111.java`](../../../tools/gametest/src/TraceCapture12111.java).
+The isolated driver is [`TraceCapture12111.java`](https://github.com/Schem-at/Nucleation/blob/v0.12.3/tools/gametest/src/TraceCapture12111.java).
 It uses the original **Minecraft 1.21.11 GameTestServer**, resolving exact obfuscated
 signatures from Mojang's mappings. It does not use the 26.2 runtime, a client,
 Fabric, MC-Inspector, a decompiler or a remapped/patched game jar. This is a new
@@ -9,7 +9,7 @@ capture route; the original hipster Fabric OracleMod has not been recovered.
 All four captures (two positive fixtures and their negative controls) **ran on
 harrison-work using Temurin 21.0.13+9-LTS** on 15 November 2026. Each contains
 40 captured ticks and asserts zero players throughout. Positive activity and
-negative-control checks passed. The [saved captures](../../../crates/mc-tick/tests/corpus/vanilla12111_execution_next/)
+negative-control checks passed. The [saved captures](https://github.com/Schem-at/Nucleation/tree/v0.12.3/crates/mc-tick/tests/corpus/vanilla12111_execution_next)
 and [source/capture hash manifest](vanilla-provenance.json) preserve this evidence.
 
 The comparator fixture transferred items at ticks 1, 9 and 17. Its actual block
@@ -59,7 +59,7 @@ configuration change is required.
 
 ## Compile and capture on harrison-work
 
-The reusable [Python runner](../../../tools/gametest/run_capture12111.py) verifies
+The reusable [Python runner](https://github.com/Schem-at/Nucleation/blob/v0.12.3/tools/gametest/run_capture12111.py) verifies
 the server bundle and mapping hashes, ZIP CRC, all extracted library/server
 checksums, the pinned Java version and every generated capture. It creates four
 fresh worlds, preserves logs on failure, enforces per-process timeouts and writes
@@ -80,7 +80,7 @@ successful captures used the same driver through the parent's equivalent
 temporary runner. The reusable runner then completed a second four-capture run
 on harrison-work, verifying the JDK archive, bundle CRC and all 40 extracted hashes.
 Every initial/tick snapshot, fixture and action matched the first run exactly;
-chunk-readiness warmup counts may differ. [Reproduction metadata and logs](validation/vanilla/reproduction/)
+chunk-readiness warmup counts may differ. [Reproduction metadata and logs](https://github.com/Schem-at/Nucleation/tree/v0.12.3/docs/performance/execution-next/validation/vanilla/reproduction)
 record the executed commands and hashes.
 
 Example paths after transferring the verified runtime; use a fresh universe for

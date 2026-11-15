@@ -8,7 +8,7 @@ The main report records which configurations pass the performance gate.
 ## Dense wire-plan storage
 
 `experiment-logic-plan-storage` changes storage in
-[`wire_plan.rs`](../../../crates/mc-tick/src/wire_plan.rs), not the computed wire
+[`wire_plan.rs`](https://github.com/Schem-at/Nucleation/blob/v0.12.3/crates/mc-tick/src/wire_plan.rs), not the computed wire
 target. The previous 1,024-slot direct map can repeatedly evict plans for fixed
 wire positions whose hashes collide. The experiment assigns distinct sparse
 plan slots through a dense position index.
@@ -49,7 +49,7 @@ answers with the reference; `off` bypasses plan queries.
 ## Compiled transition signatures
 
 `experiment-transition-signatures` replaces repeated rule-table comparisons in
-[`VanillaRules::wire_plan_transition`](../../../crates/mc-tick/src/vanilla.rs)
+[`VanillaRules::wire_plan_transition`](https://github.com/Schem-at/Nucleation/blob/v0.12.3/crates/mc-tick/src/vanilla.rs)
 with two indexed signature reads. It compiles immutable rule metadata, not
 World state or power-query results.
 
@@ -103,7 +103,7 @@ it does not eliminate the cold allocation and initialization cost.
 ## Moving-block phase
 
 `experiment-moving-phase` changes temporary work in
-[`sim.rs`](../../../crates/mc-tick/src/sim.rs):
+[`sim.rs`](https://github.com/Schem-at/Nucleation/blob/v0.12.3/crates/mc-tick/src/sim.rs):
 
 1. Extract due moves into reusable storage with the same `resolve_on <= tick`
    and ticking-bounds predicate. Stable extraction followed by the original

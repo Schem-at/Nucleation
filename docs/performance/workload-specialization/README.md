@@ -146,7 +146,7 @@ environment-mode lookup and World/journal work. This is not a whole-engine ratio
 
 Standalone feature checks also pass: moving-phase alone runs 249 library tests;
 logic-plan storage runs 265. These overlap the full suite and are not added to the
-511 total. Their logs are retained in [validation/standalone](validation/standalone).
+511 total. Their logs are retained in [validation/standalone](https://github.com/Schem-at/Nucleation/tree/v0.12.3/docs/performance/workload-specialization/validation/standalone).
 
 The standard candidates and all three final PGO builds agree with unmodified
 master on 14 existing verification cases, two new active logic cases and all

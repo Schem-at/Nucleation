@@ -99,7 +99,7 @@ inventory activity. They add differential coverage; they are **not new complete
 vanilla captures**. The shutter's failure is saved as a diagnostic, with no claim
 about whether its cause is simulator behavior, version or placement assumptions.
 
-[Validation logs and fingerprints](validation/) retain the evidence. Cache state
+[Validation logs and fingerprints](https://github.com/Schem-at/Nucleation/tree/v0.12.3/docs/performance/hipster-next/validation) retain the evidence. Cache state
 was deliberately excluded from debug/semantic snapshots in experimental builds,
 so matching hashes did not depend on concealing changed simulation state.
 
@@ -181,7 +181,7 @@ Separate Callgrind 3.25.1 runs of `bench_circuits hipster 1 2` (one load and
 four cycles including warmup) counted 977,368,745 instructions for the retained
 source and 868,229,195 for its PGO build: **11.2% fewer instructions**. These are
 instruction counts, not native speedups. Both runs used the same expanded harness
-and ran after native timings. [Raw compressed profiles and annotation](profiles/)
+and ran after native timings. [Raw compressed profiles and annotation](https://github.com/Schem-at/Nucleation/tree/v0.12.3/docs/performance/hipster-next/profiles)
 retain the data. Do not divide these counts by earlier report counts whose harness
 or executable differed.
 

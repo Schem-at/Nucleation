@@ -6,7 +6,7 @@ HX 370, Linux x86-64, Rust 1.98.0. The native thread was pinned to permitted CPU
 These are new workload baselines, **not a comparison against master** and not
 a claim of an optimization speedup.
 
-Each source-pinned [adapter](../../../circuit-adapters/README.md) uses real lever
+Each source-pinned [adapter](https://github.com/Schem-at/Nucleation/blob/v0.12.3/circuit-adapters/README.md) uses real lever
 interactions and the actual mc-tick world. Its profile embeds the existing
 `CellContract`. Expected arithmetic is computed independently, not by replacing
 the circuit. The door's aperture was independently checked in Minecraft 1.21.11.

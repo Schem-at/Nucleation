@@ -1,8 +1,8 @@
 # Active stationary logic workloads
 
-The shared [benchmark harness](../../../crates/mc-tick/examples/bench_circuits.rs)
+The shared [benchmark harness](https://github.com/Schem-at/Nucleation/blob/v0.12.3/crates/mc-tick/examples/bench_circuits.rs)
 adds `adder_active` and `logic_network`. Their inputs, generated fixture and
-assertions live in [logic.rs](../../../crates/mc-tick/examples/bench_circuits/logic.rs).
+assertions live in [logic.rs](https://github.com/Schem-at/Nucleation/blob/v0.12.3/crates/mc-tick/examples/bench_circuits/logic.rs).
 Existing workload loaders, settling, input schedules and verification case lists
 remain unchanged. `--verify --logic` runs the two additions separately from
 `--verify --expanded`.

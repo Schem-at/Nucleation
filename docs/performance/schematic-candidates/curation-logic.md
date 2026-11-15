@@ -1,7 +1,7 @@
 # Logic and memory candidate curation
 
 The local machine-readable catalog is
-[`Nucleation-schematic-archive/curation/logic.json`](../../../../Nucleation-schematic-archive/curation/logic.json).
+`Nucleation-schematic-archive/curation/logic.json` (`curation/logic.json` in the local archive).
 Its 590 rows join the archive manifest by **`source` + `path`**. Every row retains
 its pinned URL, SHA-256, source records, evidence paths, mechanism tags, proposed
 functional oracle/control and readiness. This is a candidate library, not an
@@ -63,7 +63,7 @@ archive's DC02.
 | 20 | LRA COUNT001 counter/load | 320 / 4189 | Failure triage only; excluded pending diagnosis |
 
 The three engine passes and counter failure are retained in
-[`validation/candidate-run/logic-results.jsonl`](../../../../Nucleation-schematic-archive/validation/candidate-run/logic-results.jsonl),
+`validation/candidate-run/logic-results.jsonl` (`validation/candidate-run/logic-results.jsonl` in the local archive),
 with its hash and per-case ordered-record fingerprints in the catalog. They used
 InWorld loading followed by 128 ticks and endpoint assertions. They are **not
 new vanilla captures** and do not establish every intermediate state. COUNT001
@@ -81,7 +81,7 @@ workload, not all 65,536 input pairs, minimum latency or intra-tick ordering.
 The asymmetric `1` versus `128` cases check end-to-end bit reversal; a complete
 bit-significance proof still needs broader conflicting-bit combinations.
 
-[`check_tick_binary_comparator.py`](../../../tools/check_tick_binary_comparator.py)
+[`check_tick_binary_comparator.py`](https://github.com/Schem-at/Nucleation/blob/v0.12.3/tools/check_tick_binary_comparator.py)
 recreates the exact scenario from the production-exported fixture JSON and
 original pinned schematic, and separately validates a capture. Its generated
 scenario/expectations exactly reproduced the saved protocol. A tampered capture

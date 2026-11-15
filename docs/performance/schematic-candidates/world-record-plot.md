@@ -91,7 +91,7 @@ Before admission, inspect adjacent components and a dependency/travel halo, iden
 
 ## Reproduction and scope
 
-The read-only [survey tool](../../../tools/inspect_tick_world_record_plot.py) uses the existing bounded NBT reader. It permits one region, up to 128 MiB decompressed NBT, 25 million cells and one million non-air blocks. It refuses to overwrite an output path and makes no source changes.
+The read-only [survey tool](https://github.com/Schem-at/Nucleation/blob/v0.12.3/tools/inspect_tick_world_record_plot.py) uses the existing bounded NBT reader. It permits one region, up to 128 MiB decompressed NBT, 25 million cells and one million non-air blocks. It refuses to overwrite an output path and makes no source changes.
 
 ```bash
 python3 -B tools/inspect_tick_world_record_plot.py \

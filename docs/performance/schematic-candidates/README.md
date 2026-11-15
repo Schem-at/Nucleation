@@ -8,7 +8,7 @@ and [typed adapter benchmarks](adapter-benchmarks.md).
 
 The local archive is `/Users/harrison/RustroverProjects/Nucleation-schematic-archive`.
 Launch Circuit Atlas with `python3 tools/serve_tick_archive.py --archive /path/to/archive`
-and open `http://127.0.0.1:8767`. See [dashboard setup](../../../apps/schematic-atlas/README.md).
+and open `http://127.0.0.1:8767`. See [dashboard setup](https://github.com/Schem-at/Nucleation/blob/v0.12.3/apps/schematic-atlas/README.md).
 The simpler `index.html` also opens directly: the search, source, format and priority filters
 work without a server. Original downloads, provenance, byte hashes, source
 READMEs, saved DataVersions and alternate formats are retained separately.
@@ -111,7 +111,7 @@ their functional specification, two match native tick-end traces, and only one
 satisfies both: the lamp-panel 2×2. The other matching build is hollow in vanilla
 and fails the proposed solid-door criterion. See the linked reports for scope.
 
-[Executable adapters](../../../circuit-adapters/README.md) attach named typed
+[Executable adapters](https://github.com/Schem-at/Nucleation/blob/v0.12.3/circuit-adapters/README.md) attach named typed
 ports, reset/timing rules, independent suites and a native benchmark runner to
 the adder, comparator and admitted 2×2 door. Atlas exposes their code and results.
 The benchmark suite does not time all library candidates: admission requires a

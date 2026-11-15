@@ -331,7 +331,7 @@ Separate Callgrind runs after native timing counted **858,124,694 →587,598,018
 instructions**, a **31.5% reduction**, comparing the reference PGO and selected
 PGO binaries with the identical `hipster 1 2` command (one load, four cycles
 including warmup). This is not a wall-clock speedup estimate. Raw compressed
-profiles and annotations are in [profiles/](profiles/).
+profiles and annotations are in [profiles/](https://github.com/Schem-at/Nucleation/tree/v0.12.3/docs/performance/execution-plans/profiles).
 
 The standard reference and selected build also produced **17,172 byte-identical
 stderr lines** for `hipster 1 1` with `MC_TICK_TRACE_EVENTS=1`,

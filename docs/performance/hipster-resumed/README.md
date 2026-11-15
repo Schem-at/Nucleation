@@ -148,7 +148,7 @@ ordered differential checks use the released engine as their reference. No new
 Minecraft server capture was made; the offline reference archive was not supplied
 in this session. Reconstructed fingerprint serialization differs from the lost
 historical harness, so hashes are compared between identical fresh harnesses.
-Full logs and fingerprint rows are in [`validation/`](validation/).
+Full logs and fingerprint rows are in [`validation/`](https://github.com/Schem-at/Nucleation/tree/v0.12.3/docs/performance/hipster-resumed/validation).
 
 ## Separate instruction profiles
 
@@ -170,7 +170,7 @@ speedup, demonstrating why instruction counts alone are insufficient.
 
 The retained profile still concentrates work in wire block-signal evaluation,
 world reads, notification draining, wire connection calculations, and emission.
-Raw compressed profiles and annotated tables are in [`profiles/`](profiles/).
+Raw compressed profiles and annotated tables are in [`profiles/`](https://github.com/Schem-at/Nucleation/tree/v0.12.3/docs/performance/hipster-resumed/profiles).
 Profiler executables/packages and build caches remain outside Git. The profiler
 was extracted under the task directory; no system installation was changed.
 
@@ -180,7 +180,7 @@ AMD Ryzen AI 9 HX 370, Linux x86-64, CPU 0 (allowed set 0–23), performance gov
 and energy preference. Rust/Cargo **1.98.0**, rustc `88d9e12ae`, release opt-level 3,
 LTO, debug=1, generic x86-64, no target-cpu=native or PGO. All variants use the same
 lockfile, harness and development-only `cpu-time = 1.0.0`; production dependencies
-are unchanged. Detailed compiler/host metadata is in [`metadata/`](metadata/).
+are unchanged. Detailed compiler/host metadata is in [`metadata/`](https://github.com/Schem-at/Nucleation/tree/v0.12.3/docs/performance/hipster-resumed/metadata).
 
 Every simulation uses `mc_test::build_sim` and RNG seed 0. Fixtures are committed
 under `crates/mc-tick/tests/corpus/structures`.
