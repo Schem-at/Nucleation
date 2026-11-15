@@ -3,8 +3,16 @@
 Circuit Atlas uses native 768×576 orthographic PNG renders of the archived saved
 state. The images come from Nucleation's resource-pack mesher and renderer on
 **harrison-work**, using real Minecraft block models and textures. No simulation
-ticks, placement updates, inventory repairs or geometry substitutions are run
-to obtain an image. The original files remain unchanged.
+ticks, placement updates or inventory repairs are run to obtain an image.
+Imports use the production format converters; original files remain unchanged.
+
+The completed cache contains **2,297 verified PNGs**: all **848 original Java
+schematics**, **883 first-pass plot components**, and **566 floor-aware exports**.
+The ten remaining first-pass components contain only invisible barrier blocks;
+the UI reports no visible geometry. Fourteen Bedrock files were excluded from
+the Java batch. All **803 geometric door candidates** have actual rendered images.
+See the [run summary](validation/atlas-thumbnails.json) and compressed
+[per-image and batch records](validation/atlas-render-records.json.gz).
 
 The local cache is `ARCHIVE/rendered-thumbnails/`. Its manifest records original
 BLAKE3/SHA-256 identity, PNG hashes, dimensions, mesh counts, resource-pack hashes,
@@ -53,6 +61,8 @@ With `blake3` and `Pillow` installed in the archive's tooling venv:
 
 ```sh
 python tools/render_tick_archive.py --archive "$ARCHIVE" reconcile results.jsonl
+python tools/render_tick_archive.py --archive "$ARCHIVE" report \
+  --output-dir docs/performance/schematic-candidates/validation
 python3 tools/serve_tick_archive.py --archive "$ARCHIVE" --port 8767
 ```
 

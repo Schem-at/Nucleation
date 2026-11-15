@@ -1,0 +1,25 @@
+{
+  "host": "harrison-work",
+  "production_engine_commit": "488ae01f",
+  "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.0\nLLVM version: 22.1.8\n",
+  "checks": [
+    {
+      "filter": "nbt::",
+      "status": "ok",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "log_sha256": "d418f012df81ded2e5c2fe5c52845d1fc2c75a69fe07883fe4bd2f71d95412fa",
+      "reproduce": "cargo test --locked --release --lib nbt::"
+    },
+    {
+      "filter": "formats::",
+      "status": "ok",
+      "passed": 95,
+      "failed": 0,
+      "ignored": 0,
+      "log_sha256": "8bc4f7931e3e501542e314e4f49687321ae3288b49b5b21aae4a1b2822f50436",
+      "reproduce": "cargo test --locked --release --lib formats::"
+    }
+  ]
+}

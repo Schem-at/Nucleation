@@ -6,6 +6,7 @@ before reconciling. Install blake3 and Pillow in an archive-local Python venv.
 """
 import argparse
 import collections
+import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -121,6 +122,38 @@ def reconcile(args):
     print(json.dumps({'verified_results': successful, 'error_results': failed, 'cache': manifest['counts']}))
 
 
+def report(args):
+    root = args.archive / 'rendered-thumbnails'
+    manifest = json.loads((root / 'manifest.json').read_text())
+    rows = json.loads((args.archive / 'library.json').read_text())['entries']
+    schematic_ids = {r['sha256'] for r in rows if r['kind'] == 'schematic'}
+    successful = {k: v for k, v in manifest['entries'].items() if v['status'] == 'ok'}
+    errors = {k: v for k, v in manifest['entries'].items() if v['status'] != 'ok'}
+    batches = {p.name: [json.loads(line) for line in p.read_text().splitlines() if line.strip()]
+               for p in sorted(root.glob('*-results.jsonl'))}
+    summary = {
+        'schema_version': 1, 'render_host': 'harrison-work',
+        'rustc': (root / 'rustc.txt').read_text(), 'host': (root / 'host.txt').read_text().strip(),
+        'final_binary_sha256': (root / 'binaries.sha256').read_text(),
+        'binary_scope': 'Snapshot after importer fixes. Earlier batch binary hashes were not recorded; these hashes are not attributed retroactively to those batches.',
+        'assets': json.loads((root / 'assets/manifest.json').read_text()),
+        'schematic_contents': len(schematic_ids), 'rendered_contents': len(successful),
+        'not_requested': len(schematic_ids - manifest['entries'].keys()),
+        'not_rendered': len(errors),
+        'unrendered_reasons': dict(collections.Counter(v.get('error', 'unknown') for v in errors.values())),
+        'png_bytes': sum((root / 'pngs' / f'{key}.png').stat().st_size for key in successful),
+        'formats': dict(collections.Counter(v['format'] for v in successful.values())),
+        'batch_counts': {name: dict(collections.Counter(r['status'] for r in records)) for name, records in batches.items()},
+        'verification': 'Every successful source/PNG BLAKE3 checked, source/PNG SHA256 recorded, every PNG decoded and dimension checked by reconcile.',
+        'simulation_ticks': 0, 'scope': manifest['scope'],
+    }
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    write_json(args.output_dir / 'atlas-thumbnails.json', summary)
+    encoded = json.dumps({'summary': summary, 'cache': manifest, 'batches': batches}, ensure_ascii=False, sort_keys=True).encode()
+    (args.output_dir / 'atlas-render-records.json.gz').write_bytes(gzip.compress(encoded, mtime=0))
+    print(json.dumps({k: summary[k] for k in ['schematic_contents', 'rendered_contents', 'not_requested', 'not_rendered', 'png_bytes']}))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--archive', type=Path, required=True)
@@ -131,8 +164,9 @@ def main():
     job.add_argument('--extension', action='append', help='Restrict to a saved suffix, e.g. .schematic; repeatable')
     job.add_argument('--input-root', type=Path, required=True); job.add_argument('--output-root', type=Path, required=True); job.add_argument('--jobs-dir', type=Path, required=True)
     result = commands.add_parser('reconcile'); result.add_argument('results', type=Path, nargs='+')
+    summary = commands.add_parser('report'); summary.add_argument('--output-dir', type=Path, required=True)
     args = parser.parse_args()
-    {'pack': make_pack, 'jobs': jobs, 'reconcile': reconcile}[args.command](args)
+    {'pack': make_pack, 'jobs': jobs, 'reconcile': reconcile, 'report': report}[args.command](args)
 
 
 if __name__ == '__main__': main()

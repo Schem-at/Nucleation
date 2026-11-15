@@ -71,7 +71,7 @@ annotated map remain available as context.
   generate a thumbnail. Missing or failed renders show an explicit text state;
   no placeholder geometry is substituted. Entity rendering has the native
   mesher's model and positioning limitations, recorded with the render result.
-- **Plot doors** selects `world-record-parts` entries classified as
+- **Plot doors** selects `world-record-parts` and `world-record-floor-parts` entries classified as
   `door_candidate`, excluding components flagged `infrastructure_review`.
   **Plot fragments** keeps the remaining extracted content, including shared
   floors that may connect several mechanisms.
@@ -107,3 +107,6 @@ provides `mountReplay(container, capture)` and returns a cleanup callback.
 
 Selections use `#entry=<sha256>` so a detail view can be bookmarked. The static
 frontend never invokes a Rust compiler or executes downloaded source files.
+Collections can also be linked directly, for example `#collection=plot-doors`.
+Floor-separated entries expose their parent, original platform cells, overlap
+and movement-review notes alongside the first-pass extraction properties.

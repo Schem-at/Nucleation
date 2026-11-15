@@ -15,7 +15,9 @@ READMEs, saved DataVersions and alternate formats are retained separately.
 
 - The original collection has **914 schematic files, 862 distinct schematic
   contents**, across 13 source groups. The verified first plot extraction adds
-  **893 separately downloadable components**; see the extraction reports below.
+  **893 separately downloadable components**; a floor-aware second pass adds
+  **566 source-derived components**. The full library now contains **2,373
+  schematic paths / 2,321 distinct files**, across 15 source groups.
 - **3,864 additional text layouts**, mainly Redstonepedia; these require conversion
   and validation before use in the Java 1.21.11 suite.
 - Three independent curators produced **57 shortlisted test proposals**:
@@ -109,7 +111,11 @@ selection contains 458,409 non-air blocks in 284×208×295 cells, 12,541 block e
 and 318 top-level entities. See the [survey](world-record-plot.md) and
 [overview map](world-record-plot-map.svg). The [full extraction](world-record-parts.md)
 produced 893 files, including 746 smaller physical door candidates, three shared
-floor groups, and 144 other components. Every exported file passed source-state,
+floor groups, and 144 other components. The [floor-aware second pass](world-record-floor-parts.md)
+separates 57 additional piston-bearing candidates from those shared platforms:
+**803 geometric door candidates** in total. Floor context is copied from the
+source with a one-block horizontal margin, and may overlap other exports.
+Every exported file passed source-state,
 block-entity payload and entity read-back checks. Candidate boundaries
 do not prove their surrounding dependencies are present. Saved inventories are
 mostly empty; edge-touching mechanisms may be cut by the approximate selection.

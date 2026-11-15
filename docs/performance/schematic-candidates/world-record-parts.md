@@ -6,7 +6,7 @@ The untouched original remains in the local archive as `user-world-record-plot/W
 
 ## Completed extraction, 15 November 2026
 
-The fresh `harrison-work` run exported and read back all **893 components** successfully. Local registration verified every extracted file's BLAKE3 and retained all files under archive source `world-record-parts`, totalling 2,415,518 compressed bytes. The [summary](world-record-parts-summary.json) records counts and verification flags; the [compressed metadata catalog](catalog/world-record-parts.json.gz) includes the full extraction manifest and curator rows. The extraction manifest's SHA-256 is `fdf6264c58b474b32f49b6f881d01582aa6d146979e21da33f1af639874b1b3e`.
+The fresh `harrison-work` run exported and read back all **893 components** successfully. Local registration verified every extracted file's BLAKE3 and retained all files under archive source `world-record-parts`, totalling 2,415,518 compressed bytes. The [summary](world-record-parts-summary.json) records counts and verification flags; the [compressed metadata catalog](catalog/world-record-parts-extraction.json.gz) includes the full extraction manifest and curator rows. The extraction manifest's SHA-256 is `fdf6264c58b474b32f49b6f881d01582aa6d146979e21da33f1af639874b1b3e`.
 
 | Result | Count |
 |---|---:|
@@ -22,6 +22,8 @@ The fresh `harrison-work` run exported and read back all **893 components** succ
 | Entity-only quarantine files | 0 |
 
 The three large infrastructure components remain in the canonical 893-part partition. They connect mechanisms through shared plot floors and must not be presented as three individual doors. Excluding them gives 746 initial individual candidates; that count does not imply the floor-attached mechanisms have been individually isolated.
+
+The completed [floor-context second pass](world-record-floor-parts.md) adds 57 piston-bearing candidates from those infrastructure components, bringing the initial geometric candidate set to 803. Its 566 derivatives preserve all nonplatform source content and explicitly account for overlapping restored platform context. They do not replace or modify this canonical partition.
 
 | Retained component | Non-air blocks | Piston-related blocks, including heads |
 |---|---:|---:|
@@ -63,7 +65,7 @@ target/release/examples/isolate_archive_plot \
   --archive /path/to/Nucleation-schematic-archive \
   --extraction /path/to/new-extraction-directory \
   --report-summary docs/performance/schematic-candidates/world-record-parts-summary.json \
-  --report-catalog docs/performance/schematic-candidates/catalog/world-record-parts.json.gz
+  --report-catalog docs/performance/schematic-candidates/catalog/world-record-parts-extraction.json.gz
 ```
 
 Registration verifies the pinned original SHA-256, the extractor's source and per-file BLAKE3 hashes, all successful read-back flags and aggregate entity assignment coverage. It then places each file in immutable SHA-256 object storage with an archive hardlink. The original outputs are not moved or modified. Existing destinations must have identical bytes; no files are deleted or overwritten. Registration produces source `world-record-parts`, its source/manifest metadata and `curation/world-record-parts.json`. The archive index can then consume these through its existing source manifest and curator join.

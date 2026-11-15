@@ -178,6 +178,22 @@ def main():
         return {'files':len(parts), 'individual_candidates':len(doors), 'source_blocks':458409, 'block_entities':12541, 'entities':318}
     check('extracted plot files, preservation and rendered doors', extracted_parts)
 
+    def floor_parts():
+        parts = [r for r in rows if r['source'] == 'world-record-floor-parts']
+        require(len(parts) == 566, 'Expected every verified second-pass component')
+        doors = [r for r in parts if r['classification'] == 'door_candidate']
+        require(len(doors) == 57 and all(r['thumbnail']['status'] == 'ok' for r in doors), 'Second-pass door renders missing')
+        require(all(r['data_version'] == 4671 and r.get('validation_status') not in PASS_STATUSES for r in parts), 'Second pass changed version or invented functionality')
+        for row in [doors[0], doors[-1]]:
+            result = entry(row['sha256'])['entries'][0]
+            require(result['parent_part'] in {'part0004', 'part0005', 'part0006'}, 'Unexpected platform parent')
+            require(result['verification']['readback'] == 'passed' and result['verification']['all_states_exact_subset_of_parent'], 'Missing source-subset/readback checks')
+            context = result['restored_platform_context']
+            require(context['exact_source_cells_only'] and context['horizontal_halo'] == 1 and context['overlap_with_other_children_allowed'], 'Restored platform context misrepresented')
+            require(sha(request('/api/file/'+row['sha256'])) == row['sha256'], 'Second-pass download mismatch')
+        return {'files':len(parts), 'new_door_candidates':len(doors), 'total_door_candidates':803, 'platform_context_is_partition':False}
+    check('floor-separated files, context provenance and rendered doors', floor_parts)
+
     for label, expected in [('comparator',{'vanilla-comparator':960}), ('door',{'vanilla-cycle':320,'vanilla-idle':320})]:
         def captures(label=label, expected=expected):
             digest = PINNED[label]; result = entry(digest)

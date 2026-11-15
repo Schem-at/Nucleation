@@ -142,6 +142,13 @@ function belongs(group, collection) {
 function chooseCollection(collection, source = null) {
   state.collection = collection; state.source = source; state.limit = PAGE_SIZE;
   renderNav(); renderResults();
+  history.replaceState(null, '', collectionURL());
+}
+function collectionURL() {
+  const params = new URLSearchParams();
+  if (state.source) params.set('source', state.source);
+  else if (state.collection !== 'all') params.set('collection', state.collection);
+  return location.pathname + location.search + (params.size ? '#' + params : '');
 }
 function renderNav() {
   $('#collections').replaceChildren();
@@ -269,7 +276,14 @@ function renderResults() {
 }
 function resetFilters() { state.query = ''; state.filter = 'all'; state.limit = PAGE_SIZE; $('#search').value = ''; $('#validation-filter').value = 'all'; renderResults(); }
 function navigate(id, opener) { state.opener = opener || document.activeElement; if (location.hash === `#entry=${id}`) openDetail(id); else location.hash = `entry=${encodeURIComponent(id)}`; }
-function handleHash() { const id = new URLSearchParams(location.hash.slice(1)).get('entry'); if (id) openDetail(id); else if ($('#detail').open) $('#detail').close(); }
+function handleHash() {
+  const params = new URLSearchParams(location.hash.slice(1)); const id = params.get('entry');
+  if (id) { openDetail(id); return; }
+  if ($('#detail').open) $('#detail').close();
+  const collection = params.get('collection'), source = params.get('source');
+  if (source && state.groups.some(g => g.rows.some(r => r.source === source))) chooseCollection('all', source);
+  else if (collections.some(c => c[0] === collection)) chooseCollection(collection);
+}
 function primaryDetail() { return state.detail?.entries?.[0] || state.byId.get(state.selected)?.row || {}; }
 function clearReplay() {
   state.captureAbort?.abort(); state.captureAbort = null;
@@ -336,6 +350,15 @@ function renderExtraction(content, row) {
     ['Source maximum X / Y / Z', textValue(bounds.max)],
   ]));
   content.append(el('p', 'detail-note extraction-note', 'Bounds use the original selection coordinates. Physical isolation does not establish a complete door: detached parts can be separate, and connected builds can share a component.'));
+  if (row.restored_platform_context) {
+    const context = row.restored_platform_context;
+    content.append(sectionTitle('Shared-floor separation'), facts([
+      ['Parent component', row.parent_part || 'Not recorded'],
+      ['Platform height', count(context.floor_y)],
+      ['Original floor cells restored', count(context.count)],
+      ['Horizontal margin', `${count(context.horizontal_halo)} block`],
+    ]), el('p', 'detail-note extraction-note', 'Shared platform cells were excluded from grouping, then restored from the source around this build. Original holes remain. Floor context may overlap another export; movement beyond this footprint still needs review.'));
+  }
   if (contactLabels.length) content.append(sectionTitle('Original selection edges'), el('p', 'evidence-box review', `Touches ${contactLabels.join('; ')}. The original selection may have cut off part of this build.`));
   const reviewTags = row.review_tags || [];
   if (reviewTags.length) {
@@ -489,7 +512,7 @@ function updateLive(event) {
 function closeDetails() { if ($('#detail').open) $('#detail').close(); }
 $('#detail').addEventListener('close', () => {
   state.entryAbort?.abort(); clearReplay(); clearLive(); state.selected = null; state.detail = null;
-  document.body.style.overflow = ''; if (location.hash.startsWith('#entry=')) history.replaceState(null, '', location.pathname + location.search);
+  document.body.style.overflow = ''; if (location.hash.startsWith('#entry=')) history.replaceState(null, '', collectionURL());
   if (state.opener?.isConnected) state.opener.focus(); else $('#search').focus(); state.opener = null;
 });
 $('#detail').addEventListener('click', event => { const r = $('#detail').getBoundingClientRect(); if (event.target === $('#detail') && (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom)) closeDetails(); });

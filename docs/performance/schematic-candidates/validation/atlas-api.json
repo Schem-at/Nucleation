@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "status": "pass",
-  "checked_at_utc": "2026-11-15T08:55:28.409788+00:00",
+  "checked_at_utc": "2026-11-15T09:05:52.173954+00:00",
   "base_url": "http://127.0.0.1:8767",
   "server_source_sha256": "1a8ba9fb6b25ad3f277c6abc582093f32c3c020bd1056eabe982ed1f767043a1",
-  "test_source_sha256": "b091e83fcaaf742d297118fd054cabd24e01301e31980dac85093ca45de91667",
-  "library_file_sha256": "75e9981fb740b33d17ff006da9f1137b205cd18442468c799497ddd148ff17c9",
-  "checks_passed": 18,
-  "checks_total": 18,
-  "http_requests": 37,
+  "test_source_sha256": "fa350a9e79f26956d7142907471b046375d9668ee98f15a171e70451e14638b8",
+  "library_file_sha256": "c5bb71597f71b5344f63f348fd8e9b0d088d1085c6c718ce516266103fdb5961",
+  "checks_passed": 19,
+  "checks_total": 19,
+  "http_requests": 41,
   "scope": "Read-only loopback API, original byte hashes, static decoding and retained capture association. No browser/UI/WASM execution, new vanilla run or new circuit parity proof.",
   "checks": [
     {
@@ -16,10 +16,10 @@
       "status": "pass",
       "details": {
         "summary": {
-          "schematic_files": 1807,
-          "unique_schematics": 1755,
+          "schematic_files": 2373,
+          "unique_schematics": 2321,
           "layout_files": 3864,
-          "sources": 14,
+          "sources": 15,
           "validated": 4
         },
         "validated_sha256": [
@@ -138,6 +138,16 @@
       }
     },
     {
+      "name": "floor-separated files, context provenance and rendered doors",
+      "status": "pass",
+      "details": {
+        "files": 566,
+        "new_door_candidates": 57,
+        "total_door_candidates": 803,
+        "platform_context_is_partition": false
+      }
+    },
+    {
       "name": "retained capture association comparator",
       "status": "pass",
       "details": [
@@ -232,8 +242,8 @@
     {
       "path": "/api/library",
       "status": 200,
-      "bytes": 7824183,
-      "sha256": "0f6364f99344dc3c9779351d7d07251344e59ce7192afa01cafc6a46007a456e",
+      "bytes": 9561969,
+      "sha256": "0bbd9cad2eb224c73a23d350877c664b85492e3cde75be7f735cc529d8bf4329",
       "content_type": "application/json"
     },
     {
@@ -354,6 +364,34 @@
       "bytes": 11596,
       "sha256": "4c52815448cf034d0422bdd7d93b917b4b2e77423d29761965f087bd3a209306",
       "content_type": "application/json"
+    },
+    {
+      "path": "/api/entry/3f5adf997012ab95a0293fcdd16e4de749547f3739ffce921c09f63aa8f0af0b",
+      "status": 200,
+      "bytes": 59349,
+      "sha256": "45b37d463daa1af013422bd3529b439661b985509f7e20daa8bdecb888baa49b",
+      "content_type": "application/json"
+    },
+    {
+      "path": "/api/file/3f5adf997012ab95a0293fcdd16e4de749547f3739ffce921c09f63aa8f0af0b",
+      "status": 200,
+      "bytes": 22017,
+      "sha256": "3f5adf997012ab95a0293fcdd16e4de749547f3739ffce921c09f63aa8f0af0b",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "/api/entry/9cc17b5165bad587591d860a0003cbe9a87e5cf8bfbdcca30049170b7fb409c6",
+      "status": 200,
+      "bytes": 10300,
+      "sha256": "0e4dfb94ac916d2a94ef5d5143d3ffc921881cb87798988e1d47b2180f55e3d1",
+      "content_type": "application/json"
+    },
+    {
+      "path": "/api/file/9cc17b5165bad587591d860a0003cbe9a87e5cf8bfbdcca30049170b7fb409c6",
+      "status": 200,
+      "bytes": 1684,
+      "sha256": "9cc17b5165bad587591d860a0003cbe9a87e5cf8bfbdcca30049170b7fb409c6",
+      "content_type": "application/octet-stream"
     },
     {
       "path": "/api/capture/vanilla-comparator",
