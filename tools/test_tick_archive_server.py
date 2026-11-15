@@ -103,7 +103,9 @@ def main():
 
     def library_counts():
         original = [r for r in rows if r['source'] not in {'world-record-parts', 'world-record-floor-parts'}]
-        expected = {'layout_files':3864, 'validated':4}
+        oracle = json.loads((server.REPO / 'docs/performance/schematic-candidates/plot-validation/oracle-results.json').read_text())
+        admitted = {c['source_sha256'] for c in oracle['cases'] if c['benchmark_admission']=='accepted'}
+        expected = {'layout_files':3864, 'validated':4+len(admitted)}
         for key, value in expected.items():require(library['summary'][key] == value, f'{key} != {value}')
         schematic = [r for r in rows if r['kind'] == 'schematic']
         original_schematic = [r for r in original if r['kind'] == 'schematic']
@@ -111,11 +113,34 @@ def main():
         require(len(schematic) == library['summary']['schematic_files'] and len({r['sha256'] for r in schematic}) == library['summary']['unique_schematics'], 'Summary disagrees with actual schematic rows')
         require(sum(r['kind'] == 'layout' for r in rows) == 3864, 'Layout row count differs')
         validated = {r['sha256'] for r in rows if r.get('validation_status') in PASS_STATUSES}
-        require(len(validated) == 4, 'Validated count must be distinct content, not duplicate paths')
+        require(len(validated) == 4+len(admitted), 'Validated count must match distinct functional evidence')
+        require(admitted.issubset(validated), 'Oracle-admitted source is missing validation')
         require(len({r['source'] for r in rows}) == library['summary']['sources'], 'Source count differs')
         require(all(r['id'] == r['sha256'] for r in rows), 'Entry ID is not the content hash')
         return {'summary':library['summary'], 'validated_sha256':sorted(validated)}
     check('library counts and distinct validation', library_counts)
+
+    def adapters():
+        observed = []
+        for profile_path in sorted((server.REPO / 'circuit-adapters').glob('*/adapter.json')):
+            profile = json.loads(profile_path.read_text())
+            record = entry(profile['source_sha256'])['adapter']
+            require(record['profile'] == profile, 'Entry adapter differs from pinned contract')
+            result = record['result']
+            require(result['status'] == 'functional_pass', 'Missing current adapter functionality check')
+            require(result['profile_sha256'] == sha(profile_path.read_bytes()), 'Stale profile result')
+            suite_bytes = request(f'/api/adapter-file/{record["id"]}/suite.json', kind='application/json')
+            require(result['suite_sha256'] == sha(suite_bytes), 'Stale suite result')
+            suite = json.loads(suite_bytes)
+            require(len(suite['vectors']) == record['vectors'] == result['vectors'], 'Vector count mismatch')
+            require(result['reset_replay'] == 'exact_checkpoint_and_outputs', 'Missing deterministic reset check')
+            runner = request(f'/api/adapter-file/{record["id"]}/runner.rs')
+            require(sha(runner) == sha((server.REPO/'examples/run_tick_adapter.rs').read_bytes()), 'Wrong runner source')
+            request(f'/api/adapter-file/{record["id"]}/not-allowed', status=404)
+            observed.append({'adapter':record['id'],'vectors':record['vectors'],'sha256':profile['source_sha256']})
+        require(len(observed) == 3, 'Expected arithmetic, comparator and door adapters')
+        return observed
+    check('source-pinned adapters, code, suites and recorded checks', adapters)
 
     for label in ['comparator', 'flyer', 'legacy', 'plot']:
         def original(label=label):
@@ -167,7 +192,8 @@ def main():
         require(sum(r['entities'] for r in parts) == 318, 'Source entity coverage differs')
         doors = [r for r in parts if r['classification'] == 'door_candidate' and 'infrastructure_review' not in r['review_tags']]
         require(len(doors) == 746, 'Shared floors must not count as individual first-pass door candidates')
-        require(all(r['data_version'] == 4671 and r.get('validation_status') not in PASS_STATUSES for r in parts), 'Extraction changed version or invented functional evidence')
+        require(all(r['data_version'] == 4671 for r in parts), 'Extraction changed source version')
+        require(all(r.get('validation_evidence') for r in parts if r.get('validation_status') in PASS_STATUSES), 'Passing extracted entry lacks recorded evidence')
         require(all(r['thumbnail']['status'] == 'ok' for r in doors), 'An extracted door lacks a verified real render')
         for row in [doors[0], doors[-1]]:
             data = request('/api/file/'+row['sha256'])
@@ -183,7 +209,8 @@ def main():
         require(len(parts) == 566, 'Expected every verified second-pass component')
         doors = [r for r in parts if r['classification'] == 'door_candidate']
         require(len(doors) == 57 and all(r['thumbnail']['status'] == 'ok' for r in doors), 'Second-pass door renders missing')
-        require(all(r['data_version'] == 4671 and r.get('validation_status') not in PASS_STATUSES for r in parts), 'Second pass changed version or invented functionality')
+        require(all(r['data_version'] == 4671 for r in parts), 'Second pass changed source version')
+        require(all(r.get('validation_evidence') for r in parts if r.get('validation_status') in PASS_STATUSES), 'Passing floor entry lacks recorded evidence')
         for row in [doors[0], doors[-1]]:
             result = entry(row['sha256'])['entries'][0]
             require(result['parent_part'] in {'part0004', 'part0005', 'part0006'}, 'Unexpected platform parent')

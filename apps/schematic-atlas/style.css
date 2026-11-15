@@ -45,3 +45,5 @@ main{margin-left:232px;padding:0 48px;max-width:1900px}.topbar{height:84px;borde
 .source-card .notes-list{overflow-wrap:anywhere}
 @media(max-width:900px){.featured-copy{width:57%;padding:24px}.featured-art{left:57%;opacity:1}.feature-actions{gap:12px}}
 @media(max-width:650px){.featured{display:flex;flex-direction:column;min-height:0}.featured-copy{width:100%;padding:24px}.featured-art{position:relative;inset:auto;width:100%;height:220px;border-top:1px solid #3b493d}.featured-preview .card-art.native-thumbnail{height:220px}.featured p:not(.eyebrow){max-width:none}.thumbnail-state{gap:7px;padding:17px}.thumbnail-state-label{font-size:6px;letter-spacing:.8px}.thumbnail-state strong{font-size:11px}.thumbnail-state-description{font-size:8px}.overview-art .thumbnail-state-label{font-size:8px}.overview-art .thumbnail-state-description{font-size:10px}.feature-pending{min-height:120px}}
+
+.chip.smoke{background:#e7eeed;color:#657f79}.evidence-box.smoke{border-color:#7b9b94;background:#e7eeed;color:#506f67}

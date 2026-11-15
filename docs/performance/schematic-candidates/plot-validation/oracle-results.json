@@ -1,0 +1,986 @@
+{
+  "cases": [
+    {
+      "aperture": {
+        "max": [
+          93,
+          66,
+          176
+        ],
+        "min": [
+          87,
+          60,
+          176
+        ]
+      },
+      "artifact_directory": "batch1/plot_part0101_7x7",
+      "benchmark_admission": "not_admitted",
+      "binaries": {
+        "checker_sha256": "491ac9cd91bb3898ada1b85d590ab6b979a9e09d99ee4aefd3c1c5880b4c63ca",
+        "exporter_sha256": "66d3bd8ecf966e1f402e3b6dca925c57280805c17c67b93106998946ead4c5f7"
+      },
+      "captures": {
+        "cycle": {
+          "functional_checks": "not performed",
+          "java": "21.0.13+9-LTS",
+          "players": 0,
+          "sha256": "2f100dd001e9b73b5a5542d551855e384fa35ab5f2beda0887dcb7f5c63c2c68",
+          "structural_capture_checks": "passed",
+          "ticks": 660,
+          "warmup_ticks": 18
+        },
+        "idle": {
+          "functional_checks": "not performed",
+          "java": "21.0.13+9-LTS",
+          "players": 0,
+          "sha256": "f377eec53bf5c9009e59d68d7400350d6a55d721192137af5e8646794c2d964c",
+          "structural_capture_checks": "passed",
+          "ticks": 660,
+          "warmup_ticks": 18
+        }
+      },
+      "case": "plot_part0101_7x7",
+      "closure_projection_axis": null,
+      "endpoint_ticks": [
+        180,
+        340,
+        500,
+        660
+      ],
+      "functional_failures": [],
+      "functional_status": "vanilla_functional_pass",
+      "native": {
+        "cycle": {
+          "actions": 4,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0101_7x7/cycle/capture.json",
+          "capture_blake3": "be5730c36d012c6405ae217cf106bdebb818db9870fa1d3695a24156291ca322",
+          "case": "plot_part0101_7x7_cycle",
+          "compared_capture_state_blake3": "f55cca0ce78ce89f9dc0cc219cd2278aa16c2fff1ed162a2db643c090713d457",
+          "compared_engine_state_blake3": "3573fd7e5cd35a200116206c474aa2f17ca6731a393dcc77cf460f9cb15a5338",
+          "declared_source_sha256": "bfa34da16e8e609dd9cdc718d8268c9d6887e2e27049f173619df55e310eee07",
+          "engine_block_changes": 23,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": {
+            "actual": "minecraft:cobblestone_wall[east=none,north=tall,south=none,up=true,waterlogged=false,west=tall]",
+            "expected": "minecraft:cobblestone_wall[east=tall,north=tall,south=none,up=true,waterlogged=false,west=tall]",
+            "field": "block",
+            "position": [
+              2,
+              0,
+              3
+            ],
+            "tick": 24
+          },
+          "fixture_blocks": 250,
+          "matching_frames_including_initial": 24,
+          "negative_control": false,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "failed"
+        },
+        "idle": {
+          "actions": 0,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0101_7x7/idle/capture.json",
+          "capture_blake3": "8f64b9cc1d2920c8d7cf032915a3b25f52372525e12cd63f524020ae43dd9857",
+          "case": "plot_part0101_7x7_idle",
+          "compared_capture_state_blake3": "08b95c027d66ba78145613d6a77c53cbdc68c8052f80ca97f733510a9e91e81b",
+          "compared_engine_state_blake3": "08b95c027d66ba78145613d6a77c53cbdc68c8052f80ca97f733510a9e91e81b",
+          "declared_source_sha256": "bfa34da16e8e609dd9cdc718d8268c9d6887e2e27049f173619df55e310eee07",
+          "engine_block_changes": 0,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 250,
+          "matching_frames_including_initial": 661,
+          "negative_control": true,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        }
+      },
+      "native_before_fix": {
+        "cycle": {
+          "actions": 4,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0101_7x7/cycle/capture.json",
+          "capture_blake3": "be5730c36d012c6405ae217cf106bdebb818db9870fa1d3695a24156291ca322",
+          "case": "plot_part0101_7x7_cycle",
+          "compared_capture_state_blake3": "f55cca0ce78ce89f9dc0cc219cd2278aa16c2fff1ed162a2db643c090713d457",
+          "compared_engine_state_blake3": "3573fd7e5cd35a200116206c474aa2f17ca6731a393dcc77cf460f9cb15a5338",
+          "declared_source_sha256": "bfa34da16e8e609dd9cdc718d8268c9d6887e2e27049f173619df55e310eee07",
+          "engine_block_changes": 23,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": {
+            "actual": "minecraft:cobblestone_wall[east=none,north=tall,south=none,up=true,waterlogged=false,west=tall]",
+            "expected": "minecraft:cobblestone_wall[east=tall,north=tall,south=none,up=true,waterlogged=false,west=tall]",
+            "field": "block",
+            "position": [
+              2,
+              0,
+              3
+            ],
+            "tick": 24
+          },
+          "fixture_blocks": 250,
+          "matching_frames_including_initial": 24,
+          "negative_control": false,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "failed"
+        },
+        "idle": {
+          "actions": 0,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0101_7x7/idle/capture.json",
+          "capture_blake3": "8f64b9cc1d2920c8d7cf032915a3b25f52372525e12cd63f524020ae43dd9857",
+          "case": "plot_part0101_7x7_idle",
+          "compared_capture_state_blake3": "08b95c027d66ba78145613d6a77c53cbdc68c8052f80ca97f733510a9e91e81b",
+          "compared_engine_state_blake3": "08b95c027d66ba78145613d6a77c53cbdc68c8052f80ca97f733510a9e91e81b",
+          "declared_source_sha256": "bfa34da16e8e609dd9cdc718d8268c9d6887e2e27049f173619df55e310eee07",
+          "engine_block_changes": 0,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 250,
+          "matching_frames_including_initial": 661,
+          "negative_control": true,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        }
+      },
+      "oracle_revised_after_capture": false,
+      "origin": [
+        86,
+        53,
+        175
+      ],
+      "pull_ticks": [
+        21,
+        181,
+        341,
+        501
+      ],
+      "rechecked_checker_revision": "9a51b44000c48a2261afe8b9f12ba7d6850c28dc",
+      "rechecked_checker_revision_note": "Checker compiled on harrison-work from the identical mc-tick engine source immediately before this focused fix commit. Other agents had unrelated dirty root/UI files; this is a source-equivalent core revision, not a claim of a clean whole-repository build.",
+      "rechecked_checker_sha256": "91c2c61075edb528b6cb8ba7e5e95687a5c550128a223d8fe09c36c028b436a0",
+      "run_error": null,
+      "run_status": "not_admitted",
+      "source_sha256": "bfa34da16e8e609dd9cdc718d8268c9d6887e2e27049f173619df55e310eee07"
+    },
+    {
+      "aperture": {
+        "max": [
+          97,
+          55,
+          203
+        ],
+        "min": [
+          92,
+          55,
+          198
+        ]
+      },
+      "artifact_directory": "batch1/plot_part0117_horizontal6x6",
+      "benchmark_admission": "not_admitted",
+      "binaries": {
+        "checker_sha256": "491ac9cd91bb3898ada1b85d590ab6b979a9e09d99ee4aefd3c1c5880b4c63ca",
+        "exporter_sha256": "66d3bd8ecf966e1f402e3b6dca925c57280805c17c67b93106998946ead4c5f7"
+      },
+      "captures": {
+        "cycle": {
+          "functional_checks": "not performed",
+          "java": "21.0.13+9-LTS",
+          "players": 0,
+          "sha256": "5f736a92e19491049a37a04b097dd0d2a0e1db6c7179316c76adc966cfed00e2",
+          "structural_capture_checks": "passed",
+          "ticks": 660,
+          "warmup_ticks": 26
+        },
+        "idle": {
+          "functional_checks": "not performed",
+          "java": "21.0.13+9-LTS",
+          "players": 0,
+          "sha256": "064a6a6399c75fb506c5281e51ca7ae81706d323abf9128202e2d581de87520a",
+          "structural_capture_checks": "passed",
+          "ticks": 660,
+          "warmup_ticks": 30
+        }
+      },
+      "case": "plot_part0117_horizontal6x6",
+      "closure_projection_axis": null,
+      "endpoint_ticks": [
+        180,
+        340,
+        500,
+        660
+      ],
+      "functional_failures": [],
+      "functional_status": "vanilla_functional_pass",
+      "native": {
+        "cycle": {
+          "actions": 4,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0117_horizontal6x6/cycle/capture.json",
+          "capture_blake3": "c0c90f579c14973ccbd362f78ab963a2d2acce3454de49b2cec256c33f76476a",
+          "case": "plot_part0117_horizontal6x6_cycle",
+          "compared_capture_state_blake3": "81d41f7dcee48e421d15dc9cd12798efedbec153bb3d23e01798ff1d8f79f913",
+          "compared_engine_state_blake3": "44fb3766dea723ffc9ad0181e4a2cf70c0d02b01e29b19e73419ee2ca6fd23b2",
+          "declared_source_sha256": "0fe86bdc4514fd616f83eaa78c492c76f835b9bdde894ffe3c61911a1055296d",
+          "engine_block_changes": 1179,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": {
+            "actual": "minecraft:cobblestone_wall[east=tall,north=tall,south=none,up=true,waterlogged=false,west=none]",
+            "expected": "minecraft:cobblestone_wall[east=tall,north=tall,south=none,up=true,waterlogged=false,west=tall]",
+            "field": "block",
+            "position": [
+              3,
+              0,
+              14
+            ],
+            "tick": 91
+          },
+          "fixture_blocks": 189,
+          "matching_frames_including_initial": 91,
+          "negative_control": false,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "failed"
+        },
+        "idle": {
+          "actions": 0,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0117_horizontal6x6/idle/capture.json",
+          "capture_blake3": "ea310f06717a0bc2b436a7dd231725f07855a101d9bc4682b05e40ff12689f87",
+          "case": "plot_part0117_horizontal6x6_idle",
+          "compared_capture_state_blake3": "30a1dbdc83b5e5daa7295f135440e1b85f88ee431a912232c2631902192e1cac",
+          "compared_engine_state_blake3": "30a1dbdc83b5e5daa7295f135440e1b85f88ee431a912232c2631902192e1cac",
+          "declared_source_sha256": "0fe86bdc4514fd616f83eaa78c492c76f835b9bdde894ffe3c61911a1055296d",
+          "engine_block_changes": 0,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 189,
+          "matching_frames_including_initial": 661,
+          "negative_control": true,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        }
+      },
+      "native_before_fix": {
+        "cycle": {
+          "actions": 4,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0117_horizontal6x6/cycle/capture.json",
+          "capture_blake3": "c0c90f579c14973ccbd362f78ab963a2d2acce3454de49b2cec256c33f76476a",
+          "case": "plot_part0117_horizontal6x6_cycle",
+          "compared_capture_state_blake3": "a31183bcdad985f5ae0908ae584b4658d4f97f667e1a8fca1eb16929fdc24e24",
+          "compared_engine_state_blake3": "f2d59933b67ee5ec79ea9344e61214174cc8c03c5b8ae5748530434b65d8ccb5",
+          "declared_source_sha256": "0fe86bdc4514fd616f83eaa78c492c76f835b9bdde894ffe3c61911a1055296d",
+          "engine_block_changes": 130,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": {
+            "actual": "minecraft:observer[facing=north,powered=false]",
+            "expected": "minecraft:observer[facing=north,powered=true]",
+            "field": "block",
+            "position": [
+              7,
+              2,
+              3
+            ],
+            "tick": 29
+          },
+          "fixture_blocks": 189,
+          "matching_frames_including_initial": 29,
+          "negative_control": false,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "failed"
+        },
+        "idle": {
+          "actions": 0,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0117_horizontal6x6/idle/capture.json",
+          "capture_blake3": "ea310f06717a0bc2b436a7dd231725f07855a101d9bc4682b05e40ff12689f87",
+          "case": "plot_part0117_horizontal6x6_idle",
+          "compared_capture_state_blake3": "30a1dbdc83b5e5daa7295f135440e1b85f88ee431a912232c2631902192e1cac",
+          "compared_engine_state_blake3": "30a1dbdc83b5e5daa7295f135440e1b85f88ee431a912232c2631902192e1cac",
+          "declared_source_sha256": "0fe86bdc4514fd616f83eaa78c492c76f835b9bdde894ffe3c61911a1055296d",
+          "engine_block_changes": 0,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 189,
+          "matching_frames_including_initial": 661,
+          "negative_control": true,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        }
+      },
+      "oracle_revised_after_capture": false,
+      "origin": [
+        91,
+        53,
+        191
+      ],
+      "pull_ticks": [
+        21,
+        181,
+        341,
+        501
+      ],
+      "rechecked_checker_revision": "9a51b44000c48a2261afe8b9f12ba7d6850c28dc",
+      "rechecked_checker_revision_note": "Checker compiled on harrison-work from the identical mc-tick engine source immediately before this focused fix commit. Other agents had unrelated dirty root/UI files; this is a source-equivalent core revision, not a claim of a clean whole-repository build.",
+      "rechecked_checker_sha256": "91c2c61075edb528b6cb8ba7e5e95687a5c550128a223d8fe09c36c028b436a0",
+      "run_error": null,
+      "run_status": "not_admitted",
+      "source_sha256": "0fe86bdc4514fd616f83eaa78c492c76f835b9bdde894ffe3c61911a1055296d"
+    },
+    {
+      "aperture": {
+        "max": [
+          158,
+          57,
+          213
+        ],
+        "min": [
+          156,
+          55,
+          213
+        ]
+      },
+      "artifact_directory": "batch1/plot_part0465_3x3",
+      "benchmark_admission": "not_admitted",
+      "binaries": {
+        "checker_sha256": "491ac9cd91bb3898ada1b85d590ab6b979a9e09d99ee4aefd3c1c5880b4c63ca",
+        "exporter_sha256": "66d3bd8ecf966e1f402e3b6dca925c57280805c17c67b93106998946ead4c5f7"
+      },
+      "captures": {
+        "cycle": {
+          "functional_checks": "not performed",
+          "java": "21.0.13+9-LTS",
+          "players": 0,
+          "sha256": "35cebf6dd41fc2751ee576ebec5389dd52704413527efe85450bdb98cfeb5734",
+          "structural_capture_checks": "passed",
+          "ticks": 660,
+          "warmup_ticks": 10
+        },
+        "idle": {
+          "functional_checks": "not performed",
+          "java": "21.0.13+9-LTS",
+          "players": 0,
+          "sha256": "8c4a10439e45af245414113c4e49773c2c87b563fb6791b909225f4a3cfb30f8",
+          "structural_capture_checks": "passed",
+          "ticks": 660,
+          "warmup_ticks": 14
+        }
+      },
+      "case": "plot_part0465_3x3",
+      "closure_projection_axis": null,
+      "endpoint_ticks": [
+        180,
+        340,
+        500,
+        660
+      ],
+      "functional_failures": [
+        {
+          "details": {
+            "air_cells": 1,
+            "allowed_closed_cells": 8,
+            "cells": 9
+          },
+          "name": "endpoint_180_closed_aperture",
+          "passed": false
+        },
+        {
+          "details": {
+            "air_cells": 1,
+            "allowed_closed_cells": 8,
+            "cells": 9
+          },
+          "name": "endpoint_500_closed_aperture",
+          "passed": false
+        }
+      ],
+      "functional_status": "vanilla_functional_failed",
+      "native": {
+        "cycle": {
+          "actions": 4,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0465_3x3/cycle/capture.json",
+          "capture_blake3": "9cb9bc089f5e73e62c37333af2d6ed17892917448bdab0cc392639dfe4e71026",
+          "case": "plot_part0465_3x3_cycle",
+          "compared_capture_state_blake3": "1ce66bac22d63a6f63f169e3c9c65bde434b8099379f2f8e1d5604b901c563dd",
+          "compared_engine_state_blake3": "1ce66bac22d63a6f63f169e3c9c65bde434b8099379f2f8e1d5604b901c563dd",
+          "declared_source_sha256": "1346e80046395ef3c4e47014d402cf2ee401967e287968022f40584cc71eab39",
+          "engine_block_changes": 412,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 38,
+          "matching_frames_including_initial": 661,
+          "negative_control": false,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        },
+        "idle": {
+          "actions": 0,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0465_3x3/idle/capture.json",
+          "capture_blake3": "9d21381fd3c87ff7e6d6bb154a9784b752dd3c88b29a005e8ea7edba5dc4ac5e",
+          "case": "plot_part0465_3x3_idle",
+          "compared_capture_state_blake3": "8fb3df7dae63f8b97101361a7fa992b5c343bbdb79402bc613d2a6dc5f94f065",
+          "compared_engine_state_blake3": "8fb3df7dae63f8b97101361a7fa992b5c343bbdb79402bc613d2a6dc5f94f065",
+          "declared_source_sha256": "1346e80046395ef3c4e47014d402cf2ee401967e287968022f40584cc71eab39",
+          "engine_block_changes": 0,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 38,
+          "matching_frames_including_initial": 661,
+          "negative_control": true,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        }
+      },
+      "native_before_fix": {
+        "cycle": {
+          "actions": 4,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0465_3x3/cycle/capture.json",
+          "capture_blake3": "9cb9bc089f5e73e62c37333af2d6ed17892917448bdab0cc392639dfe4e71026",
+          "case": "plot_part0465_3x3_cycle",
+          "compared_capture_state_blake3": "14aa61e77e71ecaedffc0fae3f9470e9ed287f9677356fd1c8ea08b78bb5bce8",
+          "compared_engine_state_blake3": "5c8cffe40ec64f917e60374f19669c49330abef4656bfdad88e8962500d5997c",
+          "declared_source_sha256": "1346e80046395ef3c4e47014d402cf2ee401967e287968022f40584cc71eab39",
+          "engine_block_changes": 63,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": {
+            "actual": "minecraft:observer[facing=west,powered=false]",
+            "expected": "minecraft:observer[facing=west,powered=true]",
+            "field": "block",
+            "position": [
+              2,
+              1,
+              1
+            ],
+            "tick": 32
+          },
+          "fixture_blocks": 38,
+          "matching_frames_including_initial": 32,
+          "negative_control": false,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "failed"
+        },
+        "idle": {
+          "actions": 0,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0465_3x3/idle/capture.json",
+          "capture_blake3": "9d21381fd3c87ff7e6d6bb154a9784b752dd3c88b29a005e8ea7edba5dc4ac5e",
+          "case": "plot_part0465_3x3_idle",
+          "compared_capture_state_blake3": "8fb3df7dae63f8b97101361a7fa992b5c343bbdb79402bc613d2a6dc5f94f065",
+          "compared_engine_state_blake3": "8fb3df7dae63f8b97101361a7fa992b5c343bbdb79402bc613d2a6dc5f94f065",
+          "declared_source_sha256": "1346e80046395ef3c4e47014d402cf2ee401967e287968022f40584cc71eab39",
+          "engine_block_changes": 0,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 38,
+          "matching_frames_including_initial": 661,
+          "negative_control": true,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        }
+      },
+      "oracle_revised_after_capture": false,
+      "origin": [
+        153,
+        53,
+        212
+      ],
+      "pull_ticks": [
+        21,
+        181,
+        341,
+        501
+      ],
+      "rechecked_checker_revision": "9a51b44000c48a2261afe8b9f12ba7d6850c28dc",
+      "rechecked_checker_revision_note": "Checker compiled on harrison-work from the identical mc-tick engine source immediately before this focused fix commit. Other agents had unrelated dirty root/UI files; this is a source-equivalent core revision, not a claim of a clean whole-repository build.",
+      "rechecked_checker_sha256": "91c2c61075edb528b6cb8ba7e5e95687a5c550128a223d8fe09c36c028b436a0",
+      "run_error": null,
+      "run_status": "not_admitted",
+      "source_sha256": "1346e80046395ef3c4e47014d402cf2ee401967e287968022f40584cc71eab39"
+    },
+    {
+      "aperture": {
+        "max": [
+          178,
+          60,
+          131
+        ],
+        "min": [
+          174,
+          56,
+          129
+        ]
+      },
+      "artifact_directory": "batch1/plot_part0622_5x5",
+      "benchmark_admission": "not_admitted",
+      "binaries": {
+        "checker_sha256": "491ac9cd91bb3898ada1b85d590ab6b979a9e09d99ee4aefd3c1c5880b4c63ca",
+        "exporter_sha256": "66d3bd8ecf966e1f402e3b6dca925c57280805c17c67b93106998946ead4c5f7"
+      },
+      "captures": {
+        "cycle": {
+          "functional_checks": "not performed",
+          "java": "21.0.13+9-LTS",
+          "players": 0,
+          "sha256": "dad97445864aa8e97d2ef7b70999a29dac4c029b1f79c956c1c5b73f726d5b4f",
+          "structural_capture_checks": "passed",
+          "ticks": 660,
+          "warmup_ticks": 22
+        },
+        "idle": {
+          "functional_checks": "not performed",
+          "java": "21.0.13+9-LTS",
+          "players": 0,
+          "sha256": "a7ed6e73245452f57caf401874d4992b1e43884cc217478cd0835183cbc1d712",
+          "structural_capture_checks": "passed",
+          "ticks": 660,
+          "warmup_ticks": 22
+        }
+      },
+      "case": "plot_part0622_5x5",
+      "closure_projection_axis": 2,
+      "endpoint_ticks": [
+        180,
+        340,
+        500,
+        660
+      ],
+      "functional_failures": [],
+      "functional_status": "vanilla_functional_pass",
+      "native": {
+        "cycle": {
+          "actions": 4,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0622_5x5/cycle/capture.json",
+          "capture_blake3": "8ccbf4b77c00205a7194de5fdb3e71ad94e574046a960c2ccc1c9ca718530c8f",
+          "case": "plot_part0622_5x5_cycle",
+          "compared_capture_state_blake3": "5f9eb9111bf996c5d292f16eaacece7de4df497e282b044770514b5cc4cbd474",
+          "compared_engine_state_blake3": "af5132a5fdc8ba2a7c15b11b2f67a8b1d1ecb82dd0d26de49881062dd3f57f41",
+          "declared_source_sha256": "0579e496cd29babb04a56e2f33f44e693bfc4021b7fcb01a77e7ff6266e09406",
+          "engine_block_changes": 517,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": {
+            "actual": "minecraft:cyan_concrete_powder",
+            "expected": "minecraft:air",
+            "field": "block",
+            "position": [
+              4,
+              10,
+              3
+            ],
+            "tick": 42
+          },
+          "fixture_blocks": 180,
+          "matching_frames_including_initial": 42,
+          "negative_control": false,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "failed"
+        },
+        "idle": {
+          "actions": 0,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0622_5x5/idle/capture.json",
+          "capture_blake3": "b5da436f5de352fc256f10a20c0e1401a3bc2b5269cc7479bc84350d021a2ea7",
+          "case": "plot_part0622_5x5_idle",
+          "compared_capture_state_blake3": "6f46699a03f303b5361b74a5d36c4e56e0cf430992d91ec7280ed3981dcf8dbc",
+          "compared_engine_state_blake3": "6f46699a03f303b5361b74a5d36c4e56e0cf430992d91ec7280ed3981dcf8dbc",
+          "declared_source_sha256": "0579e496cd29babb04a56e2f33f44e693bfc4021b7fcb01a77e7ff6266e09406",
+          "engine_block_changes": 0,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 180,
+          "matching_frames_including_initial": 661,
+          "negative_control": true,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        }
+      },
+      "native_before_fix": {
+        "cycle": {
+          "actions": 4,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0622_5x5/cycle/capture.json",
+          "capture_blake3": "8ccbf4b77c00205a7194de5fdb3e71ad94e574046a960c2ccc1c9ca718530c8f",
+          "case": "plot_part0622_5x5_cycle",
+          "compared_capture_state_blake3": "5f9eb9111bf996c5d292f16eaacece7de4df497e282b044770514b5cc4cbd474",
+          "compared_engine_state_blake3": "af5132a5fdc8ba2a7c15b11b2f67a8b1d1ecb82dd0d26de49881062dd3f57f41",
+          "declared_source_sha256": "0579e496cd29babb04a56e2f33f44e693bfc4021b7fcb01a77e7ff6266e09406",
+          "engine_block_changes": 517,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": {
+            "actual": "minecraft:cyan_concrete_powder",
+            "expected": "minecraft:air",
+            "field": "block",
+            "position": [
+              4,
+              10,
+              3
+            ],
+            "tick": 42
+          },
+          "fixture_blocks": 180,
+          "matching_frames_including_initial": 42,
+          "negative_control": false,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "failed"
+        },
+        "idle": {
+          "actions": 0,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch1/plot_part0622_5x5/idle/capture.json",
+          "capture_blake3": "b5da436f5de352fc256f10a20c0e1401a3bc2b5269cc7479bc84350d021a2ea7",
+          "case": "plot_part0622_5x5_idle",
+          "compared_capture_state_blake3": "6f46699a03f303b5361b74a5d36c4e56e0cf430992d91ec7280ed3981dcf8dbc",
+          "compared_engine_state_blake3": "6f46699a03f303b5361b74a5d36c4e56e0cf430992d91ec7280ed3981dcf8dbc",
+          "declared_source_sha256": "0579e496cd29babb04a56e2f33f44e693bfc4021b7fcb01a77e7ff6266e09406",
+          "engine_block_changes": 0,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 180,
+          "matching_frames_including_initial": 661,
+          "negative_control": true,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        }
+      },
+      "oracle_revised_after_capture": true,
+      "origin": [
+        172,
+        53,
+        128
+      ],
+      "pull_ticks": [
+        21,
+        181,
+        341,
+        501
+      ],
+      "rechecked_checker_revision": "9a51b44000c48a2261afe8b9f12ba7d6850c28dc",
+      "rechecked_checker_revision_note": "Checker compiled on harrison-work from the identical mc-tick engine source immediately before this focused fix commit. Other agents had unrelated dirty root/UI files; this is a source-equivalent core revision, not a claim of a clean whole-repository build.",
+      "rechecked_checker_sha256": "91c2c61075edb528b6cb8ba7e5e95687a5c550128a223d8fe09c36c028b436a0",
+      "run_error": null,
+      "run_status": "not_admitted",
+      "source_sha256": "0579e496cd29babb04a56e2f33f44e693bfc4021b7fcb01a77e7ff6266e09406"
+    },
+    {
+      "aperture": {
+        "max": [
+          144,
+          54,
+          171
+        ],
+        "min": [
+          143,
+          53,
+          171
+        ]
+      },
+      "artifact_directory": "batch2/plot_floor0119_2x2",
+      "benchmark_admission": "not_admitted",
+      "binaries": {
+        "checker_sha256": "491ac9cd91bb3898ada1b85d590ab6b979a9e09d99ee4aefd3c1c5880b4c63ca",
+        "exporter_sha256": "66d3bd8ecf966e1f402e3b6dca925c57280805c17c67b93106998946ead4c5f7"
+      },
+      "captures": {
+        "cycle": {
+          "functional_checks": "not performed",
+          "java": "21.0.13+9-LTS",
+          "players": 0,
+          "sha256": "e4a12366a2f4dfb9e95f800fa0576bc77d5f5a5a6aad64ba1b4c4f8235a6ef1d",
+          "structural_capture_checks": "passed",
+          "ticks": 660,
+          "warmup_ticks": 10
+        },
+        "idle": {
+          "functional_checks": "not performed",
+          "java": "21.0.13+9-LTS",
+          "players": 0,
+          "sha256": "f3cb5984bf3a93fcf4624c5e4e35ca71fdc069eca4f94a00787e9c9b4a7fc536",
+          "structural_capture_checks": "passed",
+          "ticks": 660,
+          "warmup_ticks": 10
+        }
+      },
+      "case": "plot_floor0119_2x2",
+      "closure_projection_axis": null,
+      "endpoint_ticks": [
+        180,
+        340,
+        500,
+        660
+      ],
+      "functional_failures": [],
+      "functional_status": "vanilla_functional_pass",
+      "native": {
+        "cycle": {
+          "actions": 4,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch2/plot_floor0119_2x2/cycle/capture.json",
+          "capture_blake3": "7f9ce569ca063db169855b4f382590c6e468e88408ce5dc25994a487f4c4a4ba",
+          "case": "plot_floor0119_2x2_cycle",
+          "compared_capture_state_blake3": "9ff5a2f94922c8d66a9be9f482c62c8a0858de0b7c5c4188f6516a524d990db2",
+          "compared_engine_state_blake3": "a890ec31bb3b972dd26eade4e2bde0b546d3b04cb0c3f2b1ce08cbcfd85c7609",
+          "declared_source_sha256": "db88c79d2d2e31362af0c280e29a6a2f04441901283c0f47d4c610f39b086cb7",
+          "engine_block_changes": 3,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": {
+            "actual": "minecraft:sticky_piston[extended=false,facing=east]",
+            "expected": "minecraft:sticky_piston[extended=true,facing=east]",
+            "field": "block",
+            "position": [
+              1,
+              3,
+              2
+            ],
+            "tick": 22
+          },
+          "fixture_blocks": 47,
+          "matching_frames_including_initial": 22,
+          "negative_control": false,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "failed"
+        },
+        "idle": {
+          "actions": 0,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch2/plot_floor0119_2x2/idle/capture.json",
+          "capture_blake3": "1e3f478f0540b1c62e1597ab02a3a2f346f9f3699e2b3bebc2c726631db3ea81",
+          "case": "plot_floor0119_2x2_idle",
+          "compared_capture_state_blake3": "72e1fd2178dcba857000dcd702917b5f9922207d0ad9d2bf3f9cffaaa5d1830e",
+          "compared_engine_state_blake3": "72e1fd2178dcba857000dcd702917b5f9922207d0ad9d2bf3f9cffaaa5d1830e",
+          "declared_source_sha256": "db88c79d2d2e31362af0c280e29a6a2f04441901283c0f47d4c610f39b086cb7",
+          "engine_block_changes": 0,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 47,
+          "matching_frames_including_initial": 661,
+          "negative_control": true,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        }
+      },
+      "native_before_fix": {
+        "cycle": {
+          "actions": 4,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch2/plot_floor0119_2x2/cycle/capture.json",
+          "capture_blake3": "7f9ce569ca063db169855b4f382590c6e468e88408ce5dc25994a487f4c4a4ba",
+          "case": "plot_floor0119_2x2_cycle",
+          "compared_capture_state_blake3": "9ff5a2f94922c8d66a9be9f482c62c8a0858de0b7c5c4188f6516a524d990db2",
+          "compared_engine_state_blake3": "a890ec31bb3b972dd26eade4e2bde0b546d3b04cb0c3f2b1ce08cbcfd85c7609",
+          "declared_source_sha256": "db88c79d2d2e31362af0c280e29a6a2f04441901283c0f47d4c610f39b086cb7",
+          "engine_block_changes": 3,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": {
+            "actual": "minecraft:sticky_piston[extended=false,facing=east]",
+            "expected": "minecraft:sticky_piston[extended=true,facing=east]",
+            "field": "block",
+            "position": [
+              1,
+              3,
+              2
+            ],
+            "tick": 22
+          },
+          "fixture_blocks": 47,
+          "matching_frames_including_initial": 22,
+          "negative_control": false,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "failed"
+        },
+        "idle": {
+          "actions": 0,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch2/plot_floor0119_2x2/idle/capture.json",
+          "capture_blake3": "1e3f478f0540b1c62e1597ab02a3a2f346f9f3699e2b3bebc2c726631db3ea81",
+          "case": "plot_floor0119_2x2_idle",
+          "compared_capture_state_blake3": "72e1fd2178dcba857000dcd702917b5f9922207d0ad9d2bf3f9cffaaa5d1830e",
+          "compared_engine_state_blake3": "72e1fd2178dcba857000dcd702917b5f9922207d0ad9d2bf3f9cffaaa5d1830e",
+          "declared_source_sha256": "db88c79d2d2e31362af0c280e29a6a2f04441901283c0f47d4c610f39b086cb7",
+          "engine_block_changes": 0,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 47,
+          "matching_frames_including_initial": 661,
+          "negative_control": true,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        }
+      },
+      "oracle_revised_after_capture": false,
+      "origin": [
+        140,
+        50,
+        169
+      ],
+      "pull_ticks": [
+        21,
+        181,
+        341,
+        501
+      ],
+      "rechecked_checker_revision": "9a51b44000c48a2261afe8b9f12ba7d6850c28dc",
+      "rechecked_checker_revision_note": "Checker compiled on harrison-work from the identical mc-tick engine source immediately before this focused fix commit. Other agents had unrelated dirty root/UI files; this is a source-equivalent core revision, not a claim of a clean whole-repository build.",
+      "rechecked_checker_sha256": "91c2c61075edb528b6cb8ba7e5e95687a5c550128a223d8fe09c36c028b436a0",
+      "run_error": null,
+      "run_status": "not_admitted",
+      "source_sha256": "db88c79d2d2e31362af0c280e29a6a2f04441901283c0f47d4c610f39b086cb7"
+    },
+    {
+      "aperture": {
+        "max": [
+          166,
+          55,
+          3
+        ],
+        "min": [
+          165,
+          54,
+          3
+        ]
+      },
+      "artifact_directory": "batch2/plot_part0556_lamp2x2",
+      "benchmark_admission": "accepted",
+      "binaries": {
+        "checker_sha256": "491ac9cd91bb3898ada1b85d590ab6b979a9e09d99ee4aefd3c1c5880b4c63ca",
+        "exporter_sha256": "66d3bd8ecf966e1f402e3b6dca925c57280805c17c67b93106998946ead4c5f7"
+      },
+      "captures": {
+        "cycle": {
+          "functional_checks": "not performed",
+          "java": "21.0.13+9-LTS",
+          "players": 0,
+          "sha256": "3ad7d8792ed9d38d4cde670ee106d073402d685ea9641fe56a953408fb0e1cc1",
+          "structural_capture_checks": "passed",
+          "ticks": 660,
+          "warmup_ticks": 10
+        },
+        "idle": {
+          "functional_checks": "not performed",
+          "java": "21.0.13+9-LTS",
+          "players": 0,
+          "sha256": "e1842f630e9a752a37688fd4510ea582f3483ef67f07589d6fb752809cc53d60",
+          "structural_capture_checks": "passed",
+          "ticks": 660,
+          "warmup_ticks": 10
+        }
+      },
+      "case": "plot_part0556_lamp2x2",
+      "closure_projection_axis": null,
+      "endpoint_ticks": [
+        180,
+        340,
+        500,
+        660
+      ],
+      "functional_failures": [],
+      "functional_status": "vanilla_functional_pass",
+      "native": {
+        "cycle": {
+          "actions": 4,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch2/plot_part0556_lamp2x2/cycle/capture.json",
+          "capture_blake3": "d4c2b0058c977055bc1a52dcee0eb22448e849e2c15387cd4aaa6aad90cc631b",
+          "case": "plot_part0556_lamp2x2_cycle",
+          "compared_capture_state_blake3": "7df09e7eace2cbfdf19efeb2737d943575cd95e90b4ea52c31005b7b339069df",
+          "compared_engine_state_blake3": "7df09e7eace2cbfdf19efeb2737d943575cd95e90b4ea52c31005b7b339069df",
+          "declared_source_sha256": "a60cc8eb5d752db2dc2366f7dea3d15c2a7be34cb8811c74645695faef088642",
+          "engine_block_changes": 198,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 25,
+          "matching_frames_including_initial": 661,
+          "negative_control": false,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        },
+        "idle": {
+          "actions": 0,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch2/plot_part0556_lamp2x2/idle/capture.json",
+          "capture_blake3": "bc979c8218cc05e01976dc40cb67dda8401fc6b050806754e21a97c148b16490",
+          "case": "plot_part0556_lamp2x2_idle",
+          "compared_capture_state_blake3": "87dee543fcca2a8dce842db3a2eb8f9503c96c75826c4716570edbcecb219657",
+          "compared_engine_state_blake3": "87dee543fcca2a8dce842db3a2eb8f9503c96c75826c4716570edbcecb219657",
+          "declared_source_sha256": "a60cc8eb5d752db2dc2366f7dea3d15c2a7be34cb8811c74645695faef088642",
+          "engine_block_changes": 0,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 25,
+          "matching_frames_including_initial": 661,
+          "negative_control": true,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        }
+      },
+      "native_before_fix": {
+        "cycle": {
+          "actions": 4,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch2/plot_part0556_lamp2x2/cycle/capture.json",
+          "capture_blake3": "d4c2b0058c977055bc1a52dcee0eb22448e849e2c15387cd4aaa6aad90cc631b",
+          "case": "plot_part0556_lamp2x2_cycle",
+          "compared_capture_state_blake3": "7df09e7eace2cbfdf19efeb2737d943575cd95e90b4ea52c31005b7b339069df",
+          "compared_engine_state_blake3": "7df09e7eace2cbfdf19efeb2737d943575cd95e90b4ea52c31005b7b339069df",
+          "declared_source_sha256": "a60cc8eb5d752db2dc2366f7dea3d15c2a7be34cb8811c74645695faef088642",
+          "engine_block_changes": 198,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 25,
+          "matching_frames_including_initial": 661,
+          "negative_control": false,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        },
+        "idle": {
+          "actions": 0,
+          "capture": "/home/harrison/nucleation-perf/plot-validation/oracles/batch2/plot_part0556_lamp2x2/idle/capture.json",
+          "capture_blake3": "bc979c8218cc05e01976dc40cb67dda8401fc6b050806754e21a97c148b16490",
+          "case": "plot_part0556_lamp2x2_idle",
+          "compared_capture_state_blake3": "87dee543fcca2a8dce842db3a2eb8f9503c96c75826c4716570edbcecb219657",
+          "compared_engine_state_blake3": "87dee543fcca2a8dce842db3a2eb8f9503c96c75826c4716570edbcecb219657",
+          "declared_source_sha256": "a60cc8eb5d752db2dc2366f7dea3d15c2a7be34cb8811c74645695faef088642",
+          "engine_block_changes": 0,
+          "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+          "expected_frames": 661,
+          "first_difference": null,
+          "fixture_blocks": 25,
+          "matching_frames_including_initial": 661,
+          "negative_control": true,
+          "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+          "status": "matches_capture"
+        }
+      },
+      "oracle_revised_after_capture": false,
+      "origin": [
+        163,
+        53,
+        2
+      ],
+      "pull_ticks": [
+        21,
+        181,
+        341,
+        501
+      ],
+      "rechecked_checker_revision": "9a51b44000c48a2261afe8b9f12ba7d6850c28dc",
+      "rechecked_checker_revision_note": "Checker compiled on harrison-work from the identical mc-tick engine source immediately before this focused fix commit. Other agents had unrelated dirty root/UI files; this is a source-equivalent core revision, not a claim of a clean whole-repository build.",
+      "rechecked_checker_sha256": "91c2c61075edb528b6cb8ba7e5e95687a5c550128a223d8fe09c36c028b436a0",
+      "run_error": null,
+      "run_status": "functional_and_parity_pass",
+      "source_sha256": "a60cc8eb5d752db2dc2366f7dea3d15c2a7be34cb8811c74645695faef088642"
+    }
+  ],
+  "counts": {
+    "admitted": 1,
+    "cases": 6,
+    "native_cycle_matches": 2,
+    "native_idle_matches": 6,
+    "vanilla_functional_pass": 5
+  },
+  "format_version": 1,
+  "scope": "Every captured tick-end block, comparator output and flat occupied inventory slot; no vanilla entity census, nested item-component, moving-BE payload or intra-tick parity."
+}

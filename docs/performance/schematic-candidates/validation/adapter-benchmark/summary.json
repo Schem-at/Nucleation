@@ -1,0 +1,41 @@
+{
+  "add005": {
+    "samples": 21,
+    "iterations_per_sample": 1,
+    "median_ms_per_suite": 201.09761,
+    "vectors_per_suite": 328,
+    "game_ticks_per_suite": 10496,
+    "operations_per_second": 1631.0487230554356,
+    "simulated_ticks_per_second": 52193.55913777394,
+    "range_ms_per_suite": [
+      195.8532,
+      223.487117
+    ]
+  },
+  "othercomb017": {
+    "samples": 21,
+    "iterations_per_sample": 71,
+    "median_ms_per_suite": 2.1066363943661974,
+    "vectors_per_suite": 40,
+    "game_ticks_per_suite": 960,
+    "operations_per_second": 18987.614619671658,
+    "simulated_ticks_per_second": 455702.75087211985,
+    "range_ms_per_suite": [
+      1.972630676056338,
+      2.513479295774648
+    ]
+  },
+  "plot-lamp2x2": {
+    "samples": 21,
+    "iterations_per_sample": 1000,
+    "median_ms_per_suite": 0.12978478999999998,
+    "vectors_per_suite": 4,
+    "game_ticks_per_suite": 640,
+    "operations_per_second": 30820.252511869843,
+    "simulated_ticks_per_second": 4931240.401899175,
+    "range_ms_per_suite": [
+      0.126490755,
+      0.14227859899999998
+    ]
+  }
+}

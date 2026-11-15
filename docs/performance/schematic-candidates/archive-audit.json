@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "audited_at_utc": "2026-11-15T09:02:23.574899+00:00",
+  "audited_at_utc": "2026-11-15T09:46:09.315412+00:00",
   "archive_root": "/Users/harrison/RustroverProjects/Nucleation-schematic-archive",
   "status": "passed",
   "scope": "Local content integrity, saved-tree consistency and curation joins. No network revalidation, builds, simulation or new parity proof.",

@@ -1,0 +1,41 @@
+{
+  "engine_source_commit": "df78798b0b023ca029f965030d8eb8229a4a92c3",
+  "rust_build_host": "harrison-work",
+  "local_rust_compilation": false,
+  "engine_and_scenarios": {
+    "passed": 422,
+    "failed": 0,
+    "ignored": 7
+  },
+  "bridge": {
+    "passed": 30,
+    "failed": 0
+  },
+  "adapter_unit_tests": {
+    "passed": 3,
+    "failed": 0
+  },
+  "adapter_functional_suites": 3,
+  "plot_native_candidates": 803,
+  "plot_native_assessed": 688,
+  "plot_native_unsupported": 115,
+  "vanilla_plot_cases": 6,
+  "vanilla_functional_pass": 5,
+  "native_activated_cycle_match": 2,
+  "admitted_plot_door_benchmarks": 1,
+  "web_api_checks": 20,
+  "web_ui_checks": 9,
+  "mesher_unit_tests": {
+    "passed": 269,
+    "failed": 5,
+    "baseline_passed": 267,
+    "baseline_failed": 5,
+    "note": "Same five pre-existing geometry-count failures; two new direction/seam tests pass."
+  },
+  "log_sha256": {
+    "final-engine-tests.log": "dfd034a6f76b37f1290ea5f96ad57bdabbab8d387e11017bec90b22b752ff241",
+    "final-bridge-tests.log": "0d8e6921c88ada2c0a43e886e7530accb75c27e22f10fa18408390d79fb4a59f",
+    "final-wasm-build.log": "cf5ad0e713649ab9423ab784a7539c93570e86a6dc98fd93738bc6e07d7bde21"
+  },
+  "scope": "Counts span different suites, not one combined test invocation. Door functionality, native parity, survival/replay, rendering and throughput are separate evidence."
+}

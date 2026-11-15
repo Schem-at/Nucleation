@@ -83,7 +83,13 @@ annotated map remain available as context.
   iframe and the same origin.
 - Unknown evidence is **Unvalidated**. Functional checks, vanilla parity,
   unsupported imports and source-labeled negatives are distinct statuses.
+  **Simulation checked** means a bounded idle/control/replay assessment, with
+  functionality still unproven. It is deliberately separate from passing checks.
   Opening a file is not a new functionality or parity result.
+- Admitted builds can carry an **Executable build adapter**: typed inputs and
+  outputs, tick budgets, source-pinned test vectors, native runner code and a
+  recorded result. Contracts and suites use the same real-circuit operations
+  for tests and benchmarks; the web server only serves their files.
 
 The original user-provided plot stays in the local archive. This app and its
 tracked metadata do not publish that binary.
@@ -101,6 +107,7 @@ provides `mountReplay(container, capture)` and returns a cleanup callback.
 | `/api/file/<sha256>` | Original archived file |
 | `/api/thumbnail/<sha256>` | Native textured PNG, or 404 when unavailable |
 | `/api/capture/<id>` | Retained capture data |
+| `/api/adapter-file/<id>/<file>` | Allowlisted adapter contract, suite, code, instructions or result |
 | `/api/plot-map` | Annotated World Record Plot survey |
 | `/api/plot` | Plot curation metadata |
 | `/sim-lab/` | Built live simulation application |
@@ -110,3 +117,8 @@ frontend never invokes a Rust compiler or executes downloaded source files.
 Collections can also be linked directly, for example `#collection=plot-doors`.
 Floor-separated entries expose their parent, original platform cells, overlap
 and movement-review notes alongside the first-pass extraction properties.
+
+`verify-ui.mjs` checks typed ports, evidence labels, thumbnails and mobile sizing
+in a separate headless browser. It uses Sim Lab's Playwright development
+dependency; set `CHROME_PATH` to an installed Chromium/Chrome executable if the
+Playwright browser bundle is not installed. It does not operate personal tabs.

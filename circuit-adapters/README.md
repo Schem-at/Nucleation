@@ -26,6 +26,9 @@ python3 tools/run_tick_adapters.py --archive /path/to/archive \
 python3 tools/run_tick_adapters.py --archive /path/to/archive \
   --binary target/release/examples/run_tick_adapter --output /path/to/benchmark \
   --samples 21 --iterations 3
+# Calibrated, randomized 21-round sampling on a permitted Linux CPU:
+python3 tools/benchmark_tick_adapters.py --archive /path/to/archive \
+  --binary target/release/examples/run_tick_adapter --output /path/to/fresh-run
 ```
 
 The runner resolves the original by SHA-256 from the archive manifest. It

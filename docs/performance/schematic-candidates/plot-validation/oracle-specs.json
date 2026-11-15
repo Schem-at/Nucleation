@@ -1,0 +1,241 @@
+{
+  "format_version": 1,
+  "method": "Curated source geometry, paired idle control, four real lever pulls and two complete cycles. No repairs or inventory substitutions.",
+  "cases": [
+    {
+      "case": "plot_part0465_3x3",
+      "source": "sources/world-record-parts/files/part0465.litematic",
+      "sha256": "1346e80046395ef3c4e47014d402cf2ee401967e287968022f40584cc71eab39",
+      "plot_sha256": "5476ac349cd4529d7a237828633b9e7a995d70b8937f70e4836d2f9f8db66c1e",
+      "bounds": {
+        "min": [
+          153,
+          53,
+          212
+        ],
+        "max": [
+          160,
+          59,
+          213
+        ]
+      },
+      "lever": [
+        159,
+        59,
+        212
+      ],
+      "aperture": {
+        "min": [
+          156,
+          55,
+          213
+        ],
+        "max": [
+          158,
+          57,
+          213
+        ]
+      },
+      "closed_blocks": [
+        "minecraft:quartz_block"
+      ],
+      "notes": "Zero authored entities/containers/cutoff flags. Sign: 3t to remove input bug. Preserve existing delay-3 repeater. Initially air aperture, quartz perimeter."
+    },
+    {
+      "case": "plot_part0622_5x5",
+      "source": "sources/world-record-parts/files/part0622.litematic",
+      "sha256": "0579e496cd29babb04a56e2f33f44e693bfc4021b7fcb01a77e7ff6266e09406",
+      "plot_sha256": "5476ac349cd4529d7a237828633b9e7a995d70b8937f70e4836d2f9f8db66c1e",
+      "bounds": {
+        "min": [
+          172,
+          53,
+          128
+        ],
+        "max": [
+          180,
+          63,
+          131
+        ]
+      },
+      "lever": [
+        180,
+        56,
+        128
+      ],
+      "aperture": {
+        "min": [
+          174,
+          56,
+          129
+        ],
+        "max": [
+          178,
+          60,
+          131
+        ]
+      },
+      "closed_blocks": [
+        "minecraft:quartz_block"
+      ],
+      "notes": "Zero authored entities/containers/cutoff flags. Comparator present. Cyan concrete powder may create runtime entities; checker rejects engine runtime entities, Java capture lacks entity census. Oracle revision after capture: closure is a nonflush wall, rows at z129/130/131, not one plane. Require all25 x/y rays blocked by quartz within this 3-deep air aperture, then all75 cells air when open. Original proposed z130 plane and failed audit retained.",
+      "closure_projection_axis": 2
+    },
+    {
+      "case": "plot_part0117_horizontal6x6",
+      "source": "sources/world-record-parts/files/part0117.litematic",
+      "sha256": "0fe86bdc4514fd616f83eaa78c492c76f835b9bdde894ffe3c61911a1055296d",
+      "plot_sha256": "5476ac349cd4529d7a237828633b9e7a995d70b8937f70e4836d2f9f8db66c1e",
+      "bounds": {
+        "min": [
+          91,
+          53,
+          191
+        ],
+        "max": [
+          98,
+          55,
+          205
+        ]
+      },
+      "lever": [
+        93,
+        54,
+        191
+      ],
+      "aperture": {
+        "min": [
+          92,
+          55,
+          198
+        ],
+        "max": [
+          97,
+          55,
+          203
+        ]
+      },
+      "closed_blocks": [
+        "minecraft:quartz_block"
+      ],
+      "notes": "Zero authored entities/containers/cutoff flags. Slime/honey horizontal hatch. Geometry-derived 6x6 aperture; require captured complete panel rather than assume it works."
+    },
+    {
+      "case": "plot_part0101_7x7",
+      "source": "sources/world-record-parts/files/part0101.litematic",
+      "sha256": "bfa34da16e8e609dd9cdc718d8268c9d6887e2e27049f173619df55e310eee07",
+      "plot_sha256": "5476ac349cd4529d7a237828633b9e7a995d70b8937f70e4836d2f9f8db66c1e",
+      "bounds": {
+        "min": [
+          86,
+          53,
+          175
+        ],
+        "max": [
+          94,
+          68,
+          179
+        ]
+      },
+      "lever": [
+        92,
+        53,
+        179
+      ],
+      "aperture": {
+        "min": [
+          87,
+          60,
+          176
+        ],
+        "max": [
+          93,
+          66,
+          176
+        ]
+      },
+      "closed_blocks": [
+        "minecraft:quartz_block"
+      ],
+      "notes": "Zero authored entities/containers/cutoff flags. Sign: Smallest 7x7, 432 Blocks. Slime/honey hipster-style; geometry-derived air aperture."
+    },
+    {
+      "case": "plot_floor0119_2x2",
+      "source": "sources/world-record-floor-parts/files/part0004-floorpart0119.litematic",
+      "sha256": "db88c79d2d2e31362af0c280e29a6a2f04441901283c0f47d4c610f39b086cb7",
+      "plot_sha256": "5476ac349cd4529d7a237828633b9e7a995d70b8937f70e4836d2f9f8db66c1e",
+      "bounds": {
+        "min": [
+          140,
+          50,
+          169
+        ],
+        "max": [
+          147,
+          55,
+          172
+        ]
+      },
+      "lever": [
+        144,
+        55,
+        170
+      ],
+      "aperture": {
+        "min": [
+          143,
+          53,
+          171
+        ],
+        "max": [
+          144,
+          54,
+          171
+        ]
+      },
+      "closed_blocks": [
+        "minecraft:quartz_block"
+      ],
+      "notes": "Floor-aware derived candidate with restored source platform context. Zero authored entities/cutoff. Two face-to-face empty droppers kept exactly as saved; no comparator, but missing inventory uncertainty retained. No repairs."
+    },
+    {
+      "case": "plot_part0556_lamp2x2",
+      "source": "sources/world-record-parts/files/part0556.litematic",
+      "sha256": "a60cc8eb5d752db2dc2366f7dea3d15c2a7be34cb8811c74645695faef088642",
+      "plot_sha256": "5476ac349cd4529d7a237828633b9e7a995d70b8937f70e4836d2f9f8db66c1e",
+      "bounds": {
+        "min": [
+          163,
+          53,
+          2
+        ],
+        "max": [
+          168,
+          57,
+          3
+        ]
+      },
+      "lever": [
+        166,
+        56,
+        2
+      ],
+      "aperture": {
+        "min": [
+          165,
+          54,
+          3
+        ],
+        "max": [
+          166,
+          55,
+          3
+        ]
+      },
+      "closed_blocks": [
+        "minecraft:redstone_lamp"
+      ],
+      "notes": "Zero entities/containers/cutoff. Preserve two other powered=true levers at [164,53,3] and [167,53,3] as constant inputs; only pull main north-facing unpowered lever. Panels initially redstone lamps at x164 and167,y54..55,z3."
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "host": "harrison-work",
-  "rustc": "1.98.0",
-  "engine_commit": "488ae01f",
+  "rustc": "1.98.0 (88d9e12ae 2026-08-18)",
+  "engine_commit": "df78798b0b023ca029f965030d8eb8229a4a92c3",
   "target": "wasm32-unknown-unknown",
   "features": [
     "bridge",
@@ -9,9 +9,10 @@
     "meshing"
   ],
   "profile": "release",
-  "wasm_sha256": "c6c58f52f5aa4ecaa924d490e312dc6d8addf33cca721c0000f6e3c442eb0b87",
-  "wasm_bytes": 16509389,
+  "wasm_sha256": "3e01cc423394ff67268e78d63b0fa771059c1a2020c2142ba45e8687660892b0",
+  "wasm_bytes": 16585329,
   "asset_pack_sha256": "2c5fdf060e26e3b5ff1cd7bff5e661bd3eb312c57865da64ed5cc16ec71c2dd1",
   "asset_pack_note": "Retained visualization pack; not a physics reference version.",
-  "simulation": "Single-threaded browser mc-tick reference configuration; not the native PGO benchmark binary."
+  "simulation": "Single-threaded browser mc-tick reference configuration; not the native PGO benchmark binary.",
+  "build_revision_note": "Built on harrison-work before committing the equivalent source tree; exact binary digest retained."
 }

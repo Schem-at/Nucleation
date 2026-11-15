@@ -91,12 +91,40 @@ class Archive:
         self.thumbnails = json.loads(render_manifest.read_text()).get('entries', {}) if render_manifest.exists() else {}
         self.lock = threading.Lock()
         self.work = threading.BoundedSemaphore(3)
+        self.adapters = {}
+        for path in sorted((REPO / 'circuit-adapters').glob('*/adapter.json')):
+            profile = json.loads(path.read_text())
+            result_path = path.with_name('result.json')
+            result = json.loads(result_path.read_text()) if result_path.exists() else None
+            suite = json.loads(path.with_name('suite.json').read_text())
+            if result and any(result.get(key) != value for key, value in {
+                'source_sha256': profile['source_sha256'],
+                'profile_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                'suite_sha256': hashlib.sha256(path.with_name('suite.json').read_bytes()).hexdigest(),
+            }.items()):
+                result = {'status': 'stale_result', 'note': 'Adapter or suite changed since this run.'}
+            self.adapters[profile['source_sha256']] = {
+                'id': path.parent.name, 'profile': profile, 'vectors': len(suite['vectors']),
+                'oracle': suite['oracle'], 'result': result,
+            }
         self.captures = {}
         for label, folder in [('Comparator · vanilla', 'vanilla-comparator'), ('Interlocking door · two cycles', 'vanilla-cycle'), ('Interlocking door · idle control', 'vanilla-idle')]:
             path = root / 'validation/candidate-run' / folder / 'capture.json'
             if path.exists():
                 data = json.loads(path.read_text())
                 self.captures[folder] = {'id': folder, 'label': label, 'ticks': data['capture_ticks'], 'source': 'Minecraft 1.21.11 capture', 'sha256': data['source']['sha256'], 'path': path}
+        plot_report = REPO / 'docs/performance/schematic-candidates/plot-validation/oracle-results.json'
+        if plot_report.exists():
+            for case in json.loads(plot_report.read_text()).get('cases', []):
+                folder = (root / 'validation/plot-oracles-v1' / case['artifact_directory']).resolve()
+                if not folder.is_relative_to(root.resolve()): continue
+                for mode in ['cycle', 'idle']:
+                    path = folder / mode / 'capture.json'
+                    if not path.exists(): continue
+                    capture_id = case['case'] + '-' + mode
+                    self.captures[capture_id] = {'id': capture_id, 'label': f"{case['case']} · vanilla {mode}",
+                        'ticks': case['captures'][mode]['ticks'], 'source': 'Minecraft 1.21.11 capture',
+                        'sha256': case['source_sha256'], 'path': path}
 
     def path(self, sha):
         if not re.fullmatch(r'[a-f0-9]{64}', sha) or sha not in self.by_hash:
@@ -176,7 +204,7 @@ class Archive:
             return result
 
     def slim(self):
-        keys = ['source', 'source_url', 'path', 'title', 'kind', 'bytes', 'sha256', 'data_version', 'dimensions', 'declared_blocks', 'non_air_blocks', 'entities', 'block_entities', 'palette_blocks', 'tags', 'priority', 'readiness', 'validation_status', 'validation_detail', 'local_path', 'evidence_basis', 'inspection', 'category', 'classification', 'bounds', 'cutoff_face_contacts', 'review_tags', 'isolation']
+        keys = ['source', 'source_url', 'path', 'title', 'kind', 'bytes', 'sha256', 'data_version', 'dimensions', 'declared_blocks', 'non_air_blocks', 'entities', 'block_entities', 'palette_blocks', 'tags', 'priority', 'readiness', 'validation_status', 'validation_detail', 'validation_evidence', 'simulation_status', 'functional_status', 'vanilla_status', 'benchmark_status', 'local_path', 'evidence_basis', 'inspection', 'category', 'classification', 'bounds', 'cutoff_face_contacts', 'review_tags', 'isolation']
         rows = []
         for row in self.library['entries']:
             record = {k: row[k] for k in keys if k in row}
@@ -233,8 +261,23 @@ def main():
                     available = (LAB / 'dist/index.html').exists() and (LAB / 'public/engine/nucleation.wasm').exists() and not too_large and format_supported
                     reason = 'This selection exceeds the browser engine limit of 8M cells. Survey individual candidates before extracting complete fixtures.' if too_large else ('This format needs conversion to a supported Java schematic before simulation.' if not format_supported else '')
                     return self.json({'entries': rows, 'inspection': inspection,
+                                      'adapter': archive.adapters.get(sha),
                                       'captures': [{k: v for k,v in c.items() if k != 'path'} for c in archive.captures.values() if c['sha256'] == sha],
                                       'capabilities': {'live_sim': available, 'reason': reason}, 'engine': archive.engine()})
+                if path.startswith('/api/adapter-file/'):
+                    parts = path.split('/')
+                    if len(parts) != 5: return self.json({'error':'Unknown adapter file'}, 404)
+                    _, _, _, adapter_id, name = parts
+                    if adapter_id not in {v['id'] for v in archive.adapters.values()}:
+                        return self.json({'error':'Unknown adapter'}, 404)
+                    files = {'adapter.json': REPO / 'circuit-adapters' / adapter_id / 'adapter.json',
+                             'suite.json': REPO / 'circuit-adapters' / adapter_id / 'suite.json',
+                             'result.json': REPO / 'circuit-adapters' / adapter_id / 'result.json',
+                             'runner.rs': REPO / 'examples/run_tick_adapter.rs',
+                             'implementation.rs': REPO / 'src/tick_adapter.rs',
+                             'README.md': REPO / 'circuit-adapters/README.md'}
+                    if name not in files: return self.json({'error':'Unknown adapter file'}, 404)
+                    return self.file(files[name], name)
                 if path.startswith('/api/capture/'):
                     capture = archive.captures.get(path.rsplit('/', 1)[1])
                     if not capture: return self.json({'error': 'No retained capture'}, 404)

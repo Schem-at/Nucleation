@@ -2,7 +2,9 @@
 
 Fresh work on 15 November 2026. Rust compilation and execution, and the Minecraft
 reference servers, ran on **harrison-work**. Downloads, metadata curation and
-offline indexing ran on the Mac. These are correctness results, not new timings.
+offline indexing ran on the Mac. The original checks below are supplemented by
+the [full plot assessment](plot-simulation-method.md), [fresh vanilla door checks](plot-validation/ORACLES.md),
+and [typed adapter benchmarks](adapter-benchmarks.md).
 
 The local archive is `/Users/harrison/RustroverProjects/Nucleation-schematic-archive`.
 Launch Circuit Atlas with `python3 tools/serve_tick_archive.py --archive /path/to/archive`
@@ -96,10 +98,23 @@ under `validation/candidate-run/`. Git retains small result records, capture
 hashes, compiler/host/binary metadata, source pins, the catalog and tools.
 Build caches, servers and third-party schematic binaries stay outside Git.
 
-No production simulation code or default optimization setting changed in this
-checkpoint. The additional checkers are standalone examples and the new oracle
-driver is separate from the existing fixed-case driver. The benchmark suite has
-not yet been expanded to time all library candidates: admission requires a
+The later plot checks found and fixed missing observer shape notifications from
+lamp and trapdoor state changes (`9a51b440`). This focused correction has tiny
+vanilla-derived regressions and passes the existing hipster golden. The fresh
+full engine/scenario suite passes 422 tests (7 ignored); bridge checks pass 30.
+Four sampled plot doors still diverge on wall shape, concrete powder or piston
+activation. Those remain explicit failures, not admitted benchmarks.
+
+All 803 plot candidates now have bounded native assessments: 688 complete and
+115 reject unsupported content. Of six fresh vanilla door checks, five satisfy
+their functional specification, two match native tick-end traces, and only one
+satisfies both: the lamp-panel 2×2. The other matching build is hollow in vanilla
+and fails the proposed solid-door criterion. See the linked reports for scope.
+
+[Executable adapters](../../../circuit-adapters/README.md) attach named typed
+ports, reset/timing rules, independent suites and a native benchmark runner to
+the adder, comparator and admitted 2×2 door. Atlas exposes their code and results.
+The benchmark suite does not time all library candidates: admission requires a
 finite workload, positive and negative controls, observable activity and the
 appropriate functionality/reference checks. No imported-but-idle machine counts
 as a successful benchmark.
@@ -124,6 +139,9 @@ limitations must be resolved before treating a failure as engine incompatibility
 
 Circuit Atlas exposes [textured isometric PNGs](thumbnails.md), metadata, evidence, captured-tick
 playback and an explicit live-browser launch for supported-size Java inputs.
+The [rendering repair](rendering-repairs.md) refreshed 375 chest-containing
+thumbnails and adds actual live minecart models. Sign-atlas optimization issue
+#65 was assessed, but shared glyph rendering is not implemented.
 The full plot exceeds the browser engine's 8-million-cell limit, so its live
 launch is disabled in favor of the extracted files. Live interaction uses the existing
 SimLab engine; it is not a new vanilla certification or a native speed result.

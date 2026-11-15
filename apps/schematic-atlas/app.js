@@ -77,8 +77,9 @@ function toggleFavorite(id) {
 function validation(row) {
   const raw = String(row.validation_status || '').toLowerCase();
   if (/unsupported/.test(raw)) return { key: 'review', label: 'Engine unsupported' };
+  if (/simulation_smoke_checked/.test(raw)) return { key: 'smoke', label: 'Simulation checked' };
   if (/vanilla.*(parity|match).*pass|vanilla_tick_end_parity_pass/.test(raw)) return { key: 'vanilla', label: 'Vanilla matched' };
-  if (/functional_fail|failed|mismatch/.test(raw)) return { key: 'fail', label: 'Check failed' };
+  if (/functional_fail|failed|mismatch|(?:^|_)fail(?:_|$)/.test(raw)) return { key: 'fail', label: 'Check failed' };
   if (/functional_pass/.test(raw)) return { key: 'functional', label: 'Functional checks' };
   if (row.readiness === 'known-negative') return { key: 'negative', label: 'Known negative' };
   if (row.readiness === 'quarantine') return { key: 'review', label: 'Needs review' };
@@ -90,7 +91,7 @@ function chip(row) {
   return node;
 }
 function relevance(row) {
-  const score = { vanilla: 500, functional: 400, unvalidated: 100, review: 20, fail: 10, negative: 30 }[validation(row).key];
+  const score = { vanilla: 500, functional: 400, smoke: 150, unvalidated: 100, review: 20, fail: 10, negative: 30 }[validation(row).key];
   return score + (row.priority === 'high' ? 90 : row.priority === 'medium' ? 40 : 0) + (isPlotDoor(row) ? 160 : 0);
 }
 function evidenceText(row) {
@@ -381,6 +382,22 @@ function renderProperties() {
     const dimensionsText = Array.isArray(savedDimensions) ? savedDimensions.map(count).join(' × ') : dimensionLabel(row);
     content.append(sectionTitle('Saved file'), facts([['Placed blocks', count(inspected.non_air_blocks ?? blocks(row))], ['Dimensions · X × Y × Z', dimensionsText], ['Native data version', inspected.native_data_version ?? row.data_version ?? row.static?.native_data_version ?? row.native_data_version ?? 'Unknown'], ['File size', size(row.bytes)], ['Saved entities', count(inspected.entities ?? row.entities ?? row.static?.entities ?? row.static?.entity_count)], ['Block entities', count(inspected.block_entities ?? row.block_entities ?? row.static?.block_entities ?? row.static?.block_entity_count)]]));
     content.append(sectionTitle('Validation evidence'), el('p', `evidence-box ${validation(row).key}`, evidenceText(row)));
+    const adapter = state.detail?.adapter;
+    if (adapter) {
+      content.append(sectionTitle('Executable build adapter'));
+      const profile = adapter.profile;
+      const typeName = type => type === 'Boolean' ? 'bool' : type?.UnsignedInt ? `u${type.UnsignedInt.bits}` : textValue(type);
+      for (const [direction, ports] of [['Inputs', profile.cell.io.inputs], ['Outputs', profile.cell.io.outputs]]) {
+        content.append(el('p', 'detail-note', direction), el('code', 'hash-label', Object.entries(ports).map(([name, mapping]) => `${name}: ${typeName(mapping.io_type)}`).join(' · ')));
+      }
+      content.append(facts([['Response window', `${profile.response_ticks} game ticks`], ['Test vectors', adapter.vectors], ['Latest adapter check', adapter.result?.status || 'Not recorded'], ['Reset', 'Restore initialized checkpoint']]));
+      content.append(el('p', 'detail-note', adapter.oracle), el('p', 'detail-note', 'Runs the real circuit with named ports. Fixed response windows are not minimal latency measurements. Native tests and benchmarks use the same adapter.'));
+      const links = el('div', 'tag-list');
+      for (const [file,label] of [['adapter.json','Contract'],['suite.json','Test vectors'],['runner.rs','Runner code'],['implementation.rs','Adapter code'],['README.md','Run instructions'],...(adapter.result ? [['result.json','Recorded result']] : [])]) {
+        const link=el('a','button secondary',label); link.href=`/api/adapter-file/${encodeURIComponent(adapter.id)}/${file}`; link.target='_blank'; link.rel='noopener'; links.append(link);
+      }
+      content.append(links);
+    }
     if (isPlotPart(row)) renderExtraction(content, row);
     if (inspected.scope || inspected.note) content.append(el('p', 'detail-note', inspected.scope || inspected.note));
     const tags = el('div', 'tag-list'); for (const text of (row.tags || []).slice(0,40)) tags.append(el('span', 'tag', text));
