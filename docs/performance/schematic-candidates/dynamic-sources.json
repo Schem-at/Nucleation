@@ -1,0 +1,196 @@
+{
+  "status": "static-only; no simulator or Minecraft reference execution",
+  "coordinate_space": "Normalized schematic enclosing-box coordinates; confirm after production import. Negative saved region extents must be preserved during decoding.",
+  "reference_target": "Minecraft Java 1.21.11; preserve each input's native DataVersion when datafixing",
+  "redistribution": "No explicit schematic redistribution license was found. Retain attribution and URLs; downloaded binaries stay outside Git.",
+  "candidates": [
+    {
+      "id": "interlocking_door3",
+      "title": "3x3 Door With Interlocking Block Open/Close Sequence",
+      "designer": "SleeperPin",
+      "saved_author": "SleeperPin",
+      "source_url": "https://www.reddit.com/r/redstone/comments/1qs127k/3x3_door_with_interlocking_block_openclose/",
+      "download_url": "https://sleeperpin-minecraft.s3.us-east-2.amazonaws.com/3x3_interlocking_block_door.litematic",
+      "sha256": "e7b964e92109edebd0860f1ec95c158eebd8f66436e4c6c5b7c36862b7675586",
+      "bytes": 1398,
+      "native_data_version": 4671,
+      "dimensions": [
+        9,
+        13,
+        5
+      ],
+      "non_air_blocks": 174,
+      "initial_block_entities": 16,
+      "initial_entities": 0,
+      "initial_moving_piston_block_entities": 0,
+      "proposed_controls": [
+        "Use the saved lever at (6,1,4). Capture one complete close/open cycle to determine safe dwell, then require two complete cycles. Author explicitly says it is not spam-proof."
+      ],
+      "proposed_checks": [
+        "Compare every tick-end block state and comparator output to vanilla.",
+        "Verify complete panel opening/closing and exact return of all mechanism blocks.",
+        "Preserve the seven redstone items across three droppers and hoppers; compare occupied slots every tick.",
+        "Repeat at negative origin and rotated placements to test the author's orientation/location claim separately."
+      ],
+      "notes": [
+        "Native save is already DataVersion 4671, matching the 1.21.11 reference.",
+        "Uses copper bulbs, crafters, observers, pistons and inventory timing; adds coverage beyond the existing doors."
+      ],
+      "initial_piston_states": {
+        "minecraft:sticky_piston extended=false": 19,
+        "minecraft:piston extended=false": 4
+      },
+      "initial_block_entity_types": {
+        "minecraft:comparator": 7,
+        "minecraft:hopper": 3,
+        "minecraft:dropper": 3,
+        "minecraft:crafter": 3
+      },
+      "initial_occupied_slots": 3,
+      "initial_item_count": 7
+    },
+    {
+      "id": "accessible_shulker_loader",
+      "title": "Bottom-Accessible Shulker Loader (AL001)",
+      "designer": "vktec",
+      "saved_author": "vktec",
+      "source_url": "https://storagecatalog.org/archives/AL001-Bottom-Accessible-Shulker-Loader/",
+      "original_post_url": "https://discord.com/channels/1375556143186837695/1392582196652675092",
+      "download_url": "https://raw.githubusercontent.com/Storage-Catalog/Archive/refs/heads/main/Archive/AL_accessible-loaders/AL001_Bottom-Accessible_Shulker_Loader/attachments/AL001_accessible_shulker_loader.litematic",
+      "sha256": "9f7a7dbc3502576a32dee7559885073f38d7293dae30d4ffff650a790e430ad8",
+      "bytes": 796,
+      "declared_save_version": "1.16.5",
+      "native_data_version": 2586,
+      "dimensions": [
+        1,
+        6,
+        7
+      ],
+      "non_air_blocks": 29,
+      "initial_block_entities": 12,
+      "initial_entities": 0,
+      "initial_moving_piston_block_entities": 0,
+      "proposed_controls": [
+        "Seed replacement empty boxes in dispenser (0,2,1); saved containers are empty.",
+        "Supply items via hopper (0,1,0), which faces the box at (0,1,1). Verify input route in vanilla first.",
+        "For a compact rollover case, seed that box with 1727 ordinary 64-stackable items, then deliver one final item; also capture an empty-input negative control."
+      ],
+      "proposed_checks": [
+        "Full box is broken, collected, and replaced with an empty box.",
+        "All 1728 contents survive inside the emitted/collected shulker item; no duplication or loss.",
+        "Compare replacement timing, all block states and comparator outputs.",
+        "Run a second refill/replacement cycle once the single-cycle reference passes."
+      ],
+      "notes": [
+        "Archive describes single hopper-speed operation and reliable collection.",
+        "Independent parity requires nested shulker-item contents and item-entity capture beyond the current flat-slot driver."
+      ],
+      "initial_piston_states": {
+        "minecraft:sticky_piston extended=false": 3,
+        "minecraft:piston extended=false": 3
+      },
+      "initial_block_entity_types": {
+        "minecraft:shulker_box": 1,
+        "minecraft:hopper": 6,
+        "minecraft:dropper": 2,
+        "minecraft:comparator": 2,
+        "minecraft:dispenser": 1
+      },
+      "initial_occupied_slots": 0,
+      "initial_item_count": 0
+    },
+    {
+      "id": "cud_mixed_loader",
+      "title": "1x CUD-based loader (OL004)",
+      "designer": "Kizu",
+      "saved_author": "auraa42",
+      "source_url": "https://storagecatalog.org/archives/OL004-1x-CUD-based-loader/",
+      "original_post_url": "https://discord.com/channels/1375556143186837695/1455729805948489769",
+      "download_url": "https://raw.githubusercontent.com/Storage-Catalog/Archive/refs/heads/main/Archive/OL_other-loaders/OL004_1x_CUD-based_loader/attachments/OL004_Cud_Loader.litematic",
+      "sha256": "cab979903d5f72a0f06a1bf1510fd96877bc2d4ed655ee54667d6e3bfa0ef226",
+      "bytes": 1482,
+      "declared_save_version": "1.20.1",
+      "native_data_version": 3465,
+      "dimensions": [
+        4,
+        6,
+        4
+      ],
+      "non_air_blocks": 81,
+      "initial_block_entities": 15,
+      "initial_entities": 0,
+      "initial_moving_piston_block_entities": 0,
+      "proposed_controls": [
+        "Supply a finite mixed batch through input hopper (0,3,2), facing the box at (1,3,2), then stop input.",
+        "Keep the saved empty-box stock and comparator OutputSignal values; record initial occupied slots before ticking.",
+        "Determine the fader timeout from vanilla, then test bursts separated by shorter and longer gaps plus a zero-input control."
+      ],
+      "proposed_checks": [
+        "End-of-input detection replaces a partly filled box after the fader timeout.",
+        "Each mixed item appears exactly once in the emitted box; no item remains unintentionally buffered.",
+        "Compare the actual comparator outputs, not only powered block properties.",
+        "Compare box replacement and item-entity paths under identical finite inputs."
+      ],
+      "notes": [
+        "Archive attributes design to Kizu; the file's saved author is auraa42. Preserve both.",
+        "Contains water and packed ice; needs nested shulker contents and item-entity capture before independent parity can be claimed."
+      ],
+      "initial_piston_states": {
+        "minecraft:piston extended=false": 1,
+        "minecraft:sticky_piston extended=false": 1
+      },
+      "initial_block_entity_types": {
+        "minecraft:comparator": 6,
+        "minecraft:shulker_box": 1,
+        "minecraft:chest": 2,
+        "minecraft:hopper": 2,
+        "minecraft:sign": 2,
+        "minecraft:dropper": 1,
+        "minecraft:dispenser": 1
+      },
+      "initial_occupied_slots": 76,
+      "initial_item_count": 76
+    },
+    {
+      "id": "plane_flyer",
+      "title": "Plane Flying Machine",
+      "designer": "viktig_sau",
+      "saved_author": "viktig_sau",
+      "source_url": "https://redstone-schematics.org/schematic/8",
+      "download_url": "https://redstone-schematics.org/schematic/8/download/litematic?k=26f564e20d6eca0939bdbdea52507691",
+      "sha256": "be17be1f79c2bee74f909b4205a3b1ad7c5e9e70c69454abc51b51927fd585dd",
+      "bytes": 958,
+      "native_data_version": 4556,
+      "dimensions": [
+        27,
+        6,
+        33
+      ],
+      "non_air_blocks": 252,
+      "initial_block_entities": 0,
+      "initial_entities": 0,
+      "initial_moving_piston_block_entities": 0,
+      "proposed_controls": [
+        "Establish launch on vanilla by a controlled front-face block update to the tail observer at (25,2,16), facing east. This is a topology-derived candidate, not an author-specified verified launch.",
+        "Reserve a fully ticking travel corridor and capture repeated movement before introducing a tail-only stop; author warns that stopping another part can break the plane."
+      ],
+      "proposed_checks": [
+        "At matching settled cycle boundaries, the full 252-block machine is an exact translation, with no stranded parts or lost blocks.",
+        "Compare every tick-end in-flight and landed state to vanilla, including branching slime/honey assemblies.",
+        "Require repeated movement, controlled stop, and restart; preserve observer/piston event ordering through differential traces."
+      ],
+      "notes": [
+        "Listing says version any; actual saved DataVersion is 4556.",
+        "No inventories or entities initially, so block capture is a useful first check.",
+        "Download requires a browser-like User-Agent and its token may expire; refresh the link from the source page rather than accepting changed bytes."
+      ],
+      "initial_piston_states": {
+        "minecraft:piston extended=false": 24,
+        "minecraft:sticky_piston extended=false": 1
+      },
+      "initial_block_entity_types": {},
+      "initial_occupied_slots": 0,
+      "initial_item_count": 0
+    }
+  ]
+}

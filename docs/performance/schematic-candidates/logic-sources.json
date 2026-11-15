@@ -1,0 +1,2213 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/mattbatwings/Logical-Redstone-Archive",
+  "commit": "6d054aa0a87d8f58f672625b3e6d0e727bd97016",
+  "upstream_commit_date": "2026-11-07T04:01:42Z",
+  "license_status": "No license file found in the pinned schematic repository tree; GitHub license metadata is null. The separate website license is not a schematic license.",
+  "artifact_policy": "Retain downloaded artifacts in ignored storage; this catalog contains metadata and inspection only.",
+  "status": "Downloaded and statically inspected; not imported, simulated or validated against vanilla.",
+  "intended_reference": "Minecraft Java 1.21.11; preserve each artifact's actual DataVersion when importing.",
+  "provenance_note": "All four entries were archived 2026-02-15 and endorsed by mattbatwings. Empty authors means upstream did not name an author, not public domain.",
+  "files": [
+    {
+      "id": "LFF006",
+      "name": "Data (D) Latch",
+      "authors": [],
+      "directory": "Archive/LFF_latches-flipflops/LFF006_Data_D_Latch",
+      "filename": "LFF006_dlatch.schem",
+      "bytes": 775,
+      "sha256": "0663302dfc40ac8c33055d5a43aefe834be4290bdda9baaec6f2ccab238cad54",
+      "git_blob_sha1": "dcbc328092b2a5f0487cb5ba9733869f11b7b544",
+      "page": "https://mattbatwings.github.io/lra/archives/LFF006-Data-D-Latch/",
+      "declared_size": [
+        8,
+        3,
+        5
+      ],
+      "declared_function": "Press Clock to save the current data into the repeater lock.",
+      "proposed_checks": [
+        "Store 0 and 1 with data stable throughout the clock pulse.",
+        "Change data without a clock pulse and require the stored output to hold.",
+        "Capture timing around clock release in vanilla before asserting edge semantics."
+      ],
+      "download_url": "https://raw.githubusercontent.com/mattbatwings/Logical-Redstone-Archive/6d054aa0a87d8f58f672625b3e6d0e727bd97016/Archive/LFF_latches-flipflops/LFF006_Data_D_Latch/attachments/LFF006_dlatch.schem",
+      "declared_minecraft_version": "1.21.4",
+      "metadata_url": "https://raw.githubusercontent.com/mattbatwings/Logical-Redstone-Archive/6d054aa0a87d8f58f672625b3e6d0e727bd97016/Archive/LFF_latches-flipflops/LFF006_Data_D_Latch/data.json",
+      "sha256_verified": true,
+      "git_blob_verified": true,
+      "inspection": {
+        "root_name": "",
+        "sponge_version": 3,
+        "data_version": 4189,
+        "dimensions": [
+          8,
+          3,
+          5
+        ],
+        "offset": [
+          -3,
+          -4,
+          -2
+        ],
+        "volume": 120,
+        "non_air_blocks": 25,
+        "entity_count": 0,
+        "block_entity_count": 3,
+        "block_histogram": {
+          "minecraft:air": 95,
+          "minecraft:comparator": 1,
+          "minecraft:lever": 1,
+          "minecraft:light_blue_wool": 11,
+          "minecraft:oak_sign": 2,
+          "minecraft:redstone_lamp": 1,
+          "minecraft:redstone_wall_torch": 1,
+          "minecraft:redstone_wire": 4,
+          "minecraft:repeater": 3,
+          "minecraft:stone_button": 1
+        },
+        "palette": {
+          "minecraft:air": 0,
+          "minecraft:light_blue_wool": 1,
+          "minecraft:redstone_lamp[lit=false]": 2,
+          "minecraft:redstone_wire[east=none,north=side,power=0,south=side,west=none]": 3,
+          "minecraft:redstone_wire[east=side,north=none,power=0,south=side,west=none]": 4,
+          "minecraft:repeater[delay=2,facing=east,locked=false,powered=false]": 5,
+          "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]": 6,
+          "minecraft:repeater[delay=1,facing=south,locked=true,powered=false]": 7,
+          "minecraft:repeater[delay=1,facing=east,locked=false,powered=true]": 8,
+          "minecraft:redstone_wall_torch[facing=west,lit=true]": 9,
+          "minecraft:comparator[facing=east,mode=subtract,powered=false]": 10,
+          "minecraft:stone_button[face=wall,facing=east,powered=false]": 11,
+          "minecraft:lever[face=wall,facing=south,powered=false]": 12,
+          "minecraft:oak_sign[rotation=12,waterlogged=false]": 13,
+          "minecraft:oak_sign[rotation=0,waterlogged=false]": 14
+        },
+        "piston_blocks": 0,
+        "controls": [
+          {
+            "pos": [
+              7,
+              1,
+              2
+            ],
+            "state": "minecraft:stone_button[face=wall,facing=east,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              1,
+              4
+            ],
+            "state": "minecraft:lever[face=wall,facing=south,powered=false]"
+          }
+        ],
+        "lamps": [
+          {
+            "pos": [
+              0,
+              1,
+              0
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          }
+        ],
+        "boundary_diodes": [
+          {
+            "pos": [
+              0,
+              1,
+              2
+            ],
+            "state": "minecraft:repeater[delay=1,facing=south,locked=true,powered=false]"
+          }
+        ],
+        "signs": [
+          {
+            "pos": [
+              6,
+              2,
+              2
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "",
+                "Clock",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              0,
+              2,
+              3
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "",
+                "Data",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          }
+        ],
+        "decoder_programming_cells": [],
+        "coordinate_convention": "Schematic-local [x,y,z], X fastest then Z then Y; Offset retained separately.",
+        "io_mapping_status": "Static controls/signs only; bit order, electrical ports and timing not yet validated."
+      },
+      "candidate_io_mapping": {
+        "clock_button": [
+          7,
+          1,
+          2
+        ],
+        "data_lever": [
+          0,
+          1,
+          4
+        ],
+        "output_lamp": [
+          0,
+          1,
+          0
+        ],
+        "evidence": "Clock/Data signs adjacent to their controls; single output lamp. Timing not simulated."
+      },
+      "simulation_status": "not_run",
+      "vanilla_status": "not_run"
+    },
+    {
+      "id": "COUNT001",
+      "name": "8-bit Counter with Load",
+      "authors": [
+        "mattbatwings"
+      ],
+      "directory": "Archive/COUNT_counters/COUNT001_8-bit_Counter_with_Load",
+      "filename": "COUNT001_8bit_counter_load.schem",
+      "bytes": 1287,
+      "sha256": "8e4cf8434924ee79186c59fd975c8941356bfec042da5754ae1245e557cf1aae",
+      "git_blob_sha1": "ac5416d91cac1aeb1ae72dcac75042d914454c30",
+      "page": "https://mattbatwings.github.io/lra/archives/COUNT001-8-bit-Counter-with-Load/",
+      "declared_size": [
+        8,
+        20,
+        4
+      ],
+      "declared_function": "8-bit data bus, Load button, Count up button; 8-bit stored/count output.",
+      "proposed_checks": [
+        "Load 0,1,127,254,255 and verify each stored byte.",
+        "Count across 127->128 and 255->0; then test a full modulo-256 cycle.",
+        "Change load data without Load and require hold; keep Load and Count separate until vanilla defines simultaneous behavior."
+      ],
+      "download_url": "https://raw.githubusercontent.com/mattbatwings/Logical-Redstone-Archive/6d054aa0a87d8f58f672625b3e6d0e727bd97016/Archive/COUNT_counters/COUNT001_8-bit_Counter_with_Load/attachments/COUNT001_8bit_counter_load.schem",
+      "declared_minecraft_version": "1.21.4",
+      "metadata_url": "https://raw.githubusercontent.com/mattbatwings/Logical-Redstone-Archive/6d054aa0a87d8f58f672625b3e6d0e727bd97016/Archive/COUNT_counters/COUNT001_8-bit_Counter_with_Load/data.json",
+      "sha256_verified": true,
+      "git_blob_verified": true,
+      "inspection": {
+        "root_name": "",
+        "sponge_version": 3,
+        "data_version": 4189,
+        "dimensions": [
+          8,
+          20,
+          4
+        ],
+        "offset": [
+          -4,
+          -23,
+          -2
+        ],
+        "volume": 640,
+        "non_air_blocks": 320,
+        "entity_count": 0,
+        "block_entity_count": 12,
+        "block_histogram": {
+          "minecraft:air": 320,
+          "minecraft:comparator": 10,
+          "minecraft:cyan_stained_glass": 48,
+          "minecraft:cyan_wool": 101,
+          "minecraft:lever": 8,
+          "minecraft:oak_wall_sign": 2,
+          "minecraft:redstone_lamp": 16,
+          "minecraft:redstone_torch": 2,
+          "minecraft:redstone_wall_torch": 7,
+          "minecraft:redstone_wire": 61,
+          "minecraft:repeater": 46,
+          "minecraft:stone_button": 2,
+          "minecraft:target": 17
+        },
+        "palette": {
+          "minecraft:air": 0,
+          "minecraft:cyan_wool": 1,
+          "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]": 2,
+          "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]": 3,
+          "minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side]": 4,
+          "minecraft:cyan_stained_glass": 5,
+          "minecraft:redstone_wire[east=side,north=none,power=0,south=side,west=none]": 6,
+          "minecraft:repeater[delay=3,facing=west,locked=false,powered=false]": 7,
+          "minecraft:comparator[facing=south,mode=subtract,powered=false]": 8,
+          "minecraft:stone_button[face=wall,facing=west,powered=false]": 9,
+          "minecraft:redstone_wire[east=side,north=side,power=0,south=none,west=side]": 10,
+          "minecraft:redstone_wire[east=none,north=side,power=0,south=none,west=side]": 11,
+          "minecraft:oak_wall_sign[facing=west,waterlogged=false]": 12,
+          "minecraft:redstone_wire[east=side,north=side,power=0,south=side,west=side]": 13,
+          "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=up]": 14,
+          "minecraft:redstone_torch[lit=true]": 15,
+          "minecraft:repeater[delay=2,facing=east,locked=false,powered=false]": 16,
+          "minecraft:redstone_wire[east=up,north=none,power=0,south=side,west=side]": 17,
+          "minecraft:target[power=0]": 18,
+          "minecraft:repeater[delay=1,facing=north,locked=false,powered=false]": 19,
+          "minecraft:redstone_wire[east=none,north=none,power=0,south=side,west=side]": 20,
+          "minecraft:redstone_wire[east=side,north=none,power=15,south=up,west=none]": 21,
+          "minecraft:redstone_wire[east=up,north=none,power=15,south=side,west=side]": 22,
+          "minecraft:repeater[delay=1,facing=north,locked=false,powered=true]": 23,
+          "minecraft:redstone_wall_torch[facing=north,lit=true]": 24,
+          "minecraft:lever[face=wall,facing=west,powered=false]": 25,
+          "minecraft:redstone_lamp[lit=false]": 26,
+          "minecraft:comparator[facing=west,mode=subtract,powered=false]": 27,
+          "minecraft:repeater[delay=1,facing=west,locked=true,powered=false]": 28,
+          "minecraft:redstone_wire[east=none,north=up,power=0,south=none,west=side]": 29,
+          "minecraft:redstone_wire[east=side,north=none,power=15,south=none,west=up]": 30,
+          "minecraft:redstone_wire[east=none,north=up,power=14,south=side,west=none]": 31,
+          "minecraft:redstone_wire[east=none,north=side,power=0,south=up,west=none]": 32,
+          "minecraft:redstone_wire[east=side,north=none,power=13,south=up,west=none]": 33,
+          "minecraft:redstone_wire[east=up,north=none,power=14,south=side,west=side]": 34,
+          "minecraft:redstone_wire[east=none,north=up,power=12,south=side,west=none]": 35,
+          "minecraft:redstone_wire[east=side,north=none,power=11,south=up,west=none]": 36,
+          "minecraft:redstone_wire[east=none,north=up,power=10,south=side,west=none]": 37,
+          "minecraft:redstone_wire[east=side,north=none,power=9,south=up,west=none]": 38,
+          "minecraft:redstone_wall_torch[facing=north,lit=false]": 39,
+          "minecraft:repeater[delay=1,facing=west,locked=true,powered=true]": 40,
+          "minecraft:redstone_lamp[lit=true]": 41,
+          "minecraft:redstone_wire[east=side,north=none,power=13,south=none,west=up]": 42,
+          "minecraft:redstone_wire[east=none,north=up,power=8,south=side,west=none]": 43,
+          "minecraft:redstone_wire[east=side,north=none,power=7,south=up,west=none]": 44,
+          "minecraft:redstone_wire[east=up,north=none,power=12,south=side,west=side]": 45,
+          "minecraft:redstone_wire[east=none,north=up,power=6,south=side,west=none]": 46,
+          "minecraft:redstone_wire[east=side,north=none,power=5,south=up,west=none]": 47,
+          "minecraft:redstone_wire[east=none,north=up,power=4,south=side,west=none]": 48,
+          "minecraft:redstone_wire[east=side,north=none,power=3,south=up,west=none]": 49,
+          "minecraft:redstone_wire[east=none,north=up,power=2,south=side,west=none]": 50,
+          "minecraft:redstone_wire[east=side,north=none,power=1,south=side,west=none]": 51,
+          "minecraft:redstone_wire[east=side,north=none,power=14,south=side,west=side]": 52
+        },
+        "piston_blocks": 0,
+        "controls": [
+          {
+            "pos": [
+              0,
+              1,
+              2
+            ],
+            "state": "minecraft:stone_button[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              3,
+              2
+            ],
+            "state": "minecraft:stone_button[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              5,
+              2
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              7,
+              2
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              9,
+              2
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              11,
+              2
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              13,
+              2
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              15,
+              2
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              17,
+              2
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              19,
+              2
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          }
+        ],
+        "lamps": [
+          {
+            "pos": [
+              1,
+              5,
+              2
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              5,
+              5,
+              3
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              7,
+              2
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              5,
+              7,
+              3
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              9,
+              2
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              5,
+              9,
+              3
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              11,
+              2
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              5,
+              11,
+              3
+            ],
+            "state": "minecraft:redstone_lamp[lit=true]"
+          },
+          {
+            "pos": [
+              1,
+              13,
+              2
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              5,
+              13,
+              3
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              15,
+              2
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              5,
+              15,
+              3
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              17,
+              2
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              5,
+              17,
+              3
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              19,
+              2
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              5,
+              19,
+              3
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          }
+        ],
+        "boundary_diodes": [
+          {
+            "pos": [
+              3,
+              1,
+              0
+            ],
+            "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+          },
+          {
+            "pos": [
+              5,
+              3,
+              0
+            ],
+            "state": "minecraft:repeater[delay=2,facing=east,locked=false,powered=false]"
+          },
+          {
+            "pos": [
+              7,
+              4,
+              1
+            ],
+            "state": "minecraft:repeater[delay=1,facing=north,locked=false,powered=false]"
+          },
+          {
+            "pos": [
+              2,
+              19,
+              1
+            ],
+            "state": "minecraft:repeater[delay=1,facing=north,locked=false,powered=true]"
+          },
+          {
+            "pos": [
+              3,
+              19,
+              1
+            ],
+            "state": "minecraft:repeater[delay=1,facing=north,locked=false,powered=true]"
+          },
+          {
+            "pos": [
+              4,
+              19,
+              1
+            ],
+            "state": "minecraft:repeater[delay=1,facing=north,locked=false,powered=true]"
+          },
+          {
+            "pos": [
+              2,
+              19,
+              2
+            ],
+            "state": "minecraft:comparator[facing=west,mode=subtract,powered=false]"
+          },
+          {
+            "pos": [
+              4,
+              19,
+              2
+            ],
+            "state": "minecraft:repeater[delay=1,facing=west,locked=true,powered=false]"
+          },
+          {
+            "pos": [
+              6,
+              19,
+              2
+            ],
+            "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+          }
+        ],
+        "signs": [
+          {
+            "pos": [
+              0,
+              1,
+              3
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "",
+                "Load",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              0,
+              3,
+              3
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "",
+                "Count",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          }
+        ],
+        "decoder_programming_cells": [],
+        "coordinate_convention": "Schematic-local [x,y,z], X fastest then Z then Y; Offset retained separately.",
+        "io_mapping_status": "Static controls/signs only; bit order, electrical ports and timing not yet validated."
+      },
+      "candidate_io_mapping": {
+        "load_button": [
+          0,
+          1,
+          2
+        ],
+        "count_button": [
+          0,
+          3,
+          2
+        ],
+        "data_levers_bottom_to_top": [
+          [
+            0,
+            5,
+            2
+          ],
+          [
+            0,
+            7,
+            2
+          ],
+          [
+            0,
+            9,
+            2
+          ],
+          [
+            0,
+            11,
+            2
+          ],
+          [
+            0,
+            13,
+            2
+          ],
+          [
+            0,
+            15,
+            2
+          ],
+          [
+            0,
+            17,
+            2
+          ],
+          [
+            0,
+            19,
+            2
+          ]
+        ],
+        "output_lamps_bottom_to_top": [
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            5,
+            7,
+            3
+          ],
+          [
+            5,
+            9,
+            3
+          ],
+          [
+            5,
+            11,
+            3
+          ],
+          [
+            5,
+            13,
+            3
+          ],
+          [
+            5,
+            15,
+            3
+          ],
+          [
+            5,
+            17,
+            3
+          ],
+          [
+            5,
+            19,
+            3
+          ]
+        ],
+        "evidence": "Load/Count signs identify buttons. Separate data-adjacent and output lamp columns. Bit order unconfirmed.",
+        "initialization_note": "One saved output lamp is lit at [5,11,3]; explicitly load zero after settling rather than assuming a zero counter."
+      },
+      "simulation_status": "not_run",
+      "vanilla_status": "not_run"
+    },
+    {
+      "id": "DECODE004",
+      "name": "Decoder (horizontal to vertical)",
+      "authors": [],
+      "directory": "Archive/DECODE_decoders/DECODE004_Decoder_horizontal_to_vertical",
+      "filename": "DECODE004_decode_h2v.schem",
+      "bytes": 637,
+      "sha256": "09d6768f157d67845fa0615393077d610ed06c7fc9e57eb3721bb9bb3586267b",
+      "git_blob_sha1": "d3d983c472f7a81c736abd1906a2bc15e48cd5d0",
+      "page": "https://mattbatwings.github.io/lra/archives/DECODE004-Decoder-horizontal-to-vertical/",
+      "declared_size": [
+        7,
+        9,
+        11
+      ],
+      "declared_function": "Programmable 4-bit input, four one-hot outputs if uniquely programmed; not a full 4-to-16 decoder.",
+      "proposed_checks": [
+        "Read each row's programmed bit pattern independently of simulation.",
+        "Exhaust all 16 input words; output j must equal input==programmed_row_j.",
+        "The retained file has four identical rows: do not assert one-hot on this original.",
+        "For one-hot coverage, create a separately attributed and hashed derivative with distinct row programming, then capture it in vanilla."
+      ],
+      "download_url": "https://raw.githubusercontent.com/mattbatwings/Logical-Redstone-Archive/6d054aa0a87d8f58f672625b3e6d0e727bd97016/Archive/DECODE_decoders/DECODE004_Decoder_horizontal_to_vertical/attachments/DECODE004_decode_h2v.schem",
+      "declared_minecraft_version": "1.21.4",
+      "metadata_url": "https://raw.githubusercontent.com/mattbatwings/Logical-Redstone-Archive/6d054aa0a87d8f58f672625b3e6d0e727bd97016/Archive/DECODE_decoders/DECODE004_Decoder_horizontal_to_vertical/data.json",
+      "sha256_verified": true,
+      "git_blob_verified": true,
+      "inspection": {
+        "root_name": "",
+        "sponge_version": 3,
+        "data_version": 4189,
+        "dimensions": [
+          7,
+          9,
+          11
+        ],
+        "offset": [
+          -2,
+          -11,
+          -7
+        ],
+        "volume": 693,
+        "non_air_blocks": 188,
+        "entity_count": 0,
+        "block_entity_count": 0,
+        "block_histogram": {
+          "minecraft:air": 505,
+          "minecraft:lever": 4,
+          "minecraft:lime_stained_glass": 40,
+          "minecraft:lime_wool": 52,
+          "minecraft:redstone_lamp": 8,
+          "minecraft:redstone_wall_torch": 12,
+          "minecraft:redstone_wire": 64,
+          "minecraft:repeater": 8
+        },
+        "palette": {
+          "minecraft:air": 0,
+          "minecraft:lime_stained_glass": 1,
+          "minecraft:lime_wool": 2,
+          "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=up]": 3,
+          "minecraft:redstone_lamp[lit=false]": 4,
+          "minecraft:lever[face=wall,facing=east,powered=false]": 5,
+          "minecraft:redstone_wall_torch[facing=north,lit=false]": 6,
+          "minecraft:redstone_wire[east=none,north=side,power=12,south=side,west=none]": 7,
+          "minecraft:redstone_wire[east=side,north=side,power=13,south=side,west=none]": 8,
+          "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]": 9,
+          "minecraft:redstone_wire[east=up,north=none,power=0,south=none,west=side]": 10,
+          "minecraft:redstone_wire[east=none,north=side,power=14,south=side,west=none]": 11,
+          "minecraft:redstone_wire[east=side,north=side,power=15,south=side,west=none]": 12,
+          "minecraft:redstone_wall_torch[facing=west,lit=true]": 13,
+          "minecraft:redstone_wire[east=side,north=side,power=15,south=none,west=none]": 14,
+          "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]": 15
+        },
+        "piston_blocks": 0,
+        "controls": [
+          {
+            "pos": [
+              6,
+              1,
+              4
+            ],
+            "state": "minecraft:lever[face=wall,facing=east,powered=false]"
+          },
+          {
+            "pos": [
+              6,
+              1,
+              6
+            ],
+            "state": "minecraft:lever[face=wall,facing=east,powered=false]"
+          },
+          {
+            "pos": [
+              6,
+              1,
+              8
+            ],
+            "state": "minecraft:lever[face=wall,facing=east,powered=false]"
+          },
+          {
+            "pos": [
+              6,
+              1,
+              10
+            ],
+            "state": "minecraft:lever[face=wall,facing=east,powered=false]"
+          }
+        ],
+        "lamps": [
+          {
+            "pos": [
+              5,
+              1,
+              4
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              5,
+              1,
+              6
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              5,
+              1,
+              8
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              5,
+              1,
+              10
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              0,
+              2,
+              0
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              0,
+              4,
+              0
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              0,
+              6,
+              0
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              0,
+              8,
+              0
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          }
+        ],
+        "boundary_diodes": [
+          {
+            "pos": [
+              1,
+              8,
+              4
+            ],
+            "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+          },
+          {
+            "pos": [
+              1,
+              8,
+              8
+            ],
+            "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+          }
+        ],
+        "signs": [],
+        "decoder_programming_cells": [
+          {
+            "pos": [
+              1,
+              2,
+              4
+            ],
+            "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+          },
+          {
+            "pos": [
+              1,
+              2,
+              6
+            ],
+            "state": "minecraft:redstone_wall_torch[facing=west,lit=true]"
+          },
+          {
+            "pos": [
+              1,
+              2,
+              8
+            ],
+            "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+          },
+          {
+            "pos": [
+              1,
+              2,
+              10
+            ],
+            "state": "minecraft:redstone_wall_torch[facing=west,lit=true]"
+          },
+          {
+            "pos": [
+              1,
+              4,
+              4
+            ],
+            "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+          },
+          {
+            "pos": [
+              1,
+              4,
+              6
+            ],
+            "state": "minecraft:redstone_wall_torch[facing=west,lit=true]"
+          },
+          {
+            "pos": [
+              1,
+              4,
+              8
+            ],
+            "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+          },
+          {
+            "pos": [
+              1,
+              4,
+              10
+            ],
+            "state": "minecraft:redstone_wall_torch[facing=west,lit=true]"
+          },
+          {
+            "pos": [
+              1,
+              6,
+              4
+            ],
+            "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+          },
+          {
+            "pos": [
+              1,
+              6,
+              6
+            ],
+            "state": "minecraft:redstone_wall_torch[facing=west,lit=true]"
+          },
+          {
+            "pos": [
+              1,
+              6,
+              8
+            ],
+            "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+          },
+          {
+            "pos": [
+              1,
+              6,
+              10
+            ],
+            "state": "minecraft:redstone_wall_torch[facing=west,lit=true]"
+          },
+          {
+            "pos": [
+              1,
+              8,
+              4
+            ],
+            "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+          },
+          {
+            "pos": [
+              1,
+              8,
+              6
+            ],
+            "state": "minecraft:redstone_wall_torch[facing=west,lit=true]"
+          },
+          {
+            "pos": [
+              1,
+              8,
+              8
+            ],
+            "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+          },
+          {
+            "pos": [
+              1,
+              8,
+              10
+            ],
+            "state": "minecraft:redstone_wall_torch[facing=west,lit=true]"
+          }
+        ],
+        "coordinate_convention": "Schematic-local [x,y,z], X fastest then Z then Y; Offset retained separately.",
+        "io_mapping_status": "Static controls/signs only; bit order, electrical ports and timing not yet validated."
+      },
+      "candidate_io_mapping": {
+        "input_levers_increasing_z": [
+          [
+            6,
+            1,
+            4
+          ],
+          [
+            6,
+            1,
+            6
+          ],
+          [
+            6,
+            1,
+            8
+          ],
+          [
+            6,
+            1,
+            10
+          ]
+        ],
+        "output_lamps_bottom_to_top": [
+          [
+            0,
+            2,
+            0
+          ],
+          [
+            0,
+            4,
+            0
+          ],
+          [
+            0,
+            6,
+            0
+          ],
+          [
+            0,
+            8,
+            0
+          ]
+        ],
+        "evidence": "No sign labels. Each output row has repeater/torch/repeater/torch at the same four z positions.",
+        "programming_warning": "All four rows are identical in the downloaded artifact. The page's one-hot claim is conditional on unique programming; this original does not meet that condition.",
+        "expected_input_pattern_hypothesis": [
+          0,
+          1,
+          0,
+          1
+        ],
+        "hypothesis_scope": "Inferred from repeater/torch mismatch detection feeding output inversion; confirm in vanilla before treating as a fixture oracle."
+      },
+      "simulation_status": "not_run",
+      "vanilla_status": "not_run"
+    },
+    {
+      "id": "ADD005",
+      "name": "8-bit Carry Look-Everywhere Adder",
+      "authors": [
+        "Kuggo"
+      ],
+      "directory": "Archive/ADD_adders-subtractors/ADD005_8-bit_Carry_Look-Everywhere_Adder_CLE",
+      "filename": "ADD005_8bit_cle.schem",
+      "bytes": 1560,
+      "sha256": "3b4e13cd09dc8ad0b5770370d6f416e1d8140e2eec416c207ba76d8a79af46ca",
+      "git_blob_sha1": "9da01e667f00ea22e343c005de4e8f0c6aaf4f72",
+      "page": "https://mattbatwings.github.io/lra/archives/ADD005-8-bit-Carry-Look-Everywhere-Adder-CLE/",
+      "declared_size": [
+        13,
+        21,
+        20
+      ],
+      "declared_function": "Two 8-bit inputs and an 8-bit sum; source advertises four ticks, unit/settling to be verified.",
+      "proposed_checks": [
+        "Check (A+B)&255 using zero, all-one, alternating and carry-chain operands.",
+        "Exhaust all 65536 input pairs outside timed benchmarks after mapping port order.",
+        "The actual schematic also labels CIN/COUT: cover carry-in 0/1 and carry-out separately after port confirmation.",
+        "Capture representative transitions on vanilla 1.21.11, including 255+1 and 127+1."
+      ],
+      "download_url": "https://raw.githubusercontent.com/mattbatwings/Logical-Redstone-Archive/6d054aa0a87d8f58f672625b3e6d0e727bd97016/Archive/ADD_adders-subtractors/ADD005_8-bit_Carry_Look-Everywhere_Adder_CLE/attachments/ADD005_8bit_cle.schem",
+      "declared_minecraft_version": "1.21.4",
+      "metadata_url": "https://raw.githubusercontent.com/mattbatwings/Logical-Redstone-Archive/6d054aa0a87d8f58f672625b3e6d0e727bd97016/Archive/ADD_adders-subtractors/ADD005_8-bit_Carry_Look-Everywhere_Adder_CLE/data.json",
+      "sha256_verified": true,
+      "git_blob_verified": true,
+      "inspection": {
+        "root_name": "",
+        "sponge_version": 3,
+        "data_version": 4189,
+        "dimensions": [
+          13,
+          21,
+          20
+        ],
+        "offset": [
+          -6,
+          -20,
+          -7
+        ],
+        "volume": 5460,
+        "non_air_blocks": 1217,
+        "entity_count": 0,
+        "block_entity_count": 18,
+        "block_histogram": {
+          "minecraft:air": 4243,
+          "minecraft:lever": 17,
+          "minecraft:oak_sign": 1,
+          "minecraft:oak_wall_sign": 17,
+          "minecraft:red_stained_glass": 118,
+          "minecraft:red_wool": 435,
+          "minecraft:redstone_lamp": 26,
+          "minecraft:redstone_torch": 3,
+          "minecraft:redstone_wall_torch": 141,
+          "minecraft:redstone_wire": 409,
+          "minecraft:repeater": 32,
+          "minecraft:target": 18
+        },
+        "palette": {
+          "minecraft:air": 0,
+          "minecraft:red_wool": 1,
+          "minecraft:redstone_wire[east=side,north=none,power=0,south=up,west=none]": 2,
+          "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]": 3,
+          "minecraft:redstone_wire[east=none,north=none,power=0,south=up,west=side]": 4,
+          "minecraft:redstone_lamp[lit=false]": 5,
+          "minecraft:oak_wall_sign[facing=east,waterlogged=false]": 6,
+          "minecraft:lever[face=wall,facing=west,powered=false]": 7,
+          "minecraft:oak_wall_sign[facing=south,waterlogged=false]": 8,
+          "minecraft:red_stained_glass": 9,
+          "minecraft:redstone_wall_torch[facing=east,lit=false]": 10,
+          "minecraft:redstone_wire[east=none,north=up,power=0,south=up,west=none]": 11,
+          "minecraft:redstone_wire[east=none,north=side,power=0,south=side,west=none]": 12,
+          "minecraft:redstone_wall_torch[facing=east,lit=true]": 13,
+          "minecraft:redstone_wall_torch[facing=south,lit=false]": 14,
+          "minecraft:redstone_wire[east=side,north=none,power=15,south=side,west=side]": 15,
+          "minecraft:target[power=0]": 16,
+          "minecraft:redstone_wall_torch[facing=west,lit=true]": 17,
+          "minecraft:redstone_torch[lit=true]": 18,
+          "minecraft:redstone_wire[east=side,north=none,power=0,south=side,west=none]": 19,
+          "minecraft:repeater[delay=1,facing=west,locked=false,powered=false]": 20,
+          "minecraft:redstone_wire[east=side,north=none,power=0,south=side,west=side]": 21,
+          "minecraft:redstone_wire[east=side,north=side,power=15,south=side,west=side]": 22,
+          "minecraft:repeater[delay=1,facing=south,locked=false,powered=false]": 23,
+          "minecraft:redstone_wall_torch[facing=north,lit=false]": 24,
+          "minecraft:redstone_wire[east=side,north=side,power=15,south=none,west=side]": 25,
+          "minecraft:repeater[delay=1,facing=west,locked=false,powered=true]": 26,
+          "minecraft:redstone_wire[east=none,north=side,power=0,south=up,west=none]": 27,
+          "minecraft:redstone_wire[east=none,north=side,power=0,south=none,west=side]": 28,
+          "minecraft:redstone_wire[east=up,north=none,power=15,south=none,west=side]": 29,
+          "minecraft:oak_wall_sign[facing=west,waterlogged=false]": 30,
+          "minecraft:redstone_wire[east=side,north=up,power=0,south=none,west=none]": 31,
+          "minecraft:redstone_wire[east=side,north=none,power=14,south=none,west=up]": 32,
+          "minecraft:redstone_wire[east=none,north=side,power=0,south=side,west=side]": 33,
+          "minecraft:redstone_wire[east=side,north=side,power=0,south=side,west=none]": 34,
+          "minecraft:redstone_wire[east=none,north=none,power=0,south=side,west=side]": 35,
+          "minecraft:redstone_wall_torch[facing=south,lit=true]": 36,
+          "minecraft:redstone_wire[east=none,north=side,power=15,south=side,west=none]": 37,
+          "minecraft:redstone_wire[east=side,north=side,power=14,south=none,west=none]": 38,
+          "minecraft:redstone_wire[east=up,north=none,power=13,south=none,west=side]": 39,
+          "minecraft:redstone_wire[east=side,north=side,power=0,south=none,west=none]": 40,
+          "minecraft:redstone_wire[east=side,north=none,power=12,south=none,west=up]": 41,
+          "minecraft:redstone_wire[east=side,north=none,power=15,south=up,west=none]": 42,
+          "minecraft:redstone_wire[east=side,north=none,power=13,south=none,west=side]": 43,
+          "minecraft:redstone_wire[east=side,north=up,power=14,south=none,west=none]": 44,
+          "minecraft:redstone_wire[east=side,north=none,power=11,south=none,west=side]": 45,
+          "minecraft:redstone_wire[east=side,north=none,power=14,south=none,west=side]": 46,
+          "minecraft:oak_sign[rotation=12,waterlogged=false]": 47,
+          "minecraft:redstone_torch[lit=false]": 48,
+          "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=up]": 49
+        },
+        "piston_blocks": 0,
+        "controls": [
+          {
+            "pos": [
+              5,
+              1,
+              18
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              4,
+              17
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              4,
+              19
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              6,
+              15
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              6,
+              17
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              8,
+              13
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              8,
+              15
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              10,
+              11
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              10,
+              13
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              12,
+              9
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              12,
+              11
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              14,
+              7
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              14,
+              9
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              16,
+              5
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              16,
+              7
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              18,
+              3
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          },
+          {
+            "pos": [
+              0,
+              18,
+              5
+            ],
+            "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+          }
+        ],
+        "lamps": [
+          {
+            "pos": [
+              11,
+              1,
+              15
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              6,
+              1,
+              18
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              11,
+              3,
+              13
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              4,
+              17
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              4,
+              19
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              11,
+              5,
+              11
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              6,
+              15
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              6,
+              17
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              11,
+              7,
+              9
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              8,
+              13
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              8,
+              15
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              11,
+              9,
+              7
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              10,
+              11
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              10,
+              13
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              11,
+              11,
+              5
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              12,
+              9
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              12,
+              11
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              11,
+              13,
+              3
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              14,
+              7
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              14,
+              9
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              11,
+              15,
+              1
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              16,
+              5
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              16,
+              7
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              18,
+              3
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              1,
+              18,
+              5
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          },
+          {
+            "pos": [
+              10,
+              18,
+              7
+            ],
+            "state": "minecraft:redstone_lamp[lit=false]"
+          }
+        ],
+        "boundary_diodes": [
+          {
+            "pos": [
+              3,
+              17,
+              0
+            ],
+            "state": "minecraft:repeater[delay=1,facing=west,locked=false,powered=false]"
+          }
+        ],
+        "signs": [
+          {
+            "pos": [
+              12,
+              1,
+              15
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "1",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              6,
+              1,
+              19
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "CIN",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              12,
+              3,
+              13
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "2",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              0,
+              4,
+              18
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "1",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              12,
+              5,
+              11
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "4",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              0,
+              6,
+              16
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "2",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              12,
+              7,
+              9
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "8",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              0,
+              8,
+              14
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "4",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              12,
+              9,
+              7
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "16",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              0,
+              10,
+              12
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "8",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              12,
+              11,
+              5
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "32",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              0,
+              12,
+              10
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "16",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              12,
+              13,
+              3
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "64",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              0,
+              14,
+              8
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "32",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              12,
+              15,
+              1
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "128",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              0,
+              16,
+              6
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "64",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              0,
+              18,
+              4
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "128",
+                "",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          },
+          {
+            "pos": [
+              10,
+              19,
+              7
+            ],
+            "id": "minecraft:sign",
+            "text": {
+              "front_text": [
+                "COUT",
+                "(2 ticks)",
+                "",
+                ""
+              ],
+              "back_text": [
+                "",
+                "",
+                "",
+                ""
+              ]
+            }
+          }
+        ],
+        "decoder_programming_cells": [],
+        "coordinate_convention": "Schematic-local [x,y,z], X fastest then Z then Y; Offset retained separately.",
+        "io_mapping_status": "Static controls/signs only; bit order, electrical ports and timing not yet validated."
+      },
+      "candidate_io_mapping": {
+        "input_pair_positions_by_weight": [
+          {
+            "weight": 1,
+            "positions": [
+              [
+                0,
+                4,
+                17
+              ],
+              [
+                0,
+                4,
+                19
+              ]
+            ]
+          },
+          {
+            "weight": 2,
+            "positions": [
+              [
+                0,
+                6,
+                15
+              ],
+              [
+                0,
+                6,
+                17
+              ]
+            ]
+          },
+          {
+            "weight": 4,
+            "positions": [
+              [
+                0,
+                8,
+                13
+              ],
+              [
+                0,
+                8,
+                15
+              ]
+            ]
+          },
+          {
+            "weight": 8,
+            "positions": [
+              [
+                0,
+                10,
+                11
+              ],
+              [
+                0,
+                10,
+                13
+              ]
+            ]
+          },
+          {
+            "weight": 16,
+            "positions": [
+              [
+                0,
+                12,
+                9
+              ],
+              [
+                0,
+                12,
+                11
+              ]
+            ]
+          },
+          {
+            "weight": 32,
+            "positions": [
+              [
+                0,
+                14,
+                7
+              ],
+              [
+                0,
+                14,
+                9
+              ]
+            ]
+          },
+          {
+            "weight": 64,
+            "positions": [
+              [
+                0,
+                16,
+                5
+              ],
+              [
+                0,
+                16,
+                7
+              ]
+            ]
+          },
+          {
+            "weight": 128,
+            "positions": [
+              [
+                0,
+                18,
+                3
+              ],
+              [
+                0,
+                18,
+                5
+              ]
+            ]
+          }
+        ],
+        "sum_lamps_by_weight": [
+          {
+            "weight": 1,
+            "pos": [
+              11,
+              1,
+              15
+            ]
+          },
+          {
+            "weight": 2,
+            "pos": [
+              11,
+              3,
+              13
+            ]
+          },
+          {
+            "weight": 4,
+            "pos": [
+              11,
+              5,
+              11
+            ]
+          },
+          {
+            "weight": 8,
+            "pos": [
+              11,
+              7,
+              9
+            ]
+          },
+          {
+            "weight": 16,
+            "pos": [
+              11,
+              9,
+              7
+            ]
+          },
+          {
+            "weight": 32,
+            "pos": [
+              11,
+              11,
+              5
+            ]
+          },
+          {
+            "weight": 64,
+            "pos": [
+              11,
+              13,
+              3
+            ]
+          },
+          {
+            "weight": 128,
+            "pos": [
+              11,
+              15,
+              1
+            ]
+          }
+        ],
+        "carry_in_lever": [
+          5,
+          1,
+          18
+        ],
+        "carry_out_lamp": [
+          10,
+          18,
+          7
+        ],
+        "evidence": "Input and sum sign labels give weights 1..128; CIN/COUT signs identify extra carry controls/output. A/B names are interchangeable for addition.",
+        "timing_note": "COUT sign says '(2 ticks)' while archive advertises four ticks for sum; capture exact game-tick timing independently."
+      },
+      "simulation_status": "not_run",
+      "vanilla_status": "not_run"
+    }
+  ]
+}
