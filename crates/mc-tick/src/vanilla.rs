@@ -244,6 +244,8 @@ pub struct VanillaRules {
     plan_identity: crate::wire_plan::RulesIdentity,
     #[cfg(feature = "experiment-piston-plan")]
     piston_plan_identity: crate::piston_plan::RulesIdentity,
+    #[cfg(feature = "experiment-transition-signatures")]
+    transition_signatures: crate::wire_plan::TransitionSignatures,
 }
 
 #[cfg(any(feature = "experiment-wire-plan", feature = "experiment-piston-plan"))]
@@ -846,9 +848,286 @@ mod wire_plan_tests {
     }
 }
 
+#[cfg(all(test, feature = "experiment-transition-signatures"))]
+mod transition_signature_tests {
+    use super::*;
+    use crate::wire::WireSide;
+    use crate::wire_plan::{Mode, Transition};
+
+    fn check(rules: &VanillaRules, from: StateId, to: StateId) {
+        assert_eq!(rules.wire_plan_transition_mode(from, to, Mode::Shadow),
+            rules.reference_wire_plan_transition(from, to), "{from:?} -> {to:?}");
+    }
+
+    fn registered_logic_palette() -> (VanillaRules, usize) {
+        let mut registry = StateRegistry::new();
+        for descriptor in ["minecraft:stone", "minecraft:glass", "minecraft:redstone_block"] {
+            registry.intern(descriptor).unwrap();
+        }
+        for power in 0..=15 {
+            for sides in ["east=none,north=none,south=none,west=none",
+                "east=side,north=side,south=side,west=side"] {
+                registry.intern(&format!("minecraft:redstone_wire[{sides},power={power}]")).unwrap();
+            }
+            for block in ["light_weighted_pressure_plate", "heavy_weighted_pressure_plate"] {
+                registry.intern(&format!("minecraft:{block}[power={power}]")).unwrap();
+            }
+        }
+        for powered in [false, true] {
+            registry.intern(&format!("minecraft:redstone_torch[lit={powered}]")).unwrap();
+            registry.intern(&format!("minecraft:stone_pressure_plate[powered={powered}]")).unwrap();
+            for facing in ["north", "south", "west", "east"] {
+                registry.intern(&format!("minecraft:repeater[delay=1,facing={facing},locked=false,powered={powered}]")).unwrap();
+                registry.intern(&format!("minecraft:comparator[facing={facing},mode=compare,powered={powered}]")).unwrap();
+                registry.intern(&format!("minecraft:redstone_wall_torch[facing={facing},lit={powered}]")).unwrap();
+                for face in ["floor", "wall", "ceiling"] {
+                    registry.intern(&format!("minecraft:lever[face={face},facing={facing},powered={powered}]")).unwrap();
+                    registry.intern(&format!("minecraft:stone_button[face={face},facing={facing},powered={powered}]")).unwrap();
+                }
+            }
+            for facing in ["down", "up", "north", "south", "west", "east"] {
+                registry.intern(&format!("minecraft:observer[facing={facing},powered={powered}]")).unwrap();
+            }
+        }
+        let rules = register_all(&mut registry, &mut BehaviourTable::new());
+        (rules, registry.len())
+    }
+
+    #[test]
+    fn every_pair_in_a_registered_logic_palette_matches_the_original_classifier() {
+        let (rules, palette_states) = registered_logic_palette();
+        let before = format!("{rules:?}");
+        assert!(!rules.transition_signatures.initialized());
+        for from in 0..palette_states {
+            for to in 0..palette_states {
+                check(&rules, StateId(from as u16), StateId(to as u16));
+            }
+        }
+        assert!(rules.transition_signatures.initialized());
+        assert_eq!(format!("{rules:?}"), before, "derived metadata is not semantic Debug state");
+    }
+
+    /// Manual measurement only. This isolates rule compilation/classification;
+    /// it is not a circuit benchmark and excludes World/journal/plan work.
+    #[test]
+    #[ignore = "manual release-mode timing; run alone on the benchmark host"]
+    fn measure_transition_signature_cold_and_warm() {
+        use std::hint::black_box;
+        use std::time::Instant;
+        use cpu_time::ThreadTime;
+        assert!(!cfg!(debug_assertions), "this manual measurement requires --release");
+        const WARMUPS: usize = 3;
+        const SAMPLES: usize = 21;
+        const PAIRS: usize = 4096;
+        const REPEATS: usize = 256;
+        let (template, palette_states) = registered_logic_palette();
+        let mut random = 0x1234_5678u64;
+        let pairs = (0..PAIRS).map(|_| {
+            random = random.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let from = StateId(((random >> 32) as usize % palette_states) as u16);
+            random = random.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let to = StateId(((random >> 32) as usize % palette_states) as u16);
+            (from, to)
+        }).collect::<Vec<_>>();
+        let measure = |operation: &mut dyn FnMut()| {
+            let elapsed = Instant::now();
+            let cpu = ThreadTime::now();
+            operation();
+            let cpu_ns = cpu.elapsed().as_nanos() as u64;
+            let elapsed_ns = elapsed.elapsed().as_nanos() as u64;
+            (cpu_ns, elapsed_ns)
+        };
+        for sample in 0..WARMUPS + SAMPLES {
+            // Clone and allocation of result rows are outside every timer.
+            // The wrapper's Clone starts cold even if its source was warmed.
+            let rules = template.clone();
+            assert!(!rules.transition_signatures.initialized());
+            let mut rows = Vec::with_capacity(3);
+            let (from, to) = pairs[0];
+            let (cpu_ns, elapsed_ns) = measure(&mut || {
+                black_box(black_box(&rules).wire_plan_transition_mode(
+                    black_box(from), black_box(to), Mode::On));
+            });
+            rows.push(("first_signature_classification", 1, cpu_ns, elapsed_ns));
+            assert!(rules.transition_signatures.initialized());
+
+            // Alternate the warmed/reference order to avoid always measuring
+            // one after the other. Both use the same deterministic pair stream
+            // and include identical loop/black_box overhead.
+            for reference in if sample % 2 == 0 { [false, true] } else { [true, false] } {
+                let (cpu_ns, elapsed_ns) = if reference {
+                    measure(&mut || {
+                        for _ in 0..REPEATS {
+                            for &(from, to) in &pairs {
+                                black_box(black_box(&rules).reference_wire_plan_transition(
+                                    black_box(from), black_box(to)));
+                            }
+                        }
+                    })
+                } else {
+                    measure(&mut || {
+                        for _ in 0..REPEATS {
+                            for &(from, to) in &pairs {
+                                black_box(black_box(&rules).wire_plan_transition_mode(
+                                    black_box(from), black_box(to), Mode::On));
+                            }
+                        }
+                    })
+                };
+                rows.push((if reference { "reference_classification" } else { "warmed_signature_classification" },
+                    PAIRS * REPEATS, cpu_ns, elapsed_ns));
+            }
+            // Table/rule destruction is outside timers, as is JSON formatting.
+            drop(rules);
+            if sample < WARMUPS { continue; }
+            for (case, iterations, cpu_ns, elapsed_ns) in rows {
+                println!("{}", serde_json::json!({
+                    "benchmark": "transition_signature_microbenchmark",
+                    "scope": "registered mixed logic palette; classifier only; includes loop and black_box overhead; excludes environment mode lookup, world and journal work",
+                    "case": case,
+                    "sample": sample - WARMUPS,
+                    "samples": SAMPLES,
+                    "warmups": WARMUPS,
+                    "palette_states": palette_states,
+                    "table_states": 65536,
+                    "table_bytes": 524288,
+                    "iterations": iterations,
+                    "samples_cpu_ns": cpu_ns,
+                    "samples_ns": elapsed_ns
+                }));
+            }
+        }
+    }
+
+    #[test]
+    fn full_u8_values_sparse_ids_and_absent_zero_metadata_remain_distinct() {
+        let mut rules = VanillaRules::default();
+        for power in 0..=255u8 {
+            rules.wires.insert(StateId(u16::from(power) + 1), (power, [WireSide::Side; 4]));
+            // Intentionally leave powered=false: the reference still compares
+            // metadata on these unusual custom states, including Some(0).
+            rules.analog_emission.insert(StateId(u16::from(power) + 257), power);
+        }
+        let high = StateId(u16::MAX);
+        rules.powered.insert(high);
+        rules.analog_emission.insert(high, 255);
+        rules.emit_only.insert(high, Dir::Down);
+        rules.emit_except.insert(high, Dir::Up);
+        rules.strong_into.insert(high, Dir::East);
+        rules.conductors.insert(high);
+        rules.comparators.insert(high);
+        rules.wires.insert(high, (255, [WireSide::Up; 4]));
+        for from in 0..=512u16 {
+            for to in 0..=512u16 { check(&rules, StateId(from), StateId(to)); }
+            check(&rules, StateId(from), high);
+            check(&rules, high, StateId(from));
+        }
+        // Every unassigned ID, including the highest sparse gap, has the
+        // reference's absent metadata; table lookup cannot alias a populated ID.
+        for id in 513..u16::MAX { check(&rules, StateId(id), StateId::AIR); }
+        assert_eq!(rules.wire_plan_transition_mode(StateId(1), StateId(256), Mode::On), Transition::WireValue);
+        assert_eq!(rules.wire_plan_transition_mode(StateId::AIR, StateId(1), Mode::On), Transition::Structural);
+        assert_eq!(rules.wire_plan_transition_mode(StateId::AIR, StateId(257), Mode::On), Transition::Structural);
+    }
+
+    #[test]
+    fn all_direction_options_and_stored_wire_shape_omission_match_exactly() {
+        let mut rules = VanillaRules::default();
+        for (index, dir) in crate::pos::ALL_DIRS.into_iter().enumerate() {
+            rules.emit_only.insert(StateId(100 + index as u16), dir);
+            rules.emit_except.insert(StateId(200 + index as u16), dir);
+            rules.strong_into.insert(StateId(300 + index as u16), dir);
+        }
+        rules.wires.insert(StateId(400), (0, [WireSide::None; 4]));
+        rules.wires.insert(StateId(401), (0, [WireSide::Up; 4]));
+        let states = std::iter::once(StateId::AIR)
+            .chain((100..106).map(StateId)).chain((200..206).map(StateId))
+            .chain((300..306).map(StateId)).chain([StateId(400), StateId(401)])
+            .collect::<Vec<_>>();
+        for &from in &states { for &to in &states { check(&rules, from, to); } }
+        assert_eq!(rules.wire_plan_transition_mode(StateId(400), StateId(401), Mode::On), Transition::Irrelevant);
+        for id in [100, 200, 300] {
+            assert_eq!(rules.wire_plan_transition_mode(StateId::AIR, StateId(id), Mode::On), Transition::Structural,
+                "Some(Down) must not alias None");
+        }
+    }
+
+    #[test]
+    fn warmed_rules_clone_rebuilds_after_private_custom_rule_edits_and_off_stays_cold() {
+        let mut rules = VanillaRules::default();
+        rules.wires.insert(StateId(1), (0, [WireSide::Side; 4]));
+        rules.wires.insert(StateId(2), (1, [WireSide::Side; 4]));
+        assert_eq!(rules.wire_plan_transition_mode(StateId(1), StateId(2), Mode::Off), Transition::WireValue);
+        assert!(!rules.transition_signatures.initialized(), "off mode must not allocate the table");
+        check(&rules, StateId(1), StateId(2));
+        let mut changed = rules.clone();
+        assert!(!changed.transition_signatures.initialized());
+        // No public API mutates these private rule fields after registration.
+        // Internal custom-rule construction may edit a clone before sharing it;
+        // a warmed source's table must not survive into that new identity.
+        changed.powered.insert(StateId(1));
+        changed.analog_emission.insert(StateId(1), 0);
+        changed.emit_only.insert(StateId(1), Dir::Down);
+        changed.emit_except.insert(StateId(1), Dir::Up);
+        changed.strong_into.insert(StateId(1), Dir::East);
+        changed.conductors.insert(StateId(1));
+        changed.comparators.insert(StateId(1));
+        changed.wires.insert(StateId(1), (255, [WireSide::Up; 4]));
+        check(&changed, StateId(1), StateId(2));
+        assert_eq!(changed.wire_plan_transition_mode(StateId(1), StateId(2), Mode::On), Transition::Structural);
+        assert_eq!(rules.wire_plan_transition_mode(StateId(1), StateId(2), Mode::On), Transition::WireValue);
+        let mut value_only = rules.clone();
+        value_only.wires.insert(StateId(1), (1, [WireSide::None; 4]));
+        assert_eq!(value_only.wire_plan_transition_mode(StateId(1), StateId(2), Mode::Shadow), Transition::Irrelevant);
+        fn send_sync<T: Send + Sync>() {}
+        send_sync::<VanillaRules>();
+    }
+}
+
 #[cfg(feature = "experiment-wire-plan")]
 impl VanillaRules {
     fn wire_plan_transition(&self, from: StateId, to: StateId) -> crate::wire_plan::Transition {
+        #[cfg(feature = "experiment-transition-signatures")]
+        { self.wire_plan_transition_mode(from, to, crate::wire_plan::transition_mode()) }
+        #[cfg(not(feature = "experiment-transition-signatures"))]
+        { self.reference_wire_plan_transition(from, to) }
+    }
+
+    #[cfg(feature = "experiment-transition-signatures")]
+    fn wire_plan_transition_mode(&self, from: StateId, to: StateId,
+        mode: crate::wire_plan::Mode) -> crate::wire_plan::Transition {
+        use crate::wire_plan::Mode;
+        if mode == Mode::Off { return self.reference_wire_plan_transition(from, to); }
+        let result = self.transition_signatures.classify(from, to,
+            |state| self.wire_plan_signature(state));
+        if mode == Mode::Shadow {
+            assert_eq!(result, self.reference_wire_plan_transition(from, to),
+                "wire transition signature diverged for {from:?} -> {to:?}");
+        }
+        result
+    }
+
+    #[cfg(feature = "experiment-transition-signatures")]
+    fn wire_plan_signature(&self, state: StateId) -> u64 {
+        // Options have distinct absent encodings: Some(0) is not None, and
+        // Dir::Down (zero in the enum) is not an unrestricted direction.
+        // Keep all properties compared by the original classifier, including
+        // metadata on currently unpowered states and arbitrary u8 emissions.
+        let direction = |value: Option<&Dir>| value.map_or(0, |dir| *dir as u64 + 1);
+        let analog = self.analog_emission.get(&state).map_or(0, |value| 256 + u64::from(*value));
+        let wire = self.wires.get(&state);
+        u64::from(self.powered.contains(&state))
+            | (analog << 1)
+            | (direction(self.emit_only.get(&state)) << 10)
+            | (direction(self.emit_except.get(&state)) << 13)
+            | (direction(self.strong_into.get(&state)) << 16)
+            | (u64::from(self.conductors.contains(&state)) << 19)
+            | (u64::from(self.comparators.contains(&state)) << 20)
+            | (u64::from(wire.is_some()) << 21)
+            | (wire.map_or(0, |(power, _)| u64::from(*power)) << 32)
+    }
+
+    fn reference_wire_plan_transition(&self, from: StateId, to: StateId) -> crate::wire_plan::Transition {
         use crate::wire_plan::Transition;
         let same = self.powered.contains(&from) == self.powered.contains(&to)
             && self.analog_emission.get(&from) == self.analog_emission.get(&to)

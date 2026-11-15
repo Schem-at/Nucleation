@@ -115,3 +115,15 @@ and `experiment-piston-plan`. The first two augment input plans. Piston plans us
 live comparator/dust inputs and quasi-connectivity. Their counters feature is
 diagnostic only. All new features remain disabled by default; the reports retain
 regressions and rejected combinations as well as gains.
+
+The [workload specialization report](../../docs/performance/workload-specialization/README.md)
+compares active stationary logic and flying machines with current `master`.
+`experiment-logic-plan-storage` uses bounded position indexing to avoid wire-plan
+cache collisions; it remains valid after structural edits and movement.
+`experiment-moving-phase` reuses due-move storage and bypasses empty entity
+displacement work using live checks. Both are independently selectable and
+disabled by default. They preserve the same ordered callbacks and recordings.
+`experiment-transition-signatures` precomputes exact state-transition metadata
+for immutable rules. `MC_TICK_TRANSITION_SIGNATURES=off|on|shadow` is sampled once
+per process; shadow compares classifications with the reference implementation.
+Its 512 KiB table is initialized on first use and resets on rules cloning.

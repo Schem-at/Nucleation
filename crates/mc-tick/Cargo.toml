@@ -23,6 +23,7 @@ experiment-update-arena = []
 experiment-lazy-journal = []
 experiment-moving-phase = []
 experiment-logic-plan-storage = ["experiment-world-plan-cache"]
+experiment-transition-signatures = ["experiment-world-plan-cache"]
 
 # Dependencies are deliberately near-zero. This crate's reason to exist is a fast
 # edit->test loop, and every dependency added here is paid on every iteration for

@@ -146,6 +146,52 @@ pub(crate) fn mode() -> Mode {
     })
 }
 
+#[cfg(feature = "experiment-transition-signatures")]
+pub(crate) fn transition_mode() -> Mode {
+    static MODE: OnceLock<Mode> = OnceLock::new();
+    *MODE.get_or_init(|| match std::env::var("MC_TICK_TRANSITION_SIGNATURES").as_deref() {
+        Ok("off") => Mode::Off,
+        Ok("shadow") => Mode::Shadow,
+        _ => Mode::On,
+    })
+}
+
+/// A compiled view of immutable rule metadata, never of World state. The low
+/// 32 bits encode every structural property used by the reference classifier;
+/// the upper bits encode only live wire power. Covering the entire u16 domain
+/// costs exactly 512 KiB and preserves sparse and unregistered state semantics.
+#[cfg(feature = "experiment-transition-signatures")]
+#[derive(Default)]
+pub(crate) struct TransitionSignatures(OnceLock<Box<[u64]>>);
+
+#[cfg(feature = "experiment-transition-signatures")]
+impl Clone for TransitionSignatures {
+    // Internal callers can modify a cloned VanillaRules before sharing it.
+    // Never carry a warmed derived table into a new rules identity.
+    fn clone(&self) -> Self { Self::default() }
+}
+
+#[cfg(feature = "experiment-transition-signatures")]
+impl TransitionSignatures {
+    pub fn classify(&self, from: StateId, to: StateId, signature: impl Fn(StateId) -> u64) -> Transition {
+        let values = self.0.get_or_init(|| {
+            (0..=u16::MAX).map(|id| signature(StateId(id)))
+                .collect::<Vec<_>>().into_boxed_slice()
+        });
+        let difference = values[from.raw() as usize] ^ values[to.raw() as usize];
+        if difference & u64::from(u32::MAX) != 0 {
+            Transition::Structural
+        } else if difference != 0 {
+            Transition::WireValue
+        } else {
+            Transition::Irrelevant
+        }
+    }
+
+    #[cfg(test)]
+    pub fn initialized(&self) -> bool { self.0.get().is_some() }
+}
+
 /// A token held by the exact immutable rules instance that built a plan. A
 /// cloned rules value may subsequently be changed, so its identity starts fresh.
 #[cfg(feature = "experiment-world-plan-cache")]

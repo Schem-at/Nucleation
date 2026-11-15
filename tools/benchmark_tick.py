@@ -24,6 +24,7 @@ assert all(mode in ('off','on') for mode in modes.values()),'Shadow instrumentat
 assert all(mode in ('off','on') for mode in plan_modes.values()),'Shadow instrumentation is forbidden in timings'
 assert os.environ.get('MC_TICK_WIRE_PLAN', 'on') != 'shadow', 'Shadow recomputation is forbidden in timings'
 assert os.environ.get('MC_TICK_PISTON_PLAN', 'on') != 'shadow', 'Shadow recomputation is forbidden in timings'
+assert os.environ.get('MC_TICK_TRANSITION_SIGNATURES', 'on') != 'shadow', 'Shadow recomputation is forbidden in timings'
 for key in os.environ:
     assert not key.startswith('MC_TICK_TRACE_') and key!='MC_TICK_DEBUG_COMPARATOR','Diagnostics must be off'
 
@@ -45,6 +46,7 @@ metadata={'kind' :'metadata','utc':datetime.datetime.now(datetime.timezone.utc).
     'cpuinfo':pathlib.Path('/proc/cpuinfo').read_text().split('\n\n')[0],
     'fixture_manifest':fixture_manifest,'seed':a.seed,'rounds':a.rounds,'target_ms':a.target_ms,'modes':modes,'plan_modes':plan_modes,
     'piston_plan_mode':os.environ.get('MC_TICK_PISTON_PLAN','on'),
+    'transition_signature_mode':os.environ.get('MC_TICK_TRANSITION_SIGNATURES','on'),
     'variants':{name:{'path':path,'sha256':hashlib.file_digest(open(path,'rb'),'sha256').hexdigest()}
                 for name,path in variants.items()},
     'method':'one warmup sample per subprocess; input+stepping+recording timed; restore/setup/drop excluded',
