@@ -1812,7 +1812,9 @@ impl<P: PowerSource> BlockBehaviour for Lamp<P> {
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         let signal = self.has_signal(ctx, pos);
         if signal && !self.lit {
-            ctx.set_quiet(pos, self.states.get(true));
+            // Vanilla writes with flag 2: no neighbourChanged callbacks, but
+            // observers watching the lamp still receive the shape update.
+            ctx.set_shape_only(pos, self.states.get(true));
         } else if !signal && self.lit {
             ctx.schedule(pos, LAMP_OFF_DELAY, TickPriority::Normal);
         }
@@ -1820,7 +1822,7 @@ impl<P: PowerSource> BlockBehaviour for Lamp<P> {
 
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         if self.lit && !self.has_signal(ctx, pos) {
-            ctx.set_quiet(pos, self.states.get(false));
+            ctx.set_shape_only(pos, self.states.get(false));
         }
     }
 
@@ -2031,7 +2033,9 @@ impl<P: PowerSource> BlockBehaviour for Trapdoor<P> {
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         let signal = self.has_signal(ctx, pos);
         if signal != self.powered {
-            ctx.set_quiet(pos, self.states.get(signal));
+            // Flag 2 preserves shape notifications, including the observer
+            // watching this trapdoor in the horizontal plot-door fixture.
+            ctx.set_shape_only(pos, self.states.get(signal));
         }
     }
 

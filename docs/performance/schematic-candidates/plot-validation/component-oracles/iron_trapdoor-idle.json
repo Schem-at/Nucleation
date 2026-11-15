@@ -1,0 +1,71 @@
+{
+  "format_version": 1,
+  "data_version": 4671,
+  "case": "synthetic_iron_trapdoor_observer_idle",
+  "negative_control": true,
+  "size": [
+    4,
+    3,
+    3
+  ],
+  "origin": [
+    0,
+    100,
+    0
+  ],
+  "watch": {
+    "min": [
+      -2,
+      -2,
+      -2
+    ],
+    "max": [
+      5,
+      4,
+      4
+    ]
+  },
+  "rng_seed": 0,
+  "capture_ticks": 100,
+  "source": {
+    "sha256": "870106c043ed01f2dd6eeba3924e4ed11cb45c85de1925fab67eb5645fc78150",
+    "data_version": 4671,
+    "kind": "synthetic_minimized_fixture",
+    "fixture_path": "docs/performance/schematic-candidates/plot-validation/component-oracles/iron_trapdoor-fixture.json"
+  },
+  "fixture": [
+    {
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "state": "minecraft:cyan_wool"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        1
+      ],
+      "state": "minecraft:iron_trapdoor[facing=east,half=top,open=false,powered=false,waterlogged=false]"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        1
+      ],
+      "state": "minecraft:observer[facing=west,powered=false]"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        1
+      ],
+      "state": "minecraft:lever[face=floor,facing=north,powered=false]"
+    }
+  ],
+  "actions": []
+}

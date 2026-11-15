@@ -1,0 +1,605 @@
+{
+  "mc_version": "1.21.11",
+  "data_version": 4671,
+  "capture_method": "Pinned zero-player GameTestServer, four actual lever pulls, fresh idle controls, 15 November 2026 on harrison-work.",
+  "runs": [
+    {
+      "case": "synthetic_lamp_observer_cycle",
+      "capture_sha256": "1d64261f8f923b7da8e9be8c55f85b142c828b84c0ecb52a665214365edeaa4f",
+      "scenario_sha256": "f73c3ec2bc28ff775d5621f3c87a00fdc82588f21492a9fd827025d61b563c0e",
+      "source": {
+        "sha256": "c2e6f1f7ce4866c8354e5698ce0bd5da4a4f54f4f66189032722deb034069e45",
+        "data_version": 4671,
+        "kind": "synthetic_minimized_fixture",
+        "fixture_path": "docs/performance/schematic-candidates/plot-validation/component-oracles/lamp-fixture.json"
+      },
+      "origin": [
+        0,
+        100,
+        0
+      ],
+      "capture_ticks": 100,
+      "actions": [
+        {
+          "tick": 21,
+          "type": "pull_lever",
+          "pos": [
+            1,
+            2,
+            1
+          ]
+        },
+        {
+          "tick": 41,
+          "type": "pull_lever",
+          "pos": [
+            1,
+            2,
+            1
+          ]
+        },
+        {
+          "tick": 61,
+          "type": "pull_lever",
+          "pos": [
+            1,
+            2,
+            1
+          ]
+        },
+        {
+          "tick": 81,
+          "type": "pull_lever",
+          "pos": [
+            1,
+            2,
+            1
+          ]
+        }
+      ],
+      "initial": [
+        [
+          1,
+          1,
+          1,
+          "minecraft:redstone_lamp[lit=false]"
+        ],
+        [
+          2,
+          1,
+          1,
+          "minecraft:observer[facing=west,powered=false]"
+        ],
+        [
+          1,
+          2,
+          1,
+          "minecraft:lever[face=floor,facing=north,powered=false]"
+        ]
+      ],
+      "changes": [
+        {
+          "tick": 21,
+          "blocks": [
+            [
+              1,
+              1,
+              1,
+              "minecraft:redstone_lamp[lit=false]",
+              "minecraft:redstone_lamp[lit=true]"
+            ],
+            [
+              1,
+              2,
+              1,
+              "minecraft:lever[face=floor,facing=north,powered=false]",
+              "minecraft:lever[face=floor,facing=north,powered=true]"
+            ]
+          ]
+        },
+        {
+          "tick": 22,
+          "blocks": [
+            [
+              2,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=false]",
+              "minecraft:observer[facing=west,powered=true]"
+            ]
+          ]
+        },
+        {
+          "tick": 24,
+          "blocks": [
+            [
+              2,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=true]",
+              "minecraft:observer[facing=west,powered=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 41,
+          "blocks": [
+            [
+              1,
+              2,
+              1,
+              "minecraft:lever[face=floor,facing=north,powered=true]",
+              "minecraft:lever[face=floor,facing=north,powered=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 44,
+          "blocks": [
+            [
+              1,
+              1,
+              1,
+              "minecraft:redstone_lamp[lit=true]",
+              "minecraft:redstone_lamp[lit=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 46,
+          "blocks": [
+            [
+              2,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=false]",
+              "minecraft:observer[facing=west,powered=true]"
+            ]
+          ]
+        },
+        {
+          "tick": 48,
+          "blocks": [
+            [
+              2,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=true]",
+              "minecraft:observer[facing=west,powered=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 61,
+          "blocks": [
+            [
+              1,
+              1,
+              1,
+              "minecraft:redstone_lamp[lit=false]",
+              "minecraft:redstone_lamp[lit=true]"
+            ],
+            [
+              1,
+              2,
+              1,
+              "minecraft:lever[face=floor,facing=north,powered=false]",
+              "minecraft:lever[face=floor,facing=north,powered=true]"
+            ]
+          ]
+        },
+        {
+          "tick": 62,
+          "blocks": [
+            [
+              2,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=false]",
+              "minecraft:observer[facing=west,powered=true]"
+            ]
+          ]
+        },
+        {
+          "tick": 64,
+          "blocks": [
+            [
+              2,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=true]",
+              "minecraft:observer[facing=west,powered=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 81,
+          "blocks": [
+            [
+              1,
+              2,
+              1,
+              "minecraft:lever[face=floor,facing=north,powered=true]",
+              "minecraft:lever[face=floor,facing=north,powered=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 84,
+          "blocks": [
+            [
+              1,
+              1,
+              1,
+              "minecraft:redstone_lamp[lit=true]",
+              "minecraft:redstone_lamp[lit=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 86,
+          "blocks": [
+            [
+              2,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=false]",
+              "minecraft:observer[facing=west,powered=true]"
+            ]
+          ]
+        },
+        {
+          "tick": 88,
+          "blocks": [
+            [
+              2,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=true]",
+              "minecraft:observer[facing=west,powered=false]"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "case": "synthetic_lamp_observer_idle",
+      "capture_sha256": "33fe4d48aff058754bf690ba3c093cd5a829068010e31f4942dc0df2357adcbb",
+      "scenario_sha256": "4c742ad53d324e5260db00939a0867092b7805fbb2b40a3f321af781e33b2e69",
+      "source": {
+        "sha256": "c2e6f1f7ce4866c8354e5698ce0bd5da4a4f54f4f66189032722deb034069e45",
+        "data_version": 4671,
+        "kind": "synthetic_minimized_fixture",
+        "fixture_path": "docs/performance/schematic-candidates/plot-validation/component-oracles/lamp-fixture.json"
+      },
+      "origin": [
+        0,
+        100,
+        0
+      ],
+      "capture_ticks": 100,
+      "actions": [],
+      "initial": [
+        [
+          1,
+          1,
+          1,
+          "minecraft:redstone_lamp[lit=false]"
+        ],
+        [
+          2,
+          1,
+          1,
+          "minecraft:observer[facing=west,powered=false]"
+        ],
+        [
+          1,
+          2,
+          1,
+          "minecraft:lever[face=floor,facing=north,powered=false]"
+        ]
+      ],
+      "changes": []
+    },
+    {
+      "case": "synthetic_iron_trapdoor_observer_cycle",
+      "capture_sha256": "d6ffa0f286b9f688f2501cc491a9fbe07b6878901fbb263e015e356e62659e3a",
+      "scenario_sha256": "f62543465fe0164b850f4dee0605efe540c4c914ffb949db0fbd9a032cd044bf",
+      "source": {
+        "sha256": "870106c043ed01f2dd6eeba3924e4ed11cb45c85de1925fab67eb5645fc78150",
+        "data_version": 4671,
+        "kind": "synthetic_minimized_fixture",
+        "fixture_path": "docs/performance/schematic-candidates/plot-validation/component-oracles/iron_trapdoor-fixture.json"
+      },
+      "origin": [
+        0,
+        100,
+        0
+      ],
+      "capture_ticks": 100,
+      "actions": [
+        {
+          "tick": 21,
+          "type": "pull_lever",
+          "pos": [
+            1,
+            2,
+            1
+          ]
+        },
+        {
+          "tick": 41,
+          "type": "pull_lever",
+          "pos": [
+            1,
+            2,
+            1
+          ]
+        },
+        {
+          "tick": 61,
+          "type": "pull_lever",
+          "pos": [
+            1,
+            2,
+            1
+          ]
+        },
+        {
+          "tick": 81,
+          "type": "pull_lever",
+          "pos": [
+            1,
+            2,
+            1
+          ]
+        }
+      ],
+      "initial": [
+        [
+          1,
+          1,
+          1,
+          "minecraft:cyan_wool"
+        ],
+        [
+          2,
+          1,
+          1,
+          "minecraft:iron_trapdoor[facing=east,half=top,open=false,powered=false,waterlogged=false]"
+        ],
+        [
+          3,
+          1,
+          1,
+          "minecraft:observer[facing=west,powered=false]"
+        ],
+        [
+          1,
+          2,
+          1,
+          "minecraft:lever[face=floor,facing=north,powered=false]"
+        ]
+      ],
+      "changes": [
+        {
+          "tick": 21,
+          "blocks": [
+            [
+              1,
+              2,
+              1,
+              "minecraft:lever[face=floor,facing=north,powered=false]",
+              "minecraft:lever[face=floor,facing=north,powered=true]"
+            ],
+            [
+              2,
+              1,
+              1,
+              "minecraft:iron_trapdoor[facing=east,half=top,open=false,powered=false,waterlogged=false]",
+              "minecraft:iron_trapdoor[facing=east,half=top,open=true,powered=true,waterlogged=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 22,
+          "blocks": [
+            [
+              3,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=false]",
+              "minecraft:observer[facing=west,powered=true]"
+            ]
+          ]
+        },
+        {
+          "tick": 24,
+          "blocks": [
+            [
+              3,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=true]",
+              "minecraft:observer[facing=west,powered=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 41,
+          "blocks": [
+            [
+              1,
+              2,
+              1,
+              "minecraft:lever[face=floor,facing=north,powered=true]",
+              "minecraft:lever[face=floor,facing=north,powered=false]"
+            ],
+            [
+              2,
+              1,
+              1,
+              "minecraft:iron_trapdoor[facing=east,half=top,open=true,powered=true,waterlogged=false]",
+              "minecraft:iron_trapdoor[facing=east,half=top,open=false,powered=false,waterlogged=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 42,
+          "blocks": [
+            [
+              3,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=false]",
+              "minecraft:observer[facing=west,powered=true]"
+            ]
+          ]
+        },
+        {
+          "tick": 44,
+          "blocks": [
+            [
+              3,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=true]",
+              "minecraft:observer[facing=west,powered=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 61,
+          "blocks": [
+            [
+              1,
+              2,
+              1,
+              "minecraft:lever[face=floor,facing=north,powered=false]",
+              "minecraft:lever[face=floor,facing=north,powered=true]"
+            ],
+            [
+              2,
+              1,
+              1,
+              "minecraft:iron_trapdoor[facing=east,half=top,open=false,powered=false,waterlogged=false]",
+              "minecraft:iron_trapdoor[facing=east,half=top,open=true,powered=true,waterlogged=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 62,
+          "blocks": [
+            [
+              3,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=false]",
+              "minecraft:observer[facing=west,powered=true]"
+            ]
+          ]
+        },
+        {
+          "tick": 64,
+          "blocks": [
+            [
+              3,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=true]",
+              "minecraft:observer[facing=west,powered=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 81,
+          "blocks": [
+            [
+              1,
+              2,
+              1,
+              "minecraft:lever[face=floor,facing=north,powered=true]",
+              "minecraft:lever[face=floor,facing=north,powered=false]"
+            ],
+            [
+              2,
+              1,
+              1,
+              "minecraft:iron_trapdoor[facing=east,half=top,open=true,powered=true,waterlogged=false]",
+              "minecraft:iron_trapdoor[facing=east,half=top,open=false,powered=false,waterlogged=false]"
+            ]
+          ]
+        },
+        {
+          "tick": 82,
+          "blocks": [
+            [
+              3,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=false]",
+              "minecraft:observer[facing=west,powered=true]"
+            ]
+          ]
+        },
+        {
+          "tick": 84,
+          "blocks": [
+            [
+              3,
+              1,
+              1,
+              "minecraft:observer[facing=west,powered=true]",
+              "minecraft:observer[facing=west,powered=false]"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "case": "synthetic_iron_trapdoor_observer_idle",
+      "capture_sha256": "542cec4ce29be69fd864d62300109a7a3f2ce4008c5d995f0a34abd5af9834a6",
+      "scenario_sha256": "644ccae77bbd54ef127f1ee8284a338211fdf765b41585c62d0ca6bf9065184e",
+      "source": {
+        "sha256": "870106c043ed01f2dd6eeba3924e4ed11cb45c85de1925fab67eb5645fc78150",
+        "data_version": 4671,
+        "kind": "synthetic_minimized_fixture",
+        "fixture_path": "docs/performance/schematic-candidates/plot-validation/component-oracles/iron_trapdoor-fixture.json"
+      },
+      "origin": [
+        0,
+        100,
+        0
+      ],
+      "capture_ticks": 100,
+      "actions": [],
+      "initial": [
+        [
+          1,
+          1,
+          1,
+          "minecraft:cyan_wool"
+        ],
+        [
+          2,
+          1,
+          1,
+          "minecraft:iron_trapdoor[facing=east,half=top,open=false,powered=false,waterlogged=false]"
+        ],
+        [
+          3,
+          1,
+          1,
+          "minecraft:observer[facing=west,powered=false]"
+        ],
+        [
+          1,
+          2,
+          1,
+          "minecraft:lever[face=floor,facing=north,powered=false]"
+        ]
+      ],
+      "changes": []
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "DataVersion": 4671,
+  "size": [
+    4,
+    3,
+    3
+  ],
+  "palette": [
+    {
+      "Name": "minecraft:cyan_wool"
+    },
+    {
+      "Name": "minecraft:iron_trapdoor",
+      "Properties": {
+        "facing": "east",
+        "half": "top",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    {
+      "Name": "minecraft:observer",
+      "Properties": {
+        "facing": "west",
+        "powered": "false"
+      }
+    },
+    {
+      "Name": "minecraft:lever",
+      "Properties": {
+        "face": "floor",
+        "facing": "north",
+        "powered": "false"
+      }
+    }
+  ],
+  "blocks": [
+    {
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        2,
+        1,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        3,
+        1,
+        1
+      ],
+      "state": 2
+    },
+    {
+      "pos": [
+        1,
+        2,
+        1
+      ],
+      "state": 3
+    }
+  ],
+  "entities": []
+}
