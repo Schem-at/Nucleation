@@ -76,7 +76,7 @@ The browser checks search for the exact supplied hipster, display its actual
 thumbnail and evidence, exercise collection downloads, and advance its live
 simulation. They do not claim browser vanilla parity.
 
-See [Atlas instructions](../../../apps/schematic-atlas/README.md) for importing,
+See [Atlas instructions](https://github.com/Schem-at/Nucleation/blob/master/apps/schematic-atlas/README.md) for importing,
 reindexing, exporting and running an individual protocol. Recreating native and
 vanilla evidence requires the separately retained archive; a Git clone alone
 does not contain the user's source files or reference captures.
