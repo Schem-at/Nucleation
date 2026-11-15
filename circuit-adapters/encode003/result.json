@@ -1,0 +1,1578 @@
+{
+  "adapter": "encode003",
+  "benchmark": {
+    "clock": "elapsed_monotonic",
+    "excludes": "load, setup, checkpoint restore, assertions, destruction, rendering, export",
+    "includes": "typed drive, real simulation ticks, named output reads and result collection",
+    "iterations": 1,
+    "samples_ns": [],
+    "warmups": 0
+  },
+  "coordinates": "production export bounding-box-relative; explicit hash_origin preserves world-dependent order",
+  "hash_origin": [
+    0,
+    0,
+    0
+  ],
+  "observations": [
+    {
+      "code": 0
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 0
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    },
+    {
+      "code": 15
+    }
+  ],
+  "oracle": "All16 programming crosspoints contain north-facing wall torches; each input has a west-facing inversion torch, so each selected row encodes1111; outputs are a wired OR. All16 inputs and all256 ordered settled transitions;513 operations. Expected values are independent of mc-tick.",
+  "output_assertions_per_run": 513,
+  "profile_sha256": "cca54d74ced28eb9047beeef8309fe60486347789ab187f592201f5a997c2f0f",
+  "random_tick_speed": 0,
+  "recording": "disabled",
+  "reset_replay": "exact_checkpoint_and_outputs",
+  "response_game_ticks": 32,
+  "rng_seed": 0,
+  "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+  "schema_version": 1,
+  "scope": "engine endpoint functionality under this fixed protocol; not a vanilla comparison or minimal latency proof",
+  "setup_game_ticks": 32,
+  "source_data_version": 4189,
+  "source_file": "ENCODE003_encode_h2h.schem",
+  "source_sha256": "5cd4e0fe2b8eab183a5d5d925ffc4d2703f6796d8c055799577e9093f4b7505f",
+  "status": "functional_pass",
+  "suite_sha256": "7bfe8b1e0690babcfcbe84a74a1c4f20bd1a6ff041447fd5bc6966eec04b43c4",
+  "ticks_per_iteration": 16416,
+  "vectors": 513,
+  "process_returncode": 0
+}

@@ -10,6 +10,16 @@ benchmarks. Original archive files are retained unchanged outside Git.
 | `add005` | `a: u8`, `b: u8`, `cin: bool` | `sum: u8`, `cout: bool` | 32 game ticks |
 | `othercomb017` | `a: u8`, `b: u8` | `equal`, `less`, `greater`: bool | 24 game ticks |
 | `plot-lamp2x2` | `closed: bool` | `air_mask: u4` (15=open, 0=closed) | 160 game ticks |
+| `add003` | `a: u8`, `b: u8`, `cin: bool` | `sum: u8`, `cout: bool` | 32 game ticks |
+| `add008` | `a`, `b`, `cin`: bool | `sum`, `cout`: bool | 32 game ticks |
+| `alu001` | `a: u8`, `b: u8`, `operation: u11` (one-hot) | `out: u8` | 64 game ticks |
+| `othercomb001` | `value: u4` | `result: u4` (decrement) | 32 game ticks |
+| `othercomb003` | `value: u4` | `result: u4` (negate) | 32 game ticks |
+| `othercomb004` | `value: u4` | `result: u4` (increment) | 32 game ticks |
+| `encode001`, `encode003` | `selected: u4` | `code: u4` (saved matrix) | 32 game ticks |
+| `decode004` | `data: u4` | `matches: u4`, `input_echo: u4` | 32 game ticks |
+| `lff006` | `data: bool`, `capture: bool` (button press) | `stored: bool` | 64 game ticks |
+
 
 These conservative observation windows are not minimal latency measurements.
 The adder has 328 deterministic vectors (both carry values, boundaries, bit
@@ -43,6 +53,9 @@ without checking that origin.
 
 - Ordered input ports and LSB-first bit positions. Actual lever pulls happen in
   this order before the next game tick, with no settling between individual bits.
+  Optional `inputs` drivers add `button_press`: true presses once, false does
+  nothing; the engine releases it. Pressing an already powered button is rejected
+  before any input mutation. Omitted drivers retain lever-level behavior.
 - Strict boolean/unsigned input validation. Out-of-range, missing or extra values
   fail before actions. Missing levers and output lamps fail explicitly.
 - Setup ticks, response ticks, quiescence requirement, seed and reset behavior.
@@ -56,8 +69,16 @@ without checking that origin.
 `python3 tools/generate_tick_adapter_suites.py`; `--check` detects drift. Never
 generate expected values from the simulator under test. For sequential builds,
 preserve operation order and author reset/clock semantics rather than treating
-each input as a combinational call. Buttons, inventory operations and moving
-reference frames need explicit adapter extensions before admission.
+each input as a combinational call. The latch explicitly settles data before
+pressing its real button. Inventory operations and moving reference frames still
+need explicit adapter extensions before admission. Per-build `oracle.py` and
+`mapping.md` explain expected-answer generation and physical port evidence.
+
+The saved encoder matrices have every crosspoint enabled: their output is 15 for
+any nonzero selection, otherwise zero. All four decoder rows match 10. ALU
+right-shift coverage is restricted to `b=0`; other selectors use the documented
+sampled operands. These contracts preserve the original builds, including their
+programming, and do not imply arbitrary programming or exhaustive 8-bit coverage.
 
 The native runner checks all vectors, resets, and requires the repeated outputs
 **and full engine checkpoint** to match. Benchmark samples include typed input

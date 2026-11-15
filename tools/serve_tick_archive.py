@@ -106,6 +106,8 @@ class Archive:
             self.adapters[profile['source_sha256']] = {
                 'id': path.parent.name, 'profile': profile, 'vectors': len(suite['vectors']),
                 'oracle': suite['oracle'], 'result': result,
+                'oracle_code': path.with_name('oracle.py').is_file(),
+                'mapping_notes': path.with_name('mapping.md').is_file(),
             }
         self.captures = {}
         for label, folder in [('Comparator · vanilla', 'vanilla-comparator'), ('Interlocking door · two cycles', 'vanilla-cycle'), ('Interlocking door · idle control', 'vanilla-idle')]:
@@ -275,6 +277,8 @@ def main():
                              'result.json': REPO / 'circuit-adapters' / adapter_id / 'result.json',
                              'runner.rs': REPO / 'examples/run_tick_adapter.rs',
                              'implementation.rs': REPO / 'src/tick_adapter.rs',
+                             'oracle.py': REPO / 'circuit-adapters' / adapter_id / 'oracle.py',
+                             'mapping.md': REPO / 'circuit-adapters' / adapter_id / 'mapping.md',
                              'README.md': REPO / 'circuit-adapters/README.md'}
                     if name not in files: return self.json({'error':'Unknown adapter file'}, 404)
                     return self.file(files[name], name)

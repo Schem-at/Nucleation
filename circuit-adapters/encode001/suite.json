@@ -1,0 +1,4111 @@
+{
+  "schema_version": 1,
+  "adapter": "encode001",
+  "oracle": "All16 programming crosspoints contain east-facing repeaters, so each selected row encodes1111; outputs are a wired OR. All16 inputs and all256 ordered settled transitions;513 operations. Expected values are independent of mc-tick.",
+  "vectors": [
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 0
+      },
+      "expected": {
+        "code": 0
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 1
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 2
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 3
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 4
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 5
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 6
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 7
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 8
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 9
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 10
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 11
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 12
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 13
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 14
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    },
+    {
+      "inputs": {
+        "selected": 15
+      },
+      "expected": {
+        "code": 15
+      }
+    }
+  ]
+}

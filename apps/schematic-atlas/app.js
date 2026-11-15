@@ -391,9 +391,11 @@ function renderProperties() {
         content.append(el('p', 'detail-note', direction), el('code', 'hash-label', Object.entries(ports).map(([name, mapping]) => `${name}: ${typeName(mapping.io_type)}`).join(' · ')));
       }
       content.append(facts([['Response window', `${profile.response_ticks} game ticks`], ['Test vectors', adapter.vectors], ['Latest adapter check', adapter.result?.status || 'Not recorded'], ['Reset', 'Restore initialized checkpoint']]));
+      const pressInputs = Object.entries(profile.inputs || {}).filter(([, driver]) => driver === 'button_press').map(([name]) => name);
+      if (pressInputs.length) content.append(el('p', 'detail-note', `${pressInputs.join(', ')}: true presses the saved button once; false waits. The engine handles release. Sequence order and data setup are explicit in the test vectors.`));
       content.append(el('p', 'detail-note', adapter.oracle), el('p', 'detail-note', 'Runs the real circuit with named ports. Fixed response windows are not minimal latency measurements. Native tests and benchmarks use the same adapter.'));
       const links = el('div', 'tag-list');
-      for (const [file,label] of [['adapter.json','Contract'],['suite.json','Test vectors'],['runner.rs','Runner code'],['implementation.rs','Adapter code'],['README.md','Run instructions'],...(adapter.result ? [['result.json','Recorded result']] : [])]) {
+      for (const [file,label] of [['adapter.json','Contract'],['suite.json','Test vectors'],['runner.rs','Runner code'],['implementation.rs','Adapter code'],...(adapter.oracle_code ? [['oracle.py','Expected-answer code']] : []),...(adapter.mapping_notes ? [['mapping.md','Port mapping']] : []),['README.md','Run instructions'],...(adapter.result ? [['result.json','Recorded result']] : [])]) {
         const link=el('a','button secondary',label); link.href=`/api/adapter-file/${encodeURIComponent(adapter.id)}/${file}`; link.target='_blank'; link.rel='noopener'; links.append(link);
       }
       content.append(links);

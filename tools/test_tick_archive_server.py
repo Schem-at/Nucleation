@@ -105,7 +105,10 @@ def main():
         original = [r for r in rows if r['source'] not in {'world-record-parts', 'world-record-floor-parts'}]
         oracle = json.loads((server.REPO / 'docs/performance/schematic-candidates/plot-validation/oracle-results.json').read_text())
         admitted = {c['source_sha256'] for c in oracle['cases'] if c['benchmark_admission']=='accepted'}
-        expected = {'layout_files':3864, 'validated':4+len(admitted)}
+        adapter_sources = {json.loads(p.read_text())['source_sha256']
+                           for p in (server.REPO / 'circuit-adapters').glob('*/adapter.json')}
+        expected_validated = admitted | adapter_sources
+        expected = {'layout_files':3864, 'validated':len(expected_validated)}
         for key, value in expected.items():require(library['summary'][key] == value, f'{key} != {value}')
         schematic = [r for r in rows if r['kind'] == 'schematic']
         original_schematic = [r for r in original if r['kind'] == 'schematic']
@@ -113,7 +116,7 @@ def main():
         require(len(schematic) == library['summary']['schematic_files'] and len({r['sha256'] for r in schematic}) == library['summary']['unique_schematics'], 'Summary disagrees with actual schematic rows')
         require(sum(r['kind'] == 'layout' for r in rows) == 3864, 'Layout row count differs')
         validated = {r['sha256'] for r in rows if r.get('validation_status') in PASS_STATUSES}
-        require(len(validated) == 4+len(admitted), 'Validated count must match distinct functional evidence')
+        require(validated == expected_validated, 'Validated sources must match distinct functional evidence')
         require(admitted.issubset(validated), 'Oracle-admitted source is missing validation')
         require(len({r['source'] for r in rows}) == library['summary']['sources'], 'Source count differs')
         require(all(r['id'] == r['sha256'] for r in rows), 'Entry ID is not the content hash')
@@ -136,9 +139,14 @@ def main():
             require(result['reset_replay'] == 'exact_checkpoint_and_outputs', 'Missing deterministic reset check')
             runner = request(f'/api/adapter-file/{record["id"]}/runner.rs')
             require(sha(runner) == sha((server.REPO/'examples/run_tick_adapter.rs').read_bytes()), 'Wrong runner source')
+            for filename, flag in [('oracle.py', 'oracle_code'), ('mapping.md', 'mapping_notes')]:
+                if record.get(flag):
+                    data = request(f'/api/adapter-file/{record["id"]}/{filename}')
+                    require(data == profile_path.with_name(filename).read_bytes(), f'Wrong {filename}')
             request(f'/api/adapter-file/{record["id"]}/not-allowed', status=404)
             observed.append({'adapter':record['id'],'vectors':record['vectors'],'sha256':profile['source_sha256']})
-        require(len(observed) == 3, 'Expected arithmetic, comparator and door adapters')
+        require({'add005', 'othercomb017', 'plot-lamp2x2'}.issubset({r['adapter'] for r in observed}),
+                'Existing arithmetic, comparator and door adapters must remain available')
         return observed
     check('source-pinned adapters, code, suites and recorded checks', adapters)
 

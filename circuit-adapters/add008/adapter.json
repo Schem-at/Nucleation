@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "id": "add008",
+  "source_sha256": "c18b62e0010cf03f5a5c0bd81d79197ba90a0666bf8411af91a12f02249ef0e9",
+  "source_data_version": 4189,
+  "description": "One-bit ripple carry full adder; exhaustive Boolean endpoints and directed transitions",
+  "evidence": [
+    "Source README specifies A, B, Cin -> Sum, Cout; the two cascaded XOR stages identify the far sum lamp.",
+    "The middle north lamp is the carry-merge output. Input indicator lamps are excluded.",
+    "32 game ticks is a conservative endpoint budget, not a minimum-latency claim.",
+    "Original save DataVersion 4189 is preserved. These are functional arithmetic checks, not a fresh vanilla comparison."
+  ],
+  "cell": {
+    "name": "add008",
+    "version": "1",
+    "io": {
+      "inputs": {
+        "a": {
+          "io_type": "Boolean",
+          "layout": "OneToOne",
+          "positions": [
+            [
+              0,
+              2,
+              2
+            ]
+          ]
+        },
+        "b": {
+          "io_type": "Boolean",
+          "layout": "OneToOne",
+          "positions": [
+            [
+              0,
+              2,
+              4
+            ]
+          ]
+        },
+        "cin": {
+          "io_type": "Boolean",
+          "layout": "OneToOne",
+          "positions": [
+            [
+              6,
+              2,
+              6
+            ]
+          ]
+        }
+      },
+      "outputs": {
+        "sum": {
+          "io_type": "Boolean",
+          "layout": "OneToOne",
+          "positions": [
+            [
+              12,
+              1,
+              3
+            ]
+          ]
+        },
+        "cout": {
+          "io_type": "Boolean",
+          "layout": "OneToOne",
+          "positions": [
+            [
+              6,
+              1,
+              0
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "input_order": [
+    "a",
+    "b",
+    "cin"
+  ],
+  "outputs": {
+    "sum": "lamp_lit",
+    "cout": "lamp_lit"
+  },
+  "setup_ticks": 128,
+  "response_ticks": 32,
+  "require_quiescent": true,
+  "rng_seed": 0,
+  "hash_origin": [
+    0,
+    0,
+    0
+  ]
+}

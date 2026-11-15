@@ -1,0 +1,432 @@
+{
+  "adapter": "lff006",
+  "benchmark": {
+    "clock": "elapsed_monotonic",
+    "excludes": "load, setup, checkpoint restore, assertions, destruction, rendering, export",
+    "includes": "typed drive, real simulation ticks, named output reads and result collection",
+    "iterations": 1,
+    "samples_ns": [],
+    "warmups": 0
+  },
+  "coordinates": "production export bounding-box-relative; explicit hash_origin preserves world-dependent order",
+  "hash_origin": [
+    0,
+    0,
+    0
+  ],
+  "observations": [
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": false
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    },
+    {
+      "stored": true
+    }
+  ],
+  "oracle": "Independent sequential stored bit: capture=true performs one actual button pulse and stores stable data; capture=false preserves the previous bit. Both polarities, hold across input transitions, duplicate holds, and repeated writes; no edge-latency or fresh vanilla-parity claim.",
+  "output_assertions_per_run": 131,
+  "profile_sha256": "b17e5067256b40795f0d74fb96f5f4ab95a63ec9b4efcc8fb19e6b6f0d8bc47d",
+  "random_tick_speed": 0,
+  "recording": "disabled",
+  "reset_replay": "exact_checkpoint_and_outputs",
+  "response_game_ticks": 64,
+  "rng_seed": 0,
+  "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+  "schema_version": 1,
+  "scope": "engine endpoint functionality under this fixed protocol; not a vanilla comparison or minimal latency proof",
+  "setup_game_ticks": 128,
+  "source_data_version": 4189,
+  "source_file": "LFF006_dlatch.schem",
+  "source_sha256": "0663302dfc40ac8c33055d5a43aefe834be4290bdda9baaec6f2ccab238cad54",
+  "status": "functional_pass",
+  "suite_sha256": "b1605b112a8e7d6beb112f1d7f81b7834f0e3138956f9ad9e30c9c43c6d7e7a3",
+  "ticks_per_iteration": 8384,
+  "vectors": 131,
+  "process_returncode": 0
+}

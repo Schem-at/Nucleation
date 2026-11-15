@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Deterministic arithmetic expectations; no simulation results are consulted."""
 import argparse
+import importlib.util
 import json
 from pathlib import Path
 
@@ -31,6 +32,16 @@ def generate():
     yield 'othercomb017/suite.json', {'schema_version':1,'adapter':'othercomb017',
           'oracle':'Independent Python integer ==, <, >; 40 fixed phase endpoints, not exhaustive.',
           'vectors':[{'inputs':{'a':a,'b':b},'expected':{'equal':a==b,'less':a<b,'greater':a>b}} for a,b in pairs]}
+    # These are trusted, reviewed repository oracle implementations, not
+    # downloaded schematic code. They use arithmetic/logic, never the simulator.
+    for path in sorted(ROOT.glob('*/oracle.py')):
+        spec = importlib.util.spec_from_file_location('tick_oracle_'+path.parent.name, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        suite = module.generate()
+        if suite.get('adapter') != path.parent.name or suite.get('schema_version') != 1 or not suite.get('vectors'):
+            raise ValueError(f'invalid generated suite: {path}')
+        yield f'{path.parent.name}/suite.json', suite
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser(); p.add_argument('--check', action='store_true'); a=p.parse_args()

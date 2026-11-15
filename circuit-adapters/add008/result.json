@@ -1,0 +1,583 @@
+{
+  "adapter": "add008",
+  "benchmark": {
+    "clock": "elapsed_monotonic",
+    "excludes": "load, setup, checkpoint restore, assertions, destruction, rendering, export",
+    "includes": "typed drive, real simulation ticks, named output reads and result collection",
+    "iterations": 1,
+    "samples_ns": [],
+    "warmups": 0
+  },
+  "coordinates": "production export bounding-box-relative; explicit hash_origin preserves world-dependent order",
+  "hash_origin": [
+    0,
+    0,
+    0
+  ],
+  "observations": [
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": false,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": false
+    },
+    {
+      "cout": true,
+      "sum": true
+    },
+    {
+      "cout": true,
+      "sum": true
+    }
+  ],
+  "oracle": "Independent three-Boolean integer sum: sum=bool(total&1); cout=total>=2. All eight input combinations and all 64 directed endpoint transitions, including unchanged inputs.",
+  "output_assertions_per_run": 272,
+  "profile_sha256": "31ed7c899868d57102e9162c64ba8d1d5f0c9964859dab2016657d6e20a4952f",
+  "random_tick_speed": 0,
+  "recording": "disabled",
+  "reset_replay": "exact_checkpoint_and_outputs",
+  "response_game_ticks": 32,
+  "rng_seed": 0,
+  "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+  "schema_version": 1,
+  "scope": "engine endpoint functionality under this fixed protocol; not a vanilla comparison or minimal latency proof",
+  "setup_game_ticks": 128,
+  "source_data_version": 4189,
+  "source_file": "ADD008_rca.schem",
+  "source_sha256": "c18b62e0010cf03f5a5c0bd81d79197ba90a0666bf8411af91a12f02249ef0e9",
+  "status": "functional_pass",
+  "suite_sha256": "561e2cf8a2257cad965ea842699e2faacd87daf21c0f120884928bb8927e73c5",
+  "ticks_per_iteration": 4352,
+  "vectors": 136,
+  "process_returncode": 0
+}

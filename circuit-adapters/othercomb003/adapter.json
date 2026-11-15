@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "id": "othercomb003",
+  "source_sha256": "3980438cd8e22834eb9b0aa1e08472ec220b4cb216eca72b409253c27faaa109",
+  "source_data_version": 4189,
+  "description": "4-bit two\u2019s-complement negator",
+  "evidence": [
+    "Original Logical Redstone Archive OTHERCOMB003 README declares: Outputs inverted input plus one, modulo16.",
+    "Original Sponge v3 source inspected, SHA-256 3980438cd8e22834eb9b0aa1e08472ec220b4cb216eca72b409253c27faaa109, DataVersion4189 retained; no source substitutions or repairs.",
+    "No sign labels are present. Port coordinates and programming geometry were fixed from NBT before simulation; see mapping.md.",
+    "Arithmetic bit order follows bottom-to-top carry/borrow propagation; output row is two blocks below its input row.",
+    "Functional truth-table checks are not a Minecraft vanilla parity claim; response window is conservative, not a measured minimum latency."
+  ],
+  "cell": {
+    "name": "othercomb003",
+    "version": "1",
+    "io": {
+      "inputs": {
+        "value": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 4
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              1,
+              3,
+              1
+            ],
+            [
+              1,
+              5,
+              1
+            ],
+            [
+              1,
+              7,
+              1
+            ],
+            [
+              1,
+              9,
+              1
+            ]
+          ]
+        }
+      },
+      "outputs": {
+        "result": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 4
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              1,
+              1,
+              7
+            ],
+            [
+              1,
+              3,
+              7
+            ],
+            [
+              1,
+              5,
+              7
+            ],
+            [
+              1,
+              7,
+              7
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "input_order": [
+    "value"
+  ],
+  "outputs": {
+    "result": "lamp_lit"
+  },
+  "setup_ticks": 32,
+  "response_ticks": 32,
+  "require_quiescent": true,
+  "rng_seed": 0,
+  "hash_origin": [
+    0,
+    0,
+    0
+  ]
+}

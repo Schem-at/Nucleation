@@ -1,0 +1,1578 @@
+{
+  "adapter": "othercomb003",
+  "benchmark": {
+    "clock": "elapsed_monotonic",
+    "excludes": "load, setup, checkpoint restore, assertions, destruction, rendering, export",
+    "includes": "typed drive, real simulation ticks, named output reads and result collection",
+    "iterations": 1,
+    "samples_ns": [],
+    "warmups": 0
+  },
+  "coordinates": "production export bounding-box-relative; explicit hash_origin preserves world-dependent order",
+  "hash_origin": [
+    0,
+    0,
+    0
+  ],
+  "observations": [
+    {
+      "result": 0
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 0
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 15
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 14
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 13
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 12
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 11
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 10
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 9
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 8
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 7
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 6
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 5
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 4
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 3
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 2
+    },
+    {
+      "result": 1
+    },
+    {
+      "result": 1
+    }
+  ],
+  "oracle": "Outputs inverted input plus one, modulo16. All16 inputs and all256 ordered settled transitions;513 operations. Expected values are independent of mc-tick.",
+  "output_assertions_per_run": 513,
+  "profile_sha256": "3e4a3ce0b82c9892c66055e186b6be22ab4b0f5c3c65f3178578f4cb438d9ec6",
+  "random_tick_speed": 0,
+  "recording": "disabled",
+  "reset_replay": "exact_checkpoint_and_outputs",
+  "response_game_ticks": 32,
+  "rng_seed": 0,
+  "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+  "schema_version": 1,
+  "scope": "engine endpoint functionality under this fixed protocol; not a vanilla comparison or minimal latency proof",
+  "setup_game_ticks": 32,
+  "source_data_version": 4189,
+  "source_file": "OTHERCOMB003_negator.schem",
+  "source_sha256": "3980438cd8e22834eb9b0aa1e08472ec220b4cb216eca72b409253c27faaa109",
+  "status": "functional_pass",
+  "suite_sha256": "1e27792fbff74f589b0905599076d7a12685d6bb426594a292b573ed3579b8ed",
+  "ticks_per_iteration": 16416,
+  "vectors": 513,
+  "process_returncode": 0
+}

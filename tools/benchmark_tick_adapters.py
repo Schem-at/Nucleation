@@ -28,6 +28,7 @@ def main():
     p.add_argument('--rounds',type=int,default=21)
     p.add_argument('--cpu',type=int)
     p.add_argument('--target-ms',type=float,default=150)
+    p.add_argument('--adapter',action='append',help='Restrict to named adapters (default: all)')
     a=p.parse_args()
     if not 1<=a.rounds<=1000 or not 1<=a.target_ms<=10000: p.error('invalid sample bounds')
     allowed=sorted(os.sched_getaffinity(0))
@@ -41,9 +42,11 @@ def main():
     by_sha={r['sha256']:r for r in library['entries']}
     cases=[]
     for profile in sorted((ROOT/'circuit-adapters').glob('*/adapter.json')):
+        if a.adapter and profile.parent.name not in a.adapter: continue
         data=json.loads(profile.read_text()); source=(archive/by_sha[data['source_sha256']]['local_path']).resolve()
         if not source.is_relative_to(archive) or digest(source)!=data['source_sha256']: raise ValueError('source mismatch')
         cases.append({'id':data['id'],'profile':profile,'source':source,'suite':profile.with_name('suite.json')})
+    if not cases or (a.adapter and {c['id'] for c in cases} != set(a.adapter)): p.error('unknown or empty adapter selection')
     def run(case,iterations,label):
         cmd=[str(binary),str(case['profile']),str(case['source']),str(case['suite']),'1',str(iterations)]
         result=subprocess.run(cmd,capture_output=True,text=True,timeout=600)
@@ -52,6 +55,8 @@ def main():
         data=json.loads(result.stdout)
         if result.returncode or data['status']!='functional_pass': raise RuntimeError(f'failed {label}')
         if digest(binary)!=binary_hash or data['runner_sha256']!=binary_hash: raise RuntimeError('binary changed during run')
+        if any(data.get(k) != v for k,v in meta['cases'][case['id']].items()):
+            raise RuntimeError(f'profile, suite or original changed during {label}')
         return data
     binary_hash=digest(binary)
     compiler=subprocess.check_output(['rustc','-Vv'],text=True)
@@ -59,6 +64,7 @@ def main():
           'cpu':cpu,'permitted_cpus':allowed,'cpuinfo':Path('/proc/cpuinfo').read_text(),
           'binary_sha256':binary_hash,'rounds':a.rounds,'seed':20261115,'target_ms':a.target_ms,
           'clock':'elapsed_monotonic','scope':'single-threaded adapter throughput; no rendering, no cross-engine speedup claim',
+          'benchmark_script_sha256':digest(Path(__file__)),
           'method':'one verified untimed warmup/sample process; reset and assertions outside timers; no dropped samples',
           'cases':{c['id']:{'profile_sha256':digest(c['profile']),'suite_sha256':digest(c['suite']),'source_sha256':digest(c['source'])} for c in cases}}
     save(a.output/'metadata.json',meta)

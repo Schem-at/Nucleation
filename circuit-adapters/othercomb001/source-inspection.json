@@ -1,0 +1,88 @@
+{
+  "source": "sources/logical-redstone-archive/files/Archive/OTHERCOMB_other-combinational/OTHERCOMB001_Decrementor/attachments/OTHERCOMB001_decrementor.schem",
+  "source_sha256": "298c115dba3df03002a07a1c4e3e5a22e1237cdeca1d2057ac2ede95649ea9e8",
+  "source_readme_sha256": "7bc571faa01d6952a28df9af2b656394a7362320f9fb762acfc6f14b08c51339",
+  "data_version": 4189,
+  "dimensions": [
+    7,
+    9,
+    4
+  ],
+  "sponge_offset": [
+    -3,
+    -10,
+    -1
+  ],
+  "controls": [
+    {
+      "pos": [
+        0,
+        2,
+        2
+      ],
+      "state": "minecraft:lever[face=wall,facing=west,powered=true]"
+    },
+    {
+      "pos": [
+        0,
+        4,
+        2
+      ],
+      "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+    },
+    {
+      "pos": [
+        0,
+        6,
+        2
+      ],
+      "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+    },
+    {
+      "pos": [
+        0,
+        8,
+        2
+      ],
+      "state": "minecraft:lever[face=wall,facing=west,powered=false]"
+    }
+  ],
+  "lamps": [
+    {
+      "pos": [
+        6,
+        0,
+        2
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        6,
+        2,
+        2
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        6,
+        4,
+        2
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        6,
+        6,
+        2
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    }
+  ],
+  "signs": [],
+  "programming_cells": [],
+  "block_entity_count": 8,
+  "entity_count": 0
+}

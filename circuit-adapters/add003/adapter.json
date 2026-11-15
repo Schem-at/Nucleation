@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "id": "add003",
+  "source_sha256": "9046ececdca2d7fd481d2f70a679af6e2c4fe1c13bc87ad66cdbdf950dd4faa8",
+  "source_data_version": 4189,
+  "description": "Fast 8-bit carry cancel adder with carry input and output",
+  "evidence": [
+    "NBT signs label input and sum bit weights 1..128 and the upper COUT lamp.",
+    "The only extra lever feeds the bottom carry path; see mapping.md for static coordinates.",
+    "32 game ticks is a conservative endpoint budget, not a minimum-latency claim.",
+    "Original save DataVersion 4189 is preserved. These are functional arithmetic checks, not a fresh vanilla comparison."
+  ],
+  "cell": {
+    "name": "add003",
+    "version": "1",
+    "io": {
+      "inputs": {
+        "a": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 8
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              0,
+              2,
+              2
+            ],
+            [
+              0,
+              4,
+              2
+            ],
+            [
+              0,
+              6,
+              2
+            ],
+            [
+              0,
+              8,
+              2
+            ],
+            [
+              0,
+              10,
+              2
+            ],
+            [
+              0,
+              12,
+              2
+            ],
+            [
+              0,
+              14,
+              2
+            ],
+            [
+              0,
+              16,
+              2
+            ]
+          ]
+        },
+        "b": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 8
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              0,
+              2,
+              5
+            ],
+            [
+              0,
+              4,
+              5
+            ],
+            [
+              0,
+              6,
+              5
+            ],
+            [
+              0,
+              8,
+              5
+            ],
+            [
+              0,
+              10,
+              5
+            ],
+            [
+              0,
+              12,
+              5
+            ],
+            [
+              0,
+              14,
+              5
+            ],
+            [
+              0,
+              16,
+              5
+            ]
+          ]
+        },
+        "cin": {
+          "io_type": "Boolean",
+          "layout": "OneToOne",
+          "positions": [
+            [
+              6,
+              1,
+              4
+            ]
+          ]
+        }
+      },
+      "outputs": {
+        "sum": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 8
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              8,
+              1,
+              1
+            ],
+            [
+              8,
+              3,
+              1
+            ],
+            [
+              8,
+              5,
+              1
+            ],
+            [
+              8,
+              7,
+              1
+            ],
+            [
+              8,
+              9,
+              1
+            ],
+            [
+              8,
+              11,
+              1
+            ],
+            [
+              8,
+              13,
+              1
+            ],
+            [
+              8,
+              15,
+              1
+            ]
+          ]
+        },
+        "cout": {
+          "io_type": "Boolean",
+          "layout": "OneToOne",
+          "positions": [
+            [
+              8,
+              18,
+              1
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "input_order": [
+    "a",
+    "b",
+    "cin"
+  ],
+  "outputs": {
+    "sum": "lamp_lit",
+    "cout": "lamp_lit"
+  },
+  "setup_ticks": 128,
+  "response_ticks": 32,
+  "require_quiescent": true,
+  "rng_seed": 0,
+  "hash_origin": [
+    0,
+    0,
+    0
+  ]
+}

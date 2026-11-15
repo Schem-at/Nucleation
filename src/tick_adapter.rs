@@ -25,6 +25,10 @@ pub struct AdapterProfile {
     pub cell: CellContract,
     /// Every input exactly once; bits within a port follow its positions (LSB first).
     pub input_order: Vec<String>,
+    /// Omitted ports use lever levels. A button input is an operation: true
+    /// presses once, false leaves it alone; release is handled by the engine.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub inputs: BTreeMap<String, InputDriver>,
     pub outputs: BTreeMap<String, Observation>,
     pub setup_ticks: u64,
     pub response_ticks: u64,
@@ -32,6 +36,14 @@ pub struct AdapterProfile {
     pub rng_seed: i64,
     /// Original-world origin used for order-sensitive Java dust hashing.
     pub hash_origin: [i32; 3],
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InputDriver {
+    #[default]
+    Lever,
+    ButtonPress,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,6 +105,17 @@ impl AdapterProfile {
             || self.outputs.keys().collect::<BTreeSet<_>>() != self.cell.io.outputs.keys().collect()
         {
             return Err("every output needs an observation method".into());
+        }
+        for (name, driver) in &self.inputs {
+            let mapping = self
+                .cell
+                .io
+                .inputs
+                .get(name)
+                .ok_or_else(|| format!("driver names unknown input {name}"))?;
+            if *driver == InputDriver::ButtonPress && mapping.io_type != IoType::Boolean {
+                return Err(format!("button input {name} must be Boolean"));
+            }
         }
         // Validate supported types BEFORE generic layout arithmetic (untrusted JSON).
         for mapping in self
@@ -192,28 +215,40 @@ impl TickAdapter {
 
     fn descriptor(&self, p: (i32, i32, i32)) -> Result<&str, String> {
         if !self.sim.world().contains(Pos::new(p.0, p.1, p.2)) {
-            return Err(format!("observation/input {p:?} is outside the simulated world"));
+            return Err(format!(
+                "observation/input {p:?} is outside the simulated world"
+            ));
         }
         self.sim
             .registry()
             .descriptor(self.sim.world().get(Pos::new(p.0, p.1, p.2)))
             .ok_or_else(|| format!("missing state descriptor at {p:?}"))
     }
-    fn lever(&self, p: (i32, i32, i32)) -> Result<bool, String> {
+    fn control(&self, p: (i32, i32, i32), driver: InputDriver) -> Result<bool, String> {
         let d = self.descriptor(p)?;
-        if d.split('[').next() != Some("minecraft:lever") {
-            return Err(format!("input {p:?} requires an actual lever, got {d}"));
+        let block = d.split('[').next().unwrap_or(d);
+        let correct = match driver {
+            InputDriver::Lever => block == "minecraft:lever",
+            InputDriver::ButtonPress => {
+                block.starts_with("minecraft:") && block.ends_with("_button")
+            }
+        };
+        if !correct {
+            return Err(format!(
+                "input {p:?} requires actual {driver:?} hardware, got {d}"
+            ));
         }
         match property(d, "powered") {
             Some("true") => Ok(true),
             Some("false") => Ok(false),
-            _ => Err(format!("lever {p:?} has no boolean powered property")),
+            _ => Err(format!("control {p:?} has no boolean powered property")),
         }
     }
     fn validate_input_blocks(&self) -> Result<(), String> {
-        for mapping in self.profile.cell.io.inputs.values() {
+        for (name, mapping) in &self.profile.cell.io.inputs {
+            let driver = self.profile.inputs.get(name).copied().unwrap_or_default();
             for &p in &mapping.positions {
-                self.lever(p)?;
+                self.control(p, driver)?;
             }
         }
         Ok(())
@@ -233,20 +268,36 @@ impl TickAdapter {
         Ok(())
     }
 
-    /// Toggle differing lever bits in the declared order before the next game
-    /// tick, then step the fixed response budget. No settling between bits.
+    /// Toggle differing lever bits and press requested buttons in the declared
+    /// order before the next game tick, then step the fixed response budget.
+    /// No settling between inputs: data setup stages must be explicit in a suite.
     /// Invalid values or missing input hardware are rejected before any action.
     pub fn drive(&mut self, values: &Values) -> Result<(), String> {
         self.profile.validate_values(values, false)?;
         self.validate_input_blocks()?;
+        // Preflight every requested press before any lever mutation. A button
+        // already down cannot represent another edge; do not silently drop it.
+        for (name, driver) in &self.profile.inputs {
+            if *driver == InputDriver::ButtonPress && values[name].as_bool() == Some(true) {
+                let p = self.profile.cell.io.inputs[name].positions[0];
+                if self.control(p, *driver)? {
+                    return Err(format!("button {name} is already pressed"));
+                }
+            }
+        }
         for name in &self.profile.input_order {
             let m = &self.profile.cell.io.inputs[name];
+            let driver = self.profile.inputs.get(name).copied().unwrap_or_default();
             let bits = m.encode(&typed(&m.io_type, &values[name])?)?;
             for (&p, signal) in m.positions.iter().zip(bits) {
-                if self.lever(p)? != (signal > 0) {
+                let activate = match driver {
+                    InputDriver::Lever => self.control(p, driver)? != (signal > 0),
+                    InputDriver::ButtonPress => signal > 0,
+                };
+                if activate {
                     self.sim.use_block(Pos::new(p.0, p.1, p.2));
-                    if self.lever(p)? != (signal > 0) {
-                        return Err(format!("lever {p:?} did not switch"));
+                    if self.control(p, driver)? != (signal > 0) {
+                        return Err(format!("control {p:?} did not switch"));
                     }
                 }
             }
@@ -303,7 +354,16 @@ mod tests {
     use super::*;
     use crate::io_contract::IoLayoutBuilder;
     fn adapter() -> TickAdapter {
-        let s = mc_tick::Structure::parse(r#"{size:[3,2,1],palette:[{Name:"minecraft:stone"},{Name:"minecraft:lever",Properties:{face:"floor",facing:"north",powered:"false"}},{Name:"minecraft:redstone_lamp",Properties:{lit:"false"}}],blocks:[{pos:[0,0,0],state:0},{pos:[0,1,0],state:1},{pos:[1,1,0],state:2}],entities:[]}"#).unwrap();
+        adapter_with_driver(InputDriver::Lever)
+    }
+    fn adapter_with_driver(driver: InputDriver) -> TickAdapter {
+        let text = r#"{size:[3,2,1],palette:[{Name:"minecraft:stone"},{Name:"minecraft:lever",Properties:{face:"floor",facing:"north",powered:"false"}},{Name:"minecraft:redstone_lamp",Properties:{lit:"false"}}],blocks:[{pos:[0,0,0],state:0},{pos:[0,1,0],state:1},{pos:[1,1,0],state:2}],entities:[]}"#;
+        let text = if driver == InputDriver::ButtonPress {
+            text.replace("minecraft:lever", "minecraft:stone_button")
+        } else {
+            text.into()
+        };
+        let s = mc_tick::Structure::parse(&text).unwrap();
         let sim = mc_test::try_build_sim(
             &s,
             Pos::default(),
@@ -341,6 +401,7 @@ mod tests {
                 evidence: vec![],
                 cell: CellContract::new("test", io),
                 input_order: vec!["switch".into()],
+                inputs: BTreeMap::from([("switch".into(), driver)]),
                 outputs: BTreeMap::from([("lit".into(), Observation::LampLit)]),
                 setup_ticks: 4,
                 response_ticks: 8,
@@ -397,8 +458,53 @@ mod tests {
         let mut a = adapter();
         a.profile.outputs.insert("lit".into(), Observation::Air);
         a.profile.cell.io.outputs.get_mut("lit").unwrap().positions = vec![(i32::MAX, 0, 0)];
-        assert!(a.read().unwrap_err().contains("outside the simulated world"));
+        assert!(a
+            .read()
+            .unwrap_err()
+            .contains("outside the simulated world"));
         a.profile.cell.io.outputs.get_mut("lit").unwrap().positions = vec![(0, 1, 1)];
         assert_eq!(a.read().unwrap()["lit"], true);
+    }
+
+    #[test]
+    fn button_is_a_press_operation_with_real_automatic_release() {
+        let mut a = adapter_with_driver(InputDriver::ButtonPress);
+        a.profile.response_ticks = 1;
+        a.profile.require_quiescent = false;
+        let press = BTreeMap::from([("switch".into(), Json::from(true))]);
+        let wait = BTreeMap::from([("switch".into(), Json::from(false))]);
+        assert_eq!(a.execute(&press).unwrap()["lit"], true);
+        let pressed = a.simulation().checkpoint();
+        assert!(a.execute(&press).unwrap_err().contains("already pressed"));
+        assert_eq!(a.simulation().checkpoint(), pressed);
+        a.profile.response_ticks = 32;
+        a.profile.require_quiescent = true;
+        assert_eq!(a.execute(&wait).unwrap()["lit"], false);
+        assert!(!a.control((0, 1, 0), InputDriver::ButtonPress).unwrap());
+        a.reset();
+        a.execute(&press).unwrap();
+        let end = a.simulation().checkpoint();
+        a.reset();
+        a.execute(&press).unwrap();
+        assert_eq!(a.simulation().checkpoint(), end);
+    }
+
+    #[test]
+    fn button_driver_requires_one_boolean_and_rejects_wrong_hardware() {
+        let mut a = adapter();
+        a.profile
+            .inputs
+            .insert("switch".into(), InputDriver::ButtonPress);
+        assert!(a.validate_input_blocks().is_err());
+        a.profile.cell.io.inputs.get_mut("switch").unwrap().io_type =
+            IoType::UnsignedInt { bits: 1 };
+        assert!(a
+            .profile
+            .validate()
+            .unwrap_err()
+            .contains("must be Boolean"));
+        let mut p = adapter().profile().clone();
+        p.inputs.insert("typo".into(), InputDriver::ButtonPress);
+        assert!(p.validate().unwrap_err().contains("unknown input"));
     }
 }
