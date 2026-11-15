@@ -11,6 +11,12 @@ FEATURES = {
 }
 FEATURES['combined'] = list(dict.fromkeys(f for name, fs in FEATURES.items()
                                          if name != 'counters' for f in fs))
+FEATURES['plan_pool'] = ['experiment-wire-plan', 'experiment-update-pool']
+FEATURES['plan_pool_directional'] = FEATURES['plan_pool'] + ['experiment-directional']
+FEATURES['certificate_pool_directional'] = ['experiment-wire-certificate', 'experiment-update-pool', 'experiment-directional']
+FEATURES['all_no_dispatch'] = [f for f in FEATURES['combined'] if f != 'experiment-wire-dispatch']
+FEATURES['all_no_cursor'] = [f for f in FEATURES['combined'] if f != 'experiment-cursor']
+FEATURES['all_no_certificate'] = [f for f in FEATURES['combined'] if f != 'experiment-wire-certificate']
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--output', type=pathlib.Path, required=True)
 p.add_argument('--variants', nargs='+', choices=FEATURES, required=True)

@@ -94,3 +94,15 @@ per process on first use. Set them before simulation; changing them requires a
 new process. Public recording controls remain dynamic. `discard_recording()`
 drops ordinary block, inventory, entity and timeline recording while preserving
 simulation state and independent update recording; `record()` starts fresh logs.
+
+### Reversible execution experiments
+
+The `experiment-*` features are independent research switches, all disabled by
+default. Their contracts, measurements and rollback instructions are in the
+[execution experiment report](../../docs/performance/execution-plans/README.md).
+`MC_TICK_WIRE_PLAN=off|on|shadow` selects the plan/certificate path when compiled
+in and is sampled once per process. Shadow mode asserts equality against the
+ordinary calculation; it must be disabled for performance measurements. Use a
+build without experiment features for the full reference, since runtime `off`
+still retains compiled-in journal overhead. These features are not published
+compatibility promises; the pool feature adds a scratch field to `TickCtx`.

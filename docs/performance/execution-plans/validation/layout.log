@@ -1,0 +1,164 @@
+warning: function `snbt_for` is never used
+  --> crates/mc-tick/tests/flying_search.rs:51:4
+   |
+51 | fn snbt_for(rows: &[&[Cell]]) -> String {
+   |    ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `evaluate` is never used
+  --> crates/mc-tick/tests/flying_search.rs:95:4
+   |
+95 | fn evaluate(snbt: &str, ticks: u64) -> (i32, i32, usize) {
+   |    ^^^^^^^^
+
+warning: `mc-tick` (test "flying_search") generated 2 warnings
+warning: unused import: `Bounds`
+  --> crates/mc-tick/tests/piston_entity.rs:25:15
+   |
+25 | use mc_tick::{Bounds, Pos, Simulation};
+   |               ^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `WireWorld`
+    --> crates/mc-tick/src/vanilla.rs:4759:37
+     |
+4759 |         use crate::wire::{WireSide, WireWorld};
+     |                                     ^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `mc-tick` (test "piston_entity") generated 1 warning (run `cargo fix --test "piston_entity" -p mc-tick` to apply 1 suggestion)
+warning: `mc-tick` (lib test) generated 1 warning (run `cargo fix --lib -p mc-tick --tests` to apply 1 suggestion)
+warning: unreachable pattern
+   --> crates/mc-tick/tests/conformance.rs:465:13
+    |
+465 |             other => panic!(
+    |             ^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/mc-tick/tests/conformance.rs:465:13
+    |
+432 | ...     mc_tick::structure::SpawnedEntity::Item(item) => match raw_id {
+    |         --------------------------------------------- matches some of the same values
+...
+442 | ...     mc_tick::structure::SpawnedEntity::Minecart(cart) => {
+    |         ------------------------------------------------- matches some of the same values
+...
+445 | ...     mc_tick::structure::SpawnedEntity::FurnaceMinecart(cart) => sim
+    |         -------------------------------------------------------- matches some of the same values
+...
+452 | ...     mc_tick::structure::SpawnedEntity::Body(body) => {
+    |         --------------------------------------------- matches some of the same values
+...
+465 | ...     other => panic!(
+    |         ^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: `mc-tick` (test "conformance") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
+     Running unittests src/lib.rs (target/debug/deps/mc_tick-7dca9f1cfae3e831)
+
+running 1 test
+dispatch table entry bytes: 24 (dynamic baseline 16)
+test behaviour::tests::typed_registration_is_explicit_replaceable_and_send_sync ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 268 filtered out; finished in 0.00s
+
+     Running tests/cart_body.rs (target/debug/deps/cart_body-aaadd9944a95cecd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/cases.rs (target/debug/deps/cases-23278855b988cbad)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/circuit.rs (target/debug/deps/circuit-ef2730961773b033)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/conformance.rs (target/debug/deps/conformance-08cf5fa276afd491)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 81 filtered out; finished in 0.00s
+
+     Running tests/corpus.rs (target/debug/deps/corpus-50e3b034c985ac13)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/flying_search.rs (target/debug/deps/flying_search-35cc3f781dd9ed31)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/hand_place.rs (target/debug/deps/hand_place-572bb05a0b2a5c4d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/hipster_door.rs (target/debug/deps/hipster_door-00fd8e1017bdaa1c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/machine_graph.rs (target/debug/deps/machine_graph-9a1a7dd606a4f45e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+     Running tests/moving_blocks.rs (target/debug/deps/moving_blocks-23ca63ef20d17436)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/perf_probe.rs (target/debug/deps/perf_probe-7e6b02ef9f5907d6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/piston_entity.rs (target/debug/deps/piston_entity-9f70d65cbd2e0242)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/piston_plate_clip.rs (target/debug/deps/piston_plate_clip-7ab3ba606399363b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/timeline.rs (target/debug/deps/timeline-8c752912421a5e83)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/timeline_replay.rs (target/debug/deps/timeline_replay-5165b3d6c6d04197)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/water_place.rs (target/debug/deps/water_place-9353ece0c96e591b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
