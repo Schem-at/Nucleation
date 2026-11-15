@@ -11,6 +11,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { loadMeshEnv } from "./mesher";
+import { hasMinecartModel, minecartModelFor, minecartRotation } from "./entity_models";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;
@@ -108,11 +109,9 @@ function entityColour(kind: string): number {
 
 /** A translucent box standing in for an entity.
  *
- * Deliberately not a model: the engine knows an entity's *hitbox* and its
- * kind, and nothing else about it. Drawing a real boat here would be drawing
- * something the simulation does not have — and a box that is exactly the
- * measured collision volume is the more useful picture anyway, because that
- * volume is the thing that decides whether a piston can shove it.
+ * Used for entity kinds without a model and while a cart's real mesh loads.
+ * Minecarts use their textured hull and payload once available; these boxes
+ * remain an honest collision-volume fallback for unsupported entity models.
  *
  * A leashed entity gets a second, brighter wireframe. There is no rope: the
  * leash *target* is discarded at parse time, on purpose, because a litematic
@@ -334,12 +333,18 @@ export class World {
 
   /** Mesh the whole build once, one three.js child per populated chunk. */
   private async meshAll(): Promise<void> {
+    // Live entities have their own moving meshes. Do not bake a second,
+    // stationary copy into the initial block chunks.
+    const hasEntities = (this.schem.entityCount?.() ?? 0) > 0;
+    const source = hasEntities ? this.schem.deepClone() : this.schem;
+    if (hasEntities) while (source.entityCount() > 0) source.removeEntity(0);
     const result = this.eng.ChunkMeshResult.createWithSize(
-      this.schem,
+      source,
       this.pack,
       this.cfg,
       this.chunkSize,
     );
+    if (hasEntities) source.clearContents();
     const count = result.chunkCount();
     const jobs: Promise<void>[] = [];
     for (let i = 0; i < count; i++) {
@@ -514,6 +519,9 @@ export class World {
         cz * this.chunkSize,
         "[]",
       );
+      // copyRegion also carries authored entities; their live representations
+      // are maintained separately from block chunks.
+      while ((scratch.entityCount?.() ?? 0) > 0) scratch.removeEntity(0);
       // An empty box has nothing to mesh and the mesher says so by
       // throwing. A dirty chunk legitimately empties out — a piston pulls
       // the last block out of it — and that must clear the chunk, not
@@ -815,25 +823,46 @@ export class World {
     }
 
     const seen = new Set<number>();
-    const place = (id: number, kind: string, pos: number[], size: [number, number, number], leashed: boolean) => {
+    const place = (id: number, kind: string, pos: number[], size: [number, number, number], leashed: boolean, yaw?: number) => {
       seen.add(id);
       let mesh = this.entityMeshes.get(id);
       if (!mesh) {
         mesh = entityBox(kind, size, leashed);
         this.entityMeshes.set(id, mesh);
         this.entityGroup.add(mesh);
+        if (hasMinecartModel(kind)) {
+          const target = mesh;
+          void minecartModelFor(kind).then(model => {
+            // A reset or entity removal can race with asynchronous GLB/image
+            // loading. Never resurrect an old cart in a replacement run.
+            if (this.entityMeshes.get(id) !== target) return;
+            target.traverse((o: Any) => {
+              o.geometry?.dispose?.();
+              const materials = Array.isArray(o.material) ? o.material : [o.material];
+              for (const material of materials) material?.dispose?.();
+            });
+            target.clear();
+            model.position.y = -size[1] / 2;
+            target.add(model);
+            target.userData.sharedEntityModel = true;
+          }).catch(error => {
+            target.userData.modelError = String(error);
+            console.warn(`Minecart model unavailable: ${kind}`, error);
+          });
+        }
       }
       // `pos` is feet-centre — centred on x and z, bottom on y — which is
       // where vanilla puts an entity's position and not where three.js wants
       // a box's origin.
       mesh.position.set(pos[0], pos[1] + size[1] / 2, pos[2]);
+      if (hasMinecartModel(kind) && Number.isFinite(yaw)) mesh.rotation.y = minecartRotation(yaw!);
     };
 
     for (const item of view.items ?? []) {
       place(item.id, "item", item.pos, ITEM_SIZE, false);
     }
     for (const cart of view.minecarts ?? []) {
-      place(cart.id, cart.kind, cart.pos, CART_SIZE, false);
+      place(cart.id, cart.kind, cart.pos, CART_SIZE, false, cart.yaw);
     }
     for (const body of view.frozen ?? []) {
       // The engine reports the measured hitbox; guessing one from the kind
@@ -844,7 +873,7 @@ export class World {
     for (const [id, mesh] of this.entityMeshes) {
       if (seen.has(id)) continue;
       this.entityGroup.remove(mesh);
-      mesh.traverse((o: Any) => o.geometry?.dispose?.());
+      if (!mesh.userData.sharedEntityModel) mesh.traverse((o: Any) => o.geometry?.dispose?.());
       this.entityMeshes.delete(id);
     }
   }
@@ -858,7 +887,7 @@ export class World {
   clearEntities(): void {
     for (const mesh of this.entityMeshes.values()) {
       this.entityGroup.remove(mesh);
-      mesh.traverse((o: Any) => o.geometry?.dispose?.());
+      if (!mesh.userData.sharedEntityModel) mesh.traverse((o: Any) => o.geometry?.dispose?.());
     }
     this.entityMeshes.clear();
   }

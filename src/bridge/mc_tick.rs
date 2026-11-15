@@ -2581,7 +2581,8 @@ pub mod ffi {
         /// Live item entities and minecarts, as JSON:
         /// `{"items":[{"id":N,"item":"...","count":N,"pos":[..],"vel":[..],
         ///   "on_ground":bool,"contents":[{"id":"...","count":N}]}],
-        ///  "minecarts":[{"id":N,"kind":"...","pos":[..],"vel":[..]}]}`.
+        ///  "minecarts":[{"id":N,"kind":"...","pos":[..],"vel":[..],"yaw":N}]}`.
+        /// Cart yaw is the engine's polar XZ angle in degrees (0 = +X, 90 = +Z).
         pub fn item_entities_json(&self, out: &mut DiplomatWrite) {
             let mut json = String::from("{\"items\":[");
             let mut first = true;
@@ -2629,7 +2630,7 @@ pub mod ffi {
                 first = false;
                 let _ = write!(
                     json,
-                    "{{\"id\":{},\"kind\":\"{}\",\"pos\":[{},{},{}],\"vel\":[{},{},{}]}}",
+                    "{{\"id\":{},\"kind\":\"{}\",\"pos\":[{},{},{}],\"vel\":[{},{},{}],\"yaw\":{}}}",
                     cart.id,
                     cart.kind,
                     cart.pos[0],
@@ -2638,6 +2639,7 @@ pub mod ffi {
                     cart.vel[0],
                     cart.vel[1],
                     cart.vel[2],
+                    cart.yaw,
                 );
             }
             json.push_str("],\"frozen\":[");

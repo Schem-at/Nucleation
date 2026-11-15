@@ -5218,7 +5218,7 @@ dependencies = [
 [[package]]
 name = "schematic-mesher"
 version = "0.2.1"
-source = "git+https://github.com/Schem-at/Schematic-Mesher.git?rev=dcc0e0aad6133109448f21a5c568236b48b3d967#dcc0e0aad6133109448f21a5c568236b48b3d967"
+source = "git+https://github.com/Schem-at/Schematic-Mesher.git?rev=5550498f97212f6ac5a0a44c03a60e3c825fdeea#5550498f97212f6ac5a0a44c03a60e3c825fdeea"
 dependencies = [
  "glam",
  "gltf-json",
