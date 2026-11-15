@@ -170,3 +170,6 @@ tests/corpus/lithium/
 /redstone-eda/adversarial/work3/
 /redstone-eda/adversarial/codex_log.jsonl
 **/__pycache__/
+
+# Downloaded and converted external performance fixtures.
+/tests/benchmark-fixtures/

@@ -1,0 +1,243 @@
+diff --git a/crates/mc-tick/src/vanilla.rs b/crates/mc-tick/src/vanilla.rs
+index 788c8e11..479081b6 100644
+--- a/crates/mc-tick/src/vanilla.rs
++++ b/crates/mc-tick/src/vanilla.rs
+@@ -349,10 +349,9 @@ impl VanillaRules {
+         with_wires: bool,
+     ) -> u8 {
+         let mut best = 0u8;
+-        for dir in crate::pos::ALL_DIRS {
++        for (dir, state) in crate::pos::ALL_DIRS.into_iter().zip(world.neighbours(pos)) {
+             let neighbour = pos.offset(dir);
+             let toward = dir.opposite();
+-            let state = world.get(neighbour);
+             let strong = if (with_wires && self.wires.contains_key(&state))
+                 || self.strong_into.get(&state) == Some(&toward) {
+                 self.emitted_state(world, outs, neighbour, state, toward, with_wires)
+@@ -382,6 +381,38 @@ impl VanillaRules {
+         strength
+     }
+ 
++    /// Share the six immediate block reads between non-wire and dust input
++    /// calculations. This is a stack snapshot during a pure query, never a
++    /// memo retained across a world or comparator-output mutation.
++    fn wire_target(&self, world: &World, outs: &crate::behaviour::ComparatorOutputs, pos: Pos) -> u8 {
++        let neighbours = world.neighbours(pos);
++        let mut block = 0u8;
++        for (dir, state) in crate::pos::ALL_DIRS.into_iter().zip(neighbours) {
++            let at = pos.offset(dir);
++            let mut signal = self.emitted_state(world, outs, at, state, dir.opposite(), false);
++            if self.conductors.contains(&state) {
++                signal = signal.max(self.direct_signal_to(world, outs, at, false));
++            }
++            block = block.max(signal);
++            // Preserve the existing exact-15 short circuit, including its
++            // behaviour for arbitrary u8 comparator and analog outputs.
++            if block == 15 { return 15; }
++        }
++        let covered = self.conductors.contains(&neighbours[Dir::Up as usize]);
++        let mut wire = 0u8;
++        for dir in crate::wire::WIRE_SIDES {
++            let state = neighbours[dir as usize];
++            if let Some((power, _)) = self.wires.get(&state) { wire = wire.max(*power); }
++            let conductor = self.conductors.contains(&state);
++            if !conductor || !covered {
++                let step = if conductor { Dir::Up } else { Dir::Down };
++                let state = world.get(pos.offset(dir).offset(step));
++                if let Some((power, _)) = self.wires.get(&state) { wire = wire.max(*power); }
++            }
++        }
++        block.max(wire.saturating_sub(1))
++    }
++
+     /// Why `pos` does or does not power `toward` — a diagnostic for tracing a
+     /// dust level back to its source.
+     pub fn explain_power(&self, world: &World, pos: Pos, toward: Dir) -> String {
+@@ -609,6 +640,10 @@ fn dir_name(dir: Dir) -> &'static str {
+ }
+ 
+ impl crate::wire::WireWorld for VanillaRules {
++    fn target_power(&self, ctx: &crate::behaviour::TickCtx<'_>, pos: Pos) -> u8 {
++        self.wire_target(ctx.world, ctx.comparator_out, pos)
++    }
++
+     fn hash_origin(&self) -> Pos {
+         self.hash_origin
+     }
+@@ -692,6 +727,10 @@ impl crate::wire::WireWorld for VanillaRules {
+ }
+ 
+ impl crate::wire::WireWorld for Arc<VanillaRules> {
++    fn target_power(&self, ctx: &crate::behaviour::TickCtx<'_>, pos: Pos) -> u8 {
++        self.wire_target(ctx.world, ctx.comparator_out, pos)
++    }
++
+     fn hash_origin(&self) -> Pos {
+         <VanillaRules as crate::wire::WireWorld>::hash_origin(self.as_ref())
+     }
+@@ -4129,6 +4168,55 @@ pub fn intern_companions(registry: &mut StateRegistry) {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn shared_wire_reads_match_separate_queries_after_every_mutation() {
++        let mut registry = StateRegistry::new();
++        let mut ids = vec![StateId::AIR];
++        for name in ["minecraft:stone", "minecraft:glass", "minecraft:redstone_block",
++            "minecraft:redstone_torch[lit=true]", "minecraft:redstone_torch[lit=false]"] {
++            ids.push(registry.intern(name).unwrap());
++        }
++        for level in [0, 1, 15, 16, 255] {
++            ids.push(registry.intern(&format!("minecraft:redstone_wire[east=side,north=none,power={level},south=none,west=side]")).unwrap());
++            ids.push(registry.intern(&format!("minecraft:light_weighted_pressure_plate[power={level}]")).unwrap());
++        }
++        for facing in ["north", "south", "west", "east"] {
++            for powered in [false, true] {
++                ids.push(registry.intern(&format!("minecraft:comparator[facing={facing},mode=compare,powered={powered}]")).unwrap());
++            }
++        }
++        let rules = register_all(&mut registry, &mut BehaviourTable::new());
++        let center = Pos::new(-13, -7, -19);
++        let mut world = World::new(crate::pos::Bounds::new(
++            Pos::new(-15, -9, -21), Pos::new(-11, -5, -17)));
++        let mut outs = crate::behaviour::ComparatorOutputs::new();
++        let mut random = 0x0123_4567u32;
++        let mut next = || {
++            random ^= random << 13; random ^= random >> 17; random ^= random << 5; random
++        };
++        let check = |world: &World, outs: &crate::behaviour::ComparatorOutputs| {
++            let mut block = 0u8;
++            for dir in crate::pos::ALL_DIRS {
++                block = block.max(rules.signal_no_wire(world, outs, center.offset(dir), dir.opposite()));
++                if block == 15 { break; }
++            }
++            let reference = if block == 15 { 15 }
++                else { block.max(crate::wire::incoming(&rules, world, center)) };
++            assert_eq!(rules.wire_target(world, outs, center), reference);
++        };
++        for _ in 0..2000 {
++            for x in -2..=2 { for y in -2..=2 { for z in -2..=2 {
++                let pos = Pos::new(center.x + x, center.y + y, center.z + z);
++                world.set(pos, ids[next() as usize % ids.len()]);
++                outs.insert(pos, [0, 1, 15, 16, 127, 255][next() as usize % 6]);
++            } } }
++            check(&world, &outs);
++            // Comparator memory can change without a block-state write.
++            outs.clear();
++            check(&world, &outs);
++        }
++    }
++
+     /// A redstone block driving two dust cells: the second cell's trace names
+     /// the first as a one-level wire step, the first names the block as its
+     /// block signal — and the back-reference from the first cell to the
+diff --git a/crates/mc-tick/src/wire.rs b/crates/mc-tick/src/wire.rs
+index 1326fb78..6be2dbde 100644
+--- a/crates/mc-tick/src/wire.rs
++++ b/crates/mc-tick/src/wire.rs
+@@ -39,6 +39,13 @@ pub trait WireWorld: Send + Sync {
+     /// The strongest non-wire signal into the wire at `pos` (vanilla's
+     /// `getBlockSignal` with `shouldSignal` off, so wires never count).
+     fn block_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> u8;
++    /// Current target strength, with all dust contributions muted while reading
++    /// non-wire power. Implementations may share reads between the two pure
++    /// queries; update delivery remains the evaluator's responsibility.
++    fn target_power(&self, ctx: &TickCtx<'_>, pos: Pos) -> u8 {
++        let block = self.block_signal(ctx, pos);
++        if block == 15 { 15 } else { block.max(incoming(self, ctx.world, pos)) }
++    }
+     /// Whether the block at `pos` conducts (`isRedstoneConductor`).
+     fn conductor(&self, world: &World, pos: Pos) -> bool;
+     /// The power level of the wire at `pos`, if it is wire.
+@@ -207,7 +214,7 @@ pub fn connection_state(
+ }
+ 
+ /// `getIncomingWireSignal`: the strongest neighbouring wire, minus one.
+-fn incoming(rules: &dyn WireWorld, world: &World, pos: Pos) -> u8 {
++pub(crate) fn incoming<R: WireWorld + ?Sized>(rules: &R, world: &World, pos: Pos) -> u8 {
+     let mut best = 0u8;
+     let covered = rules.conductor(world, pos.offset(Dir::Up));
+     for dir in [Dir::North, Dir::South, Dir::West, Dir::East] {
+@@ -256,12 +263,7 @@ fn java_hash_order_array(pos: Pos, origin: Pos) -> [Pos; 7] {
+ 
+ /// `DefaultRedstoneWireEvaluator.updatePowerStrength` for the wire at `pos`.
+ pub fn update_power_strength(rules: &dyn WireWorld, ctx: &mut TickCtx<'_>, pos: Pos, current: u8) {
+-    let block = rules.block_signal(ctx, pos);
+-    let target = if block == 15 {
+-        15
+-    } else {
+-        block.max(incoming(rules, ctx.world, pos))
+-    };
++    let target = rules.target_power(ctx, pos);
+     if target == current {
+         return;
+     }
+diff --git a/crates/mc-tick/src/world.rs b/crates/mc-tick/src/world.rs
+index 2bf88b60..53ebfd51 100644
+--- a/crates/mc-tick/src/world.rs
++++ b/crates/mc-tick/src/world.rs
+@@ -157,6 +157,29 @@ impl World {
+         }
+     }
+ 
++    /// Six current states in `Dir` order. Interior reads share the coordinate
++    /// conversion and boundary check; border reads keep ordinary air semantics.
++    #[inline]
++    pub(crate) fn neighbours(&self, pos: Pos) -> [StateId; 6] {
++        let x = pos.x.wrapping_sub(self.bounds.min.x) as u32;
++        let y = pos.y.wrapping_sub(self.bounds.min.y) as u32;
++        let z = pos.z.wrapping_sub(self.bounds.min.z) as u32;
++        if x.wrapping_sub(1) < self.size[0].saturating_sub(2)
++            && y.wrapping_sub(1) < self.size[1].saturating_sub(2)
++            && z.wrapping_sub(1) < self.size[2].saturating_sub(2)
++        {
++            let row = self.size[0] as usize;
++            let i = y as usize * self.layer_stride + z as usize * row + x as usize;
++            [self.states[i - self.layer_stride], self.states[i + self.layer_stride],
++             self.states[i - row], self.states[i + row], self.states[i - 1], self.states[i + 1]]
++        } else {
++            crate::pos::ALL_DIRS.map(|dir| {
++                let (x, y, z) = dir.delta();
++                self.get(Pos::new(pos.x.wrapping_add(x), pos.y.wrapping_add(y), pos.z.wrapping_add(z)))
++            })
++        }
++    }
++
+     /// Set the state at `pos`, returning the previous one.
+     ///
+     /// # Outside the region
+@@ -231,6 +254,34 @@ impl World {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn neighbour_batch_matches_individual_reads_at_borders_and_after_growth() {
++        for origin in [Pos::new(-7, -9, -11), Pos::new(i32::MIN, 0, 0),
++            Pos::new(i32::MAX - 4, 0, 0)] {
++            for width in 1..=5 {
++                let mut world = World::new(Bounds::new(origin,
++                    Pos::new(origin.x + (width - 1), origin.y + 4, origin.z + 4)));
++                for x in 0..width { for y in 0..5 { for z in 0..5 {
++                    world.set(Pos::new(origin.x + x, origin.y + y, origin.z + z),
++                        StateId((1 + x + 5 * z + 25 * y) as u16));
++                } } }
++                let check = |world: &World| {
++                    for x in -1..=width { for y in -1..=5 { for z in -1..=5 {
++                        let pos = Pos::new(origin.x.wrapping_add(x), origin.y + y, origin.z + z);
++                        let expected = crate::pos::ALL_DIRS.map(|dir| {
++                            let (dx, dy, dz) = dir.delta();
++                            world.get(Pos::new(pos.x.wrapping_add(dx), pos.y.wrapping_add(dy), pos.z.wrapping_add(dz)))
++                        });
++                        assert_eq!(world.neighbours(pos), expected, "at {pos:?}");
++                    } } }
++                };
++                check(&world);
++                assert!(world.grow_to_include(Pos::new(origin.x, origin.y + 6, origin.z)));
++                check(&world);
++            }
++        }
++    }
++
+     fn small() -> World {
+         World::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(3, 3, 3)))
+     }

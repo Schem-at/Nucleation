@@ -6,7 +6,7 @@ CASES = ['hipster','hipster_unrecorded','hipster_updates','hipster_timeline','do
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--variant',action='append',required=True,help='NAME=ABSOLUTE_BINARY')
 p.add_argument('--mode',action='append',default=[],help='NAME=off|on (benchmark cache config)')
-p.add_argument('--cases',nargs='+',default=CASES,choices=CASES)
+p.add_argument('--cases',nargs='+',default=CASES,metavar='CASE')
 p.add_argument('--rounds',type=int,default=21)
 p.add_argument('--seed',type=int,default=20261114)
 p.add_argument('--cpu',type=int,default=None)
@@ -27,10 +27,17 @@ def invoke(name,case,iterations):
     command=['taskset','-c',str(cpu),variants[name],case,'1',str(iterations)]
     return json.loads(subprocess.check_output(command,env=env,text=True))
 
-metadata={'kind':'metadata','utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+fixture_manifest = None
+if os.environ.get('MC_TICK_BENCH_FIXTURES'):
+    fixture_dir = pathlib.Path(os.environ['MC_TICK_BENCH_FIXTURES'])
+    fixture_manifest = json.loads((fixture_dir / 'manifest.json').read_text())
+    for name, entry in fixture_manifest['fixtures'].items():
+        assert hashlib.sha256((fixture_dir / (name+'.snbt')).read_bytes()).hexdigest() == entry['snbt_sha256'], f'{name}: generated fixture changed'
+
+metadata={'kind' :'metadata','utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
     'host':platform.node(),'platform':platform.platform(),'cpu':cpu,'allowed_cpus':allowed,
     'cpuinfo':pathlib.Path('/proc/cpuinfo').read_text().split('\n\n')[0],
-    'seed':a.seed,'rounds':a.rounds,'target_ms':a.target_ms,'modes':modes,
+    'fixture_manifest':fixture_manifest,'seed':a.seed,'rounds':a.rounds,'target_ms':a.target_ms,'modes':modes,
     'variants':{name:{'path':path,'sha256':hashlib.file_digest(open(path,'rb'),'sha256').hexdigest()}
                 for name,path in variants.items()},
     'method':'one warmup sample per subprocess; input+stepping+recording timed; restore/setup/drop excluded',

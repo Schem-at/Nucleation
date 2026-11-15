@@ -1,0 +1,138 @@
+diff --git a/crates/mc-tick/src/vanilla.rs b/crates/mc-tick/src/vanilla.rs
+index 788c8e11..18817591 100644
+--- a/crates/mc-tick/src/vanilla.rs
++++ b/crates/mc-tick/src/vanilla.rs
+@@ -237,6 +237,31 @@ pub struct VanillaRules {
+     /// States whose comparator read comes from the block state itself —
+     /// a composter's `level` (0-8).
+     state_analog: StateTable<u8>,
++    /// Immutable, four-byte power classification per registry state. Comparator
++    /// strengths and dust connections still come from the current simulation.
++    power_info: Vec<PowerInfo>,
++}
++
++#[derive(Debug, Clone, Copy, Default)]
++struct PowerInfo {
++    weak: u8,
++    strong: u8,
++    level: u8,
++    flags: u8,
++}
++
++impl PowerInfo {
++    const COMPARATOR: u8 = 1;
++    const CONDUCTOR: u8 = 2;
++
++    #[inline]
++    fn emission(self, outs: &crate::behaviour::ComparatorOutputs, pos: Pos) -> u8 {
++        if self.flags & Self::COMPARATOR != 0 {
++            outs.get(&pos).copied().unwrap_or(0)
++        } else {
++            self.level
++        }
++    }
+ }
+ 
+ fn wire_shape_index(power: u8, sides: [crate::wire::WireSide; 4]) -> usize {
+@@ -250,6 +275,32 @@ fn wire_shape_index(power: u8, sides: [crate::wire::WireSide; 4]) -> usize {
+ }
+ 
+ impl VanillaRules {
++    fn classify_power(&self, state: StateId) -> PowerInfo {
++        let mut weak = 0;
++        if self.powered.contains(&state) {
++            for dir in crate::pos::ALL_DIRS {
++                if self.emit_only.get(&state).is_none_or(|only| *only == dir)
++                    && self.emit_except.get(&state).is_none_or(|except| *except != dir)
++                {
++                    weak |= 1 << dir as u8;
++                }
++            }
++        }
++        PowerInfo {
++            weak,
++            strong: self.strong_into.get(&state).map_or(0, |dir| weak & (1 << *dir as u8)),
++            level: self.analog_emission.get(&state).copied().unwrap_or(15),
++            flags: u8::from(self.comparators.contains(&state)) * PowerInfo::COMPARATOR
++                | u8::from(self.conductors.contains(&state)) * PowerInfo::CONDUCTOR,
++        }
++    }
++
++    #[inline]
++    fn power_info(&self, state: StateId) -> PowerInfo {
++        self.power_info.get(state.raw() as usize).copied()
++            .unwrap_or_else(|| self.classify_power(state))
++    }
++
+     /// What the block at `pos` emits toward `toward` on its own — vanilla's
+     /// `BlockState.getSignal`, plus dust's own emission rules.
+     ///
+@@ -276,26 +327,9 @@ impl VanillaRules {
+         toward: Dir,
+         with_wires: bool,
+     ) -> u8 {
+-        if self.powered.contains(&state)
+-            && self
+-                .emit_only
+-                .get(&state)
+-                .is_none_or(|only| *only == toward)
+-            && self
+-                .emit_except
+-                .get(&state)
+-                .is_none_or(|except| *except != toward)
+-        {
+-            // A comparator emits its **stored block-entity strength**, not a
+-            // flat 15 — and a freshly placed one holds 0 even while its block
+-            // state says `powered=true`.
+-            return if self.comparators.contains(&state) {
+-                outs.get(&pos).copied().unwrap_or(0)
+-            } else if let Some(&level) = self.analog_emission.get(&state) {
+-                level
+-            } else {
+-                15
+-            };
++        let info = self.power_info(state);
++        if info.weak & (1 << toward as u8) != 0 {
++            return info.emission(outs, pos);
+         }
+         if !with_wires {
+             return 0;
+@@ -353,9 +387,11 @@ impl VanillaRules {
+             let neighbour = pos.offset(dir);
+             let toward = dir.opposite();
+             let state = world.get(neighbour);
+-            let strong = if (with_wires && self.wires.contains_key(&state))
+-                || self.strong_into.get(&state) == Some(&toward) {
+-                self.emitted_state(world, outs, neighbour, state, toward, with_wires)
++            let info = self.power_info(state);
++            let strong = if with_wires && self.wires.contains_key(&state) {
++                self.emitted_state(world, outs, neighbour, state, toward, true)
++            } else if info.strong & (1 << toward as u8) != 0 {
++                info.emission(outs, neighbour)
+             } else {
+                 0
+             };
+@@ -374,9 +410,11 @@ impl VanillaRules {
+         pos: Pos,
+         toward: Dir,
+     ) -> u8 {
+-        let state = world.get(pos);
+-        let mut strength = self.emitted_state(world, outs, pos, state, toward, false);
+-        if self.conductors.contains(&state) {
++        let info = self.power_info(world.get(pos));
++        let mut strength = if info.weak & (1 << toward as u8) != 0 {
++            info.emission(outs, pos)
++        } else { 0 };
++        if info.flags & PowerInfo::CONDUCTOR != 0 {
+             strength = strength.max(self.direct_signal_to(world, outs, pos, false));
+         }
+         strength
+@@ -2221,6 +2259,8 @@ pub fn register_all_at(
+ 
+     // Behaviours only read the completed rules. Share that immutable table
+     // instead of deep-cloning every map into every registered state.
++    rules.power_info = (0..registry.len())
++        .map(|id| rules.classify_power(StateId(id as u16))).collect();
+     let rules = Arc::new(rules);
+ 
+     // Second pass: register behaviour, resolving paired states through the

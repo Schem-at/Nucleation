@@ -1,0 +1,60 @@
+diff --git a/crates/mc-tick/src/behaviour.rs b/crates/mc-tick/src/behaviour.rs
+index 799d5006..cf31e633 100644
+--- a/crates/mc-tick/src/behaviour.rs
++++ b/crates/mc-tick/src/behaviour.rs
+@@ -499,6 +499,9 @@ impl<'a> TickCtx<'a> {
+                     );
+                 }
+             }
++            if table.inert_updates.get(state.raw() as usize).copied().unwrap_or(false) {
++                continue;
++            }
+             let Some(behaviour) = table.get(state) else {
+                 if state != StateId::AIR {
+                     pump.unknown_seen.push(state);
+@@ -1162,6 +1165,10 @@ impl<'a> TickCtx<'a> {
+ 
+ /// How one kind of block behaves.
+ pub trait BlockBehaviour: Send + Sync {
++    /// True only when both neighbour and shape callbacks are no-ops for every
++    /// input. Sampled at registration; delivery and recording still happen.
++    fn updates_are_inert(&self) -> bool { false }
++
+     /// `updateIndirectNeighbourShapes`: the *diagonal* partners a write must
+     /// also shape-update, on top of its six neighbours.
+     ///
+@@ -1332,6 +1339,8 @@ impl Inert {
+ }
+ 
+ impl BlockBehaviour for Inert {
++    fn updates_are_inert(&self) -> bool { true }
++
+     fn name(&self) -> &'static str {
+         self.0
+     }
+@@ -1344,6 +1353,7 @@ impl BlockBehaviour for Inert {
+ pub struct BehaviourTable {
+     /// Indexed by `StateId`; `None` means unregistered.
+     entries: Vec<Option<Box<dyn BlockBehaviour>>>,
++    inert_updates: Vec<bool>,
+     /// States seen with no behaviour, in a deterministic order.
+     ///
+     /// Interior mutability is avoided on purpose — recording goes through
+@@ -1357,6 +1367,7 @@ impl BehaviourTable {
+     pub fn new() -> Self {
+         let mut table = Self {
+             entries: Vec::new(),
++            inert_updates: Vec::new(),
+             unknown: BTreeSet::new(),
+         };
+         table.register(StateId::AIR, Box::new(Inert::new("air")));
+@@ -1368,7 +1379,9 @@ impl BehaviourTable {
+         let index = state.raw() as usize;
+         if self.entries.len() <= index {
+             self.entries.resize_with(index + 1, || None);
++            self.inert_updates.resize(index + 1, false);
+         }
++        self.inert_updates[index] = behaviour.updates_are_inert();
+         self.entries[index] = Some(behaviour);
+         self.unknown.remove(&state);
+     }
