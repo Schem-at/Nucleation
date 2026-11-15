@@ -10,6 +10,7 @@ p.add_argument('--output',type=pathlib.Path,required=True)
 p.add_argument('--target-dir',type=pathlib.Path,required=True)
 p.add_argument('--fixtures',type=pathlib.Path,required=True)
 p.add_argument('--jobs',type=int,default=4)
+p.add_argument('--skip-native',action='store_true',help='Only rebuild PGO after a native-CPU pilot has been rejected')
 a=p.parse_args();a.output=a.output.resolve();a.output.mkdir(parents=True,exist_ok=False)
 raw=a.output/'raw';raw.mkdir()
 root=pathlib.Path(__file__).resolve().parents[1]
@@ -47,9 +48,11 @@ with (a.output/'training.jsonl').open('w') as log:
 profile=a.output/'merged.profdata'
 subprocess.run([str(profdata),'merge','-o',str(profile),*[str(f) for f in sorted(raw.glob('*.profraw'))]],check=True)
 manifest['profile_sha256']=sha(profile)
-for name,flags in [('pgo','-Cprofile-use='+str(profile)+' -Cllvm-args=-pgo-warn-missing-function'),('native','-Ctarget-cpu=native')]:
+builds=[('pgo','-Cprofile-use='+str(profile)+' -Cllvm-args=-pgo-warn-missing-function')]
+if not a.skip_native: builds.append(('native','-Ctarget-cpu=native'))
+for name,flags in builds:
     binary=build(name,flags)
     with (a.output/(name+'-verify.jsonl')).open('w') as log:
         subprocess.run([str(binary),'--verify','--expanded'],cwd=root,env=env,stdout=log,check=True)
 (a.output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
-print('Built and verified PGO and native experiments:',a.output,flush=True)
+print('Built and verified compiler experiments:',a.output,flush=True)

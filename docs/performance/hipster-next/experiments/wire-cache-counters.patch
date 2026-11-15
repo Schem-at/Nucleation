@@ -1,0 +1,48 @@
+--- a/crates/mc-tick/src/wire_cache.rs
++++ b/crates/mc-tick/src/wire_cache.rs
+@@ -14,6 +14,20 @@
+     Shadow,
+ }
+ 
++use std::sync::atomic::{AtomicU64, Ordering};
++static QUERIES: AtomicU64 = AtomicU64::new(0);
++static MISSES: AtomicU64 = AtomicU64::new(0);
++static COLLISIONS: AtomicU64 = AtomicU64::new(0);
++static INVALIDATIONS: AtomicU64 = AtomicU64::new(0);
++impl Drop for WireCache {
++    fn drop(&mut self) {
++        if self.storage.get().is_some() {
++            eprintln!("wire-cache-counters queries={} misses={} collisions={} invalidations={}",
++                QUERIES.swap(0, Ordering::Relaxed), MISSES.swap(0, Ordering::Relaxed),
++                COLLISIONS.swap(0, Ordering::Relaxed), INVALIDATIONS.swap(0, Ordering::Relaxed));
++        }
++    }
++}
+ const SLOTS: usize = 1024;
+ const fn offsets() -> [Pos; 25] {
+     let mut result = [Pos::new(0, 0, 0); 25];
+@@ -98,20 +112,21 @@
+         for offset in OFFSETS {
+             let affected = add(changed, offset);
+             let entry = &mut storage.slots[slot(affected)];
+-            if entry.get_mut().is_some_and(|(key,_)| *key == affected) { entry.take(); }
++            if entry.get_mut().is_some_and(|(key,_)| *key == affected) { INVALIDATIONS.fetch_add(1, Ordering::Relaxed); entry.take(); }
+         }
+     }
+     pub fn query(&self, rules: &Arc<()>, pos: Pos, compute: impl Fn() -> Target) -> Target {
++        QUERIES.fetch_add(1, Ordering::Relaxed);
+         let storage = self.storage.get_or_init(|| Storage {
+             rules: rules.clone(), slots: (0..SLOTS).map(|_| OnceLock::new()).collect(),
+         });
+         // A replacement immutable rules table gets an uncached answer. Keeping
+         // the original identity alive rules out allocator-address reuse.
+         if !Arc::ptr_eq(&storage.rules, rules) { return compute(); }
+-        let (key, value) = storage.slots[slot(pos)].get_or_init(|| (pos, compute()));
++        let (key, value) = storage.slots[slot(pos)].get_or_init(|| { MISSES.fetch_add(1, Ordering::Relaxed); (pos, compute()) });
+         // Collisions are never overwritten through shared access. A world
+         // mutation can clear the slot; until then the other key falls back.
+-        if *key != pos { return compute(); }
++        if *key != pos { COLLISIONS.fetch_add(1, Ordering::Relaxed); return compute(); }
+         if self.mode == WirePowerCacheMode::Shadow { assert_eq!(*value, compute(), "wire cache structural mismatch at {pos:?}"); }
+         *value
+     }

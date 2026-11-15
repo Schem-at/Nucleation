@@ -1,0 +1,47 @@
+{
+  "exporter_sha256": "7efccda7e23f2578bcfaae33c9cc6e77e5b1f03d5c641ea73fbbff34b2ac05a0",
+  "fixtures": {
+    "item_sorter": {
+      "input_sha256": "153dfbd644afd9188bbeb126cf71c9f2a61bb22e9400c56bdca8ca45315b7509",
+      "url": null,
+      "source": "/home/harrison/code/Nucleation-simulation-performance/tests/corpus/lithium-litematic/gametest/structure/item_sorter.litematic",
+      "snbt_sha256": "9fd06d2275ad5fca075af7035983522898667232b41805b1e1e159a2cd93e8f9",
+      "spec_sha256": "8025e6e70b479817926ba4a6bc055ac51dd47660bac0b075117a7f2f0c2f9962"
+    },
+    "hopper_transfer_speed": {
+      "input_sha256": "ecedb38e736d63df79b368bae3bf91d4026dd143550e8b52550f7177c0055517",
+      "url": null,
+      "source": "/home/harrison/code/Nucleation-simulation-performance/tests/corpus/lithium-litematic/gametest/structure/hopper_transfer_speed.litematic",
+      "snbt_sha256": "f3dbc2fb554da064aba6c33fb2550af7c39a82740ed53868da6cd0b7bb2681bf",
+      "spec_sha256": "ef7da20a1dd00c03a698e25cc1ae83062ba6c1afad3acef8582dde99eec16766"
+    },
+    "hopper_storagecart_interaction": {
+      "input_sha256": "044f9e91485043534e456c3a0eb71c745390fc0547457aa2ea514dc37ba565b2",
+      "url": null,
+      "source": "/home/harrison/code/Nucleation-simulation-performance/tests/corpus/lithium-litematic/gametest/structure/hopper_storagecart_interaction.litematic",
+      "snbt_sha256": "0365522f93c2eae0233af5f7279e166f21aedfb22eccd2262762835cbe4307fc",
+      "spec_sha256": "40fe1459dfa47b71ba2a77b961bc0a405050b0bc14efe64e264bf5316968113d"
+    },
+    "comparator_update_collection": {
+      "input_sha256": "b8c125d18415481a58f2a48a971749554d16b579edf9f6a9040cf5632ec7a0b0",
+      "url": null,
+      "source": "/home/harrison/code/Nucleation-simulation-performance/tests/corpus/lithium-litematic/gametest/structure/comparator_update_collection.litematic",
+      "snbt_sha256": "a87b685250271510366eae43f19544c7c3fde6eb57fc045bd697f52463ed869f",
+      "spec_sha256": "afdaa08fa1387feb4f10e656f80e73d5b4628c684bb6bef7cd1c1fddca4094f1"
+    },
+    "shutter4": {
+      "input_sha256": "b4262fe85e36a8ca6104eb864c5f58e60725e5be0b08de2d8152c32294cecd74",
+      "url": "https://drive.google.com/uc?export=download&id=1LEfyHchgc7Wwax9cfh_1S0fozOQvt-6G",
+      "source": "/home/harrison/nucleation-perf/expanded-fixtures/sources/shutter4.litematic",
+      "snbt_sha256": "f9f020ae57217588d23339ea979bf766665734ff0f98a53dc408092d4c852c18",
+      "spec_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    "trapdoor2x3": {
+      "input_sha256": "db6d33e785c445eaf633ddca50dc965aba8f73c3b0c221e6239238810a11f6a9",
+      "url": "https://archive.org/download/2x-3-flush-piston-trapdoor/2x3%20flush%20piston%20trapdoor.litematic",
+      "source": "/home/harrison/nucleation-perf/expanded-fixtures/sources/trapdoor2x3.litematic",
+      "snbt_sha256": "3090ab6dfcb9ebb6f9623991a4a46fdd60b0fa463840c3a6905508effd3be866",
+      "spec_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    }
+  }
+}

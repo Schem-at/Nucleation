@@ -36,7 +36,8 @@ No downloaded community schematic is redistributed in Git.
 | `trapdoor2x3` | Starry0Wolf's archived community schematic | 240; lever (0,3,7) at 10,70,130,190 | All six panel cells close and reopen twice; every changed block returns to its initial state |
 
 Lithium workloads use placement settling, RNG seed 0 and random-tick speed 3.
-Setup-fired accept blocks are rearmed before timing. Start blocks become redstone
+Setup-fired accept blocks are rearmed before timing. RNG seed 0 is restored
+after setup for both verification and every timed iteration. Start blocks become redstone
 blocks, matching the existing embedded scenario controls. These assertions cover
 the named accept and inventory outcomes; they do not newly implement all upstream
 GameTest environment or fail-block semantics.

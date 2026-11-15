@@ -1,0 +1,6 @@
+{
+  "next-neighbours": 977368745,
+  "next-pgo": 868229195,
+  "command": "bench_circuits hipster 1 2 (one load and four cycles including warmup)",
+  "pgo_instruction_reduction": 0.11166670773782517
+}

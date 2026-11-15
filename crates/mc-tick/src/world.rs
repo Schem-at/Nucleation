@@ -157,6 +157,29 @@ impl World {
         }
     }
 
+    /// Six current states in `Dir` order. Interior reads share the coordinate
+    /// conversion and boundary check; border reads keep ordinary air semantics.
+    #[inline]
+    pub(crate) fn neighbours(&self, pos: Pos) -> [StateId; 6] {
+        let x = pos.x.wrapping_sub(self.bounds.min.x) as u32;
+        let y = pos.y.wrapping_sub(self.bounds.min.y) as u32;
+        let z = pos.z.wrapping_sub(self.bounds.min.z) as u32;
+        if x.wrapping_sub(1) < self.size[0].saturating_sub(2)
+            && y.wrapping_sub(1) < self.size[1].saturating_sub(2)
+            && z.wrapping_sub(1) < self.size[2].saturating_sub(2)
+        {
+            let row = self.size[0] as usize;
+            let i = y as usize * self.layer_stride + z as usize * row + x as usize;
+            [self.states[i - self.layer_stride], self.states[i + self.layer_stride],
+             self.states[i - row], self.states[i + row], self.states[i - 1], self.states[i + 1]]
+        } else {
+            crate::pos::ALL_DIRS.map(|dir| {
+                let (x, y, z) = dir.delta();
+                self.get(Pos::new(pos.x.wrapping_add(x), pos.y.wrapping_add(y), pos.z.wrapping_add(z)))
+            })
+        }
+    }
+
     /// Set the state at `pos`, returning the previous one.
     ///
     /// # Outside the region
@@ -230,6 +253,34 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn neighbour_batch_matches_individual_reads_at_borders_and_after_growth() {
+        for origin in [Pos::new(-7, -9, -11), Pos::new(i32::MIN, 0, 0),
+            Pos::new(i32::MAX - 4, 0, 0)] {
+            for width in 1..=5 {
+                let mut world = World::new(Bounds::new(origin,
+                    Pos::new(origin.x + (width - 1), origin.y + 4, origin.z + 4)));
+                for x in 0..width { for y in 0..5 { for z in 0..5 {
+                    world.set(Pos::new(origin.x + x, origin.y + y, origin.z + z),
+                        StateId((1 + x + 5 * z + 25 * y) as u16));
+                } } }
+                let check = |world: &World| {
+                    for x in -1..=width { for y in -1..=5 { for z in -1..=5 {
+                        let pos = Pos::new(origin.x.wrapping_add(x), origin.y + y, origin.z + z);
+                        let expected = crate::pos::ALL_DIRS.map(|dir| {
+                            let (dx, dy, dz) = dir.delta();
+                            world.get(Pos::new(pos.x.wrapping_add(dx), pos.y.wrapping_add(dy), pos.z.wrapping_add(dz)))
+                        });
+                        assert_eq!(world.neighbours(pos), expected, "at {pos:?}");
+                    } } }
+                };
+                check(&world);
+                assert!(world.grow_to_include(Pos::new(origin.x, origin.y + 6, origin.z)));
+                check(&world);
+            }
+        }
+    }
 
     fn small() -> World {
         World::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(3, 3, 3)))

@@ -349,10 +349,9 @@ impl VanillaRules {
         with_wires: bool,
     ) -> u8 {
         let mut best = 0u8;
-        for dir in crate::pos::ALL_DIRS {
+        for (dir, state) in crate::pos::ALL_DIRS.into_iter().zip(world.neighbours(pos)) {
             let neighbour = pos.offset(dir);
             let toward = dir.opposite();
-            let state = world.get(neighbour);
             let strong = if (with_wires && self.wires.contains_key(&state))
                 || self.strong_into.get(&state) == Some(&toward) {
                 self.emitted_state(world, outs, neighbour, state, toward, with_wires)

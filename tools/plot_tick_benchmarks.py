@@ -9,7 +9,7 @@ doc=json.loads(a.input.read_text());rows=doc['results'];baseline=doc['baseline']
 if a.variants:rows=[r for r in rows if r['variant'] in a.variants]
 if a.cases:rows=[r for r in rows if r['case'] in a.cases]
 variants=a.variants or list(dict.fromkeys(r['variant'] for r in rows if r['variant']!=baseline));cases=a.cases or list(dict.fromkeys(r['case'] for r in rows))
-labels={'diagnostics':'Diagnostic options','tables':'Dense state tables','dust':'Stack dust ordering','wire':'Wire shape indexing','world':'Cached world layout','power':'Retained engine','cache_on':'Cache enabled'}
+labels={'diagnostics':'Diagnostic options','tables':'Dense state tables','dust':'Stack dust ordering','wire':'Wire shape indexing','world':'Cached world layout','power':'Retained engine','cache_on':'Cache enabled','neighbours':'Shared neighbour reads','pgo':'Portable PGO'}
 fig,ax=plt.subplots(figsize=(11,6.5));height=.8/max(len(variants),1)
 for i,variant in enumerate(variants):
     entries=[next(r for r in rows if r['variant']==variant and r['case']==case) for case in cases]
@@ -18,7 +18,7 @@ for i,variant in enumerate(variants):
     if a.points:ax.errorbar(values,y,xerr=[lo,hi],fmt='o',capsize=3,label=labels.get(variant,variant))
     else:ax.barh(y,values,height*.9,label=labels.get(variant,variant),xerr=[lo,hi],capsize=2)
 ax.set_yticks(range(len(cases)),cases);ax.invert_yaxis();ax.axvline(1,color='gray',lw=1)
-reference={'baseline':'v0.12.2','cache_off':'cache disabled'}.get(baseline,baseline)
+reference={'baseline':'v0.12.2','cache_off':'cache disabled','retained':'previous optimized engine'}.get(baseline,baseline)
 ax.set_xlabel(f'CPU-time speedup relative to {reference} (higher is faster)')
 ax.set_title('Nucleation circuit simulation · harrison-work\nPaired bootstrap 95% intervals; all samples retained')
 ax.legend();ax.grid(axis='x',alpha=.2);ax.set_axisbelow(True);fig.tight_layout()

@@ -1,0 +1,68 @@
+{
+  "constant-cache-verify.jsonl": {
+    "reported_cases": 15,
+    "matching_accepted_fingerprints": 15
+  },
+  "expanded-verify.jsonl": {
+    "reported_cases": 16,
+    "matching_accepted_fingerprints": 15,
+    "quarantined": [
+      "shutter4 (activity-only preliminary harness)"
+    ]
+  },
+  "final-next-baseline-verify.jsonl": {
+    "reported_cases": 15,
+    "matching_accepted_fingerprints": 15
+  },
+  "final-next-verify.jsonl": {
+    "reported_cases": 15,
+    "matching_accepted_fingerprints": 15
+  },
+  "final-pgo-verify.jsonl": {
+    "reported_cases": 15,
+    "matching_accepted_fingerprints": 15
+  },
+  "fused-verify.jsonl": {
+    "reported_cases": 15,
+    "matching_accepted_fingerprints": 15
+  },
+  "inert-verify.jsonl": {
+    "reported_cases": 16,
+    "matching_accepted_fingerprints": 15,
+    "quarantined": [
+      "shutter4 (activity-only preliminary harness)"
+    ]
+  },
+  "local-cache-verify.jsonl": {
+    "reported_cases": 15,
+    "matching_accepted_fingerprints": 15
+  },
+  "native-verify.jsonl": {
+    "reported_cases": 15,
+    "matching_accepted_fingerprints": 15
+  },
+  "neighbours-verify.jsonl": {
+    "reported_cases": 8,
+    "matching_accepted_fingerprints": 8
+  },
+  "next-baseline-verify.jsonl": {
+    "reported_cases": 15,
+    "matching_accepted_fingerprints": 15
+  },
+  "next-neighbours-verify.jsonl": {
+    "reported_cases": 15,
+    "matching_accepted_fingerprints": 15
+  },
+  "once-cache-verify.jsonl": {
+    "reported_cases": 15,
+    "matching_accepted_fingerprints": 15
+  },
+  "packed-verify.jsonl": {
+    "reported_cases": 8,
+    "matching_accepted_fingerprints": 8
+  },
+  "pgo-verify.jsonl": {
+    "reported_cases": 15,
+    "matching_accepted_fingerprints": 15
+  }
+}

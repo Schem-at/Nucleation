@@ -112,6 +112,9 @@ fn prepare(case: &str) -> Simulation {
         }).collect();
         for (pos, id) in rearm { sim.registry_and_world_mut().1.set(pos, id); }
     }
+    // Both verification and timed iterations start from this exact RNG state,
+    // including workloads whose setup ticks consumed random numbers.
+    sim.set_rng_seed(0);
     sim
 }
 
