@@ -43,7 +43,7 @@
     <footer class="main-footer"><span><b>NUCLEATION</b> / CIRCUIT ATLAS</span><span>Mechanisms, with their receipts.</span></footer>
   </main>
   <dialog id="detail" class="detail-dialog" aria-labelledby="detail-title">
-    <div class="detail-top"><div class="detail-heading"><p id="detail-source" class="eyebrow"></p><h2 id="detail-title">Schematic details</h2></div><button id="close-detail" class="icon-button" type="button" aria-label="Close details">✕</button></div>
+    <div class="detail-top"><div class="detail-heading"><p id="detail-source" class="eyebrow"></p><h2 id="detail-title">Schematic details</h2></div><div class="detail-tools"><button id="toggle-properties" class="button secondary" type="button" aria-expanded="true" aria-controls="detail-properties">Hide details</button><button id="close-detail" class="icon-button" type="button" aria-label="Close details">✕</button></div></div>
     <div id="detail-loading" class="detail-loading" hidden>Reading schematic details…</div>
     <div class="detail-workspace">
       <section class="viewer-column" aria-label="Schematic workspace">
@@ -56,9 +56,9 @@
         <div class="viewer-caption"><span id="viewer-caption">Static file properties</span><span id="viewer-kind">NO SIMULATION RUNNING</span></div>
         <div class="live-metrics" aria-label="Live simulation properties"><div><span>GAME TICK</span><strong id="live-tick">—</strong></div><div><span>ACTUAL TPS</span><strong id="live-tps">—</strong></div><div><span>ENTITIES</span><strong id="live-entities">—</strong></div><div><span>ENGINE STATE</span><strong id="live-status">Not started</strong></div></div>
         <div id="engine-extra" class="engine-extra"></div>
-        <div class="workspace-actions"><button id="launch-live" class="button primary" type="button" disabled>Open live simulation <span aria-hidden="true">↗</span></button><a id="download-file" class="button secondary" download>Download original <span aria-hidden="true">↓</span></a></div><p id="launch-note" class="launch-note"></p>
+        <div class="workspace-actions"><button id="launch-live" class="button primary" type="button" disabled>Open live simulation <span aria-hidden="true">↗</span></button><a id="live-new-tab" class="button secondary" target="_blank" rel="noopener" hidden>Open in new tab ↗</a><a id="download-file" class="button secondary" download>Download original <span aria-hidden="true">↓</span></a></div><p id="launch-note" class="launch-note"></p>
       </section>
-      <section class="properties-column" aria-label="Properties and evidence"><div id="detail-badges" class="detail-badges"></div><div class="property-tabs" role="tablist" aria-label="Detail panels"><button role="tab" data-property="overview" aria-selected="true" class="active">Properties</button><button role="tab" data-property="materials" aria-selected="false">Materials</button><button role="tab" data-property="provenance" aria-selected="false">Sources</button><button role="tab" data-property="notes" aria-selected="false">Notes</button></div><div id="property-content" class="property-content"></div></section>
+      <section id="detail-properties" class="properties-column" aria-label="Properties and evidence"><div id="detail-badges" class="detail-badges"></div><div class="property-tabs" role="tablist" aria-label="Detail panels"><button role="tab" data-property="overview" aria-selected="true" class="active">Properties</button><button role="tab" data-property="materials" aria-selected="false">Materials</button><button role="tab" data-property="provenance" aria-selected="false">Sources</button><button role="tab" data-property="notes" aria-selected="false">Notes</button></div><div id="property-content" class="property-content"></div></section>
     </div>
   </dialog>
   <div id="toast" class="toast" role="status" hidden></div>

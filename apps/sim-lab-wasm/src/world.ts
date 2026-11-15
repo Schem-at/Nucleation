@@ -252,6 +252,9 @@ export class World {
    * so a dirty chunk can be re-meshed from current truth. */
   schem: Any;
   sim: Any;
+  /** Saved-space minimum, retained for coordinate-sensitive redstone ordering.
+   * Rendering, picking, entities and tick changes all use local coordinates. */
+  origin: [number, number, number] = [0, 0, 0];
   dims: [number, number, number] = [0, 0, 0];
   group = new THREE.Group();
   /** One three.js object per chunk, by chunk coordinate. */
@@ -294,8 +297,14 @@ export class World {
     const w = new World(eng, pack, cfg);
     w.settle = settle;
     w.schem = eng.Schematic.fromData(bytes);
-    const d = w.schem.tightDimensions();
-    w.dims = [Number(d.x), Number(d.y), Number(d.z)];
+    // fromSchematic rebases the schematic's complete bounding box to zero.
+    // Do the same to our private render mirror, including every region and
+    // its block entities/entities. Tight content bounds can have a different
+    // minimum and must not be mixed with the simulation's coordinate frame.
+    const [x, y, z, maxX, maxY, maxZ]: number[] = JSON.parse(w.schem.boundingBoxJson());
+    w.origin = [x, y, z];
+    w.dims = [maxX - x + 1, maxY - y + 1, maxZ - z + 1];
+    if (x !== 0 || y !== 0 || z !== 0) w.schem.translateSchematic(-x, -y, -z);
     // 0 means "one chunk for the whole build": round the longest edge up so a
     // single box covers it, and the build then has exactly one atlas.
     w.chunkSize = chunkSize > 0 ? chunkSize : Math.max(16, ...w.dims) + 1;
@@ -315,9 +324,7 @@ export class World {
       this.sim = this.eng.TickSimulation.fromSchematic(
         this.schem,
         SETTLE_MODE(this.eng)[this.settle],
-        0,
-        0,
-        0,
+        ...this.origin,
         "",
       );
       // Draw the entities the build was authored with, before any tick runs.

@@ -301,6 +301,7 @@ async function openDetail(id) {
   if (!/^[a-f0-9]{64}$/i.test(id)) { toast('This file identifier is not valid.'); return; }
   state.entryAbort?.abort(); clearReplay(); clearLive();
   state.selected = id; state.detail = null; state.property = 'overview';
+  setDetailsVisible(true);
   const row = state.byId.get(id)?.row || { sha256: id, title: 'Schematic details' };
   $('#detail-title').textContent = title(row); $('#detail-source').textContent = sourceName(row.source); $('#detail-loading').hidden = false;
   $('#download-file').href = `/api/file/${encodeURIComponent(id)}`; $('#launch-live').disabled = true;
@@ -473,8 +474,17 @@ function renderProperties() {
 function viewerMessage(container, titleText, description, action) {
   const node = el('div', 'viewer-message'); node.append(el('span', 'nav-icon', '⊞'), el('h3', '', titleText), el('p', '', description)); if (action) node.append(action); container.replaceChildren(node);
 }
+function setDetailsVisible(visible) {
+  $('#detail').classList.toggle('details-hidden', !visible);
+  $('#toggle-properties').textContent = visible ? 'Hide details' : 'Show details';
+  $('#toggle-properties').setAttribute('aria-expanded', String(visible));
+}
 function setViewer(view) {
+  if (view !== 'live' && state.liveFrame) state.liveFrame.contentWindow?.postMessage({ type: 'nucleation-atlas-command', command: 'pause' }, location.origin);
   state.viewer = view;
+  $('#detail').classList.toggle('live-workspace', view === 'live');
+  $('.live-metrics').hidden = view !== 'live';
+  $('#engine-extra').hidden = view !== 'live';
   $$('.viewer-tabs button').forEach(node => { const active = node.dataset.view === view; node.classList.toggle('active', active); node.setAttribute('aria-selected', String(active)); node.tabIndex = active ? 0 : -1; });
   for (const id of ['inspect', 'replay', 'live']) $(`#pane-${id}`).hidden = view !== id;
   $('#viewer-caption').textContent = view === 'inspect' ? 'Saved-file preview · no simulation ticks applied' : view === 'replay' ? 'Recorded capture · replay does not run the engine' : 'Live engine · properties arrive from Sim Lab';
@@ -501,20 +511,24 @@ async function loadCapture() {
 }
 function configureLive() {
   const available = Boolean(state.detail?.capabilities?.live_sim); $('#launch-live').disabled = !available;
-  $('#launch-live').textContent = 'Open live simulation ↗';
+  $('#launch-live').textContent = 'Start live simulation';
+  $('#live-new-tab').href = `/sim-lab/?archive=${encodeURIComponent(state.selected)}`;
+  $('#live-new-tab').hidden = !available;
   const unavailableReason = state.detail?.capabilities?.reason || 'The server has not advertised a usable live engine for this file.';
   const row = primaryDetail(); const large = isPlot(row) || (blocks(row) || 0) > 200000 || dimensions(row)?.reduce((a,b) => a * b, 1) > 2000000;
   $('#launch-note').className = `launch-note${large ? ' caution' : ''}`;
   $('#launch-note').textContent = !available ? `${unavailableReason} Static properties and attached captures remain available.` : large ? 'Large world file. Opening it can use substantial memory and take time. Candidate bounds are hypotheses; this launch opens the original file. Nothing starts automatically.' : 'Opens this original file in Sim Lab on demand. Import support and observed state are reported by the live engine; an open session is not a parity result.';
-  viewerMessage($('#live-stage'), available ? 'Bring the mechanism to life.' : 'This file cannot launch here', available ? 'Launch explicitly to load this file into Sim Lab. The tick, entity and throughput fields below will reflect the running engine.' : unavailableReason, available ? button('Open live simulation ↗', 'button primary', launchLive) : null);
+  viewerMessage($('#live-stage'), available ? 'Bring the mechanism to life.' : 'This file cannot launch here', available ? 'Launch explicitly to load this file into Sim Lab. The tick, entity and throughput fields below will reflect the running engine.' : unavailableReason, available ? button('Start live simulation', 'button primary', launchLive) : null);
 }
 function launchLive() {
   if (!state.detail?.capabilities?.live_sim || !state.selected) return;
   if (!state.liveFrame) {
-    const frame = document.createElement('iframe'); frame.title = `Live simulation of ${title(primaryDetail())}`; frame.src = `/sim-lab/?archive=${encodeURIComponent(state.selected)}`;
+    const frame = document.createElement('iframe'); frame.title = `Live simulation of ${title(primaryDetail())}`; frame.src = `/sim-lab/?archive=${encodeURIComponent(state.selected)}&embed=atlas`;
     frame.allow = 'fullscreen'; $('#live-stage').replaceChildren(frame); state.liveFrame = frame;
-    $('#live-status').textContent = 'Loading'; $('#launch-live').textContent = 'Return to live simulation ↗';
-  } setViewer('live');
+    $('#live-status').textContent = 'Loading'; $('#launch-live').textContent = 'Return to simulation';
+  }
+  setDetailsVisible(false);
+  setViewer('live');
 }
 function updateLive(event) {
   if (!state.liveFrame || event.origin !== location.origin || event.source !== state.liveFrame.contentWindow || event.data?.type !== 'nucleation-atlas-state') return;
@@ -524,7 +538,7 @@ function updateLive(event) {
   const entityCount = Array.isArray(current.entities) ? current.entities.length : current.entities;
   $('#live-entities').textContent = typeof entityCount === 'number' ? count(entityCount) : '—';
   const statusKind = current.statusKind || current.status || '';
-  $('#live-status').textContent = /error|unsupported/i.test(statusKind) ? statusKind : typeof current.running === 'boolean' ? (current.running ? 'Running' : current.quiescent ? 'Quiescent' : 'Paused') : statusKind || 'Not reported';
+  $('#live-status').textContent = statusKind && statusKind !== 'ready' ? statusKind[0].toUpperCase() + statusKind.slice(1) : typeof current.running === 'boolean' ? (current.running ? 'Running' : current.quiescent ? 'Quiescent' : 'Paused') : 'Not reported';
   const details = [current.statusMessage, typeof current.quiescent === 'boolean' ? `Quiescent: ${current.quiescent ? 'yes' : 'no'}` : '', typeof current.recording === 'boolean' ? `Recording: ${current.recording ? 'on' : 'off'}` : '', current.requestedTps != null ? `Requested TPS: ${textValue(current.requestedTps)}` : '', current.uncapped ? 'Uncapped' : ''];
   $('#engine-extra').textContent = details.filter(Boolean).join(' · ');
 }
@@ -537,8 +551,9 @@ $('#detail').addEventListener('close', () => {
 $('#detail').addEventListener('click', event => { const r = $('#detail').getBoundingClientRect(); if (event.target === $('#detail') && (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom)) closeDetails(); });
 $('#close-detail').addEventListener('click', closeDetails);
 $('#launch-live').addEventListener('click', launchLive);
+$('#toggle-properties').addEventListener('click', () => setDetailsVisible($('#detail').classList.contains('details-hidden')));
 $('#capture-select').addEventListener('change', loadCapture);
-$$('.viewer-tabs button').forEach(node => node.addEventListener('click', () => setViewer(node.dataset.view)));
+$$('.viewer-tabs button').forEach(node => node.addEventListener('click', () => node.dataset.view === 'live' && state.detail?.capabilities?.live_sim ? launchLive() : setViewer(node.dataset.view)));
 $('#property-content').setAttribute('role', 'tabpanel');
 $$('.property-tabs button').forEach(node => {
   node.id = `property-tab-${node.dataset.property}`; node.setAttribute('aria-controls', 'property-content');

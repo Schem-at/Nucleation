@@ -38,7 +38,7 @@ build only the JavaScript app with:
 
 ```sh
 npm --prefix apps/sim-lab-wasm ci --ignore-scripts
-npm --prefix apps/sim-lab-wasm run build -- --base=/sim-lab/
+npm --prefix apps/sim-lab-wasm run build
 ```
 
 These commands compile TypeScript and bundle the browser app. **Rust/WASM
@@ -47,8 +47,9 @@ Do not run Sim Lab's `npm run engine` or `tools/package-npm.sh` on the Mac;
 they invoke the Rust build. Copy the reviewed laptop-produced engine assets
 into place before building Sim Lab, and keep their build metadata with them.
 
-The Atlas opens `/sim-lab/?archive=<sha256>` only after **Open live simulation**
-is clicked. The server advertises whether a given file can launch and explains
+The build uses relative asset URLs, so it works under `/sim-lab/` and at a
+standalone preview root. The Atlas opens `/sim-lab/?archive=<sha256>&embed=atlas`
+when **Live simulation** or **Start live simulation** is clicked. The server advertises whether a given file can launch and explains
 format or size limits. The whole World Record Plot exceeds the current live
 world limit. The **Plot doors** collection contains extracted physical door
 candidates; **Plot fragments** retains the other isolated components. Their
@@ -66,6 +67,10 @@ annotated map remain available as context.
   external service is involved.
 - Details have keyboard-accessible tabs, an original-file download, source
   attribution and native saved-state properties. **Escape** closes details.
+- Live mode expands the canvas. **Show details** restores its sidebar;
+  **Open in new tab** opens the full workspace. The embedded toolbar offers
+  run, step, reset and camera framing, with recording and mesh controls under
+  **more**. Switching away from live mode pauses the simulation.
 - Thumbnails are native 768×576 textured isometric PNG renders of the saved
   schematic using Minecraft models and textures. No simulation ticks run to
   generate a thumbnail. Missing or failed renders show an explicit text state;
@@ -122,3 +127,9 @@ and movement-review notes alongside the first-pass extraction properties.
 in a separate headless browser. It uses Sim Lab's Playwright development
 dependency; set `CHROME_PATH` to an installed Chromium/Chrome executable if the
 Playwright browser bundle is not installed. It does not operate personal tabs.
+
+`verify-live.mjs` checks the served JS/CSS URLs and MIME types, responsive live
+workspace, reset/step/pause controls and parent telemetry using the real WASM
+engine. `../sim-lab-wasm/verify-coordinates.mjs` checks saved-origin alignment,
+mesh vertices, picking, piston updates and differential simulation on the
+reported plot entries and generated translated multi-region builds.
