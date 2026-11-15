@@ -1,39 +1,39 @@
 {
   "schema_version": 1,
-  "audited_at_utc": "2026-11-15T08:02:27.376275+00:00",
+  "audited_at_utc": "2026-11-15T08:53:06.842095+00:00",
   "archive_root": "/Users/harrison/RustroverProjects/Nucleation-schematic-archive",
   "status": "passed",
   "scope": "Local content integrity, saved-tree consistency and curation joins. No network revalidation, builds, simulation or new parity proof.",
   "byte_accounting": "manifested_bytes counts every source/path occurrence; unique_content_bytes deduplicates SHA-256 contents and is not filesystem allocated space.",
   "summary": {
-    "sources": 13,
-    "manifest_records": 6732,
-    "downloaded_files": 6732,
+    "sources": 14,
+    "manifest_records": 7625,
+    "downloaded_files": 7625,
     "metadata_files": 1954,
-    "manifested_bytes": 32193850,
+    "manifested_bytes": 34609368,
     "metadata_bytes": 9776615,
-    "sha256_verified": 6732,
-    "object_verified": 6732,
+    "sha256_verified": 7625,
+    "object_verified": 7625,
     "git_blob_verified": 6727,
     "tree_entry_verified": 6727,
-    "schematic_files": 914,
-    "schematic_bytes": 15080234,
+    "schematic_files": 1807,
+    "schematic_bytes": 17495752,
     "layout_files": 3864,
     "layout_bytes": 7337001,
-    "unique_contents": 6635,
-    "unique_content_bytes": 31578152,
-    "unique_schematic_contents": 862,
+    "unique_contents": 7528,
+    "unique_content_bytes": 33993670,
+    "unique_schematic_contents": 1755,
     "unique_layout_contents": 3852,
-    "unique_schematic_bytes": 14536080,
+    "unique_schematic_bytes": 16951598,
     "unique_layout_bytes": 7303519,
-    "curators": 4,
-    "curation_entries": 1082,
-    "curated_unique_keys": 1082,
+    "curators": 5,
+    "curation_entries": 1975,
+    "curated_unique_keys": 1975,
     "shortlist_entries": 77,
     "shortlist_unique_keys": 58,
     "known_negative_unique_keys": 12,
     "curation_readiness_counts": {
-      "unvalidated": 1050,
+      "unvalidated": 1943,
       "functional": 3,
       "quarantine": 17,
       "known-negative": 12
@@ -226,6 +226,17 @@
       "tree_entry_verified": 185,
       "schematic_files": 63,
       "schematic_bytes": 350375
+    },
+    {
+      "source": "world-record-parts",
+      "manifest_sha256": "19ba861bdaa73ae5ea9ae8b8b9856029ff5c4ed44d396bdaef00c38fc0e94d73",
+      "manifest_records": 893,
+      "downloaded_files": 893,
+      "schematic_files": 893,
+      "manifested_bytes": 2415518,
+      "schematic_bytes": 2415518,
+      "sha256_verified": 893,
+      "object_verified": 893
     }
   ],
   "curation": [
@@ -275,6 +286,20 @@
       "uncompressed_bytes": 961181
     },
     {
+      "curator": "world-record-parts",
+      "entries": 893,
+      "shortlist": 0,
+      "readiness_counts": {
+        "unvalidated": 893
+      },
+      "archive_path": "curation/world-record-parts.json",
+      "snapshot_path": "catalog/world-record-parts.json.gz",
+      "sha256": "a60333b183a0a7cf6e0b35c0b15c0ea82b0a4fcd5af6f74e938332b59b2c14e5",
+      "bytes": 622653,
+      "uncompressed_sha256": "32a8a33dbcd699cb537a2e549e19622dc41125290461e4b71eab072830948168",
+      "uncompressed_bytes": 10540576
+    },
+    {
       "curator": "world-record-plot",
       "entries": 1,
       "shortlist": 20,
@@ -299,6 +324,11 @@
     {
       "type": "local_manual_source_no_git_tree",
       "source": "user-world-record-plot",
+      "meaning": "Verified against per-file SHA-256 and user-local provenance. The original binary is not in the tracked recovery metadata."
+    },
+    {
+      "type": "local_manual_source_no_git_tree",
+      "source": "world-record-parts",
       "meaning": "Verified against per-file SHA-256 and user-local provenance. The original binary is not in the tracked recovery metadata."
     }
   ],

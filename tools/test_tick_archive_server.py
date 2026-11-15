@@ -11,6 +11,7 @@ import hashlib
 import importlib.util
 import json
 import pathlib
+import struct
 import sys
 import urllib.error
 import urllib.parse
@@ -101,10 +102,13 @@ def main():
         return entries[digest]
 
     def library_counts():
-        expected = {'schematic_files':914, 'unique_schematics':862, 'layout_files':3864, 'validated':4}
+        original = [r for r in rows if r['source'] not in {'world-record-parts', 'world-record-floor-parts'}]
+        expected = {'layout_files':3864, 'validated':4}
         for key, value in expected.items():require(library['summary'][key] == value, f'{key} != {value}')
         schematic = [r for r in rows if r['kind'] == 'schematic']
-        require(len(schematic) == 914 and len({r['sha256'] for r in schematic}) == 862, 'Summary disagrees with actual schematic rows')
+        original_schematic = [r for r in original if r['kind'] == 'schematic']
+        require(len(original_schematic) == 914 and len({r['sha256'] for r in original_schematic}) == 862, 'Original archive changed')
+        require(len(schematic) == library['summary']['schematic_files'] and len({r['sha256'] for r in schematic}) == library['summary']['unique_schematics'], 'Summary disagrees with actual schematic rows')
         require(sum(r['kind'] == 'layout' for r in rows) == 3864, 'Layout row count differs')
         validated = {r['sha256'] for r in rows if r.get('validation_status') in PASS_STATUSES}
         require(len(validated) == 4, 'Validated count must be distinct content, not duplicate paths')
@@ -130,18 +134,17 @@ def main():
             require(inspection['status'] == 'static_preview', 'Expected actual saved-block preview')
             require(inspection['non_air_blocks'] == expected == sum(inspection['materials'].values()), 'Decoded count/material mismatch')
             require('no simulation' in inspection['scope'], 'Preview scope must not imply vanilla proof')
-            svg = request('/api/thumbnail/'+PINNED[label], kind='image/svg+xml')
-            tree = ET.fromstring(svg)
-            require(tree.tag == '{http://www.w3.org/2000/svg}svg', 'Invalid SVG root')
-            require('SAVED BLOCKS' in ''.join(tree.itertext()), 'Expected actual block projection, not placeholder')
-            require(len(tree.findall('{http://www.w3.org/2000/svg}rect')) > 1, 'No projected cells')
-            require(not any(node.tag.split('}')[-1] in {'script','foreignObject','image'} for node in tree.iter()), 'Unexpected active/external SVG content')
+            png = request('/api/thumbnail/'+PINNED[label], kind='image/png')
+            require(png[:8] == b'\x89PNG\r\n\x1a\n' and struct.unpack('>II', png[16:24]) == (768,576), 'Expected native 768x576 PNG')
+            render = result['entries'][0]['thumbnail']
+            require(render['status'] == 'ok' and render['png_sha256'] == sha(png), 'Rendered image hash/provenance mismatch')
+            require(render['simulation_ticks'] == 0 and render['non_air_blocks'] == expected, 'Renderer advanced or changed input')
             if label == 'comparator':
                 controls = inspection['saved_controls']
                 require(len(controls) == 16 and all('powered=false' in x['state'] for x in controls), 'Comparator saved lever properties differ')
                 require({tuple(x['pos']) for x in controls} == {(x,1+2*i,10) for x in [0,3] for i in range(8)}, 'Comparator source port coordinates differ')
-            return {'non_air_blocks':expected, 'dimensions':inspection['dimensions'], 'svg_sha256':sha(svg), 'scope':inspection['scope']}
-        check('static saved-block thumbnail '+label, preview)
+            return {'non_air_blocks':expected, 'dimensions':inspection['dimensions'], 'png_sha256':sha(png), 'scope':inspection['scope']}
+        check('textured saved-state thumbnail '+label, preview)
 
     def plot_limit():
         result = entry(PINNED['plot']); info = result['inspection']
@@ -155,6 +158,25 @@ def main():
         require(svg.tag.endswith('}svg'), 'Plot map is not SVG')
         return {'dimensions':info['dimensions'], 'bounding_volume':info['bounding_volume'], 'live_sim':False, 'candidates':20}
     check('large plot gate and survey association', plot_limit)
+
+    def extracted_parts():
+        parts = [r for r in rows if r['source'] == 'world-record-parts']
+        require(len(parts) == 893, 'Expected every verified first-pass component')
+        require(sum(r['non_air_blocks'] for r in parts) == 458409, 'Source block coverage differs')
+        require(sum(r['block_entities'] for r in parts) == 12541, 'Source container/block-entity coverage differs')
+        require(sum(r['entities'] for r in parts) == 318, 'Source entity coverage differs')
+        doors = [r for r in parts if r['classification'] == 'door_candidate' and 'infrastructure_review' not in r['review_tags']]
+        require(len(doors) == 746, 'Shared floors must not count as individual first-pass door candidates')
+        require(all(r['data_version'] == 4671 and r.get('validation_status') not in PASS_STATUSES for r in parts), 'Extraction changed version or invented functional evidence')
+        require(all(r['thumbnail']['status'] == 'ok' for r in doors), 'An extracted door lacks a verified real render')
+        for row in [doors[0], doors[-1]]:
+            data = request('/api/file/'+row['sha256'])
+            require(sha(data) == row['sha256'], 'Extracted download hash mismatch')
+            result = entry(row['sha256'])['entries'][0]
+            require(result['verification']['readback'] == 'passed', 'Missing exact source/read-back evidence')
+            require(result['derived_from']['sha256'] == PINNED['plot'], 'Extracted source association differs')
+        return {'files':len(parts), 'individual_candidates':len(doors), 'source_blocks':458409, 'block_entities':12541, 'entities':318}
+    check('extracted plot files, preservation and rendered doors', extracted_parts)
 
     for label, expected in [('comparator',{'vanilla-comparator':960}), ('door',{'vanilla-cycle':320,'vanilla-idle':320})]:
         def captures(label=label, expected=expected):
@@ -183,8 +205,8 @@ def main():
             result = entry(row['sha256'])
             require(result['inspection']['status'] == 'metadata_only', 'Unsupported format must remain metadata-only')
             require(result['capabilities']['live_sim'] is False, 'Unsupported format must not advertise live simulation')
-            svg = ET.fromstring(request('/api/thumbnail/'+row['sha256'],kind='image/svg+xml'))
-            require('METADATA PREVIEW' in ''.join(svg.itertext()), 'Unsupported thumbnail should be labelled')
+            absent = json.loads(request('/api/thumbnail/'+row['sha256'],status=404,kind='application/json'))
+            require(absent['render']['status'] != 'ok', 'Unsupported thumbnail must not be replaced by a fake image')
             return {'extension':extension, 'sha256':row['sha256'], 'status':result['inspection']['status'], 'live_sim':False}
         check('metadata-only format '+extension, unsupported)
 

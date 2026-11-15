@@ -13,12 +13,15 @@ READMEs, saved DataVersions and alternate formats are retained separately.
 
 ## Coverage
 
-- **914 schematic files, 862 distinct schematic contents**, across 13 source groups.
+- The original collection has **914 schematic files, 862 distinct schematic
+  contents**, across 13 source groups. The verified first plot extraction adds
+  **893 separately downloadable components**; see the extraction reports below.
 - **3,864 additional text layouts**, mainly Redstonepedia; these require conversion
   and validation before use in the Java 1.21.11 suite.
 - Three independent curators produced **57 shortlisted test proposals**:
   20 logic/memory, 20 movement, and 17 storage/crafting. The user-provided
-  World Record Plot adds 20 provisional component candidates within one file.
+  World Record Plot's initial 20 survey leads have been superseded by full-plot
+  extraction using the existing part isolator.
 - All selected downloads completed. Binary NBT files were statically parsed;
   the 33 Lithium SNBT fixtures received version scanning only.
 - Fourteen Bedrock exports, source-labeled broken/non-looping machines, files
@@ -104,15 +107,17 @@ as a successful benchmark.
 The original user file is retained unchanged as a local-only source. Its native 4671
 selection contains 458,409 non-air blocks in 284×208×295 cells, 12,541 block entities
 and 318 top-level entities. See the [survey](world-record-plot.md) and
-[overview map](world-record-plot-map.svg). Twenty geometry-derived components
-are leads for extraction, not certified complete doors. Candidate boundaries
+[overview map](world-record-plot-map.svg). The [full extraction](world-record-parts.md)
+produced 893 files, including 746 smaller physical door candidates, three shared
+floor groups, and 144 other components. Every exported file passed source-state,
+block-entity payload and entity read-back checks. Candidate boundaries
 do not prove their surrounding dependencies are present. Saved inventories are
 mostly empty; edge-touching mechanisms may be cut by the approximate selection.
 Five moving-piston blocks have no saved piston block entities. These fixture
 limitations must be resolved before treating a failure as engine incompatibility.
 
-Circuit Atlas exposes metadata, material projections, evidence, captured-tick
+Circuit Atlas exposes [textured isometric PNGs](thumbnails.md), metadata, evidence, captured-tick
 playback and an explicit live-browser launch for supported-size Java inputs.
 The full plot exceeds the browser engine's 8-million-cell limit, so its live
-launch is disabled in favor of the survey. Live interaction uses the existing
+launch is disabled in favor of the extracted files. Live interaction uses the existing
 SimLab engine; it is not a new vanilla certification or a native speed result.

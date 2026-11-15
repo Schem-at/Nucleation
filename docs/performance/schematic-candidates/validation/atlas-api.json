@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "status": "pass",
-  "checked_at_utc": "2026-11-15T08:15:33.955974+00:00",
+  "checked_at_utc": "2026-11-15T08:55:28.409788+00:00",
   "base_url": "http://127.0.0.1:8767",
-  "server_source_sha256": "731674ed2f30d57518989363a3f6f9c92b967ef068071a2cb50fa025ec635355",
-  "test_source_sha256": "ca0fd93ce69647dd35c9599c547c6f4e776cbce131d84d8b28c5917b8f3383c1",
-  "library_file_sha256": "26380682c63631f44da18baaf268c1d1a1bfd8d5656d1d07995b05a56c53b82c",
-  "checks_passed": 17,
-  "checks_total": 17,
-  "http_requests": 33,
+  "server_source_sha256": "1a8ba9fb6b25ad3f277c6abc582093f32c3c020bd1056eabe982ed1f767043a1",
+  "test_source_sha256": "b091e83fcaaf742d297118fd054cabd24e01301e31980dac85093ca45de91667",
+  "library_file_sha256": "75e9981fb740b33d17ff006da9f1137b205cd18442468c799497ddd148ff17c9",
+  "checks_passed": 18,
+  "checks_total": 18,
+  "http_requests": 37,
   "scope": "Read-only loopback API, original byte hashes, static decoding and retained capture association. No browser/UI/WASM execution, new vanilla run or new circuit parity proof.",
   "checks": [
     {
@@ -16,10 +16,10 @@
       "status": "pass",
       "details": {
         "summary": {
-          "schematic_files": 914,
-          "unique_schematics": 862,
+          "schematic_files": 1807,
+          "unique_schematics": 1755,
           "layout_files": 3864,
-          "sources": 13,
+          "sources": 14,
           "validated": 4
         },
         "validated_sha256": [
@@ -71,7 +71,7 @@
       }
     },
     {
-      "name": "static saved-block thumbnail comparator",
+      "name": "textured saved-state thumbnail comparator",
       "status": "pass",
       "details": {
         "non_air_blocks": 272,
@@ -80,12 +80,12 @@
           17,
           12
         ],
-        "svg_sha256": "9659c99bf3e9771e5f9b082c2c04e8c9dc901ecb4be3f0958b2c8144bca98e00",
+        "png_sha256": "8c6a7ac9c90815fa6585cdbf15f51f53d9364bc3e69717ef0bb81122e305a487",
         "scope": "Saved cells only; no simulation or completeness proof. Multi-region overlaps may be counted more than once."
       }
     },
     {
-      "name": "static saved-block thumbnail latch",
+      "name": "textured saved-state thumbnail latch",
       "status": "pass",
       "details": {
         "non_air_blocks": 25,
@@ -94,12 +94,12 @@
           3,
           5
         ],
-        "svg_sha256": "93062082474533cba088bdb3c34878c640926713d54d5c8a3d1c31deaa4fccfa",
+        "png_sha256": "9d487a4413d9231064f6636ffbde0f0ac849dd63e3f1409f9b1f6a09f4cd46ce",
         "scope": "Saved cells only; no simulation or completeness proof. Multi-region overlaps may be counted more than once."
       }
     },
     {
-      "name": "static saved-block thumbnail flyer",
+      "name": "textured saved-state thumbnail flyer",
       "status": "pass",
       "details": {
         "non_air_blocks": 252,
@@ -108,7 +108,7 @@
           6,
           33
         ],
-        "svg_sha256": "fd3cae508e4da64d86dc96a66580f293f2e921c6a278a98d86138869975af4eb",
+        "png_sha256": "7c20d9c3aba38f55ba6508c4d49e905e7a685218427b24070e05d4de4d7173ba",
         "scope": "Saved cells only; no simulation or completeness proof. Multi-region overlaps may be counted more than once."
       }
     },
@@ -124,6 +124,17 @@
         "bounding_volume": 17426240,
         "live_sim": false,
         "candidates": 20
+      }
+    },
+    {
+      "name": "extracted plot files, preservation and rendered doors",
+      "status": "pass",
+      "details": {
+        "files": 893,
+        "individual_candidates": 746,
+        "source_blocks": 458409,
+        "block_entities": 12541,
+        "entities": 318
       }
     },
     {
@@ -221,8 +232,8 @@
     {
       "path": "/api/library",
       "status": 200,
-      "bytes": 3806337,
-      "sha256": "090c3a099704cd9d7dfabd296e29efaf972559b332fa53914e2963b95d6dc52f",
+      "bytes": 7824183,
+      "sha256": "0f6364f99344dc3c9779351d7d07251344e59ce7192afa01cafc6a46007a456e",
       "content_type": "application/json"
     },
     {
@@ -256,50 +267,50 @@
     {
       "path": "/api/entry/92d44580dc1539903b56ad08a8b1be89d70de602328d5fe36ef589743c3a3db3",
       "status": 200,
-      "bytes": 8659,
-      "sha256": "710490f7c1567663460d3c5f74c85a4f9d255940298898083950db74aa4d36f1",
+      "bytes": 9504,
+      "sha256": "13b7409853f2656f35bb3521ca0df07773e5e84c3e89b52bdc3309ef03bb76d6",
       "content_type": "application/json"
     },
     {
       "path": "/api/thumbnail/92d44580dc1539903b56ad08a8b1be89d70de602328d5fe36ef589743c3a3db3",
       "status": 200,
-      "bytes": 2887,
-      "sha256": "9659c99bf3e9771e5f9b082c2c04e8c9dc901ecb4be3f0958b2c8144bca98e00",
-      "content_type": "image/svg+xml"
+      "bytes": 172993,
+      "sha256": "8c6a7ac9c90815fa6585cdbf15f51f53d9364bc3e69717ef0bb81122e305a487",
+      "content_type": "image/png"
     },
     {
       "path": "/api/entry/0663302dfc40ac8c33055d5a43aefe834be4290bdda9baaec6f2ccab238cad54",
       "status": 200,
-      "bytes": 6233,
-      "sha256": "fb2a827b68a9f16807e2034ee28cc3ed77631160465ae48e877611061d923590",
+      "bytes": 7069,
+      "sha256": "8f018906db8028489b1073de628b6048a8917a5641f3ff2490a301d7fd3c2ff1",
       "content_type": "application/json"
     },
     {
       "path": "/api/thumbnail/0663302dfc40ac8c33055d5a43aefe834be4290bdda9baaec6f2ccab238cad54",
       "status": 200,
-      "bytes": 1354,
-      "sha256": "93062082474533cba088bdb3c34878c640926713d54d5c8a3d1c31deaa4fccfa",
-      "content_type": "image/svg+xml"
+      "bytes": 110631,
+      "sha256": "9d487a4413d9231064f6636ffbde0f0ac849dd63e3f1409f9b1f6a09f4cd46ce",
+      "content_type": "image/png"
     },
     {
       "path": "/api/entry/be17be1f79c2bee74f909b4205a3b1ad7c5e9e70c69454abc51b51927fd585dd",
       "status": 200,
-      "bytes": 2486,
-      "sha256": "35e1d2a2f02c323ae61531d26b1aa620150e62275e546ff6595fe8cb61640dd8",
+      "bytes": 3321,
+      "sha256": "6719554f7a243006efec3f407ca0d1f9431bb45c91d494168bf6d0439bbf9ef6",
       "content_type": "application/json"
     },
     {
       "path": "/api/thumbnail/be17be1f79c2bee74f909b4205a3b1ad7c5e9e70c69454abc51b51927fd585dd",
       "status": 200,
-      "bytes": 10715,
-      "sha256": "fd3cae508e4da64d86dc96a66580f293f2e921c6a278a98d86138869975af4eb",
-      "content_type": "image/svg+xml"
+      "bytes": 105604,
+      "sha256": "7c20d9c3aba38f55ba6508c4d49e905e7a685218427b24070e05d4de4d7173ba",
+      "content_type": "image/png"
     },
     {
       "path": "/api/entry/5476ac349cd4529d7a237828633b9e7a995d70b8937f70e4836d2f9f8db66c1e",
       "status": 200,
-      "bytes": 348070,
-      "sha256": "291649e131abe11601ccb801dc1556c4334f0804e0a6a85c995a961a4982928a",
+      "bytes": 349129,
+      "sha256": "0b7701e7af5899dee30f02a8e9602ca28a423cf418ccc5412195a45465b4c0a1",
       "content_type": "application/json"
     },
     {
@@ -317,6 +328,34 @@
       "content_type": "image/svg+xml"
     },
     {
+      "path": "/api/file/c69c82289b55051829fffde0c453f6a237c6f350cba463334bd287c142e37afc",
+      "status": 200,
+      "bytes": 6015,
+      "sha256": "c69c82289b55051829fffde0c453f6a237c6f350cba463334bd287c142e37afc",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "/api/entry/c69c82289b55051829fffde0c453f6a237c6f350cba463334bd287c142e37afc",
+      "status": 200,
+      "bytes": 13558,
+      "sha256": "c4732f600777b59047124dfa60f2def1cbea5fbbeacb196e0b036079c9cbfd45",
+      "content_type": "application/json"
+    },
+    {
+      "path": "/api/file/0e6ab1d334bd371447f54ecfcb1082b59b37d65d2540a0335fdccaf9a9a01bea",
+      "status": 200,
+      "bytes": 2622,
+      "sha256": "0e6ab1d334bd371447f54ecfcb1082b59b37d65d2540a0335fdccaf9a9a01bea",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "/api/entry/0e6ab1d334bd371447f54ecfcb1082b59b37d65d2540a0335fdccaf9a9a01bea",
+      "status": 200,
+      "bytes": 11596,
+      "sha256": "4c52815448cf034d0422bdd7d93b917b4b2e77423d29761965f087bd3a209306",
+      "content_type": "application/json"
+    },
+    {
       "path": "/api/capture/vanilla-comparator",
       "status": 200,
       "bytes": 17523053,
@@ -326,8 +365,8 @@
     {
       "path": "/api/entry/e7b964e92109edebd0860f1ec95c158eebd8f66436e4c6c5b7c36862b7675586",
       "status": 200,
-      "bytes": 3789,
-      "sha256": "a380f39d107ae4c41e39873be6fc03b2e4aebe17565ad8db773c456a75f28b65",
+      "bytes": 4650,
+      "sha256": "7df5fc438f00870342d767a28a090aef7fdf372afd58ac99a9e3a8363a7d7758",
       "content_type": "application/json"
     },
     {
@@ -347,44 +386,44 @@
     {
       "path": "/api/entry/a5250062c94e0aabddeb2f260ee833ab0d4cfda381051c40a667dc900d3e67d4",
       "status": 200,
-      "bytes": 5267,
-      "sha256": "9351cdb2ab208491dc040c8cc4fdd7ba3c693e5fe42ddb4d9ef510ead1c76d50",
+      "bytes": 5271,
+      "sha256": "02195905547e4816aca747f118561543cfafc8c183521bec84f8065f7b1c185f",
       "content_type": "application/json"
     },
     {
       "path": "/api/thumbnail/a5250062c94e0aabddeb2f260ee833ab0d4cfda381051c40a667dc900d3e67d4",
-      "status": 200,
-      "bytes": 309,
-      "sha256": "44bf8720602d9f6f40a175a3a962a4f515e75562eb1b7fab68bea7ff35ef8d95",
-      "content_type": "image/svg+xml"
+      "status": 404,
+      "bytes": 67,
+      "sha256": "55a89f87f423e31f6561c6a203990c7304ac4b115e5c76039853bcc2a0514f01",
+      "content_type": "application/json"
     },
     {
       "path": "/api/entry/347fc8c5f4018ff1c7e25397c73f01e7768eea4ca994b025a6a53efdc53c77be",
       "status": 200,
-      "bytes": 4689,
-      "sha256": "859f4e166ab5bf4aaf8609e36d9af70ccd0b94125df141f3c7a00b3cf71cdf34",
+      "bytes": 4693,
+      "sha256": "220c582a718b216915c37fa8681133e38c7592217a730cbcc7ef1ec26ac89eaa",
       "content_type": "application/json"
     },
     {
       "path": "/api/thumbnail/347fc8c5f4018ff1c7e25397c73f01e7768eea4ca994b025a6a53efdc53c77be",
-      "status": 200,
-      "bytes": 301,
-      "sha256": "f2f9c8d93b7e20179ce973a16b6840f985d19d16e0c2b0f299317e79d95ceaf6",
-      "content_type": "image/svg+xml"
+      "status": 404,
+      "bytes": 67,
+      "sha256": "55a89f87f423e31f6561c6a203990c7304ac4b115e5c76039853bcc2a0514f01",
+      "content_type": "application/json"
     },
     {
       "path": "/api/entry/71e3b9057bb8ebc049c93b403cf95e2760272197ecd6e25ff5f675494d3289bf",
       "status": 200,
-      "bytes": 1704,
-      "sha256": "7fb730efc3aa366d3b23b7e82915f4666143c0d0b8e6313d1e48129215d11185",
+      "bytes": 1708,
+      "sha256": "170e535f15ef32773beb6f5a7da0db9c678b799e74f8e1b4c915921f2967ec8a",
       "content_type": "application/json"
     },
     {
       "path": "/api/thumbnail/71e3b9057bb8ebc049c93b403cf95e2760272197ecd6e25ff5f675494d3289bf",
-      "status": 200,
-      "bytes": 305,
-      "sha256": "adde68dd5ddc73327a5db4cecf93afa29fe61c2f086ca85d0f5ff395e556a6f1",
-      "content_type": "image/svg+xml"
+      "status": 404,
+      "bytes": 67,
+      "sha256": "55a89f87f423e31f6561c6a203990c7304ac4b115e5c76039853bcc2a0514f01",
+      "content_type": "application/json"
     },
     {
       "path": "/api/file/0000000000000000000000000000000000000000000000000000000000000000",

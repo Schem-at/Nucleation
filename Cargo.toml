@@ -469,6 +469,10 @@ hematite-nbt = { git = "https://github.com/StackDoubleFlow/hematite_nbt" }
 name = "render_simulation_video"
 required-features = ["rendering"]
 
+[[example]]
+name = "render_archive_thumbnails"
+required-features = ["rendering"]
+
 # The one diagnostic left where there used to be six door-specific ones
 # (door55_sim, door55_doorway, door55_xray, door55_render, world_entity_audit,
 # door_batch_load). It takes a path instead of knowing about a door, and prints

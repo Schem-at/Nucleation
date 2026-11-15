@@ -50,8 +50,12 @@ into place before building Sim Lab, and keep their build metadata with them.
 The Atlas opens `/sim-lab/?archive=<sha256>` only after **Open live simulation**
 is clicked. The server advertises whether a given file can launch and explains
 format or size limits. The whole World Record Plot exceeds the current live
-world limit; its annotated map and candidate bounds remain available. There is
-no automatic crop or simulation of that plot.
+world limit. The **Plot doors** collection contains extracted physical door
+candidates; **Plot fragments** retains the other isolated components. Their
+rendered geometry, saved inventories, controls, source-coordinate bounds and
+selection-edge contacts can be inspected independently. Physical isolation is
+not a passing functionality or vanilla-parity check. The original plot and its
+annotated map remain available as context.
 
 ## Interaction and evidence
 
@@ -62,8 +66,17 @@ no automatic crop or simulation of that plot.
   external service is involved.
 - Details have keyboard-accessible tabs, an original-file download, source
   attribution and native saved-state properties. **Escape** closes details.
-- Thumbnails are the server's saved-block top projections or explicit metadata
-  previews. The fallback mechanism symbols are decorative, not screenshots.
+- Thumbnails are native 768×576 textured isometric PNG renders of the saved
+  schematic using Minecraft models and textures. No simulation ticks run to
+  generate a thumbnail. Missing or failed renders show an explicit text state;
+  no placeholder geometry is substituted. Entity rendering has the native
+  mesher's model and positioning limitations, recorded with the render result.
+- **Plot doors** selects `world-record-parts` entries classified as
+  `door_candidate`, excluding components flagged `infrastructure_review`.
+  **Plot fragments** keeps the remaining extracted content, including shared
+  floors that may connect several mechanisms.
+  Review tags expose missing controls, inventory omissions and possible cutoffs;
+  appearance alone does not establish a working mechanism.
 - **Captured run** replays a retained capture with `replay.js`; it does not run
   the simulation engine. **Live simulation** displays actual iframe-reported
   tick, throughput, entity and engine state. Messages must come from the exact
@@ -86,7 +99,7 @@ provides `mountReplay(container, capture)` and returns a cleanup callback.
 | `/api/library` | Summary and compact archive rows |
 | `/api/entry/<sha256>` | Full provenance rows, inspection, captures and capabilities |
 | `/api/file/<sha256>` | Original archived file |
-| `/api/thumbnail/<sha256>` | Bounded saved-file projection or metadata SVG |
+| `/api/thumbnail/<sha256>` | Native textured PNG, or 404 when unavailable |
 | `/api/capture/<id>` | Retained capture data |
 | `/api/plot-map` | Annotated World Record Plot survey |
 | `/api/plot` | Plot curation metadata |

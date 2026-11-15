@@ -87,6 +87,8 @@ class Archive:
         for row in self.library['entries']:
             self.by_hash[row['sha256']].append(row)
         self.inspections = {}
+        render_manifest = root / 'rendered-thumbnails/manifest.json'
+        self.thumbnails = json.loads(render_manifest.read_text()).get('entries', {}) if render_manifest.exists() else {}
         self.lock = threading.Lock()
         self.work = threading.BoundedSemaphore(3)
         self.captures = {}
@@ -106,6 +108,12 @@ class Archive:
     def engine(self):
         p = LAB / 'public/engine/build-info.json'
         return json.loads(p.read_text()) if p.exists() else {'status': 'not built'}
+
+    def thumbnail(self, sha):
+        result = self.thumbnails.get(sha, {'status': 'missing'})
+        if result.get('status') == 'ok' and not (self.root / 'rendered-thumbnails/pngs' / f'{sha}.png').is_file():
+            return {'status': 'missing'}
+        return result
 
     def inspect(self, sha):
         with self.lock:
@@ -168,11 +176,12 @@ class Archive:
             return result
 
     def slim(self):
-        keys = ['source', 'source_url', 'path', 'title', 'kind', 'bytes', 'sha256', 'data_version', 'dimensions', 'declared_blocks', 'non_air_blocks', 'entities', 'block_entities', 'palette_blocks', 'tags', 'priority', 'readiness', 'validation_status', 'validation_detail', 'local_path', 'evidence_basis', 'inspection', 'category']
+        keys = ['source', 'source_url', 'path', 'title', 'kind', 'bytes', 'sha256', 'data_version', 'dimensions', 'declared_blocks', 'non_air_blocks', 'entities', 'block_entities', 'palette_blocks', 'tags', 'priority', 'readiness', 'validation_status', 'validation_detail', 'local_path', 'evidence_basis', 'inspection', 'category', 'classification', 'bounds', 'cutoff_face_contacts', 'review_tags', 'isolation']
         rows = []
         for row in self.library['entries']:
             record = {k: row[k] for k in keys if k in row}
             record['id'] = row['sha256']
+            record['thumbnail'] = self.thumbnail(row['sha256'])
             record['title'] = str(row.get('title') or row.get('name') or Path(row['path']).stem.replace('_', ' '))
             static = row.get('static', {})
             record['non_air_blocks'] = row.get('non_air_blocks', static.get('non_air_blocks', static.get('non_air_region_sum', row.get('declared_blocks'))))
@@ -217,7 +226,7 @@ def main():
                     p = archive.path(path.rsplit('/', 1)[1]); return self.file(p, p.name)
                 if path.startswith('/api/entry/'):
                     sha = path.rsplit('/', 1)[1]; archive.path(sha)
-                    rows = [{k: v for k,v in r.items() if k not in ['search', 'projection', 'physical_components_8plus']} for r in archive.by_hash[sha]]
+                    rows = [dict({k: v for k,v in r.items() if k not in ['search', 'projection', 'physical_components_8plus']}, thumbnail=archive.thumbnail(sha)) for r in archive.by_hash[sha]]
                     inspection = {k: v for k,v in archive.inspect(sha).items() if k != '_svg'}
                     too_large = inspection.get('bounding_volume', 0) > 8_000_000
                     format_supported = rows[0]['kind'] == 'schematic' and Path(rows[0]['path']).suffix != '.mcstructure'
@@ -232,10 +241,13 @@ def main():
                     return self.file(capture['path'])
                 if path.startswith('/api/thumbnail/'):
                     sha = path.rsplit('/', 1)[1]; archive.path(sha)
+                    if archive.thumbnail(sha).get('status') != 'ok':
+                        return self.json({'error': 'No rendered thumbnail', 'render': archive.thumbnail(sha)}, 404)
+                    return self.file(archive.root / 'rendered-thumbnails/pngs' / f'{sha}.png')
+                if path.startswith('/api/projection/'):
+                    sha = path.rsplit('/', 1)[1]; archive.path(sha)
                     svg = archive.inspect(sha).get('_svg')
-                    if not svg:
-                        title = escape(Path(archive.by_hash[sha][0]['path']).suffix.upper().lstrip('.') or 'LAYOUT')
-                        svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240"><rect width="320" height="240" fill="#202925"/><path d="M60 120h70v-40h70v80h60" fill="none" stroke="#bddc7b" stroke-width="4"/><text x="18" y="224" fill="#bcc9bd" font-family="monospace" font-size="12">{title} · METADATA PREVIEW</text></svg>'
+                    if not svg: return self.json({'error': 'No saved-cell projection'}, 404)
                     return self.send(svg, 'image/svg+xml')
                 if path == '/api/plot-map': return self.file(REPO / 'docs/performance/schematic-candidates/world-record-plot-map.svg')
                 if path == '/api/plot':

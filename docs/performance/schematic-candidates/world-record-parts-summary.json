@@ -1,0 +1,65 @@
+{
+  "benchmark_status": "not_admitted",
+  "classifications": {
+    "door_candidate": 749,
+    "other_component": 144
+  },
+  "component_count": 893,
+  "extraction_manifest_sha256": "fdf6264c58b474b32f49b6f881d01582aa6d146979e21da33f1af639874b1b3e",
+  "extraction_verification": {
+    "all_exported_files_read_back": true,
+    "block_entities": 12541,
+    "block_entity_coordinate_normalization": "authoritative_id_and_absolute_position;relative_Id_id_Pos_x_y_z_wrappers_normalized;all_other_NBT_bit_exact",
+    "entities": 318,
+    "explicit_air_states": 160,
+    "functional_status": "unverified",
+    "hash_encoding": "typed_big_endian_length_delimited_NBT_with_sorted_compound_keys_and_bitwise_floats",
+    "metadata_preserved": true,
+    "non_air_blocks": 458409,
+    "preserved_block_states": 458569,
+    "source_block_entities_exactly_once": true,
+    "source_block_states_exactly_once": true,
+    "source_entities_exactly_once": true,
+    "status": "passed"
+  },
+  "files": 893,
+  "functional_status": "unverified",
+  "isolation": {
+    "api": "UniversalSchematic::split_connected_attach_nearby",
+    "connectivity": "Corner",
+    "coordinates": "original_source_coordinates_without_rebasing",
+    "entities_outside_all_block_bounds": "entity_only_quarantine_part",
+    "entity_assignment": "bounding_box_containment_then_nearest_closed_block_cube_then_part_index",
+    "entity_bbox_convention": "min_inclusive_max_plus_one_exclusive",
+    "entity_source_index": "canonical_NBT_lexicographic_order_zero_based",
+    "explicit_air_assignment": "prefer_containing_physical_bbox_then_nearest_physical_block_cube_then_part_index",
+    "explicit_air_states": "cave_air_and_void_air_preserved_without_affecting_physical_connectivity",
+    "inventory_repairs": "none",
+    "max_air_gap": 3,
+    "min_standalone_blocks": 16,
+    "non_air_definition": "excludes_minecraft_air_cave_air_and_void_air",
+    "part_order": "block_bounds_min_then_max_then_sorted_block_positions"
+  },
+  "local_only": true,
+  "native_data_version": 4671,
+  "original_sha256": "5476ac349cd4529d7a237828633b9e7a995d70b8937f70e4836d2f9f8db66c1e",
+  "quarantine_count": 0,
+  "registered_bytes": 2415518,
+  "review_tags": {
+    "empty_or_absent_saved_inventory": 617,
+    "infrastructure_review": 3,
+    "moving_piston_without_block_entity": 2,
+    "no_saved_activation_control": 59,
+    "plot_boundary": 99
+  },
+  "schema_version": 1,
+  "source": "world-record-parts",
+  "totals": {
+    "block_entities": 12541,
+    "entities": 318,
+    "explicit_air_states": 160,
+    "non_air_blocks": 458409,
+    "preserved_block_states": 458569
+  },
+  "vanilla_status": "not_run"
+}

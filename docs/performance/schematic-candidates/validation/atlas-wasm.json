@@ -9,5 +9,5 @@
   "actions": 72,
   "scope": "Every watched block state including air at initial and each tick-end; actual lever actions through JS bindings. Comparator outputs/inventory slots independently compared by native checker, not this script.",
   "max_browser_volume": 8000000,
-  "wasm_sha256": "c9035163b5398cda0cffaf030bee156b500468de7e55d8b0b8df552d325b4673"
+  "wasm_sha256": "c6c58f52f5aa4ecaa924d490e312dc6d8addf33cca721c0000f6e3c442eb0b87"
 }
