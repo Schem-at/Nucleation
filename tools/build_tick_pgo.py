@@ -12,9 +12,13 @@ p.add_argument('--fixtures',type=pathlib.Path,required=True)
 p.add_argument('--jobs',type=int,default=4)
 p.add_argument('--features',default='',help='Comma-separated mc-tick candidate features; reference is empty')
 p.add_argument('--skip-native',action='store_true',help='Only rebuild PGO after a native-CPU pilot has been rejected')
+p.add_argument('--repo',type=pathlib.Path,help='Build an isolated checkout using this same runner')
+p.add_argument('--rustflags',default='',help='Common flags before profile/native flags')
+p.add_argument('--verify-logic',action='store_true',help='Also save stationary logic verification')
+p.add_argument('--training-case',action='append',default=[],help='Add or replace CASE=ITERATIONS in common training')
 a=p.parse_args();a.output=a.output.resolve();a.output.mkdir(parents=True,exist_ok=False)
 raw=a.output/'raw';raw.mkdir()
-root=pathlib.Path(__file__).resolve().parents[1]
+root=a.repo.resolve() if a.repo else pathlib.Path(__file__).resolve().parents[1]
 def capture(*args):return subprocess.check_output(args,cwd=root,text=True).strip()
 def sha(path):return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
 rustc=capture('rustc','-vV');host=next(x.split(': ',1)[1] for x in rustc.splitlines() if x.startswith('host:'))
@@ -33,6 +37,7 @@ manifest={'rustc':rustc,'head':capture('git','rev-parse','HEAD'),
     'fixture_manifest':json.loads((a.fixtures/'manifest.json').read_text()),
     'command':command,'profile':{'opt_level':3,'lto':True,'debug':1},'builds':{}}
 def build(name,flags):
+    flags=' '.join(part for part in [a.rustflags,flags] if part)
     env['RUSTFLAGS']=flags
     with (a.output/(name+'-build.log')).open('w') as log:
         subprocess.run(command,cwd=root,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
@@ -43,6 +48,10 @@ instrumented=build('instrumented','-Cprofile-generate='+str(raw))
 # Broad training; trapdoor, transfer-speed and comparator collection are held out.
 training={'hipster':16,'door6':24,'flyer':128,'bb':16,'adder_idle':4096,
     'item_sorter':12,'hopper_storagecart_interaction':12}
+for entry in a.training_case:
+    name,count=entry.split('=',1)
+    assert int(count)>0
+    training[name]=int(count)
 manifest['training']=training
 with (a.output/'training.jsonl').open('w') as log:
     for case,iterations in training.items():
@@ -56,5 +65,8 @@ for name,flags in builds:
     binary=build(name,flags)
     with (a.output/(name+'-verify.jsonl')).open('w') as log:
         subprocess.run([str(binary),'--verify','--expanded'],cwd=root,env=env,stdout=log,check=True)
+    if a.verify_logic:
+        with (a.output/(name+'-logic-verify.jsonl')).open('w') as log:
+            subprocess.run([str(binary),'--verify','--logic'],cwd=root,env=env,stdout=log,check=True)
 (a.output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print('Built and verified compiler experiments:',a.output,flush=True)

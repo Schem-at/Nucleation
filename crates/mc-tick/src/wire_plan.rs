@@ -10,6 +10,44 @@ use std::sync::{Arc, Mutex, OnceLock};
 const CAPACITY: usize = 1024;
 const MAX_COMPARATORS: usize = 25;
 
+// Stationary logic can contain hundreds of permanently colliding wire keys.
+// Keep only a compact position index dense; actual plans remain sparse. Large
+// worlds and plans beyond the sparse budget retain the exact direct-map path.
+#[cfg(feature = "experiment-logic-plan-storage")]
+const MAX_DENSE_CELLS: usize = 262_144;
+#[cfg(feature = "experiment-logic-plan-storage")]
+const MAX_DENSE_PLANS: usize = 32_768;
+
+#[cfg(feature = "experiment-logic-plan-storage")]
+struct DenseIndex {
+    min: Pos,
+    size: [u32; 3],
+    layer_stride: usize,
+    // Zero is unassigned. Sparse slots start after the direct-map fallback.
+    slots: Vec<u32>,
+}
+
+#[cfg(feature = "experiment-logic-plan-storage")]
+impl DenseIndex {
+    fn new(world: &World) -> Option<Self> {
+        let len = world.raw_states().len();
+        if len > MAX_DENSE_CELLS { return None; }
+        let bounds = world.bounds();
+        let (x, y, z) = bounds.size();
+        Some(Self { min: bounds.min, size: [x, y, z],
+            layer_stride: x as usize * z as usize, slots: vec![0; len] })
+    }
+
+    #[inline]
+    fn index(&self, pos: Pos) -> Option<usize> {
+        let x = pos.x.wrapping_sub(self.min.x) as u32;
+        let y = pos.y.wrapping_sub(self.min.y) as u32;
+        let z = pos.z.wrapping_sub(self.min.z) as u32;
+        if x >= self.size[0] || y >= self.size[1] || z >= self.size[2] { return None; }
+        Some(y as usize * self.layer_stride + z as usize * self.size[0] as usize + x as usize)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct Group {
     pub fixed: u8,
@@ -149,6 +187,8 @@ struct State {
     world: Option<Arc<()>>,
     revision: u64,
     entries: Vec<Option<Entry>>,
+    #[cfg(feature = "experiment-logic-plan-storage")]
+    dense: Option<DenseIndex>,
     #[cfg(feature = "experiment-wire-plan-counters")]
     counts: Counts,
     #[cfg(all(test, feature = "experiment-world-plan-cache"))]
@@ -167,6 +207,7 @@ struct Counts {
     classify_structural: u64,
     classify_wire_value: u64,
     classify_irrelevant: u64,
+    conflict_misses: u64,
 }
 
 /// Scratch derived data: cloning rules starts empty and Debug never exposes
@@ -211,23 +252,64 @@ fn slot(pos: Pos) -> usize {
 }
 
 impl State {
-    fn clear(&mut self) {
+    fn clear(&mut self, world: &World) {
         self.entries.clear();
         self.entries.resize_with(CAPACITY, || None);
+        #[cfg(feature = "experiment-logic-plan-storage")]
+        { self.dense = DenseIndex::new(world); }
+        #[cfg(not(feature = "experiment-logic-plan-storage"))]
+        { let _ = world; }
         #[cfg(feature = "experiment-wire-plan-counters")]
         { self.counts.resets += 1; }
     }
 
+    /// Allocate at most one sparse slot for an in-bounds position. The first
+    /// CAPACITY slots remain reserved for oversized/out-of-bounds fallback.
+    #[inline]
+    fn query_index(&mut self, pos: Pos) -> usize {
+        #[cfg(feature = "experiment-logic-plan-storage")]
+        if let Some(dense) = &mut self.dense {
+            if let Some(index) = dense.index(pos) {
+                let assigned = dense.slots[index];
+                if assigned != 0 { return assigned as usize; }
+                if self.entries.len() < CAPACITY + MAX_DENSE_PLANS {
+                    let assigned = self.entries.len();
+                    if assigned == self.entries.capacity() {
+                        // Avoid Vec's doubling beyond the documented budget.
+                        self.entries.reserve_exact(CAPACITY);
+                    }
+                    self.entries.push(None);
+                    dense.slots[index] = assigned as u32;
+                    return assigned;
+                }
+            }
+        }
+        slot(pos)
+    }
+
+    /// Invalidating an unqueried position must not allocate a sparse plan.
+    #[inline]
+    fn existing_index(&self, pos: Pos) -> usize {
+        #[cfg(feature = "experiment-logic-plan-storage")]
+        if let Some(dense) = &self.dense {
+            if let Some(index) = dense.index(pos) {
+                let assigned = dense.slots[index];
+                if assigned != 0 { return assigned as usize; }
+            }
+        }
+        slot(pos)
+    }
+
     fn synchronize(&mut self, world: &World, classify: impl Fn(StateId, StateId) -> Transition) {
         if self.world.as_ref().is_none_or(|token| !Arc::ptr_eq(token, world.plan_identity())) {
-            self.clear();
+            self.clear(world);
             self.world = Some(world.plan_identity().clone());
             self.revision = world.plan_revision();
             return;
         }
         if self.revision == world.plan_revision() { return; }
         let Some(changes) = world.plan_changes_since(self.revision) else {
-            self.clear();
+            self.clear(world);
             self.revision = world.plan_revision();
             return;
         };
@@ -250,7 +332,8 @@ impl State {
                         if dx.abs() + dy.abs() + dz.abs() > 2 { continue; }
                         let pos = Pos::new(changed.x.wrapping_add(dx),
                             changed.y.wrapping_add(dy), changed.z.wrapping_add(dz));
-                        let entry_slot = &mut self.entries[slot(pos)];
+                        let index = self.existing_index(pos);
+                        let entry_slot = &mut self.entries[index];
                         let Some(_entry) = entry_slot.as_mut().filter(|entry| entry.pos == pos) else { continue; };
                         if kind == Transition::Structural {
                             *entry_slot = None;
@@ -289,8 +372,10 @@ impl Cache {
         state.synchronize(world, classify);
         #[cfg(feature = "experiment-wire-plan-counters")]
         { state.counts.queries += 1; }
-        let index = slot(pos);
+        let index = state.query_index(pos);
         if state.entries[index].as_ref().is_none_or(|entry| entry.pos != pos) {
+            #[cfg(feature = "experiment-wire-plan-counters")]
+            if state.entries[index].is_some() { state.counts.conflict_misses += 1; }
             state.entries[index] = Some(Entry {
                 pos,
                 plan: prepare_plan(build, world),
@@ -344,7 +429,7 @@ impl Cache {
     ) -> u8 {
         let mut state = self.0.lock().unwrap_or_else(|error| error.into_inner());
         if state.rules.as_ref().is_none_or(|token| !Arc::ptr_eq(token, rules)) {
-            state.clear();
+            state.clear(world);
             state.rules = Some(rules.clone());
             state.world = Some(world.plan_identity().clone());
             state.revision = world.plan_revision();
@@ -366,8 +451,10 @@ impl Cache {
         state.synchronize(world, classify);
         #[cfg(feature = "experiment-wire-plan-counters")]
         { state.counts.queries += 1; }
-        let index = slot(pos);
+        let index = state.query_index(pos);
         if state.entries[index].as_ref().is_none_or(|entry| entry.pos != pos) {
+            #[cfg(feature = "experiment-wire-plan-counters")]
+            if state.entries[index].is_some() { state.counts.conflict_misses += 1; }
             #[cfg(test)]
             { state.test_builds += 1; }
             state.entries[index] = Some(Entry {
@@ -416,6 +503,142 @@ mod tests {
                 plan.groups[0].fixed = world.get(source).raw() as u8;
                 plan
             }, |_, _| 0)
+    }
+
+    #[cfg(feature = "experiment-logic-plan-storage")]
+    #[test]
+    fn dense_position_slots_keep_colliding_plans_warm_and_invalidate_each_exact_key() {
+        let cache = Cache::default();
+        let first = Pos::new(-3, 0, -2);
+        let second = (10..8192).map(|x| Pos::new(x, 0, -2))
+            .find(|&p| slot(p) == slot(first)).expect("direct-map collision");
+        let mut world = World::new(Bounds::new(
+            Pos::new(-4, -1, -3), Pos::new(second.x + 1, 1, -1)));
+        world.set(first, StateId(3));
+        world.set(second, StateId(9));
+        for _ in 0..32 {
+            assert_eq!(fixed_query(&cache, &world, first, first), 3);
+            assert_eq!(fixed_query(&cache, &world, second, second), 9);
+        }
+        assert_eq!(cache.test_builds(), 2, "colliding coordinates retain separate plans");
+        {
+            let state = cache.0.lock().unwrap();
+            assert_ne!(state.existing_index(first), state.existing_index(second));
+            assert_eq!(state.entries.len(), CAPACITY + 2);
+        }
+        // A local structural edit invalidates the relevant sparse slot even
+        // though the old direct-map hash aliases the still-valid second plan.
+        world.set(first, StateId(11));
+        assert_eq!(fixed_query(&cache, &world, second, second), 9);
+        assert_eq!(cache.test_builds(), 2);
+        assert_eq!(fixed_query(&cache, &world, first, first), 11);
+        assert_eq!(cache.test_builds(), 3);
+        world.set(second, StateId(17));
+        assert_eq!(fixed_query(&cache, &world, second, second), 17);
+        assert_eq!(fixed_query(&cache, &world, first, first), 11);
+        assert_eq!(cache.test_builds(), 4);
+        // Geometry and identity changes discard the mapping before any hit.
+        assert!(world.grow_to_include(Pos::new(-5, 0, -2)));
+        assert_eq!(fixed_query(&cache, &world, first, first), 11);
+        assert_eq!(fixed_query(&cache, &world, second, second), 17);
+        assert_eq!(cache.test_builds(), 6);
+        let mut clone = world.clone();
+        clone.set(first, StateId(21));
+        assert_eq!(fixed_query(&cache, &clone, first, first), 21);
+        assert_eq!(fixed_query(&cache, &world, first, first), 11);
+        assert_eq!(cache.test_builds(), 8);
+    }
+
+    #[cfg(feature = "experiment-logic-plan-storage")]
+    #[test]
+    fn dense_storage_budgets_and_out_of_bounds_queries_keep_direct_map_fallback() {
+        let world = World::new(Bounds::new(Pos::new(0, 0, 0),
+            Pos::new(MAX_DENSE_CELLS as i32, 0, 0)));
+        let mut state = State::default();
+        state.clear(&world);
+        assert!(state.dense.is_none(), "index is bounded to one MiB of u32 slots");
+        let pos = Pos::new(27, 0, 0);
+        assert_eq!(state.query_index(pos), slot(pos));
+        assert_eq!(state.entries.len(), CAPACITY);
+
+        let world = World::new(Bounds::new(Pos::new(0, 0, 0),
+            Pos::new(MAX_DENSE_PLANS as i32 + 1, 0, 0)));
+        state.clear(&world);
+        assert!(state.dense.is_some());
+        for x in 0..MAX_DENSE_PLANS {
+            assert_eq!(state.query_index(Pos::new(x as i32, 0, 0)), CAPACITY + x);
+        }
+        let excess = Pos::new(MAX_DENSE_PLANS as i32, 0, 0);
+        assert_eq!(state.query_index(excess), slot(excess));
+        assert_eq!(state.existing_index(excess), slot(excess));
+        assert_eq!(state.entries.len(), CAPACITY + MAX_DENSE_PLANS);
+        let outside = Pos::new(-1, 0, 0);
+        assert_eq!(state.query_index(outside), slot(outside));
+        // Budget exhaustion cannot dislodge a previously assigned position.
+        assert_eq!(state.query_index(Pos::new(0, 0, 0)), CAPACITY);
+    }
+
+    #[cfg(feature = "experiment-logic-plan-storage")]
+    #[test]
+    fn exhausted_dense_budget_preserves_colliding_fallback_answers_and_invalidation() {
+        let cache = Cache::default();
+        let first = Pos::new(MAX_DENSE_PLANS as i32, 0, 0);
+        let second = (first.x + 10..first.x + 8192).map(|x| Pos::new(x, 0, 0))
+            .find(|&p| slot(p) == slot(first)).expect("fallback collision");
+        let mut world = World::new(Bounds::new(Pos::new(0, 0, 0), second));
+        world.set(first, StateId(3));
+        world.set(second, StateId(9));
+        // Initialize world identity/revision, then consume the sparse mapping
+        // budget as queried-and-later-invalidated positions would. Empty entry
+        // slots are deliberately retained by the production mapping too.
+        assert_eq!(fixed_query(&cache, &world, Pos::new(0, 0, 0), Pos::new(0, 0, 0)), 0);
+        {
+            let mut state = cache.0.lock().unwrap();
+            for x in 0..MAX_DENSE_PLANS {
+                assert_eq!(state.query_index(Pos::new(x as i32, 0, 0)), CAPACITY + x);
+            }
+            assert_eq!(state.entries.len(), CAPACITY + MAX_DENSE_PLANS);
+            assert_eq!(state.query_index(first), slot(first));
+            assert_eq!(state.query_index(second), slot(second));
+        }
+        for _ in 0..4 {
+            assert_eq!(fixed_query(&cache, &world, first, first), 3);
+            assert_eq!(fixed_query(&cache, &world, second, second), 9);
+        }
+        assert_eq!(cache.test_builds(), 9, "fallback collisions rebuild, never return another key");
+        // The second entry is currently resident. Editing the first must not
+        // invalidate a different full key merely because their hashes collide.
+        world.set(first, StateId(11));
+        assert_eq!(fixed_query(&cache, &world, second, second), 9);
+        assert_eq!(cache.test_builds(), 9);
+        assert_eq!(fixed_query(&cache, &world, first, first), 11);
+        assert_eq!(cache.test_builds(), 10);
+        world.set(first, StateId(13));
+        assert_eq!(fixed_query(&cache, &world, first, first), 13);
+        assert_eq!(cache.test_builds(), 11, "resident fallback key invalidates immediately");
+        world.set(second, StateId(17));
+        assert_eq!(fixed_query(&cache, &world, second, second), 17);
+        world.set(second, StateId(19));
+        assert_eq!(fixed_query(&cache, &world, second, second), 19);
+        assert_eq!(cache.test_builds(), 13);
+    }
+
+    #[cfg(feature = "experiment-logic-plan-storage")]
+    #[test]
+    fn dense_indices_match_world_storage_at_negative_and_extreme_coordinates() {
+        for min in [Pos::new(-9, -7, -4), Pos::new(i32::MIN, -3, -3),
+            Pos::new(i32::MAX - 4, -3, -3)] {
+            let world = World::new(Bounds::new(min,
+                Pos::new(min.x + 4, min.y + 4, min.z + 4)));
+            let dense = DenseIndex::new(&world).unwrap();
+            for index in 0..world.raw_states().len() {
+                let pos = world.bounds().position_of(index).unwrap();
+                assert_eq!(dense.index(pos), Some(index));
+            }
+            assert_eq!(dense.index(Pos::new(min.x, min.y - 1, min.z)), None);
+            assert_eq!(dense.index(Pos::new(min.x.wrapping_sub(1), min.y, min.z)), None);
+            assert_eq!(dense.index(Pos::new(min.x.wrapping_add(5), min.y, min.z)), None);
+        }
     }
 
     #[cfg(feature = "experiment-execution-view")]

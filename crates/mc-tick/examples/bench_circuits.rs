@@ -8,6 +8,8 @@ use std::time::Instant;
 
 #[path = "bench_circuits/fuzz.rs"]
 mod fuzz;
+#[path = "bench_circuits/logic.rs"]
+mod logic;
 
 const CASES: &[&str] = &[
     "hipster",
@@ -39,12 +41,14 @@ fn load(case: &str) -> Simulation {
         "door6" => ("door_6x6_inworld", SettleMode::InWorld),
         "flyer" => ("flying_machine_east", SettleMode::Quiet),
         "bb" => ("bb", SettleMode::InWorld),
-        "adder_idle" => ("adder32", SettleMode::Placement),
+        "adder_idle" | "adder_active" => ("adder32", SettleMode::Placement),
+        "logic_network" => ("logic_network", SettleMode::Placement),
         c if EXTRA.contains(&c) => (c, SettleMode::Placement),
         c if is_external(c) => (c, if matches!(c, "shutter4" | "trapdoor2x3") { SettleMode::InWorld } else { SettleMode::Placement }),
         _ => panic!("unknown case {case}; choose {CASES:?}"),
     };
     let external = is_external(case).then(|| std::fs::read_to_string(fixture_dir().join(format!("{case}.snbt"))).expect("prepare external benchmark fixtures first"));
+    let generated = (case == "logic_network").then(logic::network_fixture);
     let source = match fixture {
         "hipster_door" => include_str!("../tests/corpus/structures/hipster_door.snbt"),
         "door_6x6_inworld" => include_str!("../tests/corpus/structures/door_6x6_inworld.snbt"),
@@ -53,6 +57,7 @@ fn load(case: &str) -> Simulation {
         "adder32" => include_str!("../tests/corpus/structures/adder32.snbt"),
         "comparator_drain" => include_str!("../tests/corpus/structures/comparator_drain.snbt"),
         "item_into_hopper" => include_str!("../tests/corpus/structures/item_into_hopper.snbt"),
+        "logic_network" => generated.as_deref().unwrap(),
         _ => external.as_deref().unwrap(),
     };
     let structure = Structure::parse(source).expect("parse fixture");
@@ -98,6 +103,8 @@ fn prepare(case: &str) -> Simulation {
             sim.run(30);
             assert!(sim.recorded().len() > 100, "BB must be active");
         }
+        "adder_active" => logic::prepare_adder(&mut sim),
+        "logic_network" => logic::prepare_network(&mut sim),
         "adder_idle" => {
             sim.run(200);
             assert!(sim.is_quiescent());
@@ -123,6 +130,12 @@ fn prepare(case: &str) -> Simulation {
 
 fn recording(sim: &mut Simulation, case: &str, verify: bool) {
     if case == "hipster_unrecorded" {
+        // The same harness builds against released master without backporting
+        // engine APIs. Master cannot disable ordinary recording; never silently
+        // report a recorded run as the unrecorded workload.
+        #[cfg(bench_master)]
+        panic!("hipster_unrecorded is unavailable in the master-compatible harness");
+        #[cfg(not(bench_master))]
         sim.discard_recording();
     } else if case == "hipster_timeline" {
         sim.record_timeline();
@@ -138,6 +151,7 @@ fn ticks(case: &str) -> u64 {
         "door6" => 100,
         "flyer" | "bb" => 200,
         "adder_idle" => 500,
+        c if logic::CASES.contains(&c) => logic::ticks(c),
         "comparator_drain" | "item_into_hopper" => 40,
         "shutter4" | "trapdoor2x3" => 240,
         c if is_external(c) => 400,
@@ -146,6 +160,7 @@ fn ticks(case: &str) -> u64 {
 }
 
 fn step(sim: &mut Simulation, case: &str, tick: u64) {
+    if logic::CASES.contains(&case) { logic::inputs(sim, case, tick); }
     if (case.starts_with("hipster") && matches!(tick % 320, 10 | 170))
         || (case == "door6" && tick == 0)
     {
@@ -175,6 +190,7 @@ fn step(sim: &mut Simulation, case: &str, tick: u64) {
 
 fn validate(sim: &mut Simulation, case: &str) {
     assert!(sim.unknown_report().is_none());
+    if logic::CASES.contains(&case) { logic::validate(sim, case); }
     let accept = match case {
         "item_sorter" => Some(Pos::new(11, 2, 10)),
         "hopper_transfer_speed" => Some(Pos::new(1, 1, 14)),
@@ -237,7 +253,8 @@ fn hash_tick(hash: &mut blake3::Hasher, sim: &Simulation) {
 }
 
 fn verify(cases: &[&str]) {
-    for &case in cases.iter().filter(|&&c| c != "hipster_load") {
+    for &case in cases.iter().filter(|&&c| c != "hipster_load"
+        && !(cfg!(bench_master) && c == "hipster_unrecorded")) {
         let mut sim = prepare(case);
         recording(&mut sim, case, true);
         let ticks = if case.starts_with("hipster") {
@@ -249,6 +266,7 @@ fn verify(cases: &[&str]) {
         for tick in 0..ticks {
             step(&mut sim, case, tick);
             hash_tick(&mut hash, &sim);
+            if logic::CASES.contains(&case) { logic::hash_tick(&mut hash, &sim); }
         }
         hash.update(
             format!(
@@ -279,7 +297,9 @@ fn main() {
         return;
     }
     if args.get(1).is_some_and(|a| a == "--verify") {
-        let cases: Vec<_> = if args.get(2).is_some_and(|a| a == "--expanded") {
+        let cases: Vec<_> = if args.get(2).is_some_and(|a| a == "--logic") {
+            logic::CASES.to_vec()
+        } else if args.get(2).is_some_and(|a| a == "--expanded") {
             CASES.iter().chain(EXTRA).chain(EXTERNAL).copied().collect()
         } else { CASES.to_vec() };
         verify(&cases);
@@ -289,7 +309,7 @@ fn main() {
         verify(&[args.get(2).expect("case")]); return;
     }
     let case = args.get(1).map(String::as_str).unwrap_or("hipster");
-    assert!(CASES.contains(&case) || EXTRA.contains(&case) || is_external(case));
+    assert!(CASES.contains(&case) || EXTRA.contains(&case) || logic::CASES.contains(&case) || is_external(case));
     let samples: usize = args.get(2).map(|s| s.parse().unwrap()).unwrap_or(1);
     let iterations: usize = args.get(3).map(|s| s.parse().unwrap()).unwrap_or(1);
     assert!(samples > 0 && iterations > 0);

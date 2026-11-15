@@ -30,6 +30,20 @@ use crate::world::World;
 /// generous enough that no real build should reach it.
 const MAX_EVENT_CHAIN: usize = 1024;
 
+#[cfg(feature = "experiment-moving-phase")]
+#[derive(Default)]
+struct MovingPhaseScratch {
+    due: Vec<PendingMove>,
+}
+
+#[cfg(feature = "experiment-moving-phase")]
+impl std::fmt::Debug for MovingPhaseScratch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Reusable allocation capacity is not simulation state.
+        f.write_str("MovingPhaseScratch")
+    }
+}
+
 /// One recorded entity observation.
 #[derive(Debug, Clone, PartialEq)]
 pub enum EntityEvent {
@@ -253,6 +267,8 @@ pub struct Simulation {
     update_arena: crate::behaviour::UpdateArena,
     /// Deferred writes awaiting their block-entities phase.
     moves: Vec<PendingMove>,
+    #[cfg(feature = "experiment-moving-phase")]
+    moving_phase_scratch: MovingPhaseScratch,
     /// Torch toggle history for burnout, pruned as it ages out.
     toggles: Vec<(Pos, u64)>,
     /// Stored comparator output strengths; vanilla's ComparatorBlockEntity.
@@ -491,6 +507,8 @@ impl Simulation {
             #[cfg(feature = "experiment-update-arena")]
             update_arena: crate::behaviour::UpdateArena::default(),
             moves: Vec::new(),
+            #[cfg(feature = "experiment-moving-phase")]
+            moving_phase_scratch: MovingPhaseScratch::default(),
             toggles: Vec::new(),
             comparator_out: std::collections::HashMap::new(),
             inventories: std::collections::HashMap::new(),
@@ -1750,6 +1768,11 @@ impl Simulation {
         let ticking = self.ticking;
         // `pistonDeltasGameTime`: the running per-axis totals reset once a tick.
         self.piston_deltas.clear();
+        // With no possible target or outstanding probe, the reference loop
+        // only builds/discards geometry and refreshes an already-empty view.
+        // Recheck live lists every pass: callbacks can introduce entities.
+        #[cfg(feature = "experiment-moving-phase")]
+        if self.can_skip_piston_displacement() { return; }
         // Insertion order, which is what `tickBlockEntities` walks — and the
         // index rides along, because *when* another move's cell turns solid
         // depends on whether its block entity has already ticked this tick.
@@ -1902,6 +1925,33 @@ impl Simulation {
             self.refresh_bodies();
         }
         self.notify_piston_probes();
+    }
+
+    #[cfg(feature = "experiment-moving-phase")]
+    fn can_skip_piston_displacement(&self) -> bool {
+        self.minecarts.is_empty()
+            && self.bodies.is_empty()
+            && self.item_entities.items.is_empty()
+            && self.item_entities.others.is_empty()
+            && self.tnts.is_empty()
+            && self.piston_probes.is_empty()
+    }
+
+    #[cfg(feature = "experiment-moving-phase")]
+    fn take_due_moves(&mut self) -> Vec<PendingMove> {
+        let mut due = std::mem::take(&mut self.moving_phase_scratch.due);
+        debug_assert!(due.is_empty());
+        let tick = self.tick;
+        let ticking = self.ticking;
+        // Stable extraction finishes before any callback. A callback can
+        // inspect, clear or append moves without touching this phase's snapshot.
+        self.moves.retain(|m| {
+            let ready = m.resolve_on <= tick
+                && ticking.as_ref().is_none_or(|bounds| bounds.contains(m.pos));
+            if ready { due.push(*m); }
+            !ready
+        });
+        due
     }
 
     /// `Entity.limitPistonMovement` + `applyPistonMovementRestriction`: clamp
@@ -3771,15 +3821,20 @@ impl Simulation {
                 // event that started them. Captured from vanilla:
                 //   tick 0  stone -> moving_piston
                 //   tick 2  moving_piston -> stone (at its destination)
+                #[cfg(not(feature = "experiment-moving-phase"))]
                 let ticking = self.ticking;
+                #[cfg(not(feature = "experiment-moving-phase"))]
                 let in_ticking =
                     move |pos: Pos| ticking.as_ref().is_none_or(|bounds| bounds.contains(pos));
+                #[cfg(not(feature = "experiment-moving-phase"))]
                 let mut due: Vec<PendingMove> = self
                     .moves
                     .iter()
                     .filter(|m| m.resolve_on <= self.tick && in_ticking(m.pos))
                     .copied()
                     .collect();
+                #[cfg(feature = "experiment-moving-phase")]
+                let mut due = self.take_due_moves();
                 // Insertion order, which is what `tickBlockEntities` walks: the
                 // moving block entities tick in the order they were added to the
                 // level, and `moveBlocks` creates them farthest-from-the-piston
@@ -3805,10 +3860,16 @@ impl Simulation {
                 // is where a divergence from `getToPush` has to be chased.
                 // Frozen moves (outside the ticking bounds) stay pending: a
                 // block entity in a non-ticking chunk is suspended, not gone.
+                #[cfg(not(feature = "experiment-moving-phase"))]
                 self.moves
                     .retain(|m| m.resolve_on > self.tick || !in_ticking(m.pos));
+                #[cfg(not(feature = "experiment-moving-phase"))]
                 let mut landed: Vec<Pos> = Vec::new();
-                for entry in due {
+                #[cfg(not(feature = "experiment-moving-phase"))]
+                let entries = due;
+                #[cfg(feature = "experiment-moving-phase")]
+                let entries = due.drain(..);
+                for entry in entries {
                     let previous = self.world.get(entry.pos);
                     if previous == entry.state {
                         continue;
@@ -3850,6 +3911,7 @@ impl Simulation {
                     // column instead, and a piston above it extended into a door
                     // vanilla leaves shut.
                     self.propagate();
+                    #[cfg(not(feature = "experiment-moving-phase"))]
                     landed.push(entry.pos);
                     // `onPlace` for each landed block, *after* that block's own
                     // landing updates have run but still inside its own landing.
@@ -3870,7 +3932,11 @@ impl Simulation {
                     // Running every onPlace after every landing showed it a solid
                     // column instead, and the 6x6 door fired a piston vanilla
                     // leaves alone.
-                    for pos in std::mem::take(&mut landed) {
+                    #[cfg(not(feature = "experiment-moving-phase"))]
+                    let placed = std::mem::take(&mut landed);
+                    #[cfg(feature = "experiment-moving-phase")]
+                    let placed = [entry.pos];
+                    for pos in placed {
                         let state = self.world.get(pos);
                         let Some(behaviour) = self.behaviours.get(state) else {
                             if state != StateId::AIR {
@@ -3940,6 +4006,8 @@ impl Simulation {
                     crate::behaviour::trace_update("neighbor", entry.pos);
                     self.propagate();
                 }
+                #[cfg(feature = "experiment-moving-phase")]
+                { self.moving_phase_scratch.due = due; }
                 None
             }
 
@@ -4253,6 +4321,140 @@ mod tests {
 
     fn sim() -> Simulation {
         Simulation::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(7, 7, 7)))
+    }
+
+    #[cfg(feature = "experiment-moving-phase")]
+    mod moving_phase_tests {
+        use super::*;
+        use crate::behaviour::BlockBehaviour;
+        use std::sync::{Arc, Mutex};
+
+        fn deferred(pos: Pos, state: StateId, resolve_on: u64) -> PendingMove {
+            PendingMove { pos, state, carried: state, carried_short: None, remains: None,
+                started_on: 0, resolve_on, source_piston: false, sweep: None }
+        }
+
+        #[test]
+        fn stable_extraction_matches_reference_with_frozen_and_out_of_order_moves() {
+            let mut random = 0xcafe_f00du64;
+            let mut next = || {
+                random = random.wrapping_mul(6364136223846793005).wrapping_add(1);
+                (random >> 32) as u32
+            };
+            for round in 0..64 {
+                let mut s = sim();
+                s.tick = u64::from(next() % 24);
+                if round % 2 == 0 {
+                    s.set_ticking_bounds(Bounds::new(Pos::new(1, 1, 1), Pos::new(5, 5, 5)));
+                }
+                for _ in 0..128 {
+                    s.moves.push(deferred(Pos::new((next() % 8) as i32,
+                        (next() % 8) as i32, (next() % 8) as i32),
+                        StateId((next() % 32 + 1) as u16), u64::from(next() % 24)));
+                }
+                let ready = |m: &&PendingMove| m.resolve_on <= s.tick
+                    && s.ticking.as_ref().is_none_or(|bounds| bounds.contains(m.pos));
+                let mut expected: Vec<_> = s.moves.iter().filter(ready).copied().collect();
+                expected.sort_by_key(|m| m.resolve_on);
+                let remaining: Vec<_> = s.moves.iter().filter(|m| !ready(m)).copied().collect();
+                let mut due = s.take_due_moves();
+                due.sort_by_key(|m| m.resolve_on);
+                assert_eq!(due, expected);
+                assert_eq!(s.moves, remaining);
+                due.clear();
+                s.moving_phase_scratch.due = due;
+                assert!(s.take_due_moves().is_empty());
+            }
+        }
+
+        #[test]
+        fn landing_callbacks_keep_the_snapshot_order_and_restore_reuses_empty_scratch() {
+            const FIRST: Pos = Pos::new(1, 1, 1);
+            const SECOND: Pos = Pos::new(3, 1, 1);
+            const THIRD: Pos = Pos::new(5, 1, 1);
+            const ADDED: Pos = Pos::new(1, 1, 3);
+            const FROZEN: Pos = Pos::new(7, 7, 7);
+            const FUTURE: Pos = Pos::new(3, 1, 3);
+            struct Landing { state: StateId, calls: Arc<Mutex<Vec<Pos>>> }
+            impl BlockBehaviour for Landing {
+                fn name(&self) -> &'static str { "landing-snapshot-test" }
+                fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+                    self.calls.lock().unwrap().push(pos);
+                    if pos == FIRST {
+                        assert_eq!(ctx.world.get(SECOND), StateId::AIR);
+                        assert_eq!(ctx.world.get(THIRD), StateId::AIR);
+                        assert_eq!(ctx.moves.iter().map(|m| m.pos).collect::<Vec<_>>(),
+                            vec![FROZEN, FUTURE]);
+                        // Neither clearing nor adding to the public queue may
+                        // cancel or extend this phase's extracted snapshot.
+                        ctx.moves.clear();
+                        ctx.defer(ADDED, self.state, 0, None);
+                        ctx.inventories.insert(FIRST, crate::inventory::Inventory::empty(5));
+                        ctx.item_entities.spawn(("minecraft:stone".into(), 1),
+                            [1.5, 2.0, 1.5], [0.0; 3], 0);
+                    } else if pos == SECOND || pos == THIRD {
+                        assert_eq!(ctx.world.get(ADDED), StateId::AIR);
+                        assert_eq!(ctx.moves.len(), 1);
+                        assert_eq!(ctx.moves[0].pos, ADDED);
+                        assert!(ctx.inventories.contains_key(&FIRST));
+                        assert_eq!(ctx.item_entities.items.len(), 1);
+                    }
+                }
+            }
+            let mut s = sim();
+            let state = s.registry.intern("test:landing").unwrap();
+            let calls = Arc::new(Mutex::new(Vec::new()));
+            s.behaviours.register(state, Box::new(Landing { state, calls: calls.clone() }));
+            s.set_ticking_bounds(Bounds::new(Pos::new(0, 0, 0), Pos::new(6, 6, 6)));
+            s.tick = 2;
+            s.moves = vec![deferred(SECOND, state, 2), deferred(FROZEN, state, 0),
+                deferred(FIRST, state, 1), deferred(THIRD, state, 2), deferred(FUTURE, state, 8)];
+            let checkpoint = s.checkpoint();
+            for _ in 0..2 {
+                s.restore(&checkpoint);
+                s.record();
+                s.record_updates(true);
+                calls.lock().unwrap().clear();
+                assert!(s.can_skip_piston_displacement());
+                assert_eq!(s.run_phase(Phase::BlockEntities), None);
+                assert_eq!(*calls.lock().unwrap(), vec![FIRST, SECOND, THIRD]);
+                assert_eq!(s.recorded().iter().map(|c| c.pos).collect::<Vec<_>>(),
+                    vec![FIRST, SECOND, THIRD]);
+                assert_eq!(s.world.get(FROZEN), StateId::AIR);
+                assert_eq!(s.world.get(ADDED), StateId::AIR);
+                assert!(!s.can_skip_piston_displacement(), "callback's item is observed live");
+                assert!(s.moving_phase_scratch.due.is_empty());
+                assert!(s.moving_phase_scratch.due.capacity() >= 3);
+                assert_eq!(s.run_phase(Phase::BlockEntities), None);
+                assert_eq!(*calls.lock().unwrap(), vec![FIRST, SECOND, THIRD, ADDED]);
+                assert_eq!(s.world.get(ADDED), state);
+                assert!(s.moves.is_empty());
+            }
+        }
+
+        #[test]
+        fn no_target_fast_path_clears_deltas_and_rechecks_new_carts_and_probes() {
+            let mut s = sim();
+            let mut movement = deferred(Pos::new(3, 1, 1), StateId(1), 2);
+            movement.sweep = Some(crate::piston::Sweep { travel: Dir::East, extending: true });
+            s.moves.push(movement);
+            s.piston_deltas.insert(42, [0.5; 3]);
+            assert!(s.can_skip_piston_displacement());
+            s.displace_entities_by_pistons();
+            assert!(s.piston_deltas.is_empty());
+            assert_eq!(s.moves, vec![movement]);
+
+            s.piston_probes.push((42, [0.0; 3], [1.0; 3]));
+            assert!(!s.can_skip_piston_displacement());
+            s.displace_entities_by_pistons();
+            assert!(s.piston_probes.is_empty(), "orphaned probes still drain");
+            let id = s.spawn_minecart("minecraft:minecart".into(), [3.25, 1.0, 1.5], [0.0; 3]);
+            assert!(!s.can_skip_piston_displacement());
+            let before = s.minecarts[0].pos;
+            s.displace_entities_by_pistons();
+            assert!(s.minecarts[0].pos[0] > before[0], "a newly added cart is shoved");
+            assert!(s.piston_deltas.contains_key(&id));
+        }
     }
 
     #[cfg(feature = "experiment-update-arena")]

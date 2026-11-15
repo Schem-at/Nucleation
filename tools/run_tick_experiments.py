@@ -31,19 +31,26 @@ FEATURES['next_counters'] = FEATURES['next_combined'] + ['experiment-piston-plan
 FEATURES['next_view_lazy'] = FEATURES['next_view'] + ['experiment-lazy-journal']
 FEATURES['next_piston_local'] = FEATURES['next_piston']
 FEATURES['next_plan_combo'] = FEATURES['next_view_lazy'] + ['experiment-piston-plan']
+FEATURES['workload_previous'] = FEATURES['next_view_lazy']
+FEATURES['workload_logic'] = FEATURES['next_view_lazy'] + ['experiment-logic-plan-storage']
+FEATURES['workload_moving'] = FEATURES['next_view_lazy'] + ['experiment-moving-phase']
+FEATURES['workload_combined'] = FEATURES['workload_logic'] + ['experiment-moving-phase']
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--output', type=pathlib.Path, required=True)
 p.add_argument('--variants', nargs='+', choices=FEATURES, required=True)
 p.add_argument('--test-features', default=None)
 p.add_argument('--fixtures', type=pathlib.Path, required=True)
 p.add_argument('--fuzz-seeds', type=int, default=0, help='Untimed randomized differential sequences per fixture')
+p.add_argument('--logic', action='store_true', help='Also verify active stationary logic workloads')
+p.add_argument('--repo', type=pathlib.Path, help='Build an isolated checkout using this same runner')
+p.add_argument('--rustflags', default='', help='Explicit flags, including the benchmark-only master compatibility cfg')
 a = p.parse_args()
-root = pathlib.Path(__file__).resolve().parents[1]
+root = a.repo.resolve() if a.repo else pathlib.Path(__file__).resolve().parents[1]
 a.output = a.output.resolve(); a.output.mkdir(parents=True, exist_ok=True)
 env = os.environ.copy()
 env.update(CARGO_BUILD_JOBS='4', RUST_TEST_THREADS='4', CARGO_PROFILE_RELEASE_DEBUG='1',
            CARGO_PROFILE_RELEASE_OPT_LEVEL='3', CARGO_PROFILE_RELEASE_LTO='true',
-           MC_TICK_BENCH_FIXTURES=str(a.fixtures.resolve()), RUSTFLAGS='')
+           MC_TICK_BENCH_FIXTURES=str(a.fixtures.resolve()), RUSTFLAGS=a.rustflags)
 env.pop('CARGO_ENCODED_RUSTFLAGS', None)
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 def run(args, log, extra=None):
@@ -65,7 +72,7 @@ with tarfile.open(archive,'w:gz') as tar:
 manifest = {'rustc':subprocess.check_output(['rustc','-vV'],text=True),
             'base':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),
             'source_sha256':sources, 'source_archive_sha256':sha(archive),
-            'profile':{'opt_level':3,'lto':True,'debug':1,'cpu':'generic'},
+            'profile':{'opt_level':3,'lto':True,'debug':1,'cpu':'generic','rustflags':a.rustflags},
             'variants':{}}
 if a.test_features is not None:
     args=['cargo','test','--locked','--no-default-features','-p','mc-tick','-p','mc-test']
@@ -81,6 +88,8 @@ for name in a.variants:
     shutil.copy2(target/'release/examples/bench_circuits',binary)
     shadow={'MC_TICK_WIRE_PLAN':'shadow', 'MC_TICK_PISTON_PLAN':'shadow'}
     run([str(binary),'--verify','--expanded'],name+'-verify.jsonl',shadow)
+    if a.logic:
+        run([str(binary),'--verify','--logic'],name+'-logic-verify.jsonl',shadow)
     if a.fuzz_seeds:
         run([str(binary),'--fuzz',str(a.fuzz_seeds)],name+'-fuzz.jsonl',shadow)
     manifest['variants'][name]={'features':features,'sha256':sha(binary),'path':str(binary)}
