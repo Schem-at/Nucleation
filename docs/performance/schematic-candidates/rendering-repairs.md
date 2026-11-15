@@ -101,3 +101,60 @@ The separate [`#64`](https://github.com/Schem-at/Nucleation/issues/64) concerns
 1.21.11 multi-axis block-model rotations. The pinned mesher already contains
 Euler deserialization and X→Y→Z matrix-order regression tests for that report;
 this investigation did not reimplement them.
+
+## Saved head skins and piston presentation — 15 November 2026
+
+The engine already reads player-head profiles, but the Atlas and Sim Lab did
+not register their referenced texture PNGs. Sim Lab now registers saved skins
+before building chunk atlases. Atlas caches official Mojang texture URLs under
+the separate archive's `player-skins/`; standalone Sim Lab fetches HTTPS textures
+directly. Old HTTP URLs are normalized. Failed downloads fall back visibly and
+can be retried; name/UUID-only profiles without a saved texture URL continue to
+use default skins. No original profile or schematic is edited.
+
+The archive yielded **192 distinct saved textures**, all downloaded successfully.
+With those added to a separate resource pack, the existing native renderer on
+**harrison-work** regenerated **762** affected thumbnails with **zero failures**;
+**691** PNGs changed. Hidden/occluded head textures need not change the rendered
+pixels. Every source and PNG hash and image size passed reconciliation. No Rust
+compilation or simulation ticks were needed for this refresh. The original pack,
+old PNGs and prior render manifest remain available for rollback.
+
+Piston presentation now interpolates the last completed interval. Previously,
+`completedTick + fraction` first displayed a newly started stroke halfway to its
+destination; the new clock includes that missing first half-step. Pause holds the
+current fractional pose and resume never reverses it. Manual stepping still shows
+the exact completed state. Motion remains linear and uses the engine's own
+flights; simulation timing and update ordering are unchanged.
+
+Initial block prototypes and both piston-arm lengths finish loading before the
+world becomes interactive, preventing missing geometry on first activation.
+Swapping or retiring a cloned arm no longer disposes geometry shared with the
+prototype or other moving blocks. States introduced later can still require a
+first asynchronous parse. Initial load includes this mesh preparation.
+
+Fresh checks against the actual WASM/Three.js path:
+
+- **808 assertions:** exact downloaded face pixels occur in the two creator
+  heads' generated texture atlas; all six piston directions extend and retract
+  with correct fractional positions and arm lengths; rendering matches a parallel
+  engine instance at every sampled tick; shared geometry is not disposed during
+  arm swaps; all final handovers retire.
+- **12 clock assertions:** first-frame timing, pause/resume, manual steps,
+  fast-forward, rewind and replacement simulation.
+- A real UI run first painted a stroke at **0.0667 progress**, held the exact
+  pose across eight paused frames, and never reversed on resume. A deliberately
+  failed skin request fell back, then succeeded on retry in the same module
+  session. These are presentation checks, not a new vanilla reference capture.
+- Three skin URL/profile/fallback unit tests, the existing coordinate regression
+  (three reported plot entries and two translated multi-region builds), and
+  **22 Atlas API checks / 121 requests** passed. The JavaScript production build
+  passed; Rust engine bytes are unchanged.
+
+Reproduce with `verify-presentation-clock.mjs`, `verify-skins-motion.mjs`, and
+`verify-skin-retry-pause.mjs` under `apps/sim-lab-wasm`, plus
+`tools/test_player_head_skins.py`. Browser tests use an isolated headless profile
+and support `CHROME_PATH`. Local detailed evidence is in
+`validation/skins-motion/`; refreshed native records, prior PNGs and the prior
+manifest are in `rendered-thumbnails/head-skins-v1/`. These local assets remain
+outside Git.

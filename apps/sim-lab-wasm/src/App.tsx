@@ -11,6 +11,7 @@ import * as THREE from "three";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { World, loader, CHUNK, type SettleName } from "./world";
 import { Player } from "./player";
+import { PresentationClock } from "./presentation_clock";
 import { addDefaultLights } from "./mesher";
 import { TimelineStrip, type Activity, type Cycles, type Span } from "./timeline";
 
@@ -305,6 +306,7 @@ export default function App(): JSX.Element {
     let raf = 0;
     let last = performance.now();
     let carry = 0;
+    const presentation = new PresentationClock();
     let flushing = false;
     // Rolling measurement of what the rate actually came out to.
     let ran = 0;
@@ -396,13 +398,10 @@ export default function App(): JSX.Element {
           }
           subTick = Math.min(carry, 1);
         }
-        // A fractional tick, not a wall-clock stamp: whole ticks completed plus
-        // however far the pacing has carried toward the next. Strokes are
-        // interpolated against the same clock the simulation advances on, so
-        // one stepped tick and fifty are both drawn correctly and neither can
-        // desync — which is what the old `steps === 1` guard was papering over
-        // by teleporting everything above it.
-        world.animate(Number(world.sim.tickCount?.() ?? 0) + subTick);
+        // Present the last completed interval, so newly dispatched strokes
+        // start at their source instead of appearing half a block ahead.
+        // Pausing freezes this fractional position; manual steps stay exact.
+        world.animate(presentation.sample(world.sim, Number(world.sim.tickCount?.() ?? 0), subTick, runningRef.current));
         if (!flushing) {
           flushing = true;
           void world.flush().finally(() => {
@@ -538,7 +537,8 @@ export default function App(): JSX.Element {
           ? { kind: "error", message: failure }
           : {
               kind: "ready",
-              message: `${file.name} — ${world.dims.join("×")}`,
+              message: `${file.name} — ${world.dims.join("×")}${world.skins.requested
+                ? ` · head skins ${world.skins.loaded}/${world.skins.requested}${world.skins.failed.length ? ' (unavailable skins use defaults; reload to retry)' : ''}` : ''}`,
             },
       );
       setTick(0);

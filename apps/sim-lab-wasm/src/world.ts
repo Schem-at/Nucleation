@@ -11,6 +11,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { loadMeshEnv } from "./mesher";
+import { loadPlayerSkins, type SkinStatus } from "./player_skins";
 import { hasMinecartModel, minecartModelFor, minecartRotation } from "./entity_models";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -252,6 +253,7 @@ export class World {
    * so a dirty chunk can be re-meshed from current truth. */
   schem: Any;
   sim: Any;
+  skins: SkinStatus = { requested: 0, loaded: 0, failed: [] };
   /** Saved-space minimum, retained for coordinate-sensitive redstone ordering.
    * Rendering, picking, entities and tick changes all use local coordinates. */
   origin: [number, number, number] = [0, 0, 0];
@@ -297,6 +299,7 @@ export class World {
     const w = new World(eng, pack, cfg);
     w.settle = settle;
     w.schem = eng.Schematic.fromData(bytes);
+    w.skins = await loadPlayerSkins(eng, w.schem, pack);
     // fromSchematic rebases the schematic's complete bounding box to zero.
     // Do the same to our private render mirror, including every region and
     // its block entities/entities. Tight content bounds can have a different
@@ -370,10 +373,12 @@ export class World {
     }
     await Promise.all(jobs);
     this.rebuildSolidSet();
-    void this.warmBlockMeshes();
+    // Finish prototype preparation before allowing the first tick. A first
+    // stroke must not lose its geometry while GLTFLoader decodes an image.
+    await this.warmBlockMeshes();
   }
 
-  /** Parse a one-block mesh for every state in the build, in the background.
+  /** Prepare shared flight meshes before the loaded world becomes interactive.
    *
    * A flight whose mesh has not parsed yet is not drawn *at all* — its cell is
    * blank for the whole stroke, and the chunk cannot cover for it because the
@@ -388,17 +393,12 @@ export class World {
    * for and zero hits. Flights are keyed on the full state string. The world
    * snapshot is the same set with the properties still attached.
    *
-   * Even that is a starting point, not the whole set. Some of what flies is
-   * produced by the simulation and is in no initial state at all: a
-   * `piston_head` only exists once a piston extends, an
-   * `observer[powered=true]` only once one fires. Those are caught by
-   * [`World.warmState`] off the change stream — one flight late the first time
-   * each appears, which is the residual, and it is bounded by the number of
-   * distinct states rather than by how long the machine runs.
+   * Piston arm variants are prepared explicitly; other states introduced by
+   * simulation are warmed off the change stream. Those can still need an
+   * asynchronous first parse, bounded by the number of distinct states.
    *
-   * A few at a time and off the critical path: the user is looking at the
-   * build while this runs, and firing two hundred parses at once would stall
-   * the view to fix a flicker.
+   * A few at a time so image decoding does not monopolize the browser. The
+   * loading indicator remains visible until this initial preparation finishes.
    */
   private async warmBlockMeshes(): Promise<void> {
     const token = ++this.warmToken;
@@ -412,12 +412,25 @@ export class World {
     for (const state of states) {
       if (token !== this.warmToken) return; // a new build was loaded
       this.warmState(state);
+      // Both arm lengths and the stationary retracting base can first appear
+      // on activation, so they are absent from an unpowered build's palette.
+      if (/^minecraft:(sticky_)?piston\[/.test(state)) {
+        const facing = /facing=([a-z]+)/.exec(state)?.[1];
+        if (facing) {
+          const type = state.startsWith('minecraft:sticky_') ? 'sticky' : 'normal';
+          for (const short of ['false', 'true']) this.warmState(`minecraft:piston_head[facing=${facing},short=${short},type=${type}]`);
+          this.warmState(state.replace('extended=true', 'extended=false'));
+        }
+      }
       // Let a handful run together — serialising one per frame took fifteen
       // seconds on a 161-state build, by which time the flicker it exists to
       // prevent has already happened.
       while (this.pendingMeshes.size >= 6 && token === this.warmToken) {
         await new Promise((r) => requestAnimationFrame(r));
       }
+    }
+    while (this.pendingMeshes.size && token === this.warmToken) {
+      await new Promise((r) => requestAnimationFrame(r));
     }
   }
 
@@ -606,8 +619,8 @@ export class World {
 
   /** A 1x1x1 mesh of `state`, built once and cloned thereafter.
    *
-   * Returns null until the parse finishes; a flight with no mesh yet simply
-   * is not drawn for a frame or two, which is invisible at these speeds.
+   * Returns null until the parse finishes. Initial states and piston-arm
+   * variants are prepared before play to avoid missing first-stroke geometry.
    */
   private blockMesh(state: string): THREE.Object3D | null {
     const have = this.blockMeshes.get(state);
@@ -741,8 +754,8 @@ export class World {
 
   /** Draw every in-flight block at its position as of `tickNow`.
    *
-   * `tickNow` is a *fractional tick*: completed ticks plus how far the pacing
-   * has carried toward the next one. Interpolating against it rather than
+   * `tickNow` is a fractional presentation tick within the last completed
+   * interval, or an exact completed tick when manually stepping. Using it rather than
    * against `performance.now()` is what keeps a stroke in step with the
    * simulation — frame jitter, a throttled frame, or fifty ticks stepped at
    * once all move this clock and the stroke with it, instead of leaving an
@@ -804,7 +817,9 @@ export class World {
   private dispose(object: THREE.Object3D | null): void {
     if (!object) return;
     this.group.remove(object);
-    object.traverse((o: Any) => o.geometry?.dispose?.());
+    // Flight clones share geometry with cached prototypes and other flights.
+    // Disposing one arm during the short/long swap invalidated all its peers'
+    // GPU buffers and forced needless uploads on the next frame.
   }
 
   /** Redraw every live entity from the engine's own view.
