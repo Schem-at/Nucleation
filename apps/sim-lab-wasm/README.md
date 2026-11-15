@@ -74,3 +74,25 @@ node verify.mjs ../../crates/mc-tick/tests/corpus/litematics/6x6_sliding_door.li
 ```
 
 `window.simlab` exposes `{ world, player, scene }` for the console.
+
+## Coordinate frames
+
+Sim Lab translates its private schematic copy by the saved bounding-box minimum
+before meshing. Rendering, picking, simulation changes and live entities then
+share the engine's local coordinate system. Every region and its attached
+entities move together; archived files are unchanged. The original minimum is
+kept as `world.origin` and passed to the engine for Java redstone hash ordering.
+Use complete schematic bounds here, matching `TickSimulation.fromSchematic`,
+rather than tight content bounds.
+
+With the local Atlas serving its retained plot entries, run:
+
+```sh
+CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+  node verify-coordinates.mjs http://127.0.0.1:8767
+```
+
+This compares the render mirror, picking grid, mesh coordinates and live state
+against the original-source simulation at its saved origin, including piston
+movement, positive/negative origins, multiple regions, a container and a cart.
+It checks coordinate consistency, not a new vanilla reference capture.

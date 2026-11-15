@@ -200,3 +200,29 @@ button:disabled { opacity: 0.4; cursor: default; }
 /* Fixed so the timeline strip above it can be pinned by pixel offset rather
  * than measured at runtime. */
 .hud { height: 37px; }
+
+/* Embedded controls stay usable inside the Atlas workspace and on phones. */
+.bar{flex-wrap:wrap;gap:8px 12px;max-height:45%;overflow-y:auto}
+.bar>strong{white-space:nowrap}
+.bar .status{overflow-wrap:anywhere;line-height:1.4}
+.embedded{--panel:#202925ed;--line:#415047;--accent:#d5f475;font-family:system-ui,sans-serif}
+.embedded .bar{padding:10px 12px;font-size:12px;gap:8px}
+.embedded .bar>strong,.embedded .bar>.file{display:none}
+.embedded:not(.advanced-open) .advanced-control{display:none}
+.embedded .bar .tick{display:none}
+.embedded .bar .status{flex-basis:100%;font-size:11px;margin:0;color:#aab9ae;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.embedded .bar .status.error{white-space:normal;color:#ffb8a7}
+.embedded .bar button{padding:7px 11px;background:#2a382f;border-radius:6px}
+.embedded .bar .rate{margin-left:auto;color:#d3dfd5}
+.embedded .hud{font-size:10px;gap:10px}
+.embedded .hud .target{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:45%}
+.embedded .hud .info{display:none}
+@media(max-width:600px){
+  .bar{font-size:11px;gap:6px}
+  .embedded .bar{padding:8px}
+  .embedded .bar button{padding:6px 8px}
+  .embedded .bar .rate{flex-basis:100%;margin:0;justify-content:space-between}
+  .embedded .bar .rate input{flex:1;max-width:220px}
+  .hud .info{display:none}
+  .hud .hint{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+}

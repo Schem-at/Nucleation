@@ -80,6 +80,8 @@ function archiveFileName(disposition: string | null, queryName: string | null, s
 }
 
 export default function App(): JSX.Element {
+  const embedded = new URLSearchParams(window.location.search).get("embed") === "atlas";
+  const [advanced, setAdvanced] = useState(false);
   const mount = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const worldRef = useRef<World | null>(null);
@@ -643,8 +645,20 @@ export default function App(): JSX.Element {
     }
   }, [pollActivity]);
 
+  useEffect(() => {
+    const receive = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== window.parent || event.data?.type !== "nucleation-atlas-command") return;
+      if (event.data.command === "pause") {
+        runningRef.current = false;
+        setRunning(false);
+      }
+    };
+    window.addEventListener("message", receive);
+    return () => window.removeEventListener("message", receive);
+  }, []);
+
   return (
-    <div className="app" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
+    <div className={`app${embedded ? " embedded" : ""}${advanced ? " advanced-open" : ""}`} onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
       <div className="viewport" ref={mount} />
       <div className="crosshair" aria-hidden>
         +
@@ -666,7 +680,7 @@ export default function App(): JSX.Element {
         <button onClick={() => setRunning((r) => !r)} disabled={status.kind !== "ready"}>
           {running ? "pause" : "run"}
         </button>
-        <button onClick={toggleRecording} disabled={status.kind !== "ready"}>
+        <button className="advanced-control" onClick={toggleRecording} disabled={status.kind !== "ready"}>
           {recording ? "stop" : "record"}
         </button>
         {/* Disabled while recording: see the comment on `findCycles` above
@@ -674,6 +688,7 @@ export default function App(): JSX.Element {
             action mid-recording, only "ask once, after the run has
             stopped." */}
         <button
+          className="advanced-control"
           onClick={findCycles}
           disabled={status.kind !== "ready" || recording || !activity}
           title="replay the recorded timeline once to find a repeating span (O(ticks × blocks) — not polled)"
@@ -687,6 +702,7 @@ export default function App(): JSX.Element {
           {[10, 100].map((n) => (
             <button
               key={n}
+              className={n > 10 ? "advanced-control" : ""}
               onClick={() => stepBy(n)}
               disabled={status.kind !== "ready" || running}
             >
@@ -694,7 +710,7 @@ export default function App(): JSX.Element {
             </button>
           ))}
           <input
-            className="stepn"
+            className="stepn advanced-control"
             type="number"
             min={1}
             max={100000}
@@ -702,11 +718,11 @@ export default function App(): JSX.Element {
             onChange={(e) => setStepN(Math.max(1, Number(e.target.value) || 1))}
             title="how many ticks the › button advances"
           />
-          <button onClick={() => stepBy(stepN)} disabled={status.kind !== "ready" || running}>
+          <button className="advanced-control" onClick={() => stepBy(stepN)} disabled={status.kind !== "ready" || running}>
             ›
           </button>
         </span>
-        <label className="settle" title="how the build is settled before tick 0">
+        <label className="settle advanced-control" title="how the build is settled before tick 0">
           <select
             value={settle}
             onChange={(e) => {
@@ -722,7 +738,7 @@ export default function App(): JSX.Element {
           </select>
         </label>
         <label
-          className="settle"
+          className="settle advanced-control"
           title="mesh chunk size — smaller re-meshes less geometry per change; one chunk gives the build a single texture atlas, which never has to be decoded twice"
         >
           <select
@@ -740,6 +756,9 @@ export default function App(): JSX.Element {
             <option value={0}>one chunk (whole build)</option>
           </select>
         </label>
+        <button onClick={() => { if (lastFile.current) void open(lastFile.current); }} disabled={status.kind !== "ready"} title="Reload the original file and reset to tick zero">reset</button>
+        <button onClick={() => { const world = worldRef.current; if (world) playerRef.current?.frame(world.dims); }} disabled={!worldRef.current} title="Fit the build in view">frame build</button>
+        {embedded && <button className="advanced-toggle" aria-expanded={advanced} onClick={() => setAdvanced(v => !v)}>{advanced ? "less" : "more"}</button>}
         <label className="rate">
           {fmtTps(rate)} tps
           <input
