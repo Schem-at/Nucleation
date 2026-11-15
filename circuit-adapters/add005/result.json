@@ -1336,7 +1336,7 @@
   "reset_replay": "exact_checkpoint_and_outputs",
   "response_game_ticks": 32,
   "rng_seed": 0,
-  "runner_sha256": "f40b4c192856dd7d07b35cd917b725252a3ab08b0f8dc26312e1820e5691cab9",
+  "runner_sha256": "636bc6f99a2137d8ce771d5820329aa19759658319d3ff60b2c02a4719383fad",
   "schema_version": 1,
   "scope": "engine endpoint functionality under this fixed protocol; not a vanilla comparison or minimal latency proof",
   "setup_game_ticks": 128,

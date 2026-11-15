@@ -191,6 +191,9 @@ impl TickAdapter {
     }
 
     fn descriptor(&self, p: (i32, i32, i32)) -> Result<&str, String> {
+        if !self.sim.world().contains(Pos::new(p.0, p.1, p.2)) {
+            return Err(format!("observation/input {p:?} is outside the simulated world"));
+        }
         self.sim
             .registry()
             .descriptor(self.sim.world().get(Pos::new(p.0, p.1, p.2)))
@@ -387,5 +390,15 @@ mod tests {
         p.cell.io.inputs.get_mut("switch").unwrap().io_type =
             IoType::UnsignedInt { bits: usize::MAX };
         assert!(p.validate().is_err());
+    }
+
+    #[test]
+    fn air_observations_cannot_report_outside_world_as_open() {
+        let mut a = adapter();
+        a.profile.outputs.insert("lit".into(), Observation::Air);
+        a.profile.cell.io.outputs.get_mut("lit").unwrap().positions = vec![(i32::MAX, 0, 0)];
+        assert!(a.read().unwrap_err().contains("outside the simulated world"));
+        a.profile.cell.io.outputs.get_mut("lit").unwrap().positions = vec![(0, 1, 1)];
+        assert_eq!(a.read().unwrap()["lit"], true);
     }
 }
