@@ -17,6 +17,9 @@ FEATURES['certificate_pool_directional'] = ['experiment-wire-certificate', 'expe
 FEATURES['all_no_dispatch'] = [f for f in FEATURES['combined'] if f != 'experiment-wire-dispatch']
 FEATURES['all_no_cursor'] = [f for f in FEATURES['combined'] if f != 'experiment-cursor']
 FEATURES['all_no_certificate'] = [f for f in FEATURES['combined'] if f != 'experiment-wire-certificate']
+FEATURES['owner_selected'] = FEATURES['plan_pool_directional'] + ['experiment-world-plan-cache']
+FEATURES['owner_combined'] = FEATURES['combined'] + ['experiment-world-plan-cache']
+FEATURES['owner_counters'] = FEATURES['counters'] + ['experiment-world-plan-cache']
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--output', type=pathlib.Path, required=True)
 p.add_argument('--variants', nargs='+', choices=FEATURES, required=True)

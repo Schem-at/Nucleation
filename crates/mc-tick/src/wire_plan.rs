@@ -83,6 +83,26 @@ pub(crate) fn mode() -> Mode {
     })
 }
 
+/// A token held by the exact immutable rules instance that built a plan. A
+/// cloned rules value may subsequently be changed, so its identity starts fresh.
+#[cfg(feature = "experiment-world-plan-cache")]
+pub(crate) struct RulesIdentity(Arc<()>);
+
+#[cfg(feature = "experiment-world-plan-cache")]
+impl Default for RulesIdentity {
+    fn default() -> Self { Self(Arc::new(())) }
+}
+
+#[cfg(feature = "experiment-world-plan-cache")]
+impl Clone for RulesIdentity {
+    fn clone(&self) -> Self { Self::default() }
+}
+
+#[cfg(feature = "experiment-world-plan-cache")]
+impl RulesIdentity {
+    pub fn token(&self) -> &Arc<()> { &self.0 }
+}
+
 #[cfg(feature = "experiment-wire-certificate")]
 struct Certificate {
     target: u8,
@@ -99,11 +119,15 @@ struct Entry {
 
 #[derive(Default)]
 struct State {
+    #[cfg(feature = "experiment-world-plan-cache")]
+    rules: Option<Arc<()>>,
     world: Option<Arc<()>>,
     revision: u64,
     entries: Vec<Option<Entry>>,
     #[cfg(feature = "experiment-wire-plan-counters")]
     counts: Counts,
+    #[cfg(all(test, feature = "experiment-world-plan-cache"))]
+    test_builds: usize,
 }
 
 #[cfg(feature = "experiment-wire-plan-counters")]
@@ -128,6 +152,14 @@ pub(crate) struct Cache(Mutex<State>);
 impl Clone for Cache {
     fn clone(&self) -> Self { Self::default() }
 }
+
+// The cache is derived scratch data, not part of World semantic equality.
+#[cfg(feature = "experiment-world-plan-cache")]
+impl PartialEq for Cache {
+    fn eq(&self, _: &Self) -> bool { true }
+}
+#[cfg(feature = "experiment-world-plan-cache")]
+impl Eq for Cache {}
 
 impl std::fmt::Debug for Cache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -218,6 +250,7 @@ impl State {
 }
 
 impl Cache {
+    #[cfg(not(feature = "experiment-world-plan-cache"))]
     pub fn query(
         &self,
         world: &World,
@@ -257,6 +290,90 @@ impl Cache {
         #[cfg(feature = "experiment-wire-certificate")]
         { entry.certificate = Some(Certificate { target, comparators, dirty: false }); }
         target
+    }
+
+    #[cfg(feature = "experiment-world-plan-cache")]
+    pub fn query(
+        &self,
+        world: &World,
+        outputs: &ComparatorOutputs,
+        pos: Pos,
+        classify: impl Fn(StateId, StateId) -> Transition,
+        build: impl FnOnce() -> InputPlan,
+        power: impl FnMut(Pos) -> u8,
+    ) -> u8 {
+        let mut state = self.0.lock().unwrap_or_else(|error| error.into_inner());
+        Self::query_locked(&mut state, world, outputs, pos, classify, build, power)
+    }
+
+    #[cfg(feature = "experiment-world-plan-cache")]
+    pub fn query_for_rules(
+        &self,
+        rules: &Arc<()>,
+        world: &World,
+        outputs: &ComparatorOutputs,
+        pos: Pos,
+        classify: impl Fn(StateId, StateId) -> Transition,
+        build: impl FnOnce() -> InputPlan,
+        power: impl FnMut(Pos) -> u8,
+    ) -> u8 {
+        let mut state = self.0.lock().unwrap_or_else(|error| error.into_inner());
+        if state.rules.as_ref().is_none_or(|token| !Arc::ptr_eq(token, rules)) {
+            state.clear();
+            state.rules = Some(rules.clone());
+            state.world = Some(world.plan_identity().clone());
+            state.revision = world.plan_revision();
+        }
+        Self::query_locked(&mut state, world, outputs, pos, classify, build, power)
+    }
+
+    // Keep the original experiment untouched when the storage feature is off.
+    #[cfg(feature = "experiment-world-plan-cache")]
+    fn query_locked(
+        state: &mut State,
+        world: &World,
+        outputs: &ComparatorOutputs,
+        pos: Pos,
+        classify: impl Fn(StateId, StateId) -> Transition,
+        build: impl FnOnce() -> InputPlan,
+        power: impl FnMut(Pos) -> u8,
+    ) -> u8 {
+        state.synchronize(world, classify);
+        #[cfg(feature = "experiment-wire-plan-counters")]
+        { state.counts.queries += 1; }
+        let index = slot(pos);
+        if state.entries[index].as_ref().is_none_or(|entry| entry.pos != pos) {
+            #[cfg(test)]
+            { state.test_builds += 1; }
+            state.entries[index] = Some(Entry {
+                pos,
+                plan: build(),
+                #[cfg(feature = "experiment-wire-certificate")]
+                certificate: None,
+            });
+            #[cfg(feature = "experiment-wire-plan-counters")]
+            { state.counts.builds += 1; }
+        }
+        let entry = state.entries[index].as_mut().unwrap();
+        let comparators = entry.plan.live_comparators(outputs);
+        #[cfg(feature = "experiment-wire-certificate")]
+        if let Some(certificate) = &entry.certificate {
+            if !certificate.dirty && certificate.comparators == comparators {
+                let target = certificate.target;
+                #[cfg(feature = "experiment-wire-plan-counters")]
+                { state.counts.certificate_hits += 1; }
+                return target;
+            }
+        }
+        let target = entry.plan.evaluate(&comparators, power);
+        #[cfg(feature = "experiment-wire-certificate")]
+        { entry.certificate = Some(Certificate { target, comparators, dirty: false }); }
+        target
+    }
+
+    #[cfg(all(test, feature = "experiment-world-plan-cache"))]
+    pub(crate) fn test_builds(&self) -> usize {
+        self.0.lock().unwrap_or_else(|error| error.into_inner()).test_builds
     }
 }
 

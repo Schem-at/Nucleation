@@ -37,6 +37,8 @@ pub struct World {
     growth_limit: u64,
     #[cfg(feature = "experiment-wire-plan")]
     plan_journal: crate::world_journal::MutationJournal,
+    #[cfg(feature = "experiment-world-plan-cache")]
+    plan_cache: Box<crate::wire_plan::Cache>,
 }
 
 // Optimization bookkeeping is deliberately absent from semantic/debug snapshots.
@@ -68,6 +70,11 @@ impl LocalReadCursor<'_> {
 }
 
 impl World {
+    /// Per-world scratch storage, isolated even when multiple simulations share
+    /// the same immutable rules. The cache also checks an owned rules identity.
+    #[cfg(feature = "experiment-world-plan-cache")]
+    pub(crate) fn wire_plan_cache(&self) -> &crate::wire_plan::Cache { &self.plan_cache }
+
     /// An all-air world covering `bounds`.
     pub fn new(bounds: Bounds) -> Self {
         let (x, y, z) = bounds.size();
@@ -80,6 +87,8 @@ impl World {
             growth_limit: DEFAULT_GROWTH_LIMIT,
             #[cfg(feature = "experiment-wire-plan")]
             plan_journal: Default::default(),
+            #[cfg(feature = "experiment-world-plan-cache")]
+            plan_cache: Default::default(),
         }
     }
 

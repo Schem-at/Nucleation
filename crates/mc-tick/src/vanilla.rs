@@ -238,8 +238,10 @@ pub struct VanillaRules {
     /// States whose comparator read comes from the block state itself —
     /// a composter's `level` (0-8).
     state_analog: StateTable<u8>,
-    #[cfg(feature = "experiment-wire-plan")]
+    #[cfg(all(feature = "experiment-wire-plan", not(feature = "experiment-world-plan-cache")))]
     plan_cache: crate::wire_plan::Cache,
+    #[cfg(feature = "experiment-world-plan-cache")]
+    plan_identity: crate::wire_plan::RulesIdentity,
 }
 
 #[cfg(feature = "experiment-wire-plan")]
@@ -472,6 +474,79 @@ mod wire_plan_tests {
             }
         }
     }
+
+    #[cfg(feature = "experiment-world-plan-cache")]
+    #[test]
+    fn shared_rules_keep_separate_world_plans_warm_and_clones_start_empty() {
+        let rules = Arc::new(rules());
+        let pos = Pos::new(0, 0, 0);
+        let source = pos.offset(Dir::East);
+        let bounds = Bounds::new(Pos::new(-3, -3, -3), Pos::new(3, 3, 3));
+        let mut first = World::new(bounds);
+        let mut second = World::new(bounds);
+        first.set(source, StateId(8));
+        second.set(source, StateId(16));
+        let before = format!("{first:?}");
+        let outputs = ComparatorOutputs::new();
+        for _ in 0..64 {
+            assert_eq!(query(&rules, &first, &outputs, pos), 6);
+            assert_eq!(query(&rules, &second, &outputs, pos), 14);
+        }
+        assert_eq!(first.wire_plan_cache().test_builds(), 1);
+        assert_eq!(second.wire_plan_cache().test_builds(), 1);
+        assert_eq!(format!("{first:?}"), before);
+        let clone = first.clone();
+        assert_eq!(clone, first);
+        assert_eq!(clone.wire_plan_cache().test_builds(), 0);
+        assert_eq!(query(&rules, &clone, &outputs, pos), 6);
+        assert_eq!(clone.wire_plan_cache().test_builds(), 1);
+        assert_eq!(first.wire_plan_cache().test_builds(), 1);
+    }
+
+    #[cfg(feature = "experiment-world-plan-cache")]
+    #[test]
+    fn changed_rules_clone_cannot_reuse_a_worlds_overlapping_state_ids() {
+        let rules = rules();
+        let mut changed = rules.clone();
+        assert!(!Arc::ptr_eq(rules.plan_identity.token(), changed.plan_identity.token()));
+        changed.wires.insert(StateId(8), (4, [WireSide::Side; 4]));
+        let pos = Pos::new(0, 0, 0);
+        let mut world = World::new(Bounds::new(Pos::new(-3, -3, -3), Pos::new(3, 3, 3)));
+        world.set(pos.offset(Dir::East), StateId(8));
+        let outputs = ComparatorOutputs::new();
+        assert_eq!(query(&rules, &world, &outputs, pos), 6);
+        assert_eq!(query(&changed, &world, &outputs, pos), 3);
+        assert_eq!(query(&rules, &world, &outputs, pos), 6);
+        assert_eq!(world.wire_plan_cache().test_builds(), 3);
+    }
+
+    #[cfg(feature = "experiment-world-plan-cache")]
+    #[test]
+    fn actual_shared_rules_are_safe_and_retain_plans_across_concurrent_worlds() {
+        let rules = Arc::new(rules());
+        let barrier = Arc::new(std::sync::Barrier::new(2));
+        let mut handles = Vec::new();
+        for (id, wire_signal) in [(StateId(8), 6u8), (StateId(16), 14u8)] {
+            let rules = Arc::clone(&rules);
+            let barrier = Arc::clone(&barrier);
+            handles.push(std::thread::spawn(move || {
+                let pos = Pos::new(0, 0, 0);
+                let comparator = pos.offset(Dir::Up);
+                let mut world = World::new(Bounds::new(Pos::new(-3, -3, -3), Pos::new(3, 3, 3)));
+                world.set(pos.offset(Dir::East), id);
+                world.set(comparator, StateId(310));
+                let mut outputs = ComparatorOutputs::new();
+                for value in [0, 3, 15, 16, 255].into_iter().cycle().take(64) {
+                    outputs.insert(comparator, value);
+                    barrier.wait();
+                    assert_eq!(query(&rules, &world, &outputs, pos),
+                        if value == 15 { 15 } else { value.max(wire_signal) });
+                }
+                assert_eq!(world.wire_plan_cache().test_builds(), 1);
+            }));
+        }
+        for handle in handles { handle.join().unwrap(); }
+    }
 }
 
 #[cfg(feature = "experiment-wire-plan")]
@@ -577,7 +652,13 @@ impl VanillaRules {
         }) {
             return None;
         }
+        #[cfg(not(feature = "experiment-world-plan-cache"))]
         let result = self.plan_cache.query(world, outputs, pos,
+            |from, to| self.wire_plan_transition(from, to),
+            || self.build_wire_plan(world, pos),
+            |source| self.wires.get(&world.get(source)).map_or(0, |(power, _)| *power));
+        #[cfg(feature = "experiment-world-plan-cache")]
+        let result = world.wire_plan_cache().query_for_rules(self.plan_identity.token(), world, outputs, pos,
             |from, to| self.wire_plan_transition(from, to),
             || self.build_wire_plan(world, pos),
             |source| self.wires.get(&world.get(source)).map_or(0, |(power, _)| *power));
