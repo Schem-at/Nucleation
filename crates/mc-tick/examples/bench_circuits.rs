@@ -6,6 +6,9 @@ use mc_tick::{Pos, Simulation, StateId, Structure};
 use serde_json::json;
 use std::time::Instant;
 
+#[path = "bench_circuits/fuzz.rs"]
+mod fuzz;
+
 const CASES: &[&str] = &[
     "hipster",
     "hipster_unrecorded",
@@ -271,6 +274,10 @@ fn verify(cases: &[&str]) {
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();
+    if args.get(1).is_some_and(|a| a == "--fuzz") {
+        fuzz::verify(args.get(2).map(|s| s.parse().unwrap()).unwrap_or(8));
+        return;
+    }
     if args.get(1).is_some_and(|a| a == "--verify") {
         let cases: Vec<_> = if args.get(2).is_some_and(|a| a == "--expanded") {
             CASES.iter().chain(EXTRA).chain(EXTERNAL).copied().collect()

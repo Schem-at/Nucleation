@@ -249,6 +249,8 @@ pub struct Simulation {
     pending: Vec<crate::behaviour::UpdateEntry>,
     #[cfg(feature = "experiment-update-pool")]
     update_pool: crate::behaviour::UpdatePool,
+    #[cfg(feature = "experiment-update-arena")]
+    update_arena: crate::behaviour::UpdateArena,
     /// Deferred writes awaiting their block-entities phase.
     moves: Vec<PendingMove>,
     /// Torch toggle history for burnout, pruned as it ages out.
@@ -486,6 +488,8 @@ impl Simulation {
             pending: Vec::new(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: crate::behaviour::UpdatePool::default(),
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: crate::behaviour::UpdateArena::default(),
             moves: Vec::new(),
             toggles: Vec::new(),
             comparator_out: std::collections::HashMap::new(),
@@ -1452,6 +1456,8 @@ impl Simulation {
         // ticker reconciliation all fire as for any other removal.
         for pos in cleared {
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut self.update_arena,
                 #[cfg(feature = "experiment-update-pool")]
                 update_pool: &mut self.update_pool,
                 drain: Some(crate::behaviour::Drain {
@@ -1597,6 +1603,8 @@ impl Simulation {
                 continue;
             };
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut self.update_arena,
                 #[cfg(feature = "experiment-update-pool")]
                 update_pool: &mut self.update_pool,
                 drain: Some(crate::behaviour::Drain {
@@ -1997,6 +2005,8 @@ impl Simulation {
                 continue;
             };
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut self.update_arena,
                 #[cfg(feature = "experiment-update-pool")]
                 update_pool: &mut self.update_pool,
                 drain: Some(crate::behaviour::Drain {
@@ -2389,6 +2399,8 @@ impl Simulation {
                 continue;
             };
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut self.update_arena,
                 #[cfg(feature = "experiment-update-pool")]
                 update_pool: &mut self.update_pool,
                 drain: Some(crate::behaviour::Drain {
@@ -2905,6 +2917,8 @@ impl Simulation {
     /// so a behaviour can drain mid-handler.
     fn ctx(&mut self) -> TickCtx<'_> {
         TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut self.update_arena,
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut self.update_pool,
             drain: Some(crate::behaviour::Drain {
@@ -3074,6 +3088,8 @@ impl Simulation {
                 continue;
             };
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut self.update_arena,
                 #[cfg(feature = "experiment-update-pool")]
                 update_pool: &mut self.update_pool,
                 drain: Some(crate::behaviour::Drain {
@@ -3187,6 +3203,8 @@ impl Simulation {
         if state != StateId::AIR {
             if let Some(behaviour) = self.behaviours.get(state) {
                 let mut ctx = TickCtx {
+                    #[cfg(feature = "experiment-update-arena")]
+                    update_arena: &mut self.update_arena,
                     #[cfg(feature = "experiment-update-pool")]
                     update_pool: &mut self.update_pool,
                     drain: Some(crate::behaviour::Drain {
@@ -3438,6 +3456,8 @@ impl Simulation {
             // Field-disjoint borrows, exactly as `use_block` builds its ctx —
             // `self.ctx()` would reborrow `behaviours` mutably.
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut self.update_arena,
                 #[cfg(feature = "experiment-update-pool")]
                 update_pool: &mut self.update_pool,
                 drain: Some(crate::behaviour::Drain {
@@ -3508,6 +3528,8 @@ impl Simulation {
             return;
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut self.update_arena,
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut self.update_pool,
             drain: Some(crate::behaviour::Drain {
@@ -3595,6 +3617,8 @@ impl Simulation {
                         continue;
                     };
                     let mut ctx = TickCtx {
+                        #[cfg(feature = "experiment-update-arena")]
+                        update_arena: &mut self.update_arena,
                         #[cfg(feature = "experiment-update-pool")]
                         update_pool: &mut self.update_pool,
                         drain: Some(crate::behaviour::Drain {
@@ -3647,6 +3671,8 @@ impl Simulation {
                         continue;
                     };
                     let mut ctx = TickCtx {
+                        #[cfg(feature = "experiment-update-arena")]
+                        update_arena: &mut self.update_arena,
                         #[cfg(feature = "experiment-update-pool")]
                         update_pool: &mut self.update_pool,
                         drain: Some(crate::behaviour::Drain {
@@ -3700,6 +3726,8 @@ impl Simulation {
                         continue;
                     };
                     let mut ctx = TickCtx {
+                        #[cfg(feature = "experiment-update-arena")]
+                        update_arena: &mut self.update_arena,
                         #[cfg(feature = "experiment-update-pool")]
                         update_pool: &mut self.update_pool,
                         drain: Some(crate::behaviour::Drain {
@@ -3851,6 +3879,8 @@ impl Simulation {
                             continue;
                         };
                         let mut ctx = TickCtx {
+                            #[cfg(feature = "experiment-update-arena")]
+                            update_arena: &mut self.update_arena,
                             #[cfg(feature = "experiment-update-pool")]
                             update_pool: &mut self.update_pool,
                             drain: Some(crate::behaviour::Drain {
@@ -4034,6 +4064,8 @@ impl Simulation {
                         continue;
                     };
                     let mut ctx = TickCtx {
+                        #[cfg(feature = "experiment-update-arena")]
+                        update_arena: &mut self.update_arena,
                         #[cfg(feature = "experiment-update-pool")]
                         update_pool: &mut self.update_pool,
                         drain: Some(crate::behaviour::Drain {
@@ -4137,6 +4169,8 @@ impl Simulation {
                     )
                 });
                 let mut ctx = TickCtx {
+                    #[cfg(feature = "experiment-update-arena")]
+                    update_arena: &mut self.update_arena,
                     #[cfg(feature = "experiment-update-pool")]
                     update_pool: &mut self.update_pool,
                     drain: Some(crate::behaviour::Drain {
@@ -4221,6 +4255,69 @@ mod tests {
         Simulation::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(7, 7, 7)))
     }
 
+    #[cfg(feature = "experiment-update-arena")]
+    #[test]
+    fn arena_wire_transition_to_custom_behaviour_preserves_public_queue_observability() {
+        use crate::behaviour::{BlockBehaviour, UpdateEntry, UpdateKind};
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        struct Inspect(Arc<AtomicUsize>);
+        impl BlockBehaviour for Inspect {
+            fn name(&self) -> &'static str { "inspect-public-queue" }
+            fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, _: Pos, _: Dir) {
+                self.0.fetch_add(1, Ordering::Relaxed);
+                assert!(ctx.updates.is_empty());
+                let target = Pos::new(7, 7, 7);
+                ctx.notify(target, Dir::Up);
+                assert_eq!(ctx.updates.len(), 1, "custom code sees helper-generated entries");
+                let entry = ctx.updates[0].clone();
+                ctx.updates.clear();
+                ctx.update_neighbors_at(Pos::new(6, 6, 6));
+                assert_eq!(ctx.updates.len(), 1);
+                assert_eq!(ctx.updates[0].clone().next().unwrap().0,
+                    Pos::new(6, 6, 6).offset(crate::pos::UPDATE_ORDER[0]));
+                ctx.updates.clear();
+                ctx.updates.push(entry);
+                ctx.drain(); // Already inside a callback: must not dispatch yet.
+                assert_eq!(ctx.updates.len(), 1);
+            }
+            fn indirect_shape_targets(&self, _: &World, _: Pos) -> Vec<(Pos, Dir)> {
+                vec![(Pos::new(7, 7, 7), Dir::Down)]
+            }
+        }
+        fn run(arena: bool) -> (Simulation, usize) {
+            let mut s = sim();
+            let powered = s.registry.intern("minecraft:redstone_wire[east=none,north=none,power=15,south=none,west=none]").unwrap();
+            let off = s.registry.intern("minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]").unwrap();
+            let support = s.registry.intern("minecraft:stone").unwrap();
+            crate::vanilla::register_all(&mut s.registry, &mut s.behaviours);
+            let calls = Arc::new(AtomicUsize::new(0));
+            s.behaviours.register(off, Box::new(Inspect(calls.clone())));
+            if !arena { s.behaviours.disable_arena_for_test(); }
+            let pos = Pos::new(3, 1, 3);
+            s.world.set(pos.offset(Dir::Down), support);
+            s.world.set(pos, powered);
+            s.record();
+            s.record_updates(true);
+            let checkpoint = s.checkpoint();
+            for _ in 0..2 {
+                s.updates.push(UpdateEntry::new(vec![(pos, Dir::West, UpdateKind::Neighbor)]));
+                s.propagate();
+                assert_eq!(s.world.get(pos), off);
+                s.restore(&checkpoint);
+            }
+            (s, calls.load(Ordering::Relaxed))
+        }
+        let (arena, arena_calls) = run(true);
+        let (owned, owned_calls) = run(false);
+        assert!(arena.update_arena.native_batches() > 0, "exercise the real wire fast path");
+        assert_eq!(owned.update_arena.native_batches(), 0);
+        assert!(arena_calls > 0);
+        assert_eq!(arena_calls, owned_calls);
+        assert_eq!(arena.recorded(), owned.recorded());
+        assert_eq!(arena.recorded_updates(), owned.recorded_updates());
+        assert_eq!(format!("{:?}", arena.checkpoint()), format!("{:?}", owned.checkpoint()));
+    }
+
     #[cfg(feature = "experiment-wire-dispatch")]
     #[test]
     fn typed_wire_dispatch_matches_dynamic_registration_and_custom_replacement() {
@@ -4300,7 +4397,7 @@ mod tests {
         assert_eq!(typed.recorded_updates().last().unwrap().state, unknown);
     }
 
-    #[cfg(feature = "experiment-update-pool")]
+    #[cfg(any(feature = "experiment-update-pool", feature = "experiment-update-arena"))]
     #[test]
     fn pooled_updates_preserve_nested_order_custom_entries_and_restore() {
         use crate::behaviour::{BlockBehaviour, UpdateEntry, UpdateKind};
@@ -4339,6 +4436,7 @@ mod tests {
             assert_eq!(s.recorded_updates().iter().map(|r| r.pos.x).collect::<Vec<_>>(),
                        [0, 2, 4, 3, 1, 5]);
             assert!(s.updates.is_empty() && s.pending.is_empty());
+            #[cfg(not(feature = "experiment-update-arena"))]
             assert!(s.update_pool.retained_buffers() > 0);
             s.restore(&checkpoint);
             assert_eq!(format!("{:?}", s.checkpoint()), before,
@@ -4346,7 +4444,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "experiment-update-pool")]
+    #[cfg(any(feature = "experiment-update-pool", feature = "experiment-update-arena"))]
     #[test]
     fn pooled_updates_remain_usable_after_cascade_abort() {
         use crate::behaviour::{BlockBehaviour, UpdateEntry};
@@ -4369,6 +4467,7 @@ mod tests {
         s.propagate();
         assert_eq!(count.load(Ordering::Relaxed), 1_000_000);
         assert!(s.updates.is_empty() && s.pending.is_empty());
+        #[cfg(feature = "experiment-update-pool")]
         assert!(s.update_pool.retained_buffers() <= 2048);
         s.world.set(pos, StateId::AIR);
         s.record_updates(true);

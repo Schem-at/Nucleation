@@ -1,0 +1,11 @@
+==3804166== Callgrind, a call-graph generating cache profiler
+==3804166== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==3804166== Using Valgrind-3.25.1 and LibVEX; rerun with -h for copyright info
+==3804166== Command: /home/harrison/nucleation-perf/execution-pgo-reference/pgo flyer 1 64
+==3804166== 
+==3804166== For interactive control, run 'callgrind_control -h'.
+==3804166== 
+==3804166== Events    : Ir
+==3804166== Collected : 333138635
+==3804166== 
+==3804166== I   refs:      333,138,635

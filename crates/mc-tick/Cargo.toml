@@ -16,6 +16,11 @@ experiment-wire-plan = []
 experiment-wire-certificate = ["experiment-wire-plan"]
 experiment-wire-plan-counters = ["experiment-wire-plan"]
 experiment-world-plan-cache = ["experiment-wire-plan"]
+experiment-piston-plan = []
+experiment-piston-plan-counters = ["experiment-piston-plan"]
+experiment-execution-view = []
+experiment-update-arena = []
+experiment-lazy-journal = []
 
 # Dependencies are deliberately near-zero. This crate's reason to exist is a fast
 # edit->test loop, and every dependency added here is paid on every iteration for

@@ -221,6 +221,8 @@ mod tests {
         let pos = Pos::new(1, 1, 0);
         let o = observer(false);
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -259,6 +261,8 @@ mod tests {
         let pos = Pos::new(1, 1, 0);
         let o = observer(false);
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -301,6 +305,8 @@ mod tests {
         // Rising edge.
         {
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut crate::behaviour::UpdateArena::default(),
                 #[cfg(feature = "experiment-update-pool")]
                 update_pool: &mut crate::behaviour::UpdatePool::default(),
                 drain: None,
@@ -337,6 +343,8 @@ mod tests {
         // Falling edge.
         {
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut crate::behaviour::UpdateArena::default(),
                 #[cfg(feature = "experiment-update-pool")]
                 update_pool: &mut crate::behaviour::UpdatePool::default(),
                 drain: None,
@@ -379,6 +387,8 @@ mod tests {
         w.set(pos, ON);
         let o = observer(true);
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -413,6 +423,8 @@ mod tests {
         w.set(pos, ON);
         t.schedule(pos, 5, 2, crate::schedule::TickPriority::Normal);
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -466,6 +478,8 @@ mod tests {
         let pos = Pos::new(1, 1, 0);
         let o = observer(true); // mid-pulse
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,

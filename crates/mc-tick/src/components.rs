@@ -121,6 +121,17 @@ impl StatePair {
 /// power model — the same reasoning that keeps [`crate::state::StateRegistry`] free
 /// of Minecraft's block list.
 pub trait PowerSource: Send + Sync {
+    /// Optional concrete-rule piston experiment. Custom implementations keep
+    /// their original sequence of power queries through this default fallback.
+    #[cfg(feature = "experiment-piston-plan")]
+    fn planned_piston_power(
+        &self,
+        _world: &World,
+        _outputs: &crate::behaviour::ComparatorOutputs,
+        _pos: Pos,
+        _facing: Dir,
+    ) -> Option<bool> { None }
+
     /// `LeavesBlock.getDistanceAt`: 0 for a log, a leaf's own `distance`, and
     /// 7 for everything else — the "too far to matter" value.
     fn leaf_distance(&self, _world: &World, _pos: Pos) -> u8 {
@@ -2694,6 +2705,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -2748,6 +2761,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -2806,6 +2821,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -2862,6 +2879,8 @@ mod tests {
         };
         let pos = Pos::new(0, 1, 0);
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -2918,6 +2937,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -2975,6 +2996,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -3057,6 +3080,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -3122,6 +3147,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -3179,6 +3206,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -3313,6 +3342,8 @@ mod tests {
         }
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -3370,6 +3401,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -3429,6 +3462,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -3536,6 +3571,8 @@ mod tests {
         stored.insert(pos, 15u8);
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -3582,6 +3619,8 @@ mod tests {
         stored.insert(pos, 15u8);
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -3630,6 +3669,8 @@ mod tests {
         let mut stored = std::collections::HashMap::new();
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -3683,6 +3724,8 @@ mod tests {
         let mut stored = std::collections::HashMap::new();
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,

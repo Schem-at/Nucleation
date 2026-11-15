@@ -195,6 +195,154 @@ impl UpdatePool {
     }
 }
 
+/// Reusable eager notification payloads for the arena experiment.
+///
+/// Ranges never escape this owner: public `UpdateEntry` values remain owned
+/// vectors and may be inspected, cloned, or moved between contexts normally.
+#[cfg(feature = "experiment-update-arena")]
+#[derive(Default)]
+pub struct UpdateArena {
+    payload: Vec<(Pos, Dir, UpdateKind)>,
+    added: Vec<ArenaFrame>,
+    pending: Vec<ArenaFrame>,
+    singles: Vec<usize>,
+    sixes: Vec<usize>,
+    // Only audited vanilla-wire neighbour callbacks hide native batches here.
+    // Custom callbacks retain the observable public TickCtx::updates vector.
+    native: bool,
+    #[cfg(test)]
+    native_batches: usize,
+}
+
+#[cfg(feature = "experiment-update-arena")]
+#[derive(Clone, Copy, Debug)]
+struct ArenaFrame {
+    start: usize,
+    len: usize,
+    cursor: usize,
+}
+
+#[cfg(feature = "experiment-update-arena")]
+impl std::fmt::Debug for UpdateArena {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("UpdateArena")
+    }
+}
+
+#[cfg(feature = "experiment-update-arena")]
+impl UpdateArena {
+    const RETAIN_PAYLOAD: usize = 65_536;
+    const RETAIN_FRAMES: usize = 8_192;
+
+    #[cfg(test)]
+    pub(crate) fn native_batches(&self) -> usize { self.native_batches }
+
+    fn store(&mut self, len: usize, items: impl IntoIterator<Item = (Pos, Dir, UpdateKind)>) -> ArenaFrame {
+        let class = if len == 1 { 1 } else if len <= 6 { 6 } else { len };
+        let recycled = match class {
+            1 => self.singles.pop(),
+            6 => self.sixes.pop(),
+            _ => None,
+        };
+        let start = if let Some(start) = recycled {
+            for (slot, item) in self.payload[start..start + len].iter_mut().zip(items) {
+                *slot = item;
+            }
+            start
+        } else {
+            let start = self.payload.len();
+            self.payload.extend(items);
+            debug_assert_eq!(self.payload.len(), start + len);
+            // A five-item batch shares the six-slot class. Padding is never read.
+            self.payload.resize(start + class, (Pos::new(0, 0, 0), Dir::Down, UpdateKind::Neighbor));
+            start
+        };
+        ArenaFrame { start, len, cursor: 0 }
+    }
+
+    fn import_added(&mut self, entries: &mut Vec<UpdateEntry>) {
+        for entry in entries.drain(..) {
+            let remaining = &entry.items[entry.cursor.min(entry.items.len())..];
+            if remaining.is_empty() { continue; }
+            let frame = self.store(remaining.len(), remaining.iter().copied());
+            self.added.push(frame);
+        }
+    }
+
+    fn import_pending(&mut self, entries: &mut Vec<UpdateEntry>) {
+        for entry in entries.drain(..) {
+            let remaining = &entry.items[entry.cursor.min(entry.items.len())..];
+            if remaining.is_empty() { continue; }
+            let frame = self.store(remaining.len(), remaining.iter().copied());
+            self.pending.push(frame);
+        }
+    }
+
+    fn enqueue(&mut self, public: &mut Vec<UpdateEntry>, len: usize,
+        items: impl IntoIterator<Item = (Pos, Dir, UpdateKind)>) {
+        // Public/custom pushes interleaved between native helpers keep their
+        // original position in addedThisLayer.
+        self.import_added(public);
+        #[cfg(test)]
+        { self.native_batches += 1; }
+        if len != 0 {
+            let frame = self.store(len, items);
+            self.added.push(frame);
+        }
+    }
+
+    fn next(&mut self, public: &mut Vec<UpdateEntry>) -> Option<(Pos, Dir, UpdateKind)> {
+        self.import_added(public);
+        while let Some(frame) = self.added.pop() { self.pending.push(frame); }
+        loop {
+            let top = self.pending.last_mut()?;
+            if top.cursor < top.len {
+                let item = self.payload[top.start + top.cursor];
+                top.cursor += 1;
+                return Some(item);
+            }
+            let done = self.pending.pop().unwrap();
+            match done.len {
+                1 => self.singles.push(done.start),
+                2..=6 => self.sixes.push(done.start),
+                _ => {}
+            }
+        }
+    }
+
+    fn reset(&mut self) {
+        self.native = false;
+        self.payload.clear();
+        self.added.clear();
+        self.pending.clear();
+        self.singles.clear();
+        self.sixes.clear();
+        if self.payload.capacity() > Self::RETAIN_PAYLOAD { self.payload = Vec::new(); }
+        if self.added.capacity() > Self::RETAIN_FRAMES { self.added = Vec::new(); }
+        if self.pending.capacity() > Self::RETAIN_FRAMES { self.pending = Vec::new(); }
+        if self.singles.capacity() > Self::RETAIN_FRAMES { self.singles = Vec::new(); }
+        if self.sixes.capacity() > Self::RETAIN_FRAMES { self.sixes = Vec::new(); }
+    }
+
+    fn neighbors_at(&mut self, public: &mut Vec<UpdateEntry>, pos: Pos) {
+        trace_update("neighbors_at", pos);
+        self.enqueue(public, 6, crate::pos::UPDATE_ORDER.into_iter()
+            .map(|dir| (pos.offset(dir), dir.opposite(), UpdateKind::Neighbor)));
+    }
+
+    fn neighbor_shapes(&mut self, public: &mut Vec<UpdateEntry>, pos: Pos) {
+        for dir in crate::pos::UPDATE_SHAPE_ORDER { trace_update("shape", pos.offset(dir)); }
+        self.enqueue(public, 6, crate::pos::UPDATE_SHAPE_ORDER.into_iter()
+            .map(|dir| (pos.offset(dir), dir.opposite(), UpdateKind::Shape)));
+    }
+
+    fn own_shapes(&mut self, public: &mut Vec<UpdateEntry>, pos: Pos) {
+        for _ in crate::pos::UPDATE_SHAPE_ORDER { trace_update("shape", pos); }
+        self.enqueue(public, 6, crate::pos::UPDATE_SHAPE_ORDER.into_iter()
+            .map(|dir| (pos, dir, UpdateKind::Shape)));
+    }
+}
+
 /// `MC_TICK_TRACE_UPDATES=1` — every neighbour update the engine asks for.
 ///
 /// Logged where the update is *requested*, which is where the game logs its
@@ -507,6 +655,9 @@ pub struct TickCtx<'a> {
     /// callbacks can enqueue nested work without sharing an in-flight vector.
     #[cfg(feature = "experiment-update-pool")]
     pub update_pool: &'a mut UpdatePool,
+    /// Private-range storage for the default-off eager arena experiment.
+    #[cfg(feature = "experiment-update-arena")]
+    pub update_arena: &'a mut UpdateArena,
 }
 
 impl<'a> TickCtx<'a> {
@@ -520,6 +671,7 @@ impl<'a> TickCtx<'a> {
     ///
     /// Re-entrant calls are no-ops that leave the entries queued, which is what
     /// vanilla's `count` guard does inside `CollectingNeighborUpdater`.
+    #[cfg(not(feature = "experiment-update-arena"))]
     pub fn drain(&mut self) {
         // Vanilla's `maxChainedNeighborUpdates`: a circuit that keeps
         // re-notifying itself reports rather than hangs.
@@ -606,6 +758,86 @@ impl<'a> TickCtx<'a> {
                 }
             }
         }
+        self.drain = Some(pump);
+    }
+
+    #[cfg(feature = "experiment-update-arena")]
+    pub fn drain(&mut self) {
+        // Vanilla's `maxChainedNeighborUpdates`: a circuit that keeps
+        // re-notifying itself reports rather than hangs.
+        const MAX_UPDATE_CASCADE: usize = 1_000_000;
+        let Some(mut pump) = self.drain.take() else {
+            return;
+        };
+        let Some(table) = self.behaviours else {
+            self.drain = Some(pump);
+            return;
+        };
+        self.update_arena.native = false;
+        self.update_arena.import_pending(pump.pending);
+        let mut delivered = 0usize;
+        while let Some((pos, from, kind)) = self.update_arena.next(self.updates) {
+            delivered += 1;
+            if delivered > MAX_UPDATE_CASCADE {
+                self.updates.clear();
+                pump.pending.clear();
+                break;
+            }
+            let state = self.world.get(pos);
+            // Recorded before the behaviour lookup, so a notification landing on
+            // air or on an unregistered block still shows up: the question a
+            // propagation view answers is "what did the update reach", not
+            // "what reacted to it".
+            if let Some(log) = pump.upd_log.as_deref_mut() {
+                let tick = self.tick;
+                let seq = match log.last() {
+                    Some(last) if last.tick == tick => last.seq + 1,
+                    _ => 0,
+                };
+                log.push(UpdateRecord {
+                    tick,
+                    seq,
+                    pos,
+                    from,
+                    kind,
+                    phase: pump.phase,
+                    state,
+                });
+            }
+            if let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_NOTIFY") {
+                let filter = filter.to_string_lossy().to_string();
+                let key = format!("{},{},{}", pos.x, pos.y, pos.z);
+                if filter.split(';').any(|want| want.trim() == key) {
+                    eprintln!(
+                        "[t{}] notify ({key}) {kind:?} from {from:?}  {}",
+                        self.tick,
+                        self.states.descriptor(state).unwrap_or("minecraft:air")
+                    );
+                }
+            }
+            self.update_arena.native = kind == UpdateKind::Neighbor
+                && table.arena_wires.get(state.raw() as usize).copied().unwrap_or(false);
+            #[cfg(feature = "experiment-wire-dispatch")]
+            {
+                if !table.dispatch_update(state, self, pos, from, kind) && state != StateId::AIR {
+                    pump.unknown_seen.push(state);
+                }
+            }
+            #[cfg(not(feature = "experiment-wire-dispatch"))]
+            {
+                let Some(behaviour) = table.get(state) else {
+                    if state != StateId::AIR {
+                        pump.unknown_seen.push(state);
+                    }
+                    continue;
+                };
+                match kind {
+                    UpdateKind::Neighbor => behaviour.on_neighbor_changed(self, pos, from),
+                    UpdateKind::Shape => behaviour.on_shape_update(self, pos, from),
+                }
+            }
+        }
+        self.update_arena.reset();
         self.drain = Some(pump);
     }
 
@@ -698,6 +930,11 @@ impl<'a> TickCtx<'a> {
 
     /// Queue one `updateNeighborsAt(pos)` entry.
     pub fn update_neighbors_at(&mut self, pos: Pos) {
+        #[cfg(feature = "experiment-update-arena")]
+        if self.update_arena.native {
+            self.update_arena.neighbors_at(self.updates, pos);
+            return;
+        }
         #[cfg(feature = "experiment-update-pool")]
         let entry = self.update_pool.neighbors_at(pos);
         #[cfg(not(feature = "experiment-update-pool"))]
@@ -712,6 +949,11 @@ impl<'a> TickCtx<'a> {
     /// carries `UPDATE_KNOWN_SHAPE` and so says nothing, and the shape pass is
     /// then run over them by hand.
     pub fn update_neighbour_shapes(&mut self, pos: Pos) {
+        #[cfg(feature = "experiment-update-arena")]
+        if self.update_arena.native {
+            self.update_arena.neighbor_shapes(self.updates, pos);
+            return;
+        }
         #[cfg(feature = "experiment-update-pool")]
         let entry = self.update_pool.neighbor_shapes(pos);
         #[cfg(not(feature = "experiment-update-pool"))]
@@ -721,6 +963,13 @@ impl<'a> TickCtx<'a> {
 
     /// `updateNeighborsAtExceptFromFacing`: the same entry minus one side.
     pub fn update_neighbors_except(&mut self, pos: Pos, skip: Dir) {
+        #[cfg(feature = "experiment-update-arena")]
+        if self.update_arena.native {
+            self.update_arena.enqueue(self.updates, 5, crate::pos::UPDATE_ORDER.into_iter()
+                .filter(|dir| *dir != skip)
+                .map(|dir| (pos.offset(dir), dir.opposite(), UpdateKind::Neighbor)));
+            return;
+        }
         let items = crate::pos::UPDATE_ORDER.into_iter()
             .filter(|dir| *dir != skip)
             .map(|dir| (pos.offset(dir), dir.opposite(), UpdateKind::Neighbor));
@@ -733,6 +982,11 @@ impl<'a> TickCtx<'a> {
 
     /// `updateFromNeighbourShapes(pos)`.
     pub fn update_self_shapes(&mut self, pos: Pos) {
+        #[cfg(feature = "experiment-update-arena")]
+        if self.update_arena.native {
+            self.update_arena.own_shapes(self.updates, pos);
+            return;
+        }
         #[cfg(feature = "experiment-update-pool")]
         let entry = self.update_pool.own_shapes(pos);
         #[cfg(not(feature = "experiment-update-pool"))]
@@ -747,6 +1001,11 @@ impl<'a> TickCtx<'a> {
     }
 
     fn enqueue_one(&mut self, pos: Pos, from: Dir, kind: UpdateKind) {
+        #[cfg(feature = "experiment-update-arena")]
+        if self.update_arena.native {
+            self.update_arena.enqueue(self.updates, 1, [(pos, from, kind)]);
+            return;
+        }
         #[cfg(feature = "experiment-update-pool")]
         let entry = self.update_pool.entry(1, [(pos, from, kind)]);
         #[cfg(not(feature = "experiment-update-pool"))]
@@ -1478,6 +1737,8 @@ type RegisteredBehaviour = Box<dyn BlockBehaviour>;
 pub struct BehaviourTable {
     /// Indexed by `StateId`; `None` means unregistered.
     entries: Vec<Option<RegisteredBehaviour>>,
+    #[cfg(feature = "experiment-update-arena")]
+    arena_wires: Vec<bool>,
     /// States seen with no behaviour, in a deterministic order.
     ///
     /// Interior mutability is avoided on purpose — recording goes through
@@ -1491,6 +1752,8 @@ impl BehaviourTable {
     pub fn new() -> Self {
         let mut table = Self {
             entries: Vec::new(),
+            #[cfg(feature = "experiment-update-arena")]
+            arena_wires: Vec::new(),
             unknown: BTreeSet::new(),
         };
         table.register(StateId::AIR, Box::new(Inert::new("air")));
@@ -1509,6 +1772,11 @@ impl BehaviourTable {
         if self.entries.len() <= index {
             self.entries.resize_with(index + 1, || None);
         }
+        #[cfg(feature = "experiment-update-arena")]
+        {
+            self.arena_wires.resize(self.entries.len(), false);
+            self.arena_wires[index] = false;
+        }
         self.entries[index] = Some(behaviour);
         self.unknown.remove(&state);
     }
@@ -1525,6 +1793,8 @@ impl BehaviourTable {
         self.register_entry(state, RegisteredBehaviour::VanillaWire(Box::new(wire)));
         #[cfg(not(feature = "experiment-wire-dispatch"))]
         self.register(state, Box::new(wire));
+        #[cfg(feature = "experiment-update-arena")]
+        { self.arena_wires[state.raw() as usize] = true; }
     }
 
     #[cfg(feature = "experiment-wire-dispatch")]
@@ -1563,6 +1833,11 @@ impl BehaviourTable {
         self.entries
             .get(state.raw() as usize)
             .and_then(|slot| slot.as_deref())
+    }
+
+    #[cfg(all(test, feature = "experiment-update-arena"))]
+    pub(crate) fn disable_arena_for_test(&mut self) {
+        self.arena_wires.fill(false);
     }
 
     /// Whether `state` has a behaviour.
@@ -1789,6 +2064,8 @@ mod tests {
         let mut events = EventQueue::new();
         let states = StateRegistry::new();
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -1828,6 +2105,8 @@ mod tests {
         let mut events = EventQueue::new();
         let states = StateRegistry::new();
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
             #[cfg(feature = "experiment-update-pool")]
             update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
@@ -1900,5 +2179,119 @@ mod update_pool_tests {
         let mut one = pool.entry(1, [item]);
         assert_eq!(one.next(), Some(item));
         assert_eq!(one.next(), None, "recycled vectors must not retain old items");
+    }
+}
+
+#[cfg(all(test, feature = "experiment-update-arena"))]
+mod update_arena_tests {
+    use super::*;
+
+    fn item(id: i32) -> (Pos, Dir, UpdateKind) {
+        (Pos::new(id, -2, 3), Dir::Down, UpdateKind::Neighbor)
+    }
+
+    fn reference_next(added: &mut Vec<UpdateEntry>, pending: &mut Vec<UpdateEntry>)
+        -> Option<(Pos, Dir, UpdateKind)> {
+        while let Some(entry) = added.pop() { pending.push(entry); }
+        loop {
+            if let Some(item) = pending.last_mut()?.next() { return Some(item); }
+            pending.pop();
+        }
+    }
+
+    #[test]
+    fn nested_native_custom_native_batches_keep_depth_first_order() {
+        let mut arena = UpdateArena::default();
+        let mut public = Vec::new();
+        arena.enqueue(&mut public, 2, [item(0), item(1)]);
+        assert_eq!(arena.next(&mut public), Some(item(0)));
+        // A nested callback emits native, public/custom, then native batches.
+        arena.enqueue(&mut public, 1, [item(2)]);
+        public.push(UpdateEntry::new(vec![item(3), item(4)]));
+        arena.enqueue(&mut public, 1, [item(5)]);
+        assert_eq!(arena.next(&mut public), Some(item(2)));
+        arena.enqueue(&mut public, 1, [item(6)]);
+        let mut delivered = vec![0, 2];
+        while let Some((pos, _, _)) = arena.next(&mut public) { delivered.push(pos.x); }
+        assert_eq!(delivered, [0, 2, 6, 3, 4, 5, 1]);
+        assert!(public.is_empty());
+        assert_eq!(arena.payload.len(), 15, "nested live ranges must not overwrite parents");
+    }
+
+    #[test]
+    fn public_clones_partial_cursors_large_entries_and_reset_keep_owned_semantics() {
+        let mut original = UpdateEntry::new((0..100).map(item).collect());
+        assert_eq!(original.next(), Some(item(0)));
+        let mut cloned = original.clone();
+        let mut arena = UpdateArena::default();
+        let mut public = vec![original];
+        assert_eq!(arena.next(&mut public), Some(item(1)));
+        // Aborting with suspended ranges cannot invalidate an external clone.
+        arena.reset();
+        assert_eq!(cloned.next(), Some(item(1)));
+        public.push(cloned);
+        for id in 2..100 { assert_eq!(arena.next(&mut public), Some(item(id))); }
+        assert_eq!(arena.next(&mut public), None);
+        arena.reset();
+        public.push(UpdateEntry::new((0..UpdateArena::RETAIN_PAYLOAD + 1).map(|n| item(n as i32)).collect()));
+        assert_eq!(arena.next(&mut public), Some(item(0)));
+        arena.reset();
+        assert_eq!(arena.payload.capacity(), 0, "large custom batches are not retained");
+        arena.enqueue(&mut public, 1, [item(123)]);
+        assert_eq!(arena.next(&mut public), Some(item(123)));
+        assert_eq!(arena.next(&mut public), None);
+    }
+
+    #[test]
+    fn randomized_interleaved_batches_match_the_original_stack_machine() {
+        let mut arena = UpdateArena::default();
+        let mut public = Vec::new();
+        let mut added = Vec::new();
+        let mut pending = Vec::new();
+        let mut seed = 0x468ace13u32;
+        let mut next = || { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; seed };
+        let mut sequence = 0;
+        // Include an already partially-consumed external pending stack.
+        let mut old = UpdateEntry::new(vec![item(-3), item(-2), item(-1)]);
+        old.next();
+        pending.push(old.clone());
+        arena.import_pending(&mut vec![old]);
+        for _ in 0..1500 {
+            for _ in 0..next() % 3 {
+                let len = (next() % 24) as usize;
+                let items: Vec<_> = (0..len).map(|_| { sequence += 1; item(sequence) }).collect();
+                if next() & 1 == 0 {
+                    arena.enqueue(&mut public, len, items.iter().copied());
+                    added.push(UpdateEntry::new(items));
+                } else {
+                    let mut entry = UpdateEntry::new(items);
+                    if next() & 1 == 0 { entry.next(); }
+                    public.push(entry.clone());
+                    added.push(entry);
+                }
+            }
+            assert_eq!(arena.next(&mut public), reference_next(&mut added, &mut pending));
+        }
+        loop {
+            let expected = reference_next(&mut added, &mut pending);
+            assert_eq!(arena.next(&mut public), expected);
+            if expected.is_none() { break; }
+        }
+        arena.reset();
+        assert!(arena.pending.is_empty() && arena.added.is_empty() && arena.payload.is_empty());
+        eprintln!("arena frame bytes={} public UpdateEntry bytes={}",
+            std::mem::size_of::<ArenaFrame>(), std::mem::size_of::<UpdateEntry>());
+    }
+
+    #[test]
+    fn public_registration_removes_the_trusted_wire_marker() {
+        let mut table = BehaviourTable::new();
+        let state = StateId(7);
+        table.register_vanilla_wire(state, crate::wire::Wire {
+            power_level: 0, rules: std::sync::Arc::new(crate::vanilla::VanillaRules::default()),
+        });
+        assert!(table.arena_wires[7]);
+        table.register(state, Box::new(Inert::new("replacement")));
+        assert!(!table.arena_wires[7]);
     }
 }

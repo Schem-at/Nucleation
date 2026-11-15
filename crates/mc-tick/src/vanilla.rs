@@ -137,7 +137,7 @@ impl Descriptor {
 ///
 /// Built alongside the behaviour registration so both agree on which blocks emit
 /// power and which can be shoved.
-#[cfg_attr(not(feature = "experiment-wire-plan"), derive(Debug))]
+#[cfg_attr(not(any(feature = "experiment-wire-plan", feature = "experiment-piston-plan")), derive(Debug))]
 #[derive(Clone, Default)]
 pub struct VanillaRules {
     /// Where this world's `(0, 0, 0)` sits in the game's coordinates — see
@@ -242,9 +242,11 @@ pub struct VanillaRules {
     plan_cache: crate::wire_plan::Cache,
     #[cfg(feature = "experiment-world-plan-cache")]
     plan_identity: crate::wire_plan::RulesIdentity,
+    #[cfg(feature = "experiment-piston-plan")]
+    piston_plan_identity: crate::piston_plan::RulesIdentity,
 }
 
-#[cfg(feature = "experiment-wire-plan")]
+#[cfg(any(feature = "experiment-wire-plan", feature = "experiment-piston-plan"))]
 impl std::fmt::Debug for VanillaRules {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Exactly the semantic fields emitted by the reference derive.
@@ -284,6 +286,301 @@ impl std::fmt::Debug for VanillaRules {
             .field("emit_except", &self.emit_except)
             .field("state_analog", &self.state_analog)
             .finish()
+    }
+}
+
+#[cfg(feature = "experiment-piston-plan")]
+impl VanillaRules {
+    fn same_piston_input_structure(&self, from: StateId, to: StateId) -> bool {
+        // Dust's level and stored sides are deliberately absent: each planned
+        // dust input still runs its complete current-world emission query.
+        self.powered.contains(&from) == self.powered.contains(&to)
+            && self.analog_emission.get(&from) == self.analog_emission.get(&to)
+            && self.emit_only.get(&from) == self.emit_only.get(&to)
+            && self.emit_except.get(&from) == self.emit_except.get(&to)
+            && self.strong_into.get(&from) == self.strong_into.get(&to)
+            && self.conductors.contains(&from) == self.conductors.contains(&to)
+            && self.comparators.contains(&from) == self.comparators.contains(&to)
+            && self.wires.contains_key(&from) == self.wires.contains_key(&to)
+    }
+
+    fn append_piston_emission(&self, plan: &mut crate::piston_plan::Plan, world: &World,
+        pos: Pos, state: StateId, toward: Dir) -> bool {
+        use crate::piston_plan::Input;
+        if self.powered.contains(&state)
+            && self.emit_only.get(&state).is_none_or(|only| *only == toward)
+            && self.emit_except.get(&state).is_none_or(|except| *except != toward) {
+            if self.comparators.contains(&state) {
+                plan.inputs.push(Input::Comparator(pos));
+            } else if self.analog_emission.get(&state).copied().unwrap_or(15) > 0 {
+                plan.inputs.push(Input::Positive);
+                return true;
+            }
+        } else if self.wires.contains_key(&state) {
+            plan.inputs.push(Input::wire(world, pos, toward));
+        }
+        false
+    }
+
+    fn build_piston_plan(&self, world: &World, pos: Pos, facing: Dir) -> crate::piston_plan::Plan {
+        let mut plan = crate::piston_plan::Plan::default();
+        for (center, skip) in [(pos, facing), (pos.offset(Dir::Up), Dir::Down)] {
+            for dir in crate::pos::ALL_DIRS {
+                if dir == skip { continue; }
+                let neighbour = center.offset(dir);
+                let state = world.get(neighbour);
+                if self.append_piston_emission(&mut plan, world, neighbour, state, dir.opposite()) {
+                    return plan;
+                }
+                if self.conductors.contains(&state) {
+                    for inner in crate::pos::ALL_DIRS {
+                        let source = neighbour.offset(inner);
+                        let state = world.get(source);
+                        if (self.wires.contains_key(&state)
+                            || self.strong_into.get(&state) == Some(&inner.opposite()))
+                            && self.append_piston_emission(&mut plan, world, source, state, inner.opposite()) {
+                            return plan;
+                        }
+                    }
+                }
+            }
+        }
+        plan
+    }
+
+    fn reference_piston_power(&self, world: &World, outputs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos, facing: Dir) -> bool {
+        crate::pos::ALL_DIRS.into_iter().filter(|dir| *dir != facing)
+            .any(|dir| self.is_powered(world, outputs, pos.offset(dir), dir.opposite()))
+            || crate::pos::ALL_DIRS.into_iter().filter(|dir| *dir != Dir::Down)
+                .any(|dir| self.is_powered(world, outputs, pos.offset(Dir::Up).offset(dir), dir.opposite()))
+    }
+
+    fn planned_piston_power_mode(&self, world: &World, outputs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos, facing: Dir, mode: crate::piston_plan::Mode) -> Option<bool> {
+        use crate::piston_plan::Mode;
+        // Eager topology discovery and live dust shape reads may reach farther
+        // than the reference's first positive input. Preserve its overflow path.
+        if mode == Mode::Off || [pos.x, pos.y, pos.z].into_iter().any(|v| {
+            !(i32::MIN + 5..=i32::MAX - 5).contains(&v)
+        }) { return None; }
+        let result = world.piston_plan_cache().query(self.piston_plan_identity.token(), world, outputs,
+            pos, facing, |from, to| self.same_piston_input_structure(from, to),
+            || self.build_piston_plan(world, pos, facing),
+            |source, state, toward| self.emitted_state(world, outputs, source, state, toward, true) > 0);
+        if mode == Mode::Shadow {
+            assert_eq!(result, self.reference_piston_power(world, outputs, pos, facing),
+                "piston input plan diverged at {pos:?} facing {facing:?}");
+        }
+        Some(result)
+    }
+}
+
+#[cfg(all(test, feature = "experiment-piston-plan"))]
+mod piston_plan_tests {
+    use super::*;
+    use crate::{Bounds, Simulation};
+    use crate::behaviour::ComparatorOutputs;
+    use crate::piston_plan::Mode;
+    use crate::wire::WireSide;
+
+    fn rules() -> VanillaRules {
+        let mut rules = VanillaRules::default();
+        for power in 0..=255u8 {
+            rules.wires.insert(StateId(u16::from(power) + 1), (power, [WireSide::Side; 4]));
+        }
+        rules.wires.insert(StateId(299), (7, [WireSide::None; 4]));
+        rules.conductors.insert(StateId(300));
+        rules.sturdy_up.insert(StateId(300));
+        rules.full_cubes.insert(StateId(300));
+        for (i, dir) in crate::pos::ALL_DIRS.into_iter().enumerate() {
+            let id = StateId(310 + i as u16);
+            rules.powered.insert(id);
+            rules.comparators.insert(id);
+            rules.emit_only.insert(id, dir);
+            rules.strong_into.insert(id, dir);
+            rules.signal_sources.insert(id);
+        }
+        rules.signal_sources.insert(StateId(316));
+        for (id, power) in [(320, 0), (321, 1), (322, 15), (323, 255)] {
+            rules.powered.insert(StateId(id));
+            rules.analog_emission.insert(StateId(id), power);
+            rules.signal_sources.insert(StateId(id));
+        }
+        rules.containers.insert(StateId(330), 1);
+        rules
+    }
+
+    fn world() -> World {
+        World::new(Bounds::new(Pos::new(-8, -8, -8), Pos::new(8, 8, 8)))
+    }
+
+    fn query(rules: &VanillaRules, world: &World, outputs: &ComparatorOutputs,
+        pos: Pos, facing: Dir) -> bool {
+        rules.planned_piston_power_mode(world, outputs, pos, facing, Mode::Shadow).unwrap()
+    }
+
+    #[test]
+    fn every_facing_excludes_its_front_but_preserves_quasi_connectivity() {
+        let rules = rules();
+        let pos = Pos::new(-2, -1, -2);
+        let outputs = ComparatorOutputs::new();
+        for facing in crate::pos::ALL_DIRS {
+            let mut world = world();
+            world.set(pos.offset(facing), StateId(322));
+            assert!(!query(&rules, &world, &outputs, pos, facing));
+            world.set(pos.offset(facing), StateId::AIR);
+            world.set(pos.offset(Dir::Up).offset(Dir::Up), StateId(321));
+            assert!(query(&rules, &world, &outputs, pos, facing));
+        }
+    }
+
+    #[test]
+    fn zero_comparator_dependencies_and_inventory_driven_values_stay_live() {
+        let rules = rules();
+        let pos = Pos::new(-2, 0, -2);
+        let comparator = pos.offset(Dir::East);
+        let container = comparator.offset(Dir::East);
+        let mut world = world();
+        let mut outputs = ComparatorOutputs::new();
+        world.set(comparator, StateId(316));
+        world.set(container, StateId(330));
+        outputs.insert(comparator, 11);
+        assert!(!query(&rules, &world, &outputs, pos, Dir::North));
+        world.set(comparator, StateId(314));
+        for value in [0, 1, 15, 16, 127, 255, 0] {
+            *outputs.entry(comparator).or_insert(0) = value;
+            assert_eq!(query(&rules, &world, &outputs, pos, Dir::North), value > 0);
+        }
+        outputs.remove(&comparator);
+        assert!(!query(&rules, &world, &outputs, pos, Dir::North));
+        outputs = [(comparator, 3)].into_iter().collect();
+        assert!(query(&rules, &world, &outputs, pos, Dir::North));
+        let mut inventories = crate::inventory::InventoryMap::new();
+        for count in [0, 1, 64, 0] {
+            let mut inventory = crate::inventory::Inventory::empty(1);
+            if count != 0 {
+                inventory.stacks.push(crate::inventory::ItemStack {
+                    slot: 0, id: "minecraft:stone".into(), count, contents: None,
+                });
+            }
+            inventories.insert(container, inventory);
+            let value = rules.analog_signal(&world, &inventories, &[], container).unwrap();
+            outputs.insert(comparator, value);
+            assert_eq!(query(&rules, &world, &outputs, pos, Dir::North), count != 0);
+        }
+        world.set(comparator, StateId(315));
+        outputs.insert(comparator, 255);
+        assert!(!query(&rules, &world, &outputs, pos, Dir::North));
+    }
+
+    #[test]
+    fn wire_power_shape_and_far_connection_queries_remain_live() {
+        let rules = rules();
+        let pos = Pos::new(0, 0, 0);
+        let outputs = ComparatorOutputs::new();
+        let mut world = world();
+        let source = pos.offset(Dir::East);
+        world.set(source, StateId(8));
+        assert!(query(&rules, &world, &outputs, pos, Dir::North));
+        world.set(source, StateId(1));
+        assert!(!query(&rules, &world, &outputs, pos, Dir::North));
+        world.set(source, StateId(299));
+        assert!(!query(&rules, &world, &outputs, pos, Dir::North));
+        world.set(source, StateId(8));
+        assert!(query(&rules, &world, &outputs, pos, Dir::North));
+        assert_eq!(world.piston_plan_cache().test_builds(), 1);
+
+        let mut world = self::world();
+        world.set(Pos::new(1, 1, 0), StateId(300));
+        world.set(Pos::new(2, 1, 0), StateId(299));
+        assert!(!query(&rules, &world, &outputs, pos, Dir::Down));
+        let builds = world.piston_plan_cache().test_builds();
+        // Outside the cached structural radius, but inside a live dust shape
+        // query. It connects the opposite side and symmetry makes dust emit west.
+        world.set(Pos::new(3, 1, 0), StateId(1));
+        assert!(query(&rules, &world, &outputs, pos, Dir::Down));
+        assert_eq!(world.piston_plan_cache().test_builds(), builds);
+    }
+
+    #[test]
+    fn within_tick_conductor_changes_and_short_circuit_state_changes_are_visible() {
+        let rules = rules();
+        let pos = Pos::new(0, 0, 0);
+        let mut world = world();
+        let mut outputs = ComparatorOutputs::new();
+        let source = Pos::new(2, 0, 0);
+        world.set(source, StateId(314));
+        outputs.insert(source, 255);
+        assert!(!query(&rules, &world, &outputs, pos, Dir::North));
+        world.set(Pos::new(1, 0, 0), StateId(300));
+        assert!(query(&rules, &world, &outputs, pos, Dir::North));
+        world.set(Pos::new(1, 0, 0), StateId::AIR);
+        assert!(!query(&rules, &world, &outputs, pos, Dir::North));
+        world.set(pos.offset(Dir::Down), StateId(321));
+        assert!(query(&rules, &world, &outputs, pos, Dir::North));
+        world.set(pos.offset(Dir::Down), StateId(320));
+        assert!(!query(&rules, &world, &outputs, pos, Dir::North));
+    }
+
+    #[test]
+    fn growth_clone_restore_and_overlapping_rule_ids_never_reuse_other_plans() {
+        let rules = rules();
+        let pos = Pos::new(0, 0, 0);
+        let source = pos.offset(Dir::East);
+        let outputs = ComparatorOutputs::new();
+        let mut sim = Simulation::new(Bounds::new(Pos::new(-5, -5, -5), Pos::new(5, 5, 5)));
+        sim.registry_and_world_mut().1.set(source, StateId(321));
+        let checkpoint = sim.checkpoint();
+        assert!(query(&rules, sim.world(), &outputs, pos, Dir::North));
+        sim.registry_and_world_mut().1.set(source, StateId::AIR);
+        assert!(!query(&rules, sim.world(), &outputs, pos, Dir::North));
+        sim.restore(&checkpoint);
+        assert!(query(&rules, sim.world(), &outputs, pos, Dir::North));
+        let mut clone = sim.world().clone();
+        assert_eq!(clone.piston_plan_cache().test_builds(), 0);
+        assert!(clone.grow_to_include(Pos::new(30, 0, 0)));
+        assert!(query(&rules, &clone, &outputs, pos, Dir::North));
+        let mut other_rules = rules.clone();
+        other_rules.analog_emission.insert(StateId(321), 0);
+        assert!(!query(&other_rules, &clone, &outputs, pos, Dir::North));
+        assert!(query(&rules, &clone, &outputs, pos, Dir::North));
+        fn send_sync<T: Send + Sync>() {}
+        send_sync::<World>();
+        send_sync::<VanillaRules>();
+    }
+
+    #[test]
+    fn signed_coordinate_edges_fall_back_without_eager_discovery_overflow() {
+        let rules = rules();
+        let outputs = ComparatorOutputs::new();
+        for x in [i32::MIN, i32::MAX] {
+            let pos = Pos::new(x, 0, 0);
+            let mut world = World::new(Bounds::new(Pos::new(x.saturating_sub(5), -5, -5),
+                Pos::new(x.saturating_add(5), 5, 5)));
+            world.set(pos.offset(Dir::Down), StateId(321));
+            assert!(rules.reference_piston_power(&world, &outputs, pos, Dir::North));
+            assert_eq!(rules.planned_piston_power_mode(&world, &outputs, pos, Dir::North, Mode::Shadow), None);
+        }
+    }
+
+    #[test]
+    fn randomized_piston_inputs_match_the_uncached_boolean_queries() {
+        let rules = rules();
+        let mut world = world();
+        let mut outputs = ComparatorOutputs::new();
+        let states = [0, 1, 2, 8, 16, 17, 256, 299, 300, 310, 311, 312, 313, 314, 315, 316, 320, 321, 322, 323];
+        let mut seed = 0x7531_ace1u32;
+        let mut next = || { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; seed };
+        for _ in 0..2000 {
+            let pos = Pos::new((next() % 9) as i32 - 4, (next() % 9) as i32 - 4, (next() % 9) as i32 - 4);
+            world.set(pos, StateId(states[next() as usize % states.len()]));
+            if next() & 1 == 0 { outputs.insert(pos, next() as u8); } else { outputs.remove(&pos); }
+            for facing in crate::pos::ALL_DIRS {
+                query(&rules, &world, &outputs, Pos::new(-1, -1, -1), facing);
+                query(&rules, &world, &outputs, Pos::new(1, 1, 1), facing);
+            }
+        }
     }
 }
 
@@ -656,12 +953,12 @@ impl VanillaRules {
         let result = self.plan_cache.query(world, outputs, pos,
             |from, to| self.wire_plan_transition(from, to),
             || self.build_wire_plan(world, pos),
-            |source| self.wires.get(&world.get(source)).map_or(0, |(power, _)| *power));
+            |_, state| self.wires.get(&state).map_or(0, |(power, _)| *power));
         #[cfg(feature = "experiment-world-plan-cache")]
         let result = world.wire_plan_cache().query_for_rules(self.plan_identity.token(), world, outputs, pos,
             |from, to| self.wire_plan_transition(from, to),
             || self.build_wire_plan(world, pos),
-            |source| self.wires.get(&world.get(source)).map_or(0, |(power, _)| *power));
+            |_, state| self.wires.get(&state).map_or(0, |(power, _)| *power));
         if mode == Mode::Shadow {
             assert_eq!(result, self.reference_wire_target(world, outputs, pos),
                 "wire input plan diverged at {pos:?}");
@@ -1599,6 +1896,12 @@ fn clockwise(dir: Dir) -> Dir {
 }
 
 impl PowerSource for VanillaRules {
+    #[cfg(feature = "experiment-piston-plan")]
+    fn planned_piston_power(&self, world: &World, outputs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos, facing: Dir) -> Option<bool> {
+        self.planned_piston_power_mode(world, outputs, pos, facing, crate::piston_plan::mode())
+    }
+
     fn analog_signal(
         &self,
         world: &World,
@@ -1806,6 +2109,12 @@ impl PowerSource for VanillaRules {
 }
 
 impl PowerSource for Arc<VanillaRules> {
+    #[cfg(feature = "experiment-piston-plan")]
+    fn planned_piston_power(&self, world: &World, outputs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos, facing: Dir) -> Option<bool> {
+        <VanillaRules as PowerSource>::planned_piston_power(self.as_ref(), world, outputs, pos, facing)
+    }
+
     fn control_input_signal(
         &self,
         world: &World,

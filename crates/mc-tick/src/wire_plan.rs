@@ -20,6 +20,8 @@ pub(crate) struct Group {
 pub(crate) struct InputPlan {
     pub groups: [Group; 6],
     pub wire_inputs: Vec<Pos>,
+    #[cfg(feature = "experiment-execution-view")]
+    wire_addresses: [crate::execution_view::Address; 8],
     pub comparator_inputs: Vec<Pos>,
 }
 
@@ -42,7 +44,7 @@ impl InputPlan {
         values
     }
 
-    fn evaluate(&self, comparators: &[u8; MAX_COMPARATORS], mut power: impl FnMut(Pos) -> u8) -> u8 {
+    fn evaluate(&self, world: &World, comparators: &[u8; MAX_COMPARATORS], mut power: impl FnMut(Pos, StateId) -> u8) -> u8 {
         let mut block = 0u8;
         // Do not collapse these groups into one maximum: the original loop
         // stops at exactly 15 and may intentionally never read a later 255.
@@ -59,9 +61,32 @@ impl InputPlan {
                 return 15;
             }
         }
-        let incoming = self.wire_inputs.iter().copied().map(&mut power).max().unwrap_or(0);
+        let incoming = self.wire_inputs.iter().copied().enumerate().map(|(index, pos)| {
+            #[cfg(feature = "experiment-execution-view")]
+            let state = world.get_execution(pos, self.wire_addresses.get(index).copied().unwrap_or_default());
+            #[cfg(not(feature = "experiment-execution-view"))]
+            let state = { let _ = index; world.get(pos) };
+            power(pos, state)
+        }).max().unwrap_or(0);
         block.max(incoming.saturating_sub(1))
     }
+}
+
+fn prepare_plan(build: impl FnOnce() -> InputPlan, world: &World) -> InputPlan {
+    let plan = build();
+    #[cfg(feature = "experiment-execution-view")]
+    {
+        let mut plan = plan;
+        // Vanilla has at most two incoming wires per horizontal side. Keep
+        // bounded inline address storage; unusual test/custom plans with more
+        // inputs safely use ordinary position lookup for their remaining inputs.
+        for (address, pos) in plan.wire_addresses.iter_mut().zip(&plan.wire_inputs) {
+            *address = world.execution_address(*pos);
+        }
+        plan
+    }
+    #[cfg(not(feature = "experiment-execution-view"))]
+    { let _ = world; plan }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -258,7 +283,7 @@ impl Cache {
         pos: Pos,
         classify: impl Fn(StateId, StateId) -> Transition,
         build: impl FnOnce() -> InputPlan,
-        power: impl FnMut(Pos) -> u8,
+        power: impl FnMut(Pos, StateId) -> u8,
     ) -> u8 {
         let mut state = self.0.lock().unwrap_or_else(|error| error.into_inner());
         state.synchronize(world, classify);
@@ -268,7 +293,7 @@ impl Cache {
         if state.entries[index].as_ref().is_none_or(|entry| entry.pos != pos) {
             state.entries[index] = Some(Entry {
                 pos,
-                plan: build(),
+                plan: prepare_plan(build, world),
                 #[cfg(feature = "experiment-wire-certificate")]
                 certificate: None,
             });
@@ -286,7 +311,7 @@ impl Cache {
                 return target;
             }
         }
-        let target = entry.plan.evaluate(&comparators, power);
+        let target = entry.plan.evaluate(world, &comparators, power);
         #[cfg(feature = "experiment-wire-certificate")]
         { entry.certificate = Some(Certificate { target, comparators, dirty: false }); }
         target
@@ -300,7 +325,7 @@ impl Cache {
         pos: Pos,
         classify: impl Fn(StateId, StateId) -> Transition,
         build: impl FnOnce() -> InputPlan,
-        power: impl FnMut(Pos) -> u8,
+        power: impl FnMut(Pos, StateId) -> u8,
     ) -> u8 {
         let mut state = self.0.lock().unwrap_or_else(|error| error.into_inner());
         Self::query_locked(&mut state, world, outputs, pos, classify, build, power)
@@ -315,7 +340,7 @@ impl Cache {
         pos: Pos,
         classify: impl Fn(StateId, StateId) -> Transition,
         build: impl FnOnce() -> InputPlan,
-        power: impl FnMut(Pos) -> u8,
+        power: impl FnMut(Pos, StateId) -> u8,
     ) -> u8 {
         let mut state = self.0.lock().unwrap_or_else(|error| error.into_inner());
         if state.rules.as_ref().is_none_or(|token| !Arc::ptr_eq(token, rules)) {
@@ -336,7 +361,7 @@ impl Cache {
         pos: Pos,
         classify: impl Fn(StateId, StateId) -> Transition,
         build: impl FnOnce() -> InputPlan,
-        power: impl FnMut(Pos) -> u8,
+        power: impl FnMut(Pos, StateId) -> u8,
     ) -> u8 {
         state.synchronize(world, classify);
         #[cfg(feature = "experiment-wire-plan-counters")]
@@ -347,7 +372,7 @@ impl Cache {
             { state.test_builds += 1; }
             state.entries[index] = Some(Entry {
                 pos,
-                plan: build(),
+                plan: prepare_plan(build, world),
                 #[cfg(feature = "experiment-wire-certificate")]
                 certificate: None,
             });
@@ -365,7 +390,7 @@ impl Cache {
                 return target;
             }
         }
-        let target = entry.plan.evaluate(&comparators, power);
+        let target = entry.plan.evaluate(world, &comparators, power);
         #[cfg(feature = "experiment-wire-certificate")]
         { entry.certificate = Some(Certificate { target, comparators, dirty: false }); }
         target
@@ -390,7 +415,30 @@ mod tests {
                 let mut plan = InputPlan::default();
                 plan.groups[0].fixed = world.get(source).raw() as u8;
                 plan
-            }, |_| 0)
+            }, |_, _| 0)
+    }
+
+    #[cfg(feature = "experiment-execution-view")]
+    #[test]
+    fn execution_addresses_remain_live_and_excess_inputs_use_the_reference_lookup() {
+        let mut world = World::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(10, 2, 2)));
+        let positions: Vec<_> = (0..9).map(|x| Pos::new(x, 1, 1)).collect();
+        for (n, &pos) in positions.iter().enumerate() { world.set(pos, StateId(n as u16)); }
+        let plan = prepare_plan(|| InputPlan { wire_inputs: positions.clone(), ..InputPlan::default() }, &world);
+        let check = |world: &World| {
+            let expected = positions.iter().map(|&pos| world.get(pos).raw() as u8).max().unwrap().saturating_sub(1);
+            assert_eq!(plan.evaluate(world, &[0; MAX_COMPARATORS], |_, state| state.raw() as u8), expected);
+        };
+        check(&world);
+        world.set(positions[0], StateId(20));
+        check(&world);
+        world.set(positions[8], StateId(255));
+        check(&world);
+        assert!(world.grow_to_include(Pos::new(-5, 0, 0)));
+        check(&world);
+        let mut clone = world.clone();
+        clone.set(positions[8], StateId(0));
+        check(&clone);
     }
 
     #[test]
@@ -438,7 +486,7 @@ mod tests {
             || {
                 builds.set(builds.get() + 1);
                 InputPlan { wire_inputs: vec![source], ..InputPlan::default() }
-            }, |p| world.get(p).raw() as u8);
+            }, |_, state| state.raw() as u8);
         assert_eq!(query(&world), 0);
         for value in [1, 7, 15, 255, 0] {
             world.set(source, StateId(value));
@@ -463,7 +511,7 @@ mod tests {
                 let mut plan = InputPlan { wire_inputs: vec![source], ..InputPlan::default() };
                 plan.add_comparator(0, comparator);
                 plan
-            }, |p| { reads.set(reads.get() + 1); world.get(p).raw() as u8 });
+            }, |_, state| { reads.set(reads.get() + 1); state.raw() as u8 });
         assert_eq!(query(&world, &outputs), 0);
         assert_eq!(reads.get(), 1);
         assert_eq!(query(&world, &outputs), 0);
@@ -507,7 +555,7 @@ mod tests {
                     let mut plan = InputPlan { wire_inputs: vec![source], ..InputPlan::default() };
                     plan.add_comparator(0, comparator);
                     plan
-                }, |p| world.get(p).raw() as u8)
+                }, |_, state| state.raw() as u8)
         };
         for _ in 0..8 {
             assert_eq!(query(&first, &first_outputs), 8);

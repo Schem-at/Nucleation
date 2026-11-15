@@ -55,10 +55,14 @@ pub mod timeline;
 pub mod vanilla;
 pub mod wire;
 pub mod world;
-#[cfg(feature = "experiment-wire-plan")]
+#[cfg(any(feature = "experiment-wire-plan", feature = "experiment-piston-plan"))]
 mod world_journal;
 #[cfg(feature = "experiment-wire-plan")]
 mod wire_plan;
+#[cfg(feature = "experiment-piston-plan")]
+mod piston_plan;
+#[cfg(feature = "experiment-execution-view")]
+mod execution_view;
 
 pub use behaviour::{BehaviourTable, BlockBehaviour, Inert, TickCtx, UpdateKind, UpdateRecord};
 pub use components::{

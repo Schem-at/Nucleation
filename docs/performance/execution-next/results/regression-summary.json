@@ -1,0 +1,169 @@
+{
+  "baseline": "reference",
+  "source": "/tmp/execution-regression.jsonl",
+  "resamples": 10000,
+  "results": [
+    {
+      "case": "flyer",
+      "variant": "selected_pgo_off",
+      "reference": "selected_pgo",
+      "rounds": 9,
+      "cpu_ms": 0.1473424583963691,
+      "cpu_speedup": 1.0077149403350014,
+      "cpu_ci95": [
+        0.9743718075220544,
+        1.028414099420807
+      ],
+      "wall_ms": 0.14767761724659606,
+      "wall_speedup": 1.0079360933660697,
+      "wall_ci95": [
+        0.9738059757747781,
+        1.0305292895301217
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "selected_pgo",
+      "reference": "reference_pgo",
+      "rounds": 9,
+      "cpu_ms": 0.14847919667170953,
+      "cpu_speedup": 0.9443637274980449,
+      "cpu_ci95": [
+        0.9273917292964075,
+        0.9845157419936766
+      ],
+      "wall_ms": 0.14884960060514374,
+      "wall_speedup": 0.943476954969604,
+      "wall_ci95": [
+        0.9268227204145809,
+        0.9851592003273831
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "selected",
+      "reference": "reference",
+      "rounds": 9,
+      "cpu_ms": 0.1697386248108926,
+      "cpu_speedup": 1.0104910610494477,
+      "cpu_ci95": [
+        0.9636094694830153,
+        1.055472609354901
+      ],
+      "wall_ms": 0.17011545688350985,
+      "wall_speedup": 1.0103777787581962,
+      "wall_ci95": [
+        0.9632690655933273,
+        1.058039642335666
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "selected_pgo_off",
+      "reference": "selected_pgo",
+      "rounds": 9,
+      "cpu_ms": 7.926573363636363,
+      "cpu_speedup": 0.9848740898666669,
+      "cpu_ci95": [
+        0.9575535522652958,
+        1.0814043491245162
+      ],
+      "wall_ms": 7.955509363636363,
+      "wall_speedup": 0.9848297582865474,
+      "wall_ci95": [
+        0.9579902910850268,
+        1.0910367185565455
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "selected",
+      "reference": "reference",
+      "rounds": 9,
+      "cpu_ms": 9.121573909090909,
+      "cpu_speedup": 1.006077669231585,
+      "cpu_ci95": [
+        0.9237221877711265,
+        1.023768837911401
+      ],
+      "wall_ms": 9.152612818181819,
+      "wall_speedup": 1.0065657157949561,
+      "wall_ci95": [
+        0.9235524513758198,
+        1.024182957156513
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "selected_pgo",
+      "reference": "reference_pgo",
+      "rounds": 9,
+      "cpu_ms": 7.806676727272728,
+      "cpu_speedup": 0.9823520994453185,
+      "cpu_ci95": [
+        0.9057199915907733,
+        1.0067888514675007
+      ],
+      "wall_ms": 7.834822363636364,
+      "wall_speedup": 0.9820722860039085,
+      "wall_ci95": [
+        0.9050474728628415,
+        1.0062765666619822
+      ]
+    },
+    {
+      "case": "hipster",
+      "variant": "selected_pgo",
+      "reference": "reference_pgo",
+      "rounds": 9,
+      "cpu_ms": 9.136423125,
+      "cpu_speedup": 1.3728019656488928,
+      "cpu_ci95": [
+        1.334381157006408,
+        1.4018457442009067
+      ],
+      "wall_ms": 9.161218875,
+      "wall_speedup": 1.3740119542772085,
+      "wall_ci95": [
+        1.3345668917870142,
+        1.4025205054145327
+      ]
+    },
+    {
+      "case": "hipster",
+      "variant": "selected",
+      "reference": "reference",
+      "rounds": 9,
+      "cpu_ms": 10.340667125,
+      "cpu_speedup": 1.3409181760117823,
+      "cpu_ci95": [
+        1.3279939055213752,
+        1.3814934480980714
+      ],
+      "wall_ms": 10.379448875,
+      "wall_speedup": 1.3410108082448646,
+      "wall_ci95": [
+        1.3248324887109004,
+        1.3814689647821123
+      ]
+    },
+    {
+      "case": "hipster",
+      "variant": "selected_pgo_off",
+      "reference": "selected_pgo",
+      "rounds": 9,
+      "cpu_ms": 13.40578775,
+      "cpu_speedup": 0.6815282544660608,
+      "cpu_ci95": [
+        0.672355751716269,
+        0.7005423832702409
+      ],
+      "wall_ms": 13.45898425,
+      "wall_speedup": 0.6806768404532458,
+      "wall_ci95": [
+        0.6717434739101088,
+        0.7002778552920885
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build isolated feature candidates and save validation evidence on the benchmark host."""
-import argparse, hashlib, json, os, pathlib, shutil, subprocess
+import argparse, hashlib, json, os, pathlib, shutil, subprocess, tarfile
 
 FEATURES = {
     'reference': [], 'directional': ['experiment-directional'],
@@ -20,11 +20,20 @@ FEATURES['all_no_certificate'] = [f for f in FEATURES['combined'] if f != 'exper
 FEATURES['owner_selected'] = FEATURES['plan_pool_directional'] + ['experiment-world-plan-cache']
 FEATURES['owner_combined'] = FEATURES['combined'] + ['experiment-world-plan-cache']
 FEATURES['owner_counters'] = FEATURES['counters'] + ['experiment-world-plan-cache']
+FEATURES['next_reference'] = FEATURES['owner_selected']
+FEATURES['next_view'] = FEATURES['owner_selected'] + ['experiment-execution-view']
+FEATURES['next_arena'] = FEATURES['owner_selected'] + ['experiment-update-arena']
+FEATURES['next_piston'] = FEATURES['owner_selected'] + ['experiment-piston-plan']
+FEATURES['next_lazy'] = FEATURES['owner_selected'] + ['experiment-lazy-journal']
+FEATURES['next_combined'] = FEATURES['owner_selected'] + ['experiment-execution-view',
+    'experiment-update-arena', 'experiment-piston-plan', 'experiment-lazy-journal']
+FEATURES['next_counters'] = FEATURES['next_combined'] + ['experiment-piston-plan-counters']
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--output', type=pathlib.Path, required=True)
 p.add_argument('--variants', nargs='+', choices=FEATURES, required=True)
 p.add_argument('--test-features', default=None)
 p.add_argument('--fixtures', type=pathlib.Path, required=True)
+p.add_argument('--fuzz-seeds', type=int, default=0, help='Untimed randomized differential sequences per fixture')
 a = p.parse_args()
 root = pathlib.Path(__file__).resolve().parents[1]
 a.output = a.output.resolve(); a.output.mkdir(parents=True, exist_ok=True)
@@ -45,14 +54,20 @@ def run(args, log, extra=None):
 sources = {str(f.relative_to(root)):sha(f) for f in sorted((root/'crates/mc-tick/src').rglob('*.rs'))}
 for f in ['Cargo.lock','crates/mc-tick/Cargo.toml','crates/mc-tick/examples/bench_circuits.rs']:
     sources[f] = sha(root/f)
+for f in sorted((root/'crates/mc-tick/examples/bench_circuits').rglob('*.rs')):
+    sources[str(f.relative_to(root))] = sha(f)
+archive=a.output/'sources.tar.gz'
+with tarfile.open(archive,'w:gz') as tar:
+    for f in sources: tar.add(root/f,arcname=f)
 manifest = {'rustc':subprocess.check_output(['rustc','-vV'],text=True),
             'base':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),
-            'source_sha256':sources, 'profile':{'opt_level':3,'lto':True,'debug':1,'cpu':'generic'},
+            'source_sha256':sources, 'source_archive_sha256':sha(archive),
+            'profile':{'opt_level':3,'lto':True,'debug':1,'cpu':'generic'},
             'variants':{}}
 if a.test_features is not None:
     args=['cargo','test','--locked','--no-default-features','-p','mc-tick','-p','mc-test']
     if a.test_features: args += ['--features',a.test_features]
-    run(args,'tests.log',{'MC_TICK_WIRE_PLAN':'shadow'})
+    run(args,'tests.log',{'MC_TICK_WIRE_PLAN':'shadow', 'MC_TICK_PISTON_PLAN':'shadow'})
 for name in a.variants:
     features = FEATURES[name]
     args=['cargo','build','--locked','--release','--no-default-features','-p','mc-tick','--example','bench_circuits']
@@ -61,7 +76,10 @@ for name in a.variants:
     binary=a.output/name
     target=pathlib.Path(env.get('CARGO_TARGET_DIR',str(root/'target')))
     shutil.copy2(target/'release/examples/bench_circuits',binary)
-    run([str(binary),'--verify','--expanded'],name+'-verify.jsonl',{'MC_TICK_WIRE_PLAN':'shadow'})
+    shadow={'MC_TICK_WIRE_PLAN':'shadow', 'MC_TICK_PISTON_PLAN':'shadow'}
+    run([str(binary),'--verify','--expanded'],name+'-verify.jsonl',shadow)
+    if a.fuzz_seeds:
+        run([str(binary),'--fuzz',str(a.fuzz_seeds)],name+'-fuzz.jsonl',shadow)
     manifest['variants'][name]={'features':features,'sha256':sha(binary),'path':str(binary)}
     (a.output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print('Builds and expanded verification complete:',a.output,flush=True)
