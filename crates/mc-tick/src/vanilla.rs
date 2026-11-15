@@ -5146,7 +5146,7 @@ mod tests {
         // when dust sits above it, but renders that connection as `up` only
         // when the block is a full cube. A top slab carries the signal just the
         // same and stays `side`, which is why a slab staircase looks flat.
-        use crate::wire::{WireSide, WireWorld};
+        use crate::wire::WireSide;
         let mut registry = StateRegistry::new();
         for descriptor in [
             "minecraft:air",

@@ -76,13 +76,12 @@ pub(crate) fn mode() -> Mode {
     })
 }
 
-struct Entry { pos: Pos, facing: Dir, plan: Plan }
+struct Entry { pos: Pos, facing: Dir, validated_revision: u64, plan: Plan }
 
 #[derive(Default)]
 struct State {
     rules: Option<Arc<()>>,
     world: Option<Arc<()>>,
-    revision: u64,
     entries: Vec<Option<Entry>>,
     #[cfg(feature = "experiment-piston-plan-counters")]
     counts: Counts,
@@ -96,6 +95,12 @@ struct Counts {
     queries: u64,
     builds: u64,
     invalidations: u64,
+    validations: u64,
+    journal_changes: u64,
+    distant_changes: u64,
+    history_losses: u64,
+    // These count nearby classifications during per-entry validation, not
+    // distinct world writes. Replay stops at the first invalidating change.
     structural_changes: u64,
     ignored_changes: u64,
     resets: u64,
@@ -132,46 +137,58 @@ impl State {
         { self.counts.resets += 1; }
     }
 
-    fn synchronize(&mut self, rules: &Arc<()>, world: &World,
-        same_structure: impl Fn(StateId, StateId) -> bool) {
+    fn synchronize_identity(&mut self, rules: &Arc<()>, world: &World) {
         if self.rules.as_ref().is_none_or(|token| !Arc::ptr_eq(token, rules))
             || self.world.as_ref().is_none_or(|token| !Arc::ptr_eq(token, world.plan_identity())) {
             self.clear();
             self.rules = Some(rules.clone());
             self.world = Some(world.plan_identity().clone());
-            self.revision = world.plan_revision();
-            return;
         }
-        if self.revision == world.plan_revision() { return; }
-        let Some(changes) = world.plan_changes_since(self.revision) else {
-            self.clear();
-            self.revision = world.plan_revision();
-            return;
+    }
+
+    fn validate(&mut self, index: usize, pos: Pos, facing: Dir, revision: u64,
+        world: &World, same_structure: impl Fn(StateId, StateId) -> bool) -> bool {
+        let Some(entry) = self.entries[index].as_mut()
+            .filter(|entry| entry.pos == pos && entry.facing == facing) else { return false; };
+        if entry.validated_revision == revision { return true; }
+        #[cfg(feature = "experiment-piston-plan-counters")]
+        { self.counts.validations += 1; }
+        let Some(changes) = world.plan_changes_since(entry.validated_revision) else {
+            #[cfg(feature = "experiment-piston-plan-counters")]
+            {
+                self.counts.history_losses += 1;
+                self.counts.invalidations += 1;
+            }
+            return false;
         };
-        for (pos, from, to) in changes {
+        for (changed, from, to) in changes {
+            #[cfg(feature = "experiment-piston-plan-counters")]
+            { self.counts.journal_changes += 1; }
+            // Own/strong inputs lie in radius two around the piston or around
+            // the position above it. Dust's farther connection reads stay live.
+            // Check distance before classifying states, and validate only this
+            // queried entry; inactive entries keep their own older revision.
+            if u64::from(entry.pos.x.abs_diff(changed.x))
+                + u64::from(entry.pos.y.abs_diff(changed.y))
+                + u64::from(entry.pos.z.abs_diff(changed.z)) > 3 {
+                #[cfg(feature = "experiment-piston-plan-counters")]
+                { self.counts.distant_changes += 1; }
+                continue;
+            }
             if same_structure(from, to) {
                 #[cfg(feature = "experiment-piston-plan-counters")]
                 { self.counts.ignored_changes += 1; }
                 continue;
             }
             #[cfg(feature = "experiment-piston-plan-counters")]
-            { self.counts.structural_changes += 1; }
-            // Own/strong inputs lie in radius two around the piston or around
-            // the position above it. Dust's farther connection reads stay live.
-            for entry in &mut self.entries {
-                let affected = entry.as_ref().is_some_and(|entry| {
-                    u64::from(entry.pos.x.abs_diff(pos.x))
-                        + u64::from(entry.pos.y.abs_diff(pos.y))
-                        + u64::from(entry.pos.z.abs_diff(pos.z)) <= 3
-                });
-                if affected {
-                    *entry = None;
-                    #[cfg(feature = "experiment-piston-plan-counters")]
-                    { self.counts.invalidations += 1; }
-                }
+            {
+                self.counts.structural_changes += 1;
+                self.counts.invalidations += 1;
             }
+            return false;
         }
-        self.revision = world.plan_revision();
+        entry.validated_revision = revision;
+        true
     }
 }
 
@@ -180,12 +197,13 @@ impl Cache {
         pos: Pos, facing: Dir, same_structure: impl Fn(StateId, StateId) -> bool,
         build: impl FnOnce() -> Plan, emitted: impl FnMut(Pos, StateId, Dir) -> bool) -> bool {
         let mut state = self.0.lock().unwrap_or_else(|error| error.into_inner());
-        state.synchronize(rules, world, same_structure);
+        state.synchronize_identity(rules, world);
+        let revision = world.plan_revision();
         #[cfg(feature = "experiment-piston-plan-counters")]
         { state.counts.queries += 1; }
         let index = slot(pos, facing);
-        if state.entries[index].as_ref().is_none_or(|entry| entry.pos != pos || entry.facing != facing) {
-            state.entries[index] = Some(Entry { pos, facing, plan: build() });
+        if !state.validate(index, pos, facing, revision, world, same_structure) {
+            state.entries[index] = Some(Entry { pos, facing, validated_revision: revision, plan: build() });
             #[cfg(feature = "experiment-piston-plan-counters")]
             { state.counts.builds += 1; }
             #[cfg(test)]
@@ -249,6 +267,94 @@ mod tests {
         let before = cache.test_builds();
         fixed(&cache, &changed_rules, &world, pos, Dir::East, pos);
         assert_eq!(cache.test_builds(), before + 1);
+    }
+
+    #[test]
+    fn querying_one_entry_does_not_validate_stale_unrelated_entries() {
+        let cache = Cache::default();
+        let rules = RulesIdentity::default();
+        let pos = Pos::new(0, 0, 0);
+        let other = (8..64).map(|x| Pos::new(x, 0, 0))
+            .find(|other| slot(*other, Dir::East) != slot(pos, Dir::East)).unwrap();
+        let mut world = World::new(Bounds::new(Pos::new(-4, -4, -4), Pos::new(132, 4, 4)));
+        assert!(!fixed(&cache, &rules, &world, pos, Dir::East, pos));
+        assert!(!fixed(&cache, &rules, &world, other, Dir::East, other));
+        let initial_revision = world.plan_revision();
+        world.set(other, StateId(1));
+        assert!(!fixed(&cache, &rules, &world, pos, Dir::East, pos));
+        assert_eq!(cache.test_builds(), 2);
+        {
+            let state = cache.0.lock().unwrap();
+            assert_eq!(state.entries[slot(pos, Dir::East)].as_ref().unwrap().validated_revision,
+                world.plan_revision());
+            assert_eq!(state.entries[slot(other, Dir::East)].as_ref().unwrap().validated_revision,
+                initial_revision);
+        }
+        assert!(fixed(&cache, &rules, &world, other, Dir::East, other));
+        assert_eq!(cache.test_builds(), 3);
+
+        // Keep one entry fresh while the other loses the structural write from
+        // bounded history. A global last-seen revision would miss this change.
+        let old_revision = world.plan_revision();
+        world.set(other, StateId::AIR);
+        for i in 0..600 {
+            world.set(Pos::new(128, 0, 0), StateId(1 + i % 2));
+            assert!(!fixed(&cache, &rules, &world, pos, Dir::East, pos));
+        }
+        assert_eq!(cache.test_builds(), 3);
+        assert!(world.plan_changes_since(old_revision).is_none());
+        assert!(!fixed(&cache, &rules, &world, other, Dir::East, other));
+        assert_eq!(cache.test_builds(), 4);
+    }
+
+    #[test]
+    fn distant_changes_are_not_classified_and_near_value_changes_keep_the_plan() {
+        use std::cell::Cell;
+        let cache = Cache::default();
+        let rules = RulesIdentity::default();
+        let pos = Pos::new(-2, -2, -2);
+        let mut world = World::new(Bounds::new(Pos::new(-5, -5, -5), Pos::new(12, 5, 5)));
+        world.set(pos, StateId(1));
+        assert!(fixed(&cache, &rules, &world, pos, Dir::East, pos));
+        world.set(Pos::new(10, 0, 0), StateId(1));
+        assert!(cache.query(rules.token(), &world, &ComparatorOutputs::new(), pos, Dir::East,
+            |_, _| panic!("distant change was classified"),
+            || panic!("distant change rebuilt the plan"), |_, _, _| false));
+        world.set(pos, StateId(2));
+        let classifications = Cell::new(0);
+        assert!(cache.query(rules.token(), &world, &ComparatorOutputs::new(), pos, Dir::East,
+            |from, to| {
+                classifications.set(classifications.get() + 1);
+                assert_eq!((from, to), (StateId(1), StateId(2)));
+                true
+            }, || panic!("equivalent structure rebuilt the plan"), |_, _, _| false));
+        assert_eq!(classifications.get(), 1);
+        assert_eq!(cache.test_builds(), 1);
+    }
+
+    #[test]
+    fn revision_regression_rebuilds_and_identity_reset_clears_all_entries() {
+        let cache = Cache::default();
+        let rules = RulesIdentity::default();
+        let pos = Pos::new(0, 0, 0);
+        let other = (8..64).map(|x| Pos::new(x, 0, 0))
+            .find(|other| slot(*other, Dir::East) != slot(pos, Dir::East)).unwrap();
+        let mut world = World::new(Bounds::new(Pos::new(-4, -4, -4), Pos::new(68, 4, 4)));
+        assert!(!fixed(&cache, &rules, &world, pos, Dir::East, pos));
+        assert!(!fixed(&cache, &rules, &world, other, Dir::East, other));
+        world.set(pos, StateId(1));
+        // Model a pre-rollover entry: a revision ahead of the journal must not
+        // validate. The journal's own rollover test covers rotating its token.
+        cache.0.lock().unwrap().entries[slot(pos, Dir::East)].as_mut().unwrap()
+            .validated_revision = u64::MAX;
+        assert!(fixed(&cache, &rules, &world, pos, Dir::East, pos));
+        assert_eq!(cache.test_builds(), 3);
+        let old_identity = world.plan_identity().clone();
+        assert!(world.grow_to_include(Pos::new(-10, 0, 0)));
+        assert!(!Arc::ptr_eq(&old_identity, world.plan_identity()));
+        assert!(fixed(&cache, &rules, &world, pos, Dir::East, pos));
+        assert_eq!(cache.test_builds(), 4);
+        assert!(cache.0.lock().unwrap().entries[slot(other, Dir::East)].is_none());
     }
 
     #[test]

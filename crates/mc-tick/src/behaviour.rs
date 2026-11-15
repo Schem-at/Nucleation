@@ -136,6 +136,7 @@ impl std::fmt::Debug for UpdatePool {
 
 #[cfg(feature = "experiment-update-pool")]
 impl UpdatePool {
+    #[cfg_attr(all(feature = "experiment-update-arena", not(test)), allow(dead_code))]
     const MAX_PER_CLASS: usize = 1024;
 
     #[cfg(test)]
@@ -157,6 +158,7 @@ impl UpdatePool {
         UpdateEntry::new(buffer)
     }
 
+    #[cfg_attr(all(feature = "experiment-update-arena", not(test)), allow(dead_code))]
     pub(crate) fn recycle(&mut self, entry: UpdateEntry) {
         let mut items = entry.items;
         // Large/custom buffers are released; only these exact capacities are
@@ -761,6 +763,8 @@ impl<'a> TickCtx<'a> {
         self.drain = Some(pump);
     }
 
+    /// Deliver queued updates depth-first using reusable arena storage.
+    /// Re-entrant calls leave new updates queued for the active drain.
     #[cfg(feature = "experiment-update-arena")]
     pub fn drain(&mut self) {
         // Vanilla's `maxChainedNeighborUpdates`: a circuit that keeps

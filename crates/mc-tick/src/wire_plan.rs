@@ -251,15 +251,15 @@ impl State {
                         let pos = Pos::new(changed.x.wrapping_add(dx),
                             changed.y.wrapping_add(dy), changed.z.wrapping_add(dz));
                         let entry_slot = &mut self.entries[slot(pos)];
-                        let Some(entry) = entry_slot.as_mut().filter(|entry| entry.pos == pos) else { continue; };
+                        let Some(_entry) = entry_slot.as_mut().filter(|entry| entry.pos == pos) else { continue; };
                         if kind == Transition::Structural {
                             *entry_slot = None;
                             #[cfg(feature = "experiment-wire-plan-counters")]
                             { self.counts.structural_invalidations += 1; }
                         } else {
                             #[cfg(feature = "experiment-wire-certificate")]
-                            if entry.plan.wire_inputs.contains(&changed) {
-                                if let Some(certificate) = &mut entry.certificate {
+                            if _entry.plan.wire_inputs.contains(&changed) {
+                                if let Some(certificate) = &mut _entry.certificate {
                                     certificate.dirty = true;
                                     #[cfg(feature = "experiment-wire-plan-counters")]
                                     { self.counts.value_dirties += 1; }
@@ -317,7 +317,7 @@ impl Cache {
         target
     }
 
-    #[cfg(feature = "experiment-world-plan-cache")]
+    #[cfg(all(feature = "experiment-world-plan-cache", test))]
     pub fn query(
         &self,
         world: &World,

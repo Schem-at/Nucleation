@@ -28,6 +28,9 @@ FEATURES['next_lazy'] = FEATURES['owner_selected'] + ['experiment-lazy-journal']
 FEATURES['next_combined'] = FEATURES['owner_selected'] + ['experiment-execution-view',
     'experiment-update-arena', 'experiment-piston-plan', 'experiment-lazy-journal']
 FEATURES['next_counters'] = FEATURES['next_combined'] + ['experiment-piston-plan-counters']
+FEATURES['next_view_lazy'] = FEATURES['next_view'] + ['experiment-lazy-journal']
+FEATURES['next_piston_local'] = FEATURES['next_piston']
+FEATURES['next_plan_combo'] = FEATURES['next_view_lazy'] + ['experiment-piston-plan']
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--output', type=pathlib.Path, required=True)
 p.add_argument('--variants', nargs='+', choices=FEATURES, required=True)
