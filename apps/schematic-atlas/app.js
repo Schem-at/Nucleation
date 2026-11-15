@@ -11,6 +11,7 @@ const sourceNames = {
   'redstonepedia': 'Redstonepedia', 'curated-candidates': 'Curated Mechanisms',
   'user-world-record-plot': 'World Record Plot', 'world-record-parts': 'World Record · Extracted builds',
   'world-record-floor-parts': 'World Record · Floor attachments',
+  'user-local-schematics': 'Your schematics',
 };
 const state = {
   groups: [], byId: new Map(), summary: {}, collection: 'all', source: null,
@@ -123,6 +124,7 @@ function buildGroups(rows) {
 }
 const collections = [
   ['all', 'All schematics', '▦'], ['plot-doors', 'Plot doors', '▥'],
+  ['plot-verified', 'Verified plot doors', '✓'], ['plot-interactive', 'Interactive candidates', '▷'],
   ['plot-fragments', 'Plot fragments', '⊡'], ['logic', 'Logic & computation', '⌘'],
   ['movement', 'Pistons & movement', '↗'], ['storage', 'Items & storage', '▤'],
   ['layouts', 'Research layouts', '⊞'], ['favorites', 'Saved for later', '☆'],
@@ -131,6 +133,8 @@ function belongs(group, collection) {
   const row = group.row;
   if (collection === 'favorites') return state.favorites.has(group.id);
   if (collection === 'plot-doors') return group.rows.some(isPlotDoor);
+  if (collection === 'plot-verified') return group.rows.some(row => isPlotDoor(row) && row.door_export?.tier === 'verified');
+  if (collection === 'plot-interactive') return group.rows.some(row => isPlotDoor(row) && ['repeatable', 'responsive'].includes(row.door_export?.tier));
   if (collection === 'plot-fragments') return group.rows.some(row => isPlotPart(row) && !isPlotDoor(row));
   if (collection === 'layouts') return row.kind === 'layout';
   if (row.kind === 'layout') return false;
@@ -264,6 +268,17 @@ function renderResults() {
   const result = matchingGroups(); const shown = result.slice(0, state.limit);
   const heading = state.source ? sourceName(state.source) : collections.find(c => c[0] === state.collection)?.[1] || 'All schematics';
   $('#library-title').textContent = heading; $('#current-collection').textContent = heading;
+  const doorCollection = !state.source && ['plot-verified', 'plot-interactive'].includes(state.collection);
+  $('#collection-note').hidden = !doorCollection;
+  $('#collection-download').hidden = !doorCollection || result.length === 0;
+  if (doorCollection) {
+    const verified = state.collection === 'plot-verified';
+    $('#collection-note').textContent = verified
+      ? 'Individual extractions with a verified opening and closing cycle, plus matching vanilla tick-end captures. The download includes the typed adapter and its test vectors.'
+      : 'Individual extractions with recorded piston responses and deterministic replay. These are candidates for testing: a complete opening and closing cycle is not established. Known failures and source-labelled broken builds are excluded; selection-edge risks stay visible.';
+    $('#collection-download').href = `/api/door-bundle/${verified ? 'verified-doors' : 'interactive-door-candidates'}`;
+    $('#collection-download').textContent = verified ? 'Download verified doors + tests ↓' : 'Download all interactive candidates + protocols ↓';
+  }
   $('#result-count').textContent = `${nf.format(result.length)} unique files`;
   const container = $('#results'); container.setAttribute('aria-busy', 'false'); container.replaceChildren(); container.className = state.view === 'grid' ? 'card-grid' : 'results-table';
   if (!result.length) {
@@ -402,6 +417,17 @@ function renderProperties() {
       content.append(links);
     }
     if (isPlotPart(row)) renderExtraction(content, row);
+    if (row.door_export) {
+      const run = row.door_export;
+      content.append(sectionTitle('Extracted run protocol'), el('p', 'detail-note', run.qualification), facts([
+        ['Tested local control X / Y / Z', textValue(run.control_local)],
+        ['Saved control X / Y / Z', textValue(run.control_source)],
+        ['Native setup', `${run.setup_ticks} game ticks, InWorld`],
+      ]));
+      const link = el('a', 'button secondary', 'Download run protocol ↓');
+      link.href = `/api/door-protocol/${encodeURIComponent(state.selected)}`; link.download = '';
+      content.append(link);
+    }
     if (inspected.scope || inspected.note) content.append(el('p', 'detail-note', inspected.scope || inspected.note));
     const tags = el('div', 'tag-list'); for (const text of (row.tags || []).slice(0,40)) tags.append(el('span', 'tag', text));
     if (tags.children.length) content.append(sectionTitle('Mechanisms & labels'), tags);
@@ -437,7 +463,8 @@ function renderProperties() {
     content.append(sectionTitle(`${rows.length} source ${rows.length === 1 ? 'entry' : 'entries'}`), el('p', 'detail-note', 'Identical file contents share this view. Original paths and attribution remain separate.'));
     for (const entry of rows) {
       const item = el('div', 'source-card'); item.append(el('h3', '', sourceName(entry.source)), el('code', '', entry.path));
-      if (entry.designer || entry.author || entry.static?.saved_author) item.append(el('p', 'detail-note', `Attribution / saved author: ${textValue(entry.designer || entry.author || entry.static?.saved_author)}`));
+      const authors = entry.designer || entry.authors || entry.author || entry.static?.saved_author;
+      if (authors) item.append(el('p', 'detail-note', `Attribution / saved author: ${Array.isArray(authors) ? authors.join(', ') : textValue(authors)}`));
       if (entry.source_commit) item.append(el('code', '', `Pinned commit ${entry.source_commit}`));
       if (isPlotPart(entry)) {
         item.append(el('p', 'detail-note', 'Derived locally from the user-provided World Record Plot. Source coordinates and saved state are retained; candidate classification is structural.'));
@@ -456,7 +483,7 @@ function renderProperties() {
       const value = row[field]; if (Array.isArray(value)) notes.push(...value); else if (value) notes.push(value);
     }
     content.append(sectionTitle('Controls & curator notes'));
-    for (const field of ['finite_controls', 'control_protocol', 'test_protocol', 'observable_invariants', 'candidate_selection_method']) if (row[field]) notes.push(row[field]);
+    for (const field of ['finite_controls', 'control_protocol', 'test_protocol', 'test_plan', 'observable_invariants', 'candidate_selection_method']) if (row[field]) notes.push(row[field]);
     content.append(notes.length ? listNotes(notes) : el('p', 'detail-note', 'No control protocol is recorded for this file. Static metadata alone does not establish how to operate it.'));
     if (isPlotPart(row)) {
       content.append(sectionTitle('Recorded check state'), facts([

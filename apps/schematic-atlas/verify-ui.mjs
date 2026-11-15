@@ -38,6 +38,36 @@ try {
   await page.locator('#validation-filter').selectOption('vanilla');
   await page.waitForFunction(() => document.querySelectorAll('#results .schematic-card').length === 1);
   assert(await page.locator('#results .chip').innerText() === 'Vanilla matched', 'only admitted plot door appears as vanilla matched');
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator('#validation-filter').selectOption('all');
+  await page.goto(`${base}/#collection=plot-verified`);
+  await page.waitForFunction(() => document.querySelector('#library-title').textContent === 'Verified plot doors');
+  assert(await page.locator('#results .schematic-card').count() === 1, 'strict door collection contains the independently verified door');
+  assert(await page.locator('#collection-download').getAttribute('href') === '/api/door-bundle/verified-doors', 'verified collection download points to its local bundle');
+  await page.goto(`${base}/#collection=plot-interactive`);
+  await page.waitForFunction(() => document.querySelector('#library-title').textContent === 'Interactive candidates');
+  assert((await page.locator('#collection-note').innerText()).includes('not established'), 'motion candidates retain the incomplete-functionality label');
+  assert(await page.locator('#collection-download').getAttribute('href') === '/api/door-bundle/interactive-door-candidates', 'candidate download stays separate from verified doors');
+  await page.locator('#results .schematic-card').first().click();
+  await page.getByText('Extracted run protocol', { exact: true }).waitFor();
+  assert(await page.getByRole('link', { name: 'Download run protocol ↓', exact: true }).count() === 1, 'individual candidate exposes its recorded control protocol');
+  await page.locator('#close-detail').click();
+  await page.goto(`${base}/#collection=all`);
+  await page.locator('#search').fill('hipster');
+  await page.waitForFunction(() => document.querySelectorAll('#results .schematic-card').length === 1);
+  assert((await page.locator('#results').innerText()).includes('SoulBanished'), 'supplied hipster is indexed and searchable');
+  await page.locator('#results .schematic-card').click();
+  await page.locator('#detail[open]').waitFor();
+  await page.waitForFunction(() => document.querySelector('#detail-title').textContent.includes('Hipster'));
+  await page.locator('#detail-loading').waitFor({ state: 'hidden' });
+  await page.waitForFunction(() => {
+    const image = document.querySelector('.overview-art img');
+    return image?.src.includes('a16c594465e5664c1a29c4b87b66745916dc99b377d68be62a960847674cd8a0')
+      && image.complete && image.naturalWidth === 768;
+  });
+  assert(page.url().endsWith('a16c594465e5664c1a29c4b87b66745916dc99b377d68be62a960847674cd8a0'), 'search opens the exact supplied hipster bytes');
+  assert((await page.locator('#property-content').innerText()).includes('2,874,240'), 'hipster reference scope is visible');
+  await page.screenshot({ path: path.join(output, 'hipster-desktop.png') });
   assert(errors.length === 0, 'no uncaught browser errors');
   const report = { status: 'pass', browser: browser.version(), base, checks, errors,
     scope: 'Archive UI and evidence association; simulation correctness is checked separately.' };

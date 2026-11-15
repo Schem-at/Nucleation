@@ -9,6 +9,7 @@ import collections
 import datetime
 import hashlib
 import importlib.util
+import io
 import json
 import pathlib
 import struct
@@ -17,6 +18,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+import zipfile
 
 MAX_RESPONSE = 64 * 1024 * 1024
 PINNED = {
@@ -26,6 +28,7 @@ PINNED = {
     'plot': '5476ac349cd4529d7a237828633b9e7a995d70b8937f70e4836d2f9f8db66c1e',
     'door': 'e7b964e92109edebd0860f1ec95c158eebd8f66436e4c6c5b7c36862b7675586',
     'legacy': 'a86c62923573e8b65e7e7fde22ebfc80082520496589b49615e1b988923cf1b6',
+    'hipster': 'a16c594465e5664c1a29c4b87b66745916dc99b377d68be62a960847674cd8a0',
 }
 PASS_STATUSES = {'functional_pass', 'vanilla_tick_end_parity_pass'}
 
@@ -58,6 +61,10 @@ def main():
         parser.error('Use an HTTP loopback server without a path prefix')
     base = args.base_url.rstrip('/')
     root = args.archive.resolve()
+    def archive_path(relative):
+        path = (root / relative).resolve()
+        require(path.is_relative_to(root), 'Evidence path escapes archive')
+        return path
     server_path = pathlib.Path(__file__).with_name('serve_tick_archive.py')
     spec = importlib.util.spec_from_file_location('atlas_under_test', server_path)
     server = importlib.util.module_from_spec(spec)
@@ -102,12 +109,14 @@ def main():
         return entries[digest]
 
     def library_counts():
-        original = [r for r in rows if r['source'] not in {'world-record-parts', 'world-record-floor-parts'}]
+        original = [r for r in rows if r['source'] not in {'world-record-parts', 'world-record-floor-parts', 'user-local-schematics'}]
         oracle = json.loads((server.REPO / 'docs/performance/schematic-candidates/plot-validation/oracle-results.json').read_text())
         admitted = {c['source_sha256'] for c in oracle['cases'] if c['benchmark_admission']=='accepted'}
         adapter_sources = {json.loads(p.read_text())['source_sha256']
                            for p in (server.REPO / 'circuit-adapters').glob('*/adapter.json')}
         expected_validated = admitted | adapter_sources
+        if PINNED['hipster'] in by_hash:
+            expected_validated.add(PINNED['hipster'])
         expected = {'layout_files':3864, 'validated':len(expected_validated)}
         for key, value in expected.items():require(library['summary'][key] == value, f'{key} != {value}')
         schematic = [r for r in rows if r['kind'] == 'schematic']
@@ -122,6 +131,65 @@ def main():
         require(all(r['id'] == r['sha256'] for r in rows), 'Entry ID is not the content hash')
         return {'summary':library['summary'], 'validated_sha256':sorted(validated)}
     check('library counts and distinct validation', library_counts)
+
+    if PINNED['hipster'] in by_hash:
+        def local_hipster():
+            digest = PINNED['hipster']; result = entry(digest)
+            row = next(r for r in result['entries'] if r['source'] == 'user-local-schematics')
+            require(row['local_only'] is True and row['data_version'] == 2730, 'Local source/version not preserved')
+            require(sha(request('/api/file/'+digest)) == digest, 'Imported hipster bytes changed')
+            require(result['inspection']['non_air_blocks'] == 990 and result['inspection']['block_entities'] == 48,
+                    'Unexpected hipster saved blocks/block entities')
+            require(row['validation_status'] == 'vanilla_tick_end_parity_pass', 'Hipster reference result missing')
+            evidence = json.loads(archive_path(row['validation_evidence']).read_bytes())
+            require(evidence['status'] == 'pass' and evidence['source_sha256'] == digest,
+                    'Local source lacks its exact-source reference result')
+            require(evidence['ticks'] == 640 and evidence['block_state_assertions'] == 2874240
+                    and evidence['source_data_version'] == 2730 and evidence['initial_state_matches_benchmark_fixture'],
+                    'Hipster reference check scope differs')
+            png = request('/api/thumbnail/'+digest, kind='image/png')
+            require(sha(png) == row['thumbnail']['png_sha256'] and row['thumbnail']['non_air_blocks'] == 990,
+                    'Hipster thumbnail is not its saved source render')
+            return evidence
+        check('local hipster original, thumbnail and retained reference result', local_hipster)
+
+    pointer_path = root/'collections/plot-doors/current.json'
+    if pointer_path.is_file():
+        def door_exports():
+            pointer = json.loads(pointer_path.read_bytes())
+            folder = archive_path(pointer['directory'])
+            manifest_bytes = (folder/'manifest.json').read_bytes()
+            manifest = json.loads(manifest_bytes)
+            require(sha(manifest_bytes) == pointer['manifest_sha256'], 'Export manifest hash differs')
+            require(pointer['entries'] == manifest['entries'], 'Export pointer changed entries')
+            require(len(manifest['entries']) + len(manifest['excluded']) == manifest['candidate_count'],
+                    'Door candidates were lost during classification')
+            require(dict(collections.Counter(e['tier'] for e in manifest['entries'])) == pointer['counts'],
+                    'Export tier counts differ')
+            seen = []
+            for name, tiers in [('verified-doors', {'verified'}), ('interactive-door-candidates', {'repeatable','responsive'})]:
+                data = request('/api/door-bundle/'+name, kind='application/zip')
+                require(sha(data) == pointer['bundles'][name]['sha256'], 'Bundle hash differs')
+                with zipfile.ZipFile(io.BytesIO(data)) as bundle:
+                    require(bundle.testzip() is None, 'Bundle CRC failure')
+                    expected = [e for e in manifest['entries'] if e['tier'] in tiers]
+                    require(len([p for p in bundle.namelist() if p.endswith('.litematic')]) == len(expected),
+                            'Bundle contains missing or extra schematic files')
+                    for exported in expected:
+                        digest = exported['source_sha256']
+                        require(sha(bundle.read(exported['schematic'])) == digest, 'Export changed original bytes')
+                        protocol = json.loads(bundle.read(exported['protocol']))
+                        require(protocol['source_sha256'] == digest and protocol['evidence_tier'] == exported['tier'],
+                                'Protocol/source association differs')
+                        require(any(r.get('door_export') == exported for r in by_hash[digest]), 'Atlas lost export metadata')
+                    for exported in expected[:1]:
+                        require(request('/api/door-protocol/'+exported['source_sha256'], kind='application/json')
+                                == bundle.read(exported['protocol']), 'Protocol API differs from bundle')
+                    seen.append({'bundle':name, 'schematics':len(expected), 'sha256':sha(data)})
+            for excluded in manifest['excluded']:
+                require(all('door_export' not in r for r in by_hash[excluded['sha256']]), 'Excluded source advertised as exported')
+            return seen
+        check('door bundle integrity, original hashes, tier association and protocols', door_exports)
 
     def adapters():
         observed = []
@@ -263,6 +331,8 @@ def main():
 
     def invalid_paths():
         paths = ['/api/file/'+'0'*64, '/api/entry/'+'0'*64, '/api/thumbnail/'+'0'*64,
+                 '/api/door-bundle/unknown', '/api/door-protocol/'+'0'*64,
+                 '/api/door-bundle/%2e%2e%2flibrary.json',
                  '/api/capture/unknown', '/api/file/%2e%2e%2flibrary.json',
                  '/%2e%2e/tools/serve_tick_archive.py', '/engine/%2e%2e/%2e%2e/Cargo.toml',
                  '/sim-lab/%2e%2e/%2e%2e/Cargo.toml', '/pack/%2e%2e/%2e%2e/Cargo.toml']

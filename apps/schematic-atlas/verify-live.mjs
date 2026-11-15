@@ -66,6 +66,12 @@ try {
     await page.locator('.status.ready,.status.error').waitFor({ timeout: 90000 });
     userCases.push({ sha, state: await page.locator('.status').getAttribute('class'), message: await page.locator('.status').innerText() });
   }
+  const hipster = 'a16c594465e5664c1a29c4b87b66745916dc99b377d68be62a960847674cd8a0';
+  await page.goto(`${base}/sim-lab/?archive=${hipster}&embed=atlas`);
+  await page.locator('.status.ready').waitFor({ timeout: 90000 });
+  await page.getByRole('button', { name: 'step', exact: true }).click();
+  await page.waitForFunction(() => Number(window.simlab?.world?.sim?.tickCount()) === 1);
+  checks.push('supplied hipster loads and advances in the real browser engine');
   assert(failures.length === 0, 'no missing local assets or API responses');
   assert(errors.length === 0, 'no uncaught browser errors');
   const result = { status: 'pass', checks, errors, failures, userCases, browser: browser.version(), scope: 'Asset serving, responsive workspace and real live-engine controls; not a new vanilla parity proof.' };

@@ -67,6 +67,12 @@ benches/meshing-bench/
 /pytest-of-*/
 /nucleation_test_*/
 /render_work
+# Local downloads and source-preserving extractions belong outside Git.
+# These guards cover accidental in-repository archive locations; test fixtures
+# remain explicitly tracked for reproducible CI.
+/Nucleation-schematic-archive/
+/schematic-archive/
+/local-schematic-archive/
 CLAUDE.md
 /docs/superpowers
 /node-compile-cache/
