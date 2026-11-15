@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Read-only, loopback Circuit Atlas server over the retained local archive.
+"""Loopback Circuit Atlas server over retained originals and evidence.
 
 python3 tools/serve_tick_archive.py --archive /path/to/archive --port 8767
 Rust/WASM builds are separate; this server never compiles or executes downloads.
+Saved Mojang skin PNGs are cached separately without changing any original.
 """
 import argparse
 import collections
@@ -19,6 +20,7 @@ import urllib.parse
 from xml.sax.saxutils import escape
 
 from prepare_tick_logic_archive import NBTReader, MAX_NBT, varints
+from player_head_skins import cached_skin
 
 REPO = Path(__file__).resolve().parents[1]
 APP = REPO / 'apps/schematic-atlas'
@@ -285,6 +287,13 @@ def main():
             try:
                 if path == '/api/library': return self.json(archive.slim())
                 if path == '/api/engine': return self.json(archive.engine())
+                if path.startswith('/api/player-skin/'):
+                    digest = path.removeprefix('/api/player-skin/')
+                    if not re.fullmatch(r'[a-f0-9]{1,64}', digest): return self.json({'error':'Invalid skin hash'}, 400)
+                    try:
+                        return self.file(cached_skin(archive.root/'player-skins', digest))
+                    except Exception:
+                        return self.json({'error':'Saved skin is unavailable; the renderer can use its default skin'}, 502)
                 if path.startswith('/api/door-bundle/'):
                     p = archive.door_file('bundle', path.rsplit('/', 1)[1]); return self.file(p, p.name)
                 if path.startswith('/api/door-protocol/'):

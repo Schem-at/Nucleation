@@ -171,6 +171,7 @@ provides `mountReplay(container, capture)` and returns a cleanup callback.
 | `/api/entry/<sha256>` | Full provenance rows, inspection, captures and capabilities |
 | `/api/file/<sha256>` | Original archived file |
 | `/api/thumbnail/<sha256>` | Native textured PNG, or 404 when unavailable |
+| `/api/player-skin/<texture-hash>` | Saved Mojang skin PNG, cached locally outside Git |
 | `/api/capture/<id>` | Retained capture data |
 | `/api/adapter-file/<id>/<file>` | Allowlisted adapter contract, suite, code, instructions or result |
 | `/api/door-bundle/verified-doors` | Local verified extractions, adapters and protocols ZIP |
@@ -196,3 +197,24 @@ workspace, reset/step/pause controls and parent telemetry using the real WASM
 engine. `../sim-lab-wasm/verify-coordinates.mjs` checks saved-origin alignment,
 mesh vertices, picking, piston updates and differential simulation on the
 reported plot entries and generated translated multi-region builds.
+
+## Player-head textures
+
+The live viewer registers skins referenced by the saved block entities before
+meshing. `/api/player-skin/` accepts only a texture hash, fetches the corresponding
+HTTPS PNG from `textures.minecraft.net`, and caches it under the archive's
+`player-skins/`. Missing network resources use default skins and can be retried
+by reloading. Originals and their profile data remain unchanged.
+
+For offline native thumbnails, collect the same saved URLs and make a separate
+resource pack containing `nucleation:skins/<hash>` textures:
+
+```sh
+python3 tools/player_head_skins.py --archive /path/to/archive \
+  --pack /path/to/original-models.zip --output-pack /path/to/archive/with-skins.zip
+```
+
+Legacy 64×32 skins are padded to 64×64; this pack step uses Pillow for those
+skins. Render with the resulting pack on harrison-work, then reconcile the
+new PNGs with `tools/render_tick_archive.py`. Keep old PNGs/manifest for rollback.
+Skins and resource packs are local assets, not Git contents.

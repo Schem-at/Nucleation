@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { PresentationClock } from './src/presentation_clock.ts';
+const clock = new PresentationClock(), simulation = {};
+assert.equal(clock.sample(simulation, 0, 0, false), 0);
+assert.equal(clock.sample(simulation, 1, 0, true), 0, 'first completed step begins at stroke source');
+assert.equal(clock.sample(simulation, 1, .5, true), .5);
+assert.equal(clock.sample(simulation, 1, 0, false), .5, 'pause holds a fractional tick');
+assert.equal(clock.sample(simulation, 1, .1, true), .5, 'resume cannot go backwards');
+assert.equal(clock.sample(simulation, 1, .75, true), .75);
+assert.equal(clock.sample(simulation, 2, 0, true), 1, 'next step is continuous');
+assert.equal(clock.sample(simulation, 3, 0, false), 3, 'manual stepping shows the completed state');
+assert.equal(clock.sample(simulation, 3, 0, true), 3, 'resuming from a manual step cannot rewind');
+assert.equal(clock.sample(simulation, 100, .25, true), 99.25, 'fast-forward uses the same tick clock');
+assert.equal(clock.sample(simulation, 0, 0, false), 0, 'checkpoint rewind resets the clock');
+assert.equal(clock.sample({}, 0, 0, false), 0, 'replacement simulation resets the clock');
+console.log('Presentation clock: 12 assertions passed');
