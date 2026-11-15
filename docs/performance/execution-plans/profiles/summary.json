@@ -1,0 +1,6 @@
+{
+  "reference_pgo": 858124694,
+  "selected_pgo": 587598018,
+  "instruction_reduction": 0.31525334009325223,
+  "command": "bench_circuits hipster 1 2: one load plus four cycles including warmup"
+}

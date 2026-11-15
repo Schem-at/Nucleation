@@ -21,11 +21,12 @@ im = ax.imshow(values, aspect='auto', cmap='RdYlGn',
 for y, row in enumerate(entries):
     for x, r in enumerate(row):
         lo, hi = r['cpu_ci95']
-        ax.text(x,y,f"{r['cpu_speedup']:.3f}×\n[{lo:.3f}, {hi:.3f}]",ha='center',va='center',fontsize=8)
+        ax.text(x,y,f"{r['cpu_speedup']:.3f}×\n[{lo:.3f}, {hi:.3f}]",ha='center',va='center',fontsize=8, color='white' if im.norm(r['cpu_speedup']) < .16 or im.norm(r['cpu_speedup']) > .85 else 'black')
 ax.set_xticks(range(len(variants)), variants)
 ax.set_yticks(range(len(cases)), cases)
 ax.tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
-ax.set_title('Nucleation execution experiments · harrison-work\nCPU speedup vs reference; paired bootstrap 95% intervals',pad=36)
+reference_label=doc.get('comparison_label','reference')
+ax.set_title(f'Nucleation execution experiments · harrison-work\nCPU speedup vs {reference_label}; paired bootstrap 95% intervals',pad=36)
 fig.colorbar(im,ax=ax,label='Higher is faster',fraction=.025,pad=.025)
 fig.tight_layout()
 a.output.parent.mkdir(parents=True,exist_ok=True)

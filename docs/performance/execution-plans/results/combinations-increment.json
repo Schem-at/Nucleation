@@ -1,0 +1,331 @@
+{
+  "baseline": "baseline",
+  "source": "docs/performance/execution-plans/results/combinations-timings.jsonl",
+  "resamples": 10000,
+  "results": [
+    {
+      "case": "hipster",
+      "variant": "certificate_pool_directional",
+      "reference": "plan_pool_directional",
+      "rounds": 9,
+      "cpu_ms": 10.535926583333334,
+      "cpu_speedup": 0.9832981941732241,
+      "cpu_ci95": [
+        0.9541681110961296,
+        0.9943711812459738
+      ],
+      "wall_ms": 10.571360083333333,
+      "wall_speedup": 0.983898256043544,
+      "wall_ci95": [
+        0.954496197316017,
+        0.995095014492936
+      ]
+    },
+    {
+      "case": "hipster",
+      "variant": "all_no_certificate",
+      "reference": "plan_pool_directional",
+      "rounds": 9,
+      "cpu_ms": 10.35569025,
+      "cpu_speedup": 1.0004120761852,
+      "cpu_ci95": [
+        0.9715008530350558,
+        1.0197676769087813
+      ],
+      "wall_ms": 10.390946,
+      "wall_speedup": 1.000981311037513,
+      "wall_ci95": [
+        0.9715981222308825,
+        1.0200635488613394
+      ]
+    },
+    {
+      "case": "hipster",
+      "variant": "plan_pool_directional",
+      "reference": "plan_pool",
+      "rounds": 9,
+      "cpu_ms": 10.359957583333333,
+      "cpu_speedup": 1.0466164955582065,
+      "cpu_ci95": [
+        1.0135818832532024,
+        1.0804959901396003
+      ],
+      "wall_ms": 10.40114275,
+      "wall_speedup": 1.0459035618946775,
+      "wall_ci95": [
+        1.0137542060943934,
+        1.081066565418291
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "certificate_pool_directional",
+      "reference": "plan_pool_directional",
+      "rounds": 9,
+      "cpu_ms": 1.7963255443037973,
+      "cpu_speedup": 0.975383081234789,
+      "cpu_ci95": [
+        0.9450870828065328,
+        0.9962380620699401
+      ],
+      "wall_ms": 1.8026929746835443,
+      "wall_speedup": 0.9749011508766298,
+      "wall_ci95": [
+        0.944965189556799,
+        0.9965684791370489
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "plan_pool_directional",
+      "reference": "plan_pool",
+      "rounds": 9,
+      "cpu_ms": 1.7521055443037974,
+      "cpu_speedup": 1.0132256641553399,
+      "cpu_ci95": [
+        0.998152707033313,
+        1.0482836324134843
+      ],
+      "wall_ms": 1.7574474556962025,
+      "wall_speedup": 1.0136732107063589,
+      "wall_ci95": [
+        0.9977527880896332,
+        1.0486901469522207
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "all_no_certificate",
+      "reference": "plan_pool_directional",
+      "rounds": 9,
+      "cpu_ms": 1.8604806329113925,
+      "cpu_speedup": 0.9417488756988546,
+      "cpu_ci95": [
+        0.9255652601731859,
+        0.9748109258813358
+      ],
+      "wall_ms": 1.8654346202531646,
+      "wall_speedup": 0.9421115254404859,
+      "wall_ci95": [
+        0.9246134591400467,
+        0.9739551163269506
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "certificate_pool_directional",
+      "reference": "plan_pool_directional",
+      "rounds": 9,
+      "cpu_ms": 0.17318188985823335,
+      "cpu_speedup": 0.9716921511528089,
+      "cpu_ci95": [
+        0.9303455789844509,
+        0.9980710955941479
+      ],
+      "wall_ms": 0.17350966303162485,
+      "wall_speedup": 0.9721536821059957,
+      "wall_ci95": [
+        0.929515095738092,
+        0.9952283269393244
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "all_no_certificate",
+      "reference": "plan_pool_directional",
+      "rounds": 9,
+      "cpu_ms": 0.1754877437295529,
+      "cpu_speedup": 0.9589244212769293,
+      "cpu_ci95": [
+        0.7817509994338276,
+        0.9694535010662195
+      ],
+      "wall_ms": 0.17585915812431843,
+      "wall_speedup": 0.9591656163730904,
+      "wall_ci95": [
+        0.7772432352139141,
+        0.9694309732641977
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "plan_pool_directional",
+      "reference": "plan_pool",
+      "rounds": 9,
+      "cpu_ms": 0.1682794830970556,
+      "cpu_speedup": 0.9854428311689973,
+      "cpu_ci95": [
+        0.9636750690346126,
+        1.0961542509985187
+      ],
+      "wall_ms": 0.16867805779716466,
+      "wall_speedup": 0.9854106839741991,
+      "wall_ci95": [
+        0.963688898582775,
+        1.0954200492289505
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "certificate_pool_directional",
+      "reference": "plan_pool_directional",
+      "rounds": 9,
+      "cpu_ms": 9.089610117647059,
+      "cpu_speedup": 0.9808655677019527,
+      "cpu_ci95": [
+        0.9561193810211591,
+        0.9878868075299937
+      ],
+      "wall_ms": 9.11950782352941,
+      "wall_speedup": 0.9813497739522619,
+      "wall_ci95": [
+        0.9505304923610256,
+        0.9885776472469978
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "plan_pool_directional",
+      "reference": "plan_pool",
+      "rounds": 9,
+      "cpu_ms": 8.915685588235295,
+      "cpu_speedup": 0.9908109207793758,
+      "cpu_ci95": [
+        0.9786382829389486,
+        1.0068444133271124
+      ],
+      "wall_ms": 8.94942694117647,
+      "wall_speedup": 0.9909046230222641,
+      "wall_ci95": [
+        0.9786800541499787,
+        1.0074633483559092
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "all_no_certificate",
+      "reference": "plan_pool_directional",
+      "rounds": 9,
+      "cpu_ms": 9.180446647058824,
+      "cpu_speedup": 0.9711603292299126,
+      "cpu_ci95": [
+        0.9629143370828033,
+        0.9823525487021655
+      ],
+      "wall_ms": 9.21055105882353,
+      "wall_speedup": 0.9716494576731207,
+      "wall_ci95": [
+        0.9625884186601462,
+        0.9825867015552949
+      ]
+    },
+    {
+      "case": "item_sorter",
+      "variant": "plan_pool_directional",
+      "reference": "plan_pool",
+      "rounds": 9,
+      "cpu_ms": 1.1244156666666667,
+      "cpu_speedup": 1.0222090492322833,
+      "cpu_ci95": [
+        0.9834623554905243,
+        1.0307151156819379
+      ],
+      "wall_ms": 1.1283358188405797,
+      "wall_speedup": 1.0216531987216804,
+      "wall_ci95": [
+        0.9832902437330487,
+        1.0312884260217106
+      ]
+    },
+    {
+      "case": "item_sorter",
+      "variant": "all_no_certificate",
+      "reference": "plan_pool_directional",
+      "rounds": 9,
+      "cpu_ms": 1.1522155144927537,
+      "cpu_speedup": 0.9758727013510788,
+      "cpu_ci95": [
+        0.9612096395940821,
+        1.03787251521093
+      ],
+      "wall_ms": 1.1568052028985507,
+      "wall_speedup": 0.9753896472918373,
+      "wall_ci95": [
+        0.9601964663823813,
+        1.037065869702674
+      ]
+    },
+    {
+      "case": "item_sorter",
+      "variant": "certificate_pool_directional",
+      "reference": "plan_pool_directional",
+      "rounds": 9,
+      "cpu_ms": 1.2025962463768116,
+      "cpu_speedup": 0.9349901681917869,
+      "cpu_ci95": [
+        0.9209413905598275,
+        0.9735311324303497
+      ],
+      "wall_ms": 1.206833688405797,
+      "wall_speedup": 0.9349555201190054,
+      "wall_ci95": [
+        0.9200440750753912,
+        0.9724188421513326
+      ]
+    },
+    {
+      "case": "trapdoor2x3",
+      "variant": "plan_pool_directional",
+      "reference": "plan_pool",
+      "rounds": 9,
+      "cpu_ms": 0.8103221657142857,
+      "cpu_speedup": 0.9958346232083114,
+      "cpu_ci95": [
+        0.9828996095109768,
+        1.0710629530952969
+      ],
+      "wall_ms": 0.8129640342857143,
+      "wall_speedup": 0.9958221943763234,
+      "wall_ci95": [
+        0.9829699065897718,
+        1.0696658212439603
+      ]
+    },
+    {
+      "case": "trapdoor2x3",
+      "variant": "certificate_pool_directional",
+      "reference": "plan_pool_directional",
+      "rounds": 9,
+      "cpu_ms": 0.8128643771428572,
+      "cpu_speedup": 0.9968725269552258,
+      "cpu_ci95": [
+        0.8698031187843133,
+        1.0100267898947697
+      ],
+      "wall_ms": 0.8154578685714285,
+      "wall_speedup": 0.996941798734393,
+      "wall_ci95": [
+        0.8674142966639397,
+        1.0099117495827818
+      ]
+    },
+    {
+      "case": "trapdoor2x3",
+      "variant": "all_no_certificate",
+      "reference": "plan_pool_directional",
+      "rounds": 9,
+      "cpu_ms": 0.7943905714285715,
+      "cpu_speedup": 1.0200551150261816,
+      "cpu_ci95": [
+        0.9717389466930085,
+        1.0377215049197948
+      ],
+      "wall_ms": 0.7970384171428571,
+      "wall_speedup": 1.0199809906277113,
+      "wall_ci95": [
+        0.9715327720750913,
+        1.0386736198269477
+      ]
+    }
+  ]
+}
