@@ -111,6 +111,11 @@ jobs:
         run: |
           CARGO_VERSION=$(grep -m1 'version = ' Cargo.toml | cut -d '"' -f2)
           PYTHON_VERSION=$(grep -m1 '^version = ' bindings/python/pyproject.toml | cut -d '"' -f2)
+          NPM_VERSION=$(node -p "require('./bindings/npm/package.json').version")
+          if [[ "$NPM_VERSION" != "$CARGO_VERSION" ]]; then
+            echo "::error file=bindings/npm/package.json::version $NPM_VERSION != Cargo.toml $CARGO_VERSION"
+            exit 1
+          fi
           if [[ "$PYTHON_VERSION" != "$CARGO_VERSION" ]]; then
             echo "::error file=bindings/python/pyproject.toml::version $PYTHON_VERSION != Cargo.toml $CARGO_VERSION"
             exit 1

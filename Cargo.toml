@@ -8,7 +8,7 @@ resolver = "2"
 
 [package]
 name = "nucleation"
-version = "0.12.2"
+version = "0.12.3"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -198,11 +198,9 @@ testcontainers-modules = { version = "0.11", features = [
 ], optional = true }
 
 # Meshing dependencies - optional
-# Dual version+git dep: the git side pins the exact rev the crates.io 0.1.0
-# release was published from (253d2b6 + manifest-only packaging fixes; same
-# source). cargo publish keeps the version and drops the git side, so the
-# published nucleation crate keeps meshing/rendering.
-schematic-mesher = { version = "0.2.1", git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "5550498f97212f6ac5a0a44c03a60e3c825fdeea", optional = true }
+# Dual version+git dep: both sources identify the 0.2.2 chest-orientation fix.
+# Cargo keeps the registry version when publishing, preserving meshing/rendering.
+schematic-mesher = { version = "0.2.2", git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "36326fa7b7bb6d972401681333133353cd3294de", optional = true }
 
 # Rendering dependencies - optional
 wgpu = { version = "30", optional = true }
@@ -499,3 +497,7 @@ name = "embedded_cases"
 [[example]]
 name = "meta_overlay_poc"
 required-features = ["bridge", "mc-tick"]
+
+[[example]]
+name = "run_tick_adapter"
+required-features = ["mc-tick"]
