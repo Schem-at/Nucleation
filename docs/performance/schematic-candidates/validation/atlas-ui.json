@@ -1,0 +1,15 @@
+{
+  "browser": "Google Chrome, native CUA",
+  "url": "http://127.0.0.1:8767/",
+  "observed_passes": [
+    "Homepage displays914files,862distinctschematics,13sources,4withpassingchecks",
+    "Saved-block thumbnails render and schematic properties open",
+    "Comparator capture shows960ticks and zero players",
+    "ReplayNexttick andPlay/Pause advance recordedtick state",
+    "LiveSimLabloads pinned comparator paused withactualWebGLworld",
+    "LiveStepand+10 reach tick11; parentdashboardreceives tick11,0entities,ready/quiescent"
+  ],
+  "verification_limit": "Subsequent native CUA search/survey navigation attempts timed out; no automated claim of exhaustive UI or responsive-browser coverage. API/data tests are recorded separately.",
+  "server": "Local loopback server on127.0.0.1:8767; restart command in apps/schematic-atlas/README.md",
+  "safety_scope": "Read-only archive server; browser simulations modify an in-memory copy, not the original schematic."
+}

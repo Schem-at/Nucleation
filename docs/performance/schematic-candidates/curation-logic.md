@@ -44,7 +44,7 @@ archive's DC02.
 | 1 | LRA LFF006 D latch | 25 / 4189 | Repeater-lock hold/capture; 18 engine checks passed |
 | 2 | LRA ADD005 8-bit CLE adder | 1,217 / 4189 | Carry-heavy arithmetic; 656 engine checks across 328 vectors passed |
 | 3 | LRA DECODE004 decoder | 188 / 4189 | 32 engine checks passed against its actual repeated programming |
-| 4 | LRA OTHERCOMB017 binary comparator | 272 / 4671 | Native-version candidate with an exhaustive 8-bit integer oracle |
+| 4 | LRA OTHERCOMB017 binary comparator | 272 / 4671 | 40 vanilla vectors passed; both engine variants matched all 961 frames |
 | 5 | LRA ALU003 ALU | 1,059 / 4671 | Native-version arithmetic/logic/shift mix; map operation table first |
 | 6 | LRA HEX008 single hex equality cell | 17 / 4671 | All 16 strengths and live inventory-driven comparison |
 | 7 | LRA LFF003 hex D latch | 16 / 4440 | Analogue hold/capture, beyond boolean power |
@@ -70,6 +70,33 @@ new vanilla captures** and do not establish every intermediate state. COUNT001
 passed its load checks, then its first increment after loading zero returned
 zero instead of one. Engine behavior, input protocol and source-version handling
 remain possible causes; no vanilla incompatibility has been established.
+
+OTHERCOMB017 now has a separate fresh **1.21.11** result: 40 phases of 24 game
+ticks, 72 actual lever pulls and 960 captured ticks. The
+[functional report](validation/comparator-functional.json) records **120/120
+output assertions** and **640/640 input-state checks** against ordinary unsigned
+integer equality/ordering. Selected and reference engine checkers also matched
+all 961 frames, including the initial snapshot. This covers the captured
+workload, not all 65,536 input pairs, minimum latency or intra-tick ordering.
+The asymmetric `1` versus `128` cases check end-to-end bit reversal; a complete
+bit-significance proof still needs broader conflicting-bit combinations.
+
+[`check_tick_binary_comparator.py`](../../../tools/check_tick_binary_comparator.py)
+recreates the exact scenario from the production-exported fixture JSON and
+original pinned schematic, and separately validates a capture. Its generated
+scenario/expectations exactly reproduced the saved protocol. A tampered capture
+with one wrong lamp and one wrong input lever produced two failures, without
+changing the original evidence. The report pins source, export, scenario,
+capture and validator hashes. Run, with new output paths:
+
+```sh
+python3 tools/check_tick_binary_comparator.py generate \
+  --fixture-json OTHERCOMB017.json --source-file OTHERCOMB017.schem \
+  --scenario-out scenario.json --checks-out checks.json
+python3 tools/check_tick_binary_comparator.py validate \
+  --fixture-json OTHERCOMB017.json --source-file OTHERCOMB017.schem \
+  --scenario scenario.json --capture capture.json --output functional.json
+```
 
 ## Controls and warnings
 

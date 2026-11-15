@@ -1,0 +1,54 @@
+{
+  "status": "identical_all_result_fields",
+  "reference_sha256": "3cbd8b4204516ff9ec78b649098cda3190a5ca3589ad66d52092faac1fce3c22",
+  "selected_sha256": "3cbd8b4204516ff9ec78b649098cda3190a5ca3589ad66d52092faac1fce3c22",
+  "selected_features": [
+    "experiment-directional",
+    "experiment-update-pool",
+    "experiment-world-plan-cache",
+    "experiment-execution-view",
+    "experiment-lazy-journal",
+    "experiment-logic-plan-storage",
+    "experiment-moving-phase",
+    "experiment-transition-signatures"
+  ],
+  "selected_environment": {
+    "MC_TICK_WIRE_PLAN": "shadow",
+    "MC_TICK_TRANSITION_SIGNATURES": "shadow"
+  },
+  "profile": "dev; correctness only; no timing results",
+  "cases": [
+    {
+      "case": "LFF006",
+      "status": "functional_pass",
+      "checks_passed": 18,
+      "first_failure": null,
+      "ordered_record_fingerprint": "03edf489a0fdee425f8cf400cd7403f3a6a0f3c0d64dd601b7dd18439930c0e8",
+      "block_changes": 127
+    },
+    {
+      "case": "COUNT001",
+      "status": "functional_fail",
+      "checks_passed": 2,
+      "first_failure": "counter: count 1 after loading 0x00 at tick 288: expected 0x01, got 0x00; inputs {\"count_pulses\":1,\"loaded\":0}",
+      "ordered_record_fingerprint": "bea2138101ee74e950f8e7728eed63ef06910680f4e1aa3a49be0156e0c0e8df",
+      "block_changes": 407
+    },
+    {
+      "case": "DECODE004",
+      "status": "functional_pass",
+      "checks_passed": 32,
+      "first_failure": null,
+      "ordered_record_fingerprint": "af8bef5ee365405343edc8dfb20bec8525a44a9dfe501114310505b835fb5300",
+      "block_changes": 2092
+    },
+    {
+      "case": "ADD005",
+      "status": "functional_pass",
+      "checks_passed": 656,
+      "first_failure": null,
+      "ordered_record_fingerprint": "edd8b874f7ac089d283318180c39fbb7d7259e486bf0afef725590dc77e8dc61",
+      "block_changes": 130488
+    }
+  ]
+}

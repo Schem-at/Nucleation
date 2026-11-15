@@ -1,0 +1,3 @@
+682d7f4ff823c583b6ad1631c0e9ecafeede3aed602610e11f3bc4e6e531eda4  /home/harrison/nucleation-perf/execution-target/debug/examples/check_community_capture
+83d2e56711a92b447e985cac1e52d90146bcc2d9343de5c6863bfd219f6d0f99  /home/harrison/nucleation-perf/execution-target/debug/examples/check_logic_candidates
+a75fc4706f57861459fd6e9c05b6c52e049d1b7d7071993f7ece691fc7a3534c  /home/harrison/nucleation-perf/schematic-candidates/check-binaries/reference-logic

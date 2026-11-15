@@ -1,0 +1,16 @@
+{
+  "status": "identical_captured_states_and_inputs",
+  "fields": {
+    "initial": true,
+    "snapshots": true,
+    "fixture": true,
+    "actions": true,
+    "watch": true,
+    "origin": true,
+    "source": true
+  },
+  "first_sha256": "d439e631334d30916674471d0be39919741ddd19e3475b5503ce8fc2a12196f9",
+  "repeat_sha256": "dbb680885ef14ea7f58140e9f8dfe02fd8ecbf41dca8de8ee358ed1e5c1e4cd2",
+  "frames": 961,
+  "scope": "two fresh vanilla worlds, same input sequence; all captured frames equal"
+}

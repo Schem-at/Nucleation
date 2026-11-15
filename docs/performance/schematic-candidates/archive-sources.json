@@ -1,0 +1,666 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "config": {
+        "id": "autocrafting",
+        "repository": "XPBot1/Autocrafting-Archive",
+        "commit": "a060302478997a59b97b68555ee16901c627281c",
+        "category": "autocrafting",
+        "url": "https://github.com/XPBot1/Autocrafting-Archive",
+        "license_status": "Preserve source/per-entry license; no blanket redistribution claim."
+      },
+      "source_json_sha256": "730177bd8b8ffc0b4a5cddb45984cd3cf4327f27e7c706a91253706dae32c61e",
+      "manifest_sha256": "c1784deb40c97bd81a81ef0afabed565cf6258540216a7cab08722d55938eac5",
+      "tree": {
+        "url": "https://api.github.com/repos/XPBot1/Autocrafting-Archive/git/trees/a060302478997a59b97b68555ee16901c627281c?recursive=1",
+        "archive_path": "sources/autocrafting/tree.json",
+        "sha": "a060302478997a59b97b68555ee16901c627281c",
+        "saved_json_sha256": "f7e1d472e6bc735af946de817dac0632c2e46758308b2ceff16d1b861f56e101",
+        "saved_json_bytes": 88268,
+        "entries": 253,
+        "blobs": 162,
+        "truncated": false
+      }
+    },
+    {
+      "config": {
+        "id": "casual-builds",
+        "repository": "CasualMinecraft/casual-builds",
+        "commit": "0901c0036f4ee2481d38cbac6b4d178a640a17bd",
+        "category": "survival mechanisms",
+        "url": "https://github.com/CasualMinecraft/casual-builds"
+      },
+      "source_json_sha256": "954158e86fd4b1f06fa136e6b36e4b3ca3f0732ee5166f39fb0e738a719cd43b",
+      "manifest_sha256": "752ade17555dac318ef998543151f60c28daafb3b1369407b2564b8559c74927",
+      "tree": {
+        "url": "https://api.github.com/repos/CasualMinecraft/casual-builds/git/trees/0901c0036f4ee2481d38cbac6b4d178a640a17bd?recursive=1",
+        "archive_path": "sources/casual-builds/tree.json",
+        "sha": "0901c0036f4ee2481d38cbac6b4d178a640a17bd",
+        "saved_json_sha256": "ef4866df20e4a45c6780677eb687d2d3b8fb0f7e90ec7f977ce5cf9accac2107",
+        "saved_json_bytes": 15554,
+        "entries": 49,
+        "blobs": 30,
+        "truncated": false
+      }
+    },
+    {
+      "config": {
+        "id": "curated-candidates",
+        "category": "curated mechanisms",
+        "url": "https://github.com/Schem-at/Nucleation/tree/codex/simulation-corpus-expansion/docs/performance/schematic-candidates",
+        "license_status": "Preserve each originalcreator/source; localresearchcopies."
+      },
+      "source_json_sha256": "267123ac320a1a6ffa3fcc5680f881af53445b50a2cc081c40eb47c420d53125",
+      "manifest_sha256": "ac4ec085c7103e2442b73bfcaef67d45feb94f3e8ac6a006b6c0048f73bac66a",
+      "manual_manifest": {
+        "source": {
+          "id": "curated-candidates",
+          "category": "curated mechanisms",
+          "url": "https://github.com/Schem-at/Nucleation/tree/codex/simulation-corpus-expansion/docs/performance/schematic-candidates",
+          "license_status": "Preserve each originalcreator/source; localresearchcopies."
+        },
+        "files": [
+          {
+            "path": "interlocking_door3.litematic",
+            "kind": "schematic",
+            "status": "downloaded",
+            "sha256": "e7b964e92109edebd0860f1ec95c158eebd8f66436e4c6c5b7c36862b7675586",
+            "bytes": 1398,
+            "local_path": "sources/curated-candidates/files/interlocking_door3.litematic",
+            "object_path": "objects/sha256/e7/e7b964e92109edebd0860f1ec95c158eebd8f66436e4c6c5b7c36862b7675586",
+            "url": "https://sleeperpin-minecraft.s3.us-east-2.amazonaws.com/3x3_interlocking_block_door.litematic",
+            "source_url": "https://www.reddit.com/r/redstone/comments/1qs127k/3x3_door_with_interlocking_block_openclose/",
+            "validation": "static inspection; not simulated"
+          },
+          {
+            "path": "accessible_shulker_loader.litematic",
+            "kind": "schematic",
+            "status": "downloaded",
+            "sha256": "9f7a7dbc3502576a32dee7559885073f38d7293dae30d4ffff650a790e430ad8",
+            "bytes": 796,
+            "local_path": "sources/curated-candidates/files/accessible_shulker_loader.litematic",
+            "object_path": "objects/sha256/9f/9f7a7dbc3502576a32dee7559885073f38d7293dae30d4ffff650a790e430ad8",
+            "url": "https://raw.githubusercontent.com/Storage-Catalog/Archive/refs/heads/main/Archive/AL_accessible-loaders/AL001_Bottom-Accessible_Shulker_Loader/attachments/AL001_accessible_shulker_loader.litematic",
+            "source_url": "https://storagecatalog.org/archives/AL001-Bottom-Accessible-Shulker-Loader/",
+            "validation": "static inspection; not simulated"
+          },
+          {
+            "path": "cud_mixed_loader.litematic",
+            "kind": "schematic",
+            "status": "downloaded",
+            "sha256": "cab979903d5f72a0f06a1bf1510fd96877bc2d4ed655ee54667d6e3bfa0ef226",
+            "bytes": 1482,
+            "local_path": "sources/curated-candidates/files/cud_mixed_loader.litematic",
+            "object_path": "objects/sha256/ca/cab979903d5f72a0f06a1bf1510fd96877bc2d4ed655ee54667d6e3bfa0ef226",
+            "url": "https://raw.githubusercontent.com/Storage-Catalog/Archive/refs/heads/main/Archive/OL_other-loaders/OL004_1x_CUD-based_loader/attachments/OL004_Cud_Loader.litematic",
+            "source_url": "https://storagecatalog.org/archives/OL004-1x-CUD-based-loader/",
+            "validation": "static inspection; not simulated"
+          },
+          {
+            "path": "plane_flyer.litematic",
+            "kind": "schematic",
+            "status": "downloaded",
+            "sha256": "be17be1f79c2bee74f909b4205a3b1ad7c5e9e70c69454abc51b51927fd585dd",
+            "bytes": 958,
+            "local_path": "sources/curated-candidates/files/plane_flyer.litematic",
+            "object_path": "objects/sha256/be/be17be1f79c2bee74f909b4205a3b1ad7c5e9e70c69454abc51b51927fd585dd",
+            "url": "https://redstone-schematics.org/schematic/8/download/litematic?k=26f564e20d6eca0939bdbdea52507691",
+            "source_url": "https://redstone-schematics.org/schematic/8",
+            "validation": "static inspection; not simulated"
+          }
+        ],
+        "schematics": 4,
+        "layouts": 0,
+        "downloaded": 4,
+        "errors": 0,
+        "downloaded_bytes": 4634
+      },
+      "manual_recovery": {
+        "mode": "per-file-download",
+        "files": [
+          {
+            "path": "interlocking_door3.litematic",
+            "original_url": "https://sleeperpin-minecraft.s3.us-east-2.amazonaws.com/3x3_interlocking_block_door.litematic",
+            "destination_under_archive": "sources/curated-candidates/files/interlocking_door3.litematic",
+            "sha256": "e7b964e92109edebd0860f1ec95c158eebd8f66436e4c6c5b7c36862b7675586",
+            "bytes": 1398
+          },
+          {
+            "path": "accessible_shulker_loader.litematic",
+            "original_url": "https://raw.githubusercontent.com/Storage-Catalog/Archive/refs/heads/main/Archive/AL_accessible-loaders/AL001_Bottom-Accessible_Shulker_Loader/attachments/AL001_accessible_shulker_loader.litematic",
+            "destination_under_archive": "sources/curated-candidates/files/accessible_shulker_loader.litematic",
+            "sha256": "9f7a7dbc3502576a32dee7559885073f38d7293dae30d4ffff650a790e430ad8",
+            "bytes": 796
+          },
+          {
+            "path": "cud_mixed_loader.litematic",
+            "original_url": "https://raw.githubusercontent.com/Storage-Catalog/Archive/refs/heads/main/Archive/OL_other-loaders/OL004_1x_CUD-based_loader/attachments/OL004_Cud_Loader.litematic",
+            "destination_under_archive": "sources/curated-candidates/files/cud_mixed_loader.litematic",
+            "sha256": "cab979903d5f72a0f06a1bf1510fd96877bc2d4ed655ee54667d6e3bfa0ef226",
+            "bytes": 1482
+          },
+          {
+            "path": "plane_flyer.litematic",
+            "original_url": "https://redstone-schematics.org/schematic/8/download/litematic?k=26f564e20d6eca0939bdbdea52507691",
+            "destination_under_archive": "sources/curated-candidates/files/plane_flyer.litematic",
+            "sha256": "be17be1f79c2bee74f909b4205a3b1ad7c5e9e70c69454abc51b51927fd585dd",
+            "bytes": 958
+          }
+        ],
+        "note": "Recover each exact content from its recorded source; verify the saved hash before registration."
+      },
+      "manual_provenance": {
+        "status": "static-only; no simulator or Minecraft reference execution",
+        "coordinate_space": "Normalized schematic enclosing-box coordinates; confirm after production import. Negative saved region extents must be preserved during decoding.",
+        "reference_target": "Minecraft Java 1.21.11; preserve each input's native DataVersion when datafixing",
+        "redistribution": "No explicit schematic redistribution license was found. Retain attribution and URLs; downloaded binaries stay outside Git.",
+        "candidates": [
+          {
+            "id": "interlocking_door3",
+            "title": "3x3 Door With Interlocking Block Open/Close Sequence",
+            "designer": "SleeperPin",
+            "saved_author": "SleeperPin",
+            "source_url": "https://www.reddit.com/r/redstone/comments/1qs127k/3x3_door_with_interlocking_block_openclose/",
+            "download_url": "https://sleeperpin-minecraft.s3.us-east-2.amazonaws.com/3x3_interlocking_block_door.litematic",
+            "sha256": "e7b964e92109edebd0860f1ec95c158eebd8f66436e4c6c5b7c36862b7675586",
+            "bytes": 1398,
+            "native_data_version": 4671,
+            "dimensions": [
+              9,
+              13,
+              5
+            ],
+            "non_air_blocks": 174,
+            "initial_block_entities": 16,
+            "initial_entities": 0,
+            "initial_moving_piston_block_entities": 0,
+            "proposed_controls": [
+              "Use the saved lever at (6,1,4). Capture one complete close/open cycle to determine safe dwell, then require two complete cycles. Author explicitly says it is not spam-proof."
+            ],
+            "proposed_checks": [
+              "Compare every tick-end block state and comparator output to vanilla.",
+              "Verify complete panel opening/closing and exact return of all mechanism blocks.",
+              "Preserve the seven redstone items across three droppers and hoppers; compare occupied slots every tick.",
+              "Repeat at negative origin and rotated placements to test the author's orientation/location claim separately."
+            ],
+            "notes": [
+              "Native save is already DataVersion 4671, matching the 1.21.11 reference.",
+              "Uses copper bulbs, crafters, observers, pistons and inventory timing; adds coverage beyond the existing doors."
+            ],
+            "initial_piston_states": {
+              "minecraft:sticky_piston extended=false": 19,
+              "minecraft:piston extended=false": 4
+            },
+            "initial_block_entity_types": {
+              "minecraft:comparator": 7,
+              "minecraft:hopper": 3,
+              "minecraft:dropper": 3,
+              "minecraft:crafter": 3
+            },
+            "initial_occupied_slots": 3,
+            "initial_item_count": 7
+          },
+          {
+            "id": "accessible_shulker_loader",
+            "title": "Bottom-Accessible Shulker Loader (AL001)",
+            "designer": "vktec",
+            "saved_author": "vktec",
+            "source_url": "https://storagecatalog.org/archives/AL001-Bottom-Accessible-Shulker-Loader/",
+            "original_post_url": "https://discord.com/channels/1375556143186837695/1392582196652675092",
+            "download_url": "https://raw.githubusercontent.com/Storage-Catalog/Archive/refs/heads/main/Archive/AL_accessible-loaders/AL001_Bottom-Accessible_Shulker_Loader/attachments/AL001_accessible_shulker_loader.litematic",
+            "sha256": "9f7a7dbc3502576a32dee7559885073f38d7293dae30d4ffff650a790e430ad8",
+            "bytes": 796,
+            "declared_save_version": "1.16.5",
+            "native_data_version": 2586,
+            "dimensions": [
+              1,
+              6,
+              7
+            ],
+            "non_air_blocks": 29,
+            "initial_block_entities": 12,
+            "initial_entities": 0,
+            "initial_moving_piston_block_entities": 0,
+            "proposed_controls": [
+              "Seed replacement empty boxes in dispenser (0,2,1); saved containers are empty.",
+              "Supply items via hopper (0,1,0), which faces the box at (0,1,1). Verify input route in vanilla first.",
+              "For a compact rollover case, seed that box with 1727 ordinary 64-stackable items, then deliver one final item; also capture an empty-input negative control."
+            ],
+            "proposed_checks": [
+              "Full box is broken, collected, and replaced with an empty box.",
+              "All 1728 contents survive inside the emitted/collected shulker item; no duplication or loss.",
+              "Compare replacement timing, all block states and comparator outputs.",
+              "Run a second refill/replacement cycle once the single-cycle reference passes."
+            ],
+            "notes": [
+              "Archive describes single hopper-speed operation and reliable collection.",
+              "Independent parity requires nested shulker-item contents and item-entity capture beyond the current flat-slot driver."
+            ],
+            "initial_piston_states": {
+              "minecraft:sticky_piston extended=false": 3,
+              "minecraft:piston extended=false": 3
+            },
+            "initial_block_entity_types": {
+              "minecraft:shulker_box": 1,
+              "minecraft:hopper": 6,
+              "minecraft:dropper": 2,
+              "minecraft:comparator": 2,
+              "minecraft:dispenser": 1
+            },
+            "initial_occupied_slots": 0,
+            "initial_item_count": 0
+          },
+          {
+            "id": "cud_mixed_loader",
+            "title": "1x CUD-based loader (OL004)",
+            "designer": "Kizu",
+            "saved_author": "auraa42",
+            "source_url": "https://storagecatalog.org/archives/OL004-1x-CUD-based-loader/",
+            "original_post_url": "https://discord.com/channels/1375556143186837695/1455729805948489769",
+            "download_url": "https://raw.githubusercontent.com/Storage-Catalog/Archive/refs/heads/main/Archive/OL_other-loaders/OL004_1x_CUD-based_loader/attachments/OL004_Cud_Loader.litematic",
+            "sha256": "cab979903d5f72a0f06a1bf1510fd96877bc2d4ed655ee54667d6e3bfa0ef226",
+            "bytes": 1482,
+            "declared_save_version": "1.20.1",
+            "native_data_version": 3465,
+            "dimensions": [
+              4,
+              6,
+              4
+            ],
+            "non_air_blocks": 81,
+            "initial_block_entities": 15,
+            "initial_entities": 0,
+            "initial_moving_piston_block_entities": 0,
+            "proposed_controls": [
+              "Supply a finite mixed batch through input hopper (0,3,2), facing the box at (1,3,2), then stop input.",
+              "Keep the saved empty-box stock and comparator OutputSignal values; record initial occupied slots before ticking.",
+              "Determine the fader timeout from vanilla, then test bursts separated by shorter and longer gaps plus a zero-input control."
+            ],
+            "proposed_checks": [
+              "End-of-input detection replaces a partly filled box after the fader timeout.",
+              "Each mixed item appears exactly once in the emitted box; no item remains unintentionally buffered.",
+              "Compare the actual comparator outputs, not only powered block properties.",
+              "Compare box replacement and item-entity paths under identical finite inputs."
+            ],
+            "notes": [
+              "Archive attributes design to Kizu; the file's saved author is auraa42. Preserve both.",
+              "Contains water and packed ice; needs nested shulker contents and item-entity capture before independent parity can be claimed."
+            ],
+            "initial_piston_states": {
+              "minecraft:piston extended=false": 1,
+              "minecraft:sticky_piston extended=false": 1
+            },
+            "initial_block_entity_types": {
+              "minecraft:comparator": 6,
+              "minecraft:shulker_box": 1,
+              "minecraft:chest": 2,
+              "minecraft:hopper": 2,
+              "minecraft:sign": 2,
+              "minecraft:dropper": 1,
+              "minecraft:dispenser": 1
+            },
+            "initial_occupied_slots": 76,
+            "initial_item_count": 76
+          },
+          {
+            "id": "plane_flyer",
+            "title": "Plane Flying Machine",
+            "designer": "viktig_sau",
+            "saved_author": "viktig_sau",
+            "source_url": "https://redstone-schematics.org/schematic/8",
+            "download_url": "https://redstone-schematics.org/schematic/8/download/litematic?k=26f564e20d6eca0939bdbdea52507691",
+            "sha256": "be17be1f79c2bee74f909b4205a3b1ad7c5e9e70c69454abc51b51927fd585dd",
+            "bytes": 958,
+            "native_data_version": 4556,
+            "dimensions": [
+              27,
+              6,
+              33
+            ],
+            "non_air_blocks": 252,
+            "initial_block_entities": 0,
+            "initial_entities": 0,
+            "initial_moving_piston_block_entities": 0,
+            "proposed_controls": [
+              "Establish launch on vanilla by a controlled front-face block update to the tail observer at (25,2,16), facing east. This is a topology-derived candidate, not an author-specified verified launch.",
+              "Reserve a fully ticking travel corridor and capture repeated movement before introducing a tail-only stop; author warns that stopping another part can break the plane."
+            ],
+            "proposed_checks": [
+              "At matching settled cycle boundaries, the full 252-block machine is an exact translation, with no stranded parts or lost blocks.",
+              "Compare every tick-end in-flight and landed state to vanilla, including branching slime/honey assemblies.",
+              "Require repeated movement, controlled stop, and restart; preserve observer/piston event ordering through differential traces."
+            ],
+            "notes": [
+              "Listing says version any; actual saved DataVersion is 4556.",
+              "No inventories or entities initially, so block capture is a useful first check.",
+              "Download requires a browser-like User-Agent and its token may expire; refresh the link from the source page rather than accepting changed bytes."
+            ],
+            "initial_piston_states": {
+              "minecraft:piston extended=false": 24,
+              "minecraft:sticky_piston extended=false": 1
+            },
+            "initial_block_entity_types": {},
+            "initial_occupied_slots": 0,
+            "initial_item_count": 0
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "id": "lithium-gametests",
+        "repository": "CaffeineMC/lithium",
+        "commit": "2f3cbe1b42c4cbe4813afee8ed837ae7f54b7ac2",
+        "category": "upstream regression structures",
+        "path_prefixes": [
+          "common/src/gametest/"
+        ],
+        "license_status": "LGPL-3.0; retain attribution and original repository license.",
+        "url": "https://github.com/CaffeineMC/lithium"
+      },
+      "source_json_sha256": "85d6f30ea5fbfcf7251875ff1c846f7638569dbe644027cddf0c672af7f91ed1",
+      "manifest_sha256": "9d1caf80461da17e96174bb03fd61852a5c3a7e8573ece4ee4f9c8ff6941890e",
+      "tree": {
+        "url": "https://api.github.com/repos/CaffeineMC/lithium/git/trees/2f3cbe1b42c4cbe4813afee8ed837ae7f54b7ac2?recursive=1",
+        "archive_path": "sources/lithium-gametests/tree.json",
+        "sha": "2f3cbe1b42c4cbe4813afee8ed837ae7f54b7ac2",
+        "saved_json_sha256": "41238e10a822a7aa461d6217e9eef0b9f38a17dccfcc69046890e79b90bb3c82",
+        "saved_json_bytes": 383807,
+        "entries": 1101,
+        "blobs": 765,
+        "truncated": false
+      }
+    },
+    {
+      "config": {
+        "id": "logical-redstone-archive",
+        "repository": "mattbatwings/Logical-Redstone-Archive",
+        "commit": "6d054aa0a87d8f58f672625b3e6d0e727bd97016",
+        "category": "logic",
+        "url": "https://github.com/mattbatwings/Logical-Redstone-Archive",
+        "license_status": "No archive-wide license established; local research copies, no redistribution inferred."
+      },
+      "source_json_sha256": "777c533307c8e3d9d203d227f18b8cfa8c1a88887b7c042346caabcb5ffb9391",
+      "manifest_sha256": "df98a3c7c35f7715f6d558eb0a74ee4a15b0e611d5b7f16f85f27aad457b3ee0",
+      "tree": {
+        "url": "https://api.github.com/repos/mattbatwings/Logical-Redstone-Archive/git/trees/6d054aa0a87d8f58f672625b3e6d0e727bd97016?recursive=1",
+        "archive_path": "sources/logical-redstone-archive/tree.json",
+        "sha": "6d054aa0a87d8f58f672625b3e6d0e727bd97016",
+        "saved_json_sha256": "ae02a7d7137be31871f9633b590bdc9dc3c163c4afa88b70749700fa242477b8",
+        "saved_json_bytes": 567054,
+        "entries": 1582,
+        "blobs": 932,
+        "truncated": false
+      }
+    },
+    {
+      "config": {
+        "id": "redstonepedia",
+        "repository": "vjeux/redstonepedia",
+        "commit": "86a5e4843d8effe81bf7bf411a554cef8b58a1c9",
+        "category": "generated 26.3 layouts; needs conversion",
+        "path_prefixes": [
+          "designs/piston-door-3x3/archive/",
+          "designs/circuits/",
+          "crates/redsim/tests/fixtures/"
+        ],
+        "layout_extensions": [
+          ".fixture",
+          ".txt"
+        ],
+        "url": "https://github.com/vjeux/redstonepedia"
+      },
+      "source_json_sha256": "88f6811e09789c97ef5b28686d0e3d536a66759bc0ed02cc1bd7b5099e127e58",
+      "manifest_sha256": "31f437808b732dcc250780110133fef35d1c3024e98d3f9d8346b9aa7a3d71ac",
+      "tree": {
+        "url": "https://api.github.com/repos/vjeux/redstonepedia/git/trees/86a5e4843d8effe81bf7bf411a554cef8b58a1c9?recursive=1",
+        "archive_path": "sources/redstonepedia/tree.json",
+        "sha": "86a5e4843d8effe81bf7bf411a554cef8b58a1c9",
+        "saved_json_sha256": "624349a257eb03d58ab145cb7401bf4820ddf6e0590cf5f07207b96e86416fbb",
+        "saved_json_bytes": 9801480,
+        "entries": 29754,
+        "blobs": 28413,
+        "truncated": false
+      }
+    },
+    {
+      "config": {
+        "id": "slimestone-ai",
+        "repository": "X-com/slimestone-AI",
+        "commit": "b0096835b0a50d2f4ea41983c955fb0fa46ec889",
+        "category": "generated flying machines",
+        "url": "https://github.com/X-com/slimestone-AI",
+        "license_status": "Preserve source/per-entry license; no blanket redistribution claim."
+      },
+      "source_json_sha256": "cbd85d5eb39df707468edfd7c25732fcf33854972fecc92c71769cae583986c3",
+      "manifest_sha256": "7a06571caedb23b809d481f4c053b51a6a61d7b5d0e6c8bce254068460a7e820",
+      "tree": {
+        "url": "https://api.github.com/repos/X-com/slimestone-AI/git/trees/b0096835b0a50d2f4ea41983c955fb0fa46ec889?recursive=1",
+        "archive_path": "sources/slimestone-ai/tree.json",
+        "sha": "b0096835b0a50d2f4ea41983c955fb0fa46ec889",
+        "saved_json_sha256": "656438679011832149558a5a797ed32cd249db9cc65e3248a46723b8217ad3b2",
+        "saved_json_bytes": 357816,
+        "entries": 1131,
+        "blobs": 1073,
+        "truncated": false
+      }
+    },
+    {
+      "config": {
+        "id": "slimestone-military",
+        "repository": "Gudu-Z/SlimestoneMilitaryArmamentsArchives",
+        "commit": "fbdbb158f76e90c7cdda1092048544ec4340eb0b",
+        "category": "slimestone",
+        "url": "https://github.com/Gudu-Z/SlimestoneMilitaryArmamentsArchives",
+        "license_status": "Preserve source/per-entry license; no blanket redistribution claim."
+      },
+      "source_json_sha256": "f9484f4ab28b49beb9739ac6a9be28c914b4550efcd22b2d5195db2f74961408",
+      "manifest_sha256": "2f54f95eede4de7e98c11f8ca4893218ba6a2d30fe35b55caa369ef4dc56fe78",
+      "tree": {
+        "url": "https://api.github.com/repos/Gudu-Z/SlimestoneMilitaryArmamentsArchives/git/trees/fbdbb158f76e90c7cdda1092048544ec4340eb0b?recursive=1",
+        "archive_path": "sources/slimestone-military/tree.json",
+        "sha": "fbdbb158f76e90c7cdda1092048544ec4340eb0b",
+        "saved_json_sha256": "c02fd62b4eebf6c6ea9c4902f486520135a90d85a67801cedcd7cf0c10049404",
+        "saved_json_bytes": 76597,
+        "entries": 227,
+        "blobs": 135,
+        "truncated": false
+      }
+    },
+    {
+      "config": {
+        "id": "soontech-archive",
+        "repository": "Soontech-Annals/Archive",
+        "commit": "dd1ab242c66e3de3805a5acffdcd5ef1d87c7740",
+        "category": "encoded storage",
+        "url": "https://github.com/Soontech-Annals/Archive",
+        "license_status": "Root Unlicense; retain source and attribution."
+      },
+      "source_json_sha256": "fc1a66a9845b00d746a99cd66c6ff2aded020abbf48d9baa9a9fbc32875558b7",
+      "manifest_sha256": "65392bed9f19f6a713ed28026780a58387dbb4fa85f55f6dd5e5deb7ec2c6847",
+      "tree": {
+        "url": "https://api.github.com/repos/Soontech-Annals/Archive/git/trees/dd1ab242c66e3de3805a5acffdcd5ef1d87c7740?recursive=1",
+        "archive_path": "sources/soontech-archive/tree.json",
+        "sha": "dd1ab242c66e3de3805a5acffdcd5ef1d87c7740",
+        "saved_json_sha256": "e562f409cef9b992ac4ab7368daae28f5f4f6603c4dc5dab83a3ff8ea0bc4574",
+        "saved_json_bytes": 130078,
+        "entries": 382,
+        "blobs": 311,
+        "truncated": false
+      }
+    },
+    {
+      "config": {
+        "id": "soontech-current",
+        "repository": "Soontech-Annals/SoonNowArchive",
+        "commit": "d58447452e7a2df336a989c4e1c389f2ecea8f7f",
+        "category": "encoded storage",
+        "url": "https://github.com/Soontech-Annals/SoonNowArchive",
+        "license_status": "Preserve source/per-entry license; no blanket redistribution claim."
+      },
+      "source_json_sha256": "d5d3f7fd3fa5568a1f8806187bdd8ca82754913980afd340d514b0b0ca192f05",
+      "manifest_sha256": "f42ce0e2064c39698c66043b9cde3f4b6138c19727a581b1f781ab1aae60839a",
+      "tree": {
+        "url": "https://api.github.com/repos/Soontech-Annals/SoonNowArchive/git/trees/d58447452e7a2df336a989c4e1c389f2ecea8f7f?recursive=1",
+        "archive_path": "sources/soontech-current/tree.json",
+        "sha": "d58447452e7a2df336a989c4e1c389f2ecea8f7f",
+        "saved_json_sha256": "951c4fcd45debf2f9a56152c53034ddaf56d6486182fb26f3a2ea35b5a00849b",
+        "saved_json_bytes": 167615,
+        "entries": 488,
+        "blobs": 302,
+        "truncated": false
+      }
+    },
+    {
+      "config": {
+        "id": "storage-catalog",
+        "repository": "Storage-Catalog/Archive",
+        "commit": "183856344fe4fad1e47cbec1c298da1d262345b1",
+        "category": "storage",
+        "url": "https://github.com/Storage-Catalog/Archive",
+        "license_status": "Preserve source/per-entry license; no blanket redistribution claim."
+      },
+      "source_json_sha256": "02cdb46f033a6ca86f59fd6b8ea5e8c7e2c97f1cb8c25a17556e4af06c37591c",
+      "manifest_sha256": "c56ef753cfa3db8d0e30969845c71bfece278622a6dd70498762b8888f75baac",
+      "tree": {
+        "url": "https://api.github.com/repos/Storage-Catalog/Archive/git/trees/183856344fe4fad1e47cbec1c298da1d262345b1?recursive=1",
+        "archive_path": "sources/storage-catalog/tree.json",
+        "sha": "183856344fe4fad1e47cbec1c298da1d262345b1",
+        "saved_json_sha256": "532f53caa984f89867693e2e2ed9cec9f33e7aa0a574767305fe03e6e5b8d411",
+        "saved_json_bytes": 725549,
+        "entries": 2106,
+        "blobs": 1363,
+        "truncated": false
+      }
+    },
+    {
+      "config": {
+        "id": "user-world-record-plot",
+        "url": "file:///Users/harrison/Library/Application%20Support/PrismLauncher/instances/1.21.11/minecraft/schematics/WorldRecordPlot.litematic",
+        "category": "user-provided world-record door plot",
+        "provenance": "User-provided local file; source author/license unverified; original retained without modifications. Not redistributed in Git.",
+        "license": "unknown; local research copy",
+        "local_only": true
+      },
+      "source_json_sha256": "f55b98edc30692ba5c6ed4c78ba7371046f9b281e06cc97d7ef7c3d6b9f8b837",
+      "manifest_sha256": "6fb6ac7ced499c9ab0daabda27df3adff62195cad7d4628fd3f6e9169d983fc8",
+      "manual_manifest": {
+        "source": {
+          "id": "user-world-record-plot",
+          "url": "file:///Users/harrison/Library/Application%20Support/PrismLauncher/instances/1.21.11/minecraft/schematics/WorldRecordPlot.litematic",
+          "category": "user-provided world-record door plot",
+          "provenance": "User-provided local file; source author/license unverified; original retained without modifications. Not redistributed in Git.",
+          "license": "unknown; local research copy",
+          "local_only": true
+        },
+        "files": [
+          {
+            "path": "WorldRecordPlot.litematic",
+            "kind": "schematic",
+            "status": "downloaded",
+            "bytes": 1269492,
+            "sha256": "5476ac349cd4529d7a237828633b9e7a995d70b8937f70e4836d2f9f8db66c1e",
+            "source_url": "file:///Users/harrison/Library/Application%20Support/PrismLauncher/instances/1.21.11/minecraft/schematics/WorldRecordPlot.litematic",
+            "local_path": "sources/user-world-record-plot/files/WorldRecordPlot.litematic",
+            "object_path": "objects/sha256/54/5476ac349cd4529d7a237828633b9e7a995d70b8937f70e4836d2f9f8db66c1e"
+          }
+        ],
+        "selected_files": 1,
+        "downloaded": 1,
+        "schematics": 1,
+        "layouts": 0,
+        "errors": 0,
+        "downloaded_bytes": 1269492
+      },
+      "manual_recovery": {
+        "mode": "explicit-local-copy",
+        "files": [
+          {
+            "path": "WorldRecordPlot.litematic",
+            "original_url": "file:///Users/harrison/Library/Application%20Support/PrismLauncher/instances/1.21.11/minecraft/schematics/WorldRecordPlot.litematic",
+            "destination_under_archive": "sources/user-world-record-plot/files/WorldRecordPlot.litematic",
+            "sha256": "5476ac349cd4529d7a237828633b9e7a995d70b8937f70e4836d2f9f8db66c1e",
+            "bytes": 1269492
+          }
+        ],
+        "note": "Preserve the user original independently. Explicitly copy it into the recorded archive destination; no public URL or external retrieval is implied."
+      }
+    },
+    {
+      "config": {
+        "id": "wither-archive",
+        "repository": "DuskScorpio/wither-archive",
+        "commit": "074bbabfc2807ab8999f787c9954d4404ae1dba0",
+        "category": "wither mechanisms",
+        "url": "https://github.com/DuskScorpio/wither-archive",
+        "license_status": "Preserve source/per-entry license; no blanket redistribution claim."
+      },
+      "source_json_sha256": "21ef070704f0b16896bc43f93dff074ac68b0a5477c348ffb1fbd5f0cb7d6666",
+      "manifest_sha256": "c827143b2f5eda19bc7ec8c082aa4f9fecf5e00d18ccb0bfa8394627021541af",
+      "tree": {
+        "url": "https://api.github.com/repos/DuskScorpio/wither-archive/git/trees/074bbabfc2807ab8999f787c9954d4404ae1dba0?recursive=1",
+        "archive_path": "sources/wither-archive/tree.json",
+        "sha": "074bbabfc2807ab8999f787c9954d4404ae1dba0",
+        "saved_json_sha256": "760e276a1fd095ac0e2c4aef8c4c4847c9ee7a15cf795b1801c54066ecc4b824",
+        "saved_json_bytes": 175093,
+        "entries": 501,
+        "blobs": 335,
+        "truncated": false
+      }
+    }
+  ],
+  "curation_archives": [
+    {
+      "curator": "logic",
+      "archive_path": "curation/logic.json",
+      "snapshot_path": "catalog/logic.json.gz",
+      "sha256": "52ea3870e2a230c263d16f23a63bf1d0760fedf743bdcc85c9d1764c889438aa",
+      "bytes": 176819,
+      "uncompressed_sha256": "41d187582c31e062acdd1fc62e21ea43f78f54a878cc6035c048f69821eb9c09",
+      "uncompressed_bytes": 2460437
+    },
+    {
+      "curator": "movement",
+      "archive_path": "curation/movement.json",
+      "snapshot_path": "catalog/movement.json.gz",
+      "sha256": "2b839bc33cef6bb8a6a441fb68d66e178693a1b0bff52ffb09775f6451196c34",
+      "bytes": 57445,
+      "uncompressed_sha256": "95e45bf6b81fa7c2b09b4b79790cbb930cd78ffb2486e8a4fa6b9627d1aabbba",
+      "uncompressed_bytes": 1183009
+    },
+    {
+      "curator": "storage",
+      "archive_path": "curation/storage.json",
+      "snapshot_path": "catalog/storage.json.gz",
+      "sha256": "8bcc1035c85da0eb5edd737e42ed20c9448d437d6f5b8232c174bea1c78f64d8",
+      "bytes": 83522,
+      "uncompressed_sha256": "b8489cbc167696ff8178565ffafc7a0a8dccba5fbd1604e34b3b025582d47d87",
+      "uncompressed_bytes": 961181
+    },
+    {
+      "curator": "world-record-plot",
+      "archive_path": "curation/world-record-plot.json",
+      "snapshot_path": "catalog/world-record-plot.json.gz",
+      "sha256": "1967e18c970fd107e943cf952be2ce7536ffa894bc73417b917356c04f639056",
+      "bytes": 188883,
+      "uncompressed_sha256": "4dff21681dcb425817a725812105b7a93cdedf96df9b0f03e57906e99cb801f1",
+      "uncompressed_bytes": 3106754
+    }
+  ],
+  "downloader": {
+    "path": "tools/archive_tick_schematics.py",
+    "sha256": "82a07c6895fe62ef01ea31006ffca65299c11ccbd7b0ca5eeea8b120053a0843"
+  },
+  "recovery": [
+    "Run audit_tick_archive.py --archive NEW_ROOT --restore-sources this-snapshot.json.",
+    "For every Git source, GET its exact tree.url into tree.archive_path below NEW_ROOT. Preserve the full recursive response; reject truncated=true. Tree JSON serialization can differ, so saved_json_sha256 describes the original local snapshot, not an HTTP-byte requirement.",
+    "Run archive_tick_schematics.py --archive NEW_ROOT --reserve-gib 5. It selects source-config path prefixes/extensions and verifies downloaded Git blobs.",
+    "For curated-candidates run prepare_tick_dynamic_candidates.py --output NEW_ROOT/sources/curated-candidates/files. It verifies each original per-file SHA-256; mutable/expired source URLs may need refreshing without changing expected content.",
+    "For every local_only source, explicitly copy the preserved original local file to manual_recovery.files[].destination_under_archive below NEW_ROOT. The snapshot retains its original file URI/hash, not its bytes; never infer or fetch an external replacement.",
+    "Run audit_tick_archive.py --archive NEW_ROOT --register-manual this-snapshot.json to verify and register all supplied manual files/objects/manifests, including local-only originals.",
+    "Run audit_tick_archive.py --archive NEW_ROOT --restore-curation this-snapshot.json to expand the adjacent verified catalog gzip files.",
+    "Run the full audit with --refresh-index. Rebuild library.json/index.html separately using the parent indexer; this tool does not modify those views.",
+    "This metadata snapshot does not back up third-party binary bytes. Keep the persistent local archive independently; remote retention is not guaranteed."
+  ]
+}

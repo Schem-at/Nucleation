@@ -1,0 +1,182 @@
+{
+  "exporter_sha256": "0bbdce3a7cfcafe98825ed5222260ddbd4bdbd24b873eec43b9e19640d531409",
+  "exporter_source_sha256": "eb7d43f7ab03b1b34c2ad59cf51ee5a82ae14a4126e0532b4529bcdddf159dfd",
+  "imports": [
+    {
+      "id": "LFF006",
+      "source_sha256": "0663302dfc40ac8c33055d5a43aefe834be4290bdda9baaec6f2ccab238cad54",
+      "command": [
+        "/home/harrison/nucleation-perf/execution-target/debug/examples/export_tick_oracle_fixture",
+        "/home/harrison/nucleation-perf/schematic-candidates/sources/logic-archive/LFF006_dlatch.schem",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/LFF006.json",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/LFF006.snbt"
+      ],
+      "exit_code": 0,
+      "status": "imported",
+      "blocks": 25,
+      "data_version": 4189,
+      "size": [
+        8,
+        3,
+        5
+      ],
+      "block_entities": 3,
+      "fixture_sha256": "70f9b957b2e0bc0229fb386122bed939930b971b46df84667cf00e6cef6fed03",
+      "snbt_sha256": "c69ae016670db0b60fa9d0d6e6438aebd23e0ae7146690da86f15cfa52413cad"
+    },
+    {
+      "id": "COUNT001",
+      "source_sha256": "8e4cf8434924ee79186c59fd975c8941356bfec042da5754ae1245e557cf1aae",
+      "command": [
+        "/home/harrison/nucleation-perf/execution-target/debug/examples/export_tick_oracle_fixture",
+        "/home/harrison/nucleation-perf/schematic-candidates/sources/logic-archive/COUNT001_8bit_counter_load.schem",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/COUNT001.json",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/COUNT001.snbt"
+      ],
+      "exit_code": 0,
+      "status": "imported",
+      "blocks": 320,
+      "data_version": 4189,
+      "size": [
+        8,
+        20,
+        4
+      ],
+      "block_entities": 12,
+      "fixture_sha256": "324482c4725f42af9f9711223a93d8fe11401cdd560c02f177071b97e652d6e1",
+      "snbt_sha256": "60212ddd6c495e311134c733fb515dd22cd6b9f2b0653a09696a4cd6726b403d"
+    },
+    {
+      "id": "DECODE004",
+      "source_sha256": "09d6768f157d67845fa0615393077d610ed06c7fc9e57eb3721bb9bb3586267b",
+      "command": [
+        "/home/harrison/nucleation-perf/execution-target/debug/examples/export_tick_oracle_fixture",
+        "/home/harrison/nucleation-perf/schematic-candidates/sources/logic-archive/DECODE004_decode_h2v.schem",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/DECODE004.json",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/DECODE004.snbt"
+      ],
+      "exit_code": 0,
+      "status": "imported",
+      "blocks": 188,
+      "data_version": 4189,
+      "size": [
+        7,
+        9,
+        11
+      ],
+      "block_entities": 0,
+      "fixture_sha256": "16ebdaaeb47b32d702cec63f88a0b16139866e156e402504a662f37f86e7ee53",
+      "snbt_sha256": "dab430c6b1d73ea83ca52254dff1534d7569642c02c4421968f84d125d8ffad2"
+    },
+    {
+      "id": "ADD005",
+      "source_sha256": "3b4e13cd09dc8ad0b5770370d6f416e1d8140e2eec416c207ba76d8a79af46ca",
+      "command": [
+        "/home/harrison/nucleation-perf/execution-target/debug/examples/export_tick_oracle_fixture",
+        "/home/harrison/nucleation-perf/schematic-candidates/sources/logic-archive/ADD005_8bit_cle.schem",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/ADD005.json",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/ADD005.snbt"
+      ],
+      "exit_code": 0,
+      "status": "imported",
+      "blocks": 1217,
+      "data_version": 4189,
+      "size": [
+        13,
+        21,
+        20
+      ],
+      "block_entities": 18,
+      "fixture_sha256": "0b4ddb554b5ef94129fd1b300a96589b331724f035befbc644a3f450c164b6e8",
+      "snbt_sha256": "d253851f3379191ff14240a3b1c2026b6fc4a7ef9dccfee5fef789e659282cce"
+    },
+    {
+      "id": "interlocking_door3",
+      "source_sha256": "e7b964e92109edebd0860f1ec95c158eebd8f66436e4c6c5b7c36862b7675586",
+      "command": [
+        "/home/harrison/nucleation-perf/execution-target/debug/examples/export_tick_oracle_fixture",
+        "/home/harrison/nucleation-perf/schematic-candidates/sources/dynamic/interlocking_door3.litematic",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/interlocking_door3.json",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/interlocking_door3.snbt"
+      ],
+      "exit_code": 0,
+      "status": "imported",
+      "blocks": 174,
+      "data_version": 4671,
+      "size": [
+        9,
+        13,
+        5
+      ],
+      "block_entities": 16,
+      "fixture_sha256": "920b41557a647d404927d0fae23081752b1349b59535542c0158f8442d92f6b5",
+      "snbt_sha256": "f7b9ae25a8aaec5b6033da43bbddd3df917126c966ac6c71cccbb704fec49398"
+    },
+    {
+      "id": "accessible_shulker_loader",
+      "source_sha256": "9f7a7dbc3502576a32dee7559885073f38d7293dae30d4ffff650a790e430ad8",
+      "command": [
+        "/home/harrison/nucleation-perf/execution-target/debug/examples/export_tick_oracle_fixture",
+        "/home/harrison/nucleation-perf/schematic-candidates/sources/dynamic/accessible_shulker_loader.litematic",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/accessible_shulker_loader.json",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/accessible_shulker_loader.snbt"
+      ],
+      "exit_code": 0,
+      "status": "imported",
+      "blocks": 29,
+      "data_version": 2586,
+      "size": [
+        1,
+        6,
+        7
+      ],
+      "block_entities": 12,
+      "fixture_sha256": "5cfe31fee038a374ae0f8df8be59beed776495a45506d110141a9c799c0ad32c",
+      "snbt_sha256": "0ea12f8e0088f0d8bad36b4e0f3fd6fd8fae1f4e7a00b78b85c9a062cc4a029b"
+    },
+    {
+      "id": "cud_mixed_loader",
+      "source_sha256": "cab979903d5f72a0f06a1bf1510fd96877bc2d4ed655ee54667d6e3bfa0ef226",
+      "command": [
+        "/home/harrison/nucleation-perf/execution-target/debug/examples/export_tick_oracle_fixture",
+        "/home/harrison/nucleation-perf/schematic-candidates/sources/dynamic/cud_mixed_loader.litematic",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/cud_mixed_loader.json",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/cud_mixed_loader.snbt"
+      ],
+      "exit_code": 0,
+      "status": "imported",
+      "blocks": 81,
+      "data_version": 3465,
+      "size": [
+        4,
+        6,
+        4
+      ],
+      "block_entities": 15,
+      "fixture_sha256": "30084c4c51c7def5eab9ca68fc14b456a00e9c9547441ae039fe465b9a37f2a4",
+      "snbt_sha256": "a5e2f66598b6ca7d1e76719b0748a5162d2f181d9a0750d3812f59d065beb893"
+    },
+    {
+      "id": "plane_flyer",
+      "source_sha256": "be17be1f79c2bee74f909b4205a3b1ad7c5e9e70c69454abc51b51927fd585dd",
+      "command": [
+        "/home/harrison/nucleation-perf/execution-target/debug/examples/export_tick_oracle_fixture",
+        "/home/harrison/nucleation-perf/schematic-candidates/sources/dynamic/plane_flyer.litematic",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/plane_flyer.json",
+        "/home/harrison/nucleation-perf/schematic-candidates/imported/plane_flyer.snbt"
+      ],
+      "exit_code": 0,
+      "status": "imported",
+      "blocks": 252,
+      "data_version": 4556,
+      "size": [
+        27,
+        6,
+        33
+      ],
+      "block_entities": 0,
+      "fixture_sha256": "503fc3944df1c7900981a33cf4a552dae542c5e34c151baaba5028e43b7d1cb9",
+      "snbt_sha256": "fe7c9e398d512302c5f9945e1e06f4a064df1bf4740d614e5bf2070b51b2dc46"
+    }
+  ]
+}

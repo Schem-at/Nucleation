@@ -1,0 +1,126 @@
+{
+  "utc": "2026-11-15T07:33:48.135319+00:00",
+  "host": "harrison-work",
+  "platform": "Linux-7.2.5-3-omarchy-x86_64-with-glibc2.44",
+  "sources_sha256": {
+    "/home/harrison/code/Nucleation-simulation-performance/tools/gametest/src/TraceCapture12111.java": "25a18d114a5581607a7f276e1bb67c8df8c759f7a8e5ac2b6f42aa84561754f5",
+    "/home/harrison/code/Nucleation-simulation-performance/tools/gametest/src/CommunityCapture12111.java": "e7b66d2109b0f810dbb31e9c350e8bbee0af4aa3585d6ad7c73847eb6b4d4770"
+  },
+  "runner_sha256": "d88ba0b4de91a5fe606d16c9b94db9f3cdfce8c8193fc96e1a6bfb99b5186b25",
+  "shared_runner_sha256": "f86ad0c474da266fd047af99551571dee822a0a2fb742ed95092f1548c0d5e1c",
+  "scenario_sha256": "14b06f9afdbeac8360c68f2334c299e03d3f0ea432acbc0a9a70b63472517a34",
+  "source": {
+    "sha256": "e7b964e92109edebd0860f1ec95c158eebd8f66436e4c6c5b7c36862b7675586",
+    "data_version": 4671,
+    "url": "https://www.reddit.com/r/redstone/comments/1qs127k/3x3_door_with_interlocking_block_openclose/"
+  },
+  "original_source_bytes_verified": true,
+  "runtime": "/home/harrison/nucleation-perf/execution-next/vanilla/runtime",
+  "server_sha1": "64bb6d763bed0a9f1d632ec347938594144943ed",
+  "mappings_sha1": "5621e9253f05fd57872bbe7f8ddf5f9a7d525955",
+  "verified_extracted_sha256": {
+    "inner/META-INF/versions/1.21.11/server-1.21.11.jar": "ec47239a8de246335e1d54f6ac319bd35641778eb4b6a6da06372840d02fcebc",
+    "inner/META-INF/libraries/at/yawk/lz4/lz4-java/1.8.1/lz4-java-1.8.1.jar": "1de8ff91b90fba9d4896b8617ed3594c2e4390d321d5a92c34f80e62e406c1b0",
+    "inner/META-INF/libraries/com/azure/azure-json/1.4.0/azure-json-1.4.0.jar": "c50bc998cd1a6c689f8644b51c206217bf2da09d5b949e777490a60290cc3a0d",
+    "inner/META-INF/libraries/com/github/oshi/oshi-core/6.9.0/oshi-core-6.9.0.jar": "b29ba9bce041e6ea822203d5b5a692660c87551241510ebc76eedffe684844c7",
+    "inner/META-INF/libraries/com/google/code/gson/gson/2.13.2/gson-2.13.2.jar": "dd0ce1b55a3ed2080cb70f9c655850cda86c206862310009dcb5e5c95265a5e0",
+    "inner/META-INF/libraries/com/google/guava/failureaccess/1.0.3/failureaccess-1.0.3.jar": "cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb",
+    "inner/META-INF/libraries/com/google/guava/guava/33.5.0-jre/guava-33.5.0-jre.jar": "1e301f0c52ac248b0b14fdc3d12283c77252d4d6f48521d572e7d8c4c2cc4ac7",
+    "inner/META-INF/libraries/com/microsoft/azure/msal4j/1.23.1/msal4j-1.23.1.jar": "414d4fe3c66c7bb1a741014f352e5f0a8329172703e7fbb0020d232a8c8385b1",
+    "inner/META-INF/libraries/com/mojang/authlib/7.0.61/authlib-7.0.61.jar": "09a152617bd23c86bf59db1f9ba82ede23ec8f691a824d6c5dec4f0175f82aa4",
+    "inner/META-INF/libraries/com/mojang/brigadier/1.3.10/brigadier-1.3.10.jar": "c8ee4136e474ac7723ca2b432ec8d1a2bc88ef7d1ec57c314ba9e33cdc83dd75",
+    "inner/META-INF/libraries/com/mojang/datafixerupper/9.0.19/datafixerupper-9.0.19.jar": "9653a39cf5c4853cc98628d902dcb23ffeb2755122ecc563bde38c8f60c0b61e",
+    "inner/META-INF/libraries/com/mojang/jtracy/1.0.37/jtracy-1.0.37.jar": "8bb68d0b65e8eceb92de2bd1d9e1443a8c9a9dd1b5818a5e54870b0f8253672a",
+    "inner/META-INF/libraries/com/mojang/logging/1.6.11/logging-1.6.11.jar": "5d803eb7348a27468c6172daef2f0d77260dd63cde377ebfa73e36789ae8fcee",
+    "inner/META-INF/libraries/commons-io/commons-io/2.20.0/commons-io-2.20.0.jar": "df90bba0fe3cb586b7f164e78fe8f8f4da3f2dd5c27fa645f888100ccc25dd72",
+    "inner/META-INF/libraries/io/netty/netty-buffer/4.2.7.Final/netty-buffer-4.2.7.Final.jar": "b81613c8ed22b1cc39eccf2a28bd0c1d4561fb2e5e542061617ef4ce1d228bf5",
+    "inner/META-INF/libraries/io/netty/netty-codec-base/4.2.7.Final/netty-codec-base-4.2.7.Final.jar": "6360415b7c87160afcde5e7d4946c35539b9f043e8166c91a7fff95cc6067d9f",
+    "inner/META-INF/libraries/io/netty/netty-codec-compression/4.2.7.Final/netty-codec-compression-4.2.7.Final.jar": "edd53ad34991804301a46571113d8ffb4d6f67e6d874674dafbb915724275cb3",
+    "inner/META-INF/libraries/io/netty/netty-codec-http/4.2.7.Final/netty-codec-http-4.2.7.Final.jar": "2984dd38420a61c4dd68fcacc51ffc528eb46f73f7795cdafdb3a4d6fcb76862",
+    "inner/META-INF/libraries/io/netty/netty-common/4.2.7.Final/netty-common-4.2.7.Final.jar": "2345bc0ed5843fa57aa49eba67529485c3a1d420fcf0429324c8220c7a80e9a6",
+    "inner/META-INF/libraries/io/netty/netty-handler/4.2.7.Final/netty-handler-4.2.7.Final.jar": "21d063409c12dbcec46d380c8856a0f7b6a5b68bb5f1d005eb065b4d64146cb3",
+    "inner/META-INF/libraries/io/netty/netty-resolver/4.2.7.Final/netty-resolver-4.2.7.Final.jar": "7e4d569867e6c08437fb21a220ea01c294b0e38f01149b683c895a1bcd928438",
+    "inner/META-INF/libraries/io/netty/netty-transport/4.2.7.Final/netty-transport-4.2.7.Final.jar": "aadc6fb05c14fb789368ca3f854721549c72f6c0d81798bbccf9de1bb716892b",
+    "inner/META-INF/libraries/io/netty/netty-transport-classes-epoll/4.2.7.Final/netty-transport-classes-epoll-4.2.7.Final.jar": "4492948e6a7694398e5197cf15ed2e21d6662a739d010ae666fa276e7222853c",
+    "inner/META-INF/libraries/io/netty/netty-transport-classes-kqueue/4.2.7.Final/netty-transport-classes-kqueue-4.2.7.Final.jar": "a3eb1c94ae1a6be9e1d1ec52c3f5c510a75b04b8ef1ea86b7e77b3f1287ae3cc",
+    "inner/META-INF/libraries/io/netty/netty-transport-native-epoll/4.2.7.Final/netty-transport-native-epoll-4.2.7.Final-linux-x86_64.jar": "7f395c8fdbe6990f7664408b57d919042401b893178fcba48bebf1a61bf78618",
+    "inner/META-INF/libraries/io/netty/netty-transport-native-epoll/4.2.7.Final/netty-transport-native-epoll-4.2.7.Final-linux-aarch_64.jar": "2f0c7309d7df48a88fb374c02cfb446e1a1e5fb597fb02d773c70ac07da2c268",
+    "inner/META-INF/libraries/io/netty/netty-transport-native-kqueue/4.2.7.Final/netty-transport-native-kqueue-4.2.7.Final-osx-x86_64.jar": "a29c08b6895746aaca796e72a429bc705f40267feb35f75cd8fbbcd4de6de99f",
+    "inner/META-INF/libraries/io/netty/netty-transport-native-kqueue/4.2.7.Final/netty-transport-native-kqueue-4.2.7.Final-osx-aarch_64.jar": "7647a69558e3d49a352781c2ae81a97e16b442d7c6565a06b4ae0f15298489d5",
+    "inner/META-INF/libraries/io/netty/netty-transport-native-unix-common/4.2.7.Final/netty-transport-native-unix-common-4.2.7.Final.jar": "736703b3f6d127e182f5be888b6e15732b0c08d6634e00725352a6a9d19974b2",
+    "inner/META-INF/libraries/it/unimi/dsi/fastutil/8.5.18/fastutil-8.5.18.jar": "9094ae67d01d0ad246f886f11ad557fc2e79c72cbf3feed83e1512a8ae90a74a",
+    "inner/META-INF/libraries/net/java/dev/jna/jna/5.17.0/jna-5.17.0.jar": "b3a9408e7c51e08ef0e3bfcc08f443f6ec0f6191ba8cd7c18d53d2b22e5bdbc0",
+    "inner/META-INF/libraries/net/java/dev/jna/jna-platform/5.17.0/jna-platform-5.17.0.jar": "b7e3d46c87bad2eb409b0e704916bcd81206168e357312dfddd0e253679cd9e0",
+    "inner/META-INF/libraries/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar": "df26cc58f235f477db07f753ba5a3ab243ebe5789d9f89ecf68dd62ea9a66c28",
+    "inner/META-INF/libraries/org/apache/commons/commons-lang3/3.19.0/commons-lang3-3.19.0.jar": "32733ab4bc90b45b63eb72677d886961003fd4ed113e07b1028f9877cb2ac735",
+    "inner/META-INF/libraries/org/apache/logging/log4j/log4j-api/2.25.2/log4j-api-2.25.2.jar": "9fd66c9fe0bea06fa9666c147989a46cafaa92b4a88753697d3945cc43338cbb",
+    "inner/META-INF/libraries/org/apache/logging/log4j/log4j-core/2.25.2/log4j-core-2.25.2.jar": "e50db7701430ff907981850ef527a41d51a53dd0017f53a0860afcbab8570277",
+    "inner/META-INF/libraries/org/apache/logging/log4j/log4j-slf4j2-impl/2.25.2/log4j-slf4j2-impl-2.25.2.jar": "faffe8c867d59f813fb4bd1edf5354bfe86125811a7c9b305e5d225da8e7ea54",
+    "inner/META-INF/libraries/org/joml/joml/1.10.8/joml-1.10.8.jar": "bf19510145178df82cd3bd37edd514c13f411531ec5545299fd3abcbc98fe7c2",
+    "inner/META-INF/libraries/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab",
+    "inner/META-INF/libraries/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832"
+  },
+  "version": {
+    "id": "1.21.11",
+    "name": "1.21.11",
+    "world_version": 4671,
+    "series_id": "main",
+    "protocol_version": 774,
+    "pack_version": {
+      "resource_major": 75,
+      "resource_minor": 0,
+      "data_major": 94,
+      "data_minor": 1
+    },
+    "build_time": "2025-12-09T12:20:42+00:00",
+    "java_component": "java-runtime-delta",
+    "java_version": 21,
+    "stable": true,
+    "use_editor": false
+  },
+  "java_version": "openjdk version \"21.0.13\" 2026-10-20 LTS\nOpenJDK Runtime Environment Temurin-21.0.13+9 (build 21.0.13+9-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.13+9 (build 21.0.13+9-LTS, mixed mode, sharing)\n",
+  "javac_version": "javac 21.0.13\n",
+  "jdk_archive_verified": false,
+  "watch_cells": 1989,
+  "commands": [
+    {
+      "label": "compile",
+      "argv": [
+        "/home/harrison/nucleation-perf/execution-next/vanilla/jdk-21.0.13+9/bin/javac",
+        "-d",
+        "/home/harrison/nucleation-perf/schematic-candidates/vanilla-idle/classes",
+        "/home/harrison/code/Nucleation-simulation-performance/tools/gametest/src/TraceCapture12111.java",
+        "/home/harrison/code/Nucleation-simulation-performance/tools/gametest/src/CommunityCapture12111.java"
+      ]
+    },
+    {
+      "label": "capture",
+      "argv": [
+        "/home/harrison/nucleation-perf/execution-next/vanilla/jdk-21.0.13+9/bin/java",
+        "-Xmx2G",
+        "-cp",
+        "/home/harrison/nucleation-perf/schematic-candidates/vanilla-idle/classes:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/versions/1.21.11/server-1.21.11.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/at/yawk/lz4/lz4-java/1.8.1/lz4-java-1.8.1.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/com/azure/azure-json/1.4.0/azure-json-1.4.0.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/com/github/oshi/oshi-core/6.9.0/oshi-core-6.9.0.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/com/google/code/gson/gson/2.13.2/gson-2.13.2.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/com/google/guava/failureaccess/1.0.3/failureaccess-1.0.3.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/com/google/guava/guava/33.5.0-jre/guava-33.5.0-jre.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/com/microsoft/azure/msal4j/1.23.1/msal4j-1.23.1.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/com/mojang/authlib/7.0.61/authlib-7.0.61.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/com/mojang/brigadier/1.3.10/brigadier-1.3.10.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/com/mojang/datafixerupper/9.0.19/datafixerupper-9.0.19.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/com/mojang/jtracy/1.0.37/jtracy-1.0.37.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/com/mojang/logging/1.6.11/logging-1.6.11.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/commons-io/commons-io/2.20.0/commons-io-2.20.0.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-buffer/4.2.7.Final/netty-buffer-4.2.7.Final.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-codec-base/4.2.7.Final/netty-codec-base-4.2.7.Final.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-codec-compression/4.2.7.Final/netty-codec-compression-4.2.7.Final.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-codec-http/4.2.7.Final/netty-codec-http-4.2.7.Final.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-common/4.2.7.Final/netty-common-4.2.7.Final.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-handler/4.2.7.Final/netty-handler-4.2.7.Final.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-resolver/4.2.7.Final/netty-resolver-4.2.7.Final.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-transport/4.2.7.Final/netty-transport-4.2.7.Final.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-transport-classes-epoll/4.2.7.Final/netty-transport-classes-epoll-4.2.7.Final.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-transport-classes-kqueue/4.2.7.Final/netty-transport-classes-kqueue-4.2.7.Final.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-transport-native-epoll/4.2.7.Final/netty-transport-native-epoll-4.2.7.Final-linux-aarch_64.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-transport-native-epoll/4.2.7.Final/netty-transport-native-epoll-4.2.7.Final-linux-x86_64.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-transport-native-kqueue/4.2.7.Final/netty-transport-native-kqueue-4.2.7.Final-osx-aarch_64.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-transport-native-kqueue/4.2.7.Final/netty-transport-native-kqueue-4.2.7.Final-osx-x86_64.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/io/netty/netty-transport-native-unix-common/4.2.7.Final/netty-transport-native-unix-common-4.2.7.Final.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/it/unimi/dsi/fastutil/8.5.18/fastutil-8.5.18.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/net/java/dev/jna/jna/5.17.0/jna-5.17.0.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/net/java/dev/jna/jna-platform/5.17.0/jna-platform-5.17.0.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/org/apache/commons/commons-lang3/3.19.0/commons-lang3-3.19.0.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/org/apache/logging/log4j/log4j-api/2.25.2/log4j-api-2.25.2.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/org/apache/logging/log4j/log4j-core/2.25.2/log4j-core-2.25.2.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/org/apache/logging/log4j/log4j-slf4j2-impl/2.25.2/log4j-slf4j2-impl-2.25.2.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/org/joml/joml/1.10.8/joml-1.10.8.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/harrison/nucleation-perf/execution-next/vanilla/runtime/inner/META-INF/libraries/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar",
+        "org.nucleation.oracle.CommunityCapture12111",
+        "--mappings",
+        "/home/harrison/nucleation-perf/execution-next/vanilla/runtime/server.txt",
+        "--universe",
+        "/home/harrison/nucleation-perf/schematic-candidates/vanilla-idle/universe",
+        "--out",
+        "/home/harrison/nucleation-perf/schematic-candidates/vanilla-idle/capture.json",
+        "--scenario",
+        "/home/harrison/nucleation-perf/schematic-candidates/vanilla-idle/scenario.json"
+      ]
+    }
+  ],
+  "functional_checks": "not performed",
+  "capture": {
+    "sha256": "d137b334f7ccac221f1ce6098bd2a8f99df6d12f9c2f01ca01cc3554388d9e15",
+    "ticks": 320,
+    "players": 0,
+    "warmup_ticks": 14,
+    "java": "21.0.13+9-LTS",
+    "structural_capture_checks": "passed",
+    "functional_checks": "not performed"
+  },
+  "complete_capture": true
+}

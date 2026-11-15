@@ -1,0 +1,322 @@
+[
+  {
+    "tick": 24,
+    "a": 0,
+    "b": 0,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 48,
+    "a": 255,
+    "b": 0,
+    "equal": false,
+    "less": false,
+    "greater": true
+  },
+  {
+    "tick": 72,
+    "a": 255,
+    "b": 255,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 96,
+    "a": 0,
+    "b": 255,
+    "equal": false,
+    "less": true,
+    "greater": false
+  },
+  {
+    "tick": 120,
+    "a": 0,
+    "b": 0,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 144,
+    "a": 1,
+    "b": 0,
+    "equal": false,
+    "less": false,
+    "greater": true
+  },
+  {
+    "tick": 168,
+    "a": 1,
+    "b": 1,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 192,
+    "a": 0,
+    "b": 1,
+    "equal": false,
+    "less": true,
+    "greater": false
+  },
+  {
+    "tick": 216,
+    "a": 0,
+    "b": 0,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 240,
+    "a": 2,
+    "b": 0,
+    "equal": false,
+    "less": false,
+    "greater": true
+  },
+  {
+    "tick": 264,
+    "a": 2,
+    "b": 2,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 288,
+    "a": 0,
+    "b": 2,
+    "equal": false,
+    "less": true,
+    "greater": false
+  },
+  {
+    "tick": 312,
+    "a": 0,
+    "b": 0,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 336,
+    "a": 4,
+    "b": 0,
+    "equal": false,
+    "less": false,
+    "greater": true
+  },
+  {
+    "tick": 360,
+    "a": 4,
+    "b": 4,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 384,
+    "a": 0,
+    "b": 4,
+    "equal": false,
+    "less": true,
+    "greater": false
+  },
+  {
+    "tick": 408,
+    "a": 0,
+    "b": 0,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 432,
+    "a": 8,
+    "b": 0,
+    "equal": false,
+    "less": false,
+    "greater": true
+  },
+  {
+    "tick": 456,
+    "a": 8,
+    "b": 8,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 480,
+    "a": 0,
+    "b": 8,
+    "equal": false,
+    "less": true,
+    "greater": false
+  },
+  {
+    "tick": 504,
+    "a": 0,
+    "b": 0,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 528,
+    "a": 16,
+    "b": 0,
+    "equal": false,
+    "less": false,
+    "greater": true
+  },
+  {
+    "tick": 552,
+    "a": 16,
+    "b": 16,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 576,
+    "a": 0,
+    "b": 16,
+    "equal": false,
+    "less": true,
+    "greater": false
+  },
+  {
+    "tick": 600,
+    "a": 0,
+    "b": 0,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 624,
+    "a": 32,
+    "b": 0,
+    "equal": false,
+    "less": false,
+    "greater": true
+  },
+  {
+    "tick": 648,
+    "a": 32,
+    "b": 32,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 672,
+    "a": 0,
+    "b": 32,
+    "equal": false,
+    "less": true,
+    "greater": false
+  },
+  {
+    "tick": 696,
+    "a": 0,
+    "b": 0,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 720,
+    "a": 64,
+    "b": 0,
+    "equal": false,
+    "less": false,
+    "greater": true
+  },
+  {
+    "tick": 744,
+    "a": 64,
+    "b": 64,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 768,
+    "a": 0,
+    "b": 64,
+    "equal": false,
+    "less": true,
+    "greater": false
+  },
+  {
+    "tick": 792,
+    "a": 0,
+    "b": 0,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 816,
+    "a": 128,
+    "b": 0,
+    "equal": false,
+    "less": false,
+    "greater": true
+  },
+  {
+    "tick": 840,
+    "a": 128,
+    "b": 128,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 864,
+    "a": 0,
+    "b": 128,
+    "equal": false,
+    "less": true,
+    "greater": false
+  },
+  {
+    "tick": 888,
+    "a": 0,
+    "b": 0,
+    "equal": true,
+    "less": false,
+    "greater": false
+  },
+  {
+    "tick": 912,
+    "a": 1,
+    "b": 128,
+    "equal": false,
+    "less": true,
+    "greater": false
+  },
+  {
+    "tick": 936,
+    "a": 128,
+    "b": 1,
+    "equal": false,
+    "less": false,
+    "greater": true
+  },
+  {
+    "tick": 960,
+    "a": 0,
+    "b": 0,
+    "equal": true,
+    "less": false,
+    "greater": false
+  }
+]
