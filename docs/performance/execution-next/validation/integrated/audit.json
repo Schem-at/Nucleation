@@ -1,0 +1,10 @@
+{
+  "integrated/next_combined-verify.jsonl": 15,
+  "integrated/next_arena-verify.jsonl": 15,
+  "integrated/next_piston-verify.jsonl": 15,
+  "integrated/next_combined-fuzz.jsonl": 56,
+  "integrated/next_arena-fuzz.jsonl": 56,
+  "integrated/next_piston-fuzz.jsonl": 56,
+  "tests": 458,
+  "failed": 0
+}

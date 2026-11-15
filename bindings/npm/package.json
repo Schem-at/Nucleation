@@ -1,6 +1,6 @@
 {
   "name": "nucleation",
-  "version": "0.0.0-set-by-ci",
+  "version": "0.12.3",
   "description": "A high-performance Minecraft schematic parser and utility library",
   "type": "module",
   "main": "index.mjs",

@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "render_host": "harrison-work",
+  "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.0\nLLVM version: 22.1.8\n",
+  "host": "Linux 7.2.5-3-omarchy x86_64 GNU/Linux",
+  "final_binary_sha256": "3430873d848f902579fb660bdb5b7b9171b106492fc667a50a474613359ddc32  target/release/examples/render_archive_thumbnails\n7c86c3cc61cd20121fd828067822cf4c9b095b4ea2ed98b5f28523d352af3d04  target/release/examples/isolate_archive_plot\nbb8be6cb4f9ddd4a1b6d558dffcc6a9b6b4a8a8cf59a062eb296b1d946bbc149  target/release/examples/isolate_archive_floor_parts\n",
+  "binary_scope": "Snapshot after importer fixes. Earlier batch binary hashes were not recorded; these hashes are not attributed retroactively to those batches.",
+  "assets": [
+    {
+      "minecraft": "1.21.11",
+      "client_jar_sha256": "1473c9489ac50fda3c435049a76a70d61a10b8610db27f5ba9d8756b686cd3bd",
+      "asset_pack_sha256": "2c5fdf060e26e3b5ff1cd7bff5e661bd3eb312c57865da64ed5cc16ec71c2dd1",
+      "files": 8523,
+      "bytes": 4248260,
+      "source": "Local PrismLauncher Minecraft client JAR; assets only, no code executed"
+    },
+    {
+      "minecraft": "26.3",
+      "client_jar_sha256": "4508d006323f24fa02876310c192d739af56516eb259000ac50f0909a68c9a2d",
+      "asset_pack_sha256": "2e644feda86dd38e062b8a7eb6aa44f1d4a93aa84643af663cbe5a69c73fe620",
+      "files": 9662,
+      "bytes": 4687662,
+      "source": "Local PrismLauncher Minecraft client JAR; assets only, no code executed"
+    }
+  ],
+  "schematic_contents": 2321,
+  "rendered_contents": 2297,
+  "not_requested": 14,
+  "not_rendered": 10,
+  "unrendered_reasons": {
+    "mesher produced no triangles": 10
+  },
+  "png_bytes": 343194061,
+  "formats": {
+    "litematic": 2007,
+    "schematic": 198,
+    "classic_schematic": 59,
+    "structure_snbt": 33
+  },
+  "batch_counts": {
+    "floor-results.jsonl": {
+      "ok": 566
+    },
+    "legacy-results.jsonl": {
+      "ok": 59
+    },
+    "originals-12111-results.jsonl": {
+      "ok": 829,
+      "error": 6
+    },
+    "originals-newer-results.jsonl": {
+      "ok": 11,
+      "error": 1
+    },
+    "parts-results.jsonl": {
+      "ok": 883,
+      "error": 10
+    },
+    "pilot-results.jsonl": {
+      "ok": 4
+    },
+    "retry-12111-results.jsonl": {
+      "ok": 6,
+      "error": 1
+    },
+    "retry-newer-results.jsonl": {
+      "ok": 1
+    }
+  },
+  "verification": "Every successful source/PNG BLAKE3 checked, source/PNG SHA256 recorded, every PNG decoded and dimension checked by reconcile.",
+  "simulation_ticks": 0,
+  "scope": "Textured saved-state renders; zero simulated ticks. Rendering does not establish functionality or vanilla parity."
+}

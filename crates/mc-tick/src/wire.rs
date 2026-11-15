@@ -26,6 +26,16 @@ use crate::world::World;
 
 /// What the wire needs to know about everything that is not wire.
 pub trait WireWorld: Send + Sync {
+    /// Optional concrete-rule experiment. Implementations with observable or
+    /// custom query behavior keep the default exact evaluator.
+    #[cfg(feature = "experiment-wire-plan")]
+    fn planned_target(
+        &self,
+        _world: &World,
+        _outputs: &crate::behaviour::ComparatorOutputs,
+        _pos: Pos,
+    ) -> Option<u8> { None }
+
     /// Where this world's `(0, 0, 0)` sits in the game's coordinates.
     ///
     /// Only `updatePowerStrength`'s `HashSet<BlockPos>` needs it, and only
@@ -142,7 +152,7 @@ fn trace_side(
     can_connect_up: bool,
     climbed: bool,
 ) {
-    let Some(filter) = std::env::var_os("MC_TICK_TRACE_SIDE") else {
+    let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_SIDE") else {
         return;
     };
     let wanted = filter.to_string_lossy().split(';').any(|t| {
@@ -206,8 +216,47 @@ pub fn connection_state(
     sides
 }
 
+/// Demand-driven connectedness for the concrete vanilla rules. The public
+/// `WireWorld` trait does not promise pure queries, so its generic full-shape
+/// operation deliberately retains its original calls and order.
+#[cfg(feature = "experiment-directional")]
+pub(crate) fn connects_toward(
+    rules: &crate::vanilla::VanillaRules,
+    world: &World,
+    pos: Pos,
+    current: [WireSide; 4],
+    toward: Dir,
+) -> bool {
+    let can_connect_up = !rules.conductor(world, pos.offset(Dir::Up));
+    connected_toward_by(current, toward, |dir| {
+        connecting_side(rules, world, pos, dir, can_connect_up)
+    })
+}
+
+#[cfg(feature = "experiment-directional")]
+fn connected_toward_by(
+    current: [WireSide; 4],
+    toward: Dir,
+    mut raw_side: impl FnMut(Dir) -> WireSide,
+) -> bool {
+    let perpendicular = match toward {
+        Dir::North | Dir::South => [Dir::West, Dir::East],
+        Dir::West | Dir::East => [Dir::North, Dir::South],
+        _ => return false,
+    };
+    if raw_side(toward).connected() {
+        return true;
+    }
+    if perpendicular.into_iter().any(|dir| raw_side(dir).connected()) {
+        return false;
+    }
+    // With no perpendicular connection, symmetry fills this side unless the
+    // stored state was a dot and every raw side remains disconnected.
+    current.iter().any(|side| side.connected()) || raw_side(toward.opposite()).connected()
+}
+
 /// `getIncomingWireSignal`: the strongest neighbouring wire, minus one.
-fn incoming(rules: &dyn WireWorld, world: &World, pos: Pos) -> u8 {
+pub(crate) fn incoming(rules: &dyn WireWorld, world: &World, pos: Pos) -> u8 {
     let mut best = 0u8;
     let covered = rules.conductor(world, pos.offset(Dir::Up));
     for dir in [Dir::North, Dir::South, Dir::West, Dir::East] {
@@ -234,41 +283,40 @@ fn incoming(rules: &dyn WireWorld, world: &World, pos: Pos) -> u8 {
 /// `Vec3i.hashCode()` = `(y + z·31)·31 + x`, chains appended, iterated bucket
 /// by bucket.
 pub fn java_hash_order(pos: Pos, origin: Pos) -> Vec<Pos> {
-    let mut entries: Vec<Pos> = vec![pos];
-    for dir in crate::pos::JAVA_DIRECTIONS {
-        entries.push(pos.offset(dir));
+    java_hash_order_array(pos, origin).to_vec()
+}
+
+fn java_hash_order_array(pos: Pos, origin: Pos) -> [Pos; 7] {
+    let mut entries = [pos; 7];
+    for (i, dir) in crate::pos::JAVA_DIRECTIONS.into_iter().enumerate() {
+        entries[i + 1] = pos.offset(dir);
     }
-    let mut buckets: Vec<Vec<Pos>> = vec![Vec::new(); 16];
-    for p in entries {
-        // `BlockPos.hashCode` runs on the position the game holds, which is a
-        // *world* position. This engine's world is zero-based, so the two agree
-        // only when the build happens to sit at the origin. They differ by a
-        // constant offset, and a constant offset does not preserve the bucket:
-        // a dust cell at local y=2 and world y=102 hands `updateNeighborsAt`
-        // its seven positions in genuinely different orders.
-        let (x, y, z) = (
-            p.x.wrapping_add(origin.x),
-            p.y.wrapping_add(origin.y),
-            p.z.wrapping_add(origin.z),
-        );
-        let hash = y
-            .wrapping_add(z.wrapping_mul(31))
-            .wrapping_mul(31)
-            .wrapping_add(x);
-        let spread = hash ^ (((hash as u32) >> 16) as i32);
-        buckets[(spread & 15) as usize].push(p);
-    }
-    buckets.into_iter().flatten().collect()
+    // Stable sorting retains insertion order within a Java bucket collision.
+    // Seven entries cannot resize the sixteen-bucket table.
+    entries.sort_by_key(|p| {
+        let x = p.x.wrapping_add(origin.x);
+        let y = p.y.wrapping_add(origin.y);
+        let z = p.z.wrapping_add(origin.z);
+        let hash = y.wrapping_add(z.wrapping_mul(31)).wrapping_mul(31).wrapping_add(x);
+        (hash ^ (((hash as u32) >> 16) as i32)) & 15
+    });
+    entries
 }
 
 /// `DefaultRedstoneWireEvaluator.updatePowerStrength` for the wire at `pos`.
 pub fn update_power_strength(rules: &dyn WireWorld, ctx: &mut TickCtx<'_>, pos: Pos, current: u8) {
+    #[cfg(feature = "experiment-wire-plan")]
+    let planned = rules.planned_target(ctx.world, ctx.comparator_out, pos);
+    #[cfg(not(feature = "experiment-wire-plan"))]
+    let planned: Option<u8> = None;
+    let target = planned.unwrap_or_else(|| {
     let block = rules.block_signal(ctx, pos);
-    let target = if block == 15 {
+    if block == 15 {
         15
     } else {
         block.max(incoming(rules, ctx.world, pos))
-    };
+    }
+    });
     if target == current {
         return;
     }
@@ -278,7 +326,7 @@ pub fn update_power_strength(rules: &dyn WireWorld, ctx: &mut TickCtx<'_>, pos: 
         ctx.set_shape_only(pos, state);
     }
     // Seven updateNeighborsAt entries, in the HashSet's iteration order.
-    for p in java_hash_order(pos, rules.hash_origin()) {
+    for p in java_hash_order_array(pos, rules.hash_origin()) {
         ctx.update_neighbors_at(p);
     }
 }
@@ -477,6 +525,84 @@ mod tests {
     }
 }
 
+#[cfg(all(test, feature = "experiment-directional"))]
+mod directional_tests {
+    use super::*;
+    use crate::pos::Bounds;
+
+    struct RawSides([WireSide; 4]);
+
+    impl RawSides {
+        fn at(&self, pos: Pos) -> WireSide {
+            WIRE_SIDES.into_iter().position(|dir| {
+                let (x, _, z) = dir.delta();
+                pos.x == x && pos.z == z
+            }).map_or(WireSide::None, |index| self.0[index])
+        }
+    }
+
+    // Materialize every possible raw result through the original public shape
+    // calculation, so the oracle includes its dot and axis-symmetry behavior.
+    impl WireWorld for RawSides {
+        fn block_signal(&self, _: &TickCtx<'_>, _: Pos) -> u8 { 0 }
+        fn conductor(&self, _: &World, pos: Pos) -> bool {
+            pos.y == 0 && self.at(pos) == WireSide::None
+        }
+        fn wire_power(&self, _: &World, _: Pos) -> Option<u8> { None }
+        fn wire_with_power(&self, _: &World, _: Pos, _: u8) -> Option<StateId> { None }
+        fn wire_shape(&self, _: &World, _: Pos) -> Option<(u8, [WireSide; 4])> { None }
+        fn wire_with_shape(&self, _: u8, _: [WireSide; 4]) -> Option<StateId> { None }
+        fn should_connect_to(&self, _: &World, pos: Pos, from: Option<Dir>) -> bool {
+            (pos.y == 1 && from.is_none() && self.at(pos) == WireSide::Up)
+                || (pos.y == 0 && from.is_some() && self.at(pos) == WireSide::Side)
+        }
+        fn sturdy_up(&self, _: &World, pos: Pos) -> bool {
+            pos.y == 0 && self.at(pos) == WireSide::Up
+        }
+        fn full_block(&self, _: &World, pos: Pos) -> bool {
+            pos.y == 0 && self.at(pos) == WireSide::Up
+        }
+    }
+
+    fn sides(mut value: usize) -> [WireSide; 4] {
+        std::array::from_fn(|_| {
+            let side = [WireSide::None, WireSide::Side, WireSide::Up][value % 3];
+            value /= 3;
+            side
+        })
+    }
+
+    #[test]
+    fn directional_answer_matches_all_raw_and_stored_shapes() {
+        let pos = Pos::new(0, 0, 0);
+        let world = World::new(Bounds::new(Pos::new(-2, -2, -2), Pos::new(2, 2, 2)));
+        for raw in 0..81 {
+            let rules = RawSides(sides(raw));
+            for stored in 0..81 {
+                let current = sides(stored);
+                let expected = connection_state(&rules, &world, pos, current);
+                for (index, toward) in WIRE_SIDES.into_iter().enumerate() {
+                    let actual = connected_toward_by(current, toward, |dir| {
+                        connecting_side(&rules, &world, pos, dir, true)
+                    });
+                    assert_eq!(actual, expected[index].connected(),
+                        "raw={raw} stored={stored} toward={toward:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn already_connected_direction_does_not_query_other_sides() {
+        let mut calls = Vec::new();
+        assert!(connected_toward_by([WireSide::None; 4], Dir::North, |dir| {
+            calls.push(dir);
+            WireSide::Up
+        }));
+        assert_eq!(calls, [Dir::North]);
+    }
+}
+
 #[cfg(test)]
 mod hash_order_ground_truth {
     use super::*;
@@ -671,5 +797,47 @@ mod hash_origin_matters {
             ],
         );
         assert_ne!(at_origin, in_world, "the offset must not be a no-op");
+    }
+}
+
+#[cfg(test)]
+mod ordering_tests {
+    use super::*;
+fn bucket_reference(pos: Pos, origin: Pos) -> Vec<Pos> {
+    let mut entries: Vec<Pos> = vec![pos];
+    for dir in crate::pos::JAVA_DIRECTIONS {
+        entries.push(pos.offset(dir));
+    }
+    let mut buckets: Vec<Vec<Pos>> = vec![Vec::new(); 16];
+    for p in entries {
+        // `BlockPos.hashCode` runs on the position the game holds, which is a
+        // *world* position. This engine's world is zero-based, so the two agree
+        // only when the build happens to sit at the origin. They differ by a
+        // constant offset, and a constant offset does not preserve the bucket:
+        // a dust cell at local y=2 and world y=102 hands `updateNeighborsAt`
+        // its seven positions in genuinely different orders.
+        let (x, y, z) = (
+            p.x.wrapping_add(origin.x),
+            p.y.wrapping_add(origin.y),
+            p.z.wrapping_add(origin.z),
+        );
+        let hash = y
+            .wrapping_add(z.wrapping_mul(31))
+            .wrapping_mul(31)
+            .wrapping_add(x);
+        let spread = hash ^ (((hash as u32) >> 16) as i32);
+        buckets[(spread & 15) as usize].push(p);
+    }
+    buckets.into_iter().flatten().collect()
+}
+
+    #[test]
+    fn array_matches_java_bucket_reference() {
+        let origins = [Pos::new(0,0,0), Pos::new(0,100,0), Pos::new(-31,-19,63),
+            Pos::new(i32::MAX,i32::MIN,i32::MAX), Pos::new(i32::MIN,i32::MAX,i32::MIN)];
+        for x in -10..10 { for y in -3..4 { for z in -2..3 {
+            let p = Pos::new(x,y,z);
+            for origin in origins { assert_eq!(java_hash_order_array(p, origin).as_slice(), bucket_reference(p,origin)); }
+        } } }
     }
 }

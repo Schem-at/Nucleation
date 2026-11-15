@@ -1,0 +1,583 @@
+{
+  "baseline": "feature_free_pgo",
+  "source": "docs/performance/execution-next/results/final-timings.jsonl",
+  "resamples": 10000,
+  "results": [
+    {
+      "case": "hipster",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 8.647446933333333,
+      "cpu_speedup": 1.440441997431473,
+      "cpu_ci95": [
+        1.4287345112363934,
+        1.4630715813669735
+      ],
+      "wall_ms": 8.670072333333334,
+      "wall_speedup": 1.4412908050709456,
+      "wall_ci95": [
+        1.427537498135596,
+        1.4619951514379832
+      ]
+    },
+    {
+      "case": "hipster",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 8.957124199999999,
+      "cpu_speedup": 1.3906411762531252,
+      "cpu_ci95": [
+        1.3786515329712234,
+        1.4099494849782233
+      ],
+      "wall_ms": 8.9877016,
+      "wall_speedup": 1.3903549638689978,
+      "wall_ci95": [
+        1.3785628063451105,
+        1.409037634271258
+      ]
+    },
+    {
+      "case": "hipster_unrecorded",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 8.6490266,
+      "cpu_speedup": 1.446112891671147,
+      "cpu_ci95": [
+        1.4119782824609333,
+        1.4830092004119448
+      ],
+      "wall_ms": 8.677827800000001,
+      "wall_speedup": 1.4455644994476613,
+      "wall_ci95": [
+        1.4121820076978389,
+        1.483435843106549
+      ]
+    },
+    {
+      "case": "hipster_unrecorded",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 9.027180533333333,
+      "cpu_speedup": 1.3855343670686755,
+      "cpu_ci95": [
+        1.3720206174474854,
+        1.4223160224912457
+      ],
+      "wall_ms": 9.057060266666667,
+      "wall_speedup": 1.3850365825838529,
+      "wall_ci95": [
+        1.3721061273985224,
+        1.424231708152182
+      ]
+    },
+    {
+      "case": "hipster_updates",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 9.40779176923077,
+      "cpu_speedup": 1.4032717953358025,
+      "cpu_ci95": [
+        1.3712839989236958,
+        1.4223416719627944
+      ],
+      "wall_ms": 9.447280692307691,
+      "wall_speedup": 1.402194676304453,
+      "wall_ci95": [
+        1.3720254737291055,
+        1.4220115402903952
+      ]
+    },
+    {
+      "case": "hipster_updates",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 9.731453615384616,
+      "cpu_speedup": 1.3565998840381952,
+      "cpu_ci95": [
+        1.3303722358802639,
+        1.3770420486062975
+      ],
+      "wall_ms": 9.773540461538461,
+      "wall_speedup": 1.3553866937409171,
+      "wall_ci95": [
+        1.3299253936847613,
+        1.3769716615239376
+      ]
+    },
+    {
+      "case": "hipster_timeline",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 8.965257666666666,
+      "cpu_speedup": 1.4148661575928678,
+      "cpu_ci95": [
+        1.3919864014564662,
+        1.4612007900310084
+      ],
+      "wall_ms": 9.001030133333332,
+      "wall_speedup": 1.413827092916743,
+      "wall_ci95": [
+        1.3914509696569808,
+        1.4617479970530014
+      ]
+    },
+    {
+      "case": "hipster_timeline",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 9.034192133333333,
+      "cpu_speedup": 1.4040701680302246,
+      "cpu_ci95": [
+        1.3684442359045519,
+        1.4259705294235165
+      ],
+      "wall_ms": 9.063562733333333,
+      "wall_speedup": 1.4040726192432305,
+      "wall_ci95": [
+        1.367257767441574,
+        1.425763381162398
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 1.5818006136363636,
+      "cpu_speedup": 1.1154838328879717,
+      "cpu_ci95": [
+        1.0963432973243805,
+        1.1387324863945103
+      ],
+      "wall_ms": 1.5869710340909091,
+      "wall_speedup": 1.1153163125199104,
+      "wall_ci95": [
+        1.0968330739778736,
+        1.1388423443600906
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 1.5543335340909092,
+      "cpu_speedup": 1.1351958718407453,
+      "cpu_ci95": [
+        1.120494734695414,
+        1.160698446905373
+      ],
+      "wall_ms": 1.5596442386363636,
+      "wall_speedup": 1.1348579618168022,
+      "wall_ci95": [
+        1.1215694195079216,
+        1.160123186018245
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.14325686866359447,
+      "cpu_speedup": 0.9658357314752892,
+      "cpu_ci95": [
+        0.9464258389664303,
+        0.9813307930103665
+      ],
+      "wall_ms": 0.1435803525345622,
+      "wall_speedup": 0.9651257834671905,
+      "wall_ci95": [
+        0.9462447873480132,
+        0.9828486327578758
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.13266550576036865,
+      "cpu_speedup": 1.0429433162866324,
+      "cpu_ci95": [
+        1.0301337362836207,
+        1.0580190117851234
+      ],
+      "wall_ms": 0.1329364758064516,
+      "wall_speedup": 1.0424008865119139,
+      "wall_ci95": [
+        1.0296194160920178,
+        1.0582249950435332
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 7.5098334705882355,
+      "cpu_speedup": 1.0393540018107552,
+      "cpu_ci95": [
+        1.0039749513724052,
+        1.0613138006028997
+      ],
+      "wall_ms": 7.537247,
+      "wall_speedup": 1.039019075766617,
+      "wall_ci95": [
+        1.004112299991686,
+        1.0637626132201308
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 7.771940235294117,
+      "cpu_speedup": 1.004302044828173,
+      "cpu_ci95": [
+        0.9781095248608629,
+        1.0307378063058763
+      ],
+      "wall_ms": 7.800434235294118,
+      "wall_speedup": 1.0039624943353456,
+      "wall_ci95": [
+        0.9785883754120628,
+        1.0310447804349674
+      ]
+    },
+    {
+      "case": "adder_idle",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.013190660484789328,
+      "cpu_speedup": 1.0230153574751004,
+      "cpu_ci95": [
+        0.9913903679690722,
+        1.0460741984713606
+      ],
+      "wall_ms": 0.01308334748657882,
+      "wall_speedup": 1.023083573366273,
+      "wall_ci95": [
+        0.992036979963523,
+        1.0463876157969476
+      ]
+    },
+    {
+      "case": "adder_idle",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.013998702131120871,
+      "cpu_speedup": 0.9639642393118738,
+      "cpu_ci95": [
+        0.9446306678610018,
+        1.0038012240338163
+      ],
+      "wall_ms": 0.013897832763949895,
+      "wall_speedup": 0.9631255552939507,
+      "wall_ci95": [
+        0.9445193361366101,
+        1.004292178016498
+      ]
+    },
+    {
+      "case": "hipster_load",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 2.381828761904762,
+      "cpu_speedup": 0.983480207271974,
+      "cpu_ci95": [
+        0.9743222275949849,
+        0.9998072583164693
+      ],
+      "wall_ms": 2.3907736666666666,
+      "wall_speedup": 0.9834370412112263,
+      "wall_ci95": [
+        0.9734432292006312,
+        0.9993570418285271
+      ]
+    },
+    {
+      "case": "hipster_load",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 2.3431744285714284,
+      "cpu_speedup": 0.9997042541440646,
+      "cpu_ci95": [
+        0.9793687765516377,
+        1.013276377435795
+      ],
+      "wall_ms": 2.351000888888889,
+      "wall_speedup": 1.0000742203307182,
+      "wall_ci95": [
+        0.9782693965434769,
+        1.0123951642811664
+      ]
+    },
+    {
+      "case": "comparator_drain",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.006806083152566884,
+      "cpu_speedup": 1.0274092110167043,
+      "cpu_ci95": [
+        1.0058483647097567,
+        1.0402285826811961
+      ],
+      "wall_ms": 0.006700853056961517,
+      "wall_speedup": 1.0270447094399677,
+      "wall_ci95": [
+        1.0063804756636514,
+        1.038666319250366
+      ]
+    },
+    {
+      "case": "comparator_drain",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.00690531381055676,
+      "cpu_speedup": 1.0126451474518905,
+      "cpu_ci95": [
+        0.9967252496229001,
+        1.0311051452689974
+      ],
+      "wall_ms": 0.006794678798103961,
+      "wall_speedup": 1.0128625480879814,
+      "wall_ci95": [
+        0.996258899586291,
+        1.0316164083438073
+      ]
+    },
+    {
+      "case": "item_into_hopper",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.003973127709090909,
+      "cpu_speedup": 0.9898468815207385,
+      "cpu_ci95": [
+        0.9636803994068349,
+        1.0193851272030934
+      ],
+      "wall_ms": 0.0038516106181818183,
+      "wall_speedup": 0.9898661205804383,
+      "wall_ci95": [
+        0.9682481786101027,
+        1.0196537809864565
+      ]
+    },
+    {
+      "case": "item_into_hopper",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.003982482375757576,
+      "cpu_speedup": 0.987521777037155,
+      "cpu_ci95": [
+        0.979562758984431,
+        1.0207534344670945
+      ],
+      "wall_ms": 0.0038573334303030303,
+      "wall_speedup": 0.9883975366647384,
+      "wall_ci95": [
+        0.9797870101052419,
+        1.0208110794091498
+      ]
+    },
+    {
+      "case": "item_sorter",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.6954453333333334,
+      "cpu_speedup": 1.0559862924242809,
+      "cpu_ci95": [
+        1.042034824745496,
+        1.0660565354186449
+      ],
+      "wall_ms": 0.6975394710144928,
+      "wall_speedup": 1.0557451286300386,
+      "wall_ci95": [
+        1.0391783869199032,
+        1.0666908407205513
+      ]
+    },
+    {
+      "case": "item_sorter",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.6854909782608695,
+      "cpu_speedup": 1.0713207940294145,
+      "cpu_ci95": [
+        1.061522751396449,
+        1.0804182425522664
+      ],
+      "wall_ms": 0.6878733623188406,
+      "wall_speedup": 1.0705806313944457,
+      "wall_ci95": [
+        1.0611545950488572,
+        1.0807822410078611
+      ]
+    },
+    {
+      "case": "hopper_transfer_speed",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.467585875,
+      "cpu_speedup": 1.0101862750523278,
+      "cpu_ci95": [
+        0.9826652925074607,
+        1.0287229090699372
+      ],
+      "wall_ms": 0.46878900520833333,
+      "wall_speedup": 1.010554821721557,
+      "wall_ci95": [
+        0.980692679103218,
+        1.0285855136352007
+      ]
+    },
+    {
+      "case": "hopper_transfer_speed",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.4748107604166667,
+      "cpu_speedup": 0.9948149298866502,
+      "cpu_ci95": [
+        0.9647487260286938,
+        1.0213816157894484
+      ],
+      "wall_ms": 0.4760511510416667,
+      "wall_speedup": 0.9951388386452388,
+      "wall_ci95": [
+        0.9653314446415867,
+        1.0226677110307953
+      ]
+    },
+    {
+      "case": "hopper_storagecart_interaction",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.2952624860215054,
+      "cpu_speedup": 0.9887786013416048,
+      "cpu_ci95": [
+        0.9759210101790892,
+        1.0058194641676659
+      ],
+      "wall_ms": 0.29596258494623656,
+      "wall_speedup": 0.9889033924819994,
+      "wall_ci95": [
+        0.9741709959901355,
+        1.0046667751784994
+      ]
+    },
+    {
+      "case": "hopper_storagecart_interaction",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.2964903182795699,
+      "cpu_speedup": 0.9846838495471588,
+      "cpu_ci95": [
+        0.9694086122502449,
+        0.9939158986987177
+      ],
+      "wall_ms": 0.297236711827957,
+      "wall_speedup": 0.9846643858396599,
+      "wall_ci95": [
+        0.9693300814062613,
+        0.9939064532260738
+      ]
+    },
+    {
+      "case": "comparator_update_collection",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.28228946547884187,
+      "cpu_speedup": 1.1259747986496351,
+      "cpu_ci95": [
+        1.0902212617673324,
+        1.143763214886957
+      ],
+      "wall_ms": 0.283024140311804,
+      "wall_speedup": 1.1256687328464878,
+      "wall_ci95": [
+        1.089779100880333,
+        1.1435699158453856
+      ]
+    },
+    {
+      "case": "comparator_update_collection",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.2755130645879733,
+      "cpu_speedup": 1.1536687907297407,
+      "cpu_ci95": [
+        1.1270208118605174,
+        1.16695050751935
+      ],
+      "wall_ms": 0.2762291759465479,
+      "wall_speedup": 1.153359069685689,
+      "wall_ci95": [
+        1.1271979112852655,
+        1.1666955620089983
+      ]
+    },
+    {
+      "case": "trapdoor2x3",
+      "variant": "previous_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.6367375794871796,
+      "cpu_speedup": 1.1255535066138584,
+      "cpu_ci95": [
+        1.1070108196084287,
+        1.1581921673676754
+      ],
+      "wall_ms": 0.6386233794871794,
+      "wall_speedup": 1.1260957955244102,
+      "wall_ci95": [
+        1.1077201596555106,
+        1.1586696785630077
+      ]
+    },
+    {
+      "case": "trapdoor2x3",
+      "variant": "selected_pgo",
+      "reference": "feature_free_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.6105198923076923,
+      "cpu_speedup": 1.1738883931785453,
+      "cpu_ci95": [
+        1.135038461394626,
+        1.2040466476654723
+      ],
+      "wall_ms": 0.6121475076923077,
+      "wall_speedup": 1.1748003439157668,
+      "wall_ci95": [
+        1.133780561014565,
+        1.2041356962668783
+      ]
+    }
+  ]
+}

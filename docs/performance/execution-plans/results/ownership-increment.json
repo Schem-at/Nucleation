@@ -1,0 +1,115 @@
+{
+  "baseline": "baseline",
+  "source": "/home/harrison/nucleation-perf/execution-owner/timings.jsonl",
+  "resamples": 10000,
+  "results": [
+    {
+      "case": "hipster",
+      "variant": "owner_selected",
+      "reference": "rules_selected",
+      "rounds": 9,
+      "cpu_ms": 10.915526,
+      "cpu_speedup": 0.9681619633660653,
+      "cpu_ci95": [
+        0.9431913472076917,
+        1.0023882360060514
+      ],
+      "wall_ms": 10.968417333333335,
+      "wall_speedup": 0.9683347509388469,
+      "wall_ci95": [
+        0.9379593158696201,
+        1.003872511006754
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "owner_selected",
+      "reference": "rules_selected",
+      "rounds": 9,
+      "cpu_ms": 1.7702850506329115,
+      "cpu_speedup": 0.9869288160622975,
+      "cpu_ci95": [
+        0.961285152336953,
+        1.0097503609922283
+      ],
+      "wall_ms": 1.7771836075949365,
+      "wall_speedup": 0.9873135637275036,
+      "wall_ci95": [
+        0.9602917913712026,
+        1.0093503798424832
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "owner_selected",
+      "reference": "rules_selected",
+      "rounds": 9,
+      "cpu_ms": 0.1738789005524862,
+      "cpu_speedup": 0.9756068799517895,
+      "cpu_ci95": [
+        0.834930237887691,
+        1.0193977254552637
+      ],
+      "wall_ms": 0.17428279143646408,
+      "wall_speedup": 0.9756133703478569,
+      "wall_ci95": [
+        0.834909556790316,
+        1.0193211300931513
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "owner_selected",
+      "reference": "rules_selected",
+      "rounds": 9,
+      "cpu_ms": 9.025489625,
+      "cpu_speedup": 0.9950480941359454,
+      "cpu_ci95": [
+        0.9677541940003059,
+        1.0247583538152565
+      ],
+      "wall_ms": 9.0687956875,
+      "wall_speedup": 0.9940184588043186,
+      "wall_ci95": [
+        0.9665212713504524,
+        1.0259434072324396
+      ]
+    },
+    {
+      "case": "item_sorter",
+      "variant": "owner_selected",
+      "reference": "rules_selected",
+      "rounds": 9,
+      "cpu_ms": 1.145197543478261,
+      "cpu_speedup": 0.9936310652713728,
+      "cpu_ci95": [
+        0.9629218381903948,
+        1.0311432919425065
+      ],
+      "wall_ms": 1.1494175507246378,
+      "wall_speedup": 0.9942916772301978,
+      "wall_ci95": [
+        0.9638495275288217,
+        1.0323780258421016
+      ]
+    },
+    {
+      "case": "trapdoor2x3",
+      "variant": "owner_selected",
+      "reference": "rules_selected",
+      "rounds": 9,
+      "cpu_ms": 0.7918421843575418,
+      "cpu_speedup": 0.999508317183371,
+      "cpu_ci95": [
+        0.9624056688702234,
+        1.0238701508964438
+      ],
+      "wall_ms": 0.7946507765363129,
+      "wall_speedup": 0.9987251980665214,
+      "wall_ci95": [
+        0.9628297727121895,
+        1.0239107290757972
+      ]
+    }
+  ]
+}

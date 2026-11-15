@@ -1,0 +1,187 @@
+{
+  "baseline": "retained",
+  "source": "/home/harrison/nucleation-perf/packed-pilot.jsonl",
+  "resamples": 10000,
+  "results": [
+    {
+      "case": "hipster",
+      "variant": "packed",
+      "reference": "retained",
+      "rounds": 9,
+      "cpu_ms": 14.2012445,
+      "cpu_speedup": 1.0033873087672,
+      "cpu_ci95": [
+        0.9836541874284237,
+        1.0157426897098631
+      ],
+      "wall_ms": 14.247709833333333,
+      "wall_speedup": 1.003366611235146,
+      "wall_ci95": [
+        0.9835506104869078,
+        1.0155599539971716
+      ]
+    },
+    {
+      "case": "hipster",
+      "variant": "retained",
+      "reference": "retained",
+      "rounds": 9,
+      "cpu_ms": 14.2493485,
+      "cpu_speedup": 1.0,
+      "cpu_ci95": [
+        1.0,
+        1.0
+      ],
+      "wall_ms": 14.295676333333335,
+      "wall_speedup": 1.0,
+      "wall_ci95": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "packed",
+      "reference": "retained",
+      "rounds": 9,
+      "cpu_ms": 1.9700611162790698,
+      "cpu_speedup": 0.9875567194066981,
+      "cpu_ci95": [
+        0.9662017161797908,
+        1.015478672199852
+      ],
+      "wall_ms": 1.9771948372093022,
+      "wall_speedup": 0.9865815061596899,
+      "wall_ci95": [
+        0.966288913725544,
+        1.0159599026941835
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "retained",
+      "reference": "retained",
+      "rounds": 9,
+      "cpu_ms": 1.9455470930232557,
+      "cpu_speedup": 1.0,
+      "cpu_ci95": [
+        1.0,
+        1.0
+      ],
+      "wall_ms": 1.9506638604651163,
+      "wall_speedup": 1.0,
+      "wall_ci95": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "packed",
+      "reference": "retained",
+      "rounds": 9,
+      "cpu_ms": 0.16963684090909092,
+      "cpu_speedup": 0.9726649080971235,
+      "cpu_ci95": [
+        0.9559878606495722,
+        0.9851774509666387
+      ],
+      "wall_ms": 0.169899125,
+      "wall_speedup": 0.9732163530458547,
+      "wall_ci95": [
+        0.9567069009865522,
+        0.9854419017324964
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "retained",
+      "reference": "retained",
+      "rounds": 9,
+      "cpu_ms": 0.1649998022727273,
+      "cpu_speedup": 1.0,
+      "cpu_ci95": [
+        1.0,
+        1.0
+      ],
+      "wall_ms": 0.1653486068181818,
+      "wall_speedup": 1.0,
+      "wall_ci95": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "retained",
+      "reference": "retained",
+      "rounds": 9,
+      "cpu_ms": 8.7736886,
+      "cpu_speedup": 1.0,
+      "cpu_ci95": [
+        1.0,
+        1.0
+      ],
+      "wall_ms": 8.8089096,
+      "wall_speedup": 1.0,
+      "wall_ci95": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "packed",
+      "reference": "retained",
+      "rounds": 9,
+      "cpu_ms": 8.8732185,
+      "cpu_speedup": 0.9887831117874534,
+      "cpu_ci95": [
+        0.9667019760457748,
+        1.032392079604486
+      ],
+      "wall_ms": 8.9097855,
+      "wall_speedup": 0.9886780776035518,
+      "wall_ci95": [
+        0.9659728969790938,
+        1.0314509142784638
+      ]
+    },
+    {
+      "case": "hipster_load",
+      "variant": "retained",
+      "reference": "retained",
+      "rounds": 9,
+      "cpu_ms": 2.61038890625,
+      "cpu_speedup": 1.0,
+      "cpu_ci95": [
+        1.0,
+        1.0
+      ],
+      "wall_ms": 2.62033446875,
+      "wall_speedup": 1.0,
+      "wall_ci95": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "case": "hipster_load",
+      "variant": "packed",
+      "reference": "retained",
+      "rounds": 9,
+      "cpu_ms": 2.71926971875,
+      "cpu_speedup": 0.959959539228771,
+      "cpu_ci95": [
+        0.9211329670386845,
+        0.9921928997071191
+      ],
+      "wall_ms": 2.732148625,
+      "wall_speedup": 0.959074643587517,
+      "wall_ci95": [
+        0.9207021002209045,
+        0.9921443430612626
+      ]
+    }
+  ]
+}

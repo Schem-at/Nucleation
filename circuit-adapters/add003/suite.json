@@ -1,0 +1,4099 @@
+{
+  "schema_version": 1,
+  "adapter": "add003",
+  "oracle": "Independent unsigned arithmetic: total=a+b+cin; sum=total&255; cout=total>=256. Carry boundaries, walking bits, transitions, and 128 deterministic pseudorandom operand pairs; not exhaustive.",
+  "vectors": [
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 0,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 1,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 255,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 255,
+        "cin": false
+      },
+      "expected": {
+        "sum": 255,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 255,
+        "cin": true
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 255,
+        "cin": false
+      },
+      "expected": {
+        "sum": 254,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 255,
+        "cin": true
+      },
+      "expected": {
+        "sum": 255,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 128,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 129,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "cin": false
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "cin": true
+      },
+      "expected": {
+        "sum": 1,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 170,
+        "cin": false
+      },
+      "expected": {
+        "sum": 255,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 170,
+        "cin": true
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 85,
+        "cin": false
+      },
+      "expected": {
+        "sum": 255,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 85,
+        "cin": true
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 85,
+        "cin": false
+      },
+      "expected": {
+        "sum": 170,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 85,
+        "cin": true
+      },
+      "expected": {
+        "sum": 171,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 170,
+        "cin": false
+      },
+      "expected": {
+        "sum": 84,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 170,
+        "cin": true
+      },
+      "expected": {
+        "sum": 85,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 1,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 2,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 1,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 2,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 2,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 3,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 1,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 2,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 254,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 255,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 254,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 0,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 1,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 2,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 3,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 2,
+        "cin": false
+      },
+      "expected": {
+        "sum": 2,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 2,
+        "cin": true
+      },
+      "expected": {
+        "sum": 3,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 2,
+        "cin": false
+      },
+      "expected": {
+        "sum": 4,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 2,
+        "cin": true
+      },
+      "expected": {
+        "sum": 5,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 2,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 3,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 253,
+        "b": 2,
+        "cin": false
+      },
+      "expected": {
+        "sum": 255,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 253,
+        "b": 2,
+        "cin": true
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 0,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 1,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 4,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 5,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 4,
+        "cin": false
+      },
+      "expected": {
+        "sum": 4,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 4,
+        "cin": true
+      },
+      "expected": {
+        "sum": 5,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 4,
+        "cin": false
+      },
+      "expected": {
+        "sum": 8,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 4,
+        "cin": true
+      },
+      "expected": {
+        "sum": 9,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 4,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 5,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 251,
+        "b": 4,
+        "cin": false
+      },
+      "expected": {
+        "sum": 255,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 251,
+        "b": 4,
+        "cin": true
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 0,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 1,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 8,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 9,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 8,
+        "cin": false
+      },
+      "expected": {
+        "sum": 8,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 8,
+        "cin": true
+      },
+      "expected": {
+        "sum": 9,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 8,
+        "cin": false
+      },
+      "expected": {
+        "sum": 16,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 8,
+        "cin": true
+      },
+      "expected": {
+        "sum": 17,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 7,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 8,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 7,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 9,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 247,
+        "b": 8,
+        "cin": false
+      },
+      "expected": {
+        "sum": 255,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 247,
+        "b": 8,
+        "cin": true
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 0,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 1,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 16,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 17,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 16,
+        "cin": false
+      },
+      "expected": {
+        "sum": 16,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 16,
+        "cin": true
+      },
+      "expected": {
+        "sum": 17,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 16,
+        "cin": false
+      },
+      "expected": {
+        "sum": 32,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 16,
+        "cin": true
+      },
+      "expected": {
+        "sum": 33,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 15,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 16,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 15,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 17,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 239,
+        "b": 16,
+        "cin": false
+      },
+      "expected": {
+        "sum": 255,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 239,
+        "b": 16,
+        "cin": true
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 0,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 1,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 32,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 33,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 32,
+        "cin": false
+      },
+      "expected": {
+        "sum": 32,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 32,
+        "cin": true
+      },
+      "expected": {
+        "sum": 33,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 32,
+        "cin": false
+      },
+      "expected": {
+        "sum": 64,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 32,
+        "cin": true
+      },
+      "expected": {
+        "sum": 65,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 32,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 33,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 223,
+        "b": 32,
+        "cin": false
+      },
+      "expected": {
+        "sum": 255,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 223,
+        "b": 32,
+        "cin": true
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 0,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 1,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 64,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 65,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 64,
+        "cin": false
+      },
+      "expected": {
+        "sum": 64,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 64,
+        "cin": true
+      },
+      "expected": {
+        "sum": 65,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 64,
+        "cin": false
+      },
+      "expected": {
+        "sum": 128,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 64,
+        "cin": true
+      },
+      "expected": {
+        "sum": 129,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 63,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 64,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 63,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 65,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 191,
+        "b": 64,
+        "cin": false
+      },
+      "expected": {
+        "sum": 255,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 191,
+        "b": 64,
+        "cin": true
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 0,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 1,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 128,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 129,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 128,
+        "cin": false
+      },
+      "expected": {
+        "sum": 128,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 128,
+        "cin": true
+      },
+      "expected": {
+        "sum": 129,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "cin": false
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "cin": true
+      },
+      "expected": {
+        "sum": 1,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 128,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 129,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 128,
+        "cin": false
+      },
+      "expected": {
+        "sum": 255,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 128,
+        "cin": true
+      },
+      "expected": {
+        "sum": 0,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": false
+      },
+      "expected": {
+        "sum": 0,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "cin": true
+      },
+      "expected": {
+        "sum": 1,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 214,
+        "b": 246,
+        "cin": false
+      },
+      "expected": {
+        "sum": 204,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 214,
+        "b": 246,
+        "cin": true
+      },
+      "expected": {
+        "sum": 205,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 94,
+        "b": 80,
+        "cin": false
+      },
+      "expected": {
+        "sum": 174,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 94,
+        "b": 80,
+        "cin": true
+      },
+      "expected": {
+        "sum": 175,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 135,
+        "b": 104,
+        "cin": false
+      },
+      "expected": {
+        "sum": 239,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 135,
+        "b": 104,
+        "cin": true
+      },
+      "expected": {
+        "sum": 240,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 201,
+        "cin": false
+      },
+      "expected": {
+        "sum": 233,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 201,
+        "cin": true
+      },
+      "expected": {
+        "sum": 234,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 232,
+        "b": 42,
+        "cin": false
+      },
+      "expected": {
+        "sum": 18,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 232,
+        "b": 42,
+        "cin": true
+      },
+      "expected": {
+        "sum": 19,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 200,
+        "cin": false
+      },
+      "expected": {
+        "sum": 232,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 200,
+        "cin": true
+      },
+      "expected": {
+        "sum": 233,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 117,
+        "b": 111,
+        "cin": false
+      },
+      "expected": {
+        "sum": 228,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 117,
+        "b": 111,
+        "cin": true
+      },
+      "expected": {
+        "sum": 229,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 106,
+        "b": 109,
+        "cin": false
+      },
+      "expected": {
+        "sum": 215,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 106,
+        "b": 109,
+        "cin": true
+      },
+      "expected": {
+        "sum": 216,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 189,
+        "cin": false
+      },
+      "expected": {
+        "sum": 220,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 189,
+        "cin": true
+      },
+      "expected": {
+        "sum": 221,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 225,
+        "b": 75,
+        "cin": false
+      },
+      "expected": {
+        "sum": 44,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 225,
+        "b": 75,
+        "cin": true
+      },
+      "expected": {
+        "sum": 45,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 218,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 219,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 218,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 220,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 235,
+        "b": 181,
+        "cin": false
+      },
+      "expected": {
+        "sum": 160,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 235,
+        "b": 181,
+        "cin": true
+      },
+      "expected": {
+        "sum": 161,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 253,
+        "b": 19,
+        "cin": false
+      },
+      "expected": {
+        "sum": 16,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 253,
+        "b": 19,
+        "cin": true
+      },
+      "expected": {
+        "sum": 17,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 51,
+        "b": 217,
+        "cin": false
+      },
+      "expected": {
+        "sum": 12,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 51,
+        "b": 217,
+        "cin": true
+      },
+      "expected": {
+        "sum": 13,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 84,
+        "b": 109,
+        "cin": false
+      },
+      "expected": {
+        "sum": 193,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 84,
+        "b": 109,
+        "cin": true
+      },
+      "expected": {
+        "sum": 194,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 122,
+        "b": 255,
+        "cin": false
+      },
+      "expected": {
+        "sum": 121,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 122,
+        "b": 255,
+        "cin": true
+      },
+      "expected": {
+        "sum": 122,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 235,
+        "b": 18,
+        "cin": false
+      },
+      "expected": {
+        "sum": 253,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 235,
+        "b": 18,
+        "cin": true
+      },
+      "expected": {
+        "sum": 254,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 164,
+        "b": 162,
+        "cin": false
+      },
+      "expected": {
+        "sum": 70,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 164,
+        "b": 162,
+        "cin": true
+      },
+      "expected": {
+        "sum": 71,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 243,
+        "b": 251,
+        "cin": false
+      },
+      "expected": {
+        "sum": 238,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 243,
+        "b": 251,
+        "cin": true
+      },
+      "expected": {
+        "sum": 239,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 132,
+        "b": 54,
+        "cin": false
+      },
+      "expected": {
+        "sum": 186,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 132,
+        "b": 54,
+        "cin": true
+      },
+      "expected": {
+        "sum": 187,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 68,
+        "b": 118,
+        "cin": false
+      },
+      "expected": {
+        "sum": 186,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 68,
+        "b": 118,
+        "cin": true
+      },
+      "expected": {
+        "sum": 187,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 6,
+        "b": 203,
+        "cin": false
+      },
+      "expected": {
+        "sum": 209,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 6,
+        "b": 203,
+        "cin": true
+      },
+      "expected": {
+        "sum": 210,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 103,
+        "b": 77,
+        "cin": false
+      },
+      "expected": {
+        "sum": 180,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 103,
+        "b": 77,
+        "cin": true
+      },
+      "expected": {
+        "sum": 181,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 191,
+        "b": 232,
+        "cin": false
+      },
+      "expected": {
+        "sum": 167,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 191,
+        "b": 232,
+        "cin": true
+      },
+      "expected": {
+        "sum": 168,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 38,
+        "b": 183,
+        "cin": false
+      },
+      "expected": {
+        "sum": 221,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 38,
+        "b": 183,
+        "cin": true
+      },
+      "expected": {
+        "sum": 222,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 9,
+        "b": 73,
+        "cin": false
+      },
+      "expected": {
+        "sum": 82,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 9,
+        "b": 73,
+        "cin": true
+      },
+      "expected": {
+        "sum": 83,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 73,
+        "cin": false
+      },
+      "expected": {
+        "sum": 73,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 73,
+        "cin": true
+      },
+      "expected": {
+        "sum": 74,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 42,
+        "b": 98,
+        "cin": false
+      },
+      "expected": {
+        "sum": 140,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 42,
+        "b": 98,
+        "cin": true
+      },
+      "expected": {
+        "sum": 141,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 26,
+        "b": 127,
+        "cin": false
+      },
+      "expected": {
+        "sum": 153,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 26,
+        "b": 127,
+        "cin": true
+      },
+      "expected": {
+        "sum": 154,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 42,
+        "b": 199,
+        "cin": false
+      },
+      "expected": {
+        "sum": 241,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 42,
+        "b": 199,
+        "cin": true
+      },
+      "expected": {
+        "sum": 242,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 119,
+        "b": 147,
+        "cin": false
+      },
+      "expected": {
+        "sum": 10,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 119,
+        "b": 147,
+        "cin": true
+      },
+      "expected": {
+        "sum": 11,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 98,
+        "b": 229,
+        "cin": false
+      },
+      "expected": {
+        "sum": 71,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 98,
+        "b": 229,
+        "cin": true
+      },
+      "expected": {
+        "sum": 72,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 141,
+        "b": 170,
+        "cin": false
+      },
+      "expected": {
+        "sum": 55,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 141,
+        "b": 170,
+        "cin": true
+      },
+      "expected": {
+        "sum": 56,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 231,
+        "b": 164,
+        "cin": false
+      },
+      "expected": {
+        "sum": 139,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 231,
+        "b": 164,
+        "cin": true
+      },
+      "expected": {
+        "sum": 140,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 148,
+        "b": 158,
+        "cin": false
+      },
+      "expected": {
+        "sum": 50,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 148,
+        "b": 158,
+        "cin": true
+      },
+      "expected": {
+        "sum": 51,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 69,
+        "b": 229,
+        "cin": false
+      },
+      "expected": {
+        "sum": 42,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 69,
+        "b": 229,
+        "cin": true
+      },
+      "expected": {
+        "sum": 43,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 21,
+        "b": 224,
+        "cin": false
+      },
+      "expected": {
+        "sum": 245,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 21,
+        "b": 224,
+        "cin": true
+      },
+      "expected": {
+        "sum": 246,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 79,
+        "b": 244,
+        "cin": false
+      },
+      "expected": {
+        "sum": 67,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 79,
+        "b": 244,
+        "cin": true
+      },
+      "expected": {
+        "sum": 68,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 152,
+        "b": 69,
+        "cin": false
+      },
+      "expected": {
+        "sum": 221,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 152,
+        "b": 69,
+        "cin": true
+      },
+      "expected": {
+        "sum": 222,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 224,
+        "b": 87,
+        "cin": false
+      },
+      "expected": {
+        "sum": 55,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 224,
+        "b": 87,
+        "cin": true
+      },
+      "expected": {
+        "sum": 56,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 132,
+        "b": 180,
+        "cin": false
+      },
+      "expected": {
+        "sum": 56,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 132,
+        "b": 180,
+        "cin": true
+      },
+      "expected": {
+        "sum": 57,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 217,
+        "b": 158,
+        "cin": false
+      },
+      "expected": {
+        "sum": 119,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 217,
+        "b": 158,
+        "cin": true
+      },
+      "expected": {
+        "sum": 120,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 124,
+        "b": 251,
+        "cin": false
+      },
+      "expected": {
+        "sum": 119,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 124,
+        "b": 251,
+        "cin": true
+      },
+      "expected": {
+        "sum": 120,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 184,
+        "b": 21,
+        "cin": false
+      },
+      "expected": {
+        "sum": 205,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 184,
+        "b": 21,
+        "cin": true
+      },
+      "expected": {
+        "sum": 206,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 213,
+        "b": 92,
+        "cin": false
+      },
+      "expected": {
+        "sum": 49,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 213,
+        "b": 92,
+        "cin": true
+      },
+      "expected": {
+        "sum": 50,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 131,
+        "cin": false
+      },
+      "expected": {
+        "sum": 20,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 131,
+        "cin": true
+      },
+      "expected": {
+        "sum": 21,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 130,
+        "cin": false
+      },
+      "expected": {
+        "sum": 129,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 130,
+        "cin": true
+      },
+      "expected": {
+        "sum": 130,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 77,
+        "cin": false
+      },
+      "expected": {
+        "sum": 162,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 77,
+        "cin": true
+      },
+      "expected": {
+        "sum": 163,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 223,
+        "b": 245,
+        "cin": false
+      },
+      "expected": {
+        "sum": 212,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 223,
+        "b": 245,
+        "cin": true
+      },
+      "expected": {
+        "sum": 213,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 181,
+        "cin": false
+      },
+      "expected": {
+        "sum": 70,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 181,
+        "cin": true
+      },
+      "expected": {
+        "sum": 71,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 137,
+        "b": 63,
+        "cin": false
+      },
+      "expected": {
+        "sum": 200,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 137,
+        "b": 63,
+        "cin": true
+      },
+      "expected": {
+        "sum": 201,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 45,
+        "b": 1,
+        "cin": false
+      },
+      "expected": {
+        "sum": 46,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 45,
+        "b": 1,
+        "cin": true
+      },
+      "expected": {
+        "sum": 47,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 217,
+        "b": 88,
+        "cin": false
+      },
+      "expected": {
+        "sum": 49,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 217,
+        "b": 88,
+        "cin": true
+      },
+      "expected": {
+        "sum": 50,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 203,
+        "b": 195,
+        "cin": false
+      },
+      "expected": {
+        "sum": 142,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 203,
+        "b": 195,
+        "cin": true
+      },
+      "expected": {
+        "sum": 143,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 209,
+        "b": 14,
+        "cin": false
+      },
+      "expected": {
+        "sum": 223,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 209,
+        "b": 14,
+        "cin": true
+      },
+      "expected": {
+        "sum": 224,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 206,
+        "b": 153,
+        "cin": false
+      },
+      "expected": {
+        "sum": 103,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 206,
+        "b": 153,
+        "cin": true
+      },
+      "expected": {
+        "sum": 104,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 183,
+        "b": 123,
+        "cin": false
+      },
+      "expected": {
+        "sum": 50,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 183,
+        "b": 123,
+        "cin": true
+      },
+      "expected": {
+        "sum": 51,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 38,
+        "b": 13,
+        "cin": false
+      },
+      "expected": {
+        "sum": 51,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 38,
+        "b": 13,
+        "cin": true
+      },
+      "expected": {
+        "sum": 52,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 101,
+        "b": 183,
+        "cin": false
+      },
+      "expected": {
+        "sum": 28,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 101,
+        "b": 183,
+        "cin": true
+      },
+      "expected": {
+        "sum": 29,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 105,
+        "b": 128,
+        "cin": false
+      },
+      "expected": {
+        "sum": 233,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 105,
+        "b": 128,
+        "cin": true
+      },
+      "expected": {
+        "sum": 234,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 73,
+        "b": 107,
+        "cin": false
+      },
+      "expected": {
+        "sum": 180,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 73,
+        "b": 107,
+        "cin": true
+      },
+      "expected": {
+        "sum": 181,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 228,
+        "b": 48,
+        "cin": false
+      },
+      "expected": {
+        "sum": 20,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 228,
+        "b": 48,
+        "cin": true
+      },
+      "expected": {
+        "sum": 21,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 241,
+        "b": 228,
+        "cin": false
+      },
+      "expected": {
+        "sum": 213,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 241,
+        "b": 228,
+        "cin": true
+      },
+      "expected": {
+        "sum": 214,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 155,
+        "b": 217,
+        "cin": false
+      },
+      "expected": {
+        "sum": 116,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 155,
+        "b": 217,
+        "cin": true
+      },
+      "expected": {
+        "sum": 117,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 55,
+        "b": 204,
+        "cin": false
+      },
+      "expected": {
+        "sum": 3,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 55,
+        "b": 204,
+        "cin": true
+      },
+      "expected": {
+        "sum": 4,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 99,
+        "b": 124,
+        "cin": false
+      },
+      "expected": {
+        "sum": 223,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 99,
+        "b": 124,
+        "cin": true
+      },
+      "expected": {
+        "sum": 224,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 98,
+        "b": 176,
+        "cin": false
+      },
+      "expected": {
+        "sum": 18,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 98,
+        "b": 176,
+        "cin": true
+      },
+      "expected": {
+        "sum": 19,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 153,
+        "b": 62,
+        "cin": false
+      },
+      "expected": {
+        "sum": 215,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 153,
+        "b": 62,
+        "cin": true
+      },
+      "expected": {
+        "sum": 216,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 199,
+        "b": 240,
+        "cin": false
+      },
+      "expected": {
+        "sum": 183,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 199,
+        "b": 240,
+        "cin": true
+      },
+      "expected": {
+        "sum": 184,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 128,
+        "cin": false
+      },
+      "expected": {
+        "sum": 160,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 128,
+        "cin": true
+      },
+      "expected": {
+        "sum": 161,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 209,
+        "b": 196,
+        "cin": false
+      },
+      "expected": {
+        "sum": 149,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 209,
+        "b": 196,
+        "cin": true
+      },
+      "expected": {
+        "sum": 150,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 155,
+        "b": 144,
+        "cin": false
+      },
+      "expected": {
+        "sum": 43,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 155,
+        "b": 144,
+        "cin": true
+      },
+      "expected": {
+        "sum": 44,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 111,
+        "b": 121,
+        "cin": false
+      },
+      "expected": {
+        "sum": 232,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 111,
+        "b": 121,
+        "cin": true
+      },
+      "expected": {
+        "sum": 233,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 25,
+        "b": 158,
+        "cin": false
+      },
+      "expected": {
+        "sum": 183,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 25,
+        "b": 158,
+        "cin": true
+      },
+      "expected": {
+        "sum": 184,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 71,
+        "b": 3,
+        "cin": false
+      },
+      "expected": {
+        "sum": 74,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 71,
+        "b": 3,
+        "cin": true
+      },
+      "expected": {
+        "sum": 75,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 164,
+        "b": 213,
+        "cin": false
+      },
+      "expected": {
+        "sum": 121,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 164,
+        "b": 213,
+        "cin": true
+      },
+      "expected": {
+        "sum": 122,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 66,
+        "b": 145,
+        "cin": false
+      },
+      "expected": {
+        "sum": 211,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 66,
+        "b": 145,
+        "cin": true
+      },
+      "expected": {
+        "sum": 212,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 113,
+        "b": 183,
+        "cin": false
+      },
+      "expected": {
+        "sum": 40,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 113,
+        "b": 183,
+        "cin": true
+      },
+      "expected": {
+        "sum": 41,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 68,
+        "b": 198,
+        "cin": false
+      },
+      "expected": {
+        "sum": 10,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 68,
+        "b": 198,
+        "cin": true
+      },
+      "expected": {
+        "sum": 11,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 144,
+        "b": 45,
+        "cin": false
+      },
+      "expected": {
+        "sum": 189,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 144,
+        "b": 45,
+        "cin": true
+      },
+      "expected": {
+        "sum": 190,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 33,
+        "b": 173,
+        "cin": false
+      },
+      "expected": {
+        "sum": 206,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 33,
+        "b": 173,
+        "cin": true
+      },
+      "expected": {
+        "sum": 207,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 110,
+        "b": 225,
+        "cin": false
+      },
+      "expected": {
+        "sum": 79,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 110,
+        "b": 225,
+        "cin": true
+      },
+      "expected": {
+        "sum": 80,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 37,
+        "b": 168,
+        "cin": false
+      },
+      "expected": {
+        "sum": 205,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 37,
+        "b": 168,
+        "cin": true
+      },
+      "expected": {
+        "sum": 206,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 123,
+        "b": 209,
+        "cin": false
+      },
+      "expected": {
+        "sum": 76,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 123,
+        "b": 209,
+        "cin": true
+      },
+      "expected": {
+        "sum": 77,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 196,
+        "b": 222,
+        "cin": false
+      },
+      "expected": {
+        "sum": 162,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 196,
+        "b": 222,
+        "cin": true
+      },
+      "expected": {
+        "sum": 163,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 197,
+        "b": 52,
+        "cin": false
+      },
+      "expected": {
+        "sum": 249,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 197,
+        "b": 52,
+        "cin": true
+      },
+      "expected": {
+        "sum": 250,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 75,
+        "b": 230,
+        "cin": false
+      },
+      "expected": {
+        "sum": 49,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 75,
+        "b": 230,
+        "cin": true
+      },
+      "expected": {
+        "sum": 50,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 110,
+        "b": 34,
+        "cin": false
+      },
+      "expected": {
+        "sum": 144,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 110,
+        "b": 34,
+        "cin": true
+      },
+      "expected": {
+        "sum": 145,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 146,
+        "b": 189,
+        "cin": false
+      },
+      "expected": {
+        "sum": 79,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 146,
+        "b": 189,
+        "cin": true
+      },
+      "expected": {
+        "sum": 80,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 47,
+        "b": 155,
+        "cin": false
+      },
+      "expected": {
+        "sum": 202,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 47,
+        "b": 155,
+        "cin": true
+      },
+      "expected": {
+        "sum": 203,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 33,
+        "b": 70,
+        "cin": false
+      },
+      "expected": {
+        "sum": 103,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 33,
+        "b": 70,
+        "cin": true
+      },
+      "expected": {
+        "sum": 104,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 102,
+        "b": 203,
+        "cin": false
+      },
+      "expected": {
+        "sum": 49,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 102,
+        "b": 203,
+        "cin": true
+      },
+      "expected": {
+        "sum": 50,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 67,
+        "b": 215,
+        "cin": false
+      },
+      "expected": {
+        "sum": 26,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 67,
+        "b": 215,
+        "cin": true
+      },
+      "expected": {
+        "sum": 27,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 89,
+        "b": 195,
+        "cin": false
+      },
+      "expected": {
+        "sum": 28,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 89,
+        "b": 195,
+        "cin": true
+      },
+      "expected": {
+        "sum": 29,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 230,
+        "b": 153,
+        "cin": false
+      },
+      "expected": {
+        "sum": 127,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 230,
+        "b": 153,
+        "cin": true
+      },
+      "expected": {
+        "sum": 128,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 166,
+        "b": 241,
+        "cin": false
+      },
+      "expected": {
+        "sum": 151,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 166,
+        "b": 241,
+        "cin": true
+      },
+      "expected": {
+        "sum": 152,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 91,
+        "b": 185,
+        "cin": false
+      },
+      "expected": {
+        "sum": 20,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 91,
+        "b": 185,
+        "cin": true
+      },
+      "expected": {
+        "sum": 21,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 27,
+        "b": 18,
+        "cin": false
+      },
+      "expected": {
+        "sum": 45,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 27,
+        "b": 18,
+        "cin": true
+      },
+      "expected": {
+        "sum": 46,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 75,
+        "b": 193,
+        "cin": false
+      },
+      "expected": {
+        "sum": 12,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 75,
+        "b": 193,
+        "cin": true
+      },
+      "expected": {
+        "sum": 13,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 88,
+        "b": 115,
+        "cin": false
+      },
+      "expected": {
+        "sum": 203,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 88,
+        "b": 115,
+        "cin": true
+      },
+      "expected": {
+        "sum": 204,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 110,
+        "b": 127,
+        "cin": false
+      },
+      "expected": {
+        "sum": 237,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 110,
+        "b": 127,
+        "cin": true
+      },
+      "expected": {
+        "sum": 238,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 6,
+        "b": 173,
+        "cin": false
+      },
+      "expected": {
+        "sum": 179,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 6,
+        "b": 173,
+        "cin": true
+      },
+      "expected": {
+        "sum": 180,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 229,
+        "b": 87,
+        "cin": false
+      },
+      "expected": {
+        "sum": 60,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 229,
+        "b": 87,
+        "cin": true
+      },
+      "expected": {
+        "sum": 61,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 59,
+        "cin": false
+      },
+      "expected": {
+        "sum": 187,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 59,
+        "cin": true
+      },
+      "expected": {
+        "sum": 188,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 56,
+        "b": 251,
+        "cin": false
+      },
+      "expected": {
+        "sum": 51,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 56,
+        "b": 251,
+        "cin": true
+      },
+      "expected": {
+        "sum": 52,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 57,
+        "b": 147,
+        "cin": false
+      },
+      "expected": {
+        "sum": 204,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 57,
+        "b": 147,
+        "cin": true
+      },
+      "expected": {
+        "sum": 205,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 103,
+        "b": 205,
+        "cin": false
+      },
+      "expected": {
+        "sum": 52,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 103,
+        "b": 205,
+        "cin": true
+      },
+      "expected": {
+        "sum": 53,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 62,
+        "b": 160,
+        "cin": false
+      },
+      "expected": {
+        "sum": 222,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 62,
+        "b": 160,
+        "cin": true
+      },
+      "expected": {
+        "sum": 223,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 130,
+        "b": 106,
+        "cin": false
+      },
+      "expected": {
+        "sum": 236,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 130,
+        "b": 106,
+        "cin": true
+      },
+      "expected": {
+        "sum": 237,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 147,
+        "b": 197,
+        "cin": false
+      },
+      "expected": {
+        "sum": 88,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 147,
+        "b": 197,
+        "cin": true
+      },
+      "expected": {
+        "sum": 89,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 182,
+        "b": 49,
+        "cin": false
+      },
+      "expected": {
+        "sum": 231,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 182,
+        "b": 49,
+        "cin": true
+      },
+      "expected": {
+        "sum": 232,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 97,
+        "b": 210,
+        "cin": false
+      },
+      "expected": {
+        "sum": 51,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 97,
+        "b": 210,
+        "cin": true
+      },
+      "expected": {
+        "sum": 52,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 216,
+        "b": 183,
+        "cin": false
+      },
+      "expected": {
+        "sum": 143,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 216,
+        "b": 183,
+        "cin": true
+      },
+      "expected": {
+        "sum": 144,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 37,
+        "b": 127,
+        "cin": false
+      },
+      "expected": {
+        "sum": 164,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 37,
+        "b": 127,
+        "cin": true
+      },
+      "expected": {
+        "sum": 165,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 194,
+        "b": 122,
+        "cin": false
+      },
+      "expected": {
+        "sum": 60,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 194,
+        "b": 122,
+        "cin": true
+      },
+      "expected": {
+        "sum": 61,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 75,
+        "b": 98,
+        "cin": false
+      },
+      "expected": {
+        "sum": 173,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 75,
+        "b": 98,
+        "cin": true
+      },
+      "expected": {
+        "sum": 174,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 20,
+        "b": 80,
+        "cin": false
+      },
+      "expected": {
+        "sum": 100,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 20,
+        "b": 80,
+        "cin": true
+      },
+      "expected": {
+        "sum": 101,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 125,
+        "cin": false
+      },
+      "expected": {
+        "sum": 128,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 125,
+        "cin": true
+      },
+      "expected": {
+        "sum": 129,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 56,
+        "b": 94,
+        "cin": false
+      },
+      "expected": {
+        "sum": 150,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 56,
+        "b": 94,
+        "cin": true
+      },
+      "expected": {
+        "sum": 151,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 33,
+        "b": 201,
+        "cin": false
+      },
+      "expected": {
+        "sum": 234,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 33,
+        "b": 201,
+        "cin": true
+      },
+      "expected": {
+        "sum": 235,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 175,
+        "b": 139,
+        "cin": false
+      },
+      "expected": {
+        "sum": 58,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 175,
+        "b": 139,
+        "cin": true
+      },
+      "expected": {
+        "sum": 59,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 93,
+        "b": 90,
+        "cin": false
+      },
+      "expected": {
+        "sum": 183,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 93,
+        "b": 90,
+        "cin": true
+      },
+      "expected": {
+        "sum": 184,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 199,
+        "cin": false
+      },
+      "expected": {
+        "sum": 199,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 199,
+        "cin": true
+      },
+      "expected": {
+        "sum": 200,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 79,
+        "b": 17,
+        "cin": false
+      },
+      "expected": {
+        "sum": 96,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 79,
+        "b": 17,
+        "cin": true
+      },
+      "expected": {
+        "sum": 97,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 232,
+        "b": 155,
+        "cin": false
+      },
+      "expected": {
+        "sum": 131,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 232,
+        "b": 155,
+        "cin": true
+      },
+      "expected": {
+        "sum": 132,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 233,
+        "b": 241,
+        "cin": false
+      },
+      "expected": {
+        "sum": 218,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 233,
+        "b": 241,
+        "cin": true
+      },
+      "expected": {
+        "sum": 219,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 137,
+        "b": 202,
+        "cin": false
+      },
+      "expected": {
+        "sum": 83,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 137,
+        "b": 202,
+        "cin": true
+      },
+      "expected": {
+        "sum": 84,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 90,
+        "b": 129,
+        "cin": false
+      },
+      "expected": {
+        "sum": 219,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 90,
+        "b": 129,
+        "cin": true
+      },
+      "expected": {
+        "sum": 220,
+        "cout": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,2178 @@
+{
+  "schema_version": 1,
+  "case": "OTHERCOMB017",
+  "status": "functional_pass",
+  "reference": "Minecraft Java 1.21.11 GameTestServer capture",
+  "source_sha256": "92d44580dc1539903b56ad08a8b1be89d70de602328d5fe36ef589743c3a3db3",
+  "fixture_export_sha256": "ecd3d95e7cfb809bf18eef04d9911b70b9a762ff437fffeeea7617818a3a4955",
+  "scenario_sha256": "c14c11901bc2ac58926d70492d5a7b63f68af0d7e322e8702199733803904bfd",
+  "capture_sha256": "d439e631334d30916674471d0be39919741ddd19e3475b5503ce8fc2a12196f9",
+  "validator_sha256": "369f039d3ac72355e404033ef4c5f29e7f5064217f99c1d0aaf81e258d7d7a7c",
+  "structural_capture_checks": "passed",
+  "phase_ticks": 24,
+  "phases": 40,
+  "capture_ticks": 960,
+  "input_actions": 72,
+  "output_assertions": 120,
+  "output_assertions_passed": 120,
+  "input_state_assertions": 640,
+  "input_state_assertions_passed": 640,
+  "players": 0,
+  "ports": {
+    "equal": [
+      0,
+      15,
+      0
+    ],
+    "less": [
+      3,
+      15,
+      0
+    ],
+    "greater": [
+      4,
+      15,
+      3
+    ]
+  },
+  "bit_mapping": {
+    "A": "[0, 1+2*i, 10]",
+    "B": "[3, 1+2*i, 10]",
+    "bit_weight": "2**i for i=0..7; bottom-to-top significance"
+  },
+  "assumptions": [
+    "Output meanings are read from source signs: A=B, A<B and A>B.",
+    "Inputs are unsigned 8-bit values; bottom-to-top significance is an explicit test hypothesis.",
+    "The asymmetric 1-vs-128 cases discriminate end-to-end bit reversal. These 40 vectors do not exhaustively establish every bit-order/logic case.",
+    "Output assertions read lamps at each 24-game-tick phase end; they do not measure minimal circuit latency or transient electrical behavior.",
+    "Actual vanilla LeverBlock.pull is used, with a null player; this is not lever block replacement.",
+    "No claim about full entity/component/moving-BE behavior or intra-tick notification order."
+  ],
+  "scope": "Source-independent integer expectations for 40 reference phase endpoints, 120 output assertions. Not exhaustive 65,536-pair testing and not simulator parity.",
+  "checks": [
+    {
+      "tick": 24,
+      "a": 0,
+      "b": 0,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 48,
+      "a": 255,
+      "b": 0,
+      "equal": false,
+      "less": false,
+      "greater": true
+    },
+    {
+      "tick": 72,
+      "a": 255,
+      "b": 255,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 96,
+      "a": 0,
+      "b": 255,
+      "equal": false,
+      "less": true,
+      "greater": false
+    },
+    {
+      "tick": 120,
+      "a": 0,
+      "b": 0,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 144,
+      "a": 1,
+      "b": 0,
+      "equal": false,
+      "less": false,
+      "greater": true
+    },
+    {
+      "tick": 168,
+      "a": 1,
+      "b": 1,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 192,
+      "a": 0,
+      "b": 1,
+      "equal": false,
+      "less": true,
+      "greater": false
+    },
+    {
+      "tick": 216,
+      "a": 0,
+      "b": 0,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 240,
+      "a": 2,
+      "b": 0,
+      "equal": false,
+      "less": false,
+      "greater": true
+    },
+    {
+      "tick": 264,
+      "a": 2,
+      "b": 2,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 288,
+      "a": 0,
+      "b": 2,
+      "equal": false,
+      "less": true,
+      "greater": false
+    },
+    {
+      "tick": 312,
+      "a": 0,
+      "b": 0,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 336,
+      "a": 4,
+      "b": 0,
+      "equal": false,
+      "less": false,
+      "greater": true
+    },
+    {
+      "tick": 360,
+      "a": 4,
+      "b": 4,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 384,
+      "a": 0,
+      "b": 4,
+      "equal": false,
+      "less": true,
+      "greater": false
+    },
+    {
+      "tick": 408,
+      "a": 0,
+      "b": 0,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 432,
+      "a": 8,
+      "b": 0,
+      "equal": false,
+      "less": false,
+      "greater": true
+    },
+    {
+      "tick": 456,
+      "a": 8,
+      "b": 8,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 480,
+      "a": 0,
+      "b": 8,
+      "equal": false,
+      "less": true,
+      "greater": false
+    },
+    {
+      "tick": 504,
+      "a": 0,
+      "b": 0,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 528,
+      "a": 16,
+      "b": 0,
+      "equal": false,
+      "less": false,
+      "greater": true
+    },
+    {
+      "tick": 552,
+      "a": 16,
+      "b": 16,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 576,
+      "a": 0,
+      "b": 16,
+      "equal": false,
+      "less": true,
+      "greater": false
+    },
+    {
+      "tick": 600,
+      "a": 0,
+      "b": 0,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 624,
+      "a": 32,
+      "b": 0,
+      "equal": false,
+      "less": false,
+      "greater": true
+    },
+    {
+      "tick": 648,
+      "a": 32,
+      "b": 32,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 672,
+      "a": 0,
+      "b": 32,
+      "equal": false,
+      "less": true,
+      "greater": false
+    },
+    {
+      "tick": 696,
+      "a": 0,
+      "b": 0,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 720,
+      "a": 64,
+      "b": 0,
+      "equal": false,
+      "less": false,
+      "greater": true
+    },
+    {
+      "tick": 744,
+      "a": 64,
+      "b": 64,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 768,
+      "a": 0,
+      "b": 64,
+      "equal": false,
+      "less": true,
+      "greater": false
+    },
+    {
+      "tick": 792,
+      "a": 0,
+      "b": 0,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 816,
+      "a": 128,
+      "b": 0,
+      "equal": false,
+      "less": false,
+      "greater": true
+    },
+    {
+      "tick": 840,
+      "a": 128,
+      "b": 128,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 864,
+      "a": 0,
+      "b": 128,
+      "equal": false,
+      "less": true,
+      "greater": false
+    },
+    {
+      "tick": 888,
+      "a": 0,
+      "b": 0,
+      "equal": true,
+      "less": false,
+      "greater": false
+    },
+    {
+      "tick": 912,
+      "a": 1,
+      "b": 128,
+      "equal": false,
+      "less": true,
+      "greater": false
+    },
+    {
+      "tick": 936,
+      "a": 128,
+      "b": 1,
+      "equal": false,
+      "less": false,
+      "greater": true
+    },
+    {
+      "tick": 960,
+      "a": 0,
+      "b": 0,
+      "equal": true,
+      "less": false,
+      "greater": false
+    }
+  ],
+  "observations": [
+    {
+      "tick": 24,
+      "a": 0,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 24,
+      "a": 0,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 24,
+      "a": 0,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 48,
+      "a": 255,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 48,
+      "a": 255,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 48,
+      "a": 255,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 72,
+      "a": 255,
+      "b": 255,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 72,
+      "a": 255,
+      "b": 255,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 72,
+      "a": 255,
+      "b": 255,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 96,
+      "a": 0,
+      "b": 255,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 96,
+      "a": 0,
+      "b": 255,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 96,
+      "a": 0,
+      "b": 255,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 120,
+      "a": 0,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 120,
+      "a": 0,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 120,
+      "a": 0,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 144,
+      "a": 1,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 144,
+      "a": 1,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 144,
+      "a": 1,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 168,
+      "a": 1,
+      "b": 1,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 168,
+      "a": 1,
+      "b": 1,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 168,
+      "a": 1,
+      "b": 1,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 192,
+      "a": 0,
+      "b": 1,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 192,
+      "a": 0,
+      "b": 1,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 192,
+      "a": 0,
+      "b": 1,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 216,
+      "a": 0,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 216,
+      "a": 0,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 216,
+      "a": 0,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 240,
+      "a": 2,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 240,
+      "a": 2,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 240,
+      "a": 2,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 264,
+      "a": 2,
+      "b": 2,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 264,
+      "a": 2,
+      "b": 2,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 264,
+      "a": 2,
+      "b": 2,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 288,
+      "a": 0,
+      "b": 2,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 288,
+      "a": 0,
+      "b": 2,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 288,
+      "a": 0,
+      "b": 2,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 312,
+      "a": 0,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 312,
+      "a": 0,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 312,
+      "a": 0,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 336,
+      "a": 4,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 336,
+      "a": 4,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 336,
+      "a": 4,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 360,
+      "a": 4,
+      "b": 4,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 360,
+      "a": 4,
+      "b": 4,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 360,
+      "a": 4,
+      "b": 4,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 384,
+      "a": 0,
+      "b": 4,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 384,
+      "a": 0,
+      "b": 4,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 384,
+      "a": 0,
+      "b": 4,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 408,
+      "a": 0,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 408,
+      "a": 0,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 408,
+      "a": 0,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 432,
+      "a": 8,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 432,
+      "a": 8,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 432,
+      "a": 8,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 456,
+      "a": 8,
+      "b": 8,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 456,
+      "a": 8,
+      "b": 8,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 456,
+      "a": 8,
+      "b": 8,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 480,
+      "a": 0,
+      "b": 8,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 480,
+      "a": 0,
+      "b": 8,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 480,
+      "a": 0,
+      "b": 8,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 504,
+      "a": 0,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 504,
+      "a": 0,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 504,
+      "a": 0,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 528,
+      "a": 16,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 528,
+      "a": 16,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 528,
+      "a": 16,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 552,
+      "a": 16,
+      "b": 16,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 552,
+      "a": 16,
+      "b": 16,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 552,
+      "a": 16,
+      "b": 16,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 576,
+      "a": 0,
+      "b": 16,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 576,
+      "a": 0,
+      "b": 16,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 576,
+      "a": 0,
+      "b": 16,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 600,
+      "a": 0,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 600,
+      "a": 0,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 600,
+      "a": 0,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 624,
+      "a": 32,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 624,
+      "a": 32,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 624,
+      "a": 32,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 648,
+      "a": 32,
+      "b": 32,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 648,
+      "a": 32,
+      "b": 32,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 648,
+      "a": 32,
+      "b": 32,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 672,
+      "a": 0,
+      "b": 32,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 672,
+      "a": 0,
+      "b": 32,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 672,
+      "a": 0,
+      "b": 32,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 696,
+      "a": 0,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 696,
+      "a": 0,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 696,
+      "a": 0,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 720,
+      "a": 64,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 720,
+      "a": 64,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 720,
+      "a": 64,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 744,
+      "a": 64,
+      "b": 64,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 744,
+      "a": 64,
+      "b": 64,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 744,
+      "a": 64,
+      "b": 64,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 768,
+      "a": 0,
+      "b": 64,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 768,
+      "a": 0,
+      "b": 64,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 768,
+      "a": 0,
+      "b": 64,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 792,
+      "a": 0,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 792,
+      "a": 0,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 792,
+      "a": 0,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 816,
+      "a": 128,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 816,
+      "a": 128,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 816,
+      "a": 128,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 840,
+      "a": 128,
+      "b": 128,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 840,
+      "a": 128,
+      "b": 128,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 840,
+      "a": 128,
+      "b": 128,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 864,
+      "a": 0,
+      "b": 128,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 864,
+      "a": 0,
+      "b": 128,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 864,
+      "a": 0,
+      "b": 128,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 888,
+      "a": 0,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 888,
+      "a": 0,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 888,
+      "a": 0,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 912,
+      "a": 1,
+      "b": 128,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 912,
+      "a": 1,
+      "b": 128,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 912,
+      "a": 1,
+      "b": 128,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 936,
+      "a": 128,
+      "b": 1,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 936,
+      "a": 128,
+      "b": 1,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 936,
+      "a": 128,
+      "b": 1,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 960,
+      "a": 0,
+      "b": 0,
+      "output": "equal",
+      "pos": [
+        0,
+        15,
+        0
+      ],
+      "expected": true,
+      "actual": true,
+      "state": "minecraft:redstone_lamp[lit=true]",
+      "passed": true
+    },
+    {
+      "tick": 960,
+      "a": 0,
+      "b": 0,
+      "output": "less",
+      "pos": [
+        3,
+        15,
+        0
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    },
+    {
+      "tick": 960,
+      "a": 0,
+      "b": 0,
+      "output": "greater",
+      "pos": [
+        4,
+        15,
+        3
+      ],
+      "expected": false,
+      "actual": false,
+      "state": "minecraft:redstone_lamp[lit=false]",
+      "passed": true
+    }
+  ],
+  "failures": [],
+  "first_failure": null
+}

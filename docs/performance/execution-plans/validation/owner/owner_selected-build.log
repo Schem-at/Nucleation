@@ -1,0 +1,23 @@
+   Compiling mc-tick v0.1.0 (/home/harrison/code/Nucleation-simulation-performance/crates/mc-tick)
+warning: unused variable: `entry`
+   --> crates/mc-tick/src/wire_plan.rs:229:34
+    |
+229 | ...                let Some(entry) = entry_slot.as_mut().filter(|entry|...
+    |                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_entry`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `query` is never used
+   --> crates/mc-tick/src/wire_plan.rs:296:12
+    |
+252 | impl Cache {
+    | ---------- method in this implementation
+...
+296 |     pub fn query(
+    |            ^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling mc-test v0.1.0 (/home/harrison/code/Nucleation-simulation-performance/crates/mc-test)
+warning: `mc-tick` (lib) generated 2 warnings (run `cargo fix --lib -p mc-tick` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 11.46s

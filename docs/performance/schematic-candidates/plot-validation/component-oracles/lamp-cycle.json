@@ -1,0 +1,100 @@
+{
+  "format_version": 1,
+  "data_version": 4671,
+  "case": "synthetic_lamp_observer_cycle",
+  "negative_control": false,
+  "size": [
+    3,
+    3,
+    3
+  ],
+  "origin": [
+    0,
+    100,
+    0
+  ],
+  "watch": {
+    "min": [
+      -2,
+      -2,
+      -2
+    ],
+    "max": [
+      4,
+      4,
+      4
+    ]
+  },
+  "rng_seed": 0,
+  "capture_ticks": 100,
+  "source": {
+    "sha256": "c2e6f1f7ce4866c8354e5698ce0bd5da4a4f54f4f66189032722deb034069e45",
+    "data_version": 4671,
+    "kind": "synthetic_minimized_fixture",
+    "fixture_path": "docs/performance/schematic-candidates/plot-validation/component-oracles/lamp-fixture.json"
+  },
+  "fixture": [
+    {
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        1
+      ],
+      "state": "minecraft:observer[facing=west,powered=false]"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        1
+      ],
+      "state": "minecraft:lever[face=floor,facing=north,powered=false]"
+    }
+  ],
+  "actions": [
+    {
+      "tick": 21,
+      "type": "pull_lever",
+      "pos": [
+        1,
+        2,
+        1
+      ]
+    },
+    {
+      "tick": 41,
+      "type": "pull_lever",
+      "pos": [
+        1,
+        2,
+        1
+      ]
+    },
+    {
+      "tick": 61,
+      "type": "pull_lever",
+      "pos": [
+        1,
+        2,
+        1
+      ]
+    },
+    {
+      "tick": 81,
+      "type": "pull_lever",
+      "pos": [
+        1,
+        2,
+        1
+      ]
+    }
+  ]
+}

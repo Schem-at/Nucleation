@@ -1,0 +1,619 @@
+{
+  "baseline": "master",
+  "source": "final-master-comparison.json",
+  "comparison_label": "matching master build",
+  "results": [
+    {
+      "case": "hipster",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 9.968917583333335,
+      "cpu_speedup": 8.457903115208653,
+      "cpu_ci95": [
+        8.2988197624611,
+        8.609551445530041
+      ],
+      "wall_ms": 10.000897833333333,
+      "wall_speedup": 8.462334306751492,
+      "wall_ci95": [
+        8.304203801100357,
+        8.611819286972318
+      ]
+    },
+    {
+      "case": "hipster",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 8.72217025,
+      "cpu_speedup": 8.495929381795776,
+      "cpu_ci95": [
+        8.373478163565432,
+        8.642431811991557
+      ],
+      "wall_ms": 8.753856916666667,
+      "wall_speedup": 8.495286101651022,
+      "wall_ci95": [
+        8.368140210704984,
+        8.637891493277582
+      ]
+    },
+    {
+      "case": "hipster_updates",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 10.53542076923077,
+      "cpu_speedup": 8.04605850140555,
+      "cpu_ci95": [
+        7.915840141328803,
+        8.160430866358885
+      ],
+      "wall_ms": 10.581435,
+      "wall_speedup": 8.036811460536597,
+      "wall_ci95": [
+        7.906451756546352,
+        8.162824735687032
+      ]
+    },
+    {
+      "case": "hipster_updates",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 9.641148307692308,
+      "cpu_speedup": 7.648146237415959,
+      "cpu_ci95": [
+        7.523175292755101,
+        7.805679874371914
+      ],
+      "wall_ms": 9.676152692307692,
+      "wall_speedup": 7.6489391027433555,
+      "wall_ci95": [
+        7.521364176467674,
+        7.804739062560041
+      ]
+    },
+    {
+      "case": "hipster_timeline",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 10.080154133333332,
+      "cpu_speedup": 8.350518529108205,
+      "cpu_ci95": [
+        8.208922482194316,
+        8.626226430720775
+      ],
+      "wall_ms": 10.114155066666667,
+      "wall_speedup": 8.350066519974124,
+      "wall_ci95": [
+        8.207031714322408,
+        8.624947777839377
+      ]
+    },
+    {
+      "case": "hipster_timeline",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 8.867343266666667,
+      "cpu_speedup": 8.424684901300276,
+      "cpu_ci95": [
+        8.275419108927656,
+        8.6399090186635
+      ],
+      "wall_ms": 8.897821466666667,
+      "wall_speedup": 8.4244119245908,
+      "wall_ci95": [
+        8.27132129445606,
+        8.639682604344447
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 1.6776042916666667,
+      "cpu_speedup": 7.781340929052522,
+      "cpu_ci95": [
+        7.704544844284335,
+        7.93036745519964
+      ],
+      "wall_ms": 1.6832616458333332,
+      "wall_speedup": 7.785020331125736,
+      "wall_ci95": [
+        7.700868416835948,
+        7.929192977768283
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 1.52933925,
+      "cpu_speedup": 7.57830141486484,
+      "cpu_ci95": [
+        7.506842498293348,
+        7.730460941062186
+      ],
+      "wall_ms": 1.5343946458333333,
+      "wall_speedup": 7.577495728737648,
+      "wall_ci95": [
+        7.506845091834008,
+        7.729364111555878
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 0.14892139021739131,
+      "cpu_speedup": 10.370686916023152,
+      "cpu_ci95": [
+        10.199669560127356,
+        10.528573238104668
+      ],
+      "wall_ms": 0.1492394956521739,
+      "wall_speedup": 10.378946050066476,
+      "wall_ci95": [
+        10.208081267914743,
+        10.543446565551116
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.1227414902173913,
+      "cpu_speedup": 11.40149801937478,
+      "cpu_ci95": [
+        11.202708739565676,
+        11.587196742656829
+      ],
+      "wall_ms": 0.12296343804347827,
+      "wall_speedup": 11.432079487961616,
+      "wall_ci95": [
+        11.21572287791348,
+        11.65474934364291
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 8.096526555555556,
+      "cpu_speedup": 7.6794938018620025,
+      "cpu_ci95": [
+        7.550883400403095,
+        7.9039773883977595
+      ],
+      "wall_ms": 8.124317166666668,
+      "wall_speedup": 7.679957862304858,
+      "wall_ci95": [
+        7.54827094691398,
+        7.949805190123704
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 7.138272777777778,
+      "cpu_speedup": 7.987137870497929,
+      "cpu_ci95": [
+        7.892944008184197,
+        8.06796511264192
+      ],
+      "wall_ms": 7.1624624444444445,
+      "wall_speedup": 7.9895852701930785,
+      "wall_ci95": [
+        7.893405706649486,
+        8.066254650286163
+      ]
+    },
+    {
+      "case": "adder_idle",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 0.025860533159947983,
+      "cpu_speedup": 16.390892572944296,
+      "cpu_ci95": [
+        16.11359987639511,
+        16.64490317359838
+      ],
+      "wall_ms": 0.02579510711963589,
+      "wall_speedup": 16.523249358177658,
+      "wall_ci95": [
+        16.20061588382155,
+        16.777681487764095
+      ]
+    },
+    {
+      "case": "adder_idle",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.014853039174252276,
+      "cpu_speedup": 25.995106849676127,
+      "cpu_ci95": [
+        25.59963353529955,
+        26.91185324371515
+      ],
+      "wall_ms": 0.014755377763328999,
+      "wall_speedup": 26.241140939070906,
+      "wall_ci95": [
+        25.837830740309606,
+        27.176823054050608
+      ]
+    },
+    {
+      "case": "adder_active",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 8.318611578947369,
+      "cpu_speedup": 10.204196607455113,
+      "cpu_ci95": [
+        10.109303221729217,
+        10.395928923845613
+      ],
+      "wall_ms": 8.34739594736842,
+      "wall_speedup": 10.203447689765817,
+      "wall_ci95": [
+        10.108338002976138,
+        10.392388088436867
+      ]
+    },
+    {
+      "case": "adder_active",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 7.1173177368421054,
+      "cpu_speedup": 10.29955860737217,
+      "cpu_ci95": [
+        10.124021323527561,
+        10.47716375069403
+      ],
+      "wall_ms": 7.138399421052632,
+      "wall_speedup": 10.305751623268577,
+      "wall_ci95": [
+        10.121792471245513,
+        10.46744471110261
+      ]
+    },
+    {
+      "case": "logic_network",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 0.5670041510067114,
+      "cpu_speedup": 10.94240955126703,
+      "cpu_ci95": [
+        10.717472211351847,
+        11.036944087596474
+      ],
+      "wall_ms": 0.5689408624161074,
+      "wall_speedup": 10.941586803554092,
+      "wall_ci95": [
+        10.72496333817808,
+        11.044795913199694
+      ]
+    },
+    {
+      "case": "logic_network",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.4714279496644295,
+      "cpu_speedup": 11.576744021798858,
+      "cpu_ci95": [
+        11.349498610112136,
+        11.781478106624139
+      ],
+      "wall_ms": 0.47290496644295305,
+      "wall_speedup": 11.576754534730645,
+      "wall_ci95": [
+        11.358206382905804,
+        11.785917203212986
+      ]
+    },
+    {
+      "case": "hipster_load",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 2.55823686440678,
+      "cpu_speedup": 1.2926285135137594,
+      "cpu_ci95": [
+        1.274446705512805,
+        1.3202580166855515
+      ],
+      "wall_ms": 2.5673931355932202,
+      "wall_speedup": 1.293632950048686,
+      "wall_ci95": [
+        1.2745678916425958,
+        1.320887555962176
+      ]
+    },
+    {
+      "case": "hipster_load",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 2.345594881355932,
+      "cpu_speedup": 1.313920993104579,
+      "cpu_ci95": [
+        1.2850147733060326,
+        1.3513458112835033
+      ],
+      "wall_ms": 2.35606393220339,
+      "wall_speedup": 1.3128156604078223,
+      "wall_ci95": [
+        1.284686560766173,
+        1.3516060162833963
+      ]
+    },
+    {
+      "case": "comparator_drain",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 0.011868767070998388,
+      "cpu_speedup": 4.498023765499785,
+      "cpu_ci95": [
+        4.432310119916657,
+        4.547106440939124
+      ],
+      "wall_ms": 0.011745666129442701,
+      "wall_speedup": 4.547701056645926,
+      "wall_ci95": [
+        4.4742289606868235,
+        4.598746644018911
+      ]
+    },
+    {
+      "case": "comparator_drain",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.0068175128509627625,
+      "cpu_speedup": 6.594728012271092,
+      "cpu_ci95": [
+        6.44837922371895,
+        6.689962581231508
+      ],
+      "wall_ms": 0.006707393078293324,
+      "wall_speedup": 6.700334677412675,
+      "wall_ci95": [
+        6.5466359881644705,
+        6.8064099013086805
+      ]
+    },
+    {
+      "case": "item_into_hopper",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 0.006330040774818402,
+      "cpu_speedup": 6.490488691067343,
+      "cpu_ci95": [
+        6.324607134832653,
+        6.579593436455659
+      ],
+      "wall_ms": 0.006192249878934624,
+      "wall_speedup": 6.6302840714113,
+      "wall_ci95": [
+        6.47149910802064,
+        6.72721705470693
+      ]
+    },
+    {
+      "case": "item_into_hopper",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.004050605665859564,
+      "cpu_speedup": 8.81834031049815,
+      "cpu_ci95": [
+        8.566876566582431,
+        9.010679587980595
+      ],
+      "wall_ms": 0.003921987360774819,
+      "wall_speedup": 9.097802864409836,
+      "wall_ci95": [
+        8.813715945935465,
+        9.290413541277704
+      ]
+    },
+    {
+      "case": "item_sorter",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 1.1439042406015039,
+      "cpu_speedup": 2.6016733786749486,
+      "cpu_ci95": [
+        2.5437968287502577,
+        2.6412697229865976
+      ],
+      "wall_ms": 1.1477888646616543,
+      "wall_speedup": 2.601236831177178,
+      "wall_ci95": [
+        2.5547771158094124,
+        2.639822159007755
+      ]
+    },
+    {
+      "case": "item_sorter",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.6925734210526315,
+      "cpu_speedup": 3.315897790592816,
+      "cpu_ci95": [
+        3.266856015197657,
+        3.3393234665273828
+      ],
+      "wall_ms": 0.6947372180451128,
+      "wall_speedup": 3.3150089529172333,
+      "wall_ci95": [
+        3.2688450508774753,
+        3.3406919423940966
+      ]
+    },
+    {
+      "case": "hopper_transfer_speed",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 0.8622760843373494,
+      "cpu_speedup": 1.7819088776181673,
+      "cpu_ci95": [
+        1.7509283330528385,
+        1.8117894909866592
+      ],
+      "wall_ms": 0.8645748012048192,
+      "wall_speedup": 1.783285135557651,
+      "wall_ci95": [
+        1.7518107359603032,
+        1.8127885404720863
+      ]
+    },
+    {
+      "case": "hopper_transfer_speed",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.4565025662650602,
+      "cpu_speedup": 2.3481455639423823,
+      "cpu_ci95": [
+        2.30115700861636,
+        2.3890567417546387
+      ],
+      "wall_ms": 0.4577830120481928,
+      "wall_speedup": 2.3489827347570102,
+      "wall_ci95": [
+        2.3003190235671,
+        2.3894342552692356
+      ]
+    },
+    {
+      "case": "hopper_storagecart_interaction",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 0.33182879449152547,
+      "cpu_speedup": 2.7286768024027803,
+      "cpu_ci95": [
+        2.683049452981443,
+        2.845980626690894
+      ],
+      "wall_ms": 0.3327929533898305,
+      "wall_speedup": 2.7289792030691653,
+      "wall_ci95": [
+        2.6848861437436273,
+        2.847856312748531
+      ]
+    },
+    {
+      "case": "hopper_storagecart_interaction",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.2972249745762712,
+      "cpu_speedup": 2.729975278099991,
+      "cpu_ci95": [
+        2.6840738763402623,
+        2.793631556138563
+      ],
+      "wall_ms": 0.29793078177966104,
+      "wall_speedup": 2.7317139676020608,
+      "wall_ci95": [
+        2.685148362622175,
+        2.7960954258297677
+      ]
+    },
+    {
+      "case": "comparator_update_collection",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 0.34148015065502185,
+      "cpu_speedup": 6.450166651524734,
+      "cpu_ci95": [
+        6.293538615068822,
+        6.543820648763407
+      ],
+      "wall_ms": 0.34234589082969435,
+      "wall_speedup": 6.4546514978613585,
+      "wall_ci95": [
+        6.294809686172015,
+        6.551535415670977
+      ]
+    },
+    {
+      "case": "comparator_update_collection",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.28497631877729257,
+      "cpu_speedup": 6.741704585366834,
+      "cpu_ci95": [
+        6.57537525339136,
+        6.857051488058318
+      ],
+      "wall_ms": 0.285777211790393,
+      "wall_speedup": 6.742802801550232,
+      "wall_ci95": [
+        6.582248670790697,
+        6.860203200665339
+      ]
+    },
+    {
+      "case": "trapdoor2x3",
+      "variant": "Standard",
+      "reference": "master",
+      "rounds": 21,
+      "cpu_ms": 0.7600083448275862,
+      "cpu_speedup": 8.270673745648658,
+      "cpu_ci95": [
+        8.046154244979972,
+        8.512786285797198
+      ],
+      "wall_ms": 0.7627917980295567,
+      "wall_speedup": 8.274488480496537,
+      "wall_ci95": [
+        8.054056787155472,
+        8.539360601455806
+      ]
+    },
+    {
+      "case": "trapdoor2x3",
+      "variant": "PGO",
+      "reference": "master_pgo",
+      "rounds": 21,
+      "cpu_ms": 0.5982375418719211,
+      "cpu_speedup": 9.41931776758266,
+      "cpu_ci95": [
+        9.016545035482855,
+        9.710166417328617
+      ],
+      "wall_ms": 0.5998389655172414,
+      "wall_speedup": 9.433233295537201,
+      "wall_ci95": [
+        9.001711170643715,
+        9.722667282376525
+      ]
+    }
+  ]
+}

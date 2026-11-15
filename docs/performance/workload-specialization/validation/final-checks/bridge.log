@@ -1,0 +1,52 @@
+   Compiling mc-tick v0.1.0 (/home/harrison/code/Nucleation-simulation-performance/crates/mc-tick)
+warning: nucleation@0.12.2: blockpedia data: 1267 cached colors, 0 inherited
+warning: nucleation@0.12.2: blockpedia data: generated PHF table with 1286 blocks
+warning: nucleation@0.12.2: blockpedia data: generated 35723 Java->Bedrock / 15953 Bedrock->Java mappings
+   Compiling mc-test v0.1.0 (/home/harrison/code/Nucleation-simulation-performance/crates/mc-test)
+   Compiling nucleation v0.12.2 (/home/harrison/code/Nucleation-simulation-performance)
+warning: unused variable: `schematic`
+  --> src/bridge/autostack.rs:31:40
+   |
+31 | ...etect_structures_graph(schematic: &Schematic, out: &mut DiplomatWrite) {
+   |                           ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_schematic`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `nucleation` (lib test) generated 1 warning (run `cargo fix --lib -p nucleation --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 35.83s
+     Running unittests src/lib.rs (/home/harrison/nucleation-perf/execution-target/debug/deps/nucleation-04c459d35f0ed714)
+
+running 30 tests
+test bridge::mc_tick::tests::a_nan_cart_velocity_survives_the_round_trip ... ok
+test bridge::mc_tick::tests::an_unrepresentable_entity_is_refused_and_named ... ok
+test bridge::mc_tick::tests::audit_is_silent_when_nothing_is_missing ... ok
+test bridge::mc_tick::tests::audit_names_blocks_whose_block_entity_is_missing ... ok
+test bridge::mc_tick::tests::entities_needing_unimplemented_behaviour_are_refused_by_name ... ok
+test bridge::mc_tick::tests::entities_round_trip_from_schematic_into_the_engines_parser ... ok
+test bridge::mc_tick::tests::entities_that_do_have_behaviour_still_load ... ok
+test bridge::mc_tick::tests::every_colour_of_shulker_box_counts_as_a_container ... ok
+test bridge::mc_tick::tests::frozen_scaffolding_entities_load_as_hitboxes ... ok
+test bridge::mc_tick::tests::infinite_velocities_survive_the_round_trip ... ok
+test bridge::mc_tick::tests::active_neighbour_forces_the_event_engine_fallback ... ok
+test bridge::mc_tick::tests::modern_builds_are_passed_through_untouched ... ok
+test bridge::mc_tick::tests::a_settled_line_bakes_back_and_traces_to_its_lever ... ok
+test bridge::mc_tick::tests::pre_flattening_ids_are_converted_before_the_engine_sees_them ... ok
+test bridge::mc_tick::tests::passive_resolver_skips_simulation_even_for_a_sparse_batch ... ok
+test bridge::mc_tick::tests::simulate_tag_derives_wire_power_and_connections ... ok
+test bridge::mc_tick::tests::simulate_tag_on_an_isolated_block_is_a_plain_write ... ok
+test bridge::mc_tick::tests::simulate_tag_refuses_company_in_the_braces ... ok
+test bridge::mc_tick::tests::simple_wire_resolver_matches_the_event_engine ... ok
+test bridge::mc_tick::tests::simulated_batch_matches_sequential_convenience_placements ... ok
+test bridge::mc_tick::tests::simulate_world_tag_is_an_explicit_full_world_opt_in ... ok
+test bridge::mc_tick::tests::the_batch_prefilter_keeps_an_engine_and_rejects_a_lone_block ... ok
+test bridge::mc_tick::tests::the_emitted_snbt_states_the_schematics_own_data_version ... ok
+test bridge::mc_tick::tests::source_placement_resolver_matches_the_event_engine ... ok
+test bridge::mc_tick::tests::local_simulation_cost_ignores_unrelated_world_span ... ok
+test bridge::mc_tick::tests::a_build_stamped_after_the_boundary_still_drops_its_nan_carts ... ok
+test bridge::mc_tick::tests::tiny_motions_are_written_without_an_exponent ... ok
+test bridge::mc_tick::tests::the_snbt_round_trip_keeps_the_record_doors_nan_carts ... ok
+test bridge::mc_tick::tests::the_record_doors_two_blazes_are_seated_passengers ... ok
+test bridge::mc_tick::tests::the_record_door_is_at_rest_under_in_world_and_disturbed_under_quiet ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 1001 filtered out; finished in 13.74s
+

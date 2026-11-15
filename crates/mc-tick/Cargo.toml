@@ -5,6 +5,26 @@ edition = "2021"
 description = "Vanilla-accurate Minecraft tick simulation: deterministic, steppable, checkpointable"
 license = "MIT"
 
+# Independently selectable research candidates. No candidate changes the
+# reference build unless explicitly enabled; see docs/performance/execution-plans.
+[features]
+experiment-directional = []
+experiment-cursor = []
+experiment-update-pool = []
+experiment-wire-dispatch = []
+experiment-wire-plan = []
+experiment-wire-certificate = ["experiment-wire-plan"]
+experiment-wire-plan-counters = ["experiment-wire-plan"]
+experiment-world-plan-cache = ["experiment-wire-plan"]
+experiment-piston-plan = []
+experiment-piston-plan-counters = ["experiment-piston-plan"]
+experiment-execution-view = []
+experiment-update-arena = []
+experiment-lazy-journal = []
+experiment-moving-phase = []
+experiment-logic-plan-storage = ["experiment-world-plan-cache"]
+experiment-transition-signatures = ["experiment-world-plan-cache"]
+
 # Dependencies are deliberately near-zero. This crate's reason to exist is a fast
 # edit->test loop, and every dependency added here is paid on every iteration for
 # the life of the project. Adding one is a decision, not a convenience.
@@ -14,6 +34,7 @@ smallvec = "1"
 thiserror = "2"
 
 [dev-dependencies]
+cpu-time = "=1.0.0"
 # Corpus expectations are JSON; only the test binary pays for serde.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

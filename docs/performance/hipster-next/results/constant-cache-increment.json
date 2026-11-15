@@ -1,0 +1,79 @@
+{
+  "baseline": "baseline",
+  "source": "docs/performance/hipster-next/results/constant-cache-pilot.jsonl",
+  "resamples": 10000,
+  "results": [
+    {
+      "case": "hipster",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 12.965424,
+      "cpu_speedup": 1.0198326461723632,
+      "cpu_ci95": [
+        1.0014236722306562,
+        1.0410608853027976
+      ],
+      "wall_ms": 13.0135635,
+      "wall_speedup": 1.0196822850763871,
+      "wall_ci95": [
+        1.0016874953261077,
+        1.0414985125195966
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 1.9350045116279069,
+      "cpu_speedup": 0.9675673011470894,
+      "cpu_ci95": [
+        0.9352855734006217,
+        1.0077652139370035
+      ],
+      "wall_ms": 1.9406027674418604,
+      "wall_speedup": 0.9679852528198533,
+      "wall_ci95": [
+        0.9351518821457723,
+        1.0081184389877444
+      ]
+    },
+    {
+      "case": "item_sorter",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 1.171580375,
+      "cpu_speedup": 1.022388763648513,
+      "cpu_ci95": [
+        1.0023712229152295,
+        1.072281556250699
+      ],
+      "wall_ms": 1.1747920833333332,
+      "wall_speedup": 1.0226803489931966,
+      "wall_ci95": [
+        1.0033805963963458,
+        1.0728679782853274
+      ]
+    },
+    {
+      "case": "trapdoor2x3",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 0.8579214333333334,
+      "cpu_speedup": 0.957298731667076,
+      "cpu_ci95": [
+        0.9402958727911822,
+        0.9876025034447945
+      ],
+      "wall_ms": 0.8601517666666667,
+      "wall_speedup": 0.9578676290188014,
+      "wall_ci95": [
+        0.9394943671045887,
+        0.9865608281430823
+      ]
+    }
+  ]
+}

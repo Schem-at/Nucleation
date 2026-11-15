@@ -1,0 +1,76 @@
+{
+  "master_commit": "ee89008d085a8fb0088851dcac7221ab94d2b91c",
+  "candidate_commit": "a78a5545fb6168e1ed6b38be9965e05b25c843f3",
+  "source_archives": {
+    "master": 31,
+    "candidates": 36,
+    "certificate": 36,
+    "signatures": 36
+  },
+  "current_source_files": 36,
+  "tests": {
+    "passed": 481,
+    "ignored": 8
+  },
+  "bridge": {
+    "passed": 30,
+    "ignored": 0
+  },
+  "wasm": "passed",
+  "standalone_overlapping_tests": {
+    "moving": {
+      "passed": 249,
+      "ignored": 0
+    },
+    "logic": {
+      "passed": 265,
+      "ignored": 0
+    }
+  },
+  "traces": {
+    "validation/candidates/workload_combined-logic-verify.jsonl": 2,
+    "validation/candidates/workload_combined-verify.jsonl": 14,
+    "validation/candidates/workload_logic-logic-verify.jsonl": 2,
+    "validation/candidates/workload_logic-verify.jsonl": 14,
+    "validation/candidates/workload_moving-logic-verify.jsonl": 2,
+    "validation/candidates/workload_moving-verify.jsonl": 14,
+    "validation/candidates/workload_previous-logic-verify.jsonl": 2,
+    "validation/candidates/workload_previous-verify.jsonl": 14,
+    "validation/certificate/workload_certificate-logic-verify.jsonl": 2,
+    "validation/certificate/workload_certificate-verify.jsonl": 14,
+    "validation/master/reference-logic-verify.jsonl": 2,
+    "validation/master/reference-verify.jsonl": 14,
+    "validation/pgo-master/pgo-logic-verify.jsonl": 2,
+    "validation/pgo-master/pgo-verify.jsonl": 14,
+    "validation/pgo-previous/pgo-logic-verify.jsonl": 2,
+    "validation/pgo-previous/pgo-verify.jsonl": 14,
+    "validation/pgo-selected/pgo-logic-verify.jsonl": 2,
+    "validation/pgo-selected/pgo-verify.jsonl": 14,
+    "validation/signatures/workload_combined-logic-verify.jsonl": 2,
+    "validation/signatures/workload_combined-verify.jsonl": 14,
+    "validation/signatures/workload_previous-logic-verify.jsonl": 2,
+    "validation/signatures/workload_previous-verify.jsonl": 14,
+    "validation/signatures/workload_signatures-logic-verify.jsonl": 2,
+    "validation/signatures/workload_signatures-verify.jsonl": 14,
+    "validation/candidates/workload_combined-fuzz.jsonl": 56,
+    "validation/candidates/workload_logic-fuzz.jsonl": 56,
+    "validation/candidates/workload_moving-fuzz.jsonl": 56,
+    "validation/candidates/workload_previous-fuzz.jsonl": 56,
+    "validation/certificate/workload_certificate-fuzz.jsonl": 56,
+    "validation/final/master-fuzz.jsonl": 56,
+    "validation/final/previous-fuzz.jsonl": 56,
+    "validation/final/selected-fuzz.jsonl": 56,
+    "validation/master/reference-fuzz.jsonl": 56,
+    "validation/signatures/workload_combined-fuzz.jsonl": 56,
+    "validation/signatures/workload_previous-fuzz.jsonl": 56,
+    "validation/signatures/workload_signatures-fuzz.jsonl": 56
+  },
+  "native": {
+    "samples": 2142,
+    "cases": 17,
+    "variants": 6,
+    "rounds": 21,
+    "pairing_iterations_and_hashes_match": true
+  },
+  "isolated_classifier_measurements": 63
+}

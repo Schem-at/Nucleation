@@ -1,0 +1,1527 @@
+{
+  "adapter": "add003",
+  "benchmark": {
+    "clock": "elapsed_monotonic",
+    "excludes": "load, setup, checkpoint restore, assertions, destruction, rendering, export",
+    "includes": "typed drive, real simulation ticks, named output reads and result collection",
+    "iterations": 1,
+    "samples_ns": [],
+    "warmups": 0
+  },
+  "coordinates": "production export bounding-box-relative; explicit hash_origin preserves world-dependent order",
+  "hash_origin": [
+    0,
+    0,
+    0
+  ],
+  "observations": [
+    {
+      "cout": false,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 1
+    },
+    {
+      "cout": false,
+      "sum": 255
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 255
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": true,
+      "sum": 254
+    },
+    {
+      "cout": true,
+      "sum": 255
+    },
+    {
+      "cout": false,
+      "sum": 128
+    },
+    {
+      "cout": false,
+      "sum": 129
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": true,
+      "sum": 1
+    },
+    {
+      "cout": false,
+      "sum": 255
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 255
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 170
+    },
+    {
+      "cout": false,
+      "sum": 171
+    },
+    {
+      "cout": true,
+      "sum": 84
+    },
+    {
+      "cout": true,
+      "sum": 85
+    },
+    {
+      "cout": false,
+      "sum": 1
+    },
+    {
+      "cout": false,
+      "sum": 2
+    },
+    {
+      "cout": false,
+      "sum": 1
+    },
+    {
+      "cout": false,
+      "sum": 2
+    },
+    {
+      "cout": false,
+      "sum": 2
+    },
+    {
+      "cout": false,
+      "sum": 3
+    },
+    {
+      "cout": false,
+      "sum": 1
+    },
+    {
+      "cout": false,
+      "sum": 2
+    },
+    {
+      "cout": false,
+      "sum": 255
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 1
+    },
+    {
+      "cout": false,
+      "sum": 2
+    },
+    {
+      "cout": false,
+      "sum": 3
+    },
+    {
+      "cout": false,
+      "sum": 2
+    },
+    {
+      "cout": false,
+      "sum": 3
+    },
+    {
+      "cout": false,
+      "sum": 4
+    },
+    {
+      "cout": false,
+      "sum": 5
+    },
+    {
+      "cout": false,
+      "sum": 2
+    },
+    {
+      "cout": false,
+      "sum": 3
+    },
+    {
+      "cout": false,
+      "sum": 255
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 1
+    },
+    {
+      "cout": false,
+      "sum": 4
+    },
+    {
+      "cout": false,
+      "sum": 5
+    },
+    {
+      "cout": false,
+      "sum": 4
+    },
+    {
+      "cout": false,
+      "sum": 5
+    },
+    {
+      "cout": false,
+      "sum": 8
+    },
+    {
+      "cout": false,
+      "sum": 9
+    },
+    {
+      "cout": false,
+      "sum": 4
+    },
+    {
+      "cout": false,
+      "sum": 5
+    },
+    {
+      "cout": false,
+      "sum": 255
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 1
+    },
+    {
+      "cout": false,
+      "sum": 8
+    },
+    {
+      "cout": false,
+      "sum": 9
+    },
+    {
+      "cout": false,
+      "sum": 8
+    },
+    {
+      "cout": false,
+      "sum": 9
+    },
+    {
+      "cout": false,
+      "sum": 16
+    },
+    {
+      "cout": false,
+      "sum": 17
+    },
+    {
+      "cout": false,
+      "sum": 8
+    },
+    {
+      "cout": false,
+      "sum": 9
+    },
+    {
+      "cout": false,
+      "sum": 255
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 1
+    },
+    {
+      "cout": false,
+      "sum": 16
+    },
+    {
+      "cout": false,
+      "sum": 17
+    },
+    {
+      "cout": false,
+      "sum": 16
+    },
+    {
+      "cout": false,
+      "sum": 17
+    },
+    {
+      "cout": false,
+      "sum": 32
+    },
+    {
+      "cout": false,
+      "sum": 33
+    },
+    {
+      "cout": false,
+      "sum": 16
+    },
+    {
+      "cout": false,
+      "sum": 17
+    },
+    {
+      "cout": false,
+      "sum": 255
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 1
+    },
+    {
+      "cout": false,
+      "sum": 32
+    },
+    {
+      "cout": false,
+      "sum": 33
+    },
+    {
+      "cout": false,
+      "sum": 32
+    },
+    {
+      "cout": false,
+      "sum": 33
+    },
+    {
+      "cout": false,
+      "sum": 64
+    },
+    {
+      "cout": false,
+      "sum": 65
+    },
+    {
+      "cout": false,
+      "sum": 32
+    },
+    {
+      "cout": false,
+      "sum": 33
+    },
+    {
+      "cout": false,
+      "sum": 255
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 1
+    },
+    {
+      "cout": false,
+      "sum": 64
+    },
+    {
+      "cout": false,
+      "sum": 65
+    },
+    {
+      "cout": false,
+      "sum": 64
+    },
+    {
+      "cout": false,
+      "sum": 65
+    },
+    {
+      "cout": false,
+      "sum": 128
+    },
+    {
+      "cout": false,
+      "sum": 129
+    },
+    {
+      "cout": false,
+      "sum": 64
+    },
+    {
+      "cout": false,
+      "sum": 65
+    },
+    {
+      "cout": false,
+      "sum": 255
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 1
+    },
+    {
+      "cout": false,
+      "sum": 128
+    },
+    {
+      "cout": false,
+      "sum": 129
+    },
+    {
+      "cout": false,
+      "sum": 128
+    },
+    {
+      "cout": false,
+      "sum": 129
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": true,
+      "sum": 1
+    },
+    {
+      "cout": false,
+      "sum": 128
+    },
+    {
+      "cout": false,
+      "sum": 129
+    },
+    {
+      "cout": false,
+      "sum": 255
+    },
+    {
+      "cout": true,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 0
+    },
+    {
+      "cout": false,
+      "sum": 1
+    },
+    {
+      "cout": true,
+      "sum": 204
+    },
+    {
+      "cout": true,
+      "sum": 205
+    },
+    {
+      "cout": false,
+      "sum": 174
+    },
+    {
+      "cout": false,
+      "sum": 175
+    },
+    {
+      "cout": false,
+      "sum": 239
+    },
+    {
+      "cout": false,
+      "sum": 240
+    },
+    {
+      "cout": false,
+      "sum": 233
+    },
+    {
+      "cout": false,
+      "sum": 234
+    },
+    {
+      "cout": true,
+      "sum": 18
+    },
+    {
+      "cout": true,
+      "sum": 19
+    },
+    {
+      "cout": false,
+      "sum": 232
+    },
+    {
+      "cout": false,
+      "sum": 233
+    },
+    {
+      "cout": false,
+      "sum": 228
+    },
+    {
+      "cout": false,
+      "sum": 229
+    },
+    {
+      "cout": false,
+      "sum": 215
+    },
+    {
+      "cout": false,
+      "sum": 216
+    },
+    {
+      "cout": false,
+      "sum": 220
+    },
+    {
+      "cout": false,
+      "sum": 221
+    },
+    {
+      "cout": true,
+      "sum": 44
+    },
+    {
+      "cout": true,
+      "sum": 45
+    },
+    {
+      "cout": false,
+      "sum": 219
+    },
+    {
+      "cout": false,
+      "sum": 220
+    },
+    {
+      "cout": true,
+      "sum": 160
+    },
+    {
+      "cout": true,
+      "sum": 161
+    },
+    {
+      "cout": true,
+      "sum": 16
+    },
+    {
+      "cout": true,
+      "sum": 17
+    },
+    {
+      "cout": true,
+      "sum": 12
+    },
+    {
+      "cout": true,
+      "sum": 13
+    },
+    {
+      "cout": false,
+      "sum": 193
+    },
+    {
+      "cout": false,
+      "sum": 194
+    },
+    {
+      "cout": true,
+      "sum": 121
+    },
+    {
+      "cout": true,
+      "sum": 122
+    },
+    {
+      "cout": false,
+      "sum": 253
+    },
+    {
+      "cout": false,
+      "sum": 254
+    },
+    {
+      "cout": true,
+      "sum": 70
+    },
+    {
+      "cout": true,
+      "sum": 71
+    },
+    {
+      "cout": true,
+      "sum": 238
+    },
+    {
+      "cout": true,
+      "sum": 239
+    },
+    {
+      "cout": false,
+      "sum": 186
+    },
+    {
+      "cout": false,
+      "sum": 187
+    },
+    {
+      "cout": false,
+      "sum": 186
+    },
+    {
+      "cout": false,
+      "sum": 187
+    },
+    {
+      "cout": false,
+      "sum": 209
+    },
+    {
+      "cout": false,
+      "sum": 210
+    },
+    {
+      "cout": false,
+      "sum": 180
+    },
+    {
+      "cout": false,
+      "sum": 181
+    },
+    {
+      "cout": true,
+      "sum": 167
+    },
+    {
+      "cout": true,
+      "sum": 168
+    },
+    {
+      "cout": false,
+      "sum": 221
+    },
+    {
+      "cout": false,
+      "sum": 222
+    },
+    {
+      "cout": false,
+      "sum": 82
+    },
+    {
+      "cout": false,
+      "sum": 83
+    },
+    {
+      "cout": false,
+      "sum": 73
+    },
+    {
+      "cout": false,
+      "sum": 74
+    },
+    {
+      "cout": false,
+      "sum": 140
+    },
+    {
+      "cout": false,
+      "sum": 141
+    },
+    {
+      "cout": false,
+      "sum": 153
+    },
+    {
+      "cout": false,
+      "sum": 154
+    },
+    {
+      "cout": false,
+      "sum": 241
+    },
+    {
+      "cout": false,
+      "sum": 242
+    },
+    {
+      "cout": true,
+      "sum": 10
+    },
+    {
+      "cout": true,
+      "sum": 11
+    },
+    {
+      "cout": true,
+      "sum": 71
+    },
+    {
+      "cout": true,
+      "sum": 72
+    },
+    {
+      "cout": true,
+      "sum": 55
+    },
+    {
+      "cout": true,
+      "sum": 56
+    },
+    {
+      "cout": true,
+      "sum": 139
+    },
+    {
+      "cout": true,
+      "sum": 140
+    },
+    {
+      "cout": true,
+      "sum": 50
+    },
+    {
+      "cout": true,
+      "sum": 51
+    },
+    {
+      "cout": true,
+      "sum": 42
+    },
+    {
+      "cout": true,
+      "sum": 43
+    },
+    {
+      "cout": false,
+      "sum": 245
+    },
+    {
+      "cout": false,
+      "sum": 246
+    },
+    {
+      "cout": true,
+      "sum": 67
+    },
+    {
+      "cout": true,
+      "sum": 68
+    },
+    {
+      "cout": false,
+      "sum": 221
+    },
+    {
+      "cout": false,
+      "sum": 222
+    },
+    {
+      "cout": true,
+      "sum": 55
+    },
+    {
+      "cout": true,
+      "sum": 56
+    },
+    {
+      "cout": true,
+      "sum": 56
+    },
+    {
+      "cout": true,
+      "sum": 57
+    },
+    {
+      "cout": true,
+      "sum": 119
+    },
+    {
+      "cout": true,
+      "sum": 120
+    },
+    {
+      "cout": true,
+      "sum": 119
+    },
+    {
+      "cout": true,
+      "sum": 120
+    },
+    {
+      "cout": false,
+      "sum": 205
+    },
+    {
+      "cout": false,
+      "sum": 206
+    },
+    {
+      "cout": true,
+      "sum": 49
+    },
+    {
+      "cout": true,
+      "sum": 50
+    },
+    {
+      "cout": true,
+      "sum": 20
+    },
+    {
+      "cout": true,
+      "sum": 21
+    },
+    {
+      "cout": true,
+      "sum": 129
+    },
+    {
+      "cout": true,
+      "sum": 130
+    },
+    {
+      "cout": false,
+      "sum": 162
+    },
+    {
+      "cout": false,
+      "sum": 163
+    },
+    {
+      "cout": true,
+      "sum": 212
+    },
+    {
+      "cout": true,
+      "sum": 213
+    },
+    {
+      "cout": true,
+      "sum": 70
+    },
+    {
+      "cout": true,
+      "sum": 71
+    },
+    {
+      "cout": false,
+      "sum": 200
+    },
+    {
+      "cout": false,
+      "sum": 201
+    },
+    {
+      "cout": false,
+      "sum": 46
+    },
+    {
+      "cout": false,
+      "sum": 47
+    },
+    {
+      "cout": true,
+      "sum": 49
+    },
+    {
+      "cout": true,
+      "sum": 50
+    },
+    {
+      "cout": true,
+      "sum": 142
+    },
+    {
+      "cout": true,
+      "sum": 143
+    },
+    {
+      "cout": false,
+      "sum": 223
+    },
+    {
+      "cout": false,
+      "sum": 224
+    },
+    {
+      "cout": true,
+      "sum": 103
+    },
+    {
+      "cout": true,
+      "sum": 104
+    },
+    {
+      "cout": true,
+      "sum": 50
+    },
+    {
+      "cout": true,
+      "sum": 51
+    },
+    {
+      "cout": false,
+      "sum": 51
+    },
+    {
+      "cout": false,
+      "sum": 52
+    },
+    {
+      "cout": true,
+      "sum": 28
+    },
+    {
+      "cout": true,
+      "sum": 29
+    },
+    {
+      "cout": false,
+      "sum": 233
+    },
+    {
+      "cout": false,
+      "sum": 234
+    },
+    {
+      "cout": false,
+      "sum": 180
+    },
+    {
+      "cout": false,
+      "sum": 181
+    },
+    {
+      "cout": true,
+      "sum": 20
+    },
+    {
+      "cout": true,
+      "sum": 21
+    },
+    {
+      "cout": true,
+      "sum": 213
+    },
+    {
+      "cout": true,
+      "sum": 214
+    },
+    {
+      "cout": true,
+      "sum": 116
+    },
+    {
+      "cout": true,
+      "sum": 117
+    },
+    {
+      "cout": true,
+      "sum": 3
+    },
+    {
+      "cout": true,
+      "sum": 4
+    },
+    {
+      "cout": false,
+      "sum": 223
+    },
+    {
+      "cout": false,
+      "sum": 224
+    },
+    {
+      "cout": true,
+      "sum": 18
+    },
+    {
+      "cout": true,
+      "sum": 19
+    },
+    {
+      "cout": false,
+      "sum": 215
+    },
+    {
+      "cout": false,
+      "sum": 216
+    },
+    {
+      "cout": true,
+      "sum": 183
+    },
+    {
+      "cout": true,
+      "sum": 184
+    },
+    {
+      "cout": false,
+      "sum": 160
+    },
+    {
+      "cout": false,
+      "sum": 161
+    },
+    {
+      "cout": true,
+      "sum": 149
+    },
+    {
+      "cout": true,
+      "sum": 150
+    },
+    {
+      "cout": true,
+      "sum": 43
+    },
+    {
+      "cout": true,
+      "sum": 44
+    },
+    {
+      "cout": false,
+      "sum": 232
+    },
+    {
+      "cout": false,
+      "sum": 233
+    },
+    {
+      "cout": false,
+      "sum": 183
+    },
+    {
+      "cout": false,
+      "sum": 184
+    },
+    {
+      "cout": false,
+      "sum": 74
+    },
+    {
+      "cout": false,
+      "sum": 75
+    },
+    {
+      "cout": true,
+      "sum": 121
+    },
+    {
+      "cout": true,
+      "sum": 122
+    },
+    {
+      "cout": false,
+      "sum": 211
+    },
+    {
+      "cout": false,
+      "sum": 212
+    },
+    {
+      "cout": true,
+      "sum": 40
+    },
+    {
+      "cout": true,
+      "sum": 41
+    },
+    {
+      "cout": true,
+      "sum": 10
+    },
+    {
+      "cout": true,
+      "sum": 11
+    },
+    {
+      "cout": false,
+      "sum": 189
+    },
+    {
+      "cout": false,
+      "sum": 190
+    },
+    {
+      "cout": false,
+      "sum": 206
+    },
+    {
+      "cout": false,
+      "sum": 207
+    },
+    {
+      "cout": true,
+      "sum": 79
+    },
+    {
+      "cout": true,
+      "sum": 80
+    },
+    {
+      "cout": false,
+      "sum": 205
+    },
+    {
+      "cout": false,
+      "sum": 206
+    },
+    {
+      "cout": true,
+      "sum": 76
+    },
+    {
+      "cout": true,
+      "sum": 77
+    },
+    {
+      "cout": true,
+      "sum": 162
+    },
+    {
+      "cout": true,
+      "sum": 163
+    },
+    {
+      "cout": false,
+      "sum": 249
+    },
+    {
+      "cout": false,
+      "sum": 250
+    },
+    {
+      "cout": true,
+      "sum": 49
+    },
+    {
+      "cout": true,
+      "sum": 50
+    },
+    {
+      "cout": false,
+      "sum": 144
+    },
+    {
+      "cout": false,
+      "sum": 145
+    },
+    {
+      "cout": true,
+      "sum": 79
+    },
+    {
+      "cout": true,
+      "sum": 80
+    },
+    {
+      "cout": false,
+      "sum": 202
+    },
+    {
+      "cout": false,
+      "sum": 203
+    },
+    {
+      "cout": false,
+      "sum": 103
+    },
+    {
+      "cout": false,
+      "sum": 104
+    },
+    {
+      "cout": true,
+      "sum": 49
+    },
+    {
+      "cout": true,
+      "sum": 50
+    },
+    {
+      "cout": true,
+      "sum": 26
+    },
+    {
+      "cout": true,
+      "sum": 27
+    },
+    {
+      "cout": true,
+      "sum": 28
+    },
+    {
+      "cout": true,
+      "sum": 29
+    },
+    {
+      "cout": true,
+      "sum": 127
+    },
+    {
+      "cout": true,
+      "sum": 128
+    },
+    {
+      "cout": true,
+      "sum": 151
+    },
+    {
+      "cout": true,
+      "sum": 152
+    },
+    {
+      "cout": true,
+      "sum": 20
+    },
+    {
+      "cout": true,
+      "sum": 21
+    },
+    {
+      "cout": false,
+      "sum": 45
+    },
+    {
+      "cout": false,
+      "sum": 46
+    },
+    {
+      "cout": true,
+      "sum": 12
+    },
+    {
+      "cout": true,
+      "sum": 13
+    },
+    {
+      "cout": false,
+      "sum": 203
+    },
+    {
+      "cout": false,
+      "sum": 204
+    },
+    {
+      "cout": false,
+      "sum": 237
+    },
+    {
+      "cout": false,
+      "sum": 238
+    },
+    {
+      "cout": false,
+      "sum": 179
+    },
+    {
+      "cout": false,
+      "sum": 180
+    },
+    {
+      "cout": true,
+      "sum": 60
+    },
+    {
+      "cout": true,
+      "sum": 61
+    },
+    {
+      "cout": false,
+      "sum": 187
+    },
+    {
+      "cout": false,
+      "sum": 188
+    },
+    {
+      "cout": true,
+      "sum": 51
+    },
+    {
+      "cout": true,
+      "sum": 52
+    },
+    {
+      "cout": false,
+      "sum": 204
+    },
+    {
+      "cout": false,
+      "sum": 205
+    },
+    {
+      "cout": true,
+      "sum": 52
+    },
+    {
+      "cout": true,
+      "sum": 53
+    },
+    {
+      "cout": false,
+      "sum": 222
+    },
+    {
+      "cout": false,
+      "sum": 223
+    },
+    {
+      "cout": false,
+      "sum": 236
+    },
+    {
+      "cout": false,
+      "sum": 237
+    },
+    {
+      "cout": true,
+      "sum": 88
+    },
+    {
+      "cout": true,
+      "sum": 89
+    },
+    {
+      "cout": false,
+      "sum": 231
+    },
+    {
+      "cout": false,
+      "sum": 232
+    },
+    {
+      "cout": true,
+      "sum": 51
+    },
+    {
+      "cout": true,
+      "sum": 52
+    },
+    {
+      "cout": true,
+      "sum": 143
+    },
+    {
+      "cout": true,
+      "sum": 144
+    },
+    {
+      "cout": false,
+      "sum": 164
+    },
+    {
+      "cout": false,
+      "sum": 165
+    },
+    {
+      "cout": true,
+      "sum": 60
+    },
+    {
+      "cout": true,
+      "sum": 61
+    },
+    {
+      "cout": false,
+      "sum": 173
+    },
+    {
+      "cout": false,
+      "sum": 174
+    },
+    {
+      "cout": false,
+      "sum": 100
+    },
+    {
+      "cout": false,
+      "sum": 101
+    },
+    {
+      "cout": false,
+      "sum": 128
+    },
+    {
+      "cout": false,
+      "sum": 129
+    },
+    {
+      "cout": false,
+      "sum": 150
+    },
+    {
+      "cout": false,
+      "sum": 151
+    },
+    {
+      "cout": false,
+      "sum": 234
+    },
+    {
+      "cout": false,
+      "sum": 235
+    },
+    {
+      "cout": true,
+      "sum": 58
+    },
+    {
+      "cout": true,
+      "sum": 59
+    },
+    {
+      "cout": false,
+      "sum": 183
+    },
+    {
+      "cout": false,
+      "sum": 184
+    },
+    {
+      "cout": false,
+      "sum": 199
+    },
+    {
+      "cout": false,
+      "sum": 200
+    },
+    {
+      "cout": false,
+      "sum": 96
+    },
+    {
+      "cout": false,
+      "sum": 97
+    },
+    {
+      "cout": true,
+      "sum": 131
+    },
+    {
+      "cout": true,
+      "sum": 132
+    },
+    {
+      "cout": true,
+      "sum": 218
+    },
+    {
+      "cout": true,
+      "sum": 219
+    },
+    {
+      "cout": true,
+      "sum": 83
+    },
+    {
+      "cout": true,
+      "sum": 84
+    },
+    {
+      "cout": false,
+      "sum": 219
+    },
+    {
+      "cout": false,
+      "sum": 220
+    }
+  ],
+  "oracle": "Independent unsigned arithmetic: total=a+b+cin; sum=total&255; cout=total>=256. Carry boundaries, walking bits, transitions, and 128 deterministic pseudorandom operand pairs; not exhaustive.",
+  "output_assertions_per_run": 744,
+  "profile_sha256": "7c0c2709622a20696a887f3d4f5aa8af135212328098ba3ef7fc65a7a8330a27",
+  "random_tick_speed": 0,
+  "recording": "disabled",
+  "reset_replay": "exact_checkpoint_and_outputs",
+  "response_game_ticks": 32,
+  "rng_seed": 0,
+  "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+  "schema_version": 1,
+  "scope": "engine endpoint functionality under this fixed protocol; not a vanilla comparison or minimal latency proof",
+  "setup_game_ticks": 128,
+  "source_data_version": 4189,
+  "source_file": "ADD003_8bit_cca_3t.schem",
+  "source_sha256": "9046ececdca2d7fd481d2f70a679af6e2c4fe1c13bc87ad66cdbdf950dd4faa8",
+  "status": "functional_pass",
+  "suite_sha256": "5bc6f0f70246f3a05e4d9582f4ffcffd147ba0a30bcee211b58d42ad3c2bab03",
+  "ticks_per_iteration": 11904,
+  "vectors": 372,
+  "process_returncode": 0
+}

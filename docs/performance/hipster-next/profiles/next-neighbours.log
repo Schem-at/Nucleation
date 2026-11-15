@@ -1,0 +1,11 @@
+==3790892== Callgrind, a call-graph generating cache profiler
+==3790892== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==3790892== Using Valgrind-3.25.1 and LibVEX; rerun with -h for copyright info
+==3790892== Command: /home/harrison/nucleation-perf/bin/final-next hipster 1 2
+==3790892== 
+==3790892== For interactive control, run 'callgrind_control -h'.
+==3790892== 
+==3790892== Events    : Ir
+==3790892== Collected : 977368745
+==3790892== 
+==3790892== I   refs:      977,368,745

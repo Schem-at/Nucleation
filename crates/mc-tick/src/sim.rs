@@ -30,6 +30,20 @@ use crate::world::World;
 /// generous enough that no real build should reach it.
 const MAX_EVENT_CHAIN: usize = 1024;
 
+#[cfg(feature = "experiment-moving-phase")]
+#[derive(Default)]
+struct MovingPhaseScratch {
+    due: Vec<PendingMove>,
+}
+
+#[cfg(feature = "experiment-moving-phase")]
+impl std::fmt::Debug for MovingPhaseScratch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Reusable allocation capacity is not simulation state.
+        f.write_str("MovingPhaseScratch")
+    }
+}
+
 /// One recorded entity observation.
 #[derive(Debug, Clone, PartialEq)]
 pub enum EntityEvent {
@@ -247,8 +261,14 @@ pub struct Simulation {
     updates: Vec<crate::behaviour::UpdateEntry>,
     /// The collector's stack of in-flight entries (`CollectingNeighborUpdater`).
     pending: Vec<crate::behaviour::UpdateEntry>,
+    #[cfg(feature = "experiment-update-pool")]
+    update_pool: crate::behaviour::UpdatePool,
+    #[cfg(feature = "experiment-update-arena")]
+    update_arena: crate::behaviour::UpdateArena,
     /// Deferred writes awaiting their block-entities phase.
     moves: Vec<PendingMove>,
+    #[cfg(feature = "experiment-moving-phase")]
+    moving_phase_scratch: MovingPhaseScratch,
     /// Torch toggle history for burnout, pruned as it ages out.
     toggles: Vec<(Pos, u64)>,
     /// Stored comparator output strengths; vanilla's ComparatorBlockEntity.
@@ -482,7 +502,13 @@ impl Simulation {
             unknown_seen: Vec::new(),
             updates: Vec::new(),
             pending: Vec::new(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: crate::behaviour::UpdatePool::default(),
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: crate::behaviour::UpdateArena::default(),
             moves: Vec::new(),
+            #[cfg(feature = "experiment-moving-phase")]
+            moving_phase_scratch: MovingPhaseScratch::default(),
             toggles: Vec::new(),
             comparator_out: std::collections::HashMap::new(),
             inventories: std::collections::HashMap::new(),
@@ -552,6 +578,17 @@ impl Simulation {
         for cart in &self.minecarts {
             self.entity_snapshot.insert(cart.id, cart.pos);
         }
+    }
+
+    /// Discard and disable ordinary recording and its timeline without changing
+    /// simulation state. Update recording remains independent. `record()` can
+    /// subsequently start fresh logs.
+    pub fn discard_recording(&mut self) {
+        self.timeline = None;
+        self.log = None;
+        self.inv_log = None;
+        self.ent_log = None;
+        self.entity_snapshot.clear();
     }
 
     /// Start a rich run timeline, including block deltas, input markers,
@@ -1437,6 +1474,10 @@ impl Simulation {
         // ticker reconciliation all fire as for any other removal.
         for pos in cleared {
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut self.update_arena,
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut self.update_pool,
                 drain: Some(crate::behaviour::Drain {
                     pending: &mut self.pending,
                     unknown_seen: &mut self.unknown_seen,
@@ -1580,6 +1621,10 @@ impl Simulation {
                 continue;
             };
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut self.update_arena,
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut self.update_pool,
                 drain: Some(crate::behaviour::Drain {
                     pending: &mut self.pending,
                     unknown_seen: &mut self.unknown_seen,
@@ -1723,6 +1768,11 @@ impl Simulation {
         let ticking = self.ticking;
         // `pistonDeltasGameTime`: the running per-axis totals reset once a tick.
         self.piston_deltas.clear();
+        // With no possible target or outstanding probe, the reference loop
+        // only builds/discards geometry and refreshes an already-empty view.
+        // Recheck live lists every pass: callbacks can introduce entities.
+        #[cfg(feature = "experiment-moving-phase")]
+        if self.can_skip_piston_displacement() { return; }
         // Insertion order, which is what `tickBlockEntities` walks — and the
         // index rides along, because *when* another move's cell turns solid
         // depends on whether its block entity has already ticked this tick.
@@ -1799,7 +1849,7 @@ impl Simulation {
                 else {
                     continue;
                 };
-                if std::env::var_os("MC_TICK_TRACE_SHOVE").is_some() {
+                if crate::diagnostics::var_os("MC_TICK_TRACE_SHOVE").is_some() {
                     eprintln!(
                         "t{tick} SHOVE id={id} cart={is_cart} dest={destination:?} \
                          sweep={sweep:?} progress={progress} src={source_piston} \
@@ -1809,7 +1859,7 @@ impl Simulation {
                 let mut current = (min, max);
                 let apply = |sim: &mut Self, from: ([f64; 3], [f64; 3]), travel, amount| {
                     let moved = sim.shove(from.0, from.1, travel, amount, id, is_cart, shover);
-                    if std::env::var_os("MC_TICK_TRACE_SHOVE").is_some() {
+                    if crate::diagnostics::var_os("MC_TICK_TRACE_SHOVE").is_some() {
                         eprintln!(
                             "        APPLY id={id} travel={travel:?} asked={amount} moved={moved:?}"
                         );
@@ -1875,6 +1925,33 @@ impl Simulation {
             self.refresh_bodies();
         }
         self.notify_piston_probes();
+    }
+
+    #[cfg(feature = "experiment-moving-phase")]
+    fn can_skip_piston_displacement(&self) -> bool {
+        self.minecarts.is_empty()
+            && self.bodies.is_empty()
+            && self.item_entities.items.is_empty()
+            && self.item_entities.others.is_empty()
+            && self.tnts.is_empty()
+            && self.piston_probes.is_empty()
+    }
+
+    #[cfg(feature = "experiment-moving-phase")]
+    fn take_due_moves(&mut self) -> Vec<PendingMove> {
+        let mut due = std::mem::take(&mut self.moving_phase_scratch.due);
+        debug_assert!(due.is_empty());
+        let tick = self.tick;
+        let ticking = self.ticking;
+        // Stable extraction finishes before any callback. A callback can
+        // inspect, clear or append moves without touching this phase's snapshot.
+        self.moves.retain(|m| {
+            let ready = m.resolve_on <= tick
+                && ticking.as_ref().is_none_or(|bounds| bounds.contains(m.pos));
+            if ready { due.push(*m); }
+            !ready
+        });
+        due
     }
 
     /// `Entity.limitPistonMovement` + `applyPistonMovementRestriction`: clamp
@@ -1978,6 +2055,10 @@ impl Simulation {
                 continue;
             };
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut self.update_arena,
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut self.update_pool,
                 drain: Some(crate::behaviour::Drain {
                     pending: &mut self.pending,
                     unknown_seen: &mut self.unknown_seen,
@@ -2368,6 +2449,10 @@ impl Simulation {
                 continue;
             };
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut self.update_arena,
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut self.update_pool,
                 drain: Some(crate::behaviour::Drain {
                     pending: &mut self.pending,
                     unknown_seen: &mut self.unknown_seen,
@@ -2882,6 +2967,10 @@ impl Simulation {
     /// so a behaviour can drain mid-handler.
     fn ctx(&mut self) -> TickCtx<'_> {
         TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut self.update_arena,
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut self.update_pool,
             drain: Some(crate::behaviour::Drain {
                 pending: &mut self.pending,
                 unknown_seen: &mut self.unknown_seen,
@@ -2915,12 +3004,35 @@ impl Simulation {
         }
     }
 
+    fn queue_neighbors_at(&mut self, pos: Pos) {
+        #[cfg(feature = "experiment-update-pool")]
+        let entry = self.update_pool.neighbors_at(pos);
+        #[cfg(not(feature = "experiment-update-pool"))]
+        let entry = crate::behaviour::UpdateEntry::neighbors_at(pos);
+        self.updates.push(entry);
+    }
+
+    fn queue_neighbor_shapes(&mut self, pos: Pos) {
+        #[cfg(feature = "experiment-update-pool")]
+        let entry = self.update_pool.neighbor_shapes(pos);
+        #[cfg(not(feature = "experiment-update-pool"))]
+        let entry = crate::behaviour::UpdateEntry::neighbor_shapes(pos);
+        self.updates.push(entry);
+    }
+
+    fn queue_own_shapes(&mut self, pos: Pos) {
+        #[cfg(feature = "experiment-update-pool")]
+        let entry = self.update_pool.own_shapes(pos);
+        #[cfg(not(feature = "experiment-update-pool"))]
+        let entry = crate::behaviour::UpdateEntry::own_shapes(pos);
+        self.updates.push(entry);
+    }
+
     /// Notify the neighbours of `pos`, as an external change would.
     ///
     /// This is how a lever flip or a block break enters the simulation.
     pub fn notify_neighbors(&mut self, pos: Pos) {
-        self.updates
-            .push(crate::behaviour::UpdateEntry::neighbors_at(pos));
+        self.queue_neighbors_at(pos);
         self.propagate();
     }
 
@@ -3026,6 +3138,10 @@ impl Simulation {
                 continue;
             };
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut self.update_arena,
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut self.update_pool,
                 drain: Some(crate::behaviour::Drain {
                     pending: &mut self.pending,
                     unknown_seen: &mut self.unknown_seen,
@@ -3066,8 +3182,7 @@ impl Simulation {
             //
             // The order within a write is `onPlace`, then this: a block reacts
             // to its own arrival before the neighbourhood hears about it.
-            self.updates
-                .push(crate::behaviour::UpdateEntry::neighbors_at(*pos));
+            self.queue_neighbors_at(*pos);
             self.propagate();
         }
 
@@ -3138,6 +3253,10 @@ impl Simulation {
         if state != StateId::AIR {
             if let Some(behaviour) = self.behaviours.get(state) {
                 let mut ctx = TickCtx {
+                    #[cfg(feature = "experiment-update-arena")]
+                    update_arena: &mut self.update_arena,
+                    #[cfg(feature = "experiment-update-pool")]
+                    update_pool: &mut self.update_pool,
                     drain: Some(crate::behaviour::Drain {
                         pending: &mut self.pending,
                         unknown_seen: &mut self.unknown_seen,
@@ -3188,10 +3307,8 @@ impl Simulation {
         self.propagate();
 
         // 3. markAndNotifyBlock, flag 3: neighbours and the observer pass.
-        self.updates
-            .push(crate::behaviour::UpdateEntry::neighbors_at(pos));
-        self.updates
-            .push(crate::behaviour::UpdateEntry::neighbor_shapes(pos));
+        self.queue_neighbors_at(pos);
+        self.queue_neighbor_shapes(pos);
         self.propagate();
     }
 
@@ -3265,11 +3382,9 @@ impl Simulation {
             if self.world.get(*pos) == StateId::AIR {
                 continue;
             }
-            self.updates
-                .push(crate::behaviour::UpdateEntry::own_shapes(*pos));
+            self.queue_own_shapes(*pos);
             self.propagate();
-            self.updates
-                .push(crate::behaviour::UpdateEntry::neighbors_at(*pos));
+            self.queue_neighbors_at(*pos);
             self.propagate();
         }
     }
@@ -3391,6 +3506,10 @@ impl Simulation {
             // Field-disjoint borrows, exactly as `use_block` builds its ctx —
             // `self.ctx()` would reborrow `behaviours` mutably.
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut self.update_arena,
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut self.update_pool,
                 drain: Some(crate::behaviour::Drain {
                     pending: &mut self.pending,
                     unknown_seen: &mut self.unknown_seen,
@@ -3428,10 +3547,8 @@ impl Simulation {
         // `a_placed_block_pulses_the_watching_observer`, and vanilla's own
         // record of the same write (`--at` uses setBlock flag 3) shows the
         // pulse. Queue both, drain once: the documented flag-3 order.
-        self.updates
-            .push(crate::behaviour::UpdateEntry::neighbors_at(pos));
-        self.updates
-            .push(crate::behaviour::UpdateEntry::neighbor_shapes(pos));
+        self.queue_neighbors_at(pos);
+        self.queue_neighbor_shapes(pos);
         self.propagate();
     }
 
@@ -3461,6 +3578,10 @@ impl Simulation {
             return;
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut self.update_arena,
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut self.update_pool,
             drain: Some(crate::behaviour::Drain {
                 pending: &mut self.pending,
                 unknown_seen: &mut self.unknown_seen,
@@ -3497,7 +3618,7 @@ impl Simulation {
     /// Run one phase. `Some(stop)` aborts the tick.
     fn run_phase(&mut self, phase: Phase) -> Option<StopReason> {
         self.phase = Some(phase);
-        if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+        if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
             eprintln!("[t{}] --- phase {}", self.tick, phase.name());
         }
         match phase {
@@ -3520,7 +3641,7 @@ impl Simulation {
                 // this drain. Draining into a Vec is what keeps that boundary
                 // sharp.
                 let due = self.ticks.collect_due(self.tick);
-                if std::env::var("MC_TICK_TRACE_SCHEDULE").is_ok() {
+                if crate::diagnostics::var("MC_TICK_TRACE_SCHEDULE").is_ok() {
                     let names: Vec<String> = due
                         .iter()
                         .map(|e| {
@@ -3546,6 +3667,10 @@ impl Simulation {
                         continue;
                     };
                     let mut ctx = TickCtx {
+                        #[cfg(feature = "experiment-update-arena")]
+                        update_arena: &mut self.update_arena,
+                        #[cfg(feature = "experiment-update-pool")]
+                        update_pool: &mut self.update_pool,
                         drain: Some(crate::behaviour::Drain {
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
@@ -3596,6 +3721,10 @@ impl Simulation {
                         continue;
                     };
                     let mut ctx = TickCtx {
+                        #[cfg(feature = "experiment-update-arena")]
+                        update_arena: &mut self.update_arena,
+                        #[cfg(feature = "experiment-update-pool")]
+                        update_pool: &mut self.update_pool,
                         drain: Some(crate::behaviour::Drain {
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
@@ -3647,6 +3776,10 @@ impl Simulation {
                         continue;
                     };
                     let mut ctx = TickCtx {
+                        #[cfg(feature = "experiment-update-arena")]
+                        update_arena: &mut self.update_arena,
+                        #[cfg(feature = "experiment-update-pool")]
+                        update_pool: &mut self.update_pool,
                         drain: Some(crate::behaviour::Drain {
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
@@ -3688,15 +3821,20 @@ impl Simulation {
                 // event that started them. Captured from vanilla:
                 //   tick 0  stone -> moving_piston
                 //   tick 2  moving_piston -> stone (at its destination)
+                #[cfg(not(feature = "experiment-moving-phase"))]
                 let ticking = self.ticking;
+                #[cfg(not(feature = "experiment-moving-phase"))]
                 let in_ticking =
                     move |pos: Pos| ticking.as_ref().is_none_or(|bounds| bounds.contains(pos));
+                #[cfg(not(feature = "experiment-moving-phase"))]
                 let mut due: Vec<PendingMove> = self
                     .moves
                     .iter()
                     .filter(|m| m.resolve_on <= self.tick && in_ticking(m.pos))
                     .copied()
                     .collect();
+                #[cfg(feature = "experiment-moving-phase")]
+                let mut due = self.take_due_moves();
                 // Insertion order, which is what `tickBlockEntities` walks: the
                 // moving block entities tick in the order they were added to the
                 // level, and `moveBlocks` creates them farthest-from-the-piston
@@ -3722,15 +3860,21 @@ impl Simulation {
                 // is where a divergence from `getToPush` has to be chased.
                 // Frozen moves (outside the ticking bounds) stay pending: a
                 // block entity in a non-ticking chunk is suspended, not gone.
+                #[cfg(not(feature = "experiment-moving-phase"))]
                 self.moves
                     .retain(|m| m.resolve_on > self.tick || !in_ticking(m.pos));
+                #[cfg(not(feature = "experiment-moving-phase"))]
                 let mut landed: Vec<Pos> = Vec::new();
-                for entry in due {
+                #[cfg(not(feature = "experiment-moving-phase"))]
+                let entries = due;
+                #[cfg(feature = "experiment-moving-phase")]
+                let entries = due.drain(..);
+                for entry in entries {
                     let previous = self.world.get(entry.pos);
                     if previous == entry.state {
                         continue;
                     }
-                    if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+                    if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
                         eprintln!(
                             "[t{}] land   ({}, {}, {}) -> {}",
                             self.tick,
@@ -3758,8 +3902,7 @@ impl Simulation {
                     // itself. The landed block re-examines its world, which is
                     // how an observer that was *moved* pulses two ticks after it
                     // lands, and how a landed piston notices power waiting for it.
-                    self.updates
-                        .push(crate::behaviour::UpdateEntry::own_shapes(entry.pos));
+                    self.queue_own_shapes(entry.pos);
                     // Drained per landing, not once at the end. Each moving
                     // block entity's tick completes — shapes, onPlace, neighbour
                     // updates — before the next one starts, so a neighbour woken
@@ -3768,6 +3911,7 @@ impl Simulation {
                     // column instead, and a piston above it extended into a door
                     // vanilla leaves shut.
                     self.propagate();
+                    #[cfg(not(feature = "experiment-moving-phase"))]
                     landed.push(entry.pos);
                     // `onPlace` for each landed block, *after* that block's own
                     // landing updates have run but still inside its own landing.
@@ -3788,7 +3932,11 @@ impl Simulation {
                     // Running every onPlace after every landing showed it a solid
                     // column instead, and the 6x6 door fired a piston vanilla
                     // leaves alone.
-                    for pos in std::mem::take(&mut landed) {
+                    #[cfg(not(feature = "experiment-moving-phase"))]
+                    let placed = std::mem::take(&mut landed);
+                    #[cfg(feature = "experiment-moving-phase")]
+                    let placed = [entry.pos];
+                    for pos in placed {
                         let state = self.world.get(pos);
                         let Some(behaviour) = self.behaviours.get(state) else {
                             if state != StateId::AIR {
@@ -3797,6 +3945,10 @@ impl Simulation {
                             continue;
                         };
                         let mut ctx = TickCtx {
+                            #[cfg(feature = "experiment-update-arena")]
+                            update_arena: &mut self.update_arena,
+                            #[cfg(feature = "experiment-update-pool")]
+                            update_pool: &mut self.update_pool,
                             drain: Some(crate::behaviour::Drain {
                                 pending: &mut self.pending,
                                 unknown_seen: &mut self.unknown_seen,
@@ -3837,11 +3989,9 @@ impl Simulation {
                     // `LevelChunk.setBlockState` and `markAndNotifyBlock` after
                     // it returns — which is how a landed piston queues its own
                     // extend before it wakes the piston underneath it.
-                    self.updates
-                        .push(crate::behaviour::UpdateEntry::neighbors_at(entry.pos));
+                    self.queue_neighbors_at(entry.pos);
                     self.propagate();
-                    self.updates
-                        .push(crate::behaviour::UpdateEntry::neighbor_shapes(entry.pos));
+                    self.queue_neighbor_shapes(entry.pos);
                     self.propagate();
                     // `finalTick` ends with `level.neighborChanged(pos, block,
                     // null)` — the landed block hearing a neighbour update at
@@ -3856,6 +4006,8 @@ impl Simulation {
                     crate::behaviour::trace_update("neighbor", entry.pos);
                     self.propagate();
                 }
+                #[cfg(feature = "experiment-moving-phase")]
+                { self.moving_phase_scratch.due = due; }
                 None
             }
 
@@ -3980,6 +4132,10 @@ impl Simulation {
                         continue;
                     };
                     let mut ctx = TickCtx {
+                        #[cfg(feature = "experiment-update-arena")]
+                        update_arena: &mut self.update_arena,
+                        #[cfg(feature = "experiment-update-pool")]
+                        update_pool: &mut self.update_pool,
                         drain: Some(crate::behaviour::Drain {
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
@@ -4053,7 +4209,7 @@ impl Simulation {
                 // `doBlockEvent`: an event whose position no longer holds the
                 // block it was queued for is refused and dropped. Properties may
                 // differ; only the block has to match.
-                let trace_events = std::env::var("MC_TICK_TRACE_EVENTS").is_ok();
+                let trace_events = crate::diagnostics::var("MC_TICK_TRACE_EVENTS").is_ok();
                 if !self.registry.same_block(state, event.block) {
                     if trace_events {
                         eprintln!(
@@ -4081,6 +4237,10 @@ impl Simulation {
                     )
                 });
                 let mut ctx = TickCtx {
+                    #[cfg(feature = "experiment-update-arena")]
+                    update_arena: &mut self.update_arena,
+                    #[cfg(feature = "experiment-update-pool")]
+                    update_pool: &mut self.update_pool,
                     drain: Some(crate::behaviour::Drain {
                         pending: &mut self.pending,
                         unknown_seen: &mut self.unknown_seen,
@@ -4161,6 +4321,388 @@ mod tests {
 
     fn sim() -> Simulation {
         Simulation::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(7, 7, 7)))
+    }
+
+    #[cfg(feature = "experiment-moving-phase")]
+    mod moving_phase_tests {
+        use super::*;
+        use crate::behaviour::BlockBehaviour;
+        use std::sync::{Arc, Mutex};
+
+        fn deferred(pos: Pos, state: StateId, resolve_on: u64) -> PendingMove {
+            PendingMove { pos, state, carried: state, carried_short: None, remains: None,
+                started_on: 0, resolve_on, source_piston: false, sweep: None }
+        }
+
+        #[test]
+        fn stable_extraction_matches_reference_with_frozen_and_out_of_order_moves() {
+            let mut random = 0xcafe_f00du64;
+            let mut next = || {
+                random = random.wrapping_mul(6364136223846793005).wrapping_add(1);
+                (random >> 32) as u32
+            };
+            for round in 0..64 {
+                let mut s = sim();
+                s.tick = u64::from(next() % 24);
+                if round % 2 == 0 {
+                    s.set_ticking_bounds(Bounds::new(Pos::new(1, 1, 1), Pos::new(5, 5, 5)));
+                }
+                for _ in 0..128 {
+                    s.moves.push(deferred(Pos::new((next() % 8) as i32,
+                        (next() % 8) as i32, (next() % 8) as i32),
+                        StateId((next() % 32 + 1) as u16), u64::from(next() % 24)));
+                }
+                let ready = |m: &&PendingMove| m.resolve_on <= s.tick
+                    && s.ticking.as_ref().is_none_or(|bounds| bounds.contains(m.pos));
+                let mut expected: Vec<_> = s.moves.iter().filter(ready).copied().collect();
+                expected.sort_by_key(|m| m.resolve_on);
+                let remaining: Vec<_> = s.moves.iter().filter(|m| !ready(m)).copied().collect();
+                let mut due = s.take_due_moves();
+                due.sort_by_key(|m| m.resolve_on);
+                assert_eq!(due, expected);
+                assert_eq!(s.moves, remaining);
+                due.clear();
+                s.moving_phase_scratch.due = due;
+                assert!(s.take_due_moves().is_empty());
+            }
+        }
+
+        #[test]
+        fn landing_callbacks_keep_the_snapshot_order_and_restore_reuses_empty_scratch() {
+            const FIRST: Pos = Pos::new(1, 1, 1);
+            const SECOND: Pos = Pos::new(3, 1, 1);
+            const THIRD: Pos = Pos::new(5, 1, 1);
+            const ADDED: Pos = Pos::new(1, 1, 3);
+            const FROZEN: Pos = Pos::new(7, 7, 7);
+            const FUTURE: Pos = Pos::new(3, 1, 3);
+            struct Landing { state: StateId, calls: Arc<Mutex<Vec<Pos>>> }
+            impl BlockBehaviour for Landing {
+                fn name(&self) -> &'static str { "landing-snapshot-test" }
+                fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+                    self.calls.lock().unwrap().push(pos);
+                    if pos == FIRST {
+                        assert_eq!(ctx.world.get(SECOND), StateId::AIR);
+                        assert_eq!(ctx.world.get(THIRD), StateId::AIR);
+                        assert_eq!(ctx.moves.iter().map(|m| m.pos).collect::<Vec<_>>(),
+                            vec![FROZEN, FUTURE]);
+                        // Neither clearing nor adding to the public queue may
+                        // cancel or extend this phase's extracted snapshot.
+                        ctx.moves.clear();
+                        ctx.defer(ADDED, self.state, 0, None);
+                        ctx.inventories.insert(FIRST, crate::inventory::Inventory::empty(5));
+                        ctx.item_entities.spawn(("minecraft:stone".into(), 1),
+                            [1.5, 2.0, 1.5], [0.0; 3], 0);
+                    } else if pos == SECOND || pos == THIRD {
+                        assert_eq!(ctx.world.get(ADDED), StateId::AIR);
+                        assert_eq!(ctx.moves.len(), 1);
+                        assert_eq!(ctx.moves[0].pos, ADDED);
+                        assert!(ctx.inventories.contains_key(&FIRST));
+                        assert_eq!(ctx.item_entities.items.len(), 1);
+                    }
+                }
+            }
+            let mut s = sim();
+            let state = s.registry.intern("test:landing").unwrap();
+            let calls = Arc::new(Mutex::new(Vec::new()));
+            s.behaviours.register(state, Box::new(Landing { state, calls: calls.clone() }));
+            s.set_ticking_bounds(Bounds::new(Pos::new(0, 0, 0), Pos::new(6, 6, 6)));
+            s.tick = 2;
+            s.moves = vec![deferred(SECOND, state, 2), deferred(FROZEN, state, 0),
+                deferred(FIRST, state, 1), deferred(THIRD, state, 2), deferred(FUTURE, state, 8)];
+            let checkpoint = s.checkpoint();
+            for _ in 0..2 {
+                s.restore(&checkpoint);
+                s.record();
+                s.record_updates(true);
+                calls.lock().unwrap().clear();
+                assert!(s.can_skip_piston_displacement());
+                assert_eq!(s.run_phase(Phase::BlockEntities), None);
+                assert_eq!(*calls.lock().unwrap(), vec![FIRST, SECOND, THIRD]);
+                assert_eq!(s.recorded().iter().map(|c| c.pos).collect::<Vec<_>>(),
+                    vec![FIRST, SECOND, THIRD]);
+                assert_eq!(s.world.get(FROZEN), StateId::AIR);
+                assert_eq!(s.world.get(ADDED), StateId::AIR);
+                assert!(!s.can_skip_piston_displacement(), "callback's item is observed live");
+                assert!(s.moving_phase_scratch.due.is_empty());
+                assert!(s.moving_phase_scratch.due.capacity() >= 3);
+                assert_eq!(s.run_phase(Phase::BlockEntities), None);
+                assert_eq!(*calls.lock().unwrap(), vec![FIRST, SECOND, THIRD, ADDED]);
+                assert_eq!(s.world.get(ADDED), state);
+                assert!(s.moves.is_empty());
+            }
+        }
+
+        #[test]
+        fn no_target_fast_path_clears_deltas_and_rechecks_new_carts_and_probes() {
+            let mut s = sim();
+            let mut movement = deferred(Pos::new(3, 1, 1), StateId(1), 2);
+            movement.sweep = Some(crate::piston::Sweep { travel: Dir::East, extending: true });
+            s.moves.push(movement);
+            s.piston_deltas.insert(42, [0.5; 3]);
+            assert!(s.can_skip_piston_displacement());
+            s.displace_entities_by_pistons();
+            assert!(s.piston_deltas.is_empty());
+            assert_eq!(s.moves, vec![movement]);
+
+            s.piston_probes.push((42, [0.0; 3], [1.0; 3]));
+            assert!(!s.can_skip_piston_displacement());
+            s.displace_entities_by_pistons();
+            assert!(s.piston_probes.is_empty(), "orphaned probes still drain");
+            let id = s.spawn_minecart("minecraft:minecart".into(), [3.25, 1.0, 1.5], [0.0; 3]);
+            assert!(!s.can_skip_piston_displacement());
+            let before = s.minecarts[0].pos;
+            s.displace_entities_by_pistons();
+            assert!(s.minecarts[0].pos[0] > before[0], "a newly added cart is shoved");
+            assert!(s.piston_deltas.contains_key(&id));
+        }
+    }
+
+    #[cfg(feature = "experiment-update-arena")]
+    #[test]
+    fn arena_wire_transition_to_custom_behaviour_preserves_public_queue_observability() {
+        use crate::behaviour::{BlockBehaviour, UpdateEntry, UpdateKind};
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        struct Inspect(Arc<AtomicUsize>);
+        impl BlockBehaviour for Inspect {
+            fn name(&self) -> &'static str { "inspect-public-queue" }
+            fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, _: Pos, _: Dir) {
+                self.0.fetch_add(1, Ordering::Relaxed);
+                assert!(ctx.updates.is_empty());
+                let target = Pos::new(7, 7, 7);
+                ctx.notify(target, Dir::Up);
+                assert_eq!(ctx.updates.len(), 1, "custom code sees helper-generated entries");
+                let entry = ctx.updates[0].clone();
+                ctx.updates.clear();
+                ctx.update_neighbors_at(Pos::new(6, 6, 6));
+                assert_eq!(ctx.updates.len(), 1);
+                assert_eq!(ctx.updates[0].clone().next().unwrap().0,
+                    Pos::new(6, 6, 6).offset(crate::pos::UPDATE_ORDER[0]));
+                ctx.updates.clear();
+                ctx.updates.push(entry);
+                ctx.drain(); // Already inside a callback: must not dispatch yet.
+                assert_eq!(ctx.updates.len(), 1);
+            }
+            fn indirect_shape_targets(&self, _: &World, _: Pos) -> Vec<(Pos, Dir)> {
+                vec![(Pos::new(7, 7, 7), Dir::Down)]
+            }
+        }
+        fn run(arena: bool) -> (Simulation, usize) {
+            let mut s = sim();
+            let powered = s.registry.intern("minecraft:redstone_wire[east=none,north=none,power=15,south=none,west=none]").unwrap();
+            let off = s.registry.intern("minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]").unwrap();
+            let support = s.registry.intern("minecraft:stone").unwrap();
+            crate::vanilla::register_all(&mut s.registry, &mut s.behaviours);
+            let calls = Arc::new(AtomicUsize::new(0));
+            s.behaviours.register(off, Box::new(Inspect(calls.clone())));
+            if !arena { s.behaviours.disable_arena_for_test(); }
+            let pos = Pos::new(3, 1, 3);
+            s.world.set(pos.offset(Dir::Down), support);
+            s.world.set(pos, powered);
+            s.record();
+            s.record_updates(true);
+            let checkpoint = s.checkpoint();
+            for _ in 0..2 {
+                s.updates.push(UpdateEntry::new(vec![(pos, Dir::West, UpdateKind::Neighbor)]));
+                s.propagate();
+                assert_eq!(s.world.get(pos), off);
+                s.restore(&checkpoint);
+            }
+            (s, calls.load(Ordering::Relaxed))
+        }
+        let (arena, arena_calls) = run(true);
+        let (owned, owned_calls) = run(false);
+        assert!(arena.update_arena.native_batches() > 0, "exercise the real wire fast path");
+        assert_eq!(owned.update_arena.native_batches(), 0);
+        assert!(arena_calls > 0);
+        assert_eq!(arena_calls, owned_calls);
+        assert_eq!(arena.recorded(), owned.recorded());
+        assert_eq!(arena.recorded_updates(), owned.recorded_updates());
+        assert_eq!(format!("{:?}", arena.checkpoint()), format!("{:?}", owned.checkpoint()));
+    }
+
+    #[cfg(feature = "experiment-wire-dispatch")]
+    #[test]
+    fn typed_wire_dispatch_matches_dynamic_registration_and_custom_replacement() {
+        use crate::behaviour::{BlockBehaviour, UpdateEntry, UpdateKind};
+        use std::sync::{Arc, Mutex};
+        fn run_wire(typed: bool) -> Simulation {
+            let mut s = sim();
+            let wire = s.registry.intern("minecraft:redstone_wire[east=none,north=none,power=15,south=none,west=none]").unwrap();
+            s.registry.intern("minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]").unwrap();
+            let support = s.registry.intern("minecraft:stone").unwrap();
+            let rules = Arc::new(crate::vanilla::register_all(&mut s.registry, &mut s.behaviours));
+            if !typed {
+                let wires: Vec<_> = (0..s.registry.len()).filter_map(|raw| {
+                    let id = StateId(raw as u16);
+                    let descriptor = crate::vanilla::Descriptor::parse(s.registry.descriptor(id)?);
+                    if descriptor.name != "minecraft:redstone_wire" { return None; }
+                    let power = descriptor.get("power").and_then(|v| v.parse().ok()).unwrap_or(0);
+                    Some((id, power))
+                }).collect();
+                for (id, power) in wires {
+                    s.behaviours.register(id, Box::new(crate::wire::Wire {
+                        power_level: power, rules: rules.clone(),
+                    }));
+                }
+            }
+            let pos = Pos::new(3, 1, 3);
+            s.world.set(pos.offset(Dir::Down), support);
+            s.world.set(pos, wire);
+            s.record();
+            s.record_updates(true);
+            s.updates.push(UpdateEntry::new(vec![
+                (pos, Dir::West, UpdateKind::Neighbor),
+                (pos, Dir::East, UpdateKind::Shape),
+            ]));
+            s.propagate();
+            s
+        }
+        let mut typed = run_wire(true);
+        let dynamic = run_wire(false);
+        assert!(!typed.recorded().is_empty(), "test must exercise a wire state transition");
+        assert_eq!(typed.world, dynamic.world);
+        assert_eq!(typed.recorded(), dynamic.recorded());
+        assert_eq!(typed.recorded_updates(), dynamic.recorded_updates());
+        assert_eq!(format!("{:?}", typed.checkpoint()), format!("{:?}", dynamic.checkpoint()));
+
+        struct Replacement(Arc<Mutex<Vec<UpdateKind>>>);
+        impl BlockBehaviour for Replacement {
+            fn name(&self) -> &'static str { "custom-wire-replacement" }
+            fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _: Dir) {
+                self.0.lock().unwrap().push(UpdateKind::Neighbor);
+                ctx.set_quiet(pos, StateId::AIR);
+            }
+            fn on_shape_update(&self, _: &mut TickCtx<'_>, _: Pos, _: Dir) {
+                self.0.lock().unwrap().push(UpdateKind::Shape);
+            }
+        }
+        let pos = Pos::new(3, 1, 3);
+        let state = typed.world.get(pos);
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        typed.behaviours.register(state, Box::new(Replacement(calls.clone())));
+        assert_eq!(typed.behaviours.get(state).unwrap().name(), "custom-wire-replacement");
+        typed.record_updates(true);
+        typed.updates.push(UpdateEntry::new(vec![
+            (pos, Dir::West, UpdateKind::Shape),
+            (pos, Dir::West, UpdateKind::Neighbor),
+            (pos, Dir::East, UpdateKind::Shape),
+        ]));
+        typed.propagate();
+        assert_eq!(&*calls.lock().unwrap(), &[UpdateKind::Shape, UpdateKind::Neighbor]);
+        assert_eq!(typed.recorded_updates().iter().map(|r| r.state).collect::<Vec<_>>(),
+                   [state, state, StateId::AIR], "record current state before dispatch");
+        let unknown = StateId(u16::MAX);
+        typed.world.set(pos, unknown);
+        typed.updates.push(UpdateEntry::new(vec![(pos, Dir::Up, UpdateKind::Neighbor)]));
+        typed.propagate();
+        assert!(typed.unknown_seen.contains(&unknown));
+        assert_eq!(typed.recorded_updates().last().unwrap().state, unknown);
+    }
+
+    #[cfg(any(feature = "experiment-update-pool", feature = "experiment-update-arena"))]
+    #[test]
+    fn pooled_updates_preserve_nested_order_custom_entries_and_restore() {
+        use crate::behaviour::{BlockBehaviour, UpdateEntry, UpdateKind};
+        use std::sync::{Arc, Mutex};
+        struct Nested(Arc<Mutex<Vec<i32>>>);
+        impl BlockBehaviour for Nested {
+            fn name(&self) -> &'static str { "nested" }
+            fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _: Dir) {
+                self.0.lock().unwrap().push(pos.x);
+                if pos.x == 0 {
+                    ctx.notify(Pos::new(2, 0, 0), Dir::Down);
+                    ctx.notify(Pos::new(3, 0, 0), Dir::Down);
+                    ctx.drain();
+                    assert_eq!(&*self.0.lock().unwrap(), &[0], "nested drain only queues");
+                } else if pos.x == 2 {
+                    ctx.notify(Pos::new(4, 0, 0), Dir::Down);
+                }
+            }
+        }
+        let mut s = sim();
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let state = s.registry_mut().intern("test:nested").unwrap();
+        s.behaviours.register(state, Box::new(Nested(calls.clone())));
+        for x in 0..=5 { s.world.set(Pos::new(x, 0, 0), state); }
+        let checkpoint = s.checkpoint();
+        let before = format!("{checkpoint:?}");
+        for _ in 0..2 {
+            calls.lock().unwrap().clear();
+            s.record_updates(true);
+            let item = |x| (Pos::new(x, 0, 0), Dir::Down, UpdateKind::Neighbor);
+            // Public custom batches, including a non-pooled two-item vector.
+            s.updates.push(UpdateEntry::new(vec![item(0), item(1)]));
+            s.updates.push(UpdateEntry::new(vec![item(5)]));
+            s.propagate();
+            assert_eq!(&*calls.lock().unwrap(), &[0, 2, 4, 3, 1, 5]);
+            assert_eq!(s.recorded_updates().iter().map(|r| r.pos.x).collect::<Vec<_>>(),
+                       [0, 2, 4, 3, 1, 5]);
+            assert!(s.updates.is_empty() && s.pending.is_empty());
+            #[cfg(not(feature = "experiment-update-arena"))]
+            assert!(s.update_pool.retained_buffers() > 0);
+            s.restore(&checkpoint);
+            assert_eq!(format!("{:?}", s.checkpoint()), before,
+                       "pool capacity is not semantic checkpoint state");
+        }
+    }
+
+    #[cfg(any(feature = "experiment-update-pool", feature = "experiment-update-arena"))]
+    #[test]
+    fn pooled_updates_remain_usable_after_cascade_abort() {
+        use crate::behaviour::{BlockBehaviour, UpdateEntry};
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        struct Cycle(Arc<AtomicUsize>);
+        impl BlockBehaviour for Cycle {
+            fn name(&self) -> &'static str { "cycle" }
+            fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _: Dir) {
+                self.0.fetch_add(1, Ordering::Relaxed);
+                ctx.notify(pos, Dir::Down);
+            }
+        }
+        let mut s = sim();
+        let count = Arc::new(AtomicUsize::new(0));
+        let state = s.registry_mut().intern("test:cycle").unwrap();
+        s.behaviours.register(state, Box::new(Cycle(count.clone())));
+        let pos = Pos::new(1, 1, 1);
+        s.world.set(pos, state);
+        s.updates.push(UpdateEntry::new(vec![(pos, Dir::Down, crate::behaviour::UpdateKind::Neighbor)]));
+        s.propagate();
+        assert_eq!(count.load(Ordering::Relaxed), 1_000_000);
+        assert!(s.updates.is_empty() && s.pending.is_empty());
+        #[cfg(feature = "experiment-update-pool")]
+        assert!(s.update_pool.retained_buffers() <= 2048);
+        s.world.set(pos, StateId::AIR);
+        s.record_updates(true);
+        s.notify_neighbors(pos);
+        assert_eq!(s.recorded_updates().len(), 6);
+        assert!(s.updates.is_empty() && s.pending.is_empty());
+    }
+
+    #[test]
+    fn discard_recording_preserves_state_updates_and_allows_restart() {
+        let mut s = sim();
+        let stone = s.registry_mut().intern("minecraft:stone").unwrap();
+        s.record_timeline();
+        s.record_updates(true);
+        s.place_block(Pos::new(1,1,1), stone);
+        s.run(2);
+        let saved = format!("{:?}", s.checkpoint());
+        let updates = s.recorded_updates().to_vec();
+        assert!(!s.recorded().is_empty());
+        s.discard_recording();
+        assert_eq!(format!("{:?}", s.checkpoint()), saved);
+        assert_eq!(s.recorded_updates(), updates);
+        assert!(s.recorded_timeline().is_none());
+        assert!(s.log.is_none() && s.inv_log.is_none() && s.ent_log.is_none());
+        assert!(s.entity_snapshot.is_empty());
+        s.place_block(Pos::new(2,1,1), stone);
+        s.run(2);
+        assert!(s.recorded().is_empty());
+        assert!(s.recorded_updates().len() > updates.len());
+        s.record();
+        s.place_block(Pos::new(3,1,1), stone);
+        s.run(2);
+        assert!(!s.recorded().is_empty());
     }
 
     #[test]

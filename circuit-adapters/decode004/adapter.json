@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "id": "decode004",
+  "source_sha256": "09d6768f157d67845fa0615393077d610ed06c7fc9e57eb3721bb9bb3586267b",
+  "source_data_version": 4189,
+  "description": "Four identical programmed 4-bit decoder rows; matches 1010, not one-hot",
+  "evidence": [
+    "Pinned source programming uses repeater/torch/repeater/torch in each row; all four rows match the same binary 1010 pattern.",
+    "Static port mapping and native checks retained in check_logic_candidates.rs; source independently reinspected before this adapter.",
+    "608 independent endpoints cover16 input values and all256 ordered transitions. 32 game ticks is a conservative response budget.",
+    "Original DataVersion 4189 and source unchanged; no fresh vanilla parity or glitch-free claim."
+  ],
+  "cell": {
+    "name": "decode004",
+    "version": "1",
+    "io": {
+      "inputs": {
+        "data": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 4
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              6,
+              1,
+              4
+            ],
+            [
+              6,
+              1,
+              6
+            ],
+            [
+              6,
+              1,
+              8
+            ],
+            [
+              6,
+              1,
+              10
+            ]
+          ]
+        }
+      },
+      "outputs": {
+        "matches": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 4
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              0,
+              2,
+              0
+            ],
+            [
+              0,
+              4,
+              0
+            ],
+            [
+              0,
+              6,
+              0
+            ],
+            [
+              0,
+              8,
+              0
+            ]
+          ]
+        },
+        "input_echo": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 4
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              5,
+              1,
+              4
+            ],
+            [
+              5,
+              1,
+              6
+            ],
+            [
+              5,
+              1,
+              8
+            ],
+            [
+              5,
+              1,
+              10
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "input_order": [
+    "data"
+  ],
+  "outputs": {
+    "matches": "lamp_lit",
+    "input_echo": "lamp_lit"
+  },
+  "setup_ticks": 128,
+  "response_ticks": 32,
+  "require_quiescent": true,
+  "rng_seed": 0,
+  "hash_origin": [
+    0,
+    0,
+    0
+  ]
+}

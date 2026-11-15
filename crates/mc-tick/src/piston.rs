@@ -332,7 +332,7 @@ fn add_block_line(
             return true;
         }
         if movability.is_empty(world, next) {
-            if std::env::var_os("MC_TICK_TRACE_LINE").is_some() {
+            if crate::diagnostics::var_os("MC_TICK_TRACE_LINE").is_some() {
                 eprintln!(
                     "       line from {:?} dir={push_dir:?} stopped: {:?} is empty ({} collected)",
                     (origin.x, origin.y, origin.z),
@@ -343,7 +343,7 @@ fn add_block_line(
             return true;
         }
         if !movability.is_movable(world, next) || next == piston {
-            if std::env::var_os("MC_TICK_TRACE_LINE").is_some() {
+            if crate::diagnostics::var_os("MC_TICK_TRACE_LINE").is_some() {
                 eprintln!(
                     "       line from {:?} dir={push_dir:?} FAILED at {:?}: immovable ({} collected)",
                     (origin.x, origin.y, origin.z),
@@ -360,7 +360,7 @@ fn add_block_line(
         // capture: if the game never breaks it, either the line is longer than
         // the game's or the block is not breakable at all. It was the second —
         // rails were listed as `DESTROY` and the game plainly pushes them.
-        if std::env::var_os("MC_TICK_TRACE_REACH").is_some() && movability.destroys(world, next) {
+        if crate::diagnostics::var_os("MC_TICK_TRACE_REACH").is_some() && movability.destroys(world, next) {
             eprintln!(
                 "[reach] piston={:?} dir={:?} line_origin={:?} reached={:?} collected={:?}",
                 (piston.x, piston.y, piston.z),
@@ -482,7 +482,7 @@ pub fn resolve_pull(
         &mut to_push,
         &mut to_destroy,
     ) {
-        if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+        if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
             eprintln!(
                 "       pull-fail line {:?} had {} collected: {:?}",
                 (piston.x, piston.y, piston.z),
@@ -506,7 +506,7 @@ pub fn resolve_pull(
                 &mut to_destroy,
             )
         {
-            if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+            if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
                 eprintln!(
                     "       pull-fail branch {:?} at {:?}, {} collected: {:?}",
                     (piston.x, piston.y, piston.z),
@@ -625,6 +625,10 @@ impl<P: PowerSource, M: Movability> Piston<P, M> {
         outs: &crate::behaviour::ComparatorOutputs,
         pos: Pos,
     ) -> bool {
+        #[cfg(feature = "experiment-piston-plan")]
+        if let Some(powered) = self.power.planned_piston_power(world, outs, pos, self.facing) {
+            return powered;
+        }
         // `getNeighborSignal` skips the direction the piston pushes at its own
         // position, and skips Down (back toward the piston) at the position
         // above. Read from the bytecode.
@@ -663,7 +667,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
     }
 
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
-        if std::env::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
+        if crate::diagnostics::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
             f.to_string_lossy().split(';').any(|t| {
                 let c: Vec<i32> = t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
                 c.len() == 3 && c[0] == pos.x && c[1] == pos.y && c[2] == pos.z
@@ -732,7 +736,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // A piston that is powered, unextended, and still silent is
                 // always a refused resolve — and which block refused it is the
                 // only thing worth knowing.
-                if std::env::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
+                if crate::diagnostics::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
                     f.to_string_lossy().split(';').any(|t| {
                         let c: Vec<i32> =
                             t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
@@ -797,7 +801,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     return false;
                 }
                 let plan = resolve_push(ctx.world, &self.movability, pos, self.facing);
-                if std::env::var("MC_TICK_TRACE_EVENTS").is_ok() {
+                if crate::diagnostics::var("MC_TICK_TRACE_EVENTS").is_ok() {
                     let names: Vec<String> = plan
                         .to_push
                         .iter()
@@ -1023,7 +1027,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // at the instant a retract is dispatched, which is the instant
                 // vanilla decides whether to refuse it. Both halves separately,
                 // because "powered" and "quasi-powered" fail in different ways.
-                if std::env::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
+                if crate::diagnostics::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
                     f.to_string_lossy().split(';').any(|t| {
                         let c: Vec<i32> =
                             t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
@@ -1126,7 +1130,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // first instead — as this did — puts a solid block in the
                 // quasi-connectivity ring a tick early, and a piston below
                 // reads power vanilla never gives it.
-                if std::env::var_os("MC_TICK_TRACE_RETRACT").is_some() {
+                if crate::diagnostics::var_os("MC_TICK_TRACE_RETRACT").is_some() {
                     eprintln!(
                         "[t{}] [retract] {:?} id={id} head={:?} head_state={} pending_at_head={}",
                         ctx.tick,
@@ -1215,7 +1219,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                         // The retract stroke gets the same trace the push does.
                         // Without it a pull that silently resolves to nothing is
                         // invisible, which is exactly how a failed one hid.
-                        if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+                        if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
                             let names: Vec<String> = plan
                                 .to_push
                                 .iter()
@@ -1420,13 +1424,35 @@ mod tests {
         World::new(Bounds::new(Pos::new(-2, 0, -2), Pos::new(24, 4, 2)))
     }
 
+    #[cfg(feature = "experiment-piston-plan")]
+    #[test]
+    fn custom_power_model_keeps_the_reference_piston_query_path() {
+        let piston = piston(false, false);
+        let mut world = world();
+        let pos = Pos::new(0, 1, 0);
+        let outputs = crate::behaviour::ComparatorOutputs::new();
+        assert_eq!(piston.power.planned_piston_power(&world, &outputs, pos, piston.facing), None);
+        world.set(pos.offset(Dir::East), LEVER);
+        assert!(!piston.is_powered(&world, &outputs, pos));
+        world.set(pos.offset(Dir::Up).offset(Dir::East), LEVER);
+        assert!(piston.is_powered(&world, &outputs, pos));
+    }
+
     fn run<'a>(
         world: &'a mut World,
         ticks: &'a mut TickQueue,
         events: &'a mut EventQueue,
         states: &'a StateRegistry,
+        #[cfg(feature = "experiment-update-pool")]
+        update_pool: &'a mut crate::behaviour::UpdatePool,
+        #[cfg(feature = "experiment-update-arena")]
+        update_arena: &'a mut crate::behaviour::UpdateArena,
     ) -> TickCtx<'a> {
         TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena,
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool,
             drain: None,
             behaviours: None,
             world,
@@ -1474,7 +1500,14 @@ mod tests {
         w.set(pos.offset(Dir::Up), LEVER);
 
         let p = piston(false, false);
-        let mut ctx = run(&mut w, &mut t, &mut e, &s);
+        #[cfg(feature = "experiment-update-pool")]
+        let mut update_pool = crate::behaviour::UpdatePool::default();
+        #[cfg(feature = "experiment-update-arena")]
+        let mut update_arena = crate::behaviour::UpdateArena::default();
+        let mut ctx = run(&mut w, &mut t, &mut e, &s,
+            #[cfg(feature = "experiment-update-pool")] &mut update_pool,
+            #[cfg(feature = "experiment-update-arena")] &mut update_arena,
+        );
         p.on_neighbor_changed(&mut ctx, pos, Dir::Up);
 
         assert_eq!(e.len(), 1, "must queue a block event");
@@ -1503,6 +1536,10 @@ mod tests {
         let mut ctx_moves = Vec::new();
         {
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut crate::behaviour::UpdateArena::default(),
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut crate::behaviour::UpdatePool::default(),
                 drain: None,
                 behaviours: None,
                 world: &mut w,
@@ -1635,6 +1672,10 @@ mod tests {
         let mut pulled = Vec::new();
         {
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut crate::behaviour::UpdateArena::default(),
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut crate::behaviour::UpdatePool::default(),
                 drain: None,
                 behaviours: None,
                 world: &mut w,
@@ -1704,6 +1745,10 @@ mod tests {
         let mut pulled = Vec::new();
         {
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut crate::behaviour::UpdateArena::default(),
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut crate::behaviour::UpdatePool::default(),
                 drain: None,
                 behaviours: None,
                 world: &mut w,
@@ -1770,6 +1815,10 @@ mod tests {
         let mut pulled = Vec::new();
         {
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-arena")]
+                update_arena: &mut crate::behaviour::UpdateArena::default(),
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut crate::behaviour::UpdatePool::default(),
                 drain: None,
                 behaviours: None,
                 world: &mut w,
@@ -1825,7 +1874,14 @@ mod tests {
         w.set(Pos::new(2, 1, 0), STONE);
 
         let p = piston(true, false);
-        let mut ctx = run(&mut w, &mut t, &mut e, &s);
+        #[cfg(feature = "experiment-update-pool")]
+        let mut update_pool = crate::behaviour::UpdatePool::default();
+        #[cfg(feature = "experiment-update-arena")]
+        let mut update_arena = crate::behaviour::UpdateArena::default();
+        let mut ctx = run(&mut w, &mut t, &mut e, &s,
+            #[cfg(feature = "experiment-update-pool")] &mut update_pool,
+            #[cfg(feature = "experiment-update-arena")] &mut update_arena,
+        );
         p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0);
 
         assert_eq!(w.get(Pos::new(1, 1, 0)), StateId::AIR, "head just vanishes");
@@ -1842,7 +1898,14 @@ mod tests {
         w.set(pos, RETRACTED);
 
         let p = piston(false, false);
-        let mut ctx = run(&mut w, &mut t, &mut e, &s);
+        #[cfg(feature = "experiment-update-pool")]
+        let mut update_pool = crate::behaviour::UpdatePool::default();
+        #[cfg(feature = "experiment-update-arena")]
+        let mut update_arena = crate::behaviour::UpdateArena::default();
+        let mut ctx = run(&mut w, &mut t, &mut e, &s,
+            #[cfg(feature = "experiment-update-pool")] &mut update_pool,
+            #[cfg(feature = "experiment-update-arena")] &mut update_arena,
+        );
         p.on_neighbor_changed(&mut ctx, pos, Dir::Up);
         assert!(e.is_empty(), "no power, no event");
     }
@@ -2030,7 +2093,14 @@ mod tests {
         w.set(Pos::new(1, 2, 0), LEVER);
 
         let p = piston(false, false);
-        let mut ctx = run(&mut w, &mut t, &mut e, &s);
+        #[cfg(feature = "experiment-update-pool")]
+        let mut update_pool = crate::behaviour::UpdatePool::default();
+        #[cfg(feature = "experiment-update-arena")]
+        let mut update_arena = crate::behaviour::UpdateArena::default();
+        let mut ctx = run(&mut w, &mut t, &mut e, &s,
+            #[cfg(feature = "experiment-update-pool")] &mut update_pool,
+            #[cfg(feature = "experiment-update-arena")] &mut update_arena,
+        );
         p.on_neighbor_changed(&mut ctx, pos, Dir::Up);
 
         assert_eq!(e.len(), 1, "QC must power the piston");
@@ -2049,7 +2119,14 @@ mod tests {
         w.set(Pos::new(1, 3, 0), LEVER);
 
         let p = piston(false, false);
-        let mut ctx = run(&mut w, &mut t, &mut e, &s);
+        #[cfg(feature = "experiment-update-pool")]
+        let mut update_pool = crate::behaviour::UpdatePool::default();
+        #[cfg(feature = "experiment-update-arena")]
+        let mut update_arena = crate::behaviour::UpdateArena::default();
+        let mut ctx = run(&mut w, &mut t, &mut e, &s,
+            #[cfg(feature = "experiment-update-pool")] &mut update_pool,
+            #[cfg(feature = "experiment-update-arena")] &mut update_arena,
+        );
         p.on_neighbor_changed(&mut ctx, pos, Dir::Up);
 
         assert!(e.is_empty(), "QC reaches one block up, not two");
@@ -2064,7 +2141,14 @@ mod tests {
         let mut e = EventQueue::new();
         let s = StateRegistry::new();
         let p = piston(false, false);
-        let mut ctx = run(&mut w, &mut t, &mut e, &s);
+        #[cfg(feature = "experiment-update-pool")]
+        let mut update_pool = crate::behaviour::UpdatePool::default();
+        #[cfg(feature = "experiment-update-arena")]
+        let mut update_arena = crate::behaviour::UpdateArena::default();
+        let mut ctx = run(&mut w, &mut t, &mut e, &s,
+            #[cfg(feature = "experiment-update-pool")] &mut update_pool,
+            #[cfg(feature = "experiment-update-arena")] &mut update_arena,
+        );
         assert!(!p.on_block_event(&mut ctx, Pos::new(0, 1, 0), 9, 0));
     }
 }

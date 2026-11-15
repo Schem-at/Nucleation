@@ -1,0 +1,42 @@
+{
+  "lazy": {
+    "cycles": 982464313.0,
+    "instructions": 3058776326.0,
+    "cache_misses": 75997.0,
+    "branches": 492445326.0,
+    "branch_misses": 4344681.0,
+    "ipc": 3.1133674155144604,
+    "cpu_ms_per_cycle": 0.195837201171875,
+    "min_running_fraction": 1.0
+  },
+  "reference_pgo": {
+    "cycles": 783057845.0,
+    "instructions": 2654550075.0,
+    "cache_misses": 60404.0,
+    "branches": 437177481.0,
+    "branch_misses": 1993850.0,
+    "ipc": 3.389979189851549,
+    "cpu_ms_per_cycle": 0.1485706328125,
+    "min_running_fraction": 1.0
+  },
+  "selected": {
+    "cycles": 930241282.0,
+    "instructions": 3156288730.0,
+    "cache_misses": 97460.0,
+    "branches": 464959970.0,
+    "branch_misses": 3185523.0,
+    "ipc": 3.3929785648880717,
+    "cpu_ms_per_cycle": 0.196842912109375,
+    "min_running_fraction": 1.0
+  },
+  "selected_pgo": {
+    "cycles": 793858124.0,
+    "instructions": 2609401749.0,
+    "cache_misses": 75278.0,
+    "branches": 412898618.0,
+    "branch_misses": 1632810.0,
+    "ipc": 3.2869868382174547,
+    "cpu_ms_per_cycle": 0.164512541015625,
+    "min_running_fraction": 1.0
+  }
+}

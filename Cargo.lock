@@ -1264,6 +1264,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cpu-time"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9e393a7668fe1fad3075085b86c781883000b4ede868f43627b34a87c8b7ded"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3157,6 +3167,7 @@ name = "mc-tick"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "cpu-time",
  "criterion",
  "mc-test",
  "mc-tick-trace",
@@ -3443,7 +3454,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.12.2"
+version = "0.12.3"
 dependencies = [
  "anyhow",
  "aws-sdk-s3",
@@ -5206,8 +5217,8 @@ dependencies = [
 
 [[package]]
 name = "schematic-mesher"
-version = "0.2.1"
-source = "git+https://github.com/Schem-at/Schematic-Mesher.git?rev=dcc0e0aad6133109448f21a5c568236b48b3d967#dcc0e0aad6133109448f21a5c568236b48b3d967"
+version = "0.2.2"
+source = "git+https://github.com/Schem-at/Schematic-Mesher.git?rev=36326fa7b7bb6d972401681333133353cd3294de#36326fa7b7bb6d972401681333133353cd3294de"
 dependencies = [
  "glam",
  "gltf-json",

@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "browser": "157.0.8103.52",
+  "base": "http://127.0.0.1:8767",
+  "checks": [
+    "typed adder inputs visible",
+    "typed adder outputs visible",
+    "recorded adapter evidence visible",
+    "runner source attached",
+    "real textured thumbnail visible",
+    "mobile layout stays within viewport",
+    "smoke checks have separate evidence labels",
+    "only admitted plot door appears as vanilla matched",
+    "no uncaught browser errors"
+  ],
+  "errors": [],
+  "scope": "Archive UI and evidence association; simulation correctness is checked separately."
+}

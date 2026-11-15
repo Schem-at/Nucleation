@@ -1,0 +1,68 @@
+[18:43:38] [main/INFO]: Loaded 1470 recipes
+[18:43:38] [main/INFO]: Loaded 1584 advancements
+[18:43:38] [main/INFO]: Selecting global world spawn...
+[18:43:39] [main/INFO]: Loading 0 persistent chunks...
+[18:43:39] [main/INFO]: Preparing spawn area: 100%
+[18:43:39] [main/INFO]: Time elapsed: 186 ms
+[18:43:39] [main/INFO]: Started game test server
+[18:43:39] [main/INFO]: 1 tests are now running at position 58418, -59, 6983452!
+[18:43:39] [main/INFO]: Running test environment 'minecraft:default' batch 0 (1 tests)...
+[18:43:39] [main/INFO]: [ ]
+[18:43:39] [main/INFO]: [ ]
+[18:43:39] [main/INFO]: [ ]
+[18:43:39] [main/INFO]: [ ]
+[18:43:39] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:40] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:41] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:42] [main/INFO]: [ ]
+[18:43:43] [main/INFO]: [STDOUT]: CAPTURED /home/harrison/nucleation-perf/schematic-candidates/vanilla-comparator/capture.json ticks=960 players=0 case=OTHERCOMB017
+[18:43:43] [main/INFO]: Stopping server
+[18:43:43] [main/INFO]: Saving players
+[18:43:43] [main/INFO]: Saving worlds
+[18:43:43] [main/INFO]: Saving chunks for level 'ServerLevel[Test Level]'/minecraft:overworld
+[18:44:10] [main/INFO]: Saving chunks for level 'ServerLevel[Test Level]'/minecraft:the_end
+[18:44:10] [main/INFO]: Saving chunks for level 'ServerLevel[Test Level]'/minecraft:the_nether
+[18:44:10] [main/INFO]: ThreadedAnvilChunkStorage (gametestworld): All chunks are saved
+[18:44:10] [main/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[18:44:10] [main/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[18:44:10] [main/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved

@@ -1,0 +1,151 @@
+{
+  "baseline": "baseline",
+  "source": "docs/performance/hipster-next/results/local-cache-pilot.jsonl",
+  "resamples": 10000,
+  "results": [
+    {
+      "case": "hipster",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 12.3645805,
+      "cpu_speedup": 1.0485046783431107,
+      "cpu_ci95": [
+        1.029293269297026,
+        1.070522907482924
+      ],
+      "wall_ms": 12.403840333333333,
+      "wall_speedup": 1.0487117148476677,
+      "wall_ci95": [
+        1.0294080183075263,
+        1.0707449716984156
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 1.888808046511628,
+      "cpu_speedup": 0.9724798139582209,
+      "cpu_ci95": [
+        0.9649726956799971,
+        0.9895441371119983
+      ],
+      "wall_ms": 1.8960667906976745,
+      "wall_speedup": 0.9724038766566854,
+      "wall_ci95": [
+        0.9639089851276773,
+        0.9901990806645077
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 0.1641569919678715,
+      "cpu_speedup": 0.9983485786001062,
+      "cpu_ci95": [
+        0.9735756948931434,
+        1.014843044839844
+      ],
+      "wall_ms": 0.1644610923694779,
+      "wall_speedup": 0.9990646217222752,
+      "wall_ci95": [
+        0.9735196188192967,
+        1.014747671718807
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 8.618725777777778,
+      "cpu_speedup": 0.9994843656445632,
+      "cpu_ci95": [
+        0.9011377339575095,
+        1.0078394418250676
+      ],
+      "wall_ms": 8.652986111111112,
+      "wall_speedup": 0.9994606743015817,
+      "wall_ci95": [
+        0.900683721565063,
+        1.0085219205469595
+      ]
+    },
+    {
+      "case": "item_sorter",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 1.1676975571428572,
+      "cpu_speedup": 1.0057399158483173,
+      "cpu_ci95": [
+        0.9892681370195756,
+        1.1033957819555265
+      ],
+      "wall_ms": 1.1710058142857143,
+      "wall_speedup": 1.0059183919874888,
+      "wall_ci95": [
+        0.989903303078811,
+        1.1039774278728105
+      ]
+    },
+    {
+      "case": "hopper_storagecart_interaction",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 0.33012478294573644,
+      "cpu_speedup": 0.990446530002503,
+      "cpu_ci95": [
+        0.972848075276774,
+        1.0253933952344052
+      ],
+      "wall_ms": 0.33083705426356586,
+      "wall_speedup": 0.9904925443987744,
+      "wall_ci95": [
+        0.9731257753861822,
+        1.0252192123044819
+      ]
+    },
+    {
+      "case": "comparator_update_collection",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 0.3764252163461539,
+      "cpu_speedup": 0.9934426907888346,
+      "cpu_ci95": [
+        0.984004405287631,
+        1.0269131883347051
+      ],
+      "wall_ms": 0.3774189951923077,
+      "wall_speedup": 0.993214820128685,
+      "wall_ci95": [
+        0.9836356621002721,
+        1.026840954477891
+      ]
+    },
+    {
+      "case": "trapdoor2x3",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 0.8460087362637363,
+      "cpu_speedup": 0.9520884977741962,
+      "cpu_ci95": [
+        0.8891923753552274,
+        1.0034165055143434
+      ],
+      "wall_ms": 0.8482833736263736,
+      "wall_speedup": 0.9518389349132463,
+      "wall_ci95": [
+        0.888106675900507,
+        1.003503295638111
+      ]
+    }
+  ]
+}

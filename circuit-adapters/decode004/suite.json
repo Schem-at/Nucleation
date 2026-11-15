@@ -1,0 +1,5479 @@
+{
+  "schema_version": 1,
+  "adapter": "decode004",
+  "oracle": "Independent fixed programmed-row Boolean equation: each output is !(bit0 | !bit1 | bit2 | !bit3), so matches=15 iff data=10, otherwise 0; input_echo=data. 608 endpoints cover the complete 16-word truth table, all 256 ordered transitions, ascending/descending/Gray orders and repeated match transitions.",
+  "vectors": [
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 0
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 0
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 1
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 1
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 2
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 2
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 3
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 3
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 4
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 4
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 5
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 5
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 6
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 6
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 7
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 7
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 8
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 8
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 9
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 9
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 11
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 11
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 12
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 12
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 13
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 13
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 14
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 14
+      }
+    },
+    {
+      "inputs": {
+        "data": 10
+      },
+      "expected": {
+        "matches": 15,
+        "input_echo": 10
+      }
+    },
+    {
+      "inputs": {
+        "data": 15
+      },
+      "expected": {
+        "matches": 0,
+        "input_echo": 15
+      }
+    }
+  ]
+}

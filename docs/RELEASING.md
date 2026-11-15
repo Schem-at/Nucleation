@@ -1,6 +1,7 @@
 # Releases
 
-Keep `Cargo.toml`, `Cargo.lock`, and `bindings/python/pyproject.toml` on the same
+Keep `Cargo.toml`, `Cargo.lock`, `bindings/npm/package.json`, and
+`bindings/python/pyproject.toml` on the same
 release version, update `RELEASE_NOTES.md`, and push the matching `vX.Y.Z` tag.
 The `Nucleation CI/CD` workflow builds and tests all supported bindings before
 publishing. npm and JVM versions are stamped from the Cargo version by CI.

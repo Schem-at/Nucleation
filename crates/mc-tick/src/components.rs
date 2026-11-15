@@ -121,6 +121,17 @@ impl StatePair {
 /// power model — the same reasoning that keeps [`crate::state::StateRegistry`] free
 /// of Minecraft's block list.
 pub trait PowerSource: Send + Sync {
+    /// Optional concrete-rule piston experiment. Custom implementations keep
+    /// their original sequence of power queries through this default fallback.
+    #[cfg(feature = "experiment-piston-plan")]
+    fn planned_piston_power(
+        &self,
+        _world: &World,
+        _outputs: &crate::behaviour::ComparatorOutputs,
+        _pos: Pos,
+        _facing: Dir,
+    ) -> Option<bool> { None }
+
     /// `LeavesBlock.getDistanceAt`: 0 for a log, a leaf's own `distance`, and
     /// 7 for everything else — the "too far to matter" value.
     fn leaf_distance(&self, _world: &World, _pos: Pos) -> u8 {
@@ -573,7 +584,7 @@ impl<P: PowerSource> BlockBehaviour for Torch<P> {
         // `MC_TICK_TRACE_NOTIFY` covers torches too: whether a torch schedules
         // depends on the world *at the instant it is notified*, which during a
         // placement cascade is not the world anyone can see afterwards.
-        if let Some(filter) = std::env::var_os("MC_TICK_TRACE_NOTIFY") {
+        if let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_NOTIFY") {
             let key = format!("{},{},{}", pos.x, pos.y, pos.z);
             if filter
                 .to_string_lossy()
@@ -700,7 +711,7 @@ impl<P: PowerSource> Comparator<P> {
         }
         // `MC_TICK_DEBUG_COMPARATOR=1` — every strength evaluation, with the
         // rear redstone and analog readings split out.
-        if std::env::var_os("MC_TICK_DEBUG_COMPARATOR").is_some() {
+        if crate::diagnostics::var_os("MC_TICK_DEBUG_COMPARATOR").is_some() {
             eprintln!(
                 "[cmp] at {pos:?} rear_pos {rear_pos:?} redstone {redstone} analog {:?} rear {rear}",
                 self.power.analog_signal(world, inventories, carts, rear_pos)
@@ -1801,7 +1812,9 @@ impl<P: PowerSource> BlockBehaviour for Lamp<P> {
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         let signal = self.has_signal(ctx, pos);
         if signal && !self.lit {
-            ctx.set_quiet(pos, self.states.get(true));
+            // Vanilla writes with flag 2: no neighbourChanged callbacks, but
+            // observers watching the lamp still receive the shape update.
+            ctx.set_shape_only(pos, self.states.get(true));
         } else if !signal && self.lit {
             ctx.schedule(pos, LAMP_OFF_DELAY, TickPriority::Normal);
         }
@@ -1809,7 +1822,7 @@ impl<P: PowerSource> BlockBehaviour for Lamp<P> {
 
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         if self.lit && !self.has_signal(ctx, pos) {
-            ctx.set_quiet(pos, self.states.get(false));
+            ctx.set_shape_only(pos, self.states.get(false));
         }
     }
 
@@ -2020,7 +2033,9 @@ impl<P: PowerSource> BlockBehaviour for Trapdoor<P> {
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         let signal = self.has_signal(ctx, pos);
         if signal != self.powered {
-            ctx.set_quiet(pos, self.states.get(signal));
+            // Flag 2 preserves shape notifications, including the observer
+            // watching this trapdoor in the horizontal plot-door fixture.
+            ctx.set_shape_only(pos, self.states.get(signal));
         }
     }
 
@@ -2694,6 +2709,10 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -2746,6 +2765,10 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -2802,6 +2825,10 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -2856,6 +2883,10 @@ mod tests {
         };
         let pos = Pos::new(0, 1, 0);
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -2910,6 +2941,10 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -2965,6 +3000,10 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3045,6 +3084,10 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3108,6 +3151,10 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3163,6 +3210,10 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3295,6 +3346,10 @@ mod tests {
         }
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3350,6 +3405,10 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3407,6 +3466,10 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3512,6 +3575,10 @@ mod tests {
         stored.insert(pos, 15u8);
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3556,6 +3623,10 @@ mod tests {
         stored.insert(pos, 15u8);
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3602,6 +3673,10 @@ mod tests {
         let mut stored = std::collections::HashMap::new();
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3653,6 +3728,10 @@ mod tests {
         let mut stored = std::collections::HashMap::new();
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-arena")]
+            update_arena: &mut crate::behaviour::UpdateArena::default(),
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,

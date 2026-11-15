@@ -1,0 +1,6 @@
+
+thread 'main' (3108236) panicked at crates/mc-tick/examples/bench_circuits.rs:206:21:
+assertion `left == right` failed: shutter4: doorway at Pos { x: 4, y: 5, z: 5 } after 120 ticks
+  left: "minecraft:quartz_block"
+ right: "minecraft:air"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

@@ -1,0 +1,249 @@
+{
+  "source": "sources/logical-redstone-archive/files/Archive/ENCODE_encoders/ENCODE003_Encoder_horizontal_to_horizontal/attachments/ENCODE003_encode_h2h.schem",
+  "source_sha256": "5cd4e0fe2b8eab183a5d5d925ffc4d2703f6796d8c055799577e9093f4b7505f",
+  "source_readme_sha256": "c89e3f2ced709492254e6d97780bdeb19b7fdaaf71dd7f82ce48583f16611b84",
+  "data_version": 4189,
+  "dimensions": [
+    11,
+    4,
+    10
+  ],
+  "sponge_offset": [
+    -5,
+    -5,
+    -5
+  ],
+  "controls": [
+    {
+      "pos": [
+        10,
+        3,
+        3
+      ],
+      "state": "minecraft:lever[face=wall,facing=east,powered=false]"
+    },
+    {
+      "pos": [
+        10,
+        3,
+        5
+      ],
+      "state": "minecraft:lever[face=wall,facing=east,powered=false]"
+    },
+    {
+      "pos": [
+        10,
+        3,
+        7
+      ],
+      "state": "minecraft:lever[face=wall,facing=east,powered=false]"
+    },
+    {
+      "pos": [
+        10,
+        3,
+        9
+      ],
+      "state": "minecraft:lever[face=wall,facing=east,powered=false]"
+    }
+  ],
+  "lamps": [
+    {
+      "pos": [
+        0,
+        1,
+        0
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        0
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        4,
+        1,
+        0
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        6,
+        1,
+        0
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        9,
+        3,
+        3
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        9,
+        3,
+        5
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        9,
+        3,
+        7
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        9,
+        3,
+        9
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    }
+  ],
+  "signs": [],
+  "programming_cells": [
+    {
+      "pos": [
+        0,
+        2,
+        2
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        4
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        6
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        8
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        2,
+        2,
+        2
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        2,
+        2,
+        4
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        2,
+        2,
+        6
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        2,
+        2,
+        8
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        4,
+        2,
+        2
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        4,
+        2,
+        4
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        4,
+        2,
+        6
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        4,
+        2,
+        8
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        6,
+        2,
+        2
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        6,
+        2,
+        4
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        6,
+        2,
+        6
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    },
+    {
+      "pos": [
+        6,
+        2,
+        8
+      ],
+      "state": "minecraft:redstone_wall_torch[facing=north,lit=false]"
+    }
+  ],
+  "block_entity_count": 0,
+  "entity_count": 0
+}

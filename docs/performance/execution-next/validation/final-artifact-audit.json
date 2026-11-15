@@ -1,0 +1,66 @@
+{
+  "source_commit": "0b8faf732ddc2317eef320af97330b8c4701e082",
+  "first_source_files": 35,
+  "integrated_source_files": 35,
+  "revised_source_files": 35,
+  "engine_all_features": {
+    "passed": 470,
+    "ignored": 7
+  },
+  "bridge": {
+    "passed": 30,
+    "ignored": 0
+  },
+  "wasm": "passed",
+  "differential": {
+    "validation/final/pgo-feature-free-verify.jsonl": 15,
+    "validation/final/pgo-reference-verify.jsonl": 15,
+    "validation/final/pgo-view-lazy-verify.jsonl": 15,
+    "validation/first/next_lazy-verify.jsonl": 15,
+    "validation/first/next_reference-verify.jsonl": 15,
+    "validation/first/next_view-verify.jsonl": 15,
+    "validation/first/reference-verify.jsonl": 15,
+    "validation/integrated/next_arena-verify.jsonl": 15,
+    "validation/integrated/next_combined-verify.jsonl": 15,
+    "validation/integrated/next_piston-verify.jsonl": 15,
+    "validation/revised/next_piston_local-verify.jsonl": 15,
+    "validation/revised/next_plan_combo-verify.jsonl": 15,
+    "validation/revised/next_view_lazy-verify.jsonl": 15,
+    "validation/final/pgo-feature-free-fuzz.jsonl": 56,
+    "validation/final/pgo-reference-fuzz.jsonl": 56,
+    "validation/final/pgo-view-lazy-fuzz.jsonl": 56,
+    "validation/first/next_lazy-fuzz.jsonl": 56,
+    "validation/first/next_reference-fuzz.jsonl": 56,
+    "validation/first/next_view-fuzz.jsonl": 56,
+    "validation/first/reference-fuzz.jsonl": 56,
+    "validation/integrated/next_arena-fuzz.jsonl": 56,
+    "validation/integrated/next_combined-fuzz.jsonl": 56,
+    "validation/integrated/next_piston-fuzz.jsonl": 56,
+    "validation/reference-fuzz.jsonl": 56,
+    "validation/revised/next_piston_local-fuzz.jsonl": 56,
+    "validation/revised/next_plan_combo-fuzz.jsonl": 56,
+    "validation/revised/next_view_lazy-fuzz.jsonl": 56
+  },
+  "vanilla": {
+    "captures": 4,
+    "ticks_per_capture": 40,
+    "reproduction_matches": true
+  },
+  "diagnostics": {
+    "reference": {
+      "lines": 17172,
+      "sha256": "4614c50446f79ae5c7b9933b419bc35ae5753ca6968b0905b3ea3783cab7b2c0"
+    },
+    "selected": {
+      "lines": 17172,
+      "sha256": "4614c50446f79ae5c7b9933b419bc35ae5753ca6968b0905b3ea3783cab7b2c0"
+    }
+  },
+  "native": {
+    "samples": 1680,
+    "cases": 16,
+    "variants": 5,
+    "rounds": 21,
+    "matching_iterations_and_binary_hashes": true
+  }
+}

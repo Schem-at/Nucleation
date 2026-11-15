@@ -1,0 +1,306 @@
+--- a/crates/mc-tick/src/behaviour.rs
++++ b/crates/mc-tick/src/behaviour.rs
+@@ -121,7 +121,7 @@
+ /// own, so the two sequences line up call for call. Granularity is the call,
+ /// not the notification: one `neighbors_at` covers six neighbours.
+ pub(crate) fn trace_update(kind: &str, pos: Pos) {
+-    if std::env::var_os("MC_TICK_TRACE_UPDATES").is_some() {
++    if crate::diagnostics::var_os("MC_TICK_TRACE_UPDATES").is_some() {
+         eprintln!("[upd] {kind} {} {} {}", pos.x, pos.y, pos.z);
+     }
+ }
+@@ -132,7 +132,7 @@
+ /// event log and the notification log, and that is where these have been
+ /// hiding. This says who touched a block and with which flags.
+ pub(crate) fn trace_write(kind: &str, pos: Pos, states: &StateRegistry, to: StateId) {
+-    let Some(filter) = std::env::var_os("MC_TICK_TRACE_WRITE") else {
++    let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_WRITE") else {
+         return;
+     };
+     let wanted = filter.to_string_lossy().split(';').any(|t| {
+@@ -488,7 +488,7 @@
+                     state,
+                 });
+             }
+-            if let Some(filter) = std::env::var_os("MC_TICK_TRACE_NOTIFY") {
++            if let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_NOTIFY") {
+                 let filter = filter.to_string_lossy().to_string();
+                 let key = format!("{},{},{}", pos.x, pos.y, pos.z);
+                 if filter.split(';').any(|want| want.trim() == key) {
+@@ -522,7 +522,7 @@
+         // `MC_TICK_TRACE_SCHED=x,y,z[;...]` — who books a tick, and in what
+         // order. Two blocks scheduled for the same tick fire in insertion
+         // order, so this is what decides races between them.
+-        if let Some(filter) = std::env::var_os("MC_TICK_TRACE_SCHED") {
++        if let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_SCHED") {
+             let wanted = filter.to_string_lossy().split(';').any(|t| {
+                 let c: Vec<i32> = t.split(',').filter_map(|n| n.trim().parse().ok()).collect();
+                 matches!(c[..], [x, y, z] if Pos::new(x, y, z) == pos)
+@@ -563,7 +563,7 @@
+     /// Queue a block event for this tick's block-events phase.
+     pub fn queue_event(&mut self, pos: Pos, id: u8, param: u8) {
+         let block = self.world.get(pos);
+-        if std::env::var("MC_TICK_TRACE_EVENTS").is_ok() {
++        if crate::diagnostics::var("MC_TICK_TRACE_EVENTS").is_ok() {
+             eprintln!(
+                 "[t{}] queue  {:?} id={} on {}",
+                 self.tick,
+--- a/crates/mc-tick/src/components.rs
++++ b/crates/mc-tick/src/components.rs
+@@ -573,7 +573,7 @@
+         // `MC_TICK_TRACE_NOTIFY` covers torches too: whether a torch schedules
+         // depends on the world *at the instant it is notified*, which during a
+         // placement cascade is not the world anyone can see afterwards.
+-        if let Some(filter) = std::env::var_os("MC_TICK_TRACE_NOTIFY") {
++        if let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_NOTIFY") {
+             let key = format!("{},{},{}", pos.x, pos.y, pos.z);
+             if filter
+                 .to_string_lossy()
+@@ -700,7 +700,7 @@
+         }
+         // `MC_TICK_DEBUG_COMPARATOR=1` — every strength evaluation, with the
+         // rear redstone and analog readings split out.
+-        if std::env::var_os("MC_TICK_DEBUG_COMPARATOR").is_some() {
++        if crate::diagnostics::var_os("MC_TICK_DEBUG_COMPARATOR").is_some() {
+             eprintln!(
+                 "[cmp] at {pos:?} rear_pos {rear_pos:?} redstone {redstone} analog {:?} rear {rear}",
+                 self.power.analog_signal(world, inventories, carts, rear_pos)
+--- /dev/null
++++ b/crates/mc-tick/src/diagnostics.rs
+@@ -0,0 +1,40 @@
++//! Diagnostic options are sampled once per process, on first use.
++use std::ffi::{OsStr, OsString};
++use std::sync::OnceLock;
++
++pub(crate) fn var_os(name: &str) -> Option<&'static OsStr> {
++    static MC_TICK_TRACE_EVENTS: OnceLock<Option<OsString>> = OnceLock::new();
++    static MC_TICK_TRACE_LINE: OnceLock<Option<OsString>> = OnceLock::new();
++    static MC_TICK_TRACE_NOTIFY: OnceLock<Option<OsString>> = OnceLock::new();
++    static MC_TICK_TRACE_POWER: OnceLock<Option<OsString>> = OnceLock::new();
++    static MC_TICK_TRACE_REACH: OnceLock<Option<OsString>> = OnceLock::new();
++    static MC_TICK_TRACE_RETRACT: OnceLock<Option<OsString>> = OnceLock::new();
++    static MC_TICK_TRACE_SCHED: OnceLock<Option<OsString>> = OnceLock::new();
++    static MC_TICK_TRACE_SCHEDULE: OnceLock<Option<OsString>> = OnceLock::new();
++    static MC_TICK_TRACE_SHOVE: OnceLock<Option<OsString>> = OnceLock::new();
++    static MC_TICK_TRACE_SIDE: OnceLock<Option<OsString>> = OnceLock::new();
++    static MC_TICK_TRACE_UPDATES: OnceLock<Option<OsString>> = OnceLock::new();
++    static MC_TICK_TRACE_WRITE: OnceLock<Option<OsString>> = OnceLock::new();
++    static MC_TICK_DEBUG_COMPARATOR: OnceLock<Option<OsString>> = OnceLock::new();
++    let slot = match name {
++        "MC_TICK_TRACE_EVENTS" => &MC_TICK_TRACE_EVENTS,
++        "MC_TICK_TRACE_LINE" => &MC_TICK_TRACE_LINE,
++        "MC_TICK_TRACE_NOTIFY" => &MC_TICK_TRACE_NOTIFY,
++        "MC_TICK_TRACE_POWER" => &MC_TICK_TRACE_POWER,
++        "MC_TICK_TRACE_REACH" => &MC_TICK_TRACE_REACH,
++        "MC_TICK_TRACE_RETRACT" => &MC_TICK_TRACE_RETRACT,
++        "MC_TICK_TRACE_SCHED" => &MC_TICK_TRACE_SCHED,
++        "MC_TICK_TRACE_SCHEDULE" => &MC_TICK_TRACE_SCHEDULE,
++        "MC_TICK_TRACE_SHOVE" => &MC_TICK_TRACE_SHOVE,
++        "MC_TICK_TRACE_SIDE" => &MC_TICK_TRACE_SIDE,
++        "MC_TICK_TRACE_UPDATES" => &MC_TICK_TRACE_UPDATES,
++        "MC_TICK_TRACE_WRITE" => &MC_TICK_TRACE_WRITE,
++        "MC_TICK_DEBUG_COMPARATOR" => &MC_TICK_DEBUG_COMPARATOR,
++        _ => unreachable!("unregistered diagnostic option"),
++    };
++    slot.get_or_init(|| std::env::var_os(name)).as_deref()
++}
++
++pub(crate) fn var(name: &str) -> Result<&'static str, ()> {
++    var_os(name).and_then(OsStr::to_str).ok_or(())
++}
+--- a/crates/mc-tick/src/lib.rs
++++ b/crates/mc-tick/src/lib.rs
+@@ -32,6 +32,7 @@
+ pub mod behaviour;
+ pub mod components;
+ pub mod embed;
++mod diagnostics;
+ pub mod entity;
+ pub mod entity_kind;
+ pub mod explosion;
+--- a/crates/mc-tick/src/piston.rs
++++ b/crates/mc-tick/src/piston.rs
+@@ -332,7 +332,7 @@
+             return true;
+         }
+         if movability.is_empty(world, next) {
+-            if std::env::var_os("MC_TICK_TRACE_LINE").is_some() {
++            if crate::diagnostics::var_os("MC_TICK_TRACE_LINE").is_some() {
+                 eprintln!(
+                     "       line from {:?} dir={push_dir:?} stopped: {:?} is empty ({} collected)",
+                     (origin.x, origin.y, origin.z),
+@@ -343,7 +343,7 @@
+             return true;
+         }
+         if !movability.is_movable(world, next) || next == piston {
+-            if std::env::var_os("MC_TICK_TRACE_LINE").is_some() {
++            if crate::diagnostics::var_os("MC_TICK_TRACE_LINE").is_some() {
+                 eprintln!(
+                     "       line from {:?} dir={push_dir:?} FAILED at {:?}: immovable ({} collected)",
+                     (origin.x, origin.y, origin.z),
+@@ -360,7 +360,7 @@
+         // capture: if the game never breaks it, either the line is longer than
+         // the game's or the block is not breakable at all. It was the second —
+         // rails were listed as `DESTROY` and the game plainly pushes them.
+-        if std::env::var_os("MC_TICK_TRACE_REACH").is_some() && movability.destroys(world, next) {
++        if crate::diagnostics::var_os("MC_TICK_TRACE_REACH").is_some() && movability.destroys(world, next) {
+             eprintln!(
+                 "[reach] piston={:?} dir={:?} line_origin={:?} reached={:?} collected={:?}",
+                 (piston.x, piston.y, piston.z),
+@@ -482,7 +482,7 @@
+         &mut to_push,
+         &mut to_destroy,
+     ) {
+-        if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
++        if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+             eprintln!(
+                 "       pull-fail line {:?} had {} collected: {:?}",
+                 (piston.x, piston.y, piston.z),
+@@ -506,7 +506,7 @@
+                 &mut to_destroy,
+             )
+         {
+-            if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
++            if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+                 eprintln!(
+                     "       pull-fail branch {:?} at {:?}, {} collected: {:?}",
+                     (piston.x, piston.y, piston.z),
+@@ -663,7 +663,7 @@
+     }
+ 
+     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+-        if std::env::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
++        if crate::diagnostics::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
+             f.to_string_lossy().split(';').any(|t| {
+                 let c: Vec<i32> = t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+                 c.len() == 3 && c[0] == pos.x && c[1] == pos.y && c[2] == pos.z
+@@ -732,7 +732,7 @@
+                 // A piston that is powered, unextended, and still silent is
+                 // always a refused resolve — and which block refused it is the
+                 // only thing worth knowing.
+-                if std::env::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
++                if crate::diagnostics::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
+                     f.to_string_lossy().split(';').any(|t| {
+                         let c: Vec<i32> =
+                             t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+@@ -797,7 +797,7 @@
+                     return false;
+                 }
+                 let plan = resolve_push(ctx.world, &self.movability, pos, self.facing);
+-                if std::env::var("MC_TICK_TRACE_EVENTS").is_ok() {
++                if crate::diagnostics::var("MC_TICK_TRACE_EVENTS").is_ok() {
+                     let names: Vec<String> = plan
+                         .to_push
+                         .iter()
+@@ -1023,7 +1023,7 @@
+                 // at the instant a retract is dispatched, which is the instant
+                 // vanilla decides whether to refuse it. Both halves separately,
+                 // because "powered" and "quasi-powered" fail in different ways.
+-                if std::env::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
++                if crate::diagnostics::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
+                     f.to_string_lossy().split(';').any(|t| {
+                         let c: Vec<i32> =
+                             t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+@@ -1126,7 +1126,7 @@
+                 // first instead — as this did — puts a solid block in the
+                 // quasi-connectivity ring a tick early, and a piston below
+                 // reads power vanilla never gives it.
+-                if std::env::var_os("MC_TICK_TRACE_RETRACT").is_some() {
++                if crate::diagnostics::var_os("MC_TICK_TRACE_RETRACT").is_some() {
+                     eprintln!(
+                         "[t{}] [retract] {:?} id={id} head={:?} head_state={} pending_at_head={}",
+                         ctx.tick,
+@@ -1215,7 +1215,7 @@
+                         // The retract stroke gets the same trace the push does.
+                         // Without it a pull that silently resolves to nothing is
+                         // invisible, which is exactly how a failed one hid.
+-                        if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
++                        if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+                             let names: Vec<String> = plan
+                                 .to_push
+                                 .iter()
+--- a/crates/mc-tick/src/sim.rs
++++ b/crates/mc-tick/src/sim.rs
+@@ -554,6 +554,17 @@
+         }
+     }
+ 
++    /// Discard and disable ordinary recording and its timeline without changing
++    /// simulation state. Update recording remains independent. `record()` can
++    /// subsequently start fresh logs.
++    pub fn discard_recording(&mut self) {
++        self.timeline = None;
++        self.log = None;
++        self.inv_log = None;
++        self.ent_log = None;
++        self.entity_snapshot.clear();
++    }
++
+     /// Start a rich run timeline, including block deltas, input markers,
+     /// piston strokes, and a canonical visible-world fingerprint per tick.
+     ///
+@@ -1799,7 +1810,7 @@
+                 else {
+                     continue;
+                 };
+-                if std::env::var_os("MC_TICK_TRACE_SHOVE").is_some() {
++                if crate::diagnostics::var_os("MC_TICK_TRACE_SHOVE").is_some() {
+                     eprintln!(
+                         "t{tick} SHOVE id={id} cart={is_cart} dest={destination:?} \
+                          sweep={sweep:?} progress={progress} src={source_piston} \
+@@ -1809,7 +1820,7 @@
+                 let mut current = (min, max);
+                 let apply = |sim: &mut Self, from: ([f64; 3], [f64; 3]), travel, amount| {
+                     let moved = sim.shove(from.0, from.1, travel, amount, id, is_cart, shover);
+-                    if std::env::var_os("MC_TICK_TRACE_SHOVE").is_some() {
++                    if crate::diagnostics::var_os("MC_TICK_TRACE_SHOVE").is_some() {
+                         eprintln!(
+                             "        APPLY id={id} travel={travel:?} asked={amount} moved={moved:?}"
+                         );
+@@ -3497,7 +3508,7 @@
+     /// Run one phase. `Some(stop)` aborts the tick.
+     fn run_phase(&mut self, phase: Phase) -> Option<StopReason> {
+         self.phase = Some(phase);
+-        if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
++        if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+             eprintln!("[t{}] --- phase {}", self.tick, phase.name());
+         }
+         match phase {
+@@ -3520,7 +3531,7 @@
+                 // this drain. Draining into a Vec is what keeps that boundary
+                 // sharp.
+                 let due = self.ticks.collect_due(self.tick);
+-                if std::env::var("MC_TICK_TRACE_SCHEDULE").is_ok() {
++                if crate::diagnostics::var("MC_TICK_TRACE_SCHEDULE").is_ok() {
+                     let names: Vec<String> = due
+                         .iter()
+                         .map(|e| {
+@@ -3730,7 +3741,7 @@
+                     if previous == entry.state {
+                         continue;
+                     }
+-                    if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
++                    if crate::diagnostics::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+                         eprintln!(
+                             "[t{}] land   ({}, {}, {}) -> {}",
+                             self.tick,
+@@ -4053,7 +4064,7 @@
+                 // `doBlockEvent`: an event whose position no longer holds the
+                 // block it was queued for is refused and dropped. Properties may
+                 // differ; only the block has to match.
+-                let trace_events = std::env::var("MC_TICK_TRACE_EVENTS").is_ok();
++                let trace_events = crate::diagnostics::var("MC_TICK_TRACE_EVENTS").is_ok();
+                 if !self.registry.same_block(state, event.block) {
+                     if trace_events {
+                         eprintln!(
+--- a/crates/mc-tick/src/wire.rs
++++ b/crates/mc-tick/src/wire.rs
+@@ -142,7 +142,7 @@
+     can_connect_up: bool,
+     climbed: bool,
+ ) {
+-    let Some(filter) = std::env::var_os("MC_TICK_TRACE_SIDE") else {
++    let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_SIDE") else {
+         return;
+     };
+     let wanted = filter.to_string_lossy().split(';').any(|t| {

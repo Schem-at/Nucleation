@@ -62,6 +62,23 @@ function fmtTps(tps: number): string {
   return tps.toFixed(2);
 }
 
+/** A server-provided filename is a display name, never a URL or local path. */
+function archiveFileName(disposition: string | null, queryName: string | null, sha: string): string {
+  const candidates: Array<string | null> = [];
+  const extended = disposition?.match(/(?:^|;)\s*filename\*\s*=\s*(?:"([^"]*)"|([^;]*))/i);
+  const encoded = (extended?.[1] ?? extended?.[2])?.trim().match(/^utf-8'[^']*'(.*)$/i);
+  if (encoded) {
+    try { candidates.push(decodeURIComponent(encoded[1])); } catch { /* try plain filename */ }
+  }
+  const plain = disposition?.match(/(?:^|;)\s*filename\s*=\s*(?:"((?:\\.|[^"])*)"|([^;]*))/i);
+  candidates.push(plain?.[1]?.replace(/\\(.)/g, "$1") ?? plain?.[2] ?? null, queryName);
+  for (const candidate of candidates) {
+    const name = candidate?.split(/[\\/]/).pop()?.replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, "").trim();
+    if (name && name !== "." && name !== "..") return name.slice(0, 255);
+  }
+  return `archive-${sha.slice(0, 12)}`;
+}
+
 export default function App(): JSX.Element {
   const mount = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -73,6 +90,10 @@ export default function App(): JSX.Element {
   const lastFile = useRef<File | null>(null);
   const runningRef = useRef(false);
   const rateRef = useRef(10);
+  const mountedRef = useRef(false);
+  const loadVersion = useRef(0);
+  const archiveFetch = useRef<AbortController | null>(null);
+  const loadedArchiveSha = useRef<string | null>(null);
 
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [running, setRunning] = useState(false);
@@ -121,11 +142,66 @@ export default function App(): JSX.Element {
   const [cycles, setCycles] = useState<Cycles | null>(null);
 
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      loadVersion.current++;
+      archiveFetch.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
     runningRef.current = running;
   }, [running]);
   useEffect(() => {
     rateRef.current = rate;
   }, [rate]);
+
+  // Keep the fixed-rate parent bridge independent of renders and tick rate.
+  // Query the live world at send time; absent/unsupported readings stay null.
+  const atlasState = useRef({ status, running, actualTps, target, info, rate });
+  atlasState.current = { status, running, actualTps, target, info, rate };
+  const postAtlasState = useCallback(() => {
+    if (window.parent === window) return;
+    const state = atlasState.current;
+    const world = state.status.kind === "ready" ? worldRef.current : null;
+    let currentTick: number | null = null;
+    let entityCount: number | null = null;
+    let quiescent: boolean | null = null;
+    let isRecording = false;
+    let readError: string | null = null;
+    try {
+      if (world?.sim) {
+        const value = Number(world.sim.tickCount?.());
+        currentTick = Number.isFinite(value) ? value : null;
+        entityCount = world.entityCount();
+        const quiet = world.sim.isQuiescent?.();
+        quiescent = typeof quiet === "boolean" ? quiet : null;
+        isRecording = world.isRecording();
+      }
+    } catch (error) {
+      readError = String(error);
+    }
+    const isRunning = !!world?.sim && state.running;
+    window.parent.postMessage({
+      type: "nucleation-atlas-state",
+      state: {
+        currentTick, running: isRunning, entities: entityCount, quiescent,
+        statusKind: state.status.kind, statusMessage: state.status.message ?? null,
+        actualTps: isRunning && Number.isFinite(state.actualTps) ? state.actualTps : 0,
+        recording: isRecording, archiveSha: world ? loadedArchiveSha.current : null,
+        fileName: world ? lastFile.current?.name ?? null : null,
+        target: state.target || null, info: state.info || null,
+        requestedTps: Number.isFinite(state.rate) ? state.rate : null,
+        uncapped: state.rate === UNCAPPED, readError,
+      },
+    }, window.location.origin);
+  }, []);
+  useEffect(() => {
+    const id = window.setInterval(postAtlasState, 250);
+    return () => window.clearInterval(id);
+  }, [postAtlasState]);
+  useEffect(postAtlasState, [postAtlasState, status.kind, status.message]);
 
   /** Read `timelineActivityJson()` once, right now. Shared by the polling
    * timer below and by the stop button's one extra read, so the strip's
@@ -416,17 +492,30 @@ export default function App(): JSX.Element {
     };
   }, []);
 
-  const open = useCallback(async (file: File, mode: SettleName = settle, chunk: number = chunkSize) => {
+  const open = useCallback(async (file: File, mode: SettleName = settle, chunk: number = chunkSize,
+                                  sourceSha: string | null = file === lastFile.current ? loadedArchiveSha.current : null) => {
+    archiveFetch.current?.abort();
+    archiveFetch.current = null;
+    const version = ++loadVersion.current;
+    loadedArchiveSha.current = null;
     setStatus({ kind: "loading", message: `meshing ${file.name}…` });
+    runningRef.current = false;
     setRunning(false);
+    setActualTps(0);
+    setThrottled(false);
+    setTarget("");
+    setInfo("");
     setRecording(false);
     setActivity(null);
     setSelection(null);
     setCycles(null);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
+      if (!mountedRef.current || version !== loadVersion.current) return;
       const world = await World.load(bytes, mode, chunk);
+      if (!mountedRef.current || version !== loadVersion.current) return;
       lastFile.current = file;
+      loadedArchiveSha.current = sourceSha;
       // Swap the scene contents: the old build leaves, the new one arrives.
       const previous = worldRef.current;
       if (previous) sceneRef.current?.remove(previous.group);
@@ -453,9 +542,53 @@ export default function App(): JSX.Element {
       setTick(0);
       setEntities(world.entityCount());
     } catch (e) {
-      setStatus({ kind: "error", message: String(e) });
+      if (mountedRef.current && version === loadVersion.current) {
+        setStatus({ kind: "error", message: String(e) });
+      }
     }
   }, [settle, chunkSize]);
+
+  // Mount-only archive selection: changing a mesh/settling option already uses
+  // open(lastFile) below and must not refetch the archive. Each StrictMode effect
+  // setup owns a fresh request; its cleanup never consumes a permanent once flag.
+  const openLatest = useRef(open);
+  useEffect(() => { openLatest.current = open; }, [open]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("archive");
+    if (requested === null) return;
+    if (!/^[a-f0-9]{64}$/i.test(requested)) {
+      setStatus({ kind: "error", message: "Archive identifier must be 64 hexadecimal characters." });
+      return;
+    }
+    const sha = requested.toLowerCase();
+    const controller = new AbortController();
+    archiveFetch.current = controller;
+    let active = true;
+    setStatus({ kind: "loading", message: "loading selected archive file…" });
+    void (async () => {
+      try {
+        const url = new URL(`/api/file/${sha}`, window.location.origin);
+        const response = await fetch(url, {
+          signal: controller.signal, credentials: "same-origin", redirect: "error",
+        });
+        if (!response.ok) throw new Error(`Archive load failed (HTTP ${response.status}).`);
+        const blob = await response.blob();
+        if (!active || controller.signal.aborted) return;
+        const name = archiveFileName(response.headers.get("Content-Disposition"), params.get("name"), sha);
+        await openLatest.current(new File([blob], name, { type: blob.type }), undefined, undefined, sha);
+      } catch (error) {
+        if (active && !controller.signal.aborted) {
+          setStatus({ kind: "error", message: `Cannot load selected archive file: ${String(error)}` });
+        }
+      }
+    })();
+    return () => {
+      active = false;
+      controller.abort();
+      if (archiveFetch.current === controller) archiveFetch.current = null;
+    };
+  }, []);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {

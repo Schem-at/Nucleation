@@ -1,0 +1,149 @@
+{
+  "host": "harrison-work",
+  "scope": "Native endpoint functionality; each suite repeated after checkpoint reset; no new timing samples or vanilla captures",
+  "adapters": [
+    {
+      "adapter": "add003",
+      "status": "functional_pass",
+      "vectors": 372,
+      "output_assertions_per_run": 744,
+      "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+      "source_sha256": "9046ececdca2d7fd481d2f70a679af6e2c4fe1c13bc87ad66cdbdf950dd4faa8",
+      "profile_sha256": "7c0c2709622a20696a887f3d4f5aa8af135212328098ba3ef7fc65a7a8330a27",
+      "suite_sha256": "5bc6f0f70246f3a05e4d9582f4ffcffd147ba0a30bcee211b58d42ad3c2bab03",
+      "reset_replay": "exact_checkpoint_and_outputs"
+    },
+    {
+      "adapter": "add005",
+      "status": "functional_pass",
+      "vectors": 328,
+      "output_assertions_per_run": 656,
+      "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+      "source_sha256": "3b4e13cd09dc8ad0b5770370d6f416e1d8140e2eec416c207ba76d8a79af46ca",
+      "profile_sha256": "3adfb5a2b520ac21ad6e1e4b6dac5d276d8ba98daa9d611a2efe728815e64918",
+      "suite_sha256": "e2d1791edeebf3dd1ecfe256db9af1b6293a126cd61599bcc649f26df51a9cad",
+      "reset_replay": "exact_checkpoint_and_outputs"
+    },
+    {
+      "adapter": "add008",
+      "status": "functional_pass",
+      "vectors": 136,
+      "output_assertions_per_run": 272,
+      "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+      "source_sha256": "c18b62e0010cf03f5a5c0bd81d79197ba90a0666bf8411af91a12f02249ef0e9",
+      "profile_sha256": "31ed7c899868d57102e9162c64ba8d1d5f0c9964859dab2016657d6e20a4952f",
+      "suite_sha256": "561e2cf8a2257cad965ea842699e2faacd87daf21c0f120884928bb8927e73c5",
+      "reset_replay": "exact_checkpoint_and_outputs"
+    },
+    {
+      "adapter": "alu001",
+      "status": "functional_pass",
+      "vectors": 1017,
+      "output_assertions_per_run": 1017,
+      "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+      "source_sha256": "4fa213c46c4759a761f8473e21079bfcd487b1decb0e4df53ec6b96d05fa7d96",
+      "profile_sha256": "03b6d968334bc7c8ed3330a27d50dbbe13d1d823e15287fc927ee71e7cfb29ce",
+      "suite_sha256": "f1dfc30f69ab0f1fe175e8db15c42d8d5873d24e29ea17c7f3a698a66c4969e6",
+      "reset_replay": "exact_checkpoint_and_outputs"
+    },
+    {
+      "adapter": "decode004",
+      "status": "functional_pass",
+      "vectors": 608,
+      "output_assertions_per_run": 1216,
+      "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+      "source_sha256": "09d6768f157d67845fa0615393077d610ed06c7fc9e57eb3721bb9bb3586267b",
+      "profile_sha256": "01aa0043c2b0f2b1f9bd76e69219c1ce6508c682d1979e360ed116c193209c68",
+      "suite_sha256": "df6b1afb624c1f79795e4f67c09ef4ecad3866d8c6198be9a50a1270d949d25e",
+      "reset_replay": "exact_checkpoint_and_outputs"
+    },
+    {
+      "adapter": "encode001",
+      "status": "functional_pass",
+      "vectors": 513,
+      "output_assertions_per_run": 513,
+      "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+      "source_sha256": "43141915727b29d5b2bbb5b6f0c8f2afab6f3b0a069349397080e7deb0ce09e4",
+      "profile_sha256": "541f9947d90443e4e0832eb42f54cc537624c357a5eb942adc3b49b54eccafb8",
+      "suite_sha256": "8f8da51626b0f72ba95e5c3808929b0cf213b2e34f74756a56171593916ec4ed",
+      "reset_replay": "exact_checkpoint_and_outputs"
+    },
+    {
+      "adapter": "encode003",
+      "status": "functional_pass",
+      "vectors": 513,
+      "output_assertions_per_run": 513,
+      "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+      "source_sha256": "5cd4e0fe2b8eab183a5d5d925ffc4d2703f6796d8c055799577e9093f4b7505f",
+      "profile_sha256": "cca54d74ced28eb9047beeef8309fe60486347789ab187f592201f5a997c2f0f",
+      "suite_sha256": "7bfe8b1e0690babcfcbe84a74a1c4f20bd1a6ff041447fd5bc6966eec04b43c4",
+      "reset_replay": "exact_checkpoint_and_outputs"
+    },
+    {
+      "adapter": "lff006",
+      "status": "functional_pass",
+      "vectors": 131,
+      "output_assertions_per_run": 131,
+      "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+      "source_sha256": "0663302dfc40ac8c33055d5a43aefe834be4290bdda9baaec6f2ccab238cad54",
+      "profile_sha256": "b17e5067256b40795f0d74fb96f5f4ab95a63ec9b4efcc8fb19e6b6f0d8bc47d",
+      "suite_sha256": "b1605b112a8e7d6beb112f1d7f81b7834f0e3138956f9ad9e30c9c43c6d7e7a3",
+      "reset_replay": "exact_checkpoint_and_outputs"
+    },
+    {
+      "adapter": "othercomb001",
+      "status": "functional_pass",
+      "vectors": 513,
+      "output_assertions_per_run": 513,
+      "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+      "source_sha256": "298c115dba3df03002a07a1c4e3e5a22e1237cdeca1d2057ac2ede95649ea9e8",
+      "profile_sha256": "ab1d2facf54ee9a166fcbbf1f781b8011157cf086a9ceaa2e14c5c0704057024",
+      "suite_sha256": "95b162cbd06c11968d6acd74531122456f775966c4f39f616837831dafe47513",
+      "reset_replay": "exact_checkpoint_and_outputs"
+    },
+    {
+      "adapter": "othercomb003",
+      "status": "functional_pass",
+      "vectors": 513,
+      "output_assertions_per_run": 513,
+      "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+      "source_sha256": "3980438cd8e22834eb9b0aa1e08472ec220b4cb216eca72b409253c27faaa109",
+      "profile_sha256": "3e4a3ce0b82c9892c66055e186b6be22ab4b0f5c3c65f3178578f4cb438d9ec6",
+      "suite_sha256": "1e27792fbff74f589b0905599076d7a12685d6bb426594a292b573ed3579b8ed",
+      "reset_replay": "exact_checkpoint_and_outputs"
+    },
+    {
+      "adapter": "othercomb004",
+      "status": "functional_pass",
+      "vectors": 513,
+      "output_assertions_per_run": 513,
+      "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+      "source_sha256": "5658936124734a8b7c6bfd144f81bd73ba9f860fe39d51134170dc36f0f3ff1e",
+      "profile_sha256": "dfbe15434a9cc90b01413c6c5556d99345e559e3b04917e94fea50dc0950becd",
+      "suite_sha256": "d070065fec04952702c06aa19b2adf0d4f5adfebe7ecd8130933f824030c92bd",
+      "reset_replay": "exact_checkpoint_and_outputs"
+    },
+    {
+      "adapter": "othercomb017",
+      "status": "functional_pass",
+      "vectors": 40,
+      "output_assertions_per_run": 120,
+      "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+      "source_sha256": "92d44580dc1539903b56ad08a8b1be89d70de602328d5fe36ef589743c3a3db3",
+      "profile_sha256": "dd89403c77a8ad9d64ce23a9776a7bf787a002f1943d98921f52ab3fa3833ce0",
+      "suite_sha256": "17c420ec45acaddcf6d962220d0348620e5a96e633f28c9de945476a1436362f",
+      "reset_replay": "exact_checkpoint_and_outputs"
+    },
+    {
+      "adapter": "plot-lamp2x2",
+      "status": "functional_pass",
+      "vectors": 4,
+      "output_assertions_per_run": 4,
+      "runner_sha256": "e9ab2662d0401d49f56fc8a525457db3f1983ff99c080cdad30a4e09ce356b02",
+      "source_sha256": "a60cc8eb5d752db2dc2366f7dea3d15c2a7be34cb8811c74645695faef088642",
+      "profile_sha256": "9a3b6e08304b56e18f36e773885bca315016d3708315bfcb00d54c75089acb26",
+      "suite_sha256": "a3248bfb8db038b36e76c17b10eb79fa52164d7f5a6ed746e845d62037db5253",
+      "reset_replay": "exact_checkpoint_and_outputs"
+    }
+  ]
+}

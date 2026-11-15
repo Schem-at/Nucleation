@@ -1,0 +1,36 @@
+{
+  "format_version": 1,
+  "data_version": 4671,
+  "purpose": "Synthetic isolated component oracle derived from fresh plot-door mismatches; not an original door extraction.",
+  "size": [
+    3,
+    3,
+    3
+  ],
+  "fixture": [
+    {
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        1
+      ],
+      "state": "minecraft:observer[facing=west,powered=false]"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        1
+      ],
+      "state": "minecraft:lever[face=floor,facing=north,powered=false]"
+    }
+  ]
+}

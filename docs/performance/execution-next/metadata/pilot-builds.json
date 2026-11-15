@@ -1,0 +1,174 @@
+{
+  "first": {
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.0\nLLVM version: 22.1.8\n",
+    "base": "dbbfd5344b7ef12534d5f7ce1e6499eb875944c8",
+    "source_sha256": {
+      "crates/mc-tick/src/behaviour.rs": "ca0767dce3038f390e417bbcccae3a62917c1139cc9d1af8b108a4b1abcd1c14",
+      "crates/mc-tick/src/components.rs": "03af713594a126514c01f00c94507633be37728ca90c19f59fee42e6b5e519ba",
+      "crates/mc-tick/src/diagnostics.rs": "163fc5007730a6946a9c0165f0ffb6aef6beb1c58a2261835305b3fb365f23a4",
+      "crates/mc-tick/src/embed.rs": "282f4b6809327bbf993fceb19a6d0ac32450e6da6d9656db5eb0faf0e2af04cc",
+      "crates/mc-tick/src/entity.rs": "aeca42f5fed300d6bc99e9bb2940afff1c4a788561d4d96c4b44977c21760945",
+      "crates/mc-tick/src/entity_kind.rs": "bd98deba410fe201836ece1455f356e5c0dc447c8bc9e96e4818feadfc26f6d9",
+      "crates/mc-tick/src/execution_view.rs": "1986fef8ecda1f93787c34441d5309aec0606ad4f52fba9398675d23c63cca2c",
+      "crates/mc-tick/src/explosion.rs": "ce86a8fa542c102df2bca26e651444610f93fb7105a1f1a5bf4b9f7c9c59b545",
+      "crates/mc-tick/src/fluid.rs": "be87b44984d23fa167fd4cf70ddf3bbe25149bef98a0a7738bc2af18dc3a1588",
+      "crates/mc-tick/src/inventory.rs": "ccea141b08b088eaf825b18b0409830711090ba2bfa699f6f97922947c310ea5",
+      "crates/mc-tick/src/lib.rs": "2b01212e44c740cc6de3a7d7dba4b0d6e1d68487b0159e6f5d85aec0e251a554",
+      "crates/mc-tick/src/machine_graph.rs": "d3b59ca6d95e252f0f75460232134003aad6be57f3e4848c66c0b1d1c9ede133",
+      "crates/mc-tick/src/minecart.rs": "73bf64289f90ff4e500f4906b9b1ee66d2c31df9ead8370ba6cc8743b53f2bbd",
+      "crates/mc-tick/src/motion.rs": "07d8c32651536a383ef16ca1f959f6bbddc23a7784962678f282488ab3427d76",
+      "crates/mc-tick/src/observer.rs": "0199750edfbf44c7adf3ff8ba79bcc218343a267ac161f76c90ab39feb40d87b",
+      "crates/mc-tick/src/phase.rs": "264778a0882a62f6b4b62c251ac8ac84c60e6eb3e3e751fd629c6b0e02857afa",
+      "crates/mc-tick/src/piston.rs": "b5d913655e50d4a715fa2266c094bcef3e33c24d4a2d3eb7d9de96c1a4c7cf02",
+      "crates/mc-tick/src/piston_plan.rs": "7b54525586059b53f5f917facc5c3b2d28d6652d39953a9b1a5d14b23031b858",
+      "crates/mc-tick/src/pos.rs": "62d777fa3cfa30d7dd932c6297aab038c662db9e405d1bf6d1b577cf53a08db1",
+      "crates/mc-tick/src/redstone.rs": "31cefdf9dea3fe22a5d62486fa336e48eed26ba55f6efe2b5923407ca2c27dc7",
+      "crates/mc-tick/src/rng.rs": "e76416c868f5c8dcc85c456ee13124bc007af245eba6bbd2b6655acfae3dd8eb",
+      "crates/mc-tick/src/schedule.rs": "35cbe91ba4590700a8f0b967d1df94238b14cf08db4547d725d494ce85615a37",
+      "crates/mc-tick/src/sim.rs": "858d3eb855d1c9052485db3ab18a48ac263da26786034252402c046891b2f0cd",
+      "crates/mc-tick/src/state.rs": "372a16e871f17a0dd988dd42f1f531138b33644698ecdc4e43e090a49971181d",
+      "crates/mc-tick/src/structure.rs": "31426793d91cf52ab26b66842f8c9e5298737488a42bcf01115efcd191b43eec",
+      "crates/mc-tick/src/timeline.rs": "f0fc80f8d7e9c1c2e3457bebe7ed02e6c7ffb9d734400526a30ecfe205da4a73",
+      "crates/mc-tick/src/vanilla.rs": "d124c131af196b08849ac7d63b462e8655779987e9f3aeac3e440a38444dc77b",
+      "crates/mc-tick/src/wire.rs": "8ace3265b849b539d23e01ebd7c6f8dc72ef53f75f0eba9323562e948a128ea8",
+      "crates/mc-tick/src/wire_plan.rs": "460217938cc598d377d4ea12023b85a91a0ba0c5ee31ca384c8945b5bf6c52c4",
+      "crates/mc-tick/src/world.rs": "00e742f49d4f9ff34007cc760ae449e30342a2162a9ceebbd2d0f477be9e57f2",
+      "crates/mc-tick/src/world_journal.rs": "47f8d9a686379cd8655179e339a466b8c90a4f0988b7c4a4a28ec3f0fc602fa5",
+      "Cargo.lock": "af1b466e717dcc48ad5e83e3f361730a383480b737443692d62cd99945af3314",
+      "crates/mc-tick/Cargo.toml": "16ceb37e88996551d28923796d07ac43de8ffde75dfe8365004f76cbe32ba258",
+      "crates/mc-tick/examples/bench_circuits.rs": "38bfad16f1b376ed01f54d15c19037a7305b093a38e7354c55710d5e32198434",
+      "crates/mc-tick/examples/bench_circuits/fuzz.rs": "254661b9f0b1eb5c41021c8200e275c42830824b232d634bdf05b16c040c5dd0"
+    },
+    "profile": {
+      "opt_level": 3,
+      "lto": true,
+      "debug": 1,
+      "cpu": "generic"
+    },
+    "variants": {
+      "reference": {
+        "features": [],
+        "sha256": "562ba9cbe8da1a02af12e64ac6ee819415c6e5385d2ee39e3f8353f3bb058be6",
+        "path": "/home/harrison/nucleation-perf/execution-next/first/reference"
+      },
+      "next_reference": {
+        "features": [
+          "experiment-wire-plan",
+          "experiment-update-pool",
+          "experiment-directional",
+          "experiment-world-plan-cache"
+        ],
+        "sha256": "3bad2115218a4adbff990ec9ea2cf42587ee1a678a8ec16d7de8198100deec3f",
+        "path": "/home/harrison/nucleation-perf/execution-next/first/next_reference"
+      },
+      "next_view": {
+        "features": [
+          "experiment-wire-plan",
+          "experiment-update-pool",
+          "experiment-directional",
+          "experiment-world-plan-cache",
+          "experiment-execution-view"
+        ],
+        "sha256": "97ecc39e970f858eaadf6f115f6c64d0e0e630996d46bf21d2a835a4067907cd",
+        "path": "/home/harrison/nucleation-perf/execution-next/first/next_view"
+      },
+      "next_lazy": {
+        "features": [
+          "experiment-wire-plan",
+          "experiment-update-pool",
+          "experiment-directional",
+          "experiment-world-plan-cache",
+          "experiment-lazy-journal"
+        ],
+        "sha256": "df660ceff6b9dc8409e7705262c03ef9c1d3ae8836d682b5241a37ef1e682ea6",
+        "path": "/home/harrison/nucleation-perf/execution-next/first/next_lazy"
+      }
+    }
+  },
+  "integrated": {
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.0\nLLVM version: 22.1.8\n",
+    "base": "9a10da24de10afa2dd5f957dfb9d5619fb2619eb",
+    "source_sha256": {
+      "crates/mc-tick/src/behaviour.rs": "f45d835aa5187935573329ad04d7dee676d0089a22725e9ac8ae1dde407526e9",
+      "crates/mc-tick/src/components.rs": "5a119beda975c3898c2829a67a6fde7e1ff2c88e99bf859aea6a71ab76509d9d",
+      "crates/mc-tick/src/diagnostics.rs": "163fc5007730a6946a9c0165f0ffb6aef6beb1c58a2261835305b3fb365f23a4",
+      "crates/mc-tick/src/embed.rs": "282f4b6809327bbf993fceb19a6d0ac32450e6da6d9656db5eb0faf0e2af04cc",
+      "crates/mc-tick/src/entity.rs": "aeca42f5fed300d6bc99e9bb2940afff1c4a788561d4d96c4b44977c21760945",
+      "crates/mc-tick/src/entity_kind.rs": "bd98deba410fe201836ece1455f356e5c0dc447c8bc9e96e4818feadfc26f6d9",
+      "crates/mc-tick/src/execution_view.rs": "1986fef8ecda1f93787c34441d5309aec0606ad4f52fba9398675d23c63cca2c",
+      "crates/mc-tick/src/explosion.rs": "ce86a8fa542c102df2bca26e651444610f93fb7105a1f1a5bf4b9f7c9c59b545",
+      "crates/mc-tick/src/fluid.rs": "be87b44984d23fa167fd4cf70ddf3bbe25149bef98a0a7738bc2af18dc3a1588",
+      "crates/mc-tick/src/inventory.rs": "ccea141b08b088eaf825b18b0409830711090ba2bfa699f6f97922947c310ea5",
+      "crates/mc-tick/src/lib.rs": "2b01212e44c740cc6de3a7d7dba4b0d6e1d68487b0159e6f5d85aec0e251a554",
+      "crates/mc-tick/src/machine_graph.rs": "d3b59ca6d95e252f0f75460232134003aad6be57f3e4848c66c0b1d1c9ede133",
+      "crates/mc-tick/src/minecart.rs": "73bf64289f90ff4e500f4906b9b1ee66d2c31df9ead8370ba6cc8743b53f2bbd",
+      "crates/mc-tick/src/motion.rs": "07d8c32651536a383ef16ca1f959f6bbddc23a7784962678f282488ab3427d76",
+      "crates/mc-tick/src/observer.rs": "14de7e5484e7b702f4c4e31d119e671710918099cbec2897f8b18b6fd062ef03",
+      "crates/mc-tick/src/phase.rs": "264778a0882a62f6b4b62c251ac8ac84c60e6eb3e3e751fd629c6b0e02857afa",
+      "crates/mc-tick/src/piston.rs": "15dd5c5c376512459b294fb3e3005f00629423ae1346c73372d50004c6e95b83",
+      "crates/mc-tick/src/piston_plan.rs": "005133685d432674f247b88ddacc01adbda7ae374458f34f83796620cd244336",
+      "crates/mc-tick/src/pos.rs": "62d777fa3cfa30d7dd932c6297aab038c662db9e405d1bf6d1b577cf53a08db1",
+      "crates/mc-tick/src/redstone.rs": "31cefdf9dea3fe22a5d62486fa336e48eed26ba55f6efe2b5923407ca2c27dc7",
+      "crates/mc-tick/src/rng.rs": "e76416c868f5c8dcc85c456ee13124bc007af245eba6bbd2b6655acfae3dd8eb",
+      "crates/mc-tick/src/schedule.rs": "35cbe91ba4590700a8f0b967d1df94238b14cf08db4547d725d494ce85615a37",
+      "crates/mc-tick/src/sim.rs": "42922c3adacb9d6741b134951918a0c82ad39d59d6b805bfb8ed39d255207d5a",
+      "crates/mc-tick/src/state.rs": "372a16e871f17a0dd988dd42f1f531138b33644698ecdc4e43e090a49971181d",
+      "crates/mc-tick/src/structure.rs": "31426793d91cf52ab26b66842f8c9e5298737488a42bcf01115efcd191b43eec",
+      "crates/mc-tick/src/timeline.rs": "f0fc80f8d7e9c1c2e3457bebe7ed02e6c7ffb9d734400526a30ecfe205da4a73",
+      "crates/mc-tick/src/vanilla.rs": "ecd9247ed579ad0370e32504359d69ef002cd1fbfe7eeaec91bf689220d04e46",
+      "crates/mc-tick/src/wire.rs": "8ace3265b849b539d23e01ebd7c6f8dc72ef53f75f0eba9323562e948a128ea8",
+      "crates/mc-tick/src/wire_plan.rs": "460217938cc598d377d4ea12023b85a91a0ba0c5ee31ca384c8945b5bf6c52c4",
+      "crates/mc-tick/src/world.rs": "00e742f49d4f9ff34007cc760ae449e30342a2162a9ceebbd2d0f477be9e57f2",
+      "crates/mc-tick/src/world_journal.rs": "47f8d9a686379cd8655179e339a466b8c90a4f0988b7c4a4a28ec3f0fc602fa5",
+      "Cargo.lock": "af1b466e717dcc48ad5e83e3f361730a383480b737443692d62cd99945af3314",
+      "crates/mc-tick/Cargo.toml": "16ceb37e88996551d28923796d07ac43de8ffde75dfe8365004f76cbe32ba258",
+      "crates/mc-tick/examples/bench_circuits.rs": "38bfad16f1b376ed01f54d15c19037a7305b093a38e7354c55710d5e32198434",
+      "crates/mc-tick/examples/bench_circuits/fuzz.rs": "254661b9f0b1eb5c41021c8200e275c42830824b232d634bdf05b16c040c5dd0"
+    },
+    "source_archive_sha256": "e5e51fb4c3fcb287810b2dd4246b1bb54fab594dd999262408da97a1b900a0d5",
+    "profile": {
+      "opt_level": 3,
+      "lto": true,
+      "debug": 1,
+      "cpu": "generic"
+    },
+    "variants": {
+      "next_arena": {
+        "features": [
+          "experiment-wire-plan",
+          "experiment-update-pool",
+          "experiment-directional",
+          "experiment-world-plan-cache",
+          "experiment-update-arena"
+        ],
+        "sha256": "71f2fdf4558e61a9640b9e8c0dfa96ac1c865942ccd7c0be11e85ef0d5afcb26",
+        "path": "/home/harrison/nucleation-perf/execution-next/integrated/next_arena"
+      },
+      "next_piston": {
+        "features": [
+          "experiment-wire-plan",
+          "experiment-update-pool",
+          "experiment-directional",
+          "experiment-world-plan-cache",
+          "experiment-piston-plan"
+        ],
+        "sha256": "ecd35e71af25c8107962efa39a74a351e5182be65d6814bfa29e14d8fbd7219f",
+        "path": "/home/harrison/nucleation-perf/execution-next/integrated/next_piston"
+      },
+      "next_combined": {
+        "features": [
+          "experiment-wire-plan",
+          "experiment-update-pool",
+          "experiment-directional",
+          "experiment-world-plan-cache",
+          "experiment-execution-view",
+          "experiment-update-arena",
+          "experiment-piston-plan",
+          "experiment-lazy-journal"
+        ],
+        "sha256": "271804b41ee5a6faeabc1db1bd14dc63902dff556e041c80d771bfdce1b37070",
+        "path": "/home/harrison/nucleation-perf/execution-next/integrated/next_combined"
+      }
+    }
+  }
+}

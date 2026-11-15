@@ -1,0 +1,1 @@
+COUNT001: first failure: counter: count 1 after loading 0x00 at tick 288: expected 0x01, got 0x00; inputs {"count_pulses":1,"loaded":0}

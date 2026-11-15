@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "id": "encode003",
+  "source_sha256": "5cd4e0fe2b8eab183a5d5d925ffc4d2703f6796d8c055799577e9093f4b7505f",
+  "source_data_version": 4189,
+  "description": "Horizontal programmable encoder: original all-enabled matrix",
+  "evidence": [
+    "Original Logical Redstone Archive ENCODE003 README declares: All16 programming crosspoints contain north-facing wall torches; each input has a west-facing inversion torch, so each selected row encodes1111; outputs are a wired OR.",
+    "Original Sponge v3 source inspected, SHA-256 5cd4e0fe2b8eab183a5d5d925ffc4d2703f6796d8c055799577e9093f4b7505f, DataVersion4189 retained; no source substitutions or repairs.",
+    "No sign labels are present. Port coordinates and programming geometry were fixed from NBT before simulation; see mapping.md.",
+    "Original matrix is fully programmed1111 in every row, not an identity or priority encoder. Multi-hot results follow independent OR-of-programmed-words logic.",
+    "Functional truth-table checks are not a Minecraft vanilla parity claim; response window is conservative, not a measured minimum latency."
+  ],
+  "cell": {
+    "name": "encode003",
+    "version": "1",
+    "io": {
+      "inputs": {
+        "selected": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 4
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              10,
+              3,
+              3
+            ],
+            [
+              10,
+              3,
+              5
+            ],
+            [
+              10,
+              3,
+              7
+            ],
+            [
+              10,
+              3,
+              9
+            ]
+          ]
+        }
+      },
+      "outputs": {
+        "code": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 4
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              2,
+              1,
+              0
+            ],
+            [
+              4,
+              1,
+              0
+            ],
+            [
+              6,
+              1,
+              0
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "input_order": [
+    "selected"
+  ],
+  "outputs": {
+    "code": "lamp_lit"
+  },
+  "setup_ticks": 32,
+  "response_ticks": 32,
+  "require_quiescent": true,
+  "rng_seed": 0,
+  "hash_origin": [
+    0,
+    0,
+    0
+  ]
+}

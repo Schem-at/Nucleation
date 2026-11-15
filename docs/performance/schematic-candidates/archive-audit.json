@@ -1,0 +1,367 @@
+{
+  "schema_version": 1,
+  "audited_at_utc": "2026-11-15T09:46:09.315412+00:00",
+  "archive_root": "/Users/harrison/RustroverProjects/Nucleation-schematic-archive",
+  "status": "passed",
+  "scope": "Local content integrity, saved-tree consistency and curation joins. No network revalidation, builds, simulation or new parity proof.",
+  "byte_accounting": "manifested_bytes counts every source/path occurrence; unique_content_bytes deduplicates SHA-256 contents and is not filesystem allocated space.",
+  "summary": {
+    "sources": 15,
+    "manifest_records": 8191,
+    "downloaded_files": 8191,
+    "metadata_files": 1954,
+    "manifested_bytes": 35425699,
+    "metadata_bytes": 9776615,
+    "sha256_verified": 8191,
+    "object_verified": 8191,
+    "git_blob_verified": 6727,
+    "tree_entry_verified": 6727,
+    "schematic_files": 2373,
+    "schematic_bytes": 18312083,
+    "layout_files": 3864,
+    "layout_bytes": 7337001,
+    "unique_contents": 8094,
+    "unique_content_bytes": 34810001,
+    "unique_schematic_contents": 2321,
+    "unique_layout_contents": 3852,
+    "unique_schematic_bytes": 17767929,
+    "unique_layout_bytes": 7303519,
+    "curators": 6,
+    "curation_entries": 2541,
+    "curated_unique_keys": 2541,
+    "shortlist_entries": 77,
+    "shortlist_unique_keys": 58,
+    "known_negative_unique_keys": 12,
+    "curation_readiness_counts": {
+      "unvalidated": 2509,
+      "functional": 3,
+      "quarantine": 17,
+      "known-negative": 12
+    }
+  },
+  "sources": [
+    {
+      "source": "autocrafting",
+      "manifest_sha256": "c1784deb40c97bd81a81ef0afabed565cf6258540216a7cab08722d55938eac5",
+      "manifest_records": 108,
+      "downloaded_files": 108,
+      "metadata_files": 67,
+      "manifested_bytes": 436344,
+      "metadata_bytes": 223273,
+      "sha256_verified": 108,
+      "object_verified": 108,
+      "git_blob_verified": 108,
+      "tree_entry_verified": 108,
+      "schematic_files": 41,
+      "schematic_bytes": 213071
+    },
+    {
+      "source": "casual-builds",
+      "manifest_sha256": "752ade17555dac318ef998543151f60c28daafb3b1369407b2564b8559c74927",
+      "manifest_records": 22,
+      "downloaded_files": 22,
+      "metadata_files": 14,
+      "manifested_bytes": 38587,
+      "metadata_bytes": 20015,
+      "sha256_verified": 22,
+      "object_verified": 22,
+      "git_blob_verified": 22,
+      "tree_entry_verified": 22,
+      "schematic_files": 8,
+      "schematic_bytes": 18572
+    },
+    {
+      "source": "curated-candidates",
+      "manifest_sha256": "ac4ec085c7103e2442b73bfcaef67d45feb94f3e8ac6a006b6c0048f73bac66a",
+      "manifest_records": 4,
+      "downloaded_files": 4,
+      "schematic_files": 4,
+      "manifested_bytes": 4634,
+      "schematic_bytes": 4634,
+      "sha256_verified": 4,
+      "object_verified": 4
+    },
+    {
+      "source": "lithium-gametests",
+      "manifest_sha256": "9d1caf80461da17e96174bb03fd61852a5c3a7e8573ece4ee4f9c8ff6941890e",
+      "manifest_records": 74,
+      "downloaded_files": 74,
+      "metadata_files": 41,
+      "manifested_bytes": 1360710,
+      "metadata_bytes": 90970,
+      "sha256_verified": 74,
+      "object_verified": 74,
+      "git_blob_verified": 74,
+      "tree_entry_verified": 74,
+      "schematic_files": 33,
+      "schematic_bytes": 1269740
+    },
+    {
+      "source": "logical-redstone-archive",
+      "manifest_sha256": "df98a3c7c35f7715f6d558eb0a74ee4a15b0e611d5b7f16f85f27aad457b3ee0",
+      "manifest_records": 698,
+      "downloaded_files": 698,
+      "metadata_files": 483,
+      "manifested_bytes": 3358097,
+      "metadata_bytes": 1194631,
+      "sha256_verified": 698,
+      "object_verified": 698,
+      "git_blob_verified": 698,
+      "tree_entry_verified": 698,
+      "schematic_files": 215,
+      "schematic_bytes": 2163466
+    },
+    {
+      "source": "redstonepedia",
+      "manifest_sha256": "31f437808b732dcc250780110133fef35d1c3024e98d3f9d8346b9aa7a3d71ac",
+      "manifest_records": 3988,
+      "downloaded_files": 3988,
+      "metadata_files": 124,
+      "manifested_bytes": 8589439,
+      "metadata_bytes": 1252438,
+      "sha256_verified": 3988,
+      "object_verified": 3988,
+      "git_blob_verified": 3988,
+      "tree_entry_verified": 3988,
+      "layout_files": 3864,
+      "layout_bytes": 7337001
+    },
+    {
+      "source": "slimestone-ai",
+      "manifest_sha256": "7a06571caedb23b809d481f4c053b51a6a61d7b5d0e6c8bce254068460a7e820",
+      "manifest_records": 206,
+      "downloaded_files": 206,
+      "metadata_files": 143,
+      "manifested_bytes": 3212671,
+      "metadata_bytes": 3171766,
+      "sha256_verified": 206,
+      "object_verified": 206,
+      "git_blob_verified": 206,
+      "tree_entry_verified": 206,
+      "schematic_files": 63,
+      "schematic_bytes": 40905
+    },
+    {
+      "source": "slimestone-military",
+      "manifest_sha256": "2f54f95eede4de7e98c11f8ca4893218ba6a2d30fe35b55caa369ef4dc56fe78",
+      "manifest_records": 104,
+      "downloaded_files": 104,
+      "metadata_files": 58,
+      "manifested_bytes": 662567,
+      "metadata_bytes": 245717,
+      "sha256_verified": 104,
+      "object_verified": 104,
+      "git_blob_verified": 104,
+      "tree_entry_verified": 104,
+      "schematic_files": 46,
+      "schematic_bytes": 416850
+    },
+    {
+      "source": "soontech-archive",
+      "manifest_sha256": "65392bed9f19f6a713ed28026780a58387dbb4fa85f55f6dd5e5deb7ec2c6847",
+      "manifest_records": 181,
+      "downloaded_files": 181,
+      "metadata_files": 129,
+      "manifested_bytes": 1059316,
+      "metadata_bytes": 467282,
+      "sha256_verified": 181,
+      "object_verified": 181,
+      "git_blob_verified": 181,
+      "tree_entry_verified": 181,
+      "schematic_files": 52,
+      "schematic_bytes": 592034
+    },
+    {
+      "source": "soontech-current",
+      "manifest_sha256": "f42ce0e2064c39698c66043b9cde3f4b6138c19727a581b1f781ab1aae60839a",
+      "manifest_records": 190,
+      "downloaded_files": 190,
+      "metadata_files": 135,
+      "manifested_bytes": 1321295,
+      "metadata_bytes": 385373,
+      "sha256_verified": 190,
+      "object_verified": 190,
+      "git_blob_verified": 190,
+      "tree_entry_verified": 190,
+      "schematic_files": 55,
+      "schematic_bytes": 935922
+    },
+    {
+      "source": "storage-catalog",
+      "manifest_sha256": "c56ef753cfa3db8d0e30969845c71bfece278622a6dd70498762b8888f75baac",
+      "manifest_records": 971,
+      "downloaded_files": 971,
+      "metadata_files": 638,
+      "manifested_bytes": 10071042,
+      "metadata_bytes": 2265869,
+      "sha256_verified": 971,
+      "object_verified": 971,
+      "git_blob_verified": 971,
+      "tree_entry_verified": 971,
+      "schematic_files": 333,
+      "schematic_bytes": 7805173
+    },
+    {
+      "source": "user-world-record-plot",
+      "manifest_sha256": "6fb6ac7ced499c9ab0daabda27df3adff62195cad7d4628fd3f6e9169d983fc8",
+      "manifest_records": 1,
+      "downloaded_files": 1,
+      "schematic_files": 1,
+      "manifested_bytes": 1269492,
+      "schematic_bytes": 1269492,
+      "sha256_verified": 1,
+      "object_verified": 1
+    },
+    {
+      "source": "wither-archive",
+      "manifest_sha256": "c827143b2f5eda19bc7ec8c082aa4f9fecf5e00d18ccb0bfa8394627021541af",
+      "manifest_records": 185,
+      "downloaded_files": 185,
+      "metadata_files": 122,
+      "manifested_bytes": 809656,
+      "metadata_bytes": 459281,
+      "sha256_verified": 185,
+      "object_verified": 185,
+      "git_blob_verified": 185,
+      "tree_entry_verified": 185,
+      "schematic_files": 63,
+      "schematic_bytes": 350375
+    },
+    {
+      "source": "world-record-floor-parts",
+      "manifest_sha256": "2e06472f9116f07a13a788c16efe1211c2ca639e71084197088b3133a5515838",
+      "manifest_records": 566,
+      "downloaded_files": 566,
+      "schematic_files": 566,
+      "manifested_bytes": 816331,
+      "schematic_bytes": 816331,
+      "sha256_verified": 566,
+      "object_verified": 566
+    },
+    {
+      "source": "world-record-parts",
+      "manifest_sha256": "19ba861bdaa73ae5ea9ae8b8b9856029ff5c4ed44d396bdaef00c38fc0e94d73",
+      "manifest_records": 893,
+      "downloaded_files": 893,
+      "schematic_files": 893,
+      "manifested_bytes": 2415518,
+      "schematic_bytes": 2415518,
+      "sha256_verified": 893,
+      "object_verified": 893
+    }
+  ],
+  "curation": [
+    {
+      "curator": "logic",
+      "entries": 590,
+      "shortlist": 20,
+      "readiness_counts": {
+        "unvalidated": 570,
+        "functional": 3,
+        "quarantine": 17
+      },
+      "archive_path": "curation/logic.json",
+      "snapshot_path": "catalog/logic.json.gz",
+      "sha256": "52ea3870e2a230c263d16f23a63bf1d0760fedf743bdcc85c9d1764c889438aa",
+      "bytes": 176819,
+      "uncompressed_sha256": "41d187582c31e062acdd1fc62e21ea43f78f54a878cc6035c048f69821eb9c09",
+      "uncompressed_bytes": 2460437
+    },
+    {
+      "curator": "movement",
+      "entries": 117,
+      "shortlist": 20,
+      "readiness_counts": {
+        "unvalidated": 105,
+        "known-negative": 12
+      },
+      "archive_path": "curation/movement.json",
+      "snapshot_path": "catalog/movement.json.gz",
+      "sha256": "2b839bc33cef6bb8a6a441fb68d66e178693a1b0bff52ffb09775f6451196c34",
+      "bytes": 57445,
+      "uncompressed_sha256": "95e45bf6b81fa7c2b09b4b79790cbb930cd78ffb2486e8a4fa6b9627d1aabbba",
+      "uncompressed_bytes": 1183009
+    },
+    {
+      "curator": "storage",
+      "entries": 374,
+      "shortlist": 17,
+      "readiness_counts": {
+        "unvalidated": 374
+      },
+      "archive_path": "curation/storage.json",
+      "snapshot_path": "catalog/storage.json.gz",
+      "sha256": "8bcc1035c85da0eb5edd737e42ed20c9448d437d6f5b8232c174bea1c78f64d8",
+      "bytes": 83522,
+      "uncompressed_sha256": "b8489cbc167696ff8178565ffafc7a0a8dccba5fbd1604e34b3b025582d47d87",
+      "uncompressed_bytes": 961181
+    },
+    {
+      "curator": "world-record-floor-parts",
+      "entries": 566,
+      "shortlist": 0,
+      "readiness_counts": {
+        "unvalidated": 566
+      },
+      "archive_path": "curation/world-record-floor-parts.json",
+      "snapshot_path": "catalog/world-record-floor-parts.json.gz",
+      "sha256": "b8afbf08d8ce7184ce94c504052f53bed2ee6533e4bce717823579cc1eaf9e79",
+      "bytes": 295042,
+      "uncompressed_sha256": "e2e78f2b8e2d964df8b4faeedb4cea63368ace7c367ae6a45d07c44d8a8c6ccf",
+      "uncompressed_bytes": 5585006
+    },
+    {
+      "curator": "world-record-parts",
+      "entries": 893,
+      "shortlist": 0,
+      "readiness_counts": {
+        "unvalidated": 893
+      },
+      "archive_path": "curation/world-record-parts.json",
+      "snapshot_path": "catalog/world-record-parts.json.gz",
+      "sha256": "a60333b183a0a7cf6e0b35c0b15c0ea82b0a4fcd5af6f74e938332b59b2c14e5",
+      "bytes": 622653,
+      "uncompressed_sha256": "32a8a33dbcd699cb537a2e549e19622dc41125290461e4b71eab072830948168",
+      "uncompressed_bytes": 10540576
+    },
+    {
+      "curator": "world-record-plot",
+      "entries": 1,
+      "shortlist": 20,
+      "readiness_counts": {
+        "unvalidated": 1
+      },
+      "archive_path": "curation/world-record-plot.json",
+      "snapshot_path": "catalog/world-record-plot.json.gz",
+      "sha256": "1967e18c970fd107e943cf952be2ce7536ffa894bc73417b917356c04f639056",
+      "bytes": 188883,
+      "uncompressed_sha256": "4dff21681dcb425817a725812105b7a93cdedf96df9b0f03e57906e99cb801f1",
+      "uncompressed_bytes": 3106754
+    }
+  ],
+  "errors": [],
+  "warnings": [
+    {
+      "type": "manual_source_no_git_tree",
+      "source": "curated-candidates",
+      "meaning": "Verified against per-file SHA-256 and saved provenance; URLs may be mutable or expiring."
+    },
+    {
+      "type": "local_manual_source_no_git_tree",
+      "source": "user-world-record-plot",
+      "meaning": "Verified against per-file SHA-256 and user-local provenance. The original binary is not in the tracked recovery metadata."
+    },
+    {
+      "type": "local_manual_source_no_git_tree",
+      "source": "world-record-floor-parts",
+      "meaning": "Verified against per-file SHA-256 and user-local provenance. The original binary is not in the tracked recovery metadata."
+    },
+    {
+      "type": "local_manual_source_no_git_tree",
+      "source": "world-record-parts",
+      "meaning": "Verified against per-file SHA-256 and user-local provenance. The original binary is not in the tracked recovery metadata."
+    }
+  ],
+  "index_refreshed": true,
+  "helper_sha256": "f60badef116e9b18ddc40186c9364c7275909b03403ce5e9568083ea4badc2eb"
+}

@@ -1,0 +1,12 @@
+{
+  "direct-cache": {
+    "base": "08175175",
+    "patch_sha256": "751f2555ad3d6869f696a54e5d7bb46dd8760f587d2c6be458c562cde2e1bf95",
+    "notes": "Nine-round pilot; original file-reading harness. No loading case measured. Original x86-64 hash arithmetic."
+  },
+  "boolean-cache": {
+    "base": "5a92c5be450ce4c2ea69fd9771c402de995e04ea",
+    "patch_sha256": "8e1ee1baffe86ac7966ecf83395e56d8aca7d37c931c3edfad8e337c15020abf",
+    "notes": "Final embedded-fixture harness; portable hash; seven dynamic differential scenarios."
+  }
+}

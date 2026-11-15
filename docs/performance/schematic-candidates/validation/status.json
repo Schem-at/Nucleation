@@ -1,0 +1,32 @@
+{
+  "0663302dfc40ac8c33055d5a43aefe834be4290bdda9baaec6f2ccab238cad54": {
+    "validation_status": "functional_pass",
+    "validation_detail": "18 endpoint checks; no fresh vanilla comparison",
+    "validation_evidence": "validation/candidate-run/logic-results.jsonl"
+  },
+  "8e4cf8434924ee79186c59fd975c8941356bfec042da5754ae1245e557cf1aae": {
+    "validation_status": "functional_fail",
+    "validation_detail": "counter: count 1 after loading 0x00 at tick 288: expected 0x01, got 0x00; inputs {\"count_pulses\":1,\"loaded\":0}",
+    "validation_evidence": "validation/candidate-run/logic-results.jsonl"
+  },
+  "09d6768f157d67845fa0615393077d610ed06c7fc9e57eb3721bb9bb3586267b": {
+    "validation_status": "functional_pass",
+    "validation_detail": "32 endpoint checks; no fresh vanilla comparison",
+    "validation_evidence": "validation/candidate-run/logic-results.jsonl"
+  },
+  "3b4e13cd09dc8ad0b5770370d6f416e1d8140e2eec416c207ba76d8a79af46ca": {
+    "validation_status": "functional_pass",
+    "validation_detail": "656 endpoint checks; no fresh vanilla comparison",
+    "validation_evidence": "validation/candidate-run/logic-results.jsonl"
+  },
+  "e7b964e92109edebd0860f1ec95c158eebd8f66436e4c6c5b7c36862b7675586": {
+    "validation_status": "vanilla cycles pass; engine unsupported block",
+    "validation_detail": "Engine refuses minecraft:waxed_oxidized_copper before ticking; not a passing benchmark.",
+    "validation_evidence": "validation/candidate-run/compare-cycle.json"
+  },
+  "92d44580dc1539903b56ad08a8b1be89d70de602328d5fe36ef589743c3a3db3": {
+    "validation_status": "vanilla_tick_end_parity_pass",
+    "validation_detail": "120/120 output and640/640 input assertions; two identical native1.21.11 captures,960ticks/961frames; reference+selected shadow match all captured blocks,comparator outputs,flat inventories.",
+    "validation_evidence": "validation/candidate-run/comparator-selected.json"
+  }
+}

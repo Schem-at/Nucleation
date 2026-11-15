@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "target": "wasm32-unknown-unknown",
+  "source_sha256": "92d44580dc1539903b56ad08a8b1be89d70de602328d5fe36ef589743c3a3db3",
+  "capture_sha256": "d439e631334d30916674471d0be39919741ddd19e3475b5503ce8fc2a12196f9",
+  "frames": 961,
+  "watched_cells": 3024,
+  "block_state_assertions": 2906064,
+  "actions": 72,
+  "scope": "Every watched block state including air at initial and each tick-end; actual lever actions through JS bindings. Comparator outputs/inventory slots independently compared by native checker, not this script.",
+  "max_browser_volume": 8000000,
+  "wasm_sha256": "c6c58f52f5aa4ecaa924d490e312dc6d8addf33cca721c0000f6e3c442eb0b87"
+}

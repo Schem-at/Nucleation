@@ -1,0 +1,248 @@
+{
+  "activity_counting": "Differences between consecutive tick-end maps; not a count of every intra-tick write",
+  "captures": {
+    "cycle": {
+      "actions": [
+        {
+          "pos": [
+            6,
+            1,
+            4
+          ],
+          "tick": 11,
+          "type": "pull_lever"
+        },
+        {
+          "pos": [
+            6,
+            1,
+            4
+          ],
+          "tick": 91,
+          "type": "pull_lever"
+        },
+        {
+          "pos": [
+            6,
+            1,
+            4
+          ],
+          "tick": 171,
+          "type": "pull_lever"
+        },
+        {
+          "pos": [
+            6,
+            1,
+            4
+          ],
+          "tick": 251,
+          "type": "pull_lever"
+        }
+      ],
+      "activity": {
+        "blocks": {
+          "changed_map_entries": 1658,
+          "changed_tick_boundaries": 122,
+          "first_changed_tick": 11,
+          "last_changed_tick": 300
+        },
+        "comparator_outputs": {
+          "changed_map_entries": 28,
+          "changed_tick_boundaries": 16,
+          "first_changed_tick": 29,
+          "last_changed_tick": 288
+        },
+        "inventories": {
+          "changed_map_entries": 48,
+          "changed_tick_boundaries": 22,
+          "first_changed_tick": 27,
+          "last_changed_tick": 282
+        }
+      },
+      "capture_ticks": 320,
+      "case": "interlocking_cycle",
+      "frames_including_initial": 321,
+      "initial_map_counts": {
+        "blocks": 174,
+        "comparator_outputs": 7,
+        "inventories": 3
+      },
+      "path_relative_to_capture_root": "vanilla-cycle/capture.json",
+      "phase_map_sha256": {
+        "0": "65f44d0e5861c542d1da2a005b450b19d3560a19794d85579aad313cba91cc42",
+        "160": "65f44d0e5861c542d1da2a005b450b19d3560a19794d85579aad313cba91cc42",
+        "240": "a8628e5247630999ed5c11d9aca6bdd1922b96f6ef34beea172a1eb762e039ca",
+        "320": "65f44d0e5861c542d1da2a005b450b19d3560a19794d85579aad313cba91cc42",
+        "80": "a8628e5247630999ed5c11d9aca6bdd1922b96f6ef34beea172a1eb762e039ca"
+      },
+      "scenario_sha256": "5aa335b19af37bd6e7bfc358c34fc716a77961c7e32ee2471d9a1f34229a51fd",
+      "sha256": "39602a9fd99caac0d1582600ac6f49c262a4a2c5a3bc789992ceeb26739a092c",
+      "warmup_ticks": 18
+    },
+    "idle": {
+      "actions": [],
+      "activity": {
+        "blocks": {
+          "changed_map_entries": 0,
+          "changed_tick_boundaries": 0,
+          "first_changed_tick": null,
+          "last_changed_tick": null
+        },
+        "comparator_outputs": {
+          "changed_map_entries": 0,
+          "changed_tick_boundaries": 0,
+          "first_changed_tick": null,
+          "last_changed_tick": null
+        },
+        "inventories": {
+          "changed_map_entries": 0,
+          "changed_tick_boundaries": 0,
+          "first_changed_tick": null,
+          "last_changed_tick": null
+        }
+      },
+      "capture_ticks": 320,
+      "case": "interlocking_idle",
+      "frames_including_initial": 321,
+      "initial_map_counts": {
+        "blocks": 174,
+        "comparator_outputs": 7,
+        "inventories": 3
+      },
+      "path_relative_to_capture_root": "vanilla-idle/capture.json",
+      "phase_map_sha256": {
+        "0": "65f44d0e5861c542d1da2a005b450b19d3560a19794d85579aad313cba91cc42",
+        "160": "65f44d0e5861c542d1da2a005b450b19d3560a19794d85579aad313cba91cc42",
+        "240": "65f44d0e5861c542d1da2a005b450b19d3560a19794d85579aad313cba91cc42",
+        "320": "65f44d0e5861c542d1da2a005b450b19d3560a19794d85579aad313cba91cc42",
+        "80": "65f44d0e5861c542d1da2a005b450b19d3560a19794d85579aad313cba91cc42"
+      },
+      "scenario_sha256": "14b06f9afdbeac8360c68f2334c299e03d3f0ea432acbc0a9a70b63472517a34",
+      "sha256": "d137b334f7ccac221f1ce6098bd2a8f99df6d12f9c2f01ca01cc3554388d9e15",
+      "warmup_ticks": 14
+    }
+  },
+  "checks": {
+    "cycle_all_three_maps_restored_at_ticks": [
+      160,
+      320
+    ],
+    "idle_all_three_maps_unchanged": true,
+    "initial_plus_320_consecutive_frames_each": true,
+    "panel": {
+      "all_nine_air_at_ticks": [
+        0,
+        160,
+        320
+      ],
+      "all_nine_present_at_ticks": [
+        80,
+        240
+      ],
+      "positions": [
+        [
+          3,
+          5,
+          1
+        ],
+        [
+          3,
+          6,
+          1
+        ],
+        [
+          3,
+          7,
+          1
+        ],
+        [
+          4,
+          5,
+          1
+        ],
+        [
+          4,
+          6,
+          1
+        ],
+        [
+          4,
+          7,
+          1
+        ],
+        [
+          5,
+          5,
+          1
+        ],
+        [
+          5,
+          6,
+          1
+        ],
+        [
+          5,
+          7,
+          1
+        ]
+      ],
+      "state": "minecraft:waxed_oxidized_copper"
+    },
+    "positive_activity_in_both_cycles_and_all_three_map_types": true,
+    "same_authored_fixture_and_initial_maps": true,
+    "zero_recorded_players_all_642_boundaries": true
+  },
+  "phase_map_hash_encoding": "SHA-256 of UTF-8 compact sorted-key JSON mapping each field to sorted [key coordinates..., value] rows",
+  "reference": {
+    "data_version": 4671,
+    "java_runtime_version": "21.0.13+9-LTS",
+    "mappings_sha1": "5621e9253f05fd57872bbe7f8ddf5f9a7d525955",
+    "mc_version": "1.21.11",
+    "origin": [
+      0,
+      100,
+      0
+    ],
+    "rng_seed": 0,
+    "server_inner_sha256": "ec47239a8de246335e1d54f6ac319bd35641778eb4b6a6da06372840d02fcebc",
+    "server_kind": "Minecraft GameTestServer; no client or connected players",
+    "watch": {
+      "max": [
+        10,
+        14,
+        6
+      ],
+      "min": [
+        -2,
+        -2,
+        -2
+      ]
+    }
+  },
+  "reproduce": "python3 tools/validate_tick_community.py --captures <archive>/validation/candidate-run --output docs/performance/schematic-candidates/validation/door-functional.json",
+  "result": "pass",
+  "schema_version": 1,
+  "scope": {
+    "excluded": [
+      "Nucleation-versus-vanilla equivalence (requires the separate Rust capture checker)",
+      "Runtime entity census/equality; entity_count describes the authored fixture only",
+      "Item components, recursive item inventories, and moving block-entity payload equality",
+      "Intra-tick notification order, intermediate states between captures, and cells outside watch",
+      "Performance measurements or a newly executed Minecraft capture"
+    ],
+    "included": [
+      "Retained Minecraft 1.21.11 tick-end block descriptors within the inclusive watch box",
+      "Comparator output values and simple occupied inventory slot IDs/counts",
+      "Recorded zero-player count at every captured boundary",
+      "Door panel occupancy, repeated return to the initial maps, and idle stability"
+    ]
+  },
+  "source": {
+    "data_version": 4671,
+    "sha256": "e7b964e92109edebd0860f1ec95c158eebd8f66436e4c6c5b7c36862b7675586",
+    "url": "https://www.reddit.com/r/redstone/comments/1qs127k/3x3_door_with_interlocking_block_openclose/"
+  },
+  "validation_kind": "retained vanilla capture functional assertions",
+  "validator": "tools/validate_tick_community.py"
+}

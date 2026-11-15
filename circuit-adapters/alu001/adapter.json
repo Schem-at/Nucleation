@@ -1,0 +1,256 @@
+{
+  "schema_version": 1,
+  "id": "alu001",
+  "source_sha256": "4fa213c46c4759a761f8473e21079bfcd487b1decb0e4df53ec6b96d05fa7d96",
+  "source_data_version": 4189,
+  "description": "Eight-bit ALU with eleven sign-labelled one-hot operation selectors",
+  "evidence": [
+    "Selectors are mapped directly from source signs: Add, Sub, AND, NAND, OR, NOR, XOR, XNOR, A IMPLY B, A NIMPLY B, Right-Shift.",
+    "Operation is an 11-bit ONE-HOT mask, not an opcode; zero/multiple selectors are outside the tested contract.",
+    "Named inversion buses identify A at x=0 and B at x=8 independently of simulation. Right-shift checks require b=0.",
+    "64 game ticks is a conservative endpoint budget, not a minimum-latency claim.",
+    "Original save DataVersion 4189 is preserved. These are functional arithmetic checks, not a fresh vanilla comparison."
+  ],
+  "cell": {
+    "name": "alu001",
+    "version": "1",
+    "io": {
+      "inputs": {
+        "a": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 8
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              0,
+              4,
+              21
+            ],
+            [
+              0,
+              6,
+              21
+            ],
+            [
+              0,
+              8,
+              21
+            ],
+            [
+              0,
+              10,
+              21
+            ],
+            [
+              0,
+              12,
+              21
+            ],
+            [
+              0,
+              14,
+              21
+            ],
+            [
+              0,
+              16,
+              21
+            ],
+            [
+              0,
+              18,
+              21
+            ]
+          ]
+        },
+        "b": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 8
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              8,
+              4,
+              21
+            ],
+            [
+              8,
+              6,
+              21
+            ],
+            [
+              8,
+              8,
+              21
+            ],
+            [
+              8,
+              10,
+              21
+            ],
+            [
+              8,
+              12,
+              21
+            ],
+            [
+              8,
+              14,
+              21
+            ],
+            [
+              8,
+              16,
+              21
+            ],
+            [
+              8,
+              18,
+              21
+            ]
+          ]
+        },
+        "operation": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 11
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              12,
+              3,
+              18
+            ],
+            [
+              14,
+              3,
+              18
+            ],
+            [
+              16,
+              3,
+              18
+            ],
+            [
+              18,
+              3,
+              18
+            ],
+            [
+              20,
+              3,
+              18
+            ],
+            [
+              22,
+              3,
+              18
+            ],
+            [
+              24,
+              3,
+              18
+            ],
+            [
+              26,
+              3,
+              18
+            ],
+            [
+              28,
+              3,
+              18
+            ],
+            [
+              30,
+              3,
+              18
+            ],
+            [
+              32,
+              3,
+              18
+            ]
+          ]
+        }
+      },
+      "outputs": {
+        "out": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 8
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              9,
+              4,
+              0
+            ],
+            [
+              9,
+              6,
+              0
+            ],
+            [
+              9,
+              8,
+              0
+            ],
+            [
+              9,
+              10,
+              0
+            ],
+            [
+              9,
+              12,
+              0
+            ],
+            [
+              9,
+              14,
+              0
+            ],
+            [
+              9,
+              16,
+              0
+            ],
+            [
+              9,
+              18,
+              0
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "input_order": [
+    "a",
+    "b",
+    "operation"
+  ],
+  "outputs": {
+    "out": "lamp_lit"
+  },
+  "setup_ticks": 128,
+  "response_ticks": 64,
+  "require_quiescent": true,
+  "rng_seed": 0,
+  "hash_origin": [
+    0,
+    0,
+    0
+  ]
+}

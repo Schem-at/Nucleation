@@ -1,0 +1,53 @@
+{
+  "capture_host": "harrison-work",
+  "driver_source": "tools/gametest/src/TraceCapture12111.java",
+  "driver_source_sha256": "25a18d114a5581607a7f276e1bb67c8df8c759f7a8e5ac2b6f42aa84561754f5",
+  "runner_source": "tools/gametest/run_capture12111.py",
+  "runner_source_sha256": "f86ad0c474da266fd047af99551571dee822a0a2fb742ed95092f1548c0d5e1c",
+  "captures": {
+    "crates/mc-tick/tests/corpus/vanilla12111_execution_next/comparator_drain.json": {
+      "sha256": "c01460d28b5dd6093b0acdc32566e13dd5b07b1b3e9aa30b2233281f08dde363",
+      "case": "comparator_drain",
+      "negative_control": false,
+      "mc_version": "1.21.11",
+      "data_version": 4671,
+      "java_runtime_version": "21.0.13+9-LTS",
+      "warmup_ticks": 14,
+      "snapshots": 40,
+      "zero_players_at_every_snapshot": true
+    },
+    "crates/mc-tick/tests/corpus/vanilla12111_execution_next/comparator_drain_negative.json": {
+      "sha256": "682815193216d75292fc5f4ab3c0b3d0040cbe8dd7d0ee93908d2624b290846d",
+      "case": "comparator_drain",
+      "negative_control": true,
+      "mc_version": "1.21.11",
+      "data_version": 4671,
+      "java_runtime_version": "21.0.13+9-LTS",
+      "warmup_ticks": 18,
+      "snapshots": 40,
+      "zero_players_at_every_snapshot": true
+    },
+    "crates/mc-tick/tests/corpus/vanilla12111_execution_next/piston_qc.json": {
+      "sha256": "146626997e3ebbf745b1798538fbc18f810e755fa1e6ceb4d46043d27a4708bf",
+      "case": "piston_qc",
+      "negative_control": false,
+      "mc_version": "1.21.11",
+      "data_version": 4671,
+      "java_runtime_version": "21.0.13+9-LTS",
+      "warmup_ticks": 14,
+      "snapshots": 40,
+      "zero_players_at_every_snapshot": true
+    },
+    "crates/mc-tick/tests/corpus/vanilla12111_execution_next/piston_qc_negative.json": {
+      "sha256": "c60629c0c70118f4db8f8f737e60122e24974be6c4e7cc789243daab7667197f",
+      "case": "piston_qc",
+      "negative_control": true,
+      "mc_version": "1.21.11",
+      "data_version": 4671,
+      "java_runtime_version": "21.0.13+9-LTS",
+      "warmup_ticks": 14,
+      "snapshots": 40,
+      "zero_players_at_every_snapshot": true
+    }
+  }
+}

@@ -1,0 +1,10177 @@
+{
+  "schema_version": 1,
+  "adapter": "alu001",
+  "oracle": "Independent Python unsigned 8-bit arithmetic/bitwise logic for ten operations, plus exhaustive a>>1 with b=0. Operation is a one-hot mask in source sign order. Overflow/borrow discarded; unrestricted two-operand pairs and combined selectors are not exhaustive.",
+  "vectors": [
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 1
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 16
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 32
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0,
+        "operation": 1
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0,
+        "operation": 2
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0,
+        "operation": 16
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0,
+        "operation": 32
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0,
+        "operation": 64
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0,
+        "operation": 128
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0,
+        "operation": 256
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0,
+        "operation": 512
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 255,
+        "operation": 1
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 255,
+        "operation": 2
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 255,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 255,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 255,
+        "operation": 16
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 255,
+        "operation": 32
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 255,
+        "operation": 64
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 255,
+        "operation": 128
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 255,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 255,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 255,
+        "operation": 1
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 255,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 255,
+        "operation": 4
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 255,
+        "operation": 8
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 255,
+        "operation": 16
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 255,
+        "operation": 32
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 255,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 255,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 255,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 255,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 1
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 2
+      },
+      "expected": {
+        "out": 126
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 4
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 8
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 16
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 32
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 64
+      },
+      "expected": {
+        "out": 126
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 128
+      },
+      "expected": {
+        "out": 129
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 256
+      },
+      "expected": {
+        "out": 129
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 512
+      },
+      "expected": {
+        "out": 126
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 127,
+        "operation": 1
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 127,
+        "operation": 2
+      },
+      "expected": {
+        "out": 130
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 127,
+        "operation": 4
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 127,
+        "operation": 8
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 127,
+        "operation": 16
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 127,
+        "operation": 32
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 127,
+        "operation": 64
+      },
+      "expected": {
+        "out": 126
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 127,
+        "operation": 128
+      },
+      "expected": {
+        "out": 129
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 127,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 127,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 1
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 4
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 8
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 16
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 32
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 170,
+        "operation": 1
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 170,
+        "operation": 2
+      },
+      "expected": {
+        "out": 171
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 170,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 170,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 170,
+        "operation": 16
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 170,
+        "operation": 32
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 170,
+        "operation": 64
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 170,
+        "operation": 128
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 170,
+        "operation": 256
+      },
+      "expected": {
+        "out": 170
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 170,
+        "operation": 512
+      },
+      "expected": {
+        "out": 85
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 85,
+        "operation": 1
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 85,
+        "operation": 2
+      },
+      "expected": {
+        "out": 85
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 85,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 85,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 85,
+        "operation": 16
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 85,
+        "operation": 32
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 85,
+        "operation": 64
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 85,
+        "operation": 128
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 85,
+        "operation": 256
+      },
+      "expected": {
+        "out": 85
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 85,
+        "operation": 512
+      },
+      "expected": {
+        "out": 170
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 85,
+        "operation": 1
+      },
+      "expected": {
+        "out": 170
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 85,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 85,
+        "operation": 4
+      },
+      "expected": {
+        "out": 85
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 85,
+        "operation": 8
+      },
+      "expected": {
+        "out": 170
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 85,
+        "operation": 16
+      },
+      "expected": {
+        "out": 85
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 85,
+        "operation": 32
+      },
+      "expected": {
+        "out": 170
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 85,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 85,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 85,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 85,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 170,
+        "operation": 1
+      },
+      "expected": {
+        "out": 84
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 170,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 170,
+        "operation": 4
+      },
+      "expected": {
+        "out": 170
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 170,
+        "operation": 8
+      },
+      "expected": {
+        "out": 85
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 170,
+        "operation": 16
+      },
+      "expected": {
+        "out": 170
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 170,
+        "operation": 32
+      },
+      "expected": {
+        "out": 85
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 170,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 170,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 170,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 170,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0,
+        "operation": 1
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0,
+        "operation": 2
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0,
+        "operation": 16
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0,
+        "operation": 32
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0,
+        "operation": 64
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0,
+        "operation": 128
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0,
+        "operation": 256
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0,
+        "operation": 512
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 1
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 2
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 16
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 32
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 64
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 128
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 1
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 4
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 8
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 16
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 32
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 1
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 2
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 16
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 32
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 64
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 128
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0,
+        "operation": 1
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0,
+        "operation": 2
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0,
+        "operation": 16
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0,
+        "operation": 32
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0,
+        "operation": 64
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0,
+        "operation": 128
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0,
+        "operation": 256
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0,
+        "operation": 512
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 2,
+        "operation": 1
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 2,
+        "operation": 2
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 2,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 2,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 2,
+        "operation": 16
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 2,
+        "operation": 32
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 2,
+        "operation": 64
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 2,
+        "operation": 128
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 2,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 2,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 2,
+        "operation": 1
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 2,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 2,
+        "operation": 4
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 2,
+        "operation": 8
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 2,
+        "operation": 16
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 2,
+        "operation": 32
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 2,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 2,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 2,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 2,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 1
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 4
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 8
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 16
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 32
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0,
+        "operation": 1
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0,
+        "operation": 2
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0,
+        "operation": 16
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0,
+        "operation": 32
+      },
+      "expected": {
+        "out": 251
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0,
+        "operation": 64
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0,
+        "operation": 128
+      },
+      "expected": {
+        "out": 251
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0,
+        "operation": 256
+      },
+      "expected": {
+        "out": 251
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0,
+        "operation": 512
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 4,
+        "operation": 1
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 4,
+        "operation": 2
+      },
+      "expected": {
+        "out": 252
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 4,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 4,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 4,
+        "operation": 16
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 4,
+        "operation": 32
+      },
+      "expected": {
+        "out": 251
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 4,
+        "operation": 64
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 4,
+        "operation": 128
+      },
+      "expected": {
+        "out": 251
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 4,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 4,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 4,
+        "operation": 1
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 4,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 4,
+        "operation": 4
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 4,
+        "operation": 8
+      },
+      "expected": {
+        "out": 251
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 4,
+        "operation": 16
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 4,
+        "operation": 32
+      },
+      "expected": {
+        "out": 251
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 4,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 4,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 4,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 4,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 1,
+        "operation": 1
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 1,
+        "operation": 2
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 1,
+        "operation": 4
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 1,
+        "operation": 8
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 1,
+        "operation": 16
+      },
+      "expected": {
+        "out": 3
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 1,
+        "operation": 32
+      },
+      "expected": {
+        "out": 252
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 1,
+        "operation": 64
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 1,
+        "operation": 128
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 1,
+        "operation": 256
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 1,
+        "operation": 512
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0,
+        "operation": 1
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0,
+        "operation": 2
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0,
+        "operation": 16
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0,
+        "operation": 32
+      },
+      "expected": {
+        "out": 247
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0,
+        "operation": 64
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0,
+        "operation": 128
+      },
+      "expected": {
+        "out": 247
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0,
+        "operation": 256
+      },
+      "expected": {
+        "out": 247
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0,
+        "operation": 512
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 8,
+        "operation": 1
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 8,
+        "operation": 2
+      },
+      "expected": {
+        "out": 248
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 8,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 8,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 8,
+        "operation": 16
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 8,
+        "operation": 32
+      },
+      "expected": {
+        "out": 247
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 8,
+        "operation": 64
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 8,
+        "operation": 128
+      },
+      "expected": {
+        "out": 247
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 8,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 8,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 8,
+        "operation": 1
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 8,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 8,
+        "operation": 4
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 8,
+        "operation": 8
+      },
+      "expected": {
+        "out": 247
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 8,
+        "operation": 16
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 8,
+        "operation": 32
+      },
+      "expected": {
+        "out": 247
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 8,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 8,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 8,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 8,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 7,
+        "b": 1,
+        "operation": 1
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 7,
+        "b": 1,
+        "operation": 2
+      },
+      "expected": {
+        "out": 6
+      }
+    },
+    {
+      "inputs": {
+        "a": 7,
+        "b": 1,
+        "operation": 4
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 7,
+        "b": 1,
+        "operation": 8
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 7,
+        "b": 1,
+        "operation": 16
+      },
+      "expected": {
+        "out": 7
+      }
+    },
+    {
+      "inputs": {
+        "a": 7,
+        "b": 1,
+        "operation": 32
+      },
+      "expected": {
+        "out": 248
+      }
+    },
+    {
+      "inputs": {
+        "a": 7,
+        "b": 1,
+        "operation": 64
+      },
+      "expected": {
+        "out": 6
+      }
+    },
+    {
+      "inputs": {
+        "a": 7,
+        "b": 1,
+        "operation": 128
+      },
+      "expected": {
+        "out": 249
+      }
+    },
+    {
+      "inputs": {
+        "a": 7,
+        "b": 1,
+        "operation": 256
+      },
+      "expected": {
+        "out": 249
+      }
+    },
+    {
+      "inputs": {
+        "a": 7,
+        "b": 1,
+        "operation": 512
+      },
+      "expected": {
+        "out": 6
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0,
+        "operation": 1
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0,
+        "operation": 2
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0,
+        "operation": 16
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0,
+        "operation": 32
+      },
+      "expected": {
+        "out": 239
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0,
+        "operation": 64
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0,
+        "operation": 128
+      },
+      "expected": {
+        "out": 239
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0,
+        "operation": 256
+      },
+      "expected": {
+        "out": 239
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0,
+        "operation": 512
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 16,
+        "operation": 1
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 16,
+        "operation": 2
+      },
+      "expected": {
+        "out": 240
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 16,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 16,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 16,
+        "operation": 16
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 16,
+        "operation": 32
+      },
+      "expected": {
+        "out": 239
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 16,
+        "operation": 64
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 16,
+        "operation": 128
+      },
+      "expected": {
+        "out": 239
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 16,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 16,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 16,
+        "operation": 1
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 16,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 16,
+        "operation": 4
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 16,
+        "operation": 8
+      },
+      "expected": {
+        "out": 239
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 16,
+        "operation": 16
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 16,
+        "operation": 32
+      },
+      "expected": {
+        "out": 239
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 16,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 16,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 16,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 16,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 15,
+        "b": 1,
+        "operation": 1
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 15,
+        "b": 1,
+        "operation": 2
+      },
+      "expected": {
+        "out": 14
+      }
+    },
+    {
+      "inputs": {
+        "a": 15,
+        "b": 1,
+        "operation": 4
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 15,
+        "b": 1,
+        "operation": 8
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 15,
+        "b": 1,
+        "operation": 16
+      },
+      "expected": {
+        "out": 15
+      }
+    },
+    {
+      "inputs": {
+        "a": 15,
+        "b": 1,
+        "operation": 32
+      },
+      "expected": {
+        "out": 240
+      }
+    },
+    {
+      "inputs": {
+        "a": 15,
+        "b": 1,
+        "operation": 64
+      },
+      "expected": {
+        "out": 14
+      }
+    },
+    {
+      "inputs": {
+        "a": 15,
+        "b": 1,
+        "operation": 128
+      },
+      "expected": {
+        "out": 241
+      }
+    },
+    {
+      "inputs": {
+        "a": 15,
+        "b": 1,
+        "operation": 256
+      },
+      "expected": {
+        "out": 241
+      }
+    },
+    {
+      "inputs": {
+        "a": 15,
+        "b": 1,
+        "operation": 512
+      },
+      "expected": {
+        "out": 14
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0,
+        "operation": 1
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0,
+        "operation": 2
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0,
+        "operation": 16
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0,
+        "operation": 32
+      },
+      "expected": {
+        "out": 223
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0,
+        "operation": 64
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0,
+        "operation": 128
+      },
+      "expected": {
+        "out": 223
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0,
+        "operation": 256
+      },
+      "expected": {
+        "out": 223
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0,
+        "operation": 512
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 32,
+        "operation": 1
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 32,
+        "operation": 2
+      },
+      "expected": {
+        "out": 224
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 32,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 32,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 32,
+        "operation": 16
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 32,
+        "operation": 32
+      },
+      "expected": {
+        "out": 223
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 32,
+        "operation": 64
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 32,
+        "operation": 128
+      },
+      "expected": {
+        "out": 223
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 32,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 32,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 32,
+        "operation": 1
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 32,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 32,
+        "operation": 4
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 32,
+        "operation": 8
+      },
+      "expected": {
+        "out": 223
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 32,
+        "operation": 16
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 32,
+        "operation": 32
+      },
+      "expected": {
+        "out": 223
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 32,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 32,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 32,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 32,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 1,
+        "operation": 1
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 1,
+        "operation": 2
+      },
+      "expected": {
+        "out": 30
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 1,
+        "operation": 4
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 1,
+        "operation": 8
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 1,
+        "operation": 16
+      },
+      "expected": {
+        "out": 31
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 1,
+        "operation": 32
+      },
+      "expected": {
+        "out": 224
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 1,
+        "operation": 64
+      },
+      "expected": {
+        "out": 30
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 1,
+        "operation": 128
+      },
+      "expected": {
+        "out": 225
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 1,
+        "operation": 256
+      },
+      "expected": {
+        "out": 225
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 1,
+        "operation": 512
+      },
+      "expected": {
+        "out": 30
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0,
+        "operation": 1
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0,
+        "operation": 2
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0,
+        "operation": 16
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0,
+        "operation": 32
+      },
+      "expected": {
+        "out": 191
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0,
+        "operation": 64
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0,
+        "operation": 128
+      },
+      "expected": {
+        "out": 191
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0,
+        "operation": 256
+      },
+      "expected": {
+        "out": 191
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0,
+        "operation": 512
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 64,
+        "operation": 1
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 64,
+        "operation": 2
+      },
+      "expected": {
+        "out": 192
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 64,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 64,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 64,
+        "operation": 16
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 64,
+        "operation": 32
+      },
+      "expected": {
+        "out": 191
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 64,
+        "operation": 64
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 64,
+        "operation": 128
+      },
+      "expected": {
+        "out": 191
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 64,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 64,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 64,
+        "operation": 1
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 64,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 64,
+        "operation": 4
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 64,
+        "operation": 8
+      },
+      "expected": {
+        "out": 191
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 64,
+        "operation": 16
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 64,
+        "operation": 32
+      },
+      "expected": {
+        "out": 191
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 64,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 64,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 64,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 64,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 63,
+        "b": 1,
+        "operation": 1
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 63,
+        "b": 1,
+        "operation": 2
+      },
+      "expected": {
+        "out": 62
+      }
+    },
+    {
+      "inputs": {
+        "a": 63,
+        "b": 1,
+        "operation": 4
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 63,
+        "b": 1,
+        "operation": 8
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 63,
+        "b": 1,
+        "operation": 16
+      },
+      "expected": {
+        "out": 63
+      }
+    },
+    {
+      "inputs": {
+        "a": 63,
+        "b": 1,
+        "operation": 32
+      },
+      "expected": {
+        "out": 192
+      }
+    },
+    {
+      "inputs": {
+        "a": 63,
+        "b": 1,
+        "operation": 64
+      },
+      "expected": {
+        "out": 62
+      }
+    },
+    {
+      "inputs": {
+        "a": 63,
+        "b": 1,
+        "operation": 128
+      },
+      "expected": {
+        "out": 193
+      }
+    },
+    {
+      "inputs": {
+        "a": 63,
+        "b": 1,
+        "operation": 256
+      },
+      "expected": {
+        "out": 193
+      }
+    },
+    {
+      "inputs": {
+        "a": 63,
+        "b": 1,
+        "operation": 512
+      },
+      "expected": {
+        "out": 62
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0,
+        "operation": 1
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0,
+        "operation": 2
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0,
+        "operation": 16
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0,
+        "operation": 32
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0,
+        "operation": 64
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0,
+        "operation": 128
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0,
+        "operation": 256
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0,
+        "operation": 512
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 128,
+        "operation": 1
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 128,
+        "operation": 2
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 128,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 128,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 128,
+        "operation": 16
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 128,
+        "operation": 32
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 128,
+        "operation": 64
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 128,
+        "operation": 128
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 128,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 128,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 1
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 4
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 8
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 16
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 32
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 1
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 2
+      },
+      "expected": {
+        "out": 126
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 4
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 8
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 16
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 32
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 64
+      },
+      "expected": {
+        "out": 126
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 128
+      },
+      "expected": {
+        "out": 129
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 256
+      },
+      "expected": {
+        "out": 129
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 1,
+        "operation": 512
+      },
+      "expected": {
+        "out": 126
+      }
+    },
+    {
+      "inputs": {
+        "a": 119,
+        "b": 234,
+        "operation": 1
+      },
+      "expected": {
+        "out": 97
+      }
+    },
+    {
+      "inputs": {
+        "a": 119,
+        "b": 234,
+        "operation": 2
+      },
+      "expected": {
+        "out": 141
+      }
+    },
+    {
+      "inputs": {
+        "a": 119,
+        "b": 234,
+        "operation": 4
+      },
+      "expected": {
+        "out": 98
+      }
+    },
+    {
+      "inputs": {
+        "a": 119,
+        "b": 234,
+        "operation": 8
+      },
+      "expected": {
+        "out": 157
+      }
+    },
+    {
+      "inputs": {
+        "a": 119,
+        "b": 234,
+        "operation": 16
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 119,
+        "b": 234,
+        "operation": 32
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 119,
+        "b": 234,
+        "operation": 64
+      },
+      "expected": {
+        "out": 157
+      }
+    },
+    {
+      "inputs": {
+        "a": 119,
+        "b": 234,
+        "operation": 128
+      },
+      "expected": {
+        "out": 98
+      }
+    },
+    {
+      "inputs": {
+        "a": 119,
+        "b": 234,
+        "operation": 256
+      },
+      "expected": {
+        "out": 234
+      }
+    },
+    {
+      "inputs": {
+        "a": 119,
+        "b": 234,
+        "operation": 512
+      },
+      "expected": {
+        "out": 21
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 196,
+        "operation": 1
+      },
+      "expected": {
+        "out": 180
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 196,
+        "operation": 2
+      },
+      "expected": {
+        "out": 44
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 196,
+        "operation": 4
+      },
+      "expected": {
+        "out": 192
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 196,
+        "operation": 8
+      },
+      "expected": {
+        "out": 63
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 196,
+        "operation": 16
+      },
+      "expected": {
+        "out": 244
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 196,
+        "operation": 32
+      },
+      "expected": {
+        "out": 11
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 196,
+        "operation": 64
+      },
+      "expected": {
+        "out": 52
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 196,
+        "operation": 128
+      },
+      "expected": {
+        "out": 203
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 196,
+        "operation": 256
+      },
+      "expected": {
+        "out": 207
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 196,
+        "operation": 512
+      },
+      "expected": {
+        "out": 48
+      }
+    },
+    {
+      "inputs": {
+        "a": 245,
+        "b": 136,
+        "operation": 1
+      },
+      "expected": {
+        "out": 125
+      }
+    },
+    {
+      "inputs": {
+        "a": 245,
+        "b": 136,
+        "operation": 2
+      },
+      "expected": {
+        "out": 109
+      }
+    },
+    {
+      "inputs": {
+        "a": 245,
+        "b": 136,
+        "operation": 4
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 245,
+        "b": 136,
+        "operation": 8
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 245,
+        "b": 136,
+        "operation": 16
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 245,
+        "b": 136,
+        "operation": 32
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 245,
+        "b": 136,
+        "operation": 64
+      },
+      "expected": {
+        "out": 125
+      }
+    },
+    {
+      "inputs": {
+        "a": 245,
+        "b": 136,
+        "operation": 128
+      },
+      "expected": {
+        "out": 130
+      }
+    },
+    {
+      "inputs": {
+        "a": 245,
+        "b": 136,
+        "operation": 256
+      },
+      "expected": {
+        "out": 138
+      }
+    },
+    {
+      "inputs": {
+        "a": 245,
+        "b": 136,
+        "operation": 512
+      },
+      "expected": {
+        "out": 117
+      }
+    },
+    {
+      "inputs": {
+        "a": 107,
+        "b": 99,
+        "operation": 1
+      },
+      "expected": {
+        "out": 206
+      }
+    },
+    {
+      "inputs": {
+        "a": 107,
+        "b": 99,
+        "operation": 2
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 107,
+        "b": 99,
+        "operation": 4
+      },
+      "expected": {
+        "out": 99
+      }
+    },
+    {
+      "inputs": {
+        "a": 107,
+        "b": 99,
+        "operation": 8
+      },
+      "expected": {
+        "out": 156
+      }
+    },
+    {
+      "inputs": {
+        "a": 107,
+        "b": 99,
+        "operation": 16
+      },
+      "expected": {
+        "out": 107
+      }
+    },
+    {
+      "inputs": {
+        "a": 107,
+        "b": 99,
+        "operation": 32
+      },
+      "expected": {
+        "out": 148
+      }
+    },
+    {
+      "inputs": {
+        "a": 107,
+        "b": 99,
+        "operation": 64
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 107,
+        "b": 99,
+        "operation": 128
+      },
+      "expected": {
+        "out": 247
+      }
+    },
+    {
+      "inputs": {
+        "a": 107,
+        "b": 99,
+        "operation": 256
+      },
+      "expected": {
+        "out": 247
+      }
+    },
+    {
+      "inputs": {
+        "a": 107,
+        "b": 99,
+        "operation": 512
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 104,
+        "operation": 1
+      },
+      "expected": {
+        "out": 189
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 104,
+        "operation": 2
+      },
+      "expected": {
+        "out": 237
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 104,
+        "operation": 4
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 104,
+        "operation": 8
+      },
+      "expected": {
+        "out": 191
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 104,
+        "operation": 16
+      },
+      "expected": {
+        "out": 125
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 104,
+        "operation": 32
+      },
+      "expected": {
+        "out": 130
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 104,
+        "operation": 64
+      },
+      "expected": {
+        "out": 61
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 104,
+        "operation": 128
+      },
+      "expected": {
+        "out": 194
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 104,
+        "operation": 256
+      },
+      "expected": {
+        "out": 234
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 104,
+        "operation": 512
+      },
+      "expected": {
+        "out": 21
+      }
+    },
+    {
+      "inputs": {
+        "a": 100,
+        "b": 55,
+        "operation": 1
+      },
+      "expected": {
+        "out": 155
+      }
+    },
+    {
+      "inputs": {
+        "a": 100,
+        "b": 55,
+        "operation": 2
+      },
+      "expected": {
+        "out": 45
+      }
+    },
+    {
+      "inputs": {
+        "a": 100,
+        "b": 55,
+        "operation": 4
+      },
+      "expected": {
+        "out": 36
+      }
+    },
+    {
+      "inputs": {
+        "a": 100,
+        "b": 55,
+        "operation": 8
+      },
+      "expected": {
+        "out": 219
+      }
+    },
+    {
+      "inputs": {
+        "a": 100,
+        "b": 55,
+        "operation": 16
+      },
+      "expected": {
+        "out": 119
+      }
+    },
+    {
+      "inputs": {
+        "a": 100,
+        "b": 55,
+        "operation": 32
+      },
+      "expected": {
+        "out": 136
+      }
+    },
+    {
+      "inputs": {
+        "a": 100,
+        "b": 55,
+        "operation": 64
+      },
+      "expected": {
+        "out": 83
+      }
+    },
+    {
+      "inputs": {
+        "a": 100,
+        "b": 55,
+        "operation": 128
+      },
+      "expected": {
+        "out": 172
+      }
+    },
+    {
+      "inputs": {
+        "a": 100,
+        "b": 55,
+        "operation": 256
+      },
+      "expected": {
+        "out": 191
+      }
+    },
+    {
+      "inputs": {
+        "a": 100,
+        "b": 55,
+        "operation": 512
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 88,
+        "b": 13,
+        "operation": 1
+      },
+      "expected": {
+        "out": 101
+      }
+    },
+    {
+      "inputs": {
+        "a": 88,
+        "b": 13,
+        "operation": 2
+      },
+      "expected": {
+        "out": 75
+      }
+    },
+    {
+      "inputs": {
+        "a": 88,
+        "b": 13,
+        "operation": 4
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 88,
+        "b": 13,
+        "operation": 8
+      },
+      "expected": {
+        "out": 247
+      }
+    },
+    {
+      "inputs": {
+        "a": 88,
+        "b": 13,
+        "operation": 16
+      },
+      "expected": {
+        "out": 93
+      }
+    },
+    {
+      "inputs": {
+        "a": 88,
+        "b": 13,
+        "operation": 32
+      },
+      "expected": {
+        "out": 162
+      }
+    },
+    {
+      "inputs": {
+        "a": 88,
+        "b": 13,
+        "operation": 64
+      },
+      "expected": {
+        "out": 85
+      }
+    },
+    {
+      "inputs": {
+        "a": 88,
+        "b": 13,
+        "operation": 128
+      },
+      "expected": {
+        "out": 170
+      }
+    },
+    {
+      "inputs": {
+        "a": 88,
+        "b": 13,
+        "operation": 256
+      },
+      "expected": {
+        "out": 175
+      }
+    },
+    {
+      "inputs": {
+        "a": 88,
+        "b": 13,
+        "operation": 512
+      },
+      "expected": {
+        "out": 80
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 43,
+        "operation": 1
+      },
+      "expected": {
+        "out": 126
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 43,
+        "operation": 2
+      },
+      "expected": {
+        "out": 40
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 43,
+        "operation": 4
+      },
+      "expected": {
+        "out": 3
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 43,
+        "operation": 8
+      },
+      "expected": {
+        "out": 252
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 43,
+        "operation": 16
+      },
+      "expected": {
+        "out": 123
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 43,
+        "operation": 32
+      },
+      "expected": {
+        "out": 132
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 43,
+        "operation": 64
+      },
+      "expected": {
+        "out": 120
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 43,
+        "operation": 128
+      },
+      "expected": {
+        "out": 135
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 43,
+        "operation": 256
+      },
+      "expected": {
+        "out": 175
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 43,
+        "operation": 512
+      },
+      "expected": {
+        "out": 80
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 112,
+        "operation": 1
+      },
+      "expected": {
+        "out": 143
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 112,
+        "operation": 2
+      },
+      "expected": {
+        "out": 175
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 112,
+        "operation": 4
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 112,
+        "operation": 8
+      },
+      "expected": {
+        "out": 239
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 112,
+        "operation": 16
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 112,
+        "operation": 32
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 112,
+        "operation": 64
+      },
+      "expected": {
+        "out": 111
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 112,
+        "operation": 128
+      },
+      "expected": {
+        "out": 144
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 112,
+        "operation": 256
+      },
+      "expected": {
+        "out": 240
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 112,
+        "operation": 512
+      },
+      "expected": {
+        "out": 15
+      }
+    },
+    {
+      "inputs": {
+        "a": 26,
+        "b": 134,
+        "operation": 1
+      },
+      "expected": {
+        "out": 160
+      }
+    },
+    {
+      "inputs": {
+        "a": 26,
+        "b": 134,
+        "operation": 2
+      },
+      "expected": {
+        "out": 148
+      }
+    },
+    {
+      "inputs": {
+        "a": 26,
+        "b": 134,
+        "operation": 4
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 26,
+        "b": 134,
+        "operation": 8
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 26,
+        "b": 134,
+        "operation": 16
+      },
+      "expected": {
+        "out": 158
+      }
+    },
+    {
+      "inputs": {
+        "a": 26,
+        "b": 134,
+        "operation": 32
+      },
+      "expected": {
+        "out": 97
+      }
+    },
+    {
+      "inputs": {
+        "a": 26,
+        "b": 134,
+        "operation": 64
+      },
+      "expected": {
+        "out": 156
+      }
+    },
+    {
+      "inputs": {
+        "a": 26,
+        "b": 134,
+        "operation": 128
+      },
+      "expected": {
+        "out": 99
+      }
+    },
+    {
+      "inputs": {
+        "a": 26,
+        "b": 134,
+        "operation": 256
+      },
+      "expected": {
+        "out": 231
+      }
+    },
+    {
+      "inputs": {
+        "a": 26,
+        "b": 134,
+        "operation": 512
+      },
+      "expected": {
+        "out": 24
+      }
+    },
+    {
+      "inputs": {
+        "a": 219,
+        "b": 237,
+        "operation": 1
+      },
+      "expected": {
+        "out": 200
+      }
+    },
+    {
+      "inputs": {
+        "a": 219,
+        "b": 237,
+        "operation": 2
+      },
+      "expected": {
+        "out": 238
+      }
+    },
+    {
+      "inputs": {
+        "a": 219,
+        "b": 237,
+        "operation": 4
+      },
+      "expected": {
+        "out": 201
+      }
+    },
+    {
+      "inputs": {
+        "a": 219,
+        "b": 237,
+        "operation": 8
+      },
+      "expected": {
+        "out": 54
+      }
+    },
+    {
+      "inputs": {
+        "a": 219,
+        "b": 237,
+        "operation": 16
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 219,
+        "b": 237,
+        "operation": 32
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 219,
+        "b": 237,
+        "operation": 64
+      },
+      "expected": {
+        "out": 54
+      }
+    },
+    {
+      "inputs": {
+        "a": 219,
+        "b": 237,
+        "operation": 128
+      },
+      "expected": {
+        "out": 201
+      }
+    },
+    {
+      "inputs": {
+        "a": 219,
+        "b": 237,
+        "operation": 256
+      },
+      "expected": {
+        "out": 237
+      }
+    },
+    {
+      "inputs": {
+        "a": 219,
+        "b": 237,
+        "operation": 512
+      },
+      "expected": {
+        "out": 18
+      }
+    },
+    {
+      "inputs": {
+        "a": 222,
+        "b": 67,
+        "operation": 1
+      },
+      "expected": {
+        "out": 33
+      }
+    },
+    {
+      "inputs": {
+        "a": 222,
+        "b": 67,
+        "operation": 2
+      },
+      "expected": {
+        "out": 155
+      }
+    },
+    {
+      "inputs": {
+        "a": 222,
+        "b": 67,
+        "operation": 4
+      },
+      "expected": {
+        "out": 66
+      }
+    },
+    {
+      "inputs": {
+        "a": 222,
+        "b": 67,
+        "operation": 8
+      },
+      "expected": {
+        "out": 189
+      }
+    },
+    {
+      "inputs": {
+        "a": 222,
+        "b": 67,
+        "operation": 16
+      },
+      "expected": {
+        "out": 223
+      }
+    },
+    {
+      "inputs": {
+        "a": 222,
+        "b": 67,
+        "operation": 32
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 222,
+        "b": 67,
+        "operation": 64
+      },
+      "expected": {
+        "out": 157
+      }
+    },
+    {
+      "inputs": {
+        "a": 222,
+        "b": 67,
+        "operation": 128
+      },
+      "expected": {
+        "out": 98
+      }
+    },
+    {
+      "inputs": {
+        "a": 222,
+        "b": 67,
+        "operation": 256
+      },
+      "expected": {
+        "out": 99
+      }
+    },
+    {
+      "inputs": {
+        "a": 222,
+        "b": 67,
+        "operation": 512
+      },
+      "expected": {
+        "out": 156
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 40,
+        "operation": 1
+      },
+      "expected": {
+        "out": 185
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 40,
+        "operation": 2
+      },
+      "expected": {
+        "out": 105
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 40,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 40,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 40,
+        "operation": 16
+      },
+      "expected": {
+        "out": 185
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 40,
+        "operation": 32
+      },
+      "expected": {
+        "out": 70
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 40,
+        "operation": 64
+      },
+      "expected": {
+        "out": 185
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 40,
+        "operation": 128
+      },
+      "expected": {
+        "out": 70
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 40,
+        "operation": 256
+      },
+      "expected": {
+        "out": 110
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 40,
+        "operation": 512
+      },
+      "expected": {
+        "out": 145
+      }
+    },
+    {
+      "inputs": {
+        "a": 59,
+        "b": 233,
+        "operation": 1
+      },
+      "expected": {
+        "out": 36
+      }
+    },
+    {
+      "inputs": {
+        "a": 59,
+        "b": 233,
+        "operation": 2
+      },
+      "expected": {
+        "out": 82
+      }
+    },
+    {
+      "inputs": {
+        "a": 59,
+        "b": 233,
+        "operation": 4
+      },
+      "expected": {
+        "out": 41
+      }
+    },
+    {
+      "inputs": {
+        "a": 59,
+        "b": 233,
+        "operation": 8
+      },
+      "expected": {
+        "out": 214
+      }
+    },
+    {
+      "inputs": {
+        "a": 59,
+        "b": 233,
+        "operation": 16
+      },
+      "expected": {
+        "out": 251
+      }
+    },
+    {
+      "inputs": {
+        "a": 59,
+        "b": 233,
+        "operation": 32
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 59,
+        "b": 233,
+        "operation": 64
+      },
+      "expected": {
+        "out": 210
+      }
+    },
+    {
+      "inputs": {
+        "a": 59,
+        "b": 233,
+        "operation": 128
+      },
+      "expected": {
+        "out": 45
+      }
+    },
+    {
+      "inputs": {
+        "a": 59,
+        "b": 233,
+        "operation": 256
+      },
+      "expected": {
+        "out": 237
+      }
+    },
+    {
+      "inputs": {
+        "a": 59,
+        "b": 233,
+        "operation": 512
+      },
+      "expected": {
+        "out": 18
+      }
+    },
+    {
+      "inputs": {
+        "a": 54,
+        "b": 157,
+        "operation": 1
+      },
+      "expected": {
+        "out": 211
+      }
+    },
+    {
+      "inputs": {
+        "a": 54,
+        "b": 157,
+        "operation": 2
+      },
+      "expected": {
+        "out": 153
+      }
+    },
+    {
+      "inputs": {
+        "a": 54,
+        "b": 157,
+        "operation": 4
+      },
+      "expected": {
+        "out": 20
+      }
+    },
+    {
+      "inputs": {
+        "a": 54,
+        "b": 157,
+        "operation": 8
+      },
+      "expected": {
+        "out": 235
+      }
+    },
+    {
+      "inputs": {
+        "a": 54,
+        "b": 157,
+        "operation": 16
+      },
+      "expected": {
+        "out": 191
+      }
+    },
+    {
+      "inputs": {
+        "a": 54,
+        "b": 157,
+        "operation": 32
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 54,
+        "b": 157,
+        "operation": 64
+      },
+      "expected": {
+        "out": 171
+      }
+    },
+    {
+      "inputs": {
+        "a": 54,
+        "b": 157,
+        "operation": 128
+      },
+      "expected": {
+        "out": 84
+      }
+    },
+    {
+      "inputs": {
+        "a": 54,
+        "b": 157,
+        "operation": 256
+      },
+      "expected": {
+        "out": 221
+      }
+    },
+    {
+      "inputs": {
+        "a": 54,
+        "b": 157,
+        "operation": 512
+      },
+      "expected": {
+        "out": 34
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 40,
+        "operation": 1
+      },
+      "expected": {
+        "out": 59
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 40,
+        "operation": 2
+      },
+      "expected": {
+        "out": 235
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 40,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 40,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 40,
+        "operation": 16
+      },
+      "expected": {
+        "out": 59
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 40,
+        "operation": 32
+      },
+      "expected": {
+        "out": 196
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 40,
+        "operation": 64
+      },
+      "expected": {
+        "out": 59
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 40,
+        "operation": 128
+      },
+      "expected": {
+        "out": 196
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 40,
+        "operation": 256
+      },
+      "expected": {
+        "out": 236
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 40,
+        "operation": 512
+      },
+      "expected": {
+        "out": 19
+      }
+    },
+    {
+      "inputs": {
+        "a": 141,
+        "b": 165,
+        "operation": 1
+      },
+      "expected": {
+        "out": 50
+      }
+    },
+    {
+      "inputs": {
+        "a": 141,
+        "b": 165,
+        "operation": 2
+      },
+      "expected": {
+        "out": 232
+      }
+    },
+    {
+      "inputs": {
+        "a": 141,
+        "b": 165,
+        "operation": 4
+      },
+      "expected": {
+        "out": 133
+      }
+    },
+    {
+      "inputs": {
+        "a": 141,
+        "b": 165,
+        "operation": 8
+      },
+      "expected": {
+        "out": 122
+      }
+    },
+    {
+      "inputs": {
+        "a": 141,
+        "b": 165,
+        "operation": 16
+      },
+      "expected": {
+        "out": 173
+      }
+    },
+    {
+      "inputs": {
+        "a": 141,
+        "b": 165,
+        "operation": 32
+      },
+      "expected": {
+        "out": 82
+      }
+    },
+    {
+      "inputs": {
+        "a": 141,
+        "b": 165,
+        "operation": 64
+      },
+      "expected": {
+        "out": 40
+      }
+    },
+    {
+      "inputs": {
+        "a": 141,
+        "b": 165,
+        "operation": 128
+      },
+      "expected": {
+        "out": 215
+      }
+    },
+    {
+      "inputs": {
+        "a": 141,
+        "b": 165,
+        "operation": 256
+      },
+      "expected": {
+        "out": 247
+      }
+    },
+    {
+      "inputs": {
+        "a": 141,
+        "b": 165,
+        "operation": 512
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 151,
+        "b": 213,
+        "operation": 1
+      },
+      "expected": {
+        "out": 108
+      }
+    },
+    {
+      "inputs": {
+        "a": 151,
+        "b": 213,
+        "operation": 2
+      },
+      "expected": {
+        "out": 194
+      }
+    },
+    {
+      "inputs": {
+        "a": 151,
+        "b": 213,
+        "operation": 4
+      },
+      "expected": {
+        "out": 149
+      }
+    },
+    {
+      "inputs": {
+        "a": 151,
+        "b": 213,
+        "operation": 8
+      },
+      "expected": {
+        "out": 106
+      }
+    },
+    {
+      "inputs": {
+        "a": 151,
+        "b": 213,
+        "operation": 16
+      },
+      "expected": {
+        "out": 215
+      }
+    },
+    {
+      "inputs": {
+        "a": 151,
+        "b": 213,
+        "operation": 32
+      },
+      "expected": {
+        "out": 40
+      }
+    },
+    {
+      "inputs": {
+        "a": 151,
+        "b": 213,
+        "operation": 64
+      },
+      "expected": {
+        "out": 66
+      }
+    },
+    {
+      "inputs": {
+        "a": 151,
+        "b": 213,
+        "operation": 128
+      },
+      "expected": {
+        "out": 189
+      }
+    },
+    {
+      "inputs": {
+        "a": 151,
+        "b": 213,
+        "operation": 256
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 151,
+        "b": 213,
+        "operation": 512
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 131,
+        "b": 52,
+        "operation": 1
+      },
+      "expected": {
+        "out": 183
+      }
+    },
+    {
+      "inputs": {
+        "a": 131,
+        "b": 52,
+        "operation": 2
+      },
+      "expected": {
+        "out": 79
+      }
+    },
+    {
+      "inputs": {
+        "a": 131,
+        "b": 52,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 131,
+        "b": 52,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 131,
+        "b": 52,
+        "operation": 16
+      },
+      "expected": {
+        "out": 183
+      }
+    },
+    {
+      "inputs": {
+        "a": 131,
+        "b": 52,
+        "operation": 32
+      },
+      "expected": {
+        "out": 72
+      }
+    },
+    {
+      "inputs": {
+        "a": 131,
+        "b": 52,
+        "operation": 64
+      },
+      "expected": {
+        "out": 183
+      }
+    },
+    {
+      "inputs": {
+        "a": 131,
+        "b": 52,
+        "operation": 128
+      },
+      "expected": {
+        "out": 72
+      }
+    },
+    {
+      "inputs": {
+        "a": 131,
+        "b": 52,
+        "operation": 256
+      },
+      "expected": {
+        "out": 124
+      }
+    },
+    {
+      "inputs": {
+        "a": 131,
+        "b": 52,
+        "operation": 512
+      },
+      "expected": {
+        "out": 131
+      }
+    },
+    {
+      "inputs": {
+        "a": 95,
+        "b": 225,
+        "operation": 1
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 95,
+        "b": 225,
+        "operation": 2
+      },
+      "expected": {
+        "out": 126
+      }
+    },
+    {
+      "inputs": {
+        "a": 95,
+        "b": 225,
+        "operation": 4
+      },
+      "expected": {
+        "out": 65
+      }
+    },
+    {
+      "inputs": {
+        "a": 95,
+        "b": 225,
+        "operation": 8
+      },
+      "expected": {
+        "out": 190
+      }
+    },
+    {
+      "inputs": {
+        "a": 95,
+        "b": 225,
+        "operation": 16
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 95,
+        "b": 225,
+        "operation": 32
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 95,
+        "b": 225,
+        "operation": 64
+      },
+      "expected": {
+        "out": 190
+      }
+    },
+    {
+      "inputs": {
+        "a": 95,
+        "b": 225,
+        "operation": 128
+      },
+      "expected": {
+        "out": 65
+      }
+    },
+    {
+      "inputs": {
+        "a": 95,
+        "b": 225,
+        "operation": 256
+      },
+      "expected": {
+        "out": 225
+      }
+    },
+    {
+      "inputs": {
+        "a": 95,
+        "b": 225,
+        "operation": 512
+      },
+      "expected": {
+        "out": 30
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 152,
+        "operation": 1
+      },
+      "expected": {
+        "out": 136
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 152,
+        "operation": 2
+      },
+      "expected": {
+        "out": 88
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 152,
+        "operation": 4
+      },
+      "expected": {
+        "out": 144
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 152,
+        "operation": 8
+      },
+      "expected": {
+        "out": 111
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 152,
+        "operation": 16
+      },
+      "expected": {
+        "out": 248
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 152,
+        "operation": 32
+      },
+      "expected": {
+        "out": 7
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 152,
+        "operation": 64
+      },
+      "expected": {
+        "out": 104
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 152,
+        "operation": 128
+      },
+      "expected": {
+        "out": 151
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 152,
+        "operation": 256
+      },
+      "expected": {
+        "out": 159
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 152,
+        "operation": 512
+      },
+      "expected": {
+        "out": 96
+      }
+    },
+    {
+      "inputs": {
+        "a": 156,
+        "b": 127,
+        "operation": 1
+      },
+      "expected": {
+        "out": 27
+      }
+    },
+    {
+      "inputs": {
+        "a": 156,
+        "b": 127,
+        "operation": 2
+      },
+      "expected": {
+        "out": 29
+      }
+    },
+    {
+      "inputs": {
+        "a": 156,
+        "b": 127,
+        "operation": 4
+      },
+      "expected": {
+        "out": 28
+      }
+    },
+    {
+      "inputs": {
+        "a": 156,
+        "b": 127,
+        "operation": 8
+      },
+      "expected": {
+        "out": 227
+      }
+    },
+    {
+      "inputs": {
+        "a": 156,
+        "b": 127,
+        "operation": 16
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 156,
+        "b": 127,
+        "operation": 32
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 156,
+        "b": 127,
+        "operation": 64
+      },
+      "expected": {
+        "out": 227
+      }
+    },
+    {
+      "inputs": {
+        "a": 156,
+        "b": 127,
+        "operation": 128
+      },
+      "expected": {
+        "out": 28
+      }
+    },
+    {
+      "inputs": {
+        "a": 156,
+        "b": 127,
+        "operation": 256
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 156,
+        "b": 127,
+        "operation": 512
+      },
+      "expected": {
+        "out": 128
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 232,
+        "operation": 1
+      },
+      "expected": {
+        "out": 232
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 232,
+        "operation": 2
+      },
+      "expected": {
+        "out": 24
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 232,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 232,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 232,
+        "operation": 16
+      },
+      "expected": {
+        "out": 232
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 232,
+        "operation": 32
+      },
+      "expected": {
+        "out": 23
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 232,
+        "operation": 64
+      },
+      "expected": {
+        "out": 232
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 232,
+        "operation": 128
+      },
+      "expected": {
+        "out": 23
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 232,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 232,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 188,
+        "b": 143,
+        "operation": 1
+      },
+      "expected": {
+        "out": 75
+      }
+    },
+    {
+      "inputs": {
+        "a": 188,
+        "b": 143,
+        "operation": 2
+      },
+      "expected": {
+        "out": 45
+      }
+    },
+    {
+      "inputs": {
+        "a": 188,
+        "b": 143,
+        "operation": 4
+      },
+      "expected": {
+        "out": 140
+      }
+    },
+    {
+      "inputs": {
+        "a": 188,
+        "b": 143,
+        "operation": 8
+      },
+      "expected": {
+        "out": 115
+      }
+    },
+    {
+      "inputs": {
+        "a": 188,
+        "b": 143,
+        "operation": 16
+      },
+      "expected": {
+        "out": 191
+      }
+    },
+    {
+      "inputs": {
+        "a": 188,
+        "b": 143,
+        "operation": 32
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 188,
+        "b": 143,
+        "operation": 64
+      },
+      "expected": {
+        "out": 51
+      }
+    },
+    {
+      "inputs": {
+        "a": 188,
+        "b": 143,
+        "operation": 128
+      },
+      "expected": {
+        "out": 204
+      }
+    },
+    {
+      "inputs": {
+        "a": 188,
+        "b": 143,
+        "operation": 256
+      },
+      "expected": {
+        "out": 207
+      }
+    },
+    {
+      "inputs": {
+        "a": 188,
+        "b": 143,
+        "operation": 512
+      },
+      "expected": {
+        "out": 48
+      }
+    },
+    {
+      "inputs": {
+        "a": 176,
+        "b": 17,
+        "operation": 1
+      },
+      "expected": {
+        "out": 193
+      }
+    },
+    {
+      "inputs": {
+        "a": 176,
+        "b": 17,
+        "operation": 2
+      },
+      "expected": {
+        "out": 159
+      }
+    },
+    {
+      "inputs": {
+        "a": 176,
+        "b": 17,
+        "operation": 4
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 176,
+        "b": 17,
+        "operation": 8
+      },
+      "expected": {
+        "out": 239
+      }
+    },
+    {
+      "inputs": {
+        "a": 176,
+        "b": 17,
+        "operation": 16
+      },
+      "expected": {
+        "out": 177
+      }
+    },
+    {
+      "inputs": {
+        "a": 176,
+        "b": 17,
+        "operation": 32
+      },
+      "expected": {
+        "out": 78
+      }
+    },
+    {
+      "inputs": {
+        "a": 176,
+        "b": 17,
+        "operation": 64
+      },
+      "expected": {
+        "out": 161
+      }
+    },
+    {
+      "inputs": {
+        "a": 176,
+        "b": 17,
+        "operation": 128
+      },
+      "expected": {
+        "out": 94
+      }
+    },
+    {
+      "inputs": {
+        "a": 176,
+        "b": 17,
+        "operation": 256
+      },
+      "expected": {
+        "out": 95
+      }
+    },
+    {
+      "inputs": {
+        "a": 176,
+        "b": 17,
+        "operation": 512
+      },
+      "expected": {
+        "out": 160
+      }
+    },
+    {
+      "inputs": {
+        "a": 28,
+        "b": 244,
+        "operation": 1
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 28,
+        "b": 244,
+        "operation": 2
+      },
+      "expected": {
+        "out": 40
+      }
+    },
+    {
+      "inputs": {
+        "a": 28,
+        "b": 244,
+        "operation": 4
+      },
+      "expected": {
+        "out": 20
+      }
+    },
+    {
+      "inputs": {
+        "a": 28,
+        "b": 244,
+        "operation": 8
+      },
+      "expected": {
+        "out": 235
+      }
+    },
+    {
+      "inputs": {
+        "a": 28,
+        "b": 244,
+        "operation": 16
+      },
+      "expected": {
+        "out": 252
+      }
+    },
+    {
+      "inputs": {
+        "a": 28,
+        "b": 244,
+        "operation": 32
+      },
+      "expected": {
+        "out": 3
+      }
+    },
+    {
+      "inputs": {
+        "a": 28,
+        "b": 244,
+        "operation": 64
+      },
+      "expected": {
+        "out": 232
+      }
+    },
+    {
+      "inputs": {
+        "a": 28,
+        "b": 244,
+        "operation": 128
+      },
+      "expected": {
+        "out": 23
+      }
+    },
+    {
+      "inputs": {
+        "a": 28,
+        "b": 244,
+        "operation": 256
+      },
+      "expected": {
+        "out": 247
+      }
+    },
+    {
+      "inputs": {
+        "a": 28,
+        "b": 244,
+        "operation": 512
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 145,
+        "operation": 1
+      },
+      "expected": {
+        "out": 164
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 145,
+        "operation": 2
+      },
+      "expected": {
+        "out": 130
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 145,
+        "operation": 4
+      },
+      "expected": {
+        "out": 17
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 145,
+        "operation": 8
+      },
+      "expected": {
+        "out": 238
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 145,
+        "operation": 16
+      },
+      "expected": {
+        "out": 147
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 145,
+        "operation": 32
+      },
+      "expected": {
+        "out": 108
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 145,
+        "operation": 64
+      },
+      "expected": {
+        "out": 130
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 145,
+        "operation": 128
+      },
+      "expected": {
+        "out": 125
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 145,
+        "operation": 256
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 145,
+        "operation": 512
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 148,
+        "b": 135,
+        "operation": 1
+      },
+      "expected": {
+        "out": 27
+      }
+    },
+    {
+      "inputs": {
+        "a": 148,
+        "b": 135,
+        "operation": 2
+      },
+      "expected": {
+        "out": 13
+      }
+    },
+    {
+      "inputs": {
+        "a": 148,
+        "b": 135,
+        "operation": 4
+      },
+      "expected": {
+        "out": 132
+      }
+    },
+    {
+      "inputs": {
+        "a": 148,
+        "b": 135,
+        "operation": 8
+      },
+      "expected": {
+        "out": 123
+      }
+    },
+    {
+      "inputs": {
+        "a": 148,
+        "b": 135,
+        "operation": 16
+      },
+      "expected": {
+        "out": 151
+      }
+    },
+    {
+      "inputs": {
+        "a": 148,
+        "b": 135,
+        "operation": 32
+      },
+      "expected": {
+        "out": 104
+      }
+    },
+    {
+      "inputs": {
+        "a": 148,
+        "b": 135,
+        "operation": 64
+      },
+      "expected": {
+        "out": 19
+      }
+    },
+    {
+      "inputs": {
+        "a": 148,
+        "b": 135,
+        "operation": 128
+      },
+      "expected": {
+        "out": 236
+      }
+    },
+    {
+      "inputs": {
+        "a": 148,
+        "b": 135,
+        "operation": 256
+      },
+      "expected": {
+        "out": 239
+      }
+    },
+    {
+      "inputs": {
+        "a": 148,
+        "b": 135,
+        "operation": 512
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 81,
+        "operation": 1
+      },
+      "expected": {
+        "out": 164
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 81,
+        "operation": 2
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 81,
+        "operation": 4
+      },
+      "expected": {
+        "out": 81
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 81,
+        "operation": 8
+      },
+      "expected": {
+        "out": 174
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 81,
+        "operation": 16
+      },
+      "expected": {
+        "out": 83
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 81,
+        "operation": 32
+      },
+      "expected": {
+        "out": 172
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 81,
+        "operation": 64
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 81,
+        "operation": 128
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 81,
+        "operation": 256
+      },
+      "expected": {
+        "out": 253
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 81,
+        "operation": 512
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 231,
+        "b": 182,
+        "operation": 1
+      },
+      "expected": {
+        "out": 157
+      }
+    },
+    {
+      "inputs": {
+        "a": 231,
+        "b": 182,
+        "operation": 2
+      },
+      "expected": {
+        "out": 49
+      }
+    },
+    {
+      "inputs": {
+        "a": 231,
+        "b": 182,
+        "operation": 4
+      },
+      "expected": {
+        "out": 166
+      }
+    },
+    {
+      "inputs": {
+        "a": 231,
+        "b": 182,
+        "operation": 8
+      },
+      "expected": {
+        "out": 89
+      }
+    },
+    {
+      "inputs": {
+        "a": 231,
+        "b": 182,
+        "operation": 16
+      },
+      "expected": {
+        "out": 247
+      }
+    },
+    {
+      "inputs": {
+        "a": 231,
+        "b": 182,
+        "operation": 32
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 231,
+        "b": 182,
+        "operation": 64
+      },
+      "expected": {
+        "out": 81
+      }
+    },
+    {
+      "inputs": {
+        "a": 231,
+        "b": 182,
+        "operation": 128
+      },
+      "expected": {
+        "out": 174
+      }
+    },
+    {
+      "inputs": {
+        "a": 231,
+        "b": 182,
+        "operation": 256
+      },
+      "expected": {
+        "out": 190
+      }
+    },
+    {
+      "inputs": {
+        "a": 231,
+        "b": 182,
+        "operation": 512
+      },
+      "expected": {
+        "out": 65
+      }
+    },
+    {
+      "inputs": {
+        "a": 169,
+        "b": 69,
+        "operation": 1
+      },
+      "expected": {
+        "out": 238
+      }
+    },
+    {
+      "inputs": {
+        "a": 169,
+        "b": 69,
+        "operation": 2
+      },
+      "expected": {
+        "out": 100
+      }
+    },
+    {
+      "inputs": {
+        "a": 169,
+        "b": 69,
+        "operation": 4
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 169,
+        "b": 69,
+        "operation": 8
+      },
+      "expected": {
+        "out": 254
+      }
+    },
+    {
+      "inputs": {
+        "a": 169,
+        "b": 69,
+        "operation": 16
+      },
+      "expected": {
+        "out": 237
+      }
+    },
+    {
+      "inputs": {
+        "a": 169,
+        "b": 69,
+        "operation": 32
+      },
+      "expected": {
+        "out": 18
+      }
+    },
+    {
+      "inputs": {
+        "a": 169,
+        "b": 69,
+        "operation": 64
+      },
+      "expected": {
+        "out": 236
+      }
+    },
+    {
+      "inputs": {
+        "a": 169,
+        "b": 69,
+        "operation": 128
+      },
+      "expected": {
+        "out": 19
+      }
+    },
+    {
+      "inputs": {
+        "a": 169,
+        "b": 69,
+        "operation": 256
+      },
+      "expected": {
+        "out": 87
+      }
+    },
+    {
+      "inputs": {
+        "a": 169,
+        "b": 69,
+        "operation": 512
+      },
+      "expected": {
+        "out": 168
+      }
+    },
+    {
+      "inputs": {
+        "a": 136,
+        "b": 2,
+        "operation": 1
+      },
+      "expected": {
+        "out": 138
+      }
+    },
+    {
+      "inputs": {
+        "a": 136,
+        "b": 2,
+        "operation": 2
+      },
+      "expected": {
+        "out": 134
+      }
+    },
+    {
+      "inputs": {
+        "a": 136,
+        "b": 2,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 136,
+        "b": 2,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 136,
+        "b": 2,
+        "operation": 16
+      },
+      "expected": {
+        "out": 138
+      }
+    },
+    {
+      "inputs": {
+        "a": 136,
+        "b": 2,
+        "operation": 32
+      },
+      "expected": {
+        "out": 117
+      }
+    },
+    {
+      "inputs": {
+        "a": 136,
+        "b": 2,
+        "operation": 64
+      },
+      "expected": {
+        "out": 138
+      }
+    },
+    {
+      "inputs": {
+        "a": 136,
+        "b": 2,
+        "operation": 128
+      },
+      "expected": {
+        "out": 117
+      }
+    },
+    {
+      "inputs": {
+        "a": 136,
+        "b": 2,
+        "operation": 256
+      },
+      "expected": {
+        "out": 119
+      }
+    },
+    {
+      "inputs": {
+        "a": 136,
+        "b": 2,
+        "operation": 512
+      },
+      "expected": {
+        "out": 136
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 3,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 1
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 5,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 2
+      }
+    },
+    {
+      "inputs": {
+        "a": 6,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 3
+      }
+    },
+    {
+      "inputs": {
+        "a": 7,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 3
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 9,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 4
+      }
+    },
+    {
+      "inputs": {
+        "a": 10,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 5
+      }
+    },
+    {
+      "inputs": {
+        "a": 11,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 5
+      }
+    },
+    {
+      "inputs": {
+        "a": 12,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 6
+      }
+    },
+    {
+      "inputs": {
+        "a": 13,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 6
+      }
+    },
+    {
+      "inputs": {
+        "a": 14,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 7
+      }
+    },
+    {
+      "inputs": {
+        "a": 15,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 7
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 17,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 8
+      }
+    },
+    {
+      "inputs": {
+        "a": 18,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 9
+      }
+    },
+    {
+      "inputs": {
+        "a": 19,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 9
+      }
+    },
+    {
+      "inputs": {
+        "a": 20,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 10
+      }
+    },
+    {
+      "inputs": {
+        "a": 21,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 10
+      }
+    },
+    {
+      "inputs": {
+        "a": 22,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 11
+      }
+    },
+    {
+      "inputs": {
+        "a": 23,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 11
+      }
+    },
+    {
+      "inputs": {
+        "a": 24,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 12
+      }
+    },
+    {
+      "inputs": {
+        "a": 25,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 12
+      }
+    },
+    {
+      "inputs": {
+        "a": 26,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 13
+      }
+    },
+    {
+      "inputs": {
+        "a": 27,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 13
+      }
+    },
+    {
+      "inputs": {
+        "a": 28,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 14
+      }
+    },
+    {
+      "inputs": {
+        "a": 29,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 14
+      }
+    },
+    {
+      "inputs": {
+        "a": 30,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 15
+      }
+    },
+    {
+      "inputs": {
+        "a": 31,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 15
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 33,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 16
+      }
+    },
+    {
+      "inputs": {
+        "a": 34,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 17
+      }
+    },
+    {
+      "inputs": {
+        "a": 35,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 17
+      }
+    },
+    {
+      "inputs": {
+        "a": 36,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 18
+      }
+    },
+    {
+      "inputs": {
+        "a": 37,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 18
+      }
+    },
+    {
+      "inputs": {
+        "a": 38,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 19
+      }
+    },
+    {
+      "inputs": {
+        "a": 39,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 19
+      }
+    },
+    {
+      "inputs": {
+        "a": 40,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 20
+      }
+    },
+    {
+      "inputs": {
+        "a": 41,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 20
+      }
+    },
+    {
+      "inputs": {
+        "a": 42,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 21
+      }
+    },
+    {
+      "inputs": {
+        "a": 43,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 21
+      }
+    },
+    {
+      "inputs": {
+        "a": 44,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 22
+      }
+    },
+    {
+      "inputs": {
+        "a": 45,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 22
+      }
+    },
+    {
+      "inputs": {
+        "a": 46,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 23
+      }
+    },
+    {
+      "inputs": {
+        "a": 47,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 23
+      }
+    },
+    {
+      "inputs": {
+        "a": 48,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 24
+      }
+    },
+    {
+      "inputs": {
+        "a": 49,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 24
+      }
+    },
+    {
+      "inputs": {
+        "a": 50,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 25
+      }
+    },
+    {
+      "inputs": {
+        "a": 51,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 25
+      }
+    },
+    {
+      "inputs": {
+        "a": 52,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 26
+      }
+    },
+    {
+      "inputs": {
+        "a": 53,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 26
+      }
+    },
+    {
+      "inputs": {
+        "a": 54,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 27
+      }
+    },
+    {
+      "inputs": {
+        "a": 55,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 27
+      }
+    },
+    {
+      "inputs": {
+        "a": 56,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 28
+      }
+    },
+    {
+      "inputs": {
+        "a": 57,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 28
+      }
+    },
+    {
+      "inputs": {
+        "a": 58,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 29
+      }
+    },
+    {
+      "inputs": {
+        "a": 59,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 29
+      }
+    },
+    {
+      "inputs": {
+        "a": 60,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 30
+      }
+    },
+    {
+      "inputs": {
+        "a": 61,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 30
+      }
+    },
+    {
+      "inputs": {
+        "a": 62,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 31
+      }
+    },
+    {
+      "inputs": {
+        "a": 63,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 31
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 65,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 32
+      }
+    },
+    {
+      "inputs": {
+        "a": 66,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 33
+      }
+    },
+    {
+      "inputs": {
+        "a": 67,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 33
+      }
+    },
+    {
+      "inputs": {
+        "a": 68,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 34
+      }
+    },
+    {
+      "inputs": {
+        "a": 69,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 34
+      }
+    },
+    {
+      "inputs": {
+        "a": 70,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 35
+      }
+    },
+    {
+      "inputs": {
+        "a": 71,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 35
+      }
+    },
+    {
+      "inputs": {
+        "a": 72,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 36
+      }
+    },
+    {
+      "inputs": {
+        "a": 73,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 36
+      }
+    },
+    {
+      "inputs": {
+        "a": 74,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 37
+      }
+    },
+    {
+      "inputs": {
+        "a": 75,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 37
+      }
+    },
+    {
+      "inputs": {
+        "a": 76,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 38
+      }
+    },
+    {
+      "inputs": {
+        "a": 77,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 38
+      }
+    },
+    {
+      "inputs": {
+        "a": 78,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 39
+      }
+    },
+    {
+      "inputs": {
+        "a": 79,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 39
+      }
+    },
+    {
+      "inputs": {
+        "a": 80,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 40
+      }
+    },
+    {
+      "inputs": {
+        "a": 81,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 40
+      }
+    },
+    {
+      "inputs": {
+        "a": 82,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 41
+      }
+    },
+    {
+      "inputs": {
+        "a": 83,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 41
+      }
+    },
+    {
+      "inputs": {
+        "a": 84,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 42
+      }
+    },
+    {
+      "inputs": {
+        "a": 85,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 42
+      }
+    },
+    {
+      "inputs": {
+        "a": 86,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 43
+      }
+    },
+    {
+      "inputs": {
+        "a": 87,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 43
+      }
+    },
+    {
+      "inputs": {
+        "a": 88,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 44
+      }
+    },
+    {
+      "inputs": {
+        "a": 89,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 44
+      }
+    },
+    {
+      "inputs": {
+        "a": 90,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 45
+      }
+    },
+    {
+      "inputs": {
+        "a": 91,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 45
+      }
+    },
+    {
+      "inputs": {
+        "a": 92,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 46
+      }
+    },
+    {
+      "inputs": {
+        "a": 93,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 46
+      }
+    },
+    {
+      "inputs": {
+        "a": 94,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 47
+      }
+    },
+    {
+      "inputs": {
+        "a": 95,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 47
+      }
+    },
+    {
+      "inputs": {
+        "a": 96,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 48
+      }
+    },
+    {
+      "inputs": {
+        "a": 97,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 48
+      }
+    },
+    {
+      "inputs": {
+        "a": 98,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 49
+      }
+    },
+    {
+      "inputs": {
+        "a": 99,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 49
+      }
+    },
+    {
+      "inputs": {
+        "a": 100,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 50
+      }
+    },
+    {
+      "inputs": {
+        "a": 101,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 50
+      }
+    },
+    {
+      "inputs": {
+        "a": 102,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 51
+      }
+    },
+    {
+      "inputs": {
+        "a": 103,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 51
+      }
+    },
+    {
+      "inputs": {
+        "a": 104,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 52
+      }
+    },
+    {
+      "inputs": {
+        "a": 105,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 52
+      }
+    },
+    {
+      "inputs": {
+        "a": 106,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 53
+      }
+    },
+    {
+      "inputs": {
+        "a": 107,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 53
+      }
+    },
+    {
+      "inputs": {
+        "a": 108,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 54
+      }
+    },
+    {
+      "inputs": {
+        "a": 109,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 54
+      }
+    },
+    {
+      "inputs": {
+        "a": 110,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 55
+      }
+    },
+    {
+      "inputs": {
+        "a": 111,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 55
+      }
+    },
+    {
+      "inputs": {
+        "a": 112,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 56
+      }
+    },
+    {
+      "inputs": {
+        "a": 113,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 56
+      }
+    },
+    {
+      "inputs": {
+        "a": 114,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 57
+      }
+    },
+    {
+      "inputs": {
+        "a": 115,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 57
+      }
+    },
+    {
+      "inputs": {
+        "a": 116,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 58
+      }
+    },
+    {
+      "inputs": {
+        "a": 117,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 58
+      }
+    },
+    {
+      "inputs": {
+        "a": 118,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 59
+      }
+    },
+    {
+      "inputs": {
+        "a": 119,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 59
+      }
+    },
+    {
+      "inputs": {
+        "a": 120,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 60
+      }
+    },
+    {
+      "inputs": {
+        "a": 121,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 60
+      }
+    },
+    {
+      "inputs": {
+        "a": 122,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 61
+      }
+    },
+    {
+      "inputs": {
+        "a": 123,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 61
+      }
+    },
+    {
+      "inputs": {
+        "a": 124,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 62
+      }
+    },
+    {
+      "inputs": {
+        "a": 125,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 62
+      }
+    },
+    {
+      "inputs": {
+        "a": 126,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 63
+      }
+    },
+    {
+      "inputs": {
+        "a": 127,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 63
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 129,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 64
+      }
+    },
+    {
+      "inputs": {
+        "a": 130,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 65
+      }
+    },
+    {
+      "inputs": {
+        "a": 131,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 65
+      }
+    },
+    {
+      "inputs": {
+        "a": 132,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 66
+      }
+    },
+    {
+      "inputs": {
+        "a": 133,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 66
+      }
+    },
+    {
+      "inputs": {
+        "a": 134,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 67
+      }
+    },
+    {
+      "inputs": {
+        "a": 135,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 67
+      }
+    },
+    {
+      "inputs": {
+        "a": 136,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 68
+      }
+    },
+    {
+      "inputs": {
+        "a": 137,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 68
+      }
+    },
+    {
+      "inputs": {
+        "a": 138,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 69
+      }
+    },
+    {
+      "inputs": {
+        "a": 139,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 69
+      }
+    },
+    {
+      "inputs": {
+        "a": 140,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 70
+      }
+    },
+    {
+      "inputs": {
+        "a": 141,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 70
+      }
+    },
+    {
+      "inputs": {
+        "a": 142,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 71
+      }
+    },
+    {
+      "inputs": {
+        "a": 143,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 71
+      }
+    },
+    {
+      "inputs": {
+        "a": 144,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 72
+      }
+    },
+    {
+      "inputs": {
+        "a": 145,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 72
+      }
+    },
+    {
+      "inputs": {
+        "a": 146,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 73
+      }
+    },
+    {
+      "inputs": {
+        "a": 147,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 73
+      }
+    },
+    {
+      "inputs": {
+        "a": 148,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 74
+      }
+    },
+    {
+      "inputs": {
+        "a": 149,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 74
+      }
+    },
+    {
+      "inputs": {
+        "a": 150,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 75
+      }
+    },
+    {
+      "inputs": {
+        "a": 151,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 75
+      }
+    },
+    {
+      "inputs": {
+        "a": 152,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 76
+      }
+    },
+    {
+      "inputs": {
+        "a": 153,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 76
+      }
+    },
+    {
+      "inputs": {
+        "a": 154,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 77
+      }
+    },
+    {
+      "inputs": {
+        "a": 155,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 77
+      }
+    },
+    {
+      "inputs": {
+        "a": 156,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 78
+      }
+    },
+    {
+      "inputs": {
+        "a": 157,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 78
+      }
+    },
+    {
+      "inputs": {
+        "a": 158,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 79
+      }
+    },
+    {
+      "inputs": {
+        "a": 159,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 79
+      }
+    },
+    {
+      "inputs": {
+        "a": 160,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 80
+      }
+    },
+    {
+      "inputs": {
+        "a": 161,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 80
+      }
+    },
+    {
+      "inputs": {
+        "a": 162,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 81
+      }
+    },
+    {
+      "inputs": {
+        "a": 163,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 81
+      }
+    },
+    {
+      "inputs": {
+        "a": 164,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 82
+      }
+    },
+    {
+      "inputs": {
+        "a": 165,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 82
+      }
+    },
+    {
+      "inputs": {
+        "a": 166,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 83
+      }
+    },
+    {
+      "inputs": {
+        "a": 167,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 83
+      }
+    },
+    {
+      "inputs": {
+        "a": 168,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 84
+      }
+    },
+    {
+      "inputs": {
+        "a": 169,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 84
+      }
+    },
+    {
+      "inputs": {
+        "a": 170,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 85
+      }
+    },
+    {
+      "inputs": {
+        "a": 171,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 85
+      }
+    },
+    {
+      "inputs": {
+        "a": 172,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 86
+      }
+    },
+    {
+      "inputs": {
+        "a": 173,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 86
+      }
+    },
+    {
+      "inputs": {
+        "a": 174,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 87
+      }
+    },
+    {
+      "inputs": {
+        "a": 175,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 87
+      }
+    },
+    {
+      "inputs": {
+        "a": 176,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 88
+      }
+    },
+    {
+      "inputs": {
+        "a": 177,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 88
+      }
+    },
+    {
+      "inputs": {
+        "a": 178,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 89
+      }
+    },
+    {
+      "inputs": {
+        "a": 179,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 89
+      }
+    },
+    {
+      "inputs": {
+        "a": 180,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 90
+      }
+    },
+    {
+      "inputs": {
+        "a": 181,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 90
+      }
+    },
+    {
+      "inputs": {
+        "a": 182,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 91
+      }
+    },
+    {
+      "inputs": {
+        "a": 183,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 91
+      }
+    },
+    {
+      "inputs": {
+        "a": 184,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 92
+      }
+    },
+    {
+      "inputs": {
+        "a": 185,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 92
+      }
+    },
+    {
+      "inputs": {
+        "a": 186,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 93
+      }
+    },
+    {
+      "inputs": {
+        "a": 187,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 93
+      }
+    },
+    {
+      "inputs": {
+        "a": 188,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 94
+      }
+    },
+    {
+      "inputs": {
+        "a": 189,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 94
+      }
+    },
+    {
+      "inputs": {
+        "a": 190,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 95
+      }
+    },
+    {
+      "inputs": {
+        "a": 191,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 95
+      }
+    },
+    {
+      "inputs": {
+        "a": 192,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 96
+      }
+    },
+    {
+      "inputs": {
+        "a": 193,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 96
+      }
+    },
+    {
+      "inputs": {
+        "a": 194,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 97
+      }
+    },
+    {
+      "inputs": {
+        "a": 195,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 97
+      }
+    },
+    {
+      "inputs": {
+        "a": 196,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 98
+      }
+    },
+    {
+      "inputs": {
+        "a": 197,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 98
+      }
+    },
+    {
+      "inputs": {
+        "a": 198,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 99
+      }
+    },
+    {
+      "inputs": {
+        "a": 199,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 99
+      }
+    },
+    {
+      "inputs": {
+        "a": 200,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 100
+      }
+    },
+    {
+      "inputs": {
+        "a": 201,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 100
+      }
+    },
+    {
+      "inputs": {
+        "a": 202,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 101
+      }
+    },
+    {
+      "inputs": {
+        "a": 203,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 101
+      }
+    },
+    {
+      "inputs": {
+        "a": 204,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 102
+      }
+    },
+    {
+      "inputs": {
+        "a": 205,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 102
+      }
+    },
+    {
+      "inputs": {
+        "a": 206,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 103
+      }
+    },
+    {
+      "inputs": {
+        "a": 207,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 103
+      }
+    },
+    {
+      "inputs": {
+        "a": 208,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 104
+      }
+    },
+    {
+      "inputs": {
+        "a": 209,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 104
+      }
+    },
+    {
+      "inputs": {
+        "a": 210,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 105
+      }
+    },
+    {
+      "inputs": {
+        "a": 211,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 105
+      }
+    },
+    {
+      "inputs": {
+        "a": 212,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 106
+      }
+    },
+    {
+      "inputs": {
+        "a": 213,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 106
+      }
+    },
+    {
+      "inputs": {
+        "a": 214,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 107
+      }
+    },
+    {
+      "inputs": {
+        "a": 215,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 107
+      }
+    },
+    {
+      "inputs": {
+        "a": 216,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 108
+      }
+    },
+    {
+      "inputs": {
+        "a": 217,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 108
+      }
+    },
+    {
+      "inputs": {
+        "a": 218,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 109
+      }
+    },
+    {
+      "inputs": {
+        "a": 219,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 109
+      }
+    },
+    {
+      "inputs": {
+        "a": 220,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 110
+      }
+    },
+    {
+      "inputs": {
+        "a": 221,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 110
+      }
+    },
+    {
+      "inputs": {
+        "a": 222,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 111
+      }
+    },
+    {
+      "inputs": {
+        "a": 223,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 111
+      }
+    },
+    {
+      "inputs": {
+        "a": 224,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 112
+      }
+    },
+    {
+      "inputs": {
+        "a": 225,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 112
+      }
+    },
+    {
+      "inputs": {
+        "a": 226,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 113
+      }
+    },
+    {
+      "inputs": {
+        "a": 227,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 113
+      }
+    },
+    {
+      "inputs": {
+        "a": 228,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 114
+      }
+    },
+    {
+      "inputs": {
+        "a": 229,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 114
+      }
+    },
+    {
+      "inputs": {
+        "a": 230,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 115
+      }
+    },
+    {
+      "inputs": {
+        "a": 231,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 115
+      }
+    },
+    {
+      "inputs": {
+        "a": 232,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 116
+      }
+    },
+    {
+      "inputs": {
+        "a": 233,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 116
+      }
+    },
+    {
+      "inputs": {
+        "a": 234,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 117
+      }
+    },
+    {
+      "inputs": {
+        "a": 235,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 117
+      }
+    },
+    {
+      "inputs": {
+        "a": 236,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 118
+      }
+    },
+    {
+      "inputs": {
+        "a": 237,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 118
+      }
+    },
+    {
+      "inputs": {
+        "a": 238,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 119
+      }
+    },
+    {
+      "inputs": {
+        "a": 239,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 119
+      }
+    },
+    {
+      "inputs": {
+        "a": 240,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 120
+      }
+    },
+    {
+      "inputs": {
+        "a": 241,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 120
+      }
+    },
+    {
+      "inputs": {
+        "a": 242,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 121
+      }
+    },
+    {
+      "inputs": {
+        "a": 243,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 121
+      }
+    },
+    {
+      "inputs": {
+        "a": 244,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 122
+      }
+    },
+    {
+      "inputs": {
+        "a": 245,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 122
+      }
+    },
+    {
+      "inputs": {
+        "a": 246,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 123
+      }
+    },
+    {
+      "inputs": {
+        "a": 247,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 123
+      }
+    },
+    {
+      "inputs": {
+        "a": 248,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 124
+      }
+    },
+    {
+      "inputs": {
+        "a": 249,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 124
+      }
+    },
+    {
+      "inputs": {
+        "a": 250,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 125
+      }
+    },
+    {
+      "inputs": {
+        "a": 251,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 125
+      }
+    },
+    {
+      "inputs": {
+        "a": 252,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 126
+      }
+    },
+    {
+      "inputs": {
+        "a": 253,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 126
+      }
+    },
+    {
+      "inputs": {
+        "a": 254,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 127
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 1024
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 512
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 256
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 128
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 64
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 32
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 16
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 8
+      },
+      "expected": {
+        "out": 255
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 4
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 2
+      },
+      "expected": {
+        "out": 0
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0,
+        "operation": 1
+      },
+      "expected": {
+        "out": 0
+      }
+    }
+  ]
+}

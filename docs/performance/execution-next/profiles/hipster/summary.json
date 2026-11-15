@@ -1,0 +1,22 @@
+{
+  "reference_pgo": {
+    "instructions": 587409228,
+    "command": [
+      "/home/harrison/nucleation-perf/execution-next/pgo-reference/pgo",
+      "hipster",
+      "1",
+      "2"
+    ],
+    "binary_sha256": "38dde2db57e4ca08b797fe320f567c16bd9f4e5a4fbb9ff5f377c07495ed0405"
+  },
+  "selected_pgo": {
+    "instructions": 561240089,
+    "command": [
+      "/home/harrison/nucleation-perf/execution-next/pgo-view-lazy/pgo",
+      "hipster",
+      "1",
+      "2"
+    ],
+    "binary_sha256": "b7fd5275357c80014c7b2a79a9f2f72fd0d6c9f4b1d142964443c5c0e0c5c7d8"
+  }
+}

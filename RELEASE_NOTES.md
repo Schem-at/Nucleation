@@ -1,3 +1,25 @@
+# Nucleation v0.12.3
+
+- Faster default tick simulation through cached diagnostic settings, dense state
+  tables, allocation-free Java dust ordering, indexed wire transitions, cached
+  world layout and shared neighbour reads. Reproducible benchmarks and rollback
+  evidence are in `docs/performance/`; experimental execution modes remain opt-in.
+- Lamps and trapdoors notify observers when their state changes. Expanded golden
+  and differential tests cover doors, logic, pistons, inventories and items.
+- Bounded NBT imports decode Java modified UTF-8, accept valid Int dimensions and
+  preserve legacy piston states and source data versions.
+- Corrected east/west chest orientation and double-chest seams with
+  schematic-mesher 0.2.2. Sim Lab renders textured moving minecart models.
+- Circuit Atlas provides textured archive previews, extracted plot mechanisms,
+  simulation evidence and thirteen source-pinned executable build adapters.
+  Adapters expose typed ports, independent expected-answer suites, exact reset
+  replay and reusable native benchmarks; real button presses support sequential
+  circuits. Native functional checks are labelled separately from vanilla parity.
+- Rust, Python and npm packages are versioned together. Generated binding APIs
+  remain unchanged. The crates.io package keeps its existing reduced feature
+  set; mc-tick and circuit adapters are available through the Git dependency,
+  while Python and the main npm package include the tick engine.
+
 # Nucleation v0.12.2
 
 - Fixed piston landing callbacks running after neighbor updates, which could

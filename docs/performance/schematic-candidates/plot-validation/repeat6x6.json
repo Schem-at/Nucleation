@@ -1,0 +1,14 @@
+{
+  "case": "plot_part0117_horizontal6x6",
+  "same_fields": {
+    "fixture": true,
+    "actions": true,
+    "initial": true,
+    "snapshots": true
+  },
+  "matching_frames": 661,
+  "first_capture_sha256": "5f736a92e19491049a37a04b097dd0d2a0e1db6c7179316c76adc966cfed00e2",
+  "repeat_capture_sha256": "5f736a92e19491049a37a04b097dd0d2a0e1db6c7179316c76adc966cfed00e2",
+  "first_warmup_ticks": 26,
+  "repeat_warmup_ticks": 26
+}

@@ -1,0 +1,9 @@
+   Compiling serde_core v1.0.228
+   Compiling mc-tick v0.1.0 (/home/harrison/code/Nucleation-simulation-performance/crates/mc-tick)
+   Compiling serde_json v1.0.147
+   Compiling nucleation v0.12.2 (/home/harrison/code/Nucleation-simulation-performance)
+   Compiling mc-test v0.1.0 (/home/harrison/code/Nucleation-simulation-performance/crates/mc-test)
+warning: nucleation@0.12.2: blockpedia data: 1267 cached colors, 0 inherited
+warning: nucleation@0.12.2: blockpedia data: generated PHF table with 1286 blocks
+warning: nucleation@0.12.2: blockpedia data: generated 35723 Java->Bedrock / 15953 Bedrock->Java mappings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 26.63s

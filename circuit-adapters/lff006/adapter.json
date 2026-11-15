@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "lff006",
+  "source_sha256": "0663302dfc40ac8c33055d5a43aefe834be4290bdda9baaec6f2ccab238cad54",
+  "source_data_version": 4189,
+  "description": "D latch using its actual data lever and clock stone button",
+  "evidence": [
+    "Source Data/Clock signs identify the actual lever and stone button; the source is not edited.",
+    "capture=true requests one button press; false leaves it alone. Natural release is observed after 64 game ticks.",
+    "Independent stored-bit oracle tests both polarities, hold across data transitions and repeated writes after stable-data stages.",
+    "Original DataVersion 4189; conservative response budget, not edge-latency or fresh vanilla-parity evidence."
+  ],
+  "cell": {
+    "name": "lff006",
+    "version": "1",
+    "io": {
+      "inputs": {
+        "data": {
+          "io_type": "Boolean",
+          "layout": "OneToOne",
+          "positions": [
+            [
+              0,
+              1,
+              4
+            ]
+          ]
+        },
+        "capture": {
+          "io_type": "Boolean",
+          "layout": "OneToOne",
+          "positions": [
+            [
+              7,
+              1,
+              2
+            ]
+          ]
+        }
+      },
+      "outputs": {
+        "stored": {
+          "io_type": "Boolean",
+          "layout": "OneToOne",
+          "positions": [
+            [
+              0,
+              1,
+              0
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "input_order": [
+    "data",
+    "capture"
+  ],
+  "outputs": {
+    "stored": "lamp_lit"
+  },
+  "setup_ticks": 128,
+  "response_ticks": 64,
+  "require_quiescent": true,
+  "rng_seed": 0,
+  "hash_origin": [
+    0,
+    0,
+    0
+  ],
+  "inputs": {
+    "capture": "button_press"
+  }
+}

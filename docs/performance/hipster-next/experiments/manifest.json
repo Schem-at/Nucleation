@@ -1,0 +1,14 @@
+{
+  "engine_base": "7c52701dba2f1bec6c51b369a91386149e711226",
+  "expanded_harness_commit": "b2d99f57",
+  "patches": {
+    "inert-dispatch.patch": "517ee83dd50daad979f9123849757f2886f9a45535e7b6e2b256dc2d33c1d4d3",
+    "local-cache-constant.patch": "5cbf9dbb417c96806edee877791da42d1a3ec715b35f061b1335c051869f3ff7",
+    "local-cache-once.patch": "c57da5dc09fa4a8d20861405819c805ece8cadbb50104065308e6fba67893262",
+    "neighbours.patch": "6bf27136711b7a5b3e8e57fbad0ba3b48b2b494c35a2b28b6b25df98d2bcd68f",
+    "packed-power.patch": "3eee9c5f6672911b91ab5fb17971db1bebace45d3d5b00d453a28760788b82c2",
+    "local-cache-mutex.patch": "65edb9aa5114a9245b3c7845c03111390f635f0b513cf3b37d5f0d90ab995693",
+    "wire-cache-counters.patch": "612a838758d4520258b39d67c24aadb601e7d90a81ce16e51438ce807b055bd8",
+    "fused-wire.patch": "b1e6f66fc83b606b7651a38ea8c02ac95407f5f98f2e7db5161f03fd64c7a74f"
+  }
+}

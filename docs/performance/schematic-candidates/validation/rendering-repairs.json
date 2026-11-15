@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "chests": {
+    "schema_version": 1,
+    "status": "pass",
+    "rendered": 375,
+    "changed_pngs": 234,
+    "unchanged_pngs": 141,
+    "renderer_binary_sha256": "ea95ca25600733c4bdfa179557018a15beeb9a0f71e4fecb18c2a6806320bd34",
+    "mesher_revision": "5550498f97212f6ac5a0a44c03a60e3c825fdeea",
+    "north_facing_control_byte_identical": true,
+    "originals_modified": 0,
+    "simulation_ticks": 0,
+    "transfer_retries": 25,
+    "retry_reason": "same-content originals had initially been copied under another archive path; missing duplicate paths copied and all25 rendered successfully"
+  },
+  "browser": {
+    "status": "pass",
+    "models": [
+      {
+        "kind": "minecart",
+        "vertices": 120,
+        "textured": 1,
+        "size": [
+          1.0000002137719999,
+          0.6250001172240001,
+          1.249999972312
+        ]
+      },
+      {
+        "kind": "chest_minecart",
+        "vertices": 192,
+        "textured": 2,
+        "size": [
+          1.0000002137719999,
+          0.9062500051239999,
+          1.249999972312
+        ]
+      },
+      {
+        "kind": "hopper_minecart",
+        "vertices": 248,
+        "textured": 3,
+        "size": [
+          1.0000002137719999,
+          1.0000000128775,
+          1.249999972312
+        ]
+      },
+      {
+        "kind": "furnace_minecart",
+        "vertices": 144,
+        "textured": 2,
+        "size": [
+          1.0000002137719999,
+          1.0000000128775,
+          1.249999972312
+        ]
+      },
+      {
+        "kind": "tnt_minecart",
+        "vertices": 144,
+        "textured": 2,
+        "size": [
+          1.0000002137719999,
+          1.0000000128775,
+          1.249999972312
+        ]
+      },
+      {
+        "kind": "spawner_minecart",
+        "vertices": 168,
+        "textured": 2,
+        "size": [
+          1.0000002137719999,
+          1.0000000128775,
+          1.249999972312
+        ]
+      },
+      {
+        "kind": "command_block_minecart",
+        "vertices": 144,
+        "textured": 2,
+        "size": [
+          1.0000002137719999,
+          1.0000000128775,
+          1.249999972312
+        ]
+      }
+    ],
+    "yaw_cases": 4,
+    "live_model_count": 1,
+    "first": {
+      "id": 0,
+      "kind": "minecraft:minecart",
+      "pos": [
+        1.5,
+        1.0625,
+        0.5
+      ],
+      "vel": [
+        0.2,
+        0,
+        0
+      ],
+      "yaw": 0
+    },
+    "after": {
+      "id": 0,
+      "kind": "minecraft:minecart",
+      "pos": [
+        2.8930521050808315,
+        1.0625,
+        0.5
+      ],
+      "vel": [
+        0.14427791579676666,
+        0,
+        0
+      ],
+      "yaw": 0
+    },
+    "assertions": [
+      "seven actual textured GLBs",
+      "feet-centred models",
+      "four yaw quadrants",
+      "no static ghost cart",
+      "real cart moves",
+      "visual follows position/yaw",
+      "clear/recreate retains shared mesh"
+    ],
+    "scope": "Rendering/API regression, not a new vanilla mechanics parity claim.",
+    "browser": "157.0.8103.52",
+    "engine": {
+      "host": "harrison-work",
+      "rustc": "1.98.0 (88d9e12ae 2026-08-18)",
+      "engine_commit": "9a51b440+minecart-yaw+mesher5550498",
+      "target": "wasm32-unknown-unknown",
+      "features": [
+        "bridge",
+        "mc-tick",
+        "meshing"
+      ],
+      "profile": "release",
+      "wasm_sha256": "3e01cc423394ff67268e78d63b0fa771059c1a2020c2142ba45e8687660892b0",
+      "wasm_bytes": 16585329,
+      "asset_pack_sha256": "2c5fdf060e26e3b5ff1cd7bff5e661bd3eb312c57865da64ed5cc16ec71c2dd1",
+      "asset_pack_note": "Retained visualization pack; not a physics reference version.",
+      "simulation": "Single-threaded browser mc-tick reference configuration; not the native PGO benchmark binary."
+    },
+    "sources_sha256": {
+      "src/entity_models.ts": "e9d698c68896888ec7f173447c1d75d48611c202adb82299d9d6f55bfbf7c9e4",
+      "src/world.ts": "0a1c4029e0ffe71826889bc269c1a3f895d4d43679b464d8bdaea1e72a865e96"
+    }
+  },
+  "mesher_tests": {
+    "baseline": "dcc0e0aad6133109448f21a5c568236b48b3d967",
+    "baseline_pass": 267,
+    "candidate": "5550498f97212f6ac5a0a44c03a60e3c825fdeea",
+    "candidate_pass": 269,
+    "unchanged_failing_count_tests": [
+      "bat",
+      "cat",
+      "cow",
+      "horse",
+      "wolf"
+    ],
+    "host": "harrison-work"
+  },
+  "artifact_sha256": {
+    "chest-before.png": "aaed4c0966770b0e6666cace78598f1d12809c411d58dae5bbaeae0b001db849",
+    "chest-after.png": "4db4cc78bdda8956dce0591f9e3e0a34cbd82b20c864d2c86485bc1abd0acd85",
+    "minecart-models.png": "119927a5bdb337bb38e02bc1654bfc2842e8a2bdf4b3a770c8d8add6595f303b"
+  }
+}

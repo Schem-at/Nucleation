@@ -27,21 +27,79 @@ pub const DEFAULT_GROWTH_LIMIT: u64 = 32_000_000;
 const GROWTH_STEP: i32 = 16;
 
 /// The simulated region's blocks.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct World {
     bounds: Bounds,
     states: Vec<StateId>,
+    size: [u32; 3],
+    layer_stride: usize,
     /// Ceiling on [`World::grow_to_include`]; see [`DEFAULT_GROWTH_LIMIT`].
     growth_limit: u64,
+    #[cfg(any(feature = "experiment-wire-plan", feature = "experiment-piston-plan"))]
+    plan_journal: crate::world_journal::MutationJournal,
+    #[cfg(feature = "experiment-world-plan-cache")]
+    plan_cache: Box<crate::wire_plan::Cache>,
+    #[cfg(feature = "experiment-piston-plan")]
+    piston_plan_cache: Box<crate::piston_plan::Cache>,
+    #[cfg(feature = "experiment-execution-view")]
+    execution_geometry: crate::execution_view::Geometry,
+}
+
+// Optimization bookkeeping is deliberately absent from semantic/debug snapshots.
+impl std::fmt::Debug for World {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("World").field("bounds", &self.bounds).field("states", &self.states)
+            .field("size", &self.size).field("layer_stride", &self.layer_stride)
+            .field("growth_limit", &self.growth_limit).finish()
+    }
+}
+
+#[cfg(feature = "experiment-cursor")]
+pub(crate) struct LocalReadCursor<'a> {
+    states: &'a [StateId],
+    base: usize,
+    row: isize,
+    layer: isize,
+}
+
+#[cfg(feature = "experiment-cursor")]
+impl LocalReadCursor<'_> {
+    /// Offsets are restricted to the radius-two cube proven interior at creation.
+    #[inline]
+    pub(crate) fn get(&self, offset: [i32; 3]) -> StateId {
+        assert!(offset.into_iter().all(|v| (-2..=2).contains(&v)));
+        let delta = offset[0] as isize + offset[1] as isize * self.layer + offset[2] as isize * self.row;
+        self.states[self.base.wrapping_add_signed(delta)]
+    }
 }
 
 impl World {
+    /// Per-world scratch storage, isolated even when multiple simulations share
+    /// the same immutable rules. The cache also checks an owned rules identity.
+    #[cfg(feature = "experiment-world-plan-cache")]
+    pub(crate) fn wire_plan_cache(&self) -> &crate::wire_plan::Cache { &self.plan_cache }
+
+    #[cfg(feature = "experiment-piston-plan")]
+    pub(crate) fn piston_plan_cache(&self) -> &crate::piston_plan::Cache { &self.piston_plan_cache }
+
     /// An all-air world covering `bounds`.
     pub fn new(bounds: Bounds) -> Self {
+        let (x, y, z) = bounds.size();
+        let size = [x, y, z];
         Self {
+            size,
+            layer_stride: size[0] as usize * size[2] as usize,
             bounds,
             states: vec![StateId::AIR; bounds.volume() as usize],
             growth_limit: DEFAULT_GROWTH_LIMIT,
+            #[cfg(any(feature = "experiment-wire-plan", feature = "experiment-piston-plan"))]
+            plan_journal: Default::default(),
+            #[cfg(feature = "experiment-world-plan-cache")]
+            plan_cache: Default::default(),
+            #[cfg(feature = "experiment-piston-plan")]
+            piston_plan_cache: Default::default(),
+            #[cfg(feature = "experiment-execution-view")]
+            execution_geometry: Default::default(),
         }
     }
 
@@ -107,9 +165,74 @@ impl World {
                 states[index] = *state;
             }
         }
+        let (x, y, z) = grown.size();
+        self.size = [x, y, z];
+        self.layer_stride = self.size[0] as usize * self.size[2] as usize;
         self.bounds = grown;
         self.states = states;
+        #[cfg(any(feature = "experiment-wire-plan", feature = "experiment-piston-plan"))]
+        self.plan_journal.reset();
+        #[cfg(feature = "experiment-execution-view")]
+        { self.execution_geometry = Default::default(); }
         true
+    }
+
+    #[inline]
+    fn index(&self, pos: Pos) -> Option<usize> {
+        let x = pos.x.wrapping_sub(self.bounds.min.x) as u32;
+        let y = pos.y.wrapping_sub(self.bounds.min.y) as u32;
+        let z = pos.z.wrapping_sub(self.bounds.min.z) as u32;
+        if x >= self.size[0] || y >= self.size[1] || z >= self.size[2] {
+            return None;
+        }
+        Some(y as usize * self.layer_stride + z as usize * self.size[0] as usize + x as usize)
+    }
+
+    #[cfg(any(feature = "experiment-wire-plan", feature = "experiment-piston-plan"))]
+    pub(crate) fn plan_identity(&self) -> &std::sync::Arc<()> { self.plan_journal.identity() }
+
+    #[cfg(any(feature = "experiment-wire-plan", feature = "experiment-piston-plan"))]
+    pub(crate) fn plan_revision(&self) -> u64 { self.plan_journal.revision() }
+
+    #[cfg(any(feature = "experiment-wire-plan", feature = "experiment-piston-plan"))]
+    pub(crate) fn plan_changes_since(&self, revision: u64)
+        -> Option<impl Iterator<Item = (Pos, StateId, StateId)> + '_>
+    { self.plan_journal.changes_since(revision) }
+
+    /// Resolve once while building an execution input record. Out-of-bounds
+    /// records retain the ordinary lookup path, including future world growth.
+    #[cfg(feature = "experiment-execution-view")]
+    pub(crate) fn execution_address(&self, pos: Pos) -> crate::execution_view::Address {
+        self.execution_geometry.address(self.index(pos))
+    }
+
+    /// Read the state at delivery/query time, never the state at record creation.
+    /// A record is valid only in this exact World geometry. Clone, replacement
+    /// and growth fall back automatically; unchanged geometry tolerates writes.
+    #[cfg(feature = "experiment-execution-view")]
+    #[inline]
+    pub(crate) fn get_execution(&self, pos: Pos, address: crate::execution_view::Address) -> StateId {
+        match self.execution_geometry.index(address) {
+            Some(index) => self.states[index],
+            None => self.get(pos),
+        }
+    }
+
+    /// A borrow-scoped address calculation; no derived power or state is cached.
+    #[cfg(feature = "experiment-cursor")]
+    #[inline]
+    pub(crate) fn local_reader(&self, pos: Pos) -> Option<LocalReadCursor<'_>> {
+        let x = pos.x.wrapping_sub(self.bounds.min.x) as u32;
+        let y = pos.y.wrapping_sub(self.bounds.min.y) as u32;
+        let z = pos.z.wrapping_sub(self.bounds.min.z) as u32;
+        if x.wrapping_sub(2) < self.size[0].saturating_sub(4)
+            && y.wrapping_sub(2) < self.size[1].saturating_sub(4)
+            && z.wrapping_sub(2) < self.size[2].saturating_sub(4)
+        {
+            Some(LocalReadCursor { states: &self.states,
+                base: y as usize * self.layer_stride + z as usize * self.size[0] as usize + x as usize,
+                row: self.size[0] as isize, layer: self.layer_stride as isize })
+        } else { None }
     }
 
     /// The region this world covers.
@@ -131,9 +254,32 @@ impl World {
     /// structures with a margin of padding, not to complicate this call — and it
     /// is the trace differ's job to catch it if we forget.
     pub fn get(&self, pos: Pos) -> StateId {
-        match self.bounds.index(pos) {
+        match self.index(pos) {
             Some(index) => self.states[index],
             None => StateId::AIR,
+        }
+    }
+
+    /// Six current states in `Dir` order. Interior reads share the coordinate
+    /// conversion and boundary check; border reads keep ordinary air semantics.
+    #[inline]
+    pub(crate) fn neighbours(&self, pos: Pos) -> [StateId; 6] {
+        let x = pos.x.wrapping_sub(self.bounds.min.x) as u32;
+        let y = pos.y.wrapping_sub(self.bounds.min.y) as u32;
+        let z = pos.z.wrapping_sub(self.bounds.min.z) as u32;
+        if x.wrapping_sub(1) < self.size[0].saturating_sub(2)
+            && y.wrapping_sub(1) < self.size[1].saturating_sub(2)
+            && z.wrapping_sub(1) < self.size[2].saturating_sub(2)
+        {
+            let row = self.size[0] as usize;
+            let i = y as usize * self.layer_stride + z as usize * row + x as usize;
+            [self.states[i - self.layer_stride], self.states[i + self.layer_stride],
+             self.states[i - row], self.states[i + row], self.states[i - 1], self.states[i + 1]]
+        } else {
+            crate::pos::ALL_DIRS.map(|dir| {
+                let (x, y, z) = dir.delta();
+                self.get(Pos::new(pos.x.wrapping_add(x), pos.y.wrapping_add(y), pos.z.wrapping_add(z)))
+            })
         }
     }
 
@@ -165,9 +311,11 @@ impl World {
                 return None;
             }
         }
-        let index = self.bounds.index(pos)?;
+        let index = self.index(pos)?;
         let previous = self.states[index];
         self.states[index] = state;
+        #[cfg(any(feature = "experiment-wire-plan", feature = "experiment-piston-plan"))]
+        if previous != state { self.plan_journal.record(pos, previous, state); }
         Some(previous)
     }
 
@@ -210,6 +358,158 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "experiment-execution-view")]
+    #[test]
+    fn execution_records_read_live_states_across_writes_growth_clone_and_replacement() {
+        let mut world = World::new(Bounds::new(Pos::new(-3, -4, -5), Pos::new(3, 4, 5)));
+        let mut seed = 0x25d4_09bf_147a_c38eu64;
+        let mut random = || {
+            seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17;
+            seed
+        };
+        let positions: Vec<_> = (0..128).map(|_| Pos::new(
+            (random() % 17) as i32 - 8, (random() % 17) as i32 - 8,
+            (random() % 17) as i32 - 8)).collect();
+        let original: Vec<_> = positions.iter().map(|&pos| (pos, world.execution_address(pos))).collect();
+        let mut recent = original.clone();
+        for step in 0..1024 {
+            if step % 16 == 0 {
+                recent = positions.iter().map(|&pos| (pos, world.execution_address(pos))).collect();
+            }
+            let pos = positions[(random() % positions.len() as u64) as usize];
+            let state = StateId((random() % 65536) as u16);
+            world.set(pos, state);
+            // These records predate all writes and growth, including records
+            // initially outside the region. Every result must remain current.
+            for &(query, address) in original.iter().chain(&recent) {
+                assert_eq!(world.get_execution(query, address), world.get(query));
+            }
+            if step % 127 == 0 {
+                let cloned = world.clone();
+                assert_eq!(cloned, world);
+                assert_eq!(format!("{cloned:?}"), format!("{world:?}"));
+                for &query in &positions {
+                    let address = world.execution_address(query);
+                    assert_eq!(cloned.get_execution(query, address), cloned.get(query));
+                }
+                world = cloned;
+            }
+        }
+
+        let pos = Pos::new(0, 0, 0);
+        let address = world.execution_address(pos);
+        world.set(pos, StateId(32767));
+        assert_eq!(world.execution_address(pos), address);
+        assert_eq!(world.get_execution(pos, address), StateId(32767));
+        world.set_growth_limit(0);
+        let outside = Pos::new(999, 999, 999);
+        assert_eq!(world.set(outside, StateId(3)), None);
+        assert_eq!(world.execution_address(pos), address);
+        assert_eq!(world.get_execution(pos, address), StateId(32767));
+        // Same index, different World: even an old record must read the new
+        // world's state rather than sharing validity with its source World.
+        let mut replacement = World::new(world.bounds());
+        replacement.set(pos, StateId(65535));
+        assert_eq!(replacement.get_execution(pos, address), StateId(65535));
+        fn send_sync<T: Send + Sync>() {}
+        send_sync::<World>();
+    }
+
+    #[cfg(feature = "experiment-execution-view")]
+    #[test]
+    fn execution_records_preserve_extreme_coordinate_and_outside_air_reads() {
+        for origin in [Pos::new(i32::MIN, -3, -5), Pos::new(i32::MAX - 4, -3, -5)] {
+            let mut world = World::new(Bounds::new(origin,
+                Pos::new(origin.x + 4, origin.y + 4, origin.z + 4)));
+            let records: Vec<_> = (-2..=6).map(|x| {
+                let pos = Pos::new(origin.x.wrapping_add(x), origin.y, origin.z);
+                (pos, world.execution_address(pos))
+            }).collect();
+            for (n, &(pos, address)) in records.iter().enumerate() {
+                world.set_growth_limit(0);
+                world.set(pos, StateId((n + 1) as u16));
+                assert_eq!(world.get_execution(pos, address), world.get(pos));
+            }
+            world.set_growth_limit(DEFAULT_GROWTH_LIMIT);
+            assert!(world.grow_to_include(Pos::new(origin.x, origin.y + 8, origin.z)));
+            for &(pos, address) in &records {
+                assert_eq!(world.get_execution(pos, address), world.get(pos));
+            }
+        }
+    }
+
+    #[cfg(feature = "experiment-cursor")]
+    #[test]
+    fn local_cursor_matches_reads_for_every_offset_and_growth() {
+        for origin in [Pos::new(-20, -30, -40), Pos::new(i32::MIN, 0, 0), Pos::new(i32::MAX - 8, 0, 0)] {
+            let mut world = World::new(Bounds::new(origin, Pos::new(origin.x + 8, origin.y + 8, origin.z + 8)));
+            for x in 0..9 { for y in 0..9 { for z in 0..9 {
+                world.set(Pos::new(origin.x + x, origin.y + y, origin.z + z), StateId((1 + x + y * 9 + z * 81) as u16));
+            } } }
+            for grown in [false, true] {
+                if grown { assert!(world.grow_to_include(Pos::new(origin.x, origin.y + 10, origin.z))); }
+                for x in 0..9 { for y in 0..9 { for z in 0..9 {
+                    let pos = Pos::new(origin.x + x, origin.y + y, origin.z + z);
+                    if let Some(cursor) = world.local_reader(pos) {
+                        for dx in -2..=2 { for dy in -2..=2 { for dz in -2..=2 {
+                            assert_eq!(cursor.get([dx, dy, dz]), world.get(Pos::new(pos.x + dx, pos.y + dy, pos.z + dz)));
+                        } } }
+                    } else if !grown { assert!(x < 2 || y < 2 || z < 2 || x > 6 || y > 6 || z > 6); }
+                } } }
+            }
+        }
+        let world = World::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(3, 3, 3)));
+        assert!(world.local_reader(Pos::new(2, 2, 2)).is_none());
+    }
+
+    #[cfg(any(feature = "experiment-wire-plan", feature = "experiment-piston-plan"))]
+    #[test]
+    fn plan_journal_tracks_silent_writes_and_resets_on_clone_and_growth() {
+        let mut world = small();
+        let token = std::sync::Arc::clone(world.plan_identity());
+        assert_eq!(world.plan_revision(), 0);
+        let pos = Pos::new(1, 1, 1);
+        world.set(pos, StateId(7));
+        world.set(pos, StateId(7));
+        assert_eq!(world.plan_revision(), 1);
+        assert_eq!(world.plan_changes_since(0).unwrap().collect::<Vec<_>>(), vec![(pos, StateId::AIR, StateId(7))]);
+        let cloned = world.clone();
+        assert_eq!(world, cloned);
+        assert_eq!(format!("{world:?}"), format!("{cloned:?}"));
+        assert!(!std::sync::Arc::ptr_eq(cloned.plan_identity(), &token));
+        world.grow_to_include(Pos::new(-10, 1, 1));
+        assert!(!std::sync::Arc::ptr_eq(world.plan_identity(), &token));
+        assert_eq!(world.plan_revision(), 0);
+    }
+
+    #[test]
+    fn neighbour_batch_matches_individual_reads_at_borders_and_after_growth() {
+        for origin in [Pos::new(-7, -9, -11), Pos::new(i32::MIN, 0, 0),
+            Pos::new(i32::MAX - 4, 0, 0)] {
+            for width in 1..=5 {
+                let mut world = World::new(Bounds::new(origin,
+                    Pos::new(origin.x + (width - 1), origin.y + 4, origin.z + 4)));
+                for x in 0..width { for y in 0..5 { for z in 0..5 {
+                    world.set(Pos::new(origin.x + x, origin.y + y, origin.z + z),
+                        StateId((1 + x + 5 * z + 25 * y) as u16));
+                } } }
+                let check = |world: &World| {
+                    for x in -1..=width { for y in -1..=5 { for z in -1..=5 {
+                        let pos = Pos::new(origin.x.wrapping_add(x), origin.y + y, origin.z + z);
+                        let expected = crate::pos::ALL_DIRS.map(|dir| {
+                            let (dx, dy, dz) = dir.delta();
+                            world.get(Pos::new(pos.x.wrapping_add(dx), pos.y.wrapping_add(dy), pos.z.wrapping_add(dz)))
+                        });
+                        assert_eq!(world.neighbours(pos), expected, "at {pos:?}");
+                    } } }
+                };
+                check(&world);
+                assert!(world.grow_to_include(Pos::new(origin.x, origin.y + 6, origin.z)));
+                check(&world);
+            }
+        }
+    }
 
     fn small() -> World {
         World::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(3, 3, 3)))
@@ -342,5 +642,25 @@ mod tests {
         world.set(Pos::new(1, 1, 1), StateId(9));
         assert_eq!(snapshot.get(Pos::new(1, 1, 1)), StateId(5));
         assert_eq!(world.get(Pos::new(1, 1, 1)), StateId(9));
+    }
+}
+
+#[cfg(test)]
+mod layout_tests {
+    use super::*;
+    #[test]
+    fn cached_layout_matches_bounds_at_negative_and_extreme_coordinates() {
+        for start in [-20, i32::MIN, i32::MAX - 8] {
+            let bounds = Bounds::new(Pos::new(start, start, start), Pos::new(start+3, start+4, start+5));
+            let world = World::new(bounds);
+            for x in [i32::MIN, -21, -20, -18, 0, i32::MAX, start, start+3, start+4] {
+                for y in [start, start+4, start+5, i32::MIN, i32::MAX] {
+                    for z in [start, start+5, start+6, i32::MIN, i32::MAX] {
+                        let p = Pos::new(x,y,z);
+                        assert_eq!(world.index(p), bounds.index(p), "{p:?}");
+                    }
+                }
+            }
+        }
     }
 }

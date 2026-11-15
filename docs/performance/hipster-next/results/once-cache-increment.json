@@ -1,0 +1,115 @@
+{
+  "baseline": "baseline",
+  "source": "docs/performance/hipster-next/results/once-cache-pilot.jsonl",
+  "resamples": 10000,
+  "results": [
+    {
+      "case": "hipster",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 13.428442833333333,
+      "cpu_speedup": 1.027159664342814,
+      "cpu_ci95": [
+        1.0071848526979177,
+        1.0577553980717231
+      ],
+      "wall_ms": 13.4695465,
+      "wall_speedup": 1.027427971189181,
+      "wall_ci95": [
+        1.0058210190842072,
+        1.054107903189177
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 1.954841463414634,
+      "cpu_speedup": 0.9638311634029334,
+      "cpu_ci95": [
+        0.9483312101444389,
+        0.9745269545891315
+      ],
+      "wall_ms": 1.961179,
+      "wall_speedup": 0.9640942216204715,
+      "wall_ci95": [
+        0.948762944543363,
+        0.97406152540176
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 0.16500055339805825,
+      "cpu_speedup": 0.9994989719657899,
+      "cpu_ci95": [
+        0.9879026006960917,
+        1.025336755610182
+      ],
+      "wall_ms": 0.16528705242718447,
+      "wall_speedup": 0.9994124843026838,
+      "wall_ci95": [
+        0.9877586190451195,
+        1.0246396629415806
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 8.871484,
+      "cpu_speedup": 0.9917884213183625,
+      "cpu_ci95": [
+        0.9630385204783322,
+        1.022418078500546
+      ],
+      "wall_ms": 8.902924777777779,
+      "wall_speedup": 0.9917579020816917,
+      "wall_ci95": [
+        0.9639185216922395,
+        1.0231864636756
+      ]
+    },
+    {
+      "case": "item_sorter",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 1.1544672571428571,
+      "cpu_speedup": 1.0201279729420776,
+      "cpu_ci95": [
+        0.9927159023782387,
+        1.0320060252273942
+      ],
+      "wall_ms": 1.1588414142857142,
+      "wall_speedup": 1.0194367652844993,
+      "wall_ci95": [
+        0.9925070706241542,
+        1.0317500370400114
+      ]
+    },
+    {
+      "case": "trapdoor2x3",
+      "variant": "cache_on",
+      "reference": "cache_off",
+      "rounds": 9,
+      "cpu_ms": 0.859494476744186,
+      "cpu_speedup": 0.9723642717240835,
+      "cpu_ci95": [
+        0.9594692423381113,
+        1.0121761562759723
+      ],
+      "wall_ms": 0.8622907325581395,
+      "wall_speedup": 0.9719953488411608,
+      "wall_ci95": [
+        0.960076108718493,
+        1.0124290672866851
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+# LFF006 D latch
+
+Pinned original: `Logical-Redstone-Archive/LFF006_dlatch.schem`, SHA-256 `0663302dfc40ac8c33055d5a43aefe834be4290bdda9baaec6f2ccab238cad54`, save DataVersion 4189. The source Data/Clock signs identify the data lever `(0,1,4)` and clock stone button `(7,1,2)`; the sole output lamp is `(0,1,0)`. The source button remains a button.
+
+The adapter declares `capture` as `button_press`: true means one actual `use_block` press, false means no press. The simulator releases the stone button normally. This is an operation request, not a forced powered-state assignment or a rising-edge detector over previous input values. Consecutive true vectors therefore perform separate pulses after each 64-tick response window. A still-powered button must be rejected by the shared adapter before any inputs are changed.
+
+`data` is driven before `capture`, with a complete data-only stage before every change of captured polarity. The first operation writes false to establish a known state independently of the saved output; thereafter the independent oracle updates its stored bit only on a requested pulse. It checks both captured polarities, holds through live-data transitions, duplicate holds, repeated writes of an unchanged bit, and repeated alternation. It never asks the engine for an expected value.
+
+Positions and control types come from the pinned source signs/static NBT and the existing `check_logic_candidates.rs` latch test. Evaluation uses that checker's explicit origin `(0,0,0)`, 128 setup ticks and a conservative 64 response game ticks per operation. Saved Sponge Offset `[-3,-4,-2]` remains in the unchanged input; no original-world-coordinate or clock-edge-latency proof is claimed. The fixed endpoint suite and full checkpoint replay do not establish fresh vanilla parity or setup/hold timing limits.

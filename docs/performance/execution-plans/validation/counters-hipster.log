@@ -1,0 +1,1 @@
+wire-plan-counters Counts { queries: 130860, builds: 3828, structural_invalidations: 2502, value_dirties: 18062, certificate_hits: 109724, resets: 2, classify_structural: 1862, classify_wire_value: 11228, classify_irrelevant: 4876 }

@@ -1,0 +1,169 @@
+{
+  "baseline": "logic",
+  "source": "docs/performance/workload-specialization/results/certificate-timings.jsonl",
+  "resamples": 10000,
+  "results": [
+    {
+      "case": "adder_active",
+      "variant": "previous",
+      "reference": "logic",
+      "rounds": 9,
+      "cpu_ms": 8.50396194736842,
+      "cpu_speedup": 0.9756270385351097,
+      "cpu_ci95": [
+        0.9587932919045067,
+        0.9896384581163368
+      ],
+      "wall_ms": 8.532777947368421,
+      "wall_speedup": 0.9755659261729541,
+      "wall_ci95": [
+        0.9585069007586844,
+        0.9898208814959818
+      ]
+    },
+    {
+      "case": "adder_active",
+      "variant": "certificate",
+      "reference": "logic",
+      "rounds": 9,
+      "cpu_ms": 9.263990105263158,
+      "cpu_speedup": 0.895585500011783,
+      "cpu_ci95": [
+        0.887910820056619,
+        0.9110186074320711
+      ],
+      "wall_ms": 9.29879110526316,
+      "wall_speedup": 0.8952010349324921,
+      "wall_ci95": [
+        0.8885240344786094,
+        0.9101197800455265
+      ]
+    },
+    {
+      "case": "adder_active",
+      "variant": "combined",
+      "reference": "logic",
+      "rounds": 9,
+      "cpu_ms": 8.40729589473684,
+      "cpu_speedup": 0.9868446780516238,
+      "cpu_ci95": [
+        0.9410976027266498,
+        1.0064536710744374
+      ],
+      "wall_ms": 8.441726157894736,
+      "wall_speedup": 0.9860883029554004,
+      "wall_ci95": [
+        0.9401101515572009,
+        1.006656658304674
+      ]
+    },
+    {
+      "case": "logic_network",
+      "variant": "combined",
+      "reference": "logic",
+      "rounds": 9,
+      "cpu_ms": 0.5788939315589353,
+      "cpu_speedup": 1.0079084603348472,
+      "cpu_ci95": [
+        0.9654601840005047,
+        1.0181991733497193
+      ],
+      "wall_ms": 0.58038427756654,
+      "wall_speedup": 1.0082383793640328,
+      "wall_ci95": [
+        0.9641119726115958,
+        1.0182633383107995
+      ]
+    },
+    {
+      "case": "logic_network",
+      "variant": "previous",
+      "reference": "logic",
+      "rounds": 9,
+      "cpu_ms": 0.5626594486692016,
+      "cpu_speedup": 1.036989768206643,
+      "cpu_ci95": [
+        0.998802504153981,
+        1.0518076249266406
+      ],
+      "wall_ms": 0.5642793117870722,
+      "wall_speedup": 1.0370142785650491,
+      "wall_ci95": [
+        0.9972696026039902,
+        1.0513312326188886
+      ]
+    },
+    {
+      "case": "logic_network",
+      "variant": "certificate",
+      "reference": "logic",
+      "rounds": 9,
+      "cpu_ms": 0.6594698022813689,
+      "cpu_speedup": 0.8847593767543114,
+      "cpu_ci95": [
+        0.8420445158893555,
+        0.8915236423884629
+      ],
+      "wall_ms": 0.6612633536121673,
+      "wall_speedup": 0.884920811391666,
+      "wall_ci95": [
+        0.841813288614438,
+        0.8916713686121495
+      ]
+    },
+    {
+      "case": "hipster",
+      "variant": "previous",
+      "reference": "logic",
+      "rounds": 9,
+      "cpu_ms": 10.077969133333333,
+      "cpu_speedup": 0.998644098513049,
+      "cpu_ci95": [
+        0.9740247264614335,
+        1.0221433188445814
+      ],
+      "wall_ms": 10.1190858,
+      "wall_speedup": 0.9984475409165255,
+      "wall_ci95": [
+        0.9732496997676248,
+        1.022169102879271
+      ]
+    },
+    {
+      "case": "hipster",
+      "variant": "certificate",
+      "reference": "logic",
+      "rounds": 9,
+      "cpu_ms": 10.988865800000001,
+      "cpu_speedup": 0.9158638009757113,
+      "cpu_ci95": [
+        0.8901693602838252,
+        0.9587321498942442
+      ],
+      "wall_ms": 11.031468133333332,
+      "wall_speedup": 0.9158686959176701,
+      "wall_ci95": [
+        0.8903856484948239,
+        0.9599717648944908
+      ]
+    },
+    {
+      "case": "hipster",
+      "variant": "combined",
+      "reference": "logic",
+      "rounds": 9,
+      "cpu_ms": 10.0804662,
+      "cpu_speedup": 0.9983967209770518,
+      "cpu_ci95": [
+        0.9793111224359332,
+        1.0194356964349998
+      ],
+      "wall_ms": 10.130206666666666,
+      "wall_speedup": 0.9973514525205475,
+      "wall_ci95": [
+        0.9791165849944102,
+        1.0199172791280267
+      ]
+    }
+  ]
+}

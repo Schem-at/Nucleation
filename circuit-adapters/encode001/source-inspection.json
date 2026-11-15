@@ -1,0 +1,249 @@
+{
+  "source": "sources/logical-redstone-archive/files/Archive/ENCODE_encoders/ENCODE001_Encoder_vertical_to_vertical/attachments/ENCODE001_encode_v2v.schem",
+  "source_sha256": "43141915727b29d5b2bbb5b6f0c8f2afab6f3b0a069349397080e7deb0ce09e4",
+  "source_readme_sha256": "b703f16e91de08ecfab592902218b05f1af2e2f4ede85298eecbe87e14e50751",
+  "data_version": 4189,
+  "dimensions": [
+    6,
+    10,
+    13
+  ],
+  "sponge_offset": [
+    -4,
+    -15,
+    -6
+  ],
+  "controls": [
+    {
+      "pos": [
+        5,
+        2,
+        12
+      ],
+      "state": "minecraft:lever[face=wall,facing=south,powered=false]"
+    },
+    {
+      "pos": [
+        5,
+        4,
+        12
+      ],
+      "state": "minecraft:lever[face=wall,facing=south,powered=false]"
+    },
+    {
+      "pos": [
+        5,
+        6,
+        12
+      ],
+      "state": "minecraft:lever[face=wall,facing=south,powered=false]"
+    },
+    {
+      "pos": [
+        5,
+        8,
+        12
+      ],
+      "state": "minecraft:lever[face=wall,facing=south,powered=false]"
+    }
+  ],
+  "lamps": [
+    {
+      "pos": [
+        0,
+        2,
+        0
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        5,
+        2,
+        11
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        0,
+        4,
+        0
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        5,
+        4,
+        11
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        0,
+        6,
+        0
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        5,
+        6,
+        11
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        0,
+        8,
+        0
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    },
+    {
+      "pos": [
+        5,
+        8,
+        11
+      ],
+      "state": "minecraft:redstone_lamp[lit=false]"
+    }
+  ],
+  "signs": [],
+  "programming_cells": [
+    {
+      "pos": [
+        2,
+        2,
+        2
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        5
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        2,
+        2,
+        6
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        9
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        1,
+        4,
+        2
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        2,
+        4,
+        5
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        1,
+        4,
+        6
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        2,
+        4,
+        9
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        2,
+        6,
+        2
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        1,
+        6,
+        5
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        2,
+        6,
+        6
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        1,
+        6,
+        9
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        1,
+        8,
+        2
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        2,
+        8,
+        5
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        1,
+        8,
+        6
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    },
+    {
+      "pos": [
+        2,
+        8,
+        9
+      ],
+      "state": "minecraft:repeater[delay=1,facing=east,locked=false,powered=false]"
+    }
+  ],
+  "block_entity_count": 0,
+  "entity_count": 0
+}

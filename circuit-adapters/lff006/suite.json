@@ -1,0 +1,1186 @@
+{
+  "schema_version": 1,
+  "adapter": "lff006",
+  "oracle": "Independent sequential stored bit: capture=true performs one actual button pulse and stores stable data; capture=false preserves the previous bit. Both polarities, hold across input transitions, duplicate holds, and repeated writes; no edge-latency or fresh vanilla-parity claim.",
+  "vectors": [
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": true
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": false
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": false,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": false
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    },
+    {
+      "inputs": {
+        "data": true,
+        "capture": true
+      },
+      "expected": {
+        "stored": true
+      }
+    }
+  ]
+}

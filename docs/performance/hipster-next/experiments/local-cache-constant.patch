@@ -1,0 +1,628 @@
+diff --git a/crates/mc-tick/src/lib.rs b/crates/mc-tick/src/lib.rs
+index 04ddceb6..bfd81af6 100644
+--- a/crates/mc-tick/src/lib.rs
++++ b/crates/mc-tick/src/lib.rs
+@@ -54,6 +54,8 @@ pub mod structure;
+ pub mod timeline;
+ pub mod vanilla;
+ pub mod wire;
++mod wire_cache;
++pub use wire_cache::WirePowerCacheMode;
+ pub mod world;
+ 
+ pub use behaviour::{BehaviourTable, BlockBehaviour, Inert, TickCtx, UpdateKind, UpdateRecord};
+diff --git a/crates/mc-tick/src/sim.rs b/crates/mc-tick/src/sim.rs
+index 28f1cdff..97709b86 100644
+--- a/crates/mc-tick/src/sim.rs
++++ b/crates/mc-tick/src/sim.rs
+@@ -2801,7 +2801,9 @@ impl Simulation {
+     pub fn restore(&mut self, checkpoint: &Checkpoint) {
+         self.timeline = None;
+         self.tick = checkpoint.tick;
++        let cache_mode = self.world.wire_power_cache_mode();
+         self.world = checkpoint.world.clone();
++        self.world.set_wire_power_cache_mode(cache_mode);
+         self.ticks = checkpoint.ticks.clone();
+         self.fluids = checkpoint.fluids.clone();
+         self.events = checkpoint.events.clone();
+diff --git a/crates/mc-tick/src/vanilla.rs b/crates/mc-tick/src/vanilla.rs
+index 788c8e11..2f7e10d1 100644
+--- a/crates/mc-tick/src/vanilla.rs
++++ b/crates/mc-tick/src/vanilla.rs
+@@ -143,6 +143,7 @@ pub struct VanillaRules {
+     /// [`crate::wire::WireWorld::hash_origin`]. Zero unless a capture says
+     /// otherwise.
+     hash_origin: Pos,
++    cache_identity: Arc<()>,
+     powered: StateSet,
+     /// States that emit a *level* rather than a flat 15.
+     ///
+@@ -349,10 +350,9 @@ impl VanillaRules {
+         with_wires: bool,
+     ) -> u8 {
+         let mut best = 0u8;
+-        for dir in crate::pos::ALL_DIRS {
++        for (dir, state) in crate::pos::ALL_DIRS.into_iter().zip(world.neighbours(pos)) {
+             let neighbour = pos.offset(dir);
+             let toward = dir.opposite();
+-            let state = world.get(neighbour);
+             let strong = if (with_wires && self.wires.contains_key(&state))
+                 || self.strong_into.get(&state) == Some(&toward) {
+                 self.emitted_state(world, outs, neighbour, state, toward, with_wires)
+@@ -382,6 +382,91 @@ impl VanillaRules {
+         strength
+     }
+ 
++    fn comparator_emits(&self, state: StateId, toward: Dir) -> bool {
++        self.comparators.contains(&state) && self.powered.contains(&state)
++            && self.emit_only.get(&state).is_none_or(|d| *d == toward)
++            && self.emit_except.get(&state).is_none_or(|d| *d != toward)
++    }
++
++    fn wire_target_structure(&self, world: &World, pos: Pos) -> crate::wire_cache::Target {
++        let mut result = crate::wire_cache::Target::default();
++        let empty = crate::behaviour::ComparatorOutputs::new();
++        for dir in crate::pos::ALL_DIRS {
++            let i = dir as usize;
++            let at = pos.offset(dir);
++            let state = world.get(at);
++            let toward = dir.opposite();
++            result.fixed[i] = self.emitted_state(world, &empty, at, state, toward, false);
++            let (x,y,z) = dir.delta();
++            if self.comparator_emits(state, toward) {
++                result.comparators[i] |= crate::wire_cache::dependency(Pos::new(x,y,z));
++            }
++            if self.conductors.contains(&state) {
++                for from in crate::pos::ALL_DIRS {
++                    let source = at.offset(from);
++                    let state = world.get(source);
++                    let toward = from.opposite();
++                    if self.strong_into.get(&state) == Some(&toward) {
++                        result.fixed[i] = result.fixed[i].max(self.emitted_state(world, &empty, source, state, toward, false));
++                        if self.comparator_emits(state, toward) {
++                            let (a,b,c) = from.delta();
++                            result.comparators[i] |= crate::wire_cache::dependency(Pos::new(x+a,y+b,z+c));
++                        }
++                    }
++                }
++            }
++        }
++        result.wire = crate::wire::incoming(self, world, pos);
++        if result.comparators.iter().all(|mask| *mask == 0) {
++            result.wire = result.resolve(pos, &empty);
++            result.constant = true;
++        }
++        result
++    }
++
++    fn wire_target(&self, world: &World, outs: &crate::behaviour::ComparatorOutputs, pos: Pos) -> u8 {
++        if world.wire_cache.mode == crate::WirePowerCacheMode::Off {
++            return self.wire_target_uncached(world, outs, pos);
++        }
++        let value = world.wire_cache.query(&self.cache_identity, pos, || self.wire_target_structure(world, pos)).resolve(pos, outs);
++        if world.wire_cache.mode == crate::WirePowerCacheMode::Shadow {
++            assert_eq!(value, self.wire_target_uncached(world, outs, pos), "wire cache result at {pos:?}");
++        }
++        value
++    }
++
++    /// Share the six immediate block reads between non-wire and dust input
++    /// calculations. This is a stack snapshot during a pure query, never a
++    /// memo retained across a world or comparator-output mutation.
++    fn wire_target_uncached(&self, world: &World, outs: &crate::behaviour::ComparatorOutputs, pos: Pos) -> u8 {
++        let neighbours = world.neighbours(pos);
++        let mut block = 0u8;
++        for (dir, state) in crate::pos::ALL_DIRS.into_iter().zip(neighbours) {
++            let at = pos.offset(dir);
++            let mut signal = self.emitted_state(world, outs, at, state, dir.opposite(), false);
++            if self.conductors.contains(&state) {
++                signal = signal.max(self.direct_signal_to(world, outs, at, false));
++            }
++            block = block.max(signal);
++            // Preserve the existing exact-15 short circuit, including its
++            // behaviour for arbitrary u8 comparator and analog outputs.
++            if block == 15 { return 15; }
++        }
++        let covered = self.conductors.contains(&neighbours[Dir::Up as usize]);
++        let mut wire = 0u8;
++        for dir in crate::wire::WIRE_SIDES {
++            let state = neighbours[dir as usize];
++            if let Some((power, _)) = self.wires.get(&state) { wire = wire.max(*power); }
++            let conductor = self.conductors.contains(&state);
++            if !conductor || !covered {
++                let step = if conductor { Dir::Up } else { Dir::Down };
++                let state = world.get(pos.offset(dir).offset(step));
++                if let Some((power, _)) = self.wires.get(&state) { wire = wire.max(*power); }
++            }
++        }
++        block.max(wire.saturating_sub(1))
++    }
++
+     /// Why `pos` does or does not power `toward` — a diagnostic for tracing a
+     /// dust level back to its source.
+     pub fn explain_power(&self, world: &World, pos: Pos, toward: Dir) -> String {
+@@ -609,6 +694,10 @@ fn dir_name(dir: Dir) -> &'static str {
+ }
+ 
+ impl crate::wire::WireWorld for VanillaRules {
++    fn target_power(&self, ctx: &crate::behaviour::TickCtx<'_>, pos: Pos) -> u8 {
++        self.wire_target(ctx.world, ctx.comparator_out, pos)
++    }
++
+     fn hash_origin(&self) -> Pos {
+         self.hash_origin
+     }
+@@ -692,6 +781,10 @@ impl crate::wire::WireWorld for VanillaRules {
+ }
+ 
+ impl crate::wire::WireWorld for Arc<VanillaRules> {
++    fn target_power(&self, ctx: &crate::behaviour::TickCtx<'_>, pos: Pos) -> u8 {
++        self.wire_target(ctx.world, ctx.comparator_out, pos)
++    }
++
+     fn hash_origin(&self) -> Pos {
+         <VanillaRules as crate::wire::WireWorld>::hash_origin(self.as_ref())
+     }
+@@ -4129,6 +4222,94 @@ pub fn intern_companions(registry: &mut StateRegistry) {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn wire_cache_tracks_live_comparators_and_distinct_rules_with_overlapping_ids() {
++        let mut rules = VanillaRules::default();
++        let comparator = StateId(1); let conductor = StateId(2);
++        rules.powered.push(comparator); rules.comparators.push(comparator);
++        rules.emit_only.insert(comparator, Dir::South);
++        rules.strong_into.insert(comparator, Dir::South);
++        rules.conductors.push(conductor);
++        let pos = Pos::new(-3, -2, -5);
++        let at = pos.offset(Dir::North).offset(Dir::North);
++        let mut world = World::new(crate::Bounds::new(Pos::new(-8,-8,-8), Pos::new(2,2,2)));
++        world.set_wire_power_cache_mode(crate::WirePowerCacheMode::Shadow);
++        world.set(pos.offset(Dir::North), conductor); world.set(at, comparator);
++        let mut outs = crate::behaviour::ComparatorOutputs::new();
++        assert_eq!(rules.wire_target(&world,&outs,pos),0);
++        for output in [1,15,16,255,0] {
++            outs.insert(at,output); assert_eq!(rules.wire_target(&world,&outs,pos),output);
++        }
++        *outs.entry(at).or_default() = 7; assert_eq!(rules.wire_target(&world,&outs,pos),7);
++        outs.remove(&at); assert_eq!(rules.wire_target(&world,&outs,pos),0);
++        outs = crate::behaviour::ComparatorOutputs::from([(at,19)]);
++        assert_eq!(rules.wire_target(&world,&outs,pos),19);
++        // Within one tick, losing the conductor severs the two-step path.
++        world.set(pos.offset(Dir::North),StateId::AIR);
++        assert_eq!(rules.wire_target(&world,&outs,pos),0);
++        world.set(pos.offset(Dir::North),comparator);
++        outs.insert(pos.offset(Dir::North),13);
++        assert_eq!(rules.wire_target(&world,&outs,pos),13);
++        let mut other = VanillaRules::default();
++        other.powered.push(comparator); other.analog_emission.insert(comparator,127);
++        assert_eq!(other.wire_target(&world,&outs,pos),127);
++        assert_eq!(rules.wire_target(&world,&outs,pos),13);
++        let mut other_world = world.clone();
++        other_world.set(pos.offset(Dir::North),StateId::AIR);
++        assert_eq!(other.wire_target(&other_world,&outs,pos),0);
++        assert_eq!(other.wire_target(&world,&outs,pos),127);
++    }
++
++    #[test]
++    fn shared_wire_reads_match_separate_queries_after_every_mutation() {
++        let mut registry = StateRegistry::new();
++        let mut ids = vec![StateId::AIR];
++        for name in ["minecraft:stone", "minecraft:glass", "minecraft:redstone_block",
++            "minecraft:redstone_torch[lit=true]", "minecraft:redstone_torch[lit=false]"] {
++            ids.push(registry.intern(name).unwrap());
++        }
++        for level in [0, 1, 15, 16, 255] {
++            ids.push(registry.intern(&format!("minecraft:redstone_wire[east=side,north=none,power={level},south=none,west=side]")).unwrap());
++            ids.push(registry.intern(&format!("minecraft:light_weighted_pressure_plate[power={level}]")).unwrap());
++        }
++        for facing in ["north", "south", "west", "east"] {
++            for powered in [false, true] {
++                ids.push(registry.intern(&format!("minecraft:comparator[facing={facing},mode=compare,powered={powered}]")).unwrap());
++            }
++        }
++        let rules = register_all(&mut registry, &mut BehaviourTable::new());
++        let center = Pos::new(-13, -7, -19);
++        let mut world = World::new(crate::pos::Bounds::new(
++            Pos::new(-15, -9, -21), Pos::new(-11, -5, -17)));
++        let mut outs = crate::behaviour::ComparatorOutputs::new();
++        let mut random = 0x0123_4567u32;
++        let mut next = || {
++            random ^= random << 13; random ^= random >> 17; random ^= random << 5; random
++        };
++        let check = |world: &World, outs: &crate::behaviour::ComparatorOutputs| {
++            let mut block = 0u8;
++            for dir in crate::pos::ALL_DIRS {
++                block = block.max(rules.signal_no_wire(world, outs, center.offset(dir), dir.opposite()));
++                if block == 15 { break; }
++            }
++            let reference = if block == 15 { 15 }
++                else { block.max(crate::wire::incoming(&rules, world, center)) };
++            assert_eq!(rules.wire_target(world, outs, center), reference);
++        };
++        world.set_wire_power_cache_mode(crate::WirePowerCacheMode::Shadow);
++        for _ in 0..2000 {
++            for x in -2..=2 { for y in -2..=2 { for z in -2..=2 {
++                let pos = Pos::new(center.x + x, center.y + y, center.z + z);
++                world.set(pos, ids[next() as usize % ids.len()]);
++                outs.insert(pos, [0, 1, 15, 16, 127, 255][next() as usize % 6]);
++            } } }
++            check(&world, &outs);
++            // Comparator memory can change without a block-state write.
++            outs.clear();
++            check(&world, &outs);
++        }
++    }
++
+     /// A redstone block driving two dust cells: the second cell's trace names
+     /// the first as a one-level wire step, the first names the block as its
+     /// block signal — and the back-reference from the first cell to the
+diff --git a/crates/mc-tick/src/wire.rs b/crates/mc-tick/src/wire.rs
+index 1326fb78..6be2dbde 100644
+--- a/crates/mc-tick/src/wire.rs
++++ b/crates/mc-tick/src/wire.rs
+@@ -39,6 +39,13 @@ pub trait WireWorld: Send + Sync {
+     /// The strongest non-wire signal into the wire at `pos` (vanilla's
+     /// `getBlockSignal` with `shouldSignal` off, so wires never count).
+     fn block_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> u8;
++    /// Current target strength, with all dust contributions muted while reading
++    /// non-wire power. Implementations may share reads between the two pure
++    /// queries; update delivery remains the evaluator's responsibility.
++    fn target_power(&self, ctx: &TickCtx<'_>, pos: Pos) -> u8 {
++        let block = self.block_signal(ctx, pos);
++        if block == 15 { 15 } else { block.max(incoming(self, ctx.world, pos)) }
++    }
+     /// Whether the block at `pos` conducts (`isRedstoneConductor`).
+     fn conductor(&self, world: &World, pos: Pos) -> bool;
+     /// The power level of the wire at `pos`, if it is wire.
+@@ -207,7 +214,7 @@ pub fn connection_state(
+ }
+ 
+ /// `getIncomingWireSignal`: the strongest neighbouring wire, minus one.
+-fn incoming(rules: &dyn WireWorld, world: &World, pos: Pos) -> u8 {
++pub(crate) fn incoming<R: WireWorld + ?Sized>(rules: &R, world: &World, pos: Pos) -> u8 {
+     let mut best = 0u8;
+     let covered = rules.conductor(world, pos.offset(Dir::Up));
+     for dir in [Dir::North, Dir::South, Dir::West, Dir::East] {
+@@ -256,12 +263,7 @@ fn java_hash_order_array(pos: Pos, origin: Pos) -> [Pos; 7] {
+ 
+ /// `DefaultRedstoneWireEvaluator.updatePowerStrength` for the wire at `pos`.
+ pub fn update_power_strength(rules: &dyn WireWorld, ctx: &mut TickCtx<'_>, pos: Pos, current: u8) {
+-    let block = rules.block_signal(ctx, pos);
+-    let target = if block == 15 {
+-        15
+-    } else {
+-        block.max(incoming(rules, ctx.world, pos))
+-    };
++    let target = rules.target_power(ctx, pos);
+     if target == current {
+         return;
+     }
+diff --git a/crates/mc-tick/src/world.rs b/crates/mc-tick/src/world.rs
+index 2bf88b60..7a35a67e 100644
+--- a/crates/mc-tick/src/world.rs
++++ b/crates/mc-tick/src/world.rs
+@@ -27,7 +27,7 @@ pub const DEFAULT_GROWTH_LIMIT: u64 = 32_000_000;
+ const GROWTH_STEP: i32 = 16;
+ 
+ /// The simulated region's blocks.
+-#[derive(Debug, Clone, PartialEq, Eq)]
++#[derive(Clone)]
+ pub struct World {
+     bounds: Bounds,
+     states: Vec<StateId>,
+@@ -35,9 +35,31 @@ pub struct World {
+     layer_stride: usize,
+     /// Ceiling on [`World::grow_to_include`]; see [`DEFAULT_GROWTH_LIMIT`].
+     growth_limit: u64,
++    pub(crate) wire_cache: crate::wire_cache::WireCache,
+ }
+ 
++impl std::fmt::Debug for World {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        f.debug_struct("World").field("bounds", &self.bounds).field("states", &self.states)
++            .field("size", &self.size).field("layer_stride", &self.layer_stride)
++            .field("growth_limit", &self.growth_limit).finish()
++    }
++}
++impl PartialEq for World {
++    fn eq(&self, other: &Self) -> bool {
++        self.bounds == other.bounds && self.states == other.states && self.size == other.size
++            && self.layer_stride == other.layer_stride && self.growth_limit == other.growth_limit
++    }
++}
++impl Eq for World {}
+ impl World {
++    /// Set the experimental wire target cache mode, clearing derived entries.
++    pub fn set_wire_power_cache_mode(&mut self, mode: crate::WirePowerCacheMode) {
++        self.wire_cache.clear(); self.wire_cache.mode = mode;
++    }
++    /// Current experimental wire target cache mode.
++    pub fn wire_power_cache_mode(&self) -> crate::WirePowerCacheMode { self.wire_cache.mode }
++
+     /// An all-air world covering `bounds`.
+     pub fn new(bounds: Bounds) -> Self {
+         let (x, y, z) = bounds.size();
+@@ -48,6 +70,7 @@ impl World {
+             bounds,
+             states: vec![StateId::AIR; bounds.volume() as usize],
+             growth_limit: DEFAULT_GROWTH_LIMIT,
++            wire_cache: Default::default(),
+         }
+     }
+ 
+@@ -118,6 +141,7 @@ impl World {
+         self.layer_stride = self.size[0] as usize * self.size[2] as usize;
+         self.bounds = grown;
+         self.states = states;
++        self.wire_cache.clear();
+         true
+     }
+ 
+@@ -157,6 +181,29 @@ impl World {
+         }
+     }
+ 
++    /// Six current states in `Dir` order. Interior reads share the coordinate
++    /// conversion and boundary check; border reads keep ordinary air semantics.
++    #[inline]
++    pub(crate) fn neighbours(&self, pos: Pos) -> [StateId; 6] {
++        let x = pos.x.wrapping_sub(self.bounds.min.x) as u32;
++        let y = pos.y.wrapping_sub(self.bounds.min.y) as u32;
++        let z = pos.z.wrapping_sub(self.bounds.min.z) as u32;
++        if x.wrapping_sub(1) < self.size[0].saturating_sub(2)
++            && y.wrapping_sub(1) < self.size[1].saturating_sub(2)
++            && z.wrapping_sub(1) < self.size[2].saturating_sub(2)
++        {
++            let row = self.size[0] as usize;
++            let i = y as usize * self.layer_stride + z as usize * row + x as usize;
++            [self.states[i - self.layer_stride], self.states[i + self.layer_stride],
++             self.states[i - row], self.states[i + row], self.states[i - 1], self.states[i + 1]]
++        } else {
++            crate::pos::ALL_DIRS.map(|dir| {
++                let (x, y, z) = dir.delta();
++                self.get(Pos::new(pos.x.wrapping_add(x), pos.y.wrapping_add(y), pos.z.wrapping_add(z)))
++            })
++        }
++    }
++
+     /// Set the state at `pos`, returning the previous one.
+     ///
+     /// # Outside the region
+@@ -180,6 +227,7 @@ impl World {
+     ///
+     /// [`get`]: World::get
+     pub fn set(&mut self, pos: Pos, state: StateId) -> Option<StateId> {
++        self.wire_cache.invalidate(pos);
+         if !self.bounds.contains(pos) {
+             if state == StateId::AIR || !self.grow_to_include(pos) {
+                 return None;
+@@ -231,6 +279,34 @@ impl World {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn neighbour_batch_matches_individual_reads_at_borders_and_after_growth() {
++        for origin in [Pos::new(-7, -9, -11), Pos::new(i32::MIN, 0, 0),
++            Pos::new(i32::MAX - 4, 0, 0)] {
++            for width in 1..=5 {
++                let mut world = World::new(Bounds::new(origin,
++                    Pos::new(origin.x + (width - 1), origin.y + 4, origin.z + 4)));
++                for x in 0..width { for y in 0..5 { for z in 0..5 {
++                    world.set(Pos::new(origin.x + x, origin.y + y, origin.z + z),
++                        StateId((1 + x + 5 * z + 25 * y) as u16));
++                } } }
++                let check = |world: &World| {
++                    for x in -1..=width { for y in -1..=5 { for z in -1..=5 {
++                        let pos = Pos::new(origin.x.wrapping_add(x), origin.y + y, origin.z + z);
++                        let expected = crate::pos::ALL_DIRS.map(|dir| {
++                            let (dx, dy, dz) = dir.delta();
++                            world.get(Pos::new(pos.x.wrapping_add(dx), pos.y.wrapping_add(dy), pos.z.wrapping_add(dz)))
++                        });
++                        assert_eq!(world.neighbours(pos), expected, "at {pos:?}");
++                    } } }
++                };
++                check(&world);
++                assert!(world.grow_to_include(Pos::new(origin.x, origin.y + 6, origin.z)));
++                check(&world);
++            }
++        }
++    }
++
+     fn small() -> World {
+         World::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(3, 3, 3)))
+     }
+diff --git a/crates/mc-tick/src/wire_cache.rs b/crates/mc-tick/src/wire_cache.rs
+new file mode 100644
+index 00000000..0e2bbcc0
+--- /dev/null
++++ b/crates/mc-tick/src/wire_cache.rs
+@@ -0,0 +1,187 @@
++//! Experimental bounded memo of wire target structure. Dependencies are the
++//! 25 cells within Manhattan distance two. Comparator memory is read live.
++use crate::{Pos, behaviour::ComparatorOutputs};
++use std::sync::{Arc, OnceLock};
++
++/// Configuration of the experimental wire target cache.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum WirePowerCacheMode {
++    /// Always calculate from the current world.
++    Off,
++    /// Cache structure, with immediate local invalidation on world writes.
++    On,
++    /// Recompute every hit and assert that cached structure and answer agree.
++    Shadow,
++}
++
++const SLOTS: usize = 1024;
++const fn offsets() -> [Pos; 25] {
++    let mut result = [Pos::new(0, 0, 0); 25];
++    let mut i = 0;
++    let mut x: i32 = -2;
++    while x <= 2 {
++        let mut y: i32 = -2;
++        while y <= 2 {
++            let mut z: i32 = -2;
++            while z <= 2 {
++                if x.abs() + y.abs() + z.abs() <= 2 { result[i] = Pos::new(x,y,z); i += 1; }
++                z += 1;
++            }
++            y += 1;
++        }
++        x += 1;
++    }
++    result
++}
++pub(crate) const OFFSETS: [Pos; 25] = offsets();
++const fn indices() -> [u8; 125] {
++    let mut out = [255; 125]; let mut i = 0;
++    while i < 25 {
++        let p = OFFSETS[i]; out[((p.x+2)*25+(p.y+2)*5+p.z+2) as usize] = i as u8; i += 1;
++    }
++    out
++}
++const INDICES: [u8; 125] = indices();
++pub(crate) fn dependency(p: Pos) -> u32 {
++    let i = INDICES[((p.x+2)*25+(p.y+2)*5+p.z+2) as usize];
++    assert!(i < 25); 1 << i
++}
++fn add(a: Pos, b: Pos) -> Pos { Pos::new(a.x.wrapping_add(b.x),a.y.wrapping_add(b.y),a.z.wrapping_add(b.z)) }
++fn slot(p: Pos) -> usize {
++    let h = (p.x as u32).wrapping_mul(0x9e3779b1) ^ (p.y as u32).wrapping_mul(0x85ebca77) ^ (p.z as u32).wrapping_mul(0xc2b2ae3d);
++    ((h ^ (h >> 16)) as usize) & (SLOTS - 1)
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
++pub(crate) struct Target {
++    pub fixed: [u8; 6],
++    pub comparators: [u32; 6],
++    pub wire: u8,
++    pub constant: bool,
++}
++impl Target {
++    pub fn resolve(self, pos: Pos, outs: &ComparatorOutputs) -> u8 {
++        if self.constant { return self.wire; }
++        let mut block = 0;
++        for i in 0..6 {
++            let mut strength = self.fixed[i];
++            let mut mask = self.comparators[i];
++            while mask != 0 {
++                let index = mask.trailing_zeros() as usize; mask &= mask - 1;
++                strength = strength.max(outs.get(&add(pos, OFFSETS[index])).copied().unwrap_or(0));
++            }
++            block = block.max(strength);
++            if block == 15 { return 15; }
++        }
++        block.max(self.wire)
++    }
++}
++struct Storage { rules: Arc<()>, slots: Vec<OnceLock<(Pos, Target)>> }
++pub(crate) struct WireCache { pub mode: WirePowerCacheMode, storage: OnceLock<Storage> }
++impl Default for WireCache {
++    fn default() -> Self {
++        static MODE: OnceLock<WirePowerCacheMode> = OnceLock::new();
++        let mode = *MODE.get_or_init(|| match std::env::var("MC_TICK_POWER_CACHE").as_deref() {
++            Ok("on") => WirePowerCacheMode::On,
++            Ok("shadow") => WirePowerCacheMode::Shadow,
++            _ => WirePowerCacheMode::Off,
++        });
++        Self { mode, storage: OnceLock::new() }
++    }
++}
++impl Clone for WireCache {
++    fn clone(&self) -> Self { Self { mode: self.mode, storage: OnceLock::new() } }
++}
++impl WireCache {
++    pub fn clear(&mut self) { self.storage.take(); }
++    pub fn invalidate(&mut self, changed: Pos) {
++        if self.mode == WirePowerCacheMode::Off { return; }
++        let Some(storage) = self.storage.get_mut() else { return; };
++        for offset in OFFSETS {
++            let affected = add(changed, offset);
++            let entry = &mut storage.slots[slot(affected)];
++            if entry.get_mut().is_some_and(|(key,_)| *key == affected) { entry.take(); }
++        }
++    }
++    pub fn query(&self, rules: &Arc<()>, pos: Pos, compute: impl Fn() -> Target) -> Target {
++        let storage = self.storage.get_or_init(|| Storage {
++            rules: rules.clone(), slots: (0..SLOTS).map(|_| OnceLock::new()).collect(),
++        });
++        // A replacement immutable rules table gets an uncached answer. Keeping
++        // the original identity alive rules out allocator-address reuse.
++        if !Arc::ptr_eq(&storage.rules, rules) { return compute(); }
++        let (key, value) = storage.slots[slot(pos)].get_or_init(|| (pos, compute()));
++        // Collisions are never overwritten through shared access. A world
++        // mutation can clear the slot; until then the other key falls back.
++        if *key != pos { return compute(); }
++        if self.mode == WirePowerCacheMode::Shadow { assert_eq!(*value, compute(), "wire cache structural mismatch at {pos:?}"); }
++        *value
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::{World, Bounds, StateId, Simulation};
++    use std::cell::Cell;
++    fn value(n: u8) -> Target { Target { wire: n, ..Target::default() } }
++    fn world() -> World {
++        let mut w = World::new(Bounds::new(Pos::new(-10,-10,-10), Pos::new(10,10,10)));
++        w.set_wire_power_cache_mode(WirePowerCacheMode::On); w
++    }
++    #[test]
++    fn every_dependency_invalidates_immediately_and_worlds_stay_send_sync() {
++        fn send_sync<T: Send + Sync>() {} send_sync::<World>();
++        let mut w = world(); let id = Arc::new(()); let pos = Pos::new(-3,1,-2);
++        let calls = Cell::new(0);
++        let compute = || { calls.set(calls.get()+1); value(3) };
++        w.wire_cache.query(&id,pos,compute);
++        w.wire_cache.query(&id,pos,compute); assert_eq!(calls.get(),1);
++        for (i, offset) in OFFSETS.into_iter().enumerate() {
++            w.set(add(pos,offset),StateId(1));
++            w.wire_cache.query(&id,pos,compute); assert_eq!(calls.get(),i+2);
++        }
++        // A refused write is harmless and still invalidates affected entries.
++        w.set_growth_limit(0);
++        w.set(Pos::new(-11,0,0), StateId(1));
++        assert_eq!(w.wire_cache.query(&id,pos,compute),value(3));
++    }
++    #[test]
++    fn collisions_rules_replacement_clone_growth_and_restore_cannot_reuse_stale_data() {
++        let mut w = world(); let a = Pos::new(-1,0,0); let id = Arc::new(());
++        let b = (1..100000).map(|x| Pos::new(x,0,0)).find(|p| slot(*p)==slot(a)).unwrap();
++        assert_ne!(a,b);
++        assert_eq!(w.wire_cache.query(&id,a,|| value(1)),value(1));
++        assert_eq!(w.wire_cache.query(&id,b,|| value(2)),value(2));
++        assert_eq!(w.wire_cache.query(&id,a,|| value(3)),value(1));
++        let other = Arc::new(());
++        assert_eq!(w.wire_cache.query(&other,a,|| value(4)),value(4));
++        assert_eq!(w.clone().wire_cache.query(&other,a,|| value(5)),value(5));
++        assert!(w.grow_to_include(Pos::new(20,0,0)));
++        assert_eq!(w.wire_cache.query(&other,a,|| value(6)),value(6));
++        let mut sim = Simulation::new(w.bounds());
++        sim.world_mut().set_wire_power_cache_mode(WirePowerCacheMode::Off);
++        let checkpoint = sim.checkpoint();
++        sim.world_mut().set_wire_power_cache_mode(WirePowerCacheMode::Shadow);
++        sim.world().wire_cache.query(&id,a,|| value(7));
++        sim.restore(&checkpoint);
++        assert_eq!(sim.world().wire_power_cache_mode(),WirePowerCacheMode::Shadow);
++        assert_eq!(sim.world().wire_cache.query(&id,a,|| value(8)),value(8));
++    }
++    #[test]
++    fn live_dependency_masks_keep_zero_insert_remove_entry_and_replacement() {
++        let pos = Pos::new(-4,2,-9); let relative = Pos::new(1,0,0); let at = add(pos,relative);
++        let mut target = Target::default(); target.comparators[0] = dependency(relative);
++        let mut outs = ComparatorOutputs::new();
++        assert_eq!(target.resolve(pos,&outs),0);
++        for level in [0,1,15,16,255,0] {
++            outs.insert(at,level); assert_eq!(target.resolve(pos,&outs),level);
++        }
++        *outs.entry(at).or_default()=17; assert_eq!(target.resolve(pos,&outs),17);
++        outs.remove(&at); assert_eq!(target.resolve(pos,&outs),0);
++        outs = ComparatorOutputs::from([(at,127)]); assert_eq!(target.resolve(pos,&outs),127);
++        // Exact-15 early exit is ordered: a later 255 cannot override it.
++        target.fixed[1] = 255; outs.insert(at,15); assert_eq!(target.resolve(pos,&outs),15);
++        outs.insert(at,16); assert_eq!(target.resolve(pos,&outs),255);
++    }
++}

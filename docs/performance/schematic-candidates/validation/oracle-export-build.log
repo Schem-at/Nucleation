@@ -1,0 +1,5 @@
+warning: nucleation@0.12.2: blockpedia data: 1267 cached colors, 0 inherited
+warning: nucleation@0.12.2: blockpedia data: generated PHF table with 1286 blocks
+warning: nucleation@0.12.2: blockpedia data: generated 35723 Java->Bedrock / 15953 Bedrock->Java mappings
+   Compiling nucleation v0.12.2 (/home/harrison/code/Nucleation-simulation-performance)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.55s

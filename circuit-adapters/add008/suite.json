@@ -1,0 +1,1503 @@
+{
+  "schema_version": 1,
+  "adapter": "add008",
+  "oracle": "Independent three-Boolean integer sum: sum=bool(total&1); cout=total>=2. All eight input combinations and all 64 directed endpoint transitions, including unchanged inputs.",
+  "vectors": [
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": false
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": false
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": false,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": false,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": false,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    },
+    {
+      "inputs": {
+        "a": true,
+        "b": true,
+        "cin": true
+      },
+      "expected": {
+        "sum": true,
+        "cout": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "id": "add005",
+  "source_sha256": "3b4e13cd09dc8ad0b5770370d6f416e1d8140e2eec416c207ba76d8a79af46ca",
+  "source_data_version": 4189,
+  "description": "Kuggo 8-bit carry look-everywhere adder",
+  "evidence": [
+    "Source sign labels identify bit weights 1..128 and CIN/COUT.",
+    "32 game ticks is a conservative endpoint budget, not a latency claim.",
+    "Original save DataVersion 4189; no fresh vanilla comparison for this adapter."
+  ],
+  "cell": {
+    "name": "add005",
+    "version": "1",
+    "io": {
+      "inputs": {
+        "a": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 8
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              0,
+              4,
+              17
+            ],
+            [
+              0,
+              6,
+              15
+            ],
+            [
+              0,
+              8,
+              13
+            ],
+            [
+              0,
+              10,
+              11
+            ],
+            [
+              0,
+              12,
+              9
+            ],
+            [
+              0,
+              14,
+              7
+            ],
+            [
+              0,
+              16,
+              5
+            ],
+            [
+              0,
+              18,
+              3
+            ]
+          ]
+        },
+        "b": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 8
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              0,
+              4,
+              19
+            ],
+            [
+              0,
+              6,
+              17
+            ],
+            [
+              0,
+              8,
+              15
+            ],
+            [
+              0,
+              10,
+              13
+            ],
+            [
+              0,
+              12,
+              11
+            ],
+            [
+              0,
+              14,
+              9
+            ],
+            [
+              0,
+              16,
+              7
+            ],
+            [
+              0,
+              18,
+              5
+            ]
+          ]
+        },
+        "cin": {
+          "io_type": "Boolean",
+          "layout": "OneToOne",
+          "positions": [
+            [
+              5,
+              1,
+              18
+            ]
+          ]
+        }
+      },
+      "outputs": {
+        "sum": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 8
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              11,
+              1,
+              15
+            ],
+            [
+              11,
+              3,
+              13
+            ],
+            [
+              11,
+              5,
+              11
+            ],
+            [
+              11,
+              7,
+              9
+            ],
+            [
+              11,
+              9,
+              7
+            ],
+            [
+              11,
+              11,
+              5
+            ],
+            [
+              11,
+              13,
+              3
+            ],
+            [
+              11,
+              15,
+              1
+            ]
+          ]
+        },
+        "cout": {
+          "io_type": "Boolean",
+          "layout": "OneToOne",
+          "positions": [
+            [
+              10,
+              18,
+              7
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "input_order": [
+    "a",
+    "b",
+    "cin"
+  ],
+  "outputs": {
+    "sum": "lamp_lit",
+    "cout": "lamp_lit"
+  },
+  "setup_ticks": 128,
+  "response_ticks": 32,
+  "require_quiescent": true,
+  "rng_seed": 0,
+  "hash_origin": [
+    0,
+    0,
+    0
+  ]
+}

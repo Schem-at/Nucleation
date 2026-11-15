@@ -1,0 +1,321 @@
+--------------------------------------------------------------------------------
+Profile data file '/home/harrison/nucleation-perf/execution-next/flyer-profiles/selected_pgo.callgrind' (creator: callgrind-3.25.1)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 52529959
+Trigger: Program termination
+Profiled target:  /home/harrison/nucleation-perf/execution-pgo-selected/pgo flyer 1 64 (PID 3806326, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  off
+
+--------------------------------------------------------------------------------
+Ir                   
+--------------------------------------------------------------------------------
+328,187,224 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                   file:function
+--------------------------------------------------------------------------------
+26,639,916 ( 8.12%)  crates/mc-tick/src/behaviour.rs:<mc_tick::behaviour::TickCtx>::drain [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+17,877,412 ( 5.45%)  crates/mc-tick/src/sim.rs:<mc_tick::sim::Simulation>::step [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+15,394,452 ( 4.69%)  crates/mc-tick/src/world.rs:<mc_tick::behaviour::TickCtx>::drain
+15,136,848 ( 4.61%)  crates/mc-tick/src/world.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+12,462,063 ( 3.80%)  crates/mc-tick/src/behaviour.rs:<mc_tick::sim::Simulation>::step
+10,709,184 ( 3.26%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<mc_tick::behaviour::TickCtx>::drain
+10,604,804 ( 3.23%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<mc_tick::sim::Simulation>::step
+ 9,130,407 ( 2.78%)  crates/mc-tick/src/world.rs:<mc_tick::sim::Simulation>::step
+ 8,738,075 ( 2.66%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::sim::Simulation>::step
+ 7,703,651 ( 2.35%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::behaviour::TickCtx>::drain
+ 7,278,696 ( 2.22%)  ???:free [/usr/lib/libc.so.6]
+ 6,535,596 ( 1.99%)  ???:malloc [/usr/lib/libc.so.6]
+ 6,280,362 ( 1.91%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<mc_tick::behaviour::TickCtx>::drain
+ 6,108,288 ( 1.86%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::sim::Simulation>::step
+ 5,557,736 ( 1.69%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::sim::Simulation>::step
+ 5,151,595 ( 1.57%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+ 5,113,087 ( 1.56%)  crates/mc-tick/src/pos.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+ 4,646,720 ( 1.42%)  crates/mc-tick/src/behaviour.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+ 4,187,423 ( 1.28%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/int_macros.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+ 3,738,808 ( 1.14%)  crates/mc-tick/src/piston.rs:<mc_tick::sim::Simulation>::step
+ 3,630,629 ( 1.11%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<mc_tick::sim::Simulation>::step
+ 3,431,262 ( 1.05%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/mod.rs:<mc_tick::behaviour::TickCtx>::drain
+ 3,318,406 ( 1.01%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::behaviour::TickCtx>::drain
+ 3,148,654 ( 0.96%)  crates/mc-tick/src/world.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered
+ 3,035,881 ( 0.93%)  crates/mc-tick/src/pos.rs:<mc_tick::sim::Simulation>::step
+ 2,877,280 ( 0.88%)  crates/mc-tick/src/piston.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+ 2,610,443 ( 0.80%)  crates/mc-tick/src/state.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+ 2,600,394 ( 0.79%)  crates/mc-tick/src/pos.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+ 2,387,326 ( 0.73%)  crates/mc-tick/src/vanilla.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+ 2,223,390 ( 0.68%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/non_null.rs:<mc_tick::sim::Simulation>::unknown_report
+ 2,205,366 ( 0.67%)  crates/mc-tick/src/piston.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+ 2,200,242 ( 0.67%)  crates/mc-tick/src/world.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+ 1,907,802 ( 0.58%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/memchr.rs:<mc_tick::behaviour::TickCtx>::set
+ 1,830,787 ( 0.56%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sync/once_lock.rs:<mc_tick::sim::Simulation>::step
+ 1,830,696 ( 0.56%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/mod.rs:<mc_tick::sim::Simulation>::step
+ 1,795,102 ( 0.55%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::behaviour::TickCtx>::drain
+ 1,774,491 ( 0.54%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+ 1,653,926 ( 0.50%)  crates/mc-tick/src/behaviour.rs:<mc_tick::behaviour::TickCtx>::set [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+ 1,593,479 ( 0.49%)  ???:0x0000000000176400 [/usr/lib/libc.so.6]
+ 1,574,336 ( 0.48%)  crates/mc-tick/src/vanilla.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+ 1,543,718 ( 0.47%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/iter/macros.rs:<mc_tick::sim::Simulation>::step
+ 1,510,371 ( 0.46%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+ 1,477,121 ( 0.45%)  crates/mc-tick/src/world.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+ 1,476,960 ( 0.45%)  crates/mc-tick/src/pos.rs:<mc_tick::behaviour::TickCtx>::update_neighbour_shapes
+ 1,410,421 ( 0.43%)  crates/mc-tick/src/pos.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+ 1,366,781 ( 0.42%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/non_null.rs:<mc_tick::sim::Simulation>::step
+ 1,341,118 ( 0.41%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/internal_macros.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+ 1,338,648 ( 0.41%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/int_macros.rs:<mc_tick::behaviour::TickCtx>::drain
+ 1,338,648 ( 0.41%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sync/once_lock.rs:<mc_tick::behaviour::TickCtx>::drain
+ 1,292,446 ( 0.39%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+ 1,292,382 ( 0.39%)  crates/mc-tick/src/pos.rs:<mc_tick::behaviour::TickCtx>::set
+ 1,292,340 ( 0.39%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/array/iter.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+ 1,230,600 ( 0.37%)  crates/mc-tick/src/pos.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+ 1,207,866 ( 0.37%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+ 1,207,191 ( 0.37%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mut_ptr.rs:<mc_tick::sim::Simulation>::step
+ 1,107,833 ( 0.34%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+ 1,097,499 ( 0.33%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::behaviour::TickCtx>::set
+ 1,077,048 ( 0.33%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/index_range.rs:<mc_tick::sim::Simulation>::step
+ 1,069,466 ( 0.33%)  crates/mc-tick/src/world.rs:mc_tick::piston::add_branching_blocks
+ 1,066,520 ( 0.32%)  crates/mc-tick/src/behaviour.rs:<mc_tick::behaviour::TickCtx>::set_shape_only [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+ 1,053,823 ( 0.32%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered
+ 1,038,420 ( 0.32%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/int_macros.rs:<mc_tick::sim::Simulation>::step
+ 1,025,616 ( 0.31%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/int_macros.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered
+ 1,000,220 ( 0.30%)  crates/mc-tick/src/piston.rs:mc_tick::piston::add_branching_blocks [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   997,499 ( 0.30%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+   941,099 ( 0.29%)  crates/mc-tick/src/behaviour.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_shape_update [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   907,703 ( 0.28%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/sync/atomic.rs:<mc_tick::sim::Simulation>::step
+   905,092 ( 0.28%)  crates/mc-tick/src/pos.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered
+   892,185 ( 0.27%)  crates/mc-tick/src/pos.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::on_scheduled_tick
+   889,200 ( 0.27%)  crates/mc-tick/src/state.rs:<mc_tick::sim::Simulation>::unknown_report
+   876,888 ( 0.27%)  crates/mc-tick/src/behaviour.rs:<mc_tick::behaviour::TickCtx>::land_moved_block [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   861,730 ( 0.26%)  crates/mc-tick/src/pos.rs:mc_tick::piston::add_branching_blocks
+   830,860 ( 0.25%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   816,246 ( 0.25%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   753,862 ( 0.23%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/mem/mod.rs:<mc_tick::sim::Simulation>::step
+   738,538 ( 0.23%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/iter/macros.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+   723,222 ( 0.22%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/mem/mod.rs:<mc_tick::behaviour::TickCtx>::drain
+   695,414 ( 0.21%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sys/alloc/unix.rs:<mc_tick::sim::Simulation>::step
+   689,760 ( 0.21%)  crates/mc-tick/src/piston.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>>>::is_powered [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   672,137 ( 0.20%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   669,325 ( 0.20%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/sync/atomic.rs:<mc_tick::behaviour::TickCtx>::drain
+   669,324 ( 0.20%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/boxed.rs:<mc_tick::behaviour::TickCtx>::drain
+   630,853 ( 0.19%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+   630,592 ( 0.19%)  ???:0x00000000000a6e20 [/usr/lib/libc.so.6]
+   623,094 ( 0.19%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/boxed.rs:<mc_tick::sim::Simulation>::step
+   618,024 ( 0.19%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+   617,988 ( 0.19%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/into_iter.rs:<mc_tick::sim::Simulation>::step
+   615,480 ( 0.19%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/index_range.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   609,919 ( 0.19%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/uint_macros.rs:<mc_tick::sim::Simulation>::step
+   584,630 ( 0.18%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::behaviour::TickCtx>::update_neighbour_shapes
+   571,816 ( 0.17%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/spec_from_iter_nested.rs:<mc_tick::sim::Simulation>::step
+   564,025 ( 0.17%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+   564,025 ( 0.17%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::on_scheduled_tick
+   538,475 ( 0.16%)  crates/mc-tick/src/behaviour.rs:<mc_tick::behaviour::TickCtx>::update_neighbour_shapes [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   523,101 ( 0.16%)  crates/mc-tick/src/world.rs:<mc_tick::behaviour::TickCtx>::set
+   517,975 ( 0.16%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/const_ptr.rs:<mc_tick::sim::Simulation>::step
+   515,407 ( 0.16%)  crates/mc-tick/src/observer.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::on_shape_update [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   512,882 ( 0.16%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mut_ptr.rs:<mc_tick::behaviour::TickCtx>::drain
+   512,836 ( 0.16%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/index_range.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+   512,750 ( 0.16%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::on_scheduled_tick
+   505,121 ( 0.15%)  crates/mc-tick/src/state.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered
+   492,416 ( 0.15%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:mc_tick::piston::add_branching_blocks
+   492,240 ( 0.15%)  crates/mc-tick/src/world.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+   461,550 ( 0.14%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/index_range.rs:<mc_tick::behaviour::TickCtx>::update_neighbour_shapes
+   456,433 ( 0.14%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<mc_tick::behaviour::TickCtx>::set
+   454,128 ( 0.14%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::behaviour::TickCtx>::set
+   448,104 ( 0.14%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/iter/adapters/filter.rs:<mc_tick::sim::Simulation>::unknown_report
+   446,940 ( 0.14%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/iter/macros.rs:<mc_tick::sim::Simulation>::unknown_report
+   435,950 ( 0.13%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<alloc::raw_vec::RawVec<mc_tick::pos::Pos>>::grow_one [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   425,689 ( 0.13%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/iter/range.rs:<mc_tick::sim::Simulation>::step
+   415,421 ( 0.13%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/cmp.rs:<mc_tick::sim::Simulation>::step
+   410,304 ( 0.13%)  /rust/deps/hashbrown-0.17.1/src/raw.rs:<mc_tick::sim::Simulation>::step
+   410,272 ( 0.13%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::behaviour::TickCtx>::update_neighbors_at
+   400,112 ( 0.12%)  crates/mc-tick/src/behaviour.rs:<mc_tick::behaviour::TickCtx>::set_quiet [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   397,485 ( 0.12%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/int_macros.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   394,888 ( 0.12%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+   392,288 ( 0.12%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::behaviour::TickCtx>::land_moved_block
+   384,600 ( 0.12%)  crates/mc-tick/src/world.rs:<mc_tick::behaviour::TickCtx>::set_quiet
+   382,069 ( 0.12%)  crates/mc-tick/src/schedule.rs:<mc_tick::sim::Simulation>::step
+   379,438 ( 0.12%)  crates/mc-tick/src/observer.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::on_scheduled_tick [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   369,234 ( 0.11%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<alloc::raw_vec::RawVec<mc_tick::schedule::BlockEvent>>::grow_one [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   369,216 ( 0.11%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/remove.rs:<alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut, u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>, alloc::collections::btree::node::marker::Leaf>, alloc::collections::btree::node::marker::KV>>::remove_leaf_kv::<<alloc::collections::btree::map::entry::OccupiedEntry<u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>>>::remove_kv::{closure#0}, alloc::alloc::Global> [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   364,113 ( 0.11%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/uint_macros.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+   358,988 ( 0.11%)  crates/mc-tick/src/behaviour.rs:<mc_tick::behaviour::TickCtx>::schedule [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   358,988 ( 0.11%)  crates/mc-tick/src/behaviour.rs:<mc_tick::behaviour::TickCtx>::update_neighbors_at [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   351,279 ( 0.11%)  crates/mc-tick/src/pos.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>>>::is_powered
+   348,743 ( 0.11%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/non_null.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+   346,207 ( 0.11%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+   341,816 ( 0.10%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::behaviour::TickCtx>::set
+   341,067 ( 0.10%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mut_ptr.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+   338,415 ( 0.10%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+   333,380 ( 0.10%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/map.rs:<mc_tick::sim::Simulation>::step
+   333,378 ( 0.10%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sync/once_lock.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   323,148 ( 0.10%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/int_macros.rs:mc_tick::piston::add_branching_blocks
+   323,093 ( 0.10%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<mc_tick::behaviour::TickCtx>::set
+   317,905 ( 0.10%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/index_range.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+   307,710 ( 0.09%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/index_range.rs:<mc_tick::behaviour::TickCtx>::set
+   297,424 ( 0.09%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/array/iter.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered
+   292,328 ( 0.09%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/iter/adapters/filter.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+   271,704 ( 0.08%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global> [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   256,446 ( 0.08%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/const_ptr.rs:<mc_tick::behaviour::TickCtx>::drain
+   256,420 ( 0.08%)  crates/mc-tick/src/schedule.rs:<mc_tick::schedule::TickQueue>::schedule [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   256,375 ( 0.08%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/index_range.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::on_scheduled_tick
+   254,094 ( 0.08%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/vec_deque/mod.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   253,856 ( 0.08%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/map.rs:<mc_tick::schedule::TickQueue>::schedule
+   251,286 ( 0.08%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/search.rs:<mc_tick::sim::Simulation>::step
+   235,950 ( 0.07%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/iter/macros.rs:mc_tick::piston::add_branching_blocks
+   235,920 ( 0.07%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/int_macros.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+   225,672 ( 0.07%)  crates/mc-tick/src/world_journal.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   221,178 ( 0.07%)  ???:0x0000000000175ca0 [/usr/lib/libc.so.6]
+   217,984 ( 0.07%)  crates/mc-tick/src/behaviour.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+   217,945 ( 0.07%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/internal_macros.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered
+   216,892 ( 0.07%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+   215,432 ( 0.07%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/non_null.rs:mc_tick::piston::add_branching_blocks
+   210,279 ( 0.06%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sync/once_lock.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+   208,370 ( 0.06%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<alloc::raw_vec::RawVecInner>::try_allocate_in [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   207,690 ( 0.06%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered
+   205,357 ( 0.06%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+   205,152 ( 0.06%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/convert/num.rs:<mc_tick::sim::Simulation>::step
+   199,576 ( 0.06%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/vec_deque/mod.rs:<mc_tick::sim::Simulation>::step
+   197,463 ( 0.06%)  crates/mc-tick/src/state.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   194,845 ( 0.06%)  crates/mc-tick/src/behaviour.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::on_scheduled_tick
+   184,662 ( 0.06%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<alloc::raw_vec::RawVec<mc_tick::schedule::ScheduledTick>>::grow_one [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   184,620 ( 0.06%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<mc_tick::behaviour::TickCtx>::update_neighbour_shapes
+   184,620 ( 0.06%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sync/once_lock.rs:<mc_tick::behaviour::TickCtx>::update_neighbour_shapes
+   184,590 ( 0.06%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+   179,486 ( 0.05%)  /rust/deps/hashbrown-0.17.1/src/raw.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+   176,943 ( 0.05%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::indirect_shape_targets
+   174,382 ( 0.05%)  crates/mc-tick/src/behaviour.rs:<mc_tick::wire::Wire<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::ticks_as_block_entity [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   174,335 ( 0.05%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mut_ptr.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::on_scheduled_tick
+   169,254 ( 0.05%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/mem/mod.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   169,240 ( 0.05%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sync/once_lock.rs:<mc_tick::behaviour::TickCtx>::set
+   169,224 ( 0.05%)  crates/mc-tick/src/world.rs:<mc_tick::behaviour::TickCtx>::land_moved_block
+   166,690 ( 0.05%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/sync/atomic.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   164,104 ( 0.05%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/uint_macros.rs:<alloc::raw_vec::RawVec<mc_tick::schedule::BlockEvent>>::grow_one
+   164,100 ( 0.05%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/node.rs:<mc_tick::sim::Simulation>::step
+   161,574 ( 0.05%)  crates/mc-tick/src/state.rs:mc_tick::piston::add_branching_blocks
+   161,534 ( 0.05%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::behaviour::TickCtx>::land_moved_block
+   153,850 ( 0.05%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::behaviour::TickCtx>::update_neighbour_shapes
+   153,845 ( 0.05%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/iter/traits/iterator.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>>>::is_powered
+   153,840 ( 0.05%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut, u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>, alloc::collections::btree::node::marker::Leaf>, alloc::collections::btree::node::marker::KV>>::remove_leaf_kv::<<alloc::collections::btree::map::entry::OccupiedEntry<u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>>>::remove_kv::{closure#0}, alloc::alloc::Global>
+   153,840 ( 0.05%)  crates/mc-tick/src/pos.rs:<mc_tick::behaviour::TickCtx>::set_quiet
+   148,714 ( 0.05%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/node.rs:<mc_tick::schedule::TickQueue>::schedule
+   146,174 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mut_ptr.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   146,148 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<mc_tick::behaviour::TickCtx>::land_moved_block
+   143,596 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::schedule::TickQueue>::schedule
+   143,594 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/iter/macros.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+   143,584 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/map.rs:<alloc::collections::btree::map::BTreeMap<u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>>>::remove::<u64> [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   143,570 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sync/once_lock.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+   141,043 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/boxed.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   141,043 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/cmp.rs:mc_tick::diagnostics::var_os
+   138,465 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::behaviour::TickCtx>::update_neighbour_shapes
+   138,460 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered
+   135,434 ( 0.04%)  ???:realloc [/usr/lib/libc.so.6]
+   134,024 ( 0.04%)  ???:0x00000000000a7f20 [/usr/lib/libc.so.6]
+   130,798 ( 0.04%)  crates/mc-tick/src/vanilla.rs:mc_tick::piston::add_branching_blocks
+   128,220 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/intrinsics/mod.rs:<alloc::raw_vec::RawVec<mc_tick::pos::Pos>>::grow_one
+   128,220 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/collections/hash/set.rs:<mc_tick::sim::Simulation>::step
+   128,210 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::behaviour::TickCtx>::update_neighbors_at
+   128,210 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/mod.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+   125,661 ( 0.04%)  crates/mc-tick/src/state.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+   125,636 ( 0.04%)  crates/mc-tick/src/world_journal.rs:<mc_tick::sim::Simulation>::step
+   123,093 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/intrinsics/mod.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+   123,072 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sync/once_lock.rs:<mc_tick::behaviour::TickCtx>::land_moved_block
+   123,060 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::on_scheduled_tick
+   120,208 ( 0.04%)  ???:0x00000000000a4fe0 [/usr/lib/libc.so.6]
+   117,962 ( 0.04%)  crates/mc-tick/src/behaviour.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::indirect_shape_targets [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+   117,944 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/uint_macros.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered
+   115,389 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::behaviour::TickCtx>::update_neighbors_at
+   115,380 ( 0.04%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::behaviour::TickCtx>::set_quiet
+   112,827 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sys/alloc/unix.rs:<mc_tick::behaviour::TickCtx>::set
+   112,816 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/node.rs:<alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut, u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>, alloc::collections::btree::node::marker::Leaf>, alloc::collections::btree::node::marker::KV>>::remove_leaf_kv::<<alloc::collections::btree::map::entry::OccupiedEntry<u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>>>::remove_kv::{closure#0}, alloc::alloc::Global>
+   107,688 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/index_range.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered
+   104,492 ( 0.03%)  ???:0x00000000000a4f10 [/usr/lib/libc.so.6]
+   102,582 ( 0.03%)  crates/mc-tick/src/vanilla.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+   102,576 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/cmp.rs:<alloc::raw_vec::RawVec<mc_tick::pos::Pos>>::grow_one
+   102,570 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mut_ptr.rs:<mc_tick::behaviour::TickCtx>::set
+   102,550 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/int_macros.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+   100,022 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:mc_tick::piston::add_branching_blocks
+    99,996 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::behaviour::TickCtx>::land_moved_block
+    94,879 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+    92,328 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/index_range.rs:mc_tick::piston::add_branching_blocks
+    92,310 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/sync/atomic.rs:<mc_tick::behaviour::TickCtx>::update_neighbour_shapes
+    92,310 ( 0.03%)  crates/mc-tick/src/behaviour.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+    92,304 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<alloc::collections::btree::map::BTreeMap<u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>>>::remove::<u64>
+    92,284 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/vec_deque/mod.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+    92,040 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/vec_deque/mod.rs:<mc_tick::behaviour::TickCtx>::set
+    89,753 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<mc_tick::schedule::TickQueue>::schedule
+    89,748 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/int_macros.rs:<mc_tick::behaviour::TickCtx>::set
+    84,620 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/sync/atomic.rs:<mc_tick::behaviour::TickCtx>::set
+    84,615 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered
+    84,612 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<mc_tick::behaviour::TickCtx>::set_quiet
+    84,451 ( 0.03%)  ???:0x00000000000a6190 [/usr/lib/libc.so.6]
+    83,208 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/uint_macros.rs:<mc_tick::behaviour::TickCtx>::set
+    82,840 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/intrinsics/mod.rs:<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>
+    82,112 ( 0.03%)  ???:0x000000000000aec0 [/usr/lib/ld-linux-x86-64.so.2]
+    82,072 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/uint_macros.rs:<alloc::raw_vec::RawVec<mc_tick::schedule::ScheduledTick>>::grow_one
+    82,056 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/str/pattern.rs:<mc_tick::behaviour::TickCtx>::set
+    82,054 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/map/entry.rs:<mc_tick::schedule::TickQueue>::schedule
+    82,048 ( 0.03%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mut_ptr.rs:<alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut, u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>, alloc::collections::btree::node::marker::Leaf>, alloc::collections::btree::node::marker::KV>>::remove_leaf_kv::<<alloc::collections::btree::map::entry::OccupiedEntry<u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>>>::remove_kv::{closure#0}, alloc::alloc::Global>
+    80,390 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/uint_macros.rs:<mc_tick::behaviour::TickCtx>::set_piston_moved
+    79,968 ( 0.02%)  crates/mc-tick/examples/bench_circuits.rs:bench_circuits::main [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+    79,499 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/sync/atomic.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+    79,495 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/non_null.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+    79,495 ( 0.02%)  crates/mc-tick/src/diagnostics.rs:mc_tick::diagnostics::var_os [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+    79,484 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/search.rs:<mc_tick::schedule::TickQueue>::schedule
+    76,926 ( 0.02%)  crates/mc-tick/src/pos.rs:<mc_tick::behaviour::TickCtx>::update_neighbors_at
+    76,920 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:<mc_tick::behaviour::TickCtx>::set_quiet
+    72,338 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/uint_macros.rs:<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>
+    71,802 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sync/once_lock.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+    71,799 ( 0.02%)  crates/mc-tick/src/world_journal.rs:<mc_tick::behaviour::TickCtx>::set
+    71,792 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/map/entry.rs:<alloc::collections::btree::map::BTreeMap<u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>>>::remove::<u64>
+    71,792 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/remove.rs:<alloc::collections::btree::map::BTreeMap<u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>>>::remove::<u64>
+    71,792 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/search.rs:<alloc::collections::btree::map::BTreeMap<u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>>>::remove::<u64>
+    71,785 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/boxed.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+    71,785 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mut_ptr.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+    71,785 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/sync/atomic.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+    71,785 ( 0.02%)  crates/mc-tick/src/world_journal.rs:<mc_tick::behaviour::TickCtx>::set_shape_only
+    69,744 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::behaviour::TickCtx>::set_quiet
+    69,276 ( 0.02%)  ???:0x00000000000161d0 [/usr/lib/ld-linux-x86-64.so.2]
+    69,246 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:mc_tick::piston::add_branching_blocks
+    69,235 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/map.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::on_shape_update
+    69,228 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mut_ptr.rs:<mc_tick::behaviour::TickCtx>::land_moved_block
+    69,225 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::indirect_shape_targets
+    68,573 ( 0.02%)  ???:0x000000000000fb40 [/usr/lib/ld-linux-x86-64.so.2]
+    68,449 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/vec_deque/mod.rs:<mc_tick::behaviour::TickCtx>::set_quiet
+    66,666 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mut_ptr.rs:<mc_tick::schedule::TickQueue>::schedule
+    66,666 ( 0.02%)  crates/mc-tick/src/state.rs:<mc_tick::sim::Simulation>::step
+    62,816 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/cmp.rs:<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>
+    61,552 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:mc_tick::piston::add_branching_blocks
+    61,542 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/cmp.rs:<mc_tick::behaviour::TickCtx>::set
+    61,540 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mut_ptr.rs:<mc_tick::behaviour::TickCtx>::update_neighbour_shapes
+    61,539 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/cmp.rs:<alloc::raw_vec::RawVec<mc_tick::schedule::BlockEvent>>::grow_one
+    61,539 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/intrinsics/mod.rs:<alloc::raw_vec::RawVec<mc_tick::schedule::BlockEvent>>::grow_one
+    61,539 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/iter/adapters/filter.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>>>::is_powered
+    61,536 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/option.rs:<alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut, u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>, alloc::collections::btree::node::marker::Leaf>, alloc::collections::btree::node::marker::KV>>::remove_leaf_kv::<<alloc::collections::btree::map::entry::OccupiedEntry<u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>>>::remove_kv::{closure#0}, alloc::alloc::Global>
+    61,530 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/iter/traits/collect.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::on_scheduled_tick
+    61,530 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/uint_macros.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::on_scheduled_tick
+    58,985 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mut_ptr.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_neighbor_changed
+    58,981 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/num/uint_macros.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+    58,972 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mod.rs:<alloc::sync::Arc<mc_tick::vanilla::VanillaRules> as mc_tick::components::PowerSource>::is_powered
+    56,417 ( 0.02%)  crates/mc-tick/src/schedule.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::on_shape_update
+    56,413 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/boxed.rs:<mc_tick::behaviour::TickCtx>::set
+    53,972 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/raw_vec/mod.rs:<mc_tick::behaviour::TickCtx>::set_quiet
+    53,858 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/internal_macros.rs:mc_tick::piston::add_branching_blocks
+    53,857 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sys/alloc/unix.rs:<mc_tick::piston::Piston<alloc::sync::Arc<mc_tick::vanilla::VanillaRules>, alloc::sync::Arc<mc_tick::vanilla::VanillaRules>> as mc_tick::behaviour::BlockBehaviour>::on_block_event
+    53,844 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/sync/atomic.rs:<mc_tick::behaviour::TickCtx>::land_moved_block
+    53,844 ( 0.02%)  crates/mc-tick/src/world_journal.rs:<mc_tick::behaviour::TickCtx>::set_quiet
+    51,994 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/iter/range.rs:bench_circuits::main
+    51,288 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sys/alloc/unix.rs:<alloc::raw_vec::RawVec<mc_tick::pos::Pos>>::grow_one
+    51,288 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/sys/thread_local/native/lazy.rs:<mc_tick::sim::Simulation>::step
+    51,284 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ptr/mut_ptr.rs:<mc_tick::behaviour::TickCtx>::update_neighbors_at
+    51,282 ( 0.02%)  crates/mc-tick/src/behaviour.rs:<mc_tick::observer::Observer as mc_tick::behaviour::BlockBehaviour>::ticks_as_block_entity [/home/harrison/nucleation-perf/execution-pgo-selected/pgo]
+    51,280 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/collections/btree/node.rs:<alloc::collections::btree::map::BTreeMap<u64, alloc::vec::Vec<mc_tick::schedule::ScheduledTick>>>::remove::<u64>
+    51,276 ( 0.02%)  /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/sort/stable/mod.rs:<mc_tick::sim::Simulation>::step
+

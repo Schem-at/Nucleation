@@ -92,13 +92,14 @@ pub fn from_classic_schematic_bounded(
 ) -> Result<UniversalSchematic> {
     let root = crate::formats::limits::parse_gzip_nbt(data, limits)?;
 
-    let width = root.get::<_, i16>("Width")? as i32;
-    let height = root.get::<_, i16>("Height")? as i32;
-    let length = root.get::<_, i16>("Length")? as i32;
+    let width = read_dimension(&root, "Width")?;
+    let height = read_dimension(&root, "Height")?;
+    let length = read_dimension(&root, "Length")?;
     if width <= 0 || height <= 0 || length <= 0 {
         return Err("Classic schematic has invalid dimensions".into());
     }
-    limits.check_dimensions((i64::from(width), i64::from(height), i64::from(length)))?;
+    let volume =
+        limits.check_dimensions((i64::from(width), i64::from(height), i64::from(length)))?;
 
     let blocks = match root.get::<_, &NbtTag>("Blocks")? {
         NbtTag::ByteArray(v) => v.as_slice(),
@@ -113,7 +114,6 @@ pub fn from_classic_schematic_bounded(
         _ => None,
     };
 
-    let volume = (width as usize) * (height as usize) * (length as usize);
     if blocks.len() != volume || meta_arr.len() != volume {
         return Err("Blocks/Data length does not match Width*Height*Length".into());
     }
@@ -185,6 +185,17 @@ pub fn from_classic_schematic_bounded(
 
     limits.validate_schematic(&schematic)?;
     Ok(schematic)
+}
+
+fn read_dimension(root: &NbtCompound, name: &str) -> Result<i32> {
+    // MCEdit specifies Short dimensions, but some legacy schematic writers
+    // emit Int instead. Accept either without narrowing; the caller validates
+    // positivity, dimension limits and checked volume before allocating.
+    match root.get::<_, &NbtTag>(name)? {
+        NbtTag::Short(value) => Ok(i32::from(*value)),
+        NbtTag::Int(value) => Ok(*value),
+        _ => Err(format!("Classic schematic '{name}' must be a Short or Int").into()),
+    }
 }
 
 fn parse_tile_entity(nbt: &NbtCompound) -> Option<BlockEntity> {
@@ -298,7 +309,8 @@ fn legacy_to_block_state(id: u16, meta: u8) -> BlockState {
         26 => simple("red_bed"), // color lost — approximate
         27 => simple("powered_rail"),
         28 => simple("detector_rail"),
-        29 => with_facing("sticky_piston", facing_north_s_e_w_u_d(meta & 0x07)),
+        29 => with_facing("sticky_piston", facing_north_s_e_w_u_d(meta & 0x07))
+            .with_property("extended", if meta & 0x08 != 0 { "true" } else { "false" }),
         30 => simple("cobweb"),
         31 => match meta {
             1 => simple("grass"),
@@ -306,7 +318,11 @@ fn legacy_to_block_state(id: u16, meta: u8) -> BlockState {
             _ => simple("dead_bush"),
         },
         32 => simple("dead_bush"),
-        33 => with_facing("piston", facing_north_s_e_w_u_d(meta & 0x07)),
+        33 => with_facing("piston", facing_north_s_e_w_u_d(meta & 0x07))
+            .with_property("extended", if meta & 0x08 != 0 { "true" } else { "false" }),
+        34 => with_facing("piston_head", facing_north_s_e_w_u_d(meta & 0x07))
+            .with_property("type", if meta & 0x08 != 0 { "sticky" } else { "normal" })
+            .with_property("short", "false"),
         35 => wool_block(meta),
         37 => simple("dandelion"),
         38 => simple("poppy"), // many flower subtypes by meta
@@ -659,6 +675,120 @@ fn torch_block(name: &str, meta: u8) -> BlockState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn encode_classic(root: &NbtCompound) -> Vec<u8> {
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+        use quartz_nbt::io::{write_nbt, Flavor};
+        use std::io::Write;
+
+        let mut raw = Vec::new();
+        write_nbt(&mut raw, None, root, Flavor::Uncompressed).unwrap();
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(&raw).unwrap();
+        encoder.finish().unwrap()
+    }
+
+    fn integer_dimension_fixture() -> NbtCompound {
+        let mut root = NbtCompound::new();
+        root.insert("Width", NbtTag::Int(285));
+        root.insert("Height", NbtTag::Int(1));
+        root.insert("Length", NbtTag::Int(1));
+        root.insert("Materials", NbtTag::String("Alpha".into()));
+        let mut blocks = vec![0; 285];
+        let mut data = vec![0; 285];
+        blocks[284] = 34;
+        data[284] = 11; // Sticky piston head facing south.
+        root.insert("Blocks", NbtTag::ByteArray(blocks));
+        root.insert("Data", NbtTag::ByteArray(data));
+        root
+    }
+
+    #[test]
+    fn classic_integer_dimensions_are_detected_and_read_without_narrowing() {
+        let limits = crate::formats::limits::DecodeLimits::default();
+        let manager = crate::formats::manager::get_manager();
+        let mut root = integer_dimension_fixture();
+        // Both the nonstandard Int dimensions used by old community files
+        // and the specified Short form take the production bounded path.
+        for short_dimensions in [false, true] {
+            if short_dimensions {
+                root.insert("Width", NbtTag::Short(285));
+                root.insert("Height", NbtTag::Short(1));
+                root.insert("Length", NbtTag::Short(1));
+            }
+            let bytes = encode_classic(&root);
+            let (format, schematic) = manager
+                .lock()
+                .unwrap()
+                .read_bounded_with_format(&bytes, &limits)
+                .unwrap();
+            assert_eq!(format, "classic_schematic");
+            assert_eq!(schematic.get_dimensions(), (285, 1, 1));
+            let head = schematic.get_block(284, 0, 0).unwrap();
+            assert_eq!(head.name, "minecraft:piston_head");
+            assert_eq!(head.get_property("facing").map(|s| s.as_str()), Some("south"));
+            assert_eq!(head.get_property("type").map(|s| s.as_str()), Some("sticky"));
+            assert_eq!(head.get_property("short").map(|s| s.as_str()), Some("false"));
+        }
+    }
+
+    #[test]
+    fn classic_integer_dimensions_still_validate_types_positivity_and_limits() {
+        let default_limits = crate::formats::limits::DecodeLimits::default();
+        for dimension in [
+            NbtTag::Int(0),
+            NbtTag::Int(-1),
+            NbtTag::Int(i32::MAX),
+            NbtTag::Long(285),
+            NbtTag::String("285".into()),
+        ] {
+            let mut root = integer_dimension_fixture();
+            root.insert("Width", dimension);
+            assert!(from_classic_schematic_bounded(&encode_classic(&root), &default_limits).is_err());
+        }
+
+        let bytes = encode_classic(&integer_dimension_fixture());
+        for limits in [
+            crate::formats::limits::DecodeLimits {
+                max_dimension: 284,
+                ..default_limits.clone()
+            },
+            crate::formats::limits::DecodeLimits {
+                max_volume: 284,
+                ..default_limits
+            },
+        ] {
+            let error = from_classic_schematic_bounded(&bytes, &limits)
+                .err()
+                .expect("dimension and volume limits must still apply");
+            assert!(error.to_string().contains("limit exceeded"));
+        }
+    }
+
+    #[test]
+    fn classic_piston_states_match_java_flattening_for_all_valid_metadata() {
+        // Independent table extracted from Java's flattening converter, not
+        // generated by the importer. Covers all 36 valid base/head states.
+        for id in [29_u16, 33, 34] {
+            for facing in 0..=5_u8 {
+                for flag in [0, 8] {
+                    let meta = facing | flag;
+                    let expected = crate::dataconverter::flattening::get_nbt_for_id(
+                        (i32::from(id) << 4) | i32::from(meta),
+                    );
+                    let mut expected = BlockState::from_nbt(&expected.to_quartz_nbt()).unwrap();
+                    let mut actual = legacy_to_block_state(id, meta);
+                    // Property insertion order is not part of a block state's
+                    // meaning. Sorting retains every pair and duplicate while
+                    // comparing the complete name, property set and values.
+                    actual.properties.sort();
+                    expected.properties.sort();
+                    assert_eq!(actual, expected, "id={id}, meta={meta}");
+                }
+            }
+        }
+    }
 
     #[test]
     fn detects_sponge_as_not_classic() {

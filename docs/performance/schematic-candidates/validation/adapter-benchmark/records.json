@@ -1,0 +1,506 @@
+[
+  {
+    "round": 0,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 135649668,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 0,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 199766656,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 0,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 151925211,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 1,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 129784790,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 1,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 201080573,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 1,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 174658180,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 2,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 129348951,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 2,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 203789838,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 2,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 178457030,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 3,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 208086733,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 3,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 152768371,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 3,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 134002342,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 4,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 154196274,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 4,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 223487117,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 4,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 142278599,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 5,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 155279085,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 5,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 201097610,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 5,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 129096065,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 6,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 147243575,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 6,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 136353485,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 6,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 202499848,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 7,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 152068725,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 7,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 198100839,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 7,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 133266979,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 8,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 154386794,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 8,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 134455954,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 8,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 208060820,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 9,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 207813660,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 9,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 150541729,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 9,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 129224348,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 10,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 127891626,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 10,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 149571184,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 10,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 204979358,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 11,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 131293977,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 11,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 203584040,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 11,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 145446743,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 12,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 199803793,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 12,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 128461695,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 12,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 147056430,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 13,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 130257898,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 13,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 198104229,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 13,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 140056778,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 14,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 148384640,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 14,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 196132802,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 14,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 127985779,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 15,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 198083825,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 15,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 148674149,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 15,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 127968997,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 16,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 126832622,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 16,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 145714206,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 16,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 195853200,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 17,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 201049596,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 17,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 157114775,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 17,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 134063597,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 18,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 204275858,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 18,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 128929708,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 18,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 147880169,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 19,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 205122158,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  },
+  {
+    "round": 19,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 133311319,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 19,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 148254724,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 20,
+    "case": "othercomb017",
+    "iterations": 71,
+    "elapsed_ns": 140459382,
+    "vectors_per_iteration": 40,
+    "ticks_per_iteration": 960
+  },
+  {
+    "round": 20,
+    "case": "plot-lamp2x2",
+    "iterations": 1000,
+    "elapsed_ns": 126490755,
+    "vectors_per_iteration": 4,
+    "ticks_per_iteration": 640
+  },
+  {
+    "round": 20,
+    "case": "add005",
+    "iterations": 1,
+    "elapsed_ns": 196318736,
+    "vectors_per_iteration": 328,
+    "ticks_per_iteration": 10496
+  }
+]

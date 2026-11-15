@@ -1,0 +1,10 @@
+{
+  "source": "next-pgo-annotated.txt",
+  "annotation_coverage": "99% threshold; totals below are lower bounds",
+  "instructions": {
+    "wire_neighbour_callback": 360720062,
+    "update_drain": 133419497,
+    "wire_connections": 22289168,
+    "malloc_free": 35192007
+  }
+}
