@@ -434,7 +434,17 @@ pub mod io {
             .map_err(|error| Error::other(error.to_string()))?;
         buf.resize(len, 0);
         r.read_exact(&mut buf)?;
-        String::from_utf8(buf).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+        match String::from_utf8(buf) {
+            Ok(value) => Ok(value),
+            // Java NBT uses modified UTF-8: supplementary characters are
+            // encoded as UTF-16 surrogate pairs and NUL as C0 80. Retain the
+            // UTF-8 fast path for existing files written by non-Java tools.
+            // Bedrock's little-endian NBT continues to require plain UTF-8.
+            Err(error) if endian == Endian::Big => cesu8::from_java_cesu8(error.as_bytes())
+                .map(|value| value.into_owned())
+                .map_err(|error| Error::new(ErrorKind::InvalidData, error)),
+            Err(error) => Err(Error::new(ErrorKind::InvalidData, error)),
+        }
     }
 
     /// Read `len` elements of `width` bytes in one `read_exact`.
@@ -729,7 +739,115 @@ mod snbt_roundtrip_tests {
 #[cfg(test)]
 mod bounded_nbt_tests {
     use super::io::{read_nbt_with_limits, NbtReadLimits};
-    use super::Endian;
+    use super::{Endian, NbtMap, NbtValue};
+
+    // Build independent wire fixtures rather than relying on our writer to
+    // generate the encoding that the reader is meant to accept.
+    fn append_string(bytes: &mut Vec<u8>, encoded: &[u8], endian: Endian) {
+        let len = u16::try_from(encoded.len()).unwrap();
+        bytes.extend_from_slice(&match endian {
+            Endian::Big => len.to_be_bytes(),
+            Endian::Little => len.to_le_bytes(),
+        });
+        bytes.extend_from_slice(encoded);
+    }
+
+    fn string_fixture(encoded: &[u8], endian: Endian) -> Vec<u8> {
+        let mut bytes = vec![10, 0, 0, 8]; // Root compound, empty name, string.
+        append_string(&mut bytes, b"s", endian);
+        append_string(&mut bytes, encoded, endian);
+        bytes.push(0);
+        bytes
+    }
+
+    #[test]
+    fn java_modified_utf8_preserves_nested_names_emoji_and_nul() {
+        // U+1F34C, exactly the surrogate-pair encoding encountered in a
+        // Litematica plot's signs. Java writes six bytes instead of four.
+        let banana = [0xed, 0xa0, 0xbc, 0xed, 0xbd, 0x8c];
+        let mut bytes = vec![10];
+        append_string(&mut bytes, &banana, Endian::Big); // Root name.
+        bytes.push(10);
+        append_string(&mut bytes, &banana, Endian::Big); // Compound name.
+        bytes.push(8);
+        append_string(&mut bytes, &banana, Endian::Big); // String name.
+        let mut value = banana.repeat(2);
+        value.extend_from_slice(&[0xc0, 0x80]);
+        append_string(&mut bytes, &value, Endian::Big);
+        bytes.extend_from_slice(&[0, 0]);
+
+        let mut nested = NbtMap::new();
+        nested.insert(
+            "\u{1f34c}".into(),
+            NbtValue::String("\u{1f34c}\u{1f34c}\0".into()),
+        );
+        let mut expected = NbtMap::new();
+        expected.insert("\u{1f34c}".into(), NbtValue::Compound(nested));
+        assert_eq!(
+            read_nbt_with_limits(&mut bytes.as_slice(), Endian::Big, NbtReadLimits::default())
+                .unwrap(),
+            NbtValue::Compound(expected)
+        );
+    }
+
+    #[test]
+    fn java_modified_utf8_keeps_standard_utf8_compatible_in_both_endians() {
+        let value = "ASCII \u{e9}\u{65e5}\u{1f34c}\0";
+        let mut expected = NbtMap::new();
+        expected.insert("s".into(), NbtValue::String(value.into()));
+        for endian in [Endian::Big, Endian::Little] {
+            let bytes = string_fixture(value.as_bytes(), endian);
+            assert_eq!(
+                read_nbt_with_limits(&mut bytes.as_slice(), endian, NbtReadLimits::default())
+                    .unwrap(),
+                NbtValue::Compound(expected.clone())
+            );
+        }
+    }
+
+    #[test]
+    fn java_modified_utf8_rejects_malformed_sequences() {
+        for encoded in [
+            &[0xed, 0xa0, 0xbc][..], // High surrogate without its low surrogate.
+            &[0xed, 0xbd, 0x8c][..], // Low surrogate alone.
+            &[0xed, 0xa0, 0xbc, 0xed, 0xa0, 0xbc][..], // Two high surrogates.
+            &[0xc0, 0x81][..], // Overlong encoding other than modified NUL.
+            &[0xff][..],
+        ] {
+            let bytes = string_fixture(encoded, Endian::Big);
+            let error = read_nbt_with_limits(
+                &mut bytes.as_slice(),
+                Endian::Big,
+                NbtReadLimits::default(),
+            )
+            .unwrap_err();
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+        }
+    }
+
+    #[test]
+    fn java_modified_utf8_does_not_relax_bedrock_or_string_byte_limits() {
+        for encoded in [
+            &[0xed, 0xa0, 0xbc, 0xed, 0xbd, 0x8c][..],
+            &[0xc0, 0x80][..],
+        ] {
+            let bytes = string_fixture(encoded, Endian::Little);
+            let error = read_nbt_with_limits(
+                &mut bytes.as_slice(),
+                Endian::Little,
+                NbtReadLimits::default(),
+            )
+            .unwrap_err();
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+        }
+        let bytes = string_fixture(&[0xed, 0xa0, 0xbc, 0xed, 0xbd, 0x8c], Endian::Big);
+        let limits = NbtReadLimits {
+            max_string_bytes: 5,
+            ..NbtReadLimits::default()
+        };
+        let error = read_nbt_with_limits(&mut bytes.as_slice(), Endian::Big, limits).unwrap_err();
+        assert!(error.to_string().contains("NBT string limit exceeded"));
+    }
 
     #[test]
     fn negative_collection_length_is_rejected_before_allocation() {
