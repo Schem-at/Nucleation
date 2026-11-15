@@ -5,6 +5,16 @@ edition = "2021"
 description = "Vanilla-accurate Minecraft tick simulation: deterministic, steppable, checkpointable"
 license = "MIT"
 
+# Independently selectable research candidates. No candidate changes the
+# reference build unless explicitly enabled; see docs/performance/execution-plans.
+[features]
+experiment-directional = []
+experiment-cursor = []
+experiment-update-pool = []
+experiment-wire-dispatch = []
+experiment-wire-plan = []
+experiment-wire-certificate = ["experiment-wire-plan"]
+
 # Dependencies are deliberately near-zero. This crate's reason to exist is a fast
 # edit->test loop, and every dependency added here is paid on every iteration for
 # the life of the project. Adding one is a decision, not a convenience.
