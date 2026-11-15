@@ -1,0 +1,51 @@
+{
+  "adapter": "plot-lamp2x2",
+  "benchmark": {
+    "clock": "elapsed_monotonic",
+    "excludes": "load, setup, checkpoint restore, assertions, destruction, rendering, export",
+    "includes": "typed drive, real simulation ticks, named output reads and result collection",
+    "iterations": 1,
+    "samples_ns": [],
+    "warmups": 0
+  },
+  "coordinates": "production export bounding-box-relative; explicit hash_origin preserves world-dependent order",
+  "hash_origin": [
+    163,
+    53,
+    2
+  ],
+  "observations": [
+    {
+      "air_mask": 0
+    },
+    {
+      "air_mask": 15
+    },
+    {
+      "air_mask": 0
+    },
+    {
+      "air_mask": 15
+    }
+  ],
+  "oracle": "Two close/open cycles, independently checked against vanilla 1.21.11. Every aperture air bit is asserted; the full closed material and trace are separate oracle evidence.",
+  "output_assertions_per_run": 4,
+  "profile_sha256": "9a3b6e08304b56e18f36e773885bca315016d3708315bfcb00d54c75089acb26",
+  "random_tick_speed": 0,
+  "recording": "disabled",
+  "reset_replay": "exact_checkpoint_and_outputs",
+  "response_game_ticks": 160,
+  "rng_seed": 0,
+  "runner_sha256": "f40b4c192856dd7d07b35cd917b725252a3ab08b0f8dc26312e1820e5691cab9",
+  "schema_version": 1,
+  "scope": "engine endpoint functionality under this fixed protocol; not a vanilla comparison or minimal latency proof",
+  "setup_game_ticks": 20,
+  "source_data_version": 4671,
+  "source_file": "part0556.litematic",
+  "source_sha256": "a60cc8eb5d752db2dc2366f7dea3d15c2a7be34cb8811c74645695faef088642",
+  "status": "functional_pass",
+  "suite_sha256": "a3248bfb8db038b36e76c17b10eb79fa52164d7f5a6ed746e845d62037db5253",
+  "ticks_per_iteration": 640,
+  "vectors": 4,
+  "process_returncode": 0
+}

@@ -70,6 +70,8 @@ pub mod scripting;
 #[cfg(feature = "simulation")]
 pub mod simulation;
 #[cfg(feature = "mc-tick")]
+pub mod tick_adapter;
+#[cfg(feature = "mc-tick")]
 pub mod tick_timeline;
 #[cfg(feature = "voxelize")]
 pub mod voxelize;

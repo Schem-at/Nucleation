@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "id": "plot-lamp2x2",
+  "source_sha256": "a60cc8eb5d752db2dc2366f7dea3d15c2a7be34cb8811c74645695faef088642",
+  "source_data_version": 4671,
+  "description": "World Record Plot lamp-panel 2x2 door",
+  "evidence": [
+    "Vanilla 1.21.11: four lever pulls and two complete cycles, stable endpoints, exact returns; unchanged idle control. Native matches all661frames of each capture.",
+    "Main lever false opens, true closes. Leave the two powered side levers unchanged.",
+    "air_mask is LSB first over (x2,y1),(x3,y1),(x2,y2),(x3,y2), all at z1. 15 means fully open; 0 means no air in aperture. Full closed lamp material checked separately in the vanilla oracle.",
+    "Original source coordinates retained by hash_origin; no saved inventory repair."
+  ],
+  "cell": {
+    "name": "plot-lamp2x2",
+    "version": "1",
+    "io": {
+      "inputs": {
+        "closed": {
+          "io_type": "Boolean",
+          "layout": "OneToOne",
+          "positions": [
+            [
+              3,
+              3,
+              0
+            ]
+          ]
+        }
+      },
+      "outputs": {
+        "air_mask": {
+          "io_type": {
+            "UnsignedInt": {
+              "bits": 4
+            }
+          },
+          "layout": "OneToOne",
+          "positions": [
+            [
+              2,
+              1,
+              1
+            ],
+            [
+              3,
+              1,
+              1
+            ],
+            [
+              2,
+              2,
+              1
+            ],
+            [
+              3,
+              2,
+              1
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "input_order": [
+    "closed"
+  ],
+  "outputs": {
+    "air_mask": "air"
+  },
+  "setup_ticks": 20,
+  "response_ticks": 160,
+  "require_quiescent": true,
+  "rng_seed": 0,
+  "hash_origin": [
+    163,
+    53,
+    2
+  ]
+}

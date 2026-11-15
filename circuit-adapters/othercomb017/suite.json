@@ -1,0 +1,447 @@
+{
+  "schema_version": 1,
+  "adapter": "othercomb017",
+  "oracle": "Independent Python integer ==, <, >; 40 fixed phase endpoints, not exhaustive.",
+  "vectors": [
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 0
+      },
+      "expected": {
+        "equal": false,
+        "less": false,
+        "greater": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 255,
+        "b": 255
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 255
+      },
+      "expected": {
+        "equal": false,
+        "less": true,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 0
+      },
+      "expected": {
+        "equal": false,
+        "less": false,
+        "greater": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 1
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 1
+      },
+      "expected": {
+        "equal": false,
+        "less": true,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 0
+      },
+      "expected": {
+        "equal": false,
+        "less": false,
+        "greater": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 2,
+        "b": 2
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 2
+      },
+      "expected": {
+        "equal": false,
+        "less": true,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 0
+      },
+      "expected": {
+        "equal": false,
+        "less": false,
+        "greater": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 4,
+        "b": 4
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 4
+      },
+      "expected": {
+        "equal": false,
+        "less": true,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 0
+      },
+      "expected": {
+        "equal": false,
+        "less": false,
+        "greater": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 8,
+        "b": 8
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 8
+      },
+      "expected": {
+        "equal": false,
+        "less": true,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 0
+      },
+      "expected": {
+        "equal": false,
+        "less": false,
+        "greater": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 16,
+        "b": 16
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 16
+      },
+      "expected": {
+        "equal": false,
+        "less": true,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 0
+      },
+      "expected": {
+        "equal": false,
+        "less": false,
+        "greater": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 32,
+        "b": 32
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 32
+      },
+      "expected": {
+        "equal": false,
+        "less": true,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 0
+      },
+      "expected": {
+        "equal": false,
+        "less": false,
+        "greater": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 64,
+        "b": 64
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 64
+      },
+      "expected": {
+        "equal": false,
+        "less": true,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 0
+      },
+      "expected": {
+        "equal": false,
+        "less": false,
+        "greater": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 128
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 128
+      },
+      "expected": {
+        "equal": false,
+        "less": true,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 1,
+        "b": 128
+      },
+      "expected": {
+        "equal": false,
+        "less": true,
+        "greater": false
+      }
+    },
+    {
+      "inputs": {
+        "a": 128,
+        "b": 1
+      },
+      "expected": {
+        "equal": false,
+        "less": false,
+        "greater": true
+      }
+    },
+    {
+      "inputs": {
+        "a": 0,
+        "b": 0
+      },
+      "expected": {
+        "equal": true,
+        "less": false,
+        "greater": false
+      }
+    }
+  ]
+}

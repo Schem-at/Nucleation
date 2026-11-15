@@ -1,0 +1,239 @@
+{
+  "adapter": "othercomb017",
+  "benchmark": {
+    "clock": "elapsed_monotonic",
+    "excludes": "load, setup, checkpoint restore, assertions, destruction, rendering, export",
+    "includes": "typed drive, real simulation ticks, named output reads and result collection",
+    "iterations": 1,
+    "samples_ns": [],
+    "warmups": 0
+  },
+  "coordinates": "production export bounding-box-relative; explicit hash_origin preserves world-dependent order",
+  "hash_origin": [
+    0,
+    100,
+    0
+  ],
+  "observations": [
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": true,
+      "less": false
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": false,
+      "less": true
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": true,
+      "less": false
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": false,
+      "less": true
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": true,
+      "less": false
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": false,
+      "less": true
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": true,
+      "less": false
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": false,
+      "less": true
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": true,
+      "less": false
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": false,
+      "less": true
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": true,
+      "less": false
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": false,
+      "less": true
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": true,
+      "less": false
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": false,
+      "less": true
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": true,
+      "less": false
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": false,
+      "less": true
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": true,
+      "less": false
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": false,
+      "less": true
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    },
+    {
+      "equal": false,
+      "greater": false,
+      "less": true
+    },
+    {
+      "equal": false,
+      "greater": true,
+      "less": false
+    },
+    {
+      "equal": true,
+      "greater": false,
+      "less": false
+    }
+  ],
+  "oracle": "Independent Python integer ==, <, >; 40 fixed phase endpoints, not exhaustive.",
+  "output_assertions_per_run": 120,
+  "profile_sha256": "dd89403c77a8ad9d64ce23a9776a7bf787a002f1943d98921f52ab3fa3833ce0",
+  "random_tick_speed": 0,
+  "recording": "disabled",
+  "reset_replay": "exact_checkpoint_and_outputs",
+  "response_game_ticks": 24,
+  "rng_seed": 0,
+  "runner_sha256": "f40b4c192856dd7d07b35cd917b725252a3ab08b0f8dc26312e1820e5691cab9",
+  "schema_version": 1,
+  "scope": "engine endpoint functionality under this fixed protocol; not a vanilla comparison or minimal latency proof",
+  "setup_game_ticks": 0,
+  "source_data_version": 4671,
+  "source_file": "OTHERCOMB017_8bit_binary_comparator.schem",
+  "source_sha256": "92d44580dc1539903b56ad08a8b1be89d70de602328d5fe36ef589743c3a3db3",
+  "status": "functional_pass",
+  "suite_sha256": "17c420ec45acaddcf6d962220d0348620e5a96e633f28c9de945476a1436362f",
+  "ticks_per_iteration": 960,
+  "vectors": 40,
+  "process_returncode": 0
+}

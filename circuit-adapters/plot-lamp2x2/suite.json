@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "adapter": "plot-lamp2x2",
+  "oracle": "Two close/open cycles, independently checked against vanilla 1.21.11. Every aperture air bit is asserted; the full closed material and trace are separate oracle evidence.",
+  "vectors": [
+    {
+      "inputs": {
+        "closed": true
+      },
+      "expected": {
+        "air_mask": 0
+      }
+    },
+    {
+      "inputs": {
+        "closed": false
+      },
+      "expected": {
+        "air_mask": 15
+      }
+    },
+    {
+      "inputs": {
+        "closed": true
+      },
+      "expected": {
+        "air_mask": 0
+      }
+    },
+    {
+      "inputs": {
+        "closed": false
+      },
+      "expected": {
+        "air_mask": 15
+      }
+    }
+  ]
+}
