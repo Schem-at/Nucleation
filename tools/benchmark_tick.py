@@ -19,6 +19,7 @@ assert a.rounds>0 and a.target_ms>0
 allowed=sorted(os.sched_getaffinity(0));cpu=a.cpu if a.cpu is not None else allowed[0]
 assert cpu in allowed
 assert all(mode in ('off','on') for mode in modes.values()),'Shadow instrumentation is forbidden in timings'
+assert os.environ.get('MC_TICK_WIRE_PLAN', 'on') != 'shadow', 'Shadow recomputation is forbidden in timings'
 for key in os.environ:
     assert not key.startswith('MC_TICK_TRACE_') and key!='MC_TICK_DEBUG_COMPARATOR','Diagnostics must be off'
 

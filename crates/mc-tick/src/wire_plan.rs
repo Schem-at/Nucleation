@@ -115,6 +115,9 @@ struct Counts {
     value_dirties: u64,
     certificate_hits: u64,
     resets: u64,
+    classify_structural: u64,
+    classify_wire_value: u64,
+    classify_irrelevant: u64,
 }
 
 /// Scratch derived data: cloning rules starts empty and Debug never exposes
@@ -173,6 +176,12 @@ impl State {
         };
         for (changed, from, to) in changes {
             let kind = classify(from, to);
+            #[cfg(feature = "experiment-wire-plan-counters")]
+            match kind {
+                Transition::Structural => self.counts.classify_structural += 1,
+                Transition::WireValue => self.counts.classify_wire_value += 1,
+                Transition::Irrelevant => self.counts.classify_irrelevant += 1,
+            }
             if kind == Transition::Irrelevant { continue; }
             #[cfg(not(feature = "experiment-wire-certificate"))]
             if kind == Transition::WireValue { continue; }
@@ -355,5 +364,58 @@ mod tests {
         outputs.clear();
         assert_eq!(query(&world, &outputs), 7);
         assert_eq!(reads.get(), 4);
+    }
+
+    #[test]
+    fn shared_cache_is_correct_across_interleaved_and_concurrent_worlds() {
+        use std::sync::{Barrier, atomic::{AtomicUsize, Ordering}};
+        let cache = Cache::default();
+        let builds = AtomicUsize::new(0);
+        let pos = Pos::new(0, 0, 0);
+        let source = Pos::new(1, 0, 0);
+        let comparator = Pos::new(0, 1, 0);
+        let bounds = Bounds::new(Pos::new(-3, -3, -3), Pos::new(3, 3, 3));
+        let mut first = World::new(bounds);
+        first.set(source, StateId(9));
+        let mut second = first.clone();
+        second.set(source, StateId(3));
+        let first_outputs = [(comparator, 5)].into_iter().collect();
+        let second_outputs = [(comparator, 12)].into_iter().collect();
+        // The same immutable rule interpretation/cache serves both worlds;
+        // overlapping positions and StateIds must not share validity.
+        let query = |world: &World, outputs: &ComparatorOutputs| {
+            cache.query(world, outputs, pos, |_, _| Transition::Structural,
+                || {
+                    builds.fetch_add(1, Ordering::Relaxed);
+                    let mut plan = InputPlan { wire_inputs: vec![source], ..InputPlan::default() };
+                    plan.add_comparator(0, comparator);
+                    plan
+                }, |p| world.get(p).raw() as u8)
+        };
+        for _ in 0..8 {
+            assert_eq!(query(&first, &first_outputs), 8);
+            assert_eq!(query(&second, &second_outputs), 12);
+        }
+        // This also documents the bounded single-world cache's tradeoff:
+        // alternating worlds rebuild on every query, even without mutations.
+        assert_eq!(builds.load(Ordering::Relaxed), 16);
+        for _ in 0..16 { assert_eq!(query(&first, &first_outputs), 8); }
+        assert_eq!(builds.load(Ordering::Relaxed), 17);
+
+        let barrier = Barrier::new(2);
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                barrier.wait();
+                for _ in 0..64 {
+                    assert_eq!(query(&first, &first_outputs), 8);
+                }
+            });
+            scope.spawn(|| {
+                barrier.wait();
+                for _ in 0..64 {
+                    assert_eq!(query(&second, &second_outputs), 12);
+                }
+            });
+        });
     }
 }

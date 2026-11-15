@@ -369,6 +369,34 @@ mod wire_plan_tests {
     }
 
     #[test]
+    fn eager_plan_discovery_falls_back_before_signed_coordinate_overflow() {
+        let rules = rules();
+        let outputs = ComparatorOutputs::new();
+        for x in [i32::MIN, i32::MAX] {
+            let pos = Pos::new(x, 0, 0);
+            let bounds = Bounds::new(
+                Pos::new(x.saturating_sub(3), -3, -3),
+                Pos::new(x.saturating_add(3), 3, 3));
+            let mut world = World::new(bounds);
+            world.set(pos.offset(Dir::Down), StateId(302));
+            assert_eq!(rules.reference_wire_target(&world, &outputs, pos), 15);
+            assert_eq!(rules.planned_wire_target(&world, &outputs, pos, Mode::Shadow), None);
+            let mut sim = crate::Simulation::new(bounds);
+            sim.registry_and_world_mut().1.set(pos, StateId(16));
+            sim.registry_and_world_mut().1.set(pos.offset(Dir::Down), StateId(302));
+            sim.behaviours_mut().register(StateId(16), Box::new(crate::wire::Wire {
+                power_level: 15, rules: Arc::new(rules.clone()),
+            }));
+            sim.record_updates(true);
+            let before = sim.world().clone();
+            let source = Pos::new(if x == i32::MIN { x + 1 } else { x - 1 }, 0, 0);
+            sim.notify_neighbors(source);
+            assert_eq!(sim.world(), &before);
+            assert_eq!(sim.recorded_updates().len(), 6);
+        }
+    }
+
+    #[test]
     fn writes_inside_a_tick_change_wire_values_conduction_and_diagonal_paths() {
         let rules = rules();
         let pos = Pos::new(-1, 0, -1);
@@ -541,6 +569,14 @@ impl VanillaRules {
     ) -> Option<u8> {
         use crate::wire_plan::Mode;
         if mode == Mode::Off { return None; }
+        // The compiled plan discovers all radius-two inputs eagerly, whereas
+        // the reference may return on an earlier exact-15 contribution. Do not
+        // introduce coordinate overflow on a path the reference never visits.
+        if [pos.x, pos.y, pos.z].into_iter().any(|v| {
+            !(i32::MIN + 2..=i32::MAX - 2).contains(&v)
+        }) {
+            return None;
+        }
         let result = self.plan_cache.query(world, outputs, pos,
             |from, to| self.wire_plan_transition(from, to),
             || self.build_wire_plan(world, pos),

@@ -28,8 +28,11 @@ def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 def run(args, log, extra=None):
     print('Running', ' '.join(args), flush=True)
     with (a.output / log).open('w') as f:
-        subprocess.run(args, cwd=root, env=env | (extra or {}), stdout=f,
-                       stderr=subprocess.STDOUT, check=True)
+        if log.endswith('.jsonl'):
+            with (a.output / (log + '.stderr')).open('w') as err:
+                subprocess.run(args, cwd=root, env=env | (extra or {}), stdout=f, stderr=err, check=True)
+        else:
+            subprocess.run(args, cwd=root, env=env | (extra or {}), stdout=f, stderr=subprocess.STDOUT, check=True)
 sources = {str(f.relative_to(root)):sha(f) for f in sorted((root/'crates/mc-tick/src').rglob('*.rs'))}
 for f in ['Cargo.lock','crates/mc-tick/Cargo.toml','crates/mc-tick/examples/bench_circuits.rs']:
     sources[f] = sha(root/f)
