@@ -55,6 +55,10 @@ pub mod timeline;
 pub mod vanilla;
 pub mod wire;
 pub mod world;
+#[cfg(feature = "experiment-wire-plan")]
+mod world_journal;
+#[cfg(feature = "experiment-wire-plan")]
+mod wire_plan;
 
 pub use behaviour::{BehaviourTable, BlockBehaviour, Inert, TickCtx, UpdateKind, UpdateRecord};
 pub use components::{

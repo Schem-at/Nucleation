@@ -2694,6 +2694,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -2746,6 +2748,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -2802,6 +2806,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -2856,6 +2862,8 @@ mod tests {
         };
         let pos = Pos::new(0, 1, 0);
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -2910,6 +2918,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -2965,6 +2975,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3045,6 +3057,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3108,6 +3122,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3163,6 +3179,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3295,6 +3313,8 @@ mod tests {
         }
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3350,6 +3370,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3407,6 +3429,8 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3512,6 +3536,8 @@ mod tests {
         stored.insert(pos, 15u8);
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3556,6 +3582,8 @@ mod tests {
         stored.insert(pos, 15u8);
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3602,6 +3630,8 @@ mod tests {
         let mut stored = std::collections::HashMap::new();
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -3653,6 +3683,8 @@ mod tests {
         let mut stored = std::collections::HashMap::new();
 
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,

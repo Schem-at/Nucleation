@@ -27,7 +27,7 @@ pub const DEFAULT_GROWTH_LIMIT: u64 = 32_000_000;
 const GROWTH_STEP: i32 = 16;
 
 /// The simulated region's blocks.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct World {
     bounds: Bounds,
     states: Vec<StateId>,
@@ -35,6 +35,36 @@ pub struct World {
     layer_stride: usize,
     /// Ceiling on [`World::grow_to_include`]; see [`DEFAULT_GROWTH_LIMIT`].
     growth_limit: u64,
+    #[cfg(feature = "experiment-wire-plan")]
+    plan_journal: crate::world_journal::MutationJournal,
+}
+
+// Optimization bookkeeping is deliberately absent from semantic/debug snapshots.
+impl std::fmt::Debug for World {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("World").field("bounds", &self.bounds).field("states", &self.states)
+            .field("size", &self.size).field("layer_stride", &self.layer_stride)
+            .field("growth_limit", &self.growth_limit).finish()
+    }
+}
+
+#[cfg(feature = "experiment-cursor")]
+pub(crate) struct LocalReadCursor<'a> {
+    states: &'a [StateId],
+    base: usize,
+    row: isize,
+    layer: isize,
+}
+
+#[cfg(feature = "experiment-cursor")]
+impl LocalReadCursor<'_> {
+    /// Offsets are restricted to the radius-two cube proven interior at creation.
+    #[inline]
+    pub(crate) fn get(&self, offset: [i32; 3]) -> StateId {
+        assert!(offset.into_iter().all(|v| (-2..=2).contains(&v)));
+        let delta = offset[0] as isize + offset[1] as isize * self.layer + offset[2] as isize * self.row;
+        self.states[self.base.wrapping_add_signed(delta)]
+    }
 }
 
 impl World {
@@ -48,6 +78,8 @@ impl World {
             bounds,
             states: vec![StateId::AIR; bounds.volume() as usize],
             growth_limit: DEFAULT_GROWTH_LIMIT,
+            #[cfg(feature = "experiment-wire-plan")]
+            plan_journal: Default::default(),
         }
     }
 
@@ -118,6 +150,8 @@ impl World {
         self.layer_stride = self.size[0] as usize * self.size[2] as usize;
         self.bounds = grown;
         self.states = states;
+        #[cfg(feature = "experiment-wire-plan")]
+        self.plan_journal.reset();
         true
     }
 
@@ -130,6 +164,34 @@ impl World {
             return None;
         }
         Some(y as usize * self.layer_stride + z as usize * self.size[0] as usize + x as usize)
+    }
+
+    #[cfg(feature = "experiment-wire-plan")]
+    pub(crate) fn plan_identity(&self) -> &std::sync::Arc<()> { self.plan_journal.identity() }
+
+    #[cfg(feature = "experiment-wire-plan")]
+    pub(crate) fn plan_revision(&self) -> u64 { self.plan_journal.revision() }
+
+    #[cfg(feature = "experiment-wire-plan")]
+    pub(crate) fn plan_changes_since(&self, revision: u64)
+        -> Option<impl Iterator<Item = (Pos, StateId, StateId)> + '_>
+    { self.plan_journal.changes_since(revision) }
+
+    /// A borrow-scoped address calculation; no derived power or state is cached.
+    #[cfg(feature = "experiment-cursor")]
+    #[inline]
+    pub(crate) fn local_reader(&self, pos: Pos) -> Option<LocalReadCursor<'_>> {
+        let x = pos.x.wrapping_sub(self.bounds.min.x) as u32;
+        let y = pos.y.wrapping_sub(self.bounds.min.y) as u32;
+        let z = pos.z.wrapping_sub(self.bounds.min.z) as u32;
+        if x.wrapping_sub(2) < self.size[0].saturating_sub(4)
+            && y.wrapping_sub(2) < self.size[1].saturating_sub(4)
+            && z.wrapping_sub(2) < self.size[2].saturating_sub(4)
+        {
+            Some(LocalReadCursor { states: &self.states,
+                base: y as usize * self.layer_stride + z as usize * self.size[0] as usize + x as usize,
+                row: self.size[0] as isize, layer: self.layer_stride as isize })
+        } else { None }
     }
 
     /// The region this world covers.
@@ -211,6 +273,8 @@ impl World {
         let index = self.index(pos)?;
         let previous = self.states[index];
         self.states[index] = state;
+        #[cfg(feature = "experiment-wire-plan")]
+        if previous != state { self.plan_journal.record(pos, previous, state); }
         Some(previous)
     }
 
@@ -253,6 +317,49 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "experiment-cursor")]
+    #[test]
+    fn local_cursor_matches_reads_for_every_offset_and_growth() {
+        for origin in [Pos::new(-20, -30, -40), Pos::new(i32::MIN, 0, 0), Pos::new(i32::MAX - 8, 0, 0)] {
+            let mut world = World::new(Bounds::new(origin, Pos::new(origin.x + 8, origin.y + 8, origin.z + 8)));
+            for x in 0..9 { for y in 0..9 { for z in 0..9 {
+                world.set(Pos::new(origin.x + x, origin.y + y, origin.z + z), StateId((1 + x + y * 9 + z * 81) as u16));
+            } } }
+            for grown in [false, true] {
+                if grown { assert!(world.grow_to_include(Pos::new(origin.x, origin.y + 10, origin.z))); }
+                for x in 0..9 { for y in 0..9 { for z in 0..9 {
+                    let pos = Pos::new(origin.x + x, origin.y + y, origin.z + z);
+                    if let Some(cursor) = world.local_reader(pos) {
+                        for dx in -2..=2 { for dy in -2..=2 { for dz in -2..=2 {
+                            assert_eq!(cursor.get([dx, dy, dz]), world.get(Pos::new(pos.x + dx, pos.y + dy, pos.z + dz)));
+                        } } }
+                    } else if !grown { assert!(x < 2 || y < 2 || z < 2 || x > 6 || y > 6 || z > 6); }
+                } } }
+            }
+        }
+        let world = World::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(3, 3, 3)));
+        assert!(world.local_reader(Pos::new(2, 2, 2)).is_none());
+    }
+
+    #[cfg(feature = "experiment-wire-plan")]
+    #[test]
+    fn plan_journal_tracks_silent_writes_and_resets_on_clone_and_growth() {
+        let mut world = small();
+        let token = std::sync::Arc::clone(world.plan_identity());
+        let pos = Pos::new(1, 1, 1);
+        world.set(pos, StateId(7));
+        world.set(pos, StateId(7));
+        assert_eq!(world.plan_revision(), 1);
+        assert_eq!(world.plan_changes_since(0).unwrap().collect::<Vec<_>>(), vec![(pos, StateId::AIR, StateId(7))]);
+        let cloned = world.clone();
+        assert_eq!(world, cloned);
+        assert_eq!(format!("{world:?}"), format!("{cloned:?}"));
+        assert!(!std::sync::Arc::ptr_eq(cloned.plan_identity(), &token));
+        world.grow_to_include(Pos::new(-10, 1, 1));
+        assert!(!std::sync::Arc::ptr_eq(world.plan_identity(), &token));
+        assert_eq!(world.plan_revision(), 0);
+    }
 
     #[test]
     fn neighbour_batch_matches_individual_reads_at_borders_and_after_growth() {

@@ -14,6 +14,7 @@ experiment-update-pool = []
 experiment-wire-dispatch = []
 experiment-wire-plan = []
 experiment-wire-certificate = ["experiment-wire-plan"]
+experiment-wire-plan-counters = ["experiment-wire-plan"]
 
 # Dependencies are deliberately near-zero. This crate's reason to exist is a fast
 # edit->test loop, and every dependency added here is paid on every iteration for

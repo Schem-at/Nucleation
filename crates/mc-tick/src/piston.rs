@@ -1425,8 +1425,12 @@ mod tests {
         ticks: &'a mut TickQueue,
         events: &'a mut EventQueue,
         states: &'a StateRegistry,
+        #[cfg(feature = "experiment-update-pool")]
+        update_pool: &'a mut crate::behaviour::UpdatePool,
     ) -> TickCtx<'a> {
         TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool,
             drain: None,
             behaviours: None,
             world,
@@ -1474,6 +1478,11 @@ mod tests {
         w.set(pos.offset(Dir::Up), LEVER);
 
         let p = piston(false, false);
+        #[cfg(feature = "experiment-update-pool")]
+        let mut update_pool = crate::behaviour::UpdatePool::default();
+        #[cfg(feature = "experiment-update-pool")]
+        let mut ctx = run(&mut w, &mut t, &mut e, &s, &mut update_pool);
+        #[cfg(not(feature = "experiment-update-pool"))]
         let mut ctx = run(&mut w, &mut t, &mut e, &s);
         p.on_neighbor_changed(&mut ctx, pos, Dir::Up);
 
@@ -1503,6 +1512,8 @@ mod tests {
         let mut ctx_moves = Vec::new();
         {
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut crate::behaviour::UpdatePool::default(),
                 drain: None,
                 behaviours: None,
                 world: &mut w,
@@ -1635,6 +1646,8 @@ mod tests {
         let mut pulled = Vec::new();
         {
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut crate::behaviour::UpdatePool::default(),
                 drain: None,
                 behaviours: None,
                 world: &mut w,
@@ -1704,6 +1717,8 @@ mod tests {
         let mut pulled = Vec::new();
         {
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut crate::behaviour::UpdatePool::default(),
                 drain: None,
                 behaviours: None,
                 world: &mut w,
@@ -1770,6 +1785,8 @@ mod tests {
         let mut pulled = Vec::new();
         {
             let mut ctx = TickCtx {
+                #[cfg(feature = "experiment-update-pool")]
+                update_pool: &mut crate::behaviour::UpdatePool::default(),
                 drain: None,
                 behaviours: None,
                 world: &mut w,
@@ -1825,6 +1842,11 @@ mod tests {
         w.set(Pos::new(2, 1, 0), STONE);
 
         let p = piston(true, false);
+        #[cfg(feature = "experiment-update-pool")]
+        let mut update_pool = crate::behaviour::UpdatePool::default();
+        #[cfg(feature = "experiment-update-pool")]
+        let mut ctx = run(&mut w, &mut t, &mut e, &s, &mut update_pool);
+        #[cfg(not(feature = "experiment-update-pool"))]
         let mut ctx = run(&mut w, &mut t, &mut e, &s);
         p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0);
 
@@ -1842,6 +1864,11 @@ mod tests {
         w.set(pos, RETRACTED);
 
         let p = piston(false, false);
+        #[cfg(feature = "experiment-update-pool")]
+        let mut update_pool = crate::behaviour::UpdatePool::default();
+        #[cfg(feature = "experiment-update-pool")]
+        let mut ctx = run(&mut w, &mut t, &mut e, &s, &mut update_pool);
+        #[cfg(not(feature = "experiment-update-pool"))]
         let mut ctx = run(&mut w, &mut t, &mut e, &s);
         p.on_neighbor_changed(&mut ctx, pos, Dir::Up);
         assert!(e.is_empty(), "no power, no event");
@@ -2030,6 +2057,11 @@ mod tests {
         w.set(Pos::new(1, 2, 0), LEVER);
 
         let p = piston(false, false);
+        #[cfg(feature = "experiment-update-pool")]
+        let mut update_pool = crate::behaviour::UpdatePool::default();
+        #[cfg(feature = "experiment-update-pool")]
+        let mut ctx = run(&mut w, &mut t, &mut e, &s, &mut update_pool);
+        #[cfg(not(feature = "experiment-update-pool"))]
         let mut ctx = run(&mut w, &mut t, &mut e, &s);
         p.on_neighbor_changed(&mut ctx, pos, Dir::Up);
 
@@ -2049,6 +2081,11 @@ mod tests {
         w.set(Pos::new(1, 3, 0), LEVER);
 
         let p = piston(false, false);
+        #[cfg(feature = "experiment-update-pool")]
+        let mut update_pool = crate::behaviour::UpdatePool::default();
+        #[cfg(feature = "experiment-update-pool")]
+        let mut ctx = run(&mut w, &mut t, &mut e, &s, &mut update_pool);
+        #[cfg(not(feature = "experiment-update-pool"))]
         let mut ctx = run(&mut w, &mut t, &mut e, &s);
         p.on_neighbor_changed(&mut ctx, pos, Dir::Up);
 
@@ -2064,6 +2101,11 @@ mod tests {
         let mut e = EventQueue::new();
         let s = StateRegistry::new();
         let p = piston(false, false);
+        #[cfg(feature = "experiment-update-pool")]
+        let mut update_pool = crate::behaviour::UpdatePool::default();
+        #[cfg(feature = "experiment-update-pool")]
+        let mut ctx = run(&mut w, &mut t, &mut e, &s, &mut update_pool);
+        #[cfg(not(feature = "experiment-update-pool"))]
         let mut ctx = run(&mut w, &mut t, &mut e, &s);
         assert!(!p.on_block_event(&mut ctx, Pos::new(0, 1, 0), 9, 0));
     }

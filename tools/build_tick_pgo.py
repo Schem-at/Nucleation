@@ -10,6 +10,7 @@ p.add_argument('--output',type=pathlib.Path,required=True)
 p.add_argument('--target-dir',type=pathlib.Path,required=True)
 p.add_argument('--fixtures',type=pathlib.Path,required=True)
 p.add_argument('--jobs',type=int,default=4)
+p.add_argument('--features',default='',help='Comma-separated mc-tick candidate features; reference is empty')
 p.add_argument('--skip-native',action='store_true',help='Only rebuild PGO after a native-CPU pilot has been rejected')
 a=p.parse_args();a.output=a.output.resolve();a.output.mkdir(parents=True,exist_ok=False)
 raw=a.output/'raw';raw.mkdir()
@@ -23,7 +24,8 @@ env=os.environ.copy();env.pop('CARGO_ENCODED_RUSTFLAGS',None)
 env.update(CARGO_BUILD_JOBS=str(a.jobs),CARGO_TARGET_DIR=str(a.target_dir.resolve()),
     CARGO_PROFILE_RELEASE_OPT_LEVEL='3',CARGO_PROFILE_RELEASE_LTO='true',CARGO_PROFILE_RELEASE_DEBUG='1',
     MC_TICK_BENCH_FIXTURES=str(a.fixtures.resolve()))
-command=['cargo','build','--locked','--release','--target',host,'-p','mc-tick','--example','bench_circuits']
+command=['cargo','build','--locked','--release','--no-default-features','--target',host,'-p','mc-tick','--example','bench_circuits']
+if a.features: command += ['--features', a.features]
 exe=a.target_dir.resolve()/host/'release/examples/bench_circuits'
 manifest={'rustc':rustc,'head':capture('git','rev-parse','HEAD'),
     'diff_sha256':hashlib.sha256(subprocess.check_output(['git','diff','HEAD'],cwd=root)).hexdigest(),

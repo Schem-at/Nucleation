@@ -115,6 +115,86 @@ pub struct UpdateEntry {
     cursor: usize,
 }
 
+/// Bounded scratch storage for eagerly materialized notification batches.
+///
+/// This belongs to the simulation, not a checkpoint or a drain invocation.
+/// Entries keep owning their vectors while suspended below nested batches.
+#[cfg(feature = "experiment-update-pool")]
+#[derive(Default)]
+pub struct UpdatePool {
+    singles: Vec<Vec<(Pos, Dir, UpdateKind)>>,
+    sixes: Vec<Vec<(Pos, Dir, UpdateKind)>>,
+}
+
+#[cfg(feature = "experiment-update-pool")]
+impl std::fmt::Debug for UpdatePool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Scratch occupancy and allocation capacity are not simulation state.
+        f.write_str("UpdatePool")
+    }
+}
+
+#[cfg(feature = "experiment-update-pool")]
+impl UpdatePool {
+    const MAX_PER_CLASS: usize = 1024;
+
+    #[cfg(test)]
+    pub(crate) fn retained_buffers(&self) -> usize {
+        self.singles.len() + self.sixes.len()
+    }
+
+    fn entry(
+        &mut self,
+        capacity: usize,
+        items: impl IntoIterator<Item = (Pos, Dir, UpdateKind)>,
+    ) -> UpdateEntry {
+        let mut buffer = match capacity {
+            1 => self.singles.pop(),
+            6 => self.sixes.pop(),
+            _ => None,
+        }.unwrap_or_else(|| Vec::with_capacity(capacity));
+        buffer.extend(items);
+        UpdateEntry::new(buffer)
+    }
+
+    pub(crate) fn recycle(&mut self, entry: UpdateEntry) {
+        let mut items = entry.items;
+        // Large/custom buffers are released; only these exact capacities are
+        // retained, so both vector counts and retained payload bytes are bounded.
+        let class = match items.capacity() {
+            1 => &mut self.singles,
+            6 => &mut self.sixes,
+            _ => return,
+        };
+        if class.len() < Self::MAX_PER_CLASS {
+            items.clear();
+            class.push(items);
+        }
+    }
+
+    pub(crate) fn neighbors_at(&mut self, pos: Pos) -> UpdateEntry {
+        trace_update("neighbors_at", pos);
+        self.entry(6, crate::pos::UPDATE_ORDER.into_iter()
+            .map(|dir| (pos.offset(dir), dir.opposite(), UpdateKind::Neighbor)))
+    }
+
+    pub(crate) fn neighbor_shapes(&mut self, pos: Pos) -> UpdateEntry {
+        for dir in crate::pos::UPDATE_SHAPE_ORDER {
+            trace_update("shape", pos.offset(dir));
+        }
+        self.entry(6, crate::pos::UPDATE_SHAPE_ORDER.into_iter()
+            .map(|dir| (pos.offset(dir), dir.opposite(), UpdateKind::Shape)))
+    }
+
+    pub(crate) fn own_shapes(&mut self, pos: Pos) -> UpdateEntry {
+        for _ in crate::pos::UPDATE_SHAPE_ORDER {
+            trace_update("shape", pos);
+        }
+        self.entry(6, crate::pos::UPDATE_SHAPE_ORDER.into_iter()
+            .map(|dir| (pos, dir, UpdateKind::Shape)))
+    }
+}
+
 /// `MC_TICK_TRACE_UPDATES=1` — every neighbour update the engine asks for.
 ///
 /// Logged where the update is *requested*, which is where the game logs its
@@ -423,6 +503,10 @@ pub struct TickCtx<'a> {
     /// each single notification, which is what makes cascades depth-first in
     /// call order without any re-entrant dispatch.
     pub updates: &'a mut Vec<UpdateEntry>,
+    /// Reusable batch storage remains available while `drain` is taken, so
+    /// callbacks can enqueue nested work without sharing an in-flight vector.
+    #[cfg(feature = "experiment-update-pool")]
+    pub update_pool: &'a mut UpdatePool,
 }
 
 impl<'a> TickCtx<'a> {
@@ -458,6 +542,9 @@ impl<'a> TickCtx<'a> {
                 break;
             };
             let Some((pos, from, kind)) = top.next() else {
+                #[cfg(feature = "experiment-update-pool")]
+                self.update_pool.recycle(pump.pending.pop().unwrap());
+                #[cfg(not(feature = "experiment-update-pool"))]
                 pump.pending.pop();
                 continue;
             };
@@ -499,15 +586,24 @@ impl<'a> TickCtx<'a> {
                     );
                 }
             }
-            let Some(behaviour) = table.get(state) else {
-                if state != StateId::AIR {
+            #[cfg(feature = "experiment-wire-dispatch")]
+            {
+                if !table.dispatch_update(state, self, pos, from, kind) && state != StateId::AIR {
                     pump.unknown_seen.push(state);
                 }
-                continue;
-            };
-            match kind {
-                UpdateKind::Neighbor => behaviour.on_neighbor_changed(self, pos, from),
-                UpdateKind::Shape => behaviour.on_shape_update(self, pos, from),
+            }
+            #[cfg(not(feature = "experiment-wire-dispatch"))]
+            {
+                let Some(behaviour) = table.get(state) else {
+                    if state != StateId::AIR {
+                        pump.unknown_seen.push(state);
+                    }
+                    continue;
+                };
+                match kind {
+                    UpdateKind::Neighbor => behaviour.on_neighbor_changed(self, pos, from),
+                    UpdateKind::Shape => behaviour.on_shape_update(self, pos, from),
+                }
             }
         }
         self.drain = Some(pump);
@@ -596,14 +692,17 @@ impl<'a> TickCtx<'a> {
         let targets = behaviour.indirect_shape_targets(self.world, pos);
         for (target, from) in targets {
             trace_update("shape", target);
-            self.updates
-                .push(UpdateEntry::new(vec![(target, from, UpdateKind::Shape)]));
+            self.enqueue_one(target, from, UpdateKind::Shape);
         }
     }
 
     /// Queue one `updateNeighborsAt(pos)` entry.
     pub fn update_neighbors_at(&mut self, pos: Pos) {
-        self.updates.push(UpdateEntry::neighbors_at(pos));
+        #[cfg(feature = "experiment-update-pool")]
+        let entry = self.update_pool.neighbors_at(pos);
+        #[cfg(not(feature = "experiment-update-pool"))]
+        let entry = UpdateEntry::neighbors_at(pos);
+        self.updates.push(entry);
     }
 
     /// Queue one `updateNeighbourShapes(pos)` entry.
@@ -613,30 +712,46 @@ impl<'a> TickCtx<'a> {
     /// carries `UPDATE_KNOWN_SHAPE` and so says nothing, and the shape pass is
     /// then run over them by hand.
     pub fn update_neighbour_shapes(&mut self, pos: Pos) {
-        self.updates.push(UpdateEntry::neighbor_shapes(pos));
+        #[cfg(feature = "experiment-update-pool")]
+        let entry = self.update_pool.neighbor_shapes(pos);
+        #[cfg(not(feature = "experiment-update-pool"))]
+        let entry = UpdateEntry::neighbor_shapes(pos);
+        self.updates.push(entry);
     }
 
     /// `updateNeighborsAtExceptFromFacing`: the same entry minus one side.
     pub fn update_neighbors_except(&mut self, pos: Pos, skip: Dir) {
-        self.updates.push(UpdateEntry::new(
-            crate::pos::UPDATE_ORDER
-                .iter()
-                .filter(|dir| **dir != skip)
-                .map(|dir| (pos.offset(*dir), dir.opposite(), UpdateKind::Neighbor))
-                .collect(),
-        ));
+        let items = crate::pos::UPDATE_ORDER.into_iter()
+            .filter(|dir| *dir != skip)
+            .map(|dir| (pos.offset(dir), dir.opposite(), UpdateKind::Neighbor));
+        #[cfg(feature = "experiment-update-pool")]
+        let entry = self.update_pool.entry(6, items);
+        #[cfg(not(feature = "experiment-update-pool"))]
+        let entry = UpdateEntry::new(items.collect());
+        self.updates.push(entry);
     }
 
     /// `updateFromNeighbourShapes(pos)`.
     pub fn update_self_shapes(&mut self, pos: Pos) {
-        self.updates.push(UpdateEntry::own_shapes(pos));
+        #[cfg(feature = "experiment-update-pool")]
+        let entry = self.update_pool.own_shapes(pos);
+        #[cfg(not(feature = "experiment-update-pool"))]
+        let entry = UpdateEntry::own_shapes(pos);
+        self.updates.push(entry);
     }
 
     /// Queue a single notification (`level.neighborChanged` directly).
     pub fn notify(&mut self, pos: Pos, from: Dir) {
         trace_update("neighbor", pos);
-        self.updates
-            .push(UpdateEntry::new(vec![(pos, from, UpdateKind::Neighbor)]));
+        self.enqueue_one(pos, from, UpdateKind::Neighbor);
+    }
+
+    fn enqueue_one(&mut self, pos: Pos, from: Dir, kind: UpdateKind) {
+        #[cfg(feature = "experiment-update-pool")]
+        let entry = self.update_pool.entry(1, [(pos, from, kind)]);
+        #[cfg(not(feature = "experiment-update-pool"))]
+        let entry = UpdateEntry::new(vec![(pos, from, kind)]);
+        self.updates.push(entry);
     }
 
     /// Set the state at `pos` and notify its six neighbours.
@@ -696,10 +811,10 @@ impl<'a> TickCtx<'a> {
         //
         // Nested calls are unaffected: `drain` is a no-op while a drain is
         // already running, which is exactly what `addAndRun` does.
-        self.updates.push(UpdateEntry::neighbors_at(pos));
+        self.update_neighbors_at(pos);
         self.drain();
         self.indirect_shapes(pos, previous);
-        self.updates.push(UpdateEntry::neighbor_shapes(pos));
+        self.update_neighbour_shapes(pos);
         self.indirect_shapes(pos, state);
     }
 
@@ -725,9 +840,9 @@ impl<'a> TickCtx<'a> {
             behaviour.on_placed(self, pos);
         }
         self.drain();
-        self.updates.push(UpdateEntry::neighbors_at(pos));
+        self.update_neighbors_at(pos);
         self.drain();
-        self.updates.push(UpdateEntry::neighbor_shapes(pos));
+        self.update_neighbour_shapes(pos);
         self.drain();
         self.notify(pos, Dir::Down);
         self.drain();
@@ -779,7 +894,7 @@ impl<'a> TickCtx<'a> {
         }
         self.reconcile_ticker(pos, previous, state);
         self.indirect_shapes(pos, previous);
-        self.updates.push(UpdateEntry::neighbor_shapes(pos));
+        self.update_neighbour_shapes(pos);
         self.indirect_shapes(pos, state);
     }
 
@@ -800,7 +915,7 @@ impl<'a> TickCtx<'a> {
         }
         if shapes {
             self.indirect_shapes(pos, previous);
-            self.updates.push(UpdateEntry::neighbor_shapes(pos));
+            self.update_neighbour_shapes(pos);
             self.indirect_shapes(pos, state);
         }
     }
@@ -1337,13 +1452,32 @@ impl BlockBehaviour for Inert {
     }
 }
 
+#[cfg(feature = "experiment-wire-dispatch")]
+enum RegisteredBehaviour {
+    Dynamic(Box<dyn BlockBehaviour>),
+    VanillaWire(Box<crate::wire::Wire<std::sync::Arc<crate::vanilla::VanillaRules>>>),
+}
+
+#[cfg(feature = "experiment-wire-dispatch")]
+impl RegisteredBehaviour {
+    fn as_behaviour(&self) -> &dyn BlockBehaviour {
+        match self {
+            Self::Dynamic(behaviour) => behaviour.as_ref(),
+            Self::VanillaWire(wire) => wire.as_ref(),
+        }
+    }
+}
+
+#[cfg(not(feature = "experiment-wire-dispatch"))]
+type RegisteredBehaviour = Box<dyn BlockBehaviour>;
+
 /// Dispatch from a [`StateId`] to its behaviour.
 ///
 /// Lookup is a flat `Vec` index rather than a map: it happens on every event of
 /// every tick, and this is the hot path.
 pub struct BehaviourTable {
     /// Indexed by `StateId`; `None` means unregistered.
-    entries: Vec<Option<Box<dyn BlockBehaviour>>>,
+    entries: Vec<Option<RegisteredBehaviour>>,
     /// States seen with no behaviour, in a deterministic order.
     ///
     /// Interior mutability is avoided on purpose — recording goes through
@@ -1365,6 +1499,12 @@ impl BehaviourTable {
 
     /// Register `behaviour` for `state`, replacing any previous entry.
     pub fn register(&mut self, state: StateId, behaviour: Box<dyn BlockBehaviour>) {
+        #[cfg(feature = "experiment-wire-dispatch")]
+        let behaviour = RegisteredBehaviour::Dynamic(behaviour);
+        self.register_entry(state, behaviour);
+    }
+
+    fn register_entry(&mut self, state: StateId, behaviour: RegisteredBehaviour) {
         let index = state.raw() as usize;
         if self.entries.len() <= index {
             self.entries.resize_with(index + 1, || None);
@@ -1373,8 +1513,53 @@ impl BehaviourTable {
         self.unknown.remove(&state);
     }
 
+    /// Only the vanilla installer opts into typed dispatch. Public/custom
+    /// registration always replaces this with a dynamic entry, including when
+    /// the descriptor or StateId happens to describe redstone wire.
+    pub(crate) fn register_vanilla_wire(
+        &mut self,
+        state: StateId,
+        wire: crate::wire::Wire<std::sync::Arc<crate::vanilla::VanillaRules>>,
+    ) {
+        #[cfg(feature = "experiment-wire-dispatch")]
+        self.register_entry(state, RegisteredBehaviour::VanillaWire(Box::new(wire)));
+        #[cfg(not(feature = "experiment-wire-dispatch"))]
+        self.register(state, Box::new(wire));
+    }
+
+    #[cfg(feature = "experiment-wire-dispatch")]
+    #[inline]
+    fn dispatch_update(
+        &self,
+        state: StateId,
+        ctx: &mut TickCtx<'_>,
+        pos: Pos,
+        from: Dir,
+        kind: UpdateKind,
+    ) -> bool {
+        let Some(entry) = self.entries.get(state.raw() as usize).and_then(Option::as_ref) else {
+            return false;
+        };
+        match (kind, entry) {
+            (UpdateKind::Neighbor, RegisteredBehaviour::VanillaWire(wire)) => {
+                // Concrete receiver preserves the exact implementation while
+                // permitting direct calls and compiler specialization.
+                wire.on_neighbor_changed(ctx, pos, from);
+            }
+            (UpdateKind::Neighbor, _) => entry.as_behaviour().on_neighbor_changed(ctx, pos, from),
+            (UpdateKind::Shape, _) => entry.as_behaviour().on_shape_update(ctx, pos, from),
+        }
+        true
+    }
+
     /// The behaviour for `state`, if registered.
     pub fn get(&self, state: StateId) -> Option<&dyn BlockBehaviour> {
+        #[cfg(feature = "experiment-wire-dispatch")]
+        {
+            self.entries.get(state.raw() as usize)
+                .and_then(Option::as_ref).map(RegisteredBehaviour::as_behaviour)
+        }
+        #[cfg(not(feature = "experiment-wire-dispatch"))]
         self.entries
             .get(state.raw() as usize)
             .and_then(|slot| slot.as_deref())
@@ -1481,6 +1666,29 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "experiment-wire-dispatch")]
+    #[test]
+    fn typed_registration_is_explicit_replaceable_and_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<BehaviourTable>();
+        eprintln!("dispatch table entry bytes: {} (dynamic baseline {})",
+            std::mem::size_of::<Option<RegisteredBehaviour>>(),
+            std::mem::size_of::<Option<Box<dyn BlockBehaviour>>>());
+        let mut table = BehaviourTable::new();
+        let id = StateId(7);
+        table.note_unknown(id);
+        table.register_vanilla_wire(id, crate::wire::Wire {
+            power_level: 0,
+            rules: std::sync::Arc::new(crate::vanilla::VanillaRules::default()),
+        });
+        assert!(!table.has_unknown());
+        assert!(matches!(table.entries[id.raw() as usize], Some(RegisteredBehaviour::VanillaWire(_))));
+        table.register(id, Box::new(Source(7)));
+        assert!(matches!(table.entries[id.raw() as usize], Some(RegisteredBehaviour::Dynamic(_))));
+        assert_eq!(table.get(id).unwrap().name(), "source");
+        assert!(table.get(StateId(u16::MAX)).is_none());
+    }
+
     #[test]
     fn air_is_registered_inert_from_the_start() {
         let table = BehaviourTable::new();
@@ -1581,6 +1789,8 @@ mod tests {
         let mut events = EventQueue::new();
         let states = StateRegistry::new();
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -1618,6 +1828,8 @@ mod tests {
         let mut events = EventQueue::new();
         let states = StateRegistry::new();
         let mut ctx = TickCtx {
+            #[cfg(feature = "experiment-update-pool")]
+            update_pool: &mut crate::behaviour::UpdatePool::default(),
             drain: None,
             behaviours: None,
             world: &mut world,
@@ -1647,5 +1859,46 @@ mod tests {
 
         assert_eq!(ticks.next_due(), Some(12), "delay is relative to ctx.tick");
         assert_eq!(events.len(), 1);
+    }
+}
+
+#[cfg(all(test, feature = "experiment-update-pool"))]
+mod update_pool_tests {
+    use super::*;
+
+    #[test]
+    fn eager_batches_match_and_reuse_only_completed_storage() {
+        let mut pool = UpdatePool::default();
+        let pos = Pos::new(-3, 7, -9);
+        let first = pool.neighbors_at(pos);
+        assert_eq!(first, UpdateEntry::neighbors_at(pos));
+        let first_address = first.items.as_ptr();
+        let suspended = pool.neighbor_shapes(pos);
+        assert_eq!(suspended, UpdateEntry::neighbor_shapes(pos));
+        assert_ne!(first_address, suspended.items.as_ptr());
+        pool.recycle(first);
+        let reused = pool.own_shapes(pos);
+        assert_eq!(reused, UpdateEntry::own_shapes(pos));
+        assert_eq!(first_address, reused.items.as_ptr());
+        assert_eq!(suspended, UpdateEntry::neighbor_shapes(pos));
+    }
+
+    #[test]
+    fn custom_entries_and_excess_capacity_cannot_grow_the_pool_unboundedly() {
+        let mut pool = UpdatePool::default();
+        let item = (Pos::new(0, 0, 0), Dir::Up, UpdateKind::Neighbor);
+        for _ in 0..UpdatePool::MAX_PER_CLASS + 20 {
+            pool.recycle(UpdateEntry::new(vec![item]));
+            pool.recycle(UpdateEntry::new(vec![item; 6]));
+        }
+        assert_eq!(pool.retained_buffers(), 2 * UpdatePool::MAX_PER_CLASS);
+        pool.recycle(UpdateEntry::new(vec![item; 100]));
+        let mut empty_large = Vec::with_capacity(10_000);
+        empty_large.push(item);
+        pool.recycle(UpdateEntry::new(empty_large));
+        assert_eq!(pool.retained_buffers(), 2 * UpdatePool::MAX_PER_CLASS);
+        let mut one = pool.entry(1, [item]);
+        assert_eq!(one.next(), Some(item));
+        assert_eq!(one.next(), None, "recycled vectors must not retain old items");
     }
 }

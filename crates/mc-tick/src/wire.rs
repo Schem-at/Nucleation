@@ -26,6 +26,16 @@ use crate::world::World;
 
 /// What the wire needs to know about everything that is not wire.
 pub trait WireWorld: Send + Sync {
+    /// Optional concrete-rule experiment. Implementations with observable or
+    /// custom query behavior keep the default exact evaluator.
+    #[cfg(feature = "experiment-wire-plan")]
+    fn planned_target(
+        &self,
+        _world: &World,
+        _outputs: &crate::behaviour::ComparatorOutputs,
+        _pos: Pos,
+    ) -> Option<u8> { None }
+
     /// Where this world's `(0, 0, 0)` sits in the game's coordinates.
     ///
     /// Only `updatePowerStrength`'s `HashSet<BlockPos>` needs it, and only
@@ -246,7 +256,7 @@ fn connected_toward_by(
 }
 
 /// `getIncomingWireSignal`: the strongest neighbouring wire, minus one.
-fn incoming(rules: &dyn WireWorld, world: &World, pos: Pos) -> u8 {
+pub(crate) fn incoming(rules: &dyn WireWorld, world: &World, pos: Pos) -> u8 {
     let mut best = 0u8;
     let covered = rules.conductor(world, pos.offset(Dir::Up));
     for dir in [Dir::North, Dir::South, Dir::West, Dir::East] {
@@ -295,12 +305,18 @@ fn java_hash_order_array(pos: Pos, origin: Pos) -> [Pos; 7] {
 
 /// `DefaultRedstoneWireEvaluator.updatePowerStrength` for the wire at `pos`.
 pub fn update_power_strength(rules: &dyn WireWorld, ctx: &mut TickCtx<'_>, pos: Pos, current: u8) {
+    #[cfg(feature = "experiment-wire-plan")]
+    let planned = rules.planned_target(ctx.world, ctx.comparator_out, pos);
+    #[cfg(not(feature = "experiment-wire-plan"))]
+    let planned: Option<u8> = None;
+    let target = planned.unwrap_or_else(|| {
     let block = rules.block_signal(ctx, pos);
-    let target = if block == 15 {
+    if block == 15 {
         15
     } else {
         block.max(incoming(rules, ctx.world, pos))
-    };
+    }
+    });
     if target == current {
         return;
     }

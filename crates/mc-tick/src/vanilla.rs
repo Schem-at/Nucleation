@@ -137,7 +137,8 @@ impl Descriptor {
 ///
 /// Built alongside the behaviour registration so both agree on which blocks emit
 /// power and which can be shoved.
-#[derive(Debug, Clone, Default)]
+#[cfg_attr(not(feature = "experiment-wire-plan"), derive(Debug))]
+#[derive(Clone, Default)]
 pub struct VanillaRules {
     /// Where this world's `(0, 0, 0)` sits in the game's coordinates — see
     /// [`crate::wire::WireWorld::hash_origin`]. Zero unless a capture says
@@ -237,6 +238,51 @@ pub struct VanillaRules {
     /// States whose comparator read comes from the block state itself —
     /// a composter's `level` (0-8).
     state_analog: StateTable<u8>,
+    #[cfg(feature = "experiment-wire-plan")]
+    plan_cache: crate::wire_plan::Cache,
+}
+
+#[cfg(feature = "experiment-wire-plan")]
+impl std::fmt::Debug for VanillaRules {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Exactly the semantic fields emitted by the reference derive.
+        f.debug_struct("VanillaRules")
+            .field("hash_origin", &self.hash_origin)
+            .field("powered", &self.powered)
+            .field("analog_emission", &self.analog_emission)
+            .field("detector_rails", &self.detector_rails)
+            .field("chest_halves", &self.chest_halves)
+            .field("lidded_chests", &self.lidded_chests)
+            .field("emit_only", &self.emit_only)
+            .field("strong_into", &self.strong_into)
+            .field("conductors", &self.conductors)
+            .field("containers", &self.containers)
+            .field("crafters", &self.crafters)
+            .field("hoppers", &self.hoppers)
+            .field("full_cubes", &self.full_cubes)
+            .field("wires", &self.wires)
+            .field("wire_shapes", &self.wire_shapes)
+            .field("signal_sources", &self.signal_sources)
+            .field("redstone_blocks", &self.redstone_blocks)
+            .field("sturdy_up", &self.sturdy_up)
+            .field("destroyed_by_push", &self.destroyed_by_push)
+            .field("leaf_distance", &self.leaf_distance)
+            .field("logs", &self.logs)
+            .field("repeaters", &self.repeaters)
+            .field("observer_facing", &self.observer_facing)
+            .field("immovable", &self.immovable)
+            .field("push_only", &self.push_only)
+            .field("slime", &self.slime)
+            .field("honey", &self.honey)
+            .field("diodes", &self.diodes)
+            .field("waters", &self.waters)
+            .field("water_levels", &self.water_levels)
+            .field("bubbles", &self.bubbles)
+            .field("comparators", &self.comparators)
+            .field("emit_except", &self.emit_except)
+            .field("state_analog", &self.state_analog)
+            .finish()
+    }
 }
 
 fn wire_shape_index(power: u8, sides: [crate::wire::WireSide; 4]) -> usize {
@@ -247,6 +293,264 @@ fn wire_shape_index(power: u8, sides: [crate::wire::WireSide; 4]) -> usize {
             crate::wire::WireSide::Up => 2,
         }
     })
+}
+
+#[cfg(all(test, feature = "experiment-wire-plan"))]
+mod wire_plan_tests {
+    use super::*;
+    use crate::behaviour::ComparatorOutputs;
+    use crate::pos::Bounds;
+    use crate::wire::WireSide;
+    use crate::wire_plan::Mode;
+
+    fn rules() -> VanillaRules {
+        let mut rules = VanillaRules::default();
+        for power in 0..=255u8 {
+            rules.wires.insert(StateId(u16::from(power) + 1), (power, [WireSide::Side; 4]));
+        }
+        // Same power and every possible shape: these transitions have no effect
+        // on the muted-input plan, despite changing the actual StateId.
+        rules.wires.insert(StateId(299), (7, [WireSide::None; 4]));
+        rules.conductors.insert(StateId(300));
+        for (id, value) in [(301, 1), (302, 15), (303, 255)] {
+            rules.powered.insert(StateId(id));
+            rules.analog_emission.insert(StateId(id), value);
+        }
+        for (i, dir) in crate::pos::ALL_DIRS.into_iter().enumerate() {
+            let state = StateId(310 + i as u16);
+            rules.powered.insert(state);
+            rules.comparators.insert(state);
+            rules.emit_only.insert(state, dir);
+            rules.strong_into.insert(state, dir);
+        }
+        rules
+    }
+
+    fn query(rules: &VanillaRules, world: &World, outputs: &ComparatorOutputs, pos: Pos) -> u8 {
+        rules.planned_wire_target(world, outputs, pos, Mode::Shadow).unwrap()
+    }
+
+    #[test]
+    fn comparator_maps_are_live_without_world_writes_and_activation_rebuilds() {
+        let rules = rules();
+        let pos = Pos::new(-2, 0, -2);
+        let source = pos.offset(Dir::East);
+        let mut world = World::new(Bounds::new(Pos::new(-5, -3, -5), Pos::new(3, 3, 3)));
+        let mut outputs = ComparatorOutputs::new();
+        world.set(source, StateId(316)); // Unpowered/off state has no emission metadata.
+        outputs.insert(source, 9);
+        assert_eq!(query(&rules, &world, &outputs, pos), 0);
+        world.set(source, StateId(314)); // Powered, emits west toward the wire.
+        for value in [0, 1, 15, 16, 127, 255, 0] {
+            *outputs.entry(source).or_insert(0) = value;
+            assert_eq!(query(&rules, &world, &outputs, pos), value);
+        }
+        outputs.insert(source, 11);
+        assert_eq!(query(&rules, &world, &outputs, pos), 11);
+        outputs.remove(&source);
+        assert_eq!(query(&rules, &world, &outputs, pos), 0);
+        outputs = [(source, 13)].into_iter().collect();
+        assert_eq!(query(&rules, &world, &outputs, pos), 13);
+        world.set(source, StateId(315)); // Same output map, wrong emission direction.
+        assert_eq!(query(&rules, &world, &outputs, pos), 0);
+    }
+
+    #[test]
+    fn ordered_fifteen_short_circuit_is_not_an_unrestricted_maximum() {
+        let rules = rules();
+        let pos = Pos::new(0, 0, 0);
+        let mut world = World::new(Bounds::new(Pos::new(-3, -3, -3), Pos::new(3, 3, 3)));
+        let outputs = ComparatorOutputs::new();
+        world.set(pos.offset(Dir::Down), StateId(302));
+        world.set(pos.offset(Dir::Up), StateId(303));
+        assert_eq!(query(&rules, &world, &outputs, pos), 15);
+        world.set(pos.offset(Dir::Down), StateId(301));
+        assert_eq!(query(&rules, &world, &outputs, pos), 255);
+    }
+
+    #[test]
+    fn writes_inside_a_tick_change_wire_values_conduction_and_diagonal_paths() {
+        let rules = rules();
+        let pos = Pos::new(-1, 0, -1);
+        let east = pos.offset(Dir::East);
+        let mut world = World::new(Bounds::new(Pos::new(-5, -4, -5), Pos::new(5, 4, 5)));
+        let mut outputs = ComparatorOutputs::new();
+        for power in [0u8, 1, 7, 15, 16, 255, 0] {
+            world.set(east, StateId(u16::from(power) + 1));
+            assert_eq!(query(&rules, &world, &outputs, pos), power.saturating_sub(1));
+        }
+        world.set(east, StateId(8));
+        assert_eq!(query(&rules, &world, &outputs, pos), 6);
+        world.set(east, StateId(299));
+        assert_eq!(query(&rules, &world, &outputs, pos), 6);
+        world.set(east, StateId(300));
+        world.set(east.offset(Dir::Up), StateId(16));
+        assert_eq!(query(&rules, &world, &outputs, pos), 14);
+        world.set(pos.offset(Dir::Up), StateId(300));
+        assert_eq!(query(&rules, &world, &outputs, pos), 0);
+        let source = east.offset(Dir::East);
+        world.set(source, StateId(314));
+        outputs.insert(source, 12);
+        assert_eq!(query(&rules, &world, &outputs, pos), 12);
+        world.set(east, StateId::AIR);
+        assert_eq!(query(&rules, &world, &outputs, pos), 0);
+    }
+
+    #[test]
+    fn world_rules_clone_growth_and_checkpoint_restore_cannot_reuse_other_answers() {
+        let rules = rules();
+        let bounds = Bounds::new(Pos::new(-3, -3, -3), Pos::new(3, 3, 3));
+        let pos = Pos::new(0, 0, 0);
+        let source = pos.offset(Dir::East);
+        let mut sim = crate::Simulation::new(bounds);
+        let outputs = ComparatorOutputs::new();
+        sim.registry_and_world_mut().1.set(source, StateId(8));
+        let checkpoint = sim.checkpoint();
+        assert_eq!(query(&rules, sim.world(), &outputs, pos), 6);
+        sim.registry_and_world_mut().1.set(source, StateId(16));
+        assert_eq!(query(&rules, sim.world(), &outputs, pos), 14);
+        sim.restore(&checkpoint);
+        assert_eq!(query(&rules, sim.world(), &outputs, pos), 6);
+        let mut clone = sim.world().clone();
+        clone.set(source, StateId(2));
+        assert_eq!(query(&rules, &clone, &outputs, pos), 0);
+        assert_eq!(query(&rules, sim.world(), &outputs, pos), 6);
+        assert!(clone.grow_to_include(Pos::new(20, 0, 0)));
+        clone.set(source, StateId(256));
+        assert_eq!(query(&rules, &clone, &outputs, pos), 254);
+        let mut other_rules = rules.clone();
+        other_rules.wires.insert(StateId(256), (3, [WireSide::Up; 4]));
+        assert_eq!(query(&other_rules, &clone, &outputs, pos), 2);
+        assert_eq!(query(&rules, &clone, &outputs, pos), 254);
+        fn send_sync<T: Send + Sync>() {}
+        send_sync::<VanillaRules>();
+        send_sync::<World>();
+    }
+
+    #[test]
+    fn randomized_neighbourhood_mutations_match_uncached_queries() {
+        let rules = rules();
+        let mut world = World::new(Bounds::new(Pos::new(-5, -5, -5), Pos::new(5, 5, 5)));
+        let mut outputs = ComparatorOutputs::new();
+        let choices = [0, 1, 2, 8, 16, 17, 128, 256, 299, 300, 301, 302, 303, 310, 311, 312, 313, 314, 315, 316];
+        let mut seed = 0x1234_5678u32;
+        let mut next = || { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; seed };
+        for _ in 0..3000 {
+            let p = Pos::new((next() % 7) as i32 - 3, (next() % 7) as i32 - 3, (next() % 7) as i32 - 3);
+            world.set(p, StateId(choices[next() as usize % choices.len()]));
+            if next() & 1 == 0 { outputs.insert(p, next() as u8); } else { outputs.remove(&p); }
+            for pos in [Pos::new(0, 0, 0), Pos::new(-1, -1, -1), Pos::new(1, 1, 1)] {
+                query(&rules, &world, &outputs, pos);
+            }
+        }
+    }
+}
+
+#[cfg(feature = "experiment-wire-plan")]
+impl VanillaRules {
+    fn wire_plan_transition(&self, from: StateId, to: StateId) -> crate::wire_plan::Transition {
+        use crate::wire_plan::Transition;
+        let same = self.powered.contains(&from) == self.powered.contains(&to)
+            && self.analog_emission.get(&from) == self.analog_emission.get(&to)
+            && self.emit_only.get(&from) == self.emit_only.get(&to)
+            && self.emit_except.get(&from) == self.emit_except.get(&to)
+            && self.strong_into.get(&from) == self.strong_into.get(&to)
+            && self.conductors.contains(&from) == self.conductors.contains(&to)
+            && self.comparators.contains(&from) == self.comparators.contains(&to)
+            && self.wires.contains_key(&from) == self.wires.contains_key(&to);
+        if !same { return Transition::Structural; }
+        if self.wires.get(&from).map(|(power, _)| power)
+            != self.wires.get(&to).map(|(power, _)| power) {
+            Transition::WireValue
+        } else {
+            Transition::Irrelevant
+        }
+    }
+
+    fn plan_emission(
+        &self,
+        plan: &mut crate::wire_plan::InputPlan,
+        group: usize,
+        pos: Pos,
+        state: StateId,
+        toward: Dir,
+    ) {
+        if !self.powered.contains(&state)
+            || self.emit_only.get(&state).is_some_and(|only| *only != toward)
+            || self.emit_except.get(&state).is_some_and(|except| *except == toward) {
+            return;
+        }
+        if self.comparators.contains(&state) {
+            plan.add_comparator(group, pos);
+        } else {
+            let emission = self.analog_emission.get(&state).copied().unwrap_or(15);
+            plan.groups[group].fixed = plan.groups[group].fixed.max(emission);
+        }
+    }
+
+    fn build_wire_plan(&self, world: &World, pos: Pos) -> crate::wire_plan::InputPlan {
+        let mut plan = crate::wire_plan::InputPlan::default();
+        for (group, dir) in crate::pos::ALL_DIRS.into_iter().enumerate() {
+            let neighbour = pos.offset(dir);
+            let state = world.get(neighbour);
+            self.plan_emission(&mut plan, group, neighbour, state, dir.opposite());
+            if self.conductors.contains(&state) {
+                for inner in crate::pos::ALL_DIRS {
+                    let source = neighbour.offset(inner);
+                    let state = world.get(source);
+                    if self.strong_into.get(&state) == Some(&inner.opposite()) {
+                        self.plan_emission(&mut plan, group, source, state, inner.opposite());
+                    }
+                }
+            }
+        }
+        let covered = self.conductors.contains(&world.get(pos.offset(Dir::Up)));
+        for dir in crate::wire::WIRE_SIDES {
+            let side = pos.offset(dir);
+            if self.wires.contains_key(&world.get(side)) {
+                plan.wire_inputs.push(side);
+            }
+            let diagonal = if self.conductors.contains(&world.get(side)) {
+                if covered { continue; }
+                side.offset(Dir::Up)
+            } else {
+                side.offset(Dir::Down)
+            };
+            if self.wires.contains_key(&world.get(diagonal)) {
+                plan.wire_inputs.push(diagonal);
+            }
+        }
+        plan
+    }
+
+    fn reference_wire_target(&self, world: &World, outputs: &crate::behaviour::ComparatorOutputs, pos: Pos) -> u8 {
+        let mut block = 0u8;
+        for dir in crate::pos::ALL_DIRS {
+            block = block.max(self.signal_no_wire(world, outputs, pos.offset(dir), dir.opposite()));
+            if block == 15 { return 15; }
+        }
+        block.max(crate::wire::incoming(self, world, pos))
+    }
+
+    fn planned_wire_target(
+        &self,
+        world: &World,
+        outputs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        mode: crate::wire_plan::Mode,
+    ) -> Option<u8> {
+        use crate::wire_plan::Mode;
+        if mode == Mode::Off { return None; }
+        let result = self.plan_cache.query(world, outputs, pos,
+            |from, to| self.wire_plan_transition(from, to),
+            || self.build_wire_plan(world, pos),
+            |source| self.wires.get(&world.get(source)).map_or(0, |(power, _)| *power));
+        if mode == Mode::Shadow {
+            assert_eq!(result, self.reference_wire_target(world, outputs, pos),
+                "wire input plan diverged at {pos:?}");
+        }
+        Some(result)
+    }
 }
 
 impl VanillaRules {
@@ -386,6 +690,32 @@ impl VanillaRules {
             strength = strength.max(self.direct_signal_to(world, outs, pos, false));
         }
         strength
+    }
+
+    #[cfg(feature = "experiment-cursor")]
+    fn block_signal_cursor(&self, world: &World, outs: &crate::behaviour::ComparatorOutputs, pos: Pos) -> Option<u8> {
+        let reader = world.local_reader(pos)?;
+        let mut best = 0u8;
+        for dir in crate::pos::ALL_DIRS {
+            let (x, y, z) = dir.delta();
+            let state = reader.get([x, y, z]);
+            let neighbour = pos.offset(dir);
+            let mut signal = self.emitted_state(world, outs, neighbour, state, dir.opposite(), false);
+            if self.conductors.contains(&state) {
+                for strong_dir in crate::pos::ALL_DIRS {
+                    let (dx, dy, dz) = strong_dir.delta();
+                    let source = reader.get([x + dx, y + dy, z + dz]);
+                    let toward = strong_dir.opposite();
+                    if self.strong_into.get(&source) == Some(&toward) {
+                        signal = signal.max(self.emitted_state(world, outs,
+                            neighbour.offset(strong_dir), source, toward, false));
+                    }
+                }
+            }
+            best = best.max(signal);
+            if best == 15 { break; }
+        }
+        Some(best)
     }
 
     /// Why `pos` does or does not power `toward` — a diagnostic for tracing a
@@ -615,6 +945,11 @@ fn dir_name(dir: Dir) -> &'static str {
 }
 
 impl crate::wire::WireWorld for VanillaRules {
+    #[cfg(feature = "experiment-wire-plan")]
+    fn planned_target(&self, world: &World, outputs: &crate::behaviour::ComparatorOutputs, pos: Pos) -> Option<u8> {
+        self.planned_wire_target(world, outputs, pos, crate::wire_plan::mode())
+    }
+
     fn hash_origin(&self) -> Pos {
         self.hash_origin
     }
@@ -626,6 +961,8 @@ impl crate::wire::WireWorld for VanillaRules {
     /// special-case comparators and answer a flat 15 for everything else,
     /// which lit a whole door's dust from a comparator that was emitting 0.
     fn block_signal(&self, ctx: &crate::behaviour::TickCtx<'_>, pos: Pos) -> u8 {
+        #[cfg(feature = "experiment-cursor")]
+        if let Some(signal) = self.block_signal_cursor(ctx.world, ctx.comparator_out, pos) { return signal; }
         let mut best = 0u8;
         for dir in crate::pos::ALL_DIRS {
             best = best.max(self.signal_no_wire(
@@ -698,6 +1035,11 @@ impl crate::wire::WireWorld for VanillaRules {
 }
 
 impl crate::wire::WireWorld for Arc<VanillaRules> {
+    #[cfg(feature = "experiment-wire-plan")]
+    fn planned_target(&self, world: &World, outputs: &crate::behaviour::ComparatorOutputs, pos: Pos) -> Option<u8> {
+        <VanillaRules as crate::wire::WireWorld>::planned_target(self.as_ref(), world, outputs, pos)
+    }
+
     fn hash_origin(&self) -> Pos {
         <VanillaRules as crate::wire::WireWorld>::hash_origin(self.as_ref())
     }
@@ -2474,12 +2816,12 @@ pub fn register_all_at(
                     .get("power")
                     .and_then(|p| p.parse().ok())
                     .unwrap_or(0);
-                table.register(
+                table.register_vanilla_wire(
                     *id,
-                    Box::new(crate::wire::Wire {
+                    crate::wire::Wire {
                         power_level: power,
                         rules: rules.clone(),
-                    }),
+                    },
                 );
             }
             "minecraft:note_block" => {
@@ -4134,6 +4476,41 @@ pub fn intern_companions(registry: &mut StateRegistry) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "experiment-cursor")]
+    #[test]
+    fn cursor_power_matches_reference_with_live_arbitrary_comparator_outputs() {
+        let mut registry = StateRegistry::new();
+        let states: Vec<_> = ["minecraft:air", "minecraft:stone", "minecraft:glass",
+            "minecraft:redstone_block", "minecraft:observer[facing=east,powered=true]",
+            "minecraft:observer[facing=west,powered=true]",
+            "minecraft:comparator[facing=west,mode=compare,powered=true]",
+            "minecraft:comparator[facing=north,mode=compare,powered=false]",
+            "minecraft:comparator[facing=north,mode=compare,powered=true]",
+            "minecraft:lever[face=floor,facing=east,powered=true]",
+            "minecraft:redstone_wire[east=side,north=none,power=15,south=none,west=side]"]
+            .into_iter().map(|d| registry.intern(d).unwrap()).collect();
+        let rules = register_all(&mut registry, &mut BehaviourTable::new());
+        let mut world = World::new(crate::Bounds::new(Pos::new(-5, -5, -5), Pos::new(5, 5, 5)));
+        let mut outputs = crate::behaviour::ComparatorOutputs::new();
+        let mut rng = 7u32;
+        for iteration in 0..256 {
+            outputs.clear();
+            for x in -2..=2 { for y in -2..=2 { for z in -2..=2 {
+                rng = rng.wrapping_mul(1664525).wrapping_add(1013904223);
+                let p = Pos::new(x, y, z);
+                world.set(p, states[(rng as usize >> 8) % states.len()]);
+                if rng & 1 == 0 { outputs.insert(p, (rng >> 24) as u8); }
+            } } }
+            let mut expected = 0;
+            for dir in crate::pos::ALL_DIRS {
+                expected = expected.max(rules.signal_no_wire(&world, &outputs, Pos::default().offset(dir), dir.opposite()));
+                if expected == 15 { break; }
+            }
+            assert_eq!(rules.block_signal_cursor(&world, &outputs, Pos::default()), Some(expected), "iteration {iteration}");
+        }
+        assert!(rules.block_signal_cursor(&world, &outputs, Pos::new(-5, 0, 0)).is_none());
+    }
 
     /// A redstone block driving two dust cells: the second cell's trace names
     /// the first as a one-level wire step, the first names the block as its
