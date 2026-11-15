@@ -317,6 +317,12 @@ impl VanillaRules {
                     Dir::Down => return *power,
                     Dir::Up => return 0,
                     side => {
+                        #[cfg(feature = "experiment-directional")]
+                        if crate::wire::connects_toward(self, world, pos, *stored, side) {
+                            return *power;
+                        }
+                        #[cfg(not(feature = "experiment-directional"))]
+                        {
                         let connections = crate::wire::connection_state(self, world, pos, *stored);
                         let index = match side {
                             Dir::North => 0,
@@ -326,6 +332,7 @@ impl VanillaRules {
                         };
                         if connections[index] != crate::wire::WireSide::None {
                             return *power;
+                        }
                         }
                     }
                 }
