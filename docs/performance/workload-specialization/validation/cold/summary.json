@@ -1,0 +1,17 @@
+{
+  "first_signature_classification": {
+    "samples": 21,
+    "cpu_ns_per_operation": 197740.0,
+    "elapsed_ns_per_operation": 198272.0
+  },
+  "reference_classification": {
+    "samples": 21,
+    "cpu_ns_per_operation": 2.299126625061035,
+    "elapsed_ns_per_operation": 2.3063411712646484
+  },
+  "warmed_signature_classification": {
+    "samples": 21,
+    "cpu_ns_per_operation": 1.1635618209838867,
+    "elapsed_ns_per_operation": 1.1678943634033203
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "workload_previous-verify.jsonl": {
+    "reference": "master",
+    "matched_records": 14
+  },
+  "workload_previous-logic-verify.jsonl": {
+    "reference": "master",
+    "matched_records": 2
+  },
+  "workload_previous-fuzz.jsonl": {
+    "reference": "master",
+    "matched_records": 56
+  },
+  "workload_logic-verify.jsonl": {
+    "reference": "master",
+    "matched_records": 14
+  },
+  "workload_logic-logic-verify.jsonl": {
+    "reference": "master",
+    "matched_records": 2
+  },
+  "workload_logic-fuzz.jsonl": {
+    "reference": "master",
+    "matched_records": 56
+  },
+  "workload_moving-verify.jsonl": {
+    "reference": "master",
+    "matched_records": 14
+  },
+  "workload_moving-logic-verify.jsonl": {
+    "reference": "master",
+    "matched_records": 2
+  },
+  "workload_moving-fuzz.jsonl": {
+    "reference": "master",
+    "matched_records": 56
+  },
+  "workload_combined-verify.jsonl": {
+    "reference": "master",
+    "matched_records": 14
+  },
+  "workload_combined-logic-verify.jsonl": {
+    "reference": "master",
+    "matched_records": 2
+  },
+  "workload_combined-fuzz.jsonl": {
+    "reference": "master",
+    "matched_records": 56
+  }
+}

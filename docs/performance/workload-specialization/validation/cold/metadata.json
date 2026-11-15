@@ -1,0 +1,38 @@
+{
+  "build_command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--release",
+    "--no-default-features",
+    "-p",
+    "mc-tick",
+    "--features",
+    "experiment-transition-signatures",
+    "--lib",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "measurement_command": [
+    "taskset",
+    "-c",
+    "0",
+    "/home/harrison/nucleation-perf/execution-target/release/deps/mc_tick-f09e769cc145d2c0",
+    "vanilla::transition_signature_tests::measure_transition_signature_cold_and_warm",
+    "--ignored",
+    "--exact",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "binary_sha256": "7b41c1d2e441fbd6a8cba42fbc2b8605879723352697b998f0c1c70d27d6cefb",
+  "source_commit": "a78a5545fb6168e1ed6b38be9965e05b25c843f3",
+  "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.0\nLLVM version: 22.1.8\n",
+  "profile": {
+    "opt_level": 3,
+    "lto": true,
+    "debug": 1,
+    "cpu": "generic",
+    "pgo": false
+  },
+  "cpu": 0
+}

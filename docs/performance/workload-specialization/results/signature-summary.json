@@ -1,0 +1,295 @@
+{
+  "baseline": "combined",
+  "source": "docs/performance/workload-specialization/results/signature-timings.jsonl",
+  "resamples": 10000,
+  "results": [
+    {
+      "case": "hipster",
+      "variant": "signatures",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 10.076699733333333,
+      "cpu_speedup": 1.0128677513568993,
+      "cpu_ci95": [
+        0.9626179571278122,
+        1.052833944352959
+      ],
+      "wall_ms": 10.115400066666666,
+      "wall_speedup": 1.0128085426655824,
+      "wall_ci95": [
+        0.9548161740252084,
+        1.0539261776669915
+      ]
+    },
+    {
+      "case": "hipster",
+      "variant": "previous",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 10.351909933333333,
+      "cpu_speedup": 0.9859402048249402,
+      "cpu_ci95": [
+        0.9479177348611622,
+        1.0189365349725523
+      ],
+      "wall_ms": 10.395109199999998,
+      "wall_speedup": 0.9855561305695568,
+      "wall_ci95": [
+        0.9473005951607952,
+        1.018967437756539
+      ]
+    },
+    {
+      "case": "adder_active",
+      "variant": "signatures",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 8.215514222222222,
+      "cpu_speedup": 1.003981383298277,
+      "cpu_ci95": [
+        0.9557134923150168,
+        1.0228376302571207
+      ],
+      "wall_ms": 8.245677888888888,
+      "wall_speedup": 1.0033341575137122,
+      "wall_ci95": [
+        0.954790209311809,
+        1.0228574908034702
+      ]
+    },
+    {
+      "case": "adder_active",
+      "variant": "previous",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 9.0670315,
+      "cpu_speedup": 0.9096939095594113,
+      "cpu_ci95": [
+        0.8818680136925333,
+        0.9760751375631544
+      ],
+      "wall_ms": 9.100062,
+      "wall_speedup": 0.90913339686892,
+      "wall_ci95": [
+        0.8693271948036086,
+        0.9725526350812952
+      ]
+    },
+    {
+      "case": "logic_network",
+      "variant": "previous",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 0.5623185656934306,
+      "cpu_speedup": 1.0429251772219643,
+      "cpu_ci95": [
+        1.0195312777224301,
+        1.0842485814407
+      ],
+      "wall_ms": 0.5636751350364964,
+      "wall_speedup": 1.0431869609732172,
+      "wall_ci95": [
+        1.0194090924742734,
+        1.0832804196228374
+      ]
+    },
+    {
+      "case": "logic_network",
+      "variant": "signatures",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 0.5675115,
+      "cpu_speedup": 1.0333820368063413,
+      "cpu_ci95": [
+        1.0081223427478925,
+        1.072570760945095
+      ],
+      "wall_ms": 0.5691329051094891,
+      "wall_speedup": 1.033183191159485,
+      "wall_ci95": [
+        1.008352562357892,
+        1.05758601679964
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "signatures",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 0.1460719630801688,
+      "cpu_speedup": 1.0222055741974645,
+      "cpu_ci95": [
+        1.00198837748468,
+        1.0469802187470798
+      ],
+      "wall_ms": 0.14640424367088606,
+      "wall_speedup": 1.021829456751743,
+      "wall_ci95": [
+        1.0013763982755597,
+        1.0458695318795916
+      ]
+    },
+    {
+      "case": "flyer",
+      "variant": "previous",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 0.15781813713080167,
+      "cpu_speedup": 0.9461243023719139,
+      "cpu_ci95": [
+        0.9281089207418969,
+        0.9673408625249876
+      ],
+      "wall_ms": 0.1581624135021097,
+      "wall_speedup": 0.9458642256643095,
+      "wall_ci95": [
+        0.9281820795992062,
+        0.9669180883223175
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "previous",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 8.5070915,
+      "cpu_speedup": 0.9415628583387037,
+      "cpu_ci95": [
+        0.9345860616641974,
+        0.9576368008841669
+      ],
+      "wall_ms": 8.537630444444444,
+      "wall_speedup": 0.941131050751865,
+      "wall_ci95": [
+        0.9318774862542014,
+        0.957778442402585
+      ]
+    },
+    {
+      "case": "bb",
+      "variant": "signatures",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 8.014897055555556,
+      "cpu_speedup": 0.999384188389139,
+      "cpu_ci95": [
+        0.9642932780096859,
+        1.018219337079307
+      ],
+      "wall_ms": 8.044877055555556,
+      "wall_speedup": 0.9987758738416463,
+      "wall_ci95": [
+        0.9632500043835739,
+        1.0175881908892095
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "previous",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 1.7161282903225805,
+      "cpu_speedup": 0.9810180995629629,
+      "cpu_ci95": [
+        0.9261388973702623,
+        1.008531877091021
+      ],
+      "wall_ms": 1.721332989247312,
+      "wall_speedup": 0.9811130556184114,
+      "wall_ci95": [
+        0.8924081332463046,
+        1.00908788086374
+      ]
+    },
+    {
+      "case": "door6",
+      "variant": "signatures",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 1.7064727096774195,
+      "cpu_speedup": 0.9865689058084864,
+      "cpu_ci95": [
+        0.9783514404251581,
+        1.0567985082301146
+      ],
+      "wall_ms": 1.7120641935483871,
+      "wall_speedup": 0.9864246184116425,
+      "wall_ci95": [
+        0.978331303463269,
+        1.0582741439513654
+      ]
+    },
+    {
+      "case": "item_sorter",
+      "variant": "signatures",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 1.1232988382352942,
+      "cpu_speedup": 1.0052019837945536,
+      "cpu_ci95": [
+        0.9935112992625803,
+        1.030633089346328
+      ],
+      "wall_ms": 1.1272061764705883,
+      "wall_speedup": 1.0047304358172378,
+      "wall_ci95": [
+        0.9929822849361291,
+        1.0310410821384468
+      ]
+    },
+    {
+      "case": "item_sorter",
+      "variant": "previous",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 1.1951259779411765,
+      "cpu_speedup": 0.9447892870117254,
+      "cpu_ci95": [
+        0.9276156420404549,
+        0.9621741723561875
+      ],
+      "wall_ms": 1.198477720588235,
+      "wall_speedup": 0.9449807313775558,
+      "wall_ci95": [
+        0.9275613789433016,
+        0.9624838578048985
+      ]
+    },
+    {
+      "case": "hipster_load",
+      "variant": "previous",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 2.5540441746031743,
+      "cpu_speedup": 1.017082077665771,
+      "cpu_ci95": [
+        1.0014881844749142,
+        1.047684108639367
+      ],
+      "wall_ms": 2.5631281904761902,
+      "wall_speedup": 1.0176790976819523,
+      "wall_ci95": [
+        1.0018547710140602,
+        1.0478906705313904
+      ]
+    },
+    {
+      "case": "hipster_load",
+      "variant": "signatures",
+      "reference": "combined",
+      "rounds": 9,
+      "cpu_ms": 2.547457126984127,
+      "cpu_speedup": 1.019711981818857,
+      "cpu_ci95": [
+        1.001755824008776,
+        1.0476256854537376
+      ],
+      "wall_ms": 2.5565398730158733,
+      "wall_speedup": 1.020301702179158,
+      "wall_ci95": [
+        0.9995932629708412,
+        1.0473881436275545
+      ]
+    }
+  ]
+}
