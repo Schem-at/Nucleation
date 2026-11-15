@@ -86,6 +86,22 @@ class Archive:
         self.by_hash = collections.defaultdict(list)
         for row in self.library['entries']:
             self.by_hash[row['sha256']].append(row)
+        self.door_exports = {}
+        pointer = root / 'collections/plot-doors/current.json'
+        if pointer.is_file():
+            current = json.loads(pointer.read_bytes())
+            directory = (root / current['directory']).resolve()
+            if not directory.is_relative_to(root.resolve()):
+                raise ValueError('Door export path escapes archive')
+            data = (directory / 'manifest.json').read_bytes()
+            manifest = json.loads(data)
+            if (hashlib.sha256(data).hexdigest() != current['manifest_sha256']
+                    or current['entries'] != manifest['entries'] or current['counts'] != manifest['counts']):
+                raise ValueError('Door collection manifest changed; regenerate its export')
+            self.door_exports = current
+            for entry in current['entries']:
+                for row in self.by_hash.get(entry['source_sha256'], []):
+                    row['door_export'] = entry
         self.inspections = {}
         render_manifest = root / 'rendered-thumbnails/manifest.json'
         self.thumbnails = json.loads(render_manifest.read_text()).get('entries', {}) if render_manifest.exists() else {}
@@ -138,6 +154,23 @@ class Archive:
     def engine(self):
         p = LAB / 'public/engine/build-info.json'
         return json.loads(p.read_text()) if p.exists() else {'status': 'not built'}
+
+    def door_file(self, kind, key):
+        if kind == 'bundle':
+            entry = self.door_exports.get('bundles', {}).get(key)
+            if not entry: raise KeyError('Unknown door bundle')
+            path = (self.root / entry['path']).resolve()
+            if not path.is_relative_to(self.root.resolve()): raise ValueError('Invalid bundle path')
+            if hashlib.sha256(path.read_bytes()).hexdigest() != entry['sha256']:
+                raise ValueError('Door bundle changed; regenerate its export')
+            return path
+        if kind == 'protocol':
+            entry = next((e for e in self.door_exports.get('entries', []) if e['source_sha256'] == key), None)
+            if not entry: raise KeyError('Unknown door protocol')
+            path = (self.root / self.door_exports['directory'] / entry['protocol']).resolve()
+            if not path.is_relative_to(self.root.resolve()): raise ValueError('Invalid protocol path')
+            return path
+        raise KeyError('Unknown door file')
 
     def thumbnail(self, sha):
         result = self.thumbnails.get(sha, {'status': 'missing'})
@@ -206,7 +239,7 @@ class Archive:
             return result
 
     def slim(self):
-        keys = ['source', 'source_url', 'path', 'title', 'kind', 'bytes', 'sha256', 'data_version', 'dimensions', 'declared_blocks', 'non_air_blocks', 'entities', 'block_entities', 'palette_blocks', 'tags', 'priority', 'readiness', 'validation_status', 'validation_detail', 'validation_evidence', 'simulation_status', 'functional_status', 'vanilla_status', 'benchmark_status', 'local_path', 'evidence_basis', 'inspection', 'category', 'classification', 'bounds', 'cutoff_face_contacts', 'review_tags', 'isolation']
+        keys = ['source', 'source_url', 'path', 'title', 'kind', 'bytes', 'sha256', 'data_version', 'dimensions', 'declared_blocks', 'non_air_blocks', 'entities', 'block_entities', 'palette_blocks', 'tags', 'priority', 'readiness', 'validation_status', 'validation_detail', 'validation_evidence', 'simulation_status', 'functional_status', 'vanilla_status', 'benchmark_status', 'local_path', 'evidence_basis', 'inspection', 'category', 'classification', 'bounds', 'cutoff_face_contacts', 'review_tags', 'isolation', 'door_export']
         rows = []
         for row in self.library['entries']:
             record = {k: row[k] for k in keys if k in row}
@@ -252,6 +285,10 @@ def main():
             try:
                 if path == '/api/library': return self.json(archive.slim())
                 if path == '/api/engine': return self.json(archive.engine())
+                if path.startswith('/api/door-bundle/'):
+                    p = archive.door_file('bundle', path.rsplit('/', 1)[1]); return self.file(p, p.name)
+                if path.startswith('/api/door-protocol/'):
+                    p = archive.door_file('protocol', path.rsplit('/', 1)[1]); return self.file(p, p.name)
                 if path.startswith('/api/file/'):
                     p = archive.path(path.rsplit('/', 1)[1]); return self.file(p, p.name)
                 if path.startswith('/api/entry/'):
