@@ -1,0 +1,22 @@
+[15:40:06] [main/INFO]: Loaded 1470 recipes
+[15:40:06] [main/INFO]: Loaded 1584 advancements
+[15:40:06] [main/INFO]: Selecting global world spawn...
+[15:40:07] [main/INFO]: Loading 0 persistent chunks...
+[15:40:07] [main/INFO]: Preparing spawn area: 100%
+[15:40:07] [main/INFO]: Time elapsed: 189 ms
+[15:40:07] [main/INFO]: Started game test server
+[15:40:07] [main/INFO]: 1 tests are now running at position 13073348, -59, -12127303!
+[15:40:07] [main/INFO]: Running test environment 'minecraft:default' batch 0 (1 tests)...
+[15:40:07] [main/INFO]: [ ]
+[15:40:07] [main/INFO]: [ ]
+[15:40:07] [main/INFO]: [STDOUT]: CAPTURED /home/harrison/nucleation-perf/execution-next/vanilla/reproduction/comparator_drain_negative.json ticks=40 players=0 case=comparator_drain negative=true
+[15:40:07] [main/INFO]: Stopping server
+[15:40:07] [main/INFO]: Saving players
+[15:40:07] [main/INFO]: Saving worlds
+[15:40:07] [main/INFO]: Saving chunks for level 'ServerLevel[Test Level]'/minecraft:overworld
+[15:40:33] [main/INFO]: Saving chunks for level 'ServerLevel[Test Level]'/minecraft:the_end
+[15:40:33] [main/INFO]: Saving chunks for level 'ServerLevel[Test Level]'/minecraft:the_nether
+[15:40:33] [main/INFO]: ThreadedAnvilChunkStorage (gametestworld): All chunks are saved
+[15:40:33] [main/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[15:40:33] [main/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[15:40:33] [main/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved

@@ -105,4 +105,13 @@ in and is sampled once per process. Shadow mode asserts equality against the
 ordinary calculation; it must be disabled for performance measurements. Use a
 build without experiment features for the full reference, since runtime `off`
 still retains compiled-in journal overhead. These features are not published
-compatibility promises; the pool feature adds a scratch field to `TickCtx`.
+compatibility promises; the pool and arena features add scratch fields to `TickCtx`.
+
+The [next execution report](../../docs/performance/execution-next/README.md) covers
+`experiment-execution-view` (live indexed input reads), `experiment-lazy-journal`
+(record mutations only after a plan consumer exists), `experiment-update-arena`,
+and `experiment-piston-plan`. The first two augment input plans. Piston plans use
+`MC_TICK_PISTON_PLAN=off|on|shadow`, also sampled once per process, and preserve
+live comparator/dust inputs and quasi-connectivity. Their counters feature is
+diagnostic only. All new features remain disabled by default; the reports retain
+regressions and rejected combinations as well as gains.

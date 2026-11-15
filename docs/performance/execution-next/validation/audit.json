@@ -1,0 +1,136 @@
+{
+  "engine_all_features": {
+    "passed": 470,
+    "ignored": 7
+  },
+  "bridge": {
+    "passed": 30,
+    "ignored": 0
+  },
+  "wasm": "passed",
+  "differential": {
+    "validation/first/next_lazy-verify.jsonl": {
+      "records": 15,
+      "matches_reference": true
+    },
+    "validation/first/next_reference-verify.jsonl": {
+      "records": 15,
+      "matches_reference": true
+    },
+    "validation/first/reference-verify.jsonl": {
+      "records": 15,
+      "matches_reference": true
+    },
+    "validation/first/next_view-verify.jsonl": {
+      "records": 15,
+      "matches_reference": true
+    },
+    "validation/revised/next_piston_local-verify.jsonl": {
+      "records": 15,
+      "matches_reference": true
+    },
+    "validation/revised/next_plan_combo-verify.jsonl": {
+      "records": 15,
+      "matches_reference": true
+    },
+    "validation/revised/next_view_lazy-verify.jsonl": {
+      "records": 15,
+      "matches_reference": true
+    },
+    "validation/integrated/next_combined-verify.jsonl": {
+      "records": 15,
+      "matches_reference": true
+    },
+    "validation/integrated/next_arena-verify.jsonl": {
+      "records": 15,
+      "matches_reference": true
+    },
+    "validation/integrated/next_piston-verify.jsonl": {
+      "records": 15,
+      "matches_reference": true
+    },
+    "validation/reference-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    },
+    "validation/first/next_view-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    },
+    "validation/first/reference-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    },
+    "validation/first/next_reference-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    },
+    "validation/first/next_lazy-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    },
+    "validation/revised/next_piston_local-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    },
+    "validation/revised/next_plan_combo-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    },
+    "validation/revised/next_view_lazy-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    },
+    "validation/integrated/next_combined-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    },
+    "validation/integrated/next_arena-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    },
+    "validation/integrated/next_piston-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    },
+    "validation/final/pgo-feature-free-verify.jsonl": {
+      "records": 15,
+      "matches_reference": true
+    },
+    "validation/final/pgo-reference-verify.jsonl": {
+      "records": 15,
+      "matches_reference": true
+    },
+    "validation/final/pgo-view-lazy-verify.jsonl": {
+      "records": 15,
+      "matches_reference": true
+    },
+    "validation/final/pgo-reference-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    },
+    "validation/final/pgo-feature-free-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    },
+    "validation/final/pgo-view-lazy-fuzz.jsonl": {
+      "records": 56,
+      "matches_reference": true
+    }
+  },
+  "source_commit": "0b8faf73",
+  "validated_source_files": 35,
+  "vanilla_captures": 4,
+  "vanilla_ticks_per_capture": 40,
+  "diagnostics": {
+    "reference": {
+      "lines": 17172,
+      "sha256": "4614c50446f79ae5c7b9933b419bc35ae5753ca6968b0905b3ea3783cab7b2c0"
+    },
+    "selected": {
+      "lines": 17172,
+      "sha256": "4614c50446f79ae5c7b9933b419bc35ae5753ca6968b0905b3ea3783cab7b2c0"
+    }
+  },
+  "vanilla_reproduction": "four captures matched all fixtures/actions/initial/tick snapshots"
+}

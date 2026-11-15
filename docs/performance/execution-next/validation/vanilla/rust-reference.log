@@ -1,0 +1,13 @@
+   Compiling mc-tick v0.1.0 (/home/harrison/code/Nucleation-simulation-performance/crates/mc-tick)
+   Compiling mc-test v0.1.0 (/home/harrison/code/Nucleation-simulation-performance/crates/mc-test)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.94s
+     Running tests/vanilla_execution_next.rs (/home/harrison/nucleation-perf/execution-target/debug/deps/vanilla_execution_next-9dc889949a1e4a08)
+
+running 4 tests
+test unpowered_piston_matches_fresh_vanilla_control ... ok
+test piston_quasi_connectivity_matches_fresh_vanilla_capture ... ok
+test locked_hopper_matches_fresh_vanilla_control ... ok
+test comparator_drain_matches_fresh_vanilla_capture ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

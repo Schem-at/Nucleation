@@ -1,0 +1,102 @@
+[
+  {
+    "variant": "selected_pgo",
+    "reference": "reference_pgo",
+    "metric": "cycles",
+    "ratio_candidate_over_reference": 1.013792440838135,
+    "ci95": [
+      0.8926207344939391,
+      1.2608746886278568
+    ]
+  },
+  {
+    "variant": "selected_pgo",
+    "reference": "reference_pgo",
+    "metric": "instructions",
+    "ratio_candidate_over_reference": 0.982992098576253,
+    "ci95": [
+      0.9829917269310474,
+      0.9829979877843837
+    ]
+  },
+  {
+    "variant": "selected_pgo",
+    "reference": "reference_pgo",
+    "metric": "branches",
+    "ratio_candidate_over_reference": 0.9444645160028268,
+    "ci95": [
+      0.9444640046325146,
+      0.9444705184395197
+    ]
+  },
+  {
+    "variant": "selected_pgo",
+    "reference": "reference_pgo",
+    "metric": "branch_misses",
+    "ratio_candidate_over_reference": 0.8189231888055771,
+    "ci95": [
+      0.3224633063223598,
+      4.802487023532784
+    ]
+  },
+  {
+    "variant": "selected_pgo",
+    "reference": "reference_pgo",
+    "metric": "cache_misses",
+    "ratio_candidate_over_reference": 1.246241970730415,
+    "ci95": [
+      1.0930903967289203,
+      1.880498929937958
+    ]
+  },
+  {
+    "variant": "lazy",
+    "reference": "selected",
+    "metric": "cycles",
+    "ratio_candidate_over_reference": 1.0561392318428628,
+    "ci95": [
+      0.852300282910875,
+      1.1704863747805399
+    ]
+  },
+  {
+    "variant": "lazy",
+    "reference": "selected",
+    "metric": "instructions",
+    "ratio_candidate_over_reference": 0.9691053600156536,
+    "ci95": [
+      0.96910415540188,
+      0.9691058314554132
+    ]
+  },
+  {
+    "variant": "lazy",
+    "reference": "selected",
+    "metric": "branches",
+    "ratio_candidate_over_reference": 1.0591133813089328,
+    "ci95": [
+      1.059111702599572,
+      1.0591137285605676
+    ]
+  },
+  {
+    "variant": "lazy",
+    "reference": "selected",
+    "metric": "branch_misses",
+    "ratio_candidate_over_reference": 1.3638831049093036,
+    "ci95": [
+      0.45156250442111456,
+      2.3546332809244586
+    ]
+  },
+  {
+    "variant": "lazy",
+    "reference": "selected",
+    "metric": "cache_misses",
+    "ratio_candidate_over_reference": 0.7797763184896368,
+    "ci95": [
+      0.47365007668068027,
+      1.1651959778370613
+    ]
+  }
+]
