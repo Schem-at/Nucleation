@@ -1,5 +1,12 @@
 # Extender endpoint: the original payload is blocked
 
+**18 November correction:** the newly supplied `(1).litematic` adds the missing
+barriers **and** changes the honey payload to white concrete. It completes a
+149-block extension and return in both vanilla and Atlas. See
+[the corrected-file verification](extender-corrected.md). The results below
+apply to the old file only; the push-limit controls did not establish the
+missing-power fault in the intended design.
+
 Verified 17 November 2026. `NanoLovesExtendingHisStickyPiston.litematic` does
 **not extend its payload in the pinned vanilla Java 1.21.11 reference**. A fresh
 2,000-tick run ends with all 12 honey blocks at their original positions, no

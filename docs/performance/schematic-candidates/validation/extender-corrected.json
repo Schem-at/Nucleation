@@ -1,0 +1,443 @@
+{
+  "verified_date": "2026-11-18 Australia/Sydney",
+  "source": {
+    "source_sha256": "ef09579af4818c2629b2aa894a3e7074ee620d0cdea8bb082baebee79c26bbee",
+    "original_sha256": "e3f1466374535f9eda361b0745dd6a81aa090aba5a961e3b93944b0d320e457b",
+    "source_data_version": 5023,
+    "bbox": [
+      0,
+      0,
+      0,
+      296,
+      3,
+      21
+    ],
+    "non_air_blocks": 13090,
+    "original_blocks": 9821,
+    "changed_cells": 3281
+  },
+  "source_correction": {
+    "added_barriers": 3269,
+    "honey_replaced_with_white_concrete": 12
+  },
+  "reference_version": "1.21.11",
+  "source_mode": "exact_states_no_datafix",
+  "extension_blocks": 149,
+  "payload_blocks": 12,
+  "wasm_extension_quiescent_tick": 1368,
+  "wasm_return_quiescent_tick": 3348,
+  "scope": "Full 149-block extension and return; block-state parity at sampled ticks. No intra-tick, entity, inventory or moving-block-entity comparison; no performance timing claim.",
+  "extension": {
+    "case": "extender_corrected_endpoint",
+    "status": "matches_vanilla_sampled_blocks",
+    "matching_frames": 101,
+    "simulated_ticks": 2000,
+    "capture_stride": 20,
+    "engine_quiescent": true,
+    "final_honey_positions": [],
+    "changes": 2982996,
+    "source_data_version": 5023,
+    "reference_version": "1.21.11",
+    "source_sha256": "ef09579af4818c2629b2aa894a3e7074ee620d0cdea8bb082baebee79c26bbee",
+    "capture_sha256": "65056436db8d043094c8044432200076e701e8fb60e2ceb47e731612e09cd98c",
+    "engine_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+    "expected_sha256": "3b63364b61ebf2e3ff6c9d140b0d31c7b28d97201d5a52a67e3bb4cb9a4ade0f",
+    "actual_sha256": "3b63364b61ebf2e3ff6c9d140b0d31c7b28d97201d5a52a67e3bb4cb9a4ade0f",
+    "importer": "original_schematic",
+    "scope": "Sampled tick-end block within watch, including air; every simulation tick and action is executed. No entity, inventory, moving-BE or intra-tick equality."
+  },
+  "cycle": {
+    "case": "extender_corrected_cycle",
+    "status": "matches_vanilla_sampled_blocks",
+    "matching_frames": 201,
+    "simulated_ticks": 4000,
+    "capture_stride": 20,
+    "engine_quiescent": true,
+    "final_honey_positions": [],
+    "changes": 6433092,
+    "source_data_version": 5023,
+    "reference_version": "1.21.11",
+    "source_sha256": "ef09579af4818c2629b2aa894a3e7074ee620d0cdea8bb082baebee79c26bbee",
+    "capture_sha256": "9cb49d21e71b864bbfac03a46df2fe8d29bc14f2fad5a034250e958fa10cecfd",
+    "engine_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+    "expected_sha256": "051ebf95064d14e63329cc3be2e6aefb6cffb077b648549e0f33628d21bcfe8b",
+    "actual_sha256": "051ebf95064d14e63329cc3be2e6aefb6cffb077b648549e0f33628d21bcfe8b",
+    "importer": "original_schematic",
+    "scope": "Sampled tick-end block within watch, including air; every simulation tick and action is executed. No entity, inventory, moving-BE or intra-tick equality."
+  },
+  "function": {
+    "source_sha256": "ef09579af4818c2629b2aa894a3e7074ee620d0cdea8bb082baebee79c26bbee",
+    "capture_ticks": 4000,
+    "sampled_frames": 201,
+    "functional_pass": true,
+    "extension_blocks": 149,
+    "payload_blocks": 12,
+    "final_differences": [
+      [
+        [
+          0,
+          3,
+          0
+        ],
+        "minecraft:note_block[instrument=basedrum,note=9,powered=false]",
+        "minecraft:note_block[instrument=basedrum,note=11,powered=false]"
+      ]
+    ],
+    "final_activity": {
+      "tick": 4000,
+      "block_ticks": 0,
+      "fluid_ticks": 0,
+      "block_events": 0,
+      "rescheduled_block_events": 0,
+      "moving_pistons_in_watch": 0,
+      "scope": "Queue counts cover the server level; moving-piston count covers only the declared watch. No runtime-entity census."
+    }
+  },
+  "browser": {
+    "case": "extender_corrected_cycle",
+    "source_sha256": "ef09579af4818c2629b2aa894a3e7074ee620d0cdea8bb082baebee79c26bbee",
+    "browser": "157.0.8103.80",
+    "engine": {
+      "host": "harrison-work",
+      "rustc": "1.98.0 (88d9e12ae 2026-08-18)",
+      "engine_commit": "6e1bd6714129948e51344dec781b0e1ac295e8c9",
+      "target": "wasm32-unknown-unknown",
+      "features": [
+        "bridge",
+        "mc-tick",
+        "meshing"
+      ],
+      "profile": "release",
+      "wasm_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+      "wasm_bytes": 16661332,
+      "asset_pack_sha256": "2c5fdf060e26e3b5ff1cd7bff5e661bd3eb312c57865da64ed5cc16ec71c2dd1",
+      "asset_pack_note": "Retained visualization pack; not a physics reference version.",
+      "simulation": "Single-threaded browser mc-tick reference configuration; not the native PGO benchmark binary.",
+      "build_revision_note": "Built on harrison-work from matching Rust source before checkpoint commit. Four 24-tick wall captures and the original litematic 160-tick capture match through the existing Atlas JS glue. Native original matches 1100 ticks.",
+      "previous_wasm_sha256": "c3361e60a4ea982ba4ded2219404d548db53bc81079c5191d6c8bced2bee18d6"
+    },
+    "ticks": 4000,
+    "first_quiescent_tick": 3348,
+    "quiescent": true,
+    "functional_checks": [
+      {
+        "tick": 0,
+        "name": "initial payload",
+        "positions": [
+          [
+            147,
+            3,
+            8
+          ],
+          [
+            147,
+            3,
+            9
+          ],
+          [
+            147,
+            3,
+            10
+          ],
+          [
+            147,
+            3,
+            11
+          ],
+          [
+            147,
+            3,
+            12
+          ],
+          [
+            147,
+            3,
+            13
+          ],
+          [
+            147,
+            3,
+            14
+          ],
+          [
+            147,
+            3,
+            15
+          ],
+          [
+            147,
+            3,
+            16
+          ],
+          [
+            147,
+            3,
+            17
+          ],
+          [
+            147,
+            3,
+            18
+          ],
+          [
+            147,
+            3,
+            19
+          ]
+        ],
+        "quiescent": true,
+        "remaining_flights": 0,
+        "matches_vanilla": true,
+        "render_mirror_matches_simulation": true
+      },
+      {
+        "tick": 2000,
+        "name": "149-block extension",
+        "positions": [
+          [
+            -2,
+            3,
+            8
+          ],
+          [
+            -2,
+            3,
+            9
+          ],
+          [
+            -2,
+            3,
+            10
+          ],
+          [
+            -2,
+            3,
+            11
+          ],
+          [
+            -2,
+            3,
+            12
+          ],
+          [
+            -2,
+            3,
+            13
+          ],
+          [
+            -2,
+            3,
+            14
+          ],
+          [
+            -2,
+            3,
+            15
+          ],
+          [
+            -2,
+            3,
+            16
+          ],
+          [
+            -2,
+            3,
+            17
+          ],
+          [
+            -2,
+            3,
+            18
+          ],
+          [
+            -2,
+            3,
+            19
+          ]
+        ],
+        "quiescent": true,
+        "remaining_flights": 0,
+        "matches_vanilla": true,
+        "render_mirror_matches_simulation": true
+      },
+      {
+        "tick": 4000,
+        "name": "payload returned",
+        "positions": [
+          [
+            147,
+            3,
+            8
+          ],
+          [
+            147,
+            3,
+            9
+          ],
+          [
+            147,
+            3,
+            10
+          ],
+          [
+            147,
+            3,
+            11
+          ],
+          [
+            147,
+            3,
+            12
+          ],
+          [
+            147,
+            3,
+            13
+          ],
+          [
+            147,
+            3,
+            14
+          ],
+          [
+            147,
+            3,
+            15
+          ],
+          [
+            147,
+            3,
+            16
+          ],
+          [
+            147,
+            3,
+            17
+          ],
+          [
+            147,
+            3,
+            18
+          ],
+          [
+            147,
+            3,
+            19
+          ]
+        ],
+        "quiescent": true,
+        "remaining_flights": 0,
+        "matches_vanilla": true,
+        "render_mirror_matches_simulation": true
+      }
+    ],
+    "honey": [],
+    "endpoint_matches_vanilla": true,
+    "render_mirror_matches_simulation": true,
+    "origin": [
+      0,
+      0,
+      0
+    ],
+    "render_stats": {
+      "changeRecords": 6433092,
+      "mirrorWrites": 74921,
+      "visualChanges": 74919,
+      "chunkRebuilds": 1980
+    },
+    "remaining_flights": 0,
+    "errors": []
+  },
+  "vanilla": {
+    "capture_ticks": 2000,
+    "final_activity": {
+      "tick": 2000,
+      "block_ticks": 0,
+      "fluid_ticks": 0,
+      "block_events": 0,
+      "rescheduled_block_events": 0,
+      "moving_pistons_in_watch": 0,
+      "scope": "Queue counts cover the server level; moving-piston count covers only the declared watch. No runtime-entity census."
+    },
+    "scenario_sha256": "da5b5c3d8bd4bdc552ba3a3468369459a1d927ed8c8dc270908ad9e1aff46e69",
+    "mappings_sha1": "5621e9253f05fd57872bbe7f8ddf5f9a7d525955",
+    "server_inner_sha256": "ec47239a8de246335e1d54f6ac319bd35641778eb4b6a6da06372840d02fcebc",
+    "java_runtime_version": "21.0.13+9-LTS",
+    "action_boundary": "immediately before the numbered tick; initial snapshot is tick zero",
+    "capture_stride": 20,
+    "watch": {
+      "min": [
+        -4,
+        -1,
+        -1
+      ],
+      "max": [
+        300,
+        4,
+        23
+      ]
+    }
+  },
+  "vanilla-cycle": {
+    "capture_ticks": 4000,
+    "final_activity": {
+      "tick": 4000,
+      "block_ticks": 0,
+      "fluid_ticks": 0,
+      "block_events": 0,
+      "rescheduled_block_events": 0,
+      "moving_pistons_in_watch": 0,
+      "scope": "Queue counts cover the server level; moving-piston count covers only the declared watch. No runtime-entity census."
+    },
+    "scenario_sha256": "28ac27b2b77177eb2aa7a375bde00a85af8475872a03d02404dd1bc2498250a7",
+    "mappings_sha1": "5621e9253f05fd57872bbe7f8ddf5f9a7d525955",
+    "server_inner_sha256": "ec47239a8de246335e1d54f6ac319bd35641778eb4b6a6da06372840d02fcebc",
+    "java_runtime_version": "21.0.13+9-LTS",
+    "action_boundary": "immediately before the numbered tick; initial snapshot is tick zero",
+    "capture_stride": 20,
+    "watch": {
+      "min": [
+        -4,
+        -1,
+        -1
+      ],
+      "max": [
+        300,
+        4,
+        23
+      ]
+    }
+  },
+  "thumbnail": {
+    "renderer_sha256": "ea95ca25600733c4bdfa179557018a15beeb9a0f71e4fecb18c2a6806320bd34",
+    "pack_sha256": "2e644feda86dd38e062b8a7eb6aa44f1d4a93aa84643af663cbe5a69c73fe620",
+    "asset_version": "26.3",
+    "scope": "Saved-state thumbnail, zero simulation ticks; visual asset version is separate from physics reference."
+  },
+  "atlas_load": {
+    "source_sha256": "ef09579af4818c2629b2aa894a3e7074ee620d0cdea8bb082baebee79c26bbee",
+    "status": "NanoLovesExtendingHisStickyPiston (1).litematic \u2014 297\u00d74\u00d722",
+    "blocks": 13090,
+    "bounds": [
+      0,
+      0,
+      0,
+      296,
+      3,
+      21
+    ],
+    "origin": [
+      0,
+      0,
+      0
+    ],
+    "errors": []
+  },
+  "negative_control": {
+    "status": "passed",
+    "exit_code": 1,
+    "reason": "Incorrect x=-1 payload endpoint rejected by vanilla functional preflight before browser launch."
+  },
+  "protocol_sha256": "fcc26800f3b605d3ba8e9b5d27de6a6dd3f2f585e08c3b1e8af2a7e3788f80e3",
+  "scenario_regeneration": "Generated JSON equals the captured scenario, preserving original bytes and source DV5023."
+}
