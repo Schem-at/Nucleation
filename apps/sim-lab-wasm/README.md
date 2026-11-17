@@ -100,3 +100,37 @@ This compares the render mirror, picking grid, mesh coordinates and live state
 against the original-source simulation at its saved origin, including piston
 movement, positive/negative origins, multiple regions, a container and a cart.
 It checks coordinate consistency, not a new vanilla reference capture.
+
+
+## Mesh invalidation
+
+Block meshes are rebuilt on visible changes, independently of simulation ticks
+and camera draws. `applyChanges` keeps the last state per cell in a presentation
+batch, updates the render schematic once, and dirties only chunks whose geometry
+may change. A pending A→B→A reversal cancels its rebuild. Each chunk captures its
+revision when its own meshing starts; later changes remain pending, and concurrent
+flush requests share one job. Seam neighbours (including diagonals for AO) and
+negative-coordinate growth are retained. Piston stand-ins retire when the matching
+chunk is installed, or immediately when a cancelled rebuild leaves it current.
+
+Scaffolding distance, leaf distance/persistence, and note-block pitch/instrument/
+power can be visually inert. They are ignored **only** when the loaded resource
+pack's blockstate conditions do not reference them. Missing or unrecognised pack
+definitions fall back to complete state identity. Other fields, including dust
+power/tint, waterlogging and piston poses, remain significant. The pack's
+blockstate definitions must stay fixed during a World; load a new World after
+replacing them. Cached flight models share these same visual identities.
+
+Entities still synchronise on batches with no block changes. Camera drawing and
+piston interpolation remain per animation frame. This changes presentation work,
+not simulation events, recording, inventories or physics.
+
+```sh
+node verify-mesh-invalidation.mjs
+CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+  node verify-mesh-updates.mjs http://127.0.0.1:8767
+```
+
+`world.renderStats` exposes record, mirror-write, visible-change and chunk-rebuild
+counts for diagnostics. See `docs/performance/atlas-mesh-invalidation.md` at the
+repository root for the retained same-engine comparisons and their limits.

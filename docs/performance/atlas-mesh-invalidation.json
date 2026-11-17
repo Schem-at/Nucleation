@@ -1,0 +1,147 @@
+{
+  "date": "2026-11-17",
+  "baseline_commit": "336509a0",
+  "engine_wasm_sha256": "c3361e60a4ea982ba4ded2219404d548db53bc81079c5191d6c8bced2bee18d6",
+  "scope": "Work counts for eight-tick presentation batches; not wall-clock or FPS speedups; original mechanism still has known wall-state parity gap.",
+  "workloads": [
+    {
+      "scenario": "hipster",
+      "results": [
+        {
+          "variant": "baseline",
+          "ticks": 320,
+          "batch_ticks": 8,
+          "change_records": 8984,
+          "mirror_writes": 8984,
+          "chunk_rebuilds": 42,
+          "render_mirror_sha256": "d39c070f95e66fe6b32f8620778c9b7ed073f9a7ba6992bf63f5b1ddb84c0500",
+          "final_state_sha256": "e254d6b233f470ba725678e4797249c4cb9bc971572f355fd94de21744812720"
+        },
+        {
+          "variant": "candidate",
+          "ticks": 320,
+          "batch_ticks": 8,
+          "change_records": 8984,
+          "mirror_writes": 964,
+          "chunk_rebuilds": 39,
+          "render_mirror_sha256": "d39c070f95e66fe6b32f8620778c9b7ed073f9a7ba6992bf63f5b1ddb84c0500",
+          "final_state_sha256": "e254d6b233f470ba725678e4797249c4cb9bc971572f355fd94de21744812720"
+        }
+      ]
+    },
+    {
+      "scenario": "note",
+      "results": [
+        {
+          "variant": "baseline",
+          "ticks": 160,
+          "batch_ticks": 8,
+          "change_records": 20590,
+          "mirror_writes": 20590,
+          "chunk_rebuilds": 251,
+          "render_mirror_sha256": "7bf946087f9d57b3411a2bd3736c26df07e06c380a530406ecc78dae4b1d228d",
+          "final_state_sha256": "e6fce761a4e203ca17647d4b5ce3f2d5d673382a2c998068865884fd7b4ef850"
+        },
+        {
+          "variant": "candidate",
+          "ticks": 160,
+          "batch_ticks": 8,
+          "change_records": 20590,
+          "mirror_writes": 2945,
+          "chunk_rebuilds": 243,
+          "render_mirror_sha256": "7bf946087f9d57b3411a2bd3736c26df07e06c380a530406ecc78dae4b1d228d",
+          "final_state_sha256": "e6fce761a4e203ca17647d4b5ce3f2d5d673382a2c998068865884fd7b4ef850"
+        }
+      ]
+    }
+  ],
+  "browser_checks": {
+    "checks": [
+      "idle/entity-only batches do not remesh",
+      "note changes produce identical real GLB",
+      "scaffold distance changes produce identical real GLB",
+      "batch reversal: no unnecessary rebuild",
+      "batch reversal: mirror matches baseline",
+      "note pitch: no unnecessary rebuild",
+      "note pitch: mirror matches baseline",
+      "support distance: no unnecessary rebuild",
+      "support distance: mirror matches baseline",
+      "reversal before mesh start cancels pending work",
+      "negative growth includes seam neighbours",
+      "changed geometry really rebuilds both affected chunks",
+      "negative chunk is actually installed",
+      "concurrent callers share one flush",
+      "queued chunk cancelled before its turn is skipped",
+      "changes after a mesh snapshot remain pending",
+      "only the stale in-flight snapshot is rebuilt",
+      "finished queue stays clean",
+      "each queued chunk is built once",
+      "later chunk captures the latest state",
+      "updates included in a later snapshot do not schedule duplicate work",
+      "render-only changes never mutate engine state"
+    ],
+    "comparisons": [
+      {
+        "case": "batch reversal",
+        "baseline_chunks": 1,
+        "candidate_chunks": 0
+      },
+      {
+        "case": "note pitch",
+        "baseline_chunks": 1,
+        "candidate_chunks": 0
+      },
+      {
+        "case": "support distance",
+        "baseline_chunks": 1,
+        "candidate_chunks": 0
+      }
+    ],
+    "renderStats": {
+      "changeRecords": 10,
+      "mirrorWrites": 10,
+      "visualChanges": 10,
+      "chunkRebuilds": 6
+    },
+    "errors": [],
+    "browser": "157.0.8103.79"
+  },
+  "skins_motion": {
+    "status": "pass",
+    "strokes": [
+      {
+        "direction": "east",
+        "flights": 8,
+        "sharedGeometryDisposals": 0
+      },
+      {
+        "direction": "west",
+        "flights": 8,
+        "sharedGeometryDisposals": 0
+      },
+      {
+        "direction": "up",
+        "flights": 8,
+        "sharedGeometryDisposals": 0
+      },
+      {
+        "direction": "down",
+        "flights": 8,
+        "sharedGeometryDisposals": 0
+      },
+      {
+        "direction": "south",
+        "flights": 8,
+        "sharedGeometryDisposals": 0
+      },
+      {
+        "direction": "north",
+        "flights": 8,
+        "sharedGeometryDisposals": 0
+      }
+    ],
+    "assertions": 808,
+    "errors": [],
+    "browser": "157.0.8103.79"
+  }
+}

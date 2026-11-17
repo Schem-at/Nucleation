@@ -405,7 +405,7 @@ export default function App(): JSX.Element {
         // start at their source instead of appearing half a block ahead.
         // Pausing freezes this fractional position; manual steps stay exact.
         world.animate(presentation.sample(world.sim, Number(world.sim.tickCount?.() ?? 0), subTick, runningRef.current));
-        if (!flushing) {
+        if (!flushing && world.needsRemesh()) {
           flushing = true;
           void world.flush().finally(() => {
             flushing = false;
