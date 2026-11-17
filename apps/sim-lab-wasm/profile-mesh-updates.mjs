@@ -18,7 +18,7 @@ try {
     for(const [variant,World]of constructors){
       const w=await World.load(new Uint8Array(bytes));
       const ticks=scenario==='hipster'?320:160;
-      let writes=0,chunks=0,records=0;
+      let writes=0,chunks=0,records=0,maxFlights=0;
       const set=w.schem.setBlockFromString.bind(w.schem),remesh=w.remeshChunk.bind(w);
       w.schem.setBlockFromString=(...args)=>{writes++;return set(...args);};
       w.remeshChunk=(...args)=>{chunks++;return remesh(...args);};
@@ -29,6 +29,7 @@ try {
         if(tick%8===0||tick===ticks){
           const changes=w.drainChanges();records+=changes.length;w.applyChanges(changes);
           w.animate(Number(w.sim.tickCount()));await w.flush();
+          maxFlights=Math.max(maxFlights,w.flights.size);
         }
       }
       const mirror=[],[x0,y0,z0,x1,y1,z1]=JSON.parse(w.schem.boundingBoxJson());
@@ -38,7 +39,13 @@ try {
       }
       const hash=async text=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)))].map(n=>n.toString(16).padStart(2,'0')).join('');
       const mirrorHash=await hash(JSON.stringify(mirror));
+      const expectedMirror=JSON.parse(w.sim.worldSnapshotJson())
+        .filter(b=>b.state!=='minecraft:air'&&!b.state.startsWith('minecraft:moving_piston'))
+        .map(b=>[...b.pos,b.state]);
+      const normalize=rows=>JSON.stringify(rows.map(row=>JSON.stringify(row)).sort());
+      if(normalize(mirror)!==normalize(expectedMirror))throw Error('Render mirror differs from solid simulation blocks');
       results.push({variant,ticks,batch_ticks:8,change_records:records,mirror_writes:writes,chunk_rebuilds:chunks,
+        max_rendered_piston_flights:maxFlights,render_mirror_matches_simulation:true,
         render_mirror_sha256:mirrorHash,final_state_sha256:await hash(w.sim.worldSnapshotJson())});
     }
     if(results.length===2&&results[0].final_state_sha256!==results[1].final_state_sha256)throw Error('Engine states diverged');
