@@ -1,0 +1,382 @@
+{
+  "format_version": 1,
+  "data_version": 4671,
+  "case": "wall_connections",
+  "negative_control": false,
+  "size": [
+    45,
+    2,
+    3
+  ],
+  "origin": [
+    -40,
+    100,
+    -20
+  ],
+  "watch": {
+    "min": [
+      -2,
+      -2,
+      -2
+    ],
+    "max": [
+      46,
+      3,
+      4
+    ]
+  },
+  "rng_seed": 0,
+  "capture_ticks": 24,
+  "source": {
+    "sha256": "44c3d03d9d15f51cb8d02cb66065b68e9a1c009666919134985768cedf7d631d",
+    "data_version": 4671,
+    "path": "tools/gametest/samples/wall_connections.snbt",
+    "description": "Hand-authored wall connection exceptions, partial faces, gates and bars."
+  },
+  "fixture": [
+    {
+      "pos": [
+        1,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]"
+    },
+    {
+      "pos": [
+        6,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]"
+    },
+    {
+      "pos": [
+        11,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]"
+    },
+    {
+      "pos": [
+        16,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]"
+    },
+    {
+      "pos": [
+        21,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]"
+    },
+    {
+      "pos": [
+        26,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]"
+    },
+    {
+      "pos": [
+        31,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]"
+    },
+    {
+      "pos": [
+        36,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]"
+    },
+    {
+      "pos": [
+        41,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]"
+    }
+  ],
+  "actions": [
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        2,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        7,
+        0,
+        1
+      ],
+      "state": "minecraft:glass"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        12,
+        0,
+        1
+      ],
+      "state": "minecraft:barrier[waterlogged=false]"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        17,
+        0,
+        1
+      ],
+      "state": "minecraft:pumpkin"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        22,
+        0,
+        1
+      ],
+      "state": "minecraft:oak_leaves[distance=7,persistent=true,waterlogged=false]"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        27,
+        0,
+        1
+      ],
+      "state": "minecraft:iron_bars[east=false,north=false,south=false,waterlogged=false,west=true]"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        32,
+        0,
+        1
+      ],
+      "state": "minecraft:oak_fence_gate[facing=north,in_wall=true,open=false,powered=false]"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        37,
+        0,
+        1
+      ],
+      "state": "minecraft:oak_fence_gate[facing=east,in_wall=false,open=false,powered=false]"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        42,
+        0,
+        1
+      ],
+      "state": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        2,
+        0,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        7,
+        0,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        12,
+        0,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        17,
+        0,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        22,
+        0,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        27,
+        0,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        32,
+        0,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        37,
+        0,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        42,
+        0,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        2,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        7,
+        0,
+        1
+      ],
+      "state": "minecraft:glass"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        12,
+        0,
+        1
+      ],
+      "state": "minecraft:barrier[waterlogged=false]"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        17,
+        0,
+        1
+      ],
+      "state": "minecraft:pumpkin"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        22,
+        0,
+        1
+      ],
+      "state": "minecraft:oak_leaves[distance=7,persistent=true,waterlogged=false]"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        27,
+        0,
+        1
+      ],
+      "state": "minecraft:iron_bars[east=false,north=false,south=false,waterlogged=false,west=true]"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        32,
+        0,
+        1
+      ],
+      "state": "minecraft:oak_fence_gate[facing=north,in_wall=true,open=false,powered=false]"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        37,
+        0,
+        1
+      ],
+      "state": "minecraft:oak_fence_gate[facing=east,in_wall=false,open=false,powered=false]"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        42,
+        0,
+        1
+      ],
+      "state": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]"
+    }
+  ]
+}
