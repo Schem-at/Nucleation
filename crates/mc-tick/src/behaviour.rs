@@ -1856,6 +1856,12 @@ impl BehaviourTable {
         }
     }
 
+    /// Record a missing runtime path, including a partially supported block.
+    /// Ordinary registry scans still report only unregistered states.
+    pub(crate) fn note_unsupported(&mut self, state: StateId) {
+        self.unknown.insert(state);
+    }
+
     /// Scan a world and record every unregistered state in it.
     ///
     /// Call this after loading a structure and before trusting any result. It is
@@ -1897,7 +1903,7 @@ impl BehaviourTable {
             .collect();
         names.sort_unstable();
         Some(format!(
-            "{} block state(s) have no behaviour and were simulated as nothing: {}",
+            "{} block state(s) encountered missing or unsupported behaviour: {}",
             names.len(),
             names.join(", ")
         ))

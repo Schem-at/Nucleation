@@ -1,6 +1,7 @@
 # Note-triggered piston mechanism: missing scaffolding updates
 
-Checked on 17 November 2026. The supplied mechanism activates and continues
+Original diagnosis checked on 17 November 2026. See the shared-engine follow-up
+below for the subsequent fix. The supplied mechanism activates and continues
 running in **vanilla Java 1.21.11**. Nucleation 0.12.3 accepts the input and
 starts the first pistons, but its missing scaffolding support-state updates
 stop propagation. The same failure occurs in the exact WASM binary served by
@@ -122,3 +123,57 @@ change must implement scaffolding support updates and observer notifications,
 validate their timing against this oracle, then replay the full original to
 discover any subsequent divergence. The original remains a known failing
 simulation candidate, not an admitted vanilla-parity benchmark.
+
+
+## Shared-engine follow-up: 17 November 2026
+
+The scaffolding behavior is now registered in `mc-tick`, including companion
+states and component classification. It applies to native callers and the
+browser WASM without a schematic-specific switch. Support recomputation is
+scheduled per mutation, not once per tick, and ordinary state writes preserve
+observer delivery. Piston support uses the head/base union at current movement
+progress: treating the retracting base as solid for the entire movement changed
+the reproducer one tick too soon.
+
+Three playerless 1.21.11 captures are committed as compact JSON under
+`crates/mc-tick/tests/corpus/scaffolding12111/`. These are hand-authored fixtures;
+the user's litematic and large captures remain outside Git.
+
+| Capture | Ticks | Result | Ordered engine block changes |
+|---|---:|---|---:|
+| Eight-block note trigger | 24 | Every frame matches | 12 |
+| 14 support configurations, vertical propagation, support removal/restoration | 24 | Every frame matches | 48 |
+| Enclosed waterlogged scaffolding / flow channel | 24 | Every frame matches | 4 |
+
+Support cases include glass, leaves, top/bottom slabs, stairs and trapdoors,
+observers, walls, soul sand and piston bases. Leaves do **not** provide the
+support scaffolding requires; soul sand does despite its lower collision box.
+The new support table is separate from dust's existing support approximations.
+
+The original 9,821-block mechanism passes its former tick-23 failure. Its next
+first mismatch is **tick 30**, at `(0,0,19)`: vanilla rewrites the east and south
+cobblestone-wall arms from `low` to `tall`; the current engine leaves them low.
+The comparison stops at this mismatch, so it establishes 30 matching frames
+(including tick zero), **not** 160- or 1,100-tick parity or a completed stroke.
+The existing 1,100-tick vanilla capture remains available for the wall follow-up.
+
+Limits: the oracle compares tick-end blocks, flat inventories and comparator
+outputs, not full entities, moving block entities or intra-tick order. General
+falling-block entities remain unimplemented. A scaffold already at distance 7
+that is still unsupported is surfaced through the unknown-behavior report;
+newly unsupported scaffolding instead follows the destruction/item-drop path.
+General fluid face occlusion and arbitrary moving partial-block support remain
+separate physics gaps. The enclosed water test does not establish those cases.
+
+To replay the new regressions on harrison-work:
+
+```sh
+cargo test --locked -p mc-tick --test scaffolding
+cargo run --locked -p mc-tick --example check_community_capture -- \
+  --capture crates/mc-tick/tests/corpus/scaffolding12111/note_trigger.json
+```
+
+The native capture checker now accepts the explicit `exact_states_no_datafix`
+projection and actual note-block actions. It preserves the source's data version
+and rejects block-entity NBT in projection mode; default native-reference checks
+remain in place.

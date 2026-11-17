@@ -2593,7 +2593,7 @@ impl Simulation {
     pub fn unknown_report(&mut self) -> Option<String> {
         let seen = std::mem::take(&mut self.unknown_seen);
         for state in seen {
-            self.behaviours.note_unknown(state);
+            self.behaviours.note_unsupported(state);
         }
         self.behaviours.note_unknown_in(&self.world);
         self.behaviours.unknown_report(&self.registry)

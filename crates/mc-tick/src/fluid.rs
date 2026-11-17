@@ -30,8 +30,9 @@
 //! `canPassThroughWall` is a shape computation over collision faces; this
 //! engine approximates it with the full-cube table — water flows between any
 //! two non-full-cube cells. Waterlogged blocks count as *sources for
-//! neighbours* (their `getFluidState` is a full source) but do not run their
-//! own spread tick here; a build that relies on water leaking out of a
+//! neighbours* (their `getFluidState` is a full source). Scaffolding runs its
+//! scheduled source spread; other waterlogged blocks do not run their own
+//! spread tick here; a build that relies on water leaking out of a
 //! waterlogged stair will diverge and the capture that shows it becomes the
 //! fixture for doing walls properly.
 
