@@ -132,3 +132,12 @@ occupied inventory slots inside the watch box. It does not independently census
 vanilla entities, nested item components, moving BE payloads or intra-tick
 notifications. Extend that observation model before claiming those mechanics
 are covered. Storage/crafting shortlist notes identify those required extensions.
+
+## Note-triggered scaffolding regression
+
+The [17 November scaffolding investigation](note-trigger-scaffolding.md) records
+a known simulator mismatch, an eight-block native-1.21.11 reproducer, and commands
+for replaying the real note-block use. Its explicit cross-version mode preserves
+the original saved version and requires exact vanilla block-state round trips;
+it does not provide general datafixing. Keep this failure outside accepted
+benchmark scores until the engine matches the reference.

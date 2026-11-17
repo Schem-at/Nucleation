@@ -1,0 +1,113 @@
+{
+  "format_version": 1,
+  "data_version": 4671,
+  "case": "scaffolding_note_trigger",
+  "negative_control": false,
+  "size": [
+    2,
+    4,
+    3
+  ],
+  "origin": [
+    0,
+    100,
+    0
+  ],
+  "watch": {
+    "min": [
+      -2,
+      -2,
+      -2
+    ],
+    "max": [
+      3,
+      5,
+      4
+    ]
+  },
+  "rng_seed": 0,
+  "capture_ticks": 24,
+  "source": {
+    "sha256": "1ba59372f786697fa96ffe46cfa4524785f9cc66b614fe7a1265767909407498",
+    "data_version": 4671,
+    "path": "tools/gametest/samples/scaffolding_note_trigger.snbt",
+    "description": "Hand-authored eight-block support-distance reproducer; not an archived schematic extraction."
+  },
+  "fixture": [
+    {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "state": "minecraft:piston[extended=false,facing=south]"
+    },
+    {
+      "pos": [
+        0,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        0
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=true,distance=1,waterlogged=false]"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        2
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        0
+      ],
+      "state": "minecraft:observer[facing=west,powered=false]"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        0
+      ],
+      "state": "minecraft:observer[facing=up,powered=false]"
+    },
+    {
+      "pos": [
+        0,
+        3,
+        0
+      ],
+      "state": "minecraft:note_block[instrument=basedrum,note=9,powered=false]"
+    }
+  ],
+  "actions": [
+    {
+      "tick": 1,
+      "type": "use_note_block",
+      "pos": [
+        0,
+        3,
+        0
+      ]
+    }
+  ]
+}

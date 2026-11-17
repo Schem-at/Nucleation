@@ -1,0 +1,84 @@
+{
+  "DataVersion": 4671,
+  "size": [
+    2,
+    4,
+    3
+  ],
+  "data": [
+    {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "state": "minecraft:piston{extended:false,facing:south}"
+    },
+    {
+      "pos": [
+        0,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        0
+      ],
+      "state": "minecraft:scaffolding{bottom:false,distance:0,waterlogged:false}"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding{bottom:true,distance:1,waterlogged:false}"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        2
+      ],
+      "state": "minecraft:scaffolding{bottom:false,distance:0,waterlogged:false}"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        0
+      ],
+      "state": "minecraft:observer{facing:west,powered:false}"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        0
+      ],
+      "state": "minecraft:observer{facing:up,powered:false}"
+    },
+    {
+      "pos": [
+        0,
+        3,
+        0
+      ],
+      "state": "minecraft:note_block{instrument:basedrum,note:9,powered:false}"
+    }
+  ],
+  "entities": [],
+  "palette": [
+    "minecraft:note_block{instrument:basedrum,note:9,powered:false}",
+    "minecraft:observer{facing:up,powered:false}",
+    "minecraft:observer{facing:west,powered:false}",
+    "minecraft:piston{extended:false,facing:south}",
+    "minecraft:scaffolding{bottom:false,distance:0,waterlogged:false}",
+    "minecraft:scaffolding{bottom:true,distance:1,waterlogged:false}",
+    "minecraft:stone"
+  ]
+}

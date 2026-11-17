@@ -93,7 +93,9 @@ public final class CommunityCapture12111 {
         for(String key:List.of("entities","item_entities"))if(scenario.containsKey(key)&&!array(scenario.get(key),key).isEmpty())throw new IllegalArgumentException("Entity loading is not implemented");
         Map<String,Object> source=object(scenario.get("source"),"source");
         if(!string(source.get("sha256"),"source.sha256").matches("[0-9a-f]{64}"))throw new IllegalArgumentException("Invalid source SHA-256");
-        if(integer(source.get("data_version"),"source.data_version")!=4671)throw new IllegalArgumentException("Source must itself be native 4671");
+        boolean exactStates="exact_states_no_datafix".equals(scenario.get("source_mode"));
+        if(scenario.containsKey("source_mode")&&!exactStates)throw new IllegalArgumentException("Unknown source_mode");
+        if(integer(source.get("data_version"),"source.data_version")!=4671&&!exactStates)throw new IllegalArgumentException("Non-native source requires explicit exact-state compatibility mode");
         size=vector(scenario.get("size"),"size"); origin=vector(scenario.get("origin"),"origin");
         Map<String,Object> watch=object(scenario.get("watch"),"watch");
         minimum=vector(watch.get("min"),"watch.min"); maximum=vector(watch.get("max"),"watch.max");
@@ -118,6 +120,7 @@ public final class CommunityCapture12111 {
             String descriptor=string(b.get("state"),"fixture.state");
             String nbt=b.containsKey("nbt")?string(b.get("nbt"),"fixture.nbt"):null;
             if(descriptor.equals("minecraft:air")&&nbt!=null)throw new IllegalArgumentException("Air cannot carry block entity NBT");
+            if(exactStates&&nbt!=null)throw new IllegalArgumentException("Exact-state compatibility mode cannot import block entities");
             fixture.add(new Fixture(p[0],p[1],p[2],descriptor,nbt));
         }
         if(fixture.isEmpty())throw new IllegalArgumentException("Empty fixture");
@@ -128,7 +131,7 @@ public final class CommunityCapture12111 {
             if(t<1||t>ticks||t<priorTick||!watched(p))throw new IllegalArgumentException("Actions must be ordered, within ticks and watch box");
             priorTick=t;String value=null;
             if(kind.equals("set_block"))value=string(a.get("state"),"action.state");
-            else if(!Set.of("notify_neighbors","pull_lever").contains(kind)||a.containsKey("state"))throw new IllegalArgumentException("Unknown or invalid action: "+kind);
+            else if(!Set.of("notify_neighbors","pull_lever","use_note_block").contains(kind)||a.containsKey("state"))throw new IllegalArgumentException("Unknown or invalid action: "+kind);
             actions.add(new Action(t,kind,p[0],p[1],p[2],value));
         }
 
@@ -162,6 +165,14 @@ public final class CommunityCapture12111 {
                 if(entity==null)throw new IllegalStateException("Block entity failed to load: "+b);
                 names.call(world,LEVEL,"setBlockEntity",ENTITY,entity);
             }
+            // Detached: never connected, ticked or added to the level. NoteBlock's
+            // actual use path needs a player for its statistic/game-event calls.
+            Object notePlayer=null;
+            if(actions.stream().anyMatch(a->a.type.equals("use_note_block"))){
+                Object profile=names.construct("com.mojang.authlib.GameProfile","java.util.UUID,java.lang.String",UUID.fromString("00000000-0000-0000-0000-000000000001"),"oracle-note-use");
+                Object info=names.call(null,"net.minecraft.server.level.ClientInformation","createDefault","");
+                notePlayer=names.construct("net.minecraft.server.level.ServerPlayer",MC+","+SERVER_LEVEL+",com.mojang.authlib.GameProfile,net.minecraft.server.level.ClientInformation",server,world,profile,info);
+            }
             Object random=names.call(world,LEVEL,"getRandom","");
             names.call(random,"net.minecraft.util.RandomSource","setSeed","long",(long)seed);
             Map<String,Object> initial=capture(0);
@@ -177,6 +188,10 @@ public final class CommunityCapture12111 {
                         Object current=read(a.x,a.y,a.z);
                         require(descriptor(current).startsWith("minecraft:lever["),"pull_lever target is not a lever: "+a);
                         names.call(names.field("net.minecraft.world.level.block.Blocks","LEVER"),"net.minecraft.world.level.block.LeverBlock","pull",STATE+","+LEVEL+","+POS+",net.minecraft.world.entity.player.Player",current,world,p,null);
+                    }else if(a.type.equals("use_note_block")){
+                        Object current=read(a.x,a.y,a.z);
+                        require(descriptor(current).startsWith("minecraft:note_block["),"use_note_block target is not a note block: "+a);
+                        names.call(names.field("net.minecraft.world.level.block.Blocks","NOTE_BLOCK"),"net.minecraft.world.level.block.NoteBlock","useWithoutItem",STATE+","+LEVEL+","+POS+",net.minecraft.world.entity.player.Player,net.minecraft.world.phys.BlockHitResult",current,world,p,notePlayer,null);
                     }else names.call(world,LEVEL,"updateNeighborsAt",POS+",net.minecraft.world.level.block.Block,net.minecraft.world.level.redstone.Orientation",p,names.field("net.minecraft.world.level.block.Blocks","AIR"),null);
                 }
                 tick();snapshots.add(capture(t));
@@ -192,7 +207,12 @@ public final class CommunityCapture12111 {
             result.put("initial",initial);result.put("snapshots",snapshots);
             if(out.toAbsolutePath().getParent()!=null)Files.createDirectories(out.toAbsolutePath().getParent());
             // Gson also escapes all JSON control characters in arbitrary source metadata/NBT.
-            Files.writeString(out,(String)gsonType.getMethod("toJson",Object.class).invoke(gson,result)+"\n",StandardOpenOption.CREATE_NEW);
+            // Large mechanisms already retain their snapshots. Stream JSON to
+            // avoid allocating a second, hundreds-of-megabytes output string.
+            try(var writer=Files.newBufferedWriter(out,StandardOpenOption.CREATE_NEW)){
+                gsonType.getMethod("toJson",Object.class,Appendable.class).invoke(gson,result,writer);
+                writer.write("\n");
+            }
             System.out.println("CAPTURED "+out+" ticks="+ticks+" players=0 case="+label);success=true;
         }finally{names.call(server,MC,"stopServer","");}
         if(success)System.exit(0);
