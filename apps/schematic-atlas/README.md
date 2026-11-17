@@ -60,6 +60,14 @@ annotated map remain available as context.
 
 ## Interaction and evidence
 
+- Drop a schematic onto **Your live workbench**, or click the drop area to
+  choose one. Litematic, Schematica, Sponge, NBT and SNBT files up to 128 MB
+  open paused in the live simulator. Use **run**, **step** and **reset**;
+  **Choose another** replaces the session, and closing it stops simulation.
+  Files pass directly to the browser engine: they are not uploaded, indexed,
+  saved to the archive or added to Git. Saved player-head texture URLs may
+  still request their textures through the local skin cache. Large selections
+  remain subject to the engine's world-size limit.
 - Use **/** to focus search. Search covers names, mechanism tags, source names,
   paths and recorded native data versions.
 - Cards render 60 at a time. Switch to the table for a dense comparison.
@@ -161,7 +169,7 @@ parity; those claims come from the attached verified adapter/oracle evidence.
 
 ## Files and API
 
-`index.html`, `app.js` and `style.css` implement the interface. `replay.js`
+`index.html`, `app.js`, `local-live.js` and `style.css` implement the interface. `replay.js`
 provides `mountReplay(container, capture)` and returns a cleanup callback.
 `tools/serve_tick_archive.py` owns the API and routes:
 
@@ -197,6 +205,12 @@ workspace, reset/step/pause controls and parent telemetry using the real WASM
 engine. `../sim-lab-wasm/verify-coordinates.mjs` checks saved-origin alignment,
 mesh vertices, picking, piston updates and differential simulation on the
 reported plot entries and generated translated multi-region builds.
+
+`verify-drop-live.mjs` checks drag/drop and keyboard file selection against the
+real WASM engine, including step/run/pause/reset, replacement, malformed input,
+mobile layout and disposal on close. Pass the server URL, an evidence output
+directory and optionally a schematic fixture path as its three arguments.
+It defaults to the tracked D-latch fixture; the supplied hipster was also checked.
 
 ## Player-head textures
 

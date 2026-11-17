@@ -27,6 +27,15 @@
       <div class="intro-copy"><p class="eyebrow">COLLECTED. INSPECTED. PUT TO THE TEST.</p><h1 id="page-title">A little world<br>of <em>possibilities.</em></h1><p class="intro-description">Explore the mechanisms. Look inside their state.<br>Find out what actually works.</p></div>
       <div class="intro-index" aria-label="Archive summary"><span class="index-label">ARCHIVE INDEX</span><div id="summary-stats" class="summary-stats"><span class="loading-line">Reading the archive…</span></div><span class="index-note">Validation belongs to the evidence, not the filename.</span></div>
     </section>
+    <section class="try-live" aria-labelledby="try-live-title">
+      <div><p class="eyebrow">YOUR LIVE WORKBENCH</p><h2 id="try-live-title">Put your own build to the test.</h2><p class="try-live-copy">Drop a schematic, flip its levers, and watch it run.</p></div>
+      <button id="local-drop" class="local-drop" type="button" aria-describedby="local-file-help local-file-error">
+        <span class="drop-icon" aria-hidden="true">↥</span><span><strong>Drop your schematic here</strong><small>or click to choose a file</small></span><span class="drop-action" aria-hidden="true">Try it live ↗</span>
+      </button>
+      <input id="local-file-input" type="file" accept=".litematic,.schem,.schematic,.nbt,.snbt" hidden>
+      <p id="local-file-help" class="drop-help">Litematic, Schematica, Sponge, NBT or SNBT · Up to 128 MB · Files stay in this browser session.</p>
+      <p id="local-file-error" class="drop-error" role="alert" hidden></p>
+    </section>
     <section id="featured" class="featured" hidden aria-label="Featured world-record plot"></section>
     <section id="library" class="library" aria-labelledby="library-title">
       <div class="library-heading"><div><p class="eyebrow">THE COLLECTION</p><h2 id="library-title">All schematics</h2></div><span id="result-count" class="result-count" aria-live="polite"></span></div>
@@ -62,6 +71,12 @@
       </section>
       <section id="detail-properties" class="properties-column" aria-label="Properties and evidence"><div id="detail-badges" class="detail-badges"></div><div class="property-tabs" role="tablist" aria-label="Detail panels"><button role="tab" data-property="overview" aria-selected="true" class="active">Properties</button><button role="tab" data-property="materials" aria-selected="false">Materials</button><button role="tab" data-property="provenance" aria-selected="false">Sources</button><button role="tab" data-property="notes" aria-selected="false">Notes</button></div><div id="property-content" class="property-content"></div></section>
     </div>
+  </dialog>
+  <dialog id="local-live" class="detail-dialog local-dialog" aria-labelledby="local-live-title">
+    <div class="detail-top"><div class="detail-heading"><p class="eyebrow">YOUR LIVE WORKBENCH · TEMPORARY SESSION</p><h2 id="local-live-title">Your schematic</h2></div><div class="detail-tools"><button id="local-replace" class="button secondary" type="button">Choose another</button><button id="local-close" class="icon-button" type="button" aria-label="Close live workbench">✕</button></div></div>
+    <p id="local-status" class="local-status" role="status">Opening the simulator…</p>
+    <div id="local-stage" class="local-stage"></div>
+    <div class="live-metrics local-metrics" aria-label="Local simulation properties"><div><span>GAME TICK</span><strong id="local-tick">—</strong></div><div><span>ACTUAL TPS</span><strong id="local-tps">—</strong></div><div><span>ENTITIES</span><strong id="local-entities">—</strong></div><div><span>ENGINE STATE</span><strong id="local-run-state">Loading</strong></div></div>
   </dialog>
   <div id="toast" class="toast" role="status" hidden></div>
 </body>

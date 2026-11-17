@@ -97,6 +97,8 @@ export default function App(): JSX.Element {
   const loadVersion = useRef(0);
   const archiveFetch = useRef<AbortController | null>(null);
   const loadedArchiveSha = useRef<string | null>(null);
+  const loadedLocalRequest = useRef<string | null>(null);
+  const bridgeSession = useRef(crypto.randomUUID());
 
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [running, setRunning] = useState(false);
@@ -193,6 +195,7 @@ export default function App(): JSX.Element {
         statusKind: state.status.kind, statusMessage: state.status.message ?? null,
         actualTps: isRunning && Number.isFinite(state.actualTps) ? state.actualTps : 0,
         recording: isRecording, archiveSha: world ? loadedArchiveSha.current : null,
+        localRequestId: loadedLocalRequest.current,
         fileName: world ? lastFile.current?.name ?? null : null,
         target: state.target || null, info: state.info || null,
         requestedTps: Number.isFinite(state.rate) ? state.rate : null,
@@ -647,13 +650,24 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     const receive = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin || event.source !== window.parent || event.data?.type !== "nucleation-atlas-command") return;
+      if (window.parent === window || event.origin !== window.location.origin || event.source !== window.parent || event.data?.type !== "nucleation-atlas-command") return;
       if (event.data.command === "pause") {
         runningRef.current = false;
         setRunning(false);
+      } else if (event.data.command === "load-file" && event.data.file instanceof File
+                 && typeof event.data.requestId === "string") {
+        loadedLocalRequest.current = event.data.requestId;
+        const file: File = event.data.file;
+        if (!file.size || file.size > 128 * 1024 * 1024) {
+          runningRef.current = false; setRunning(false);
+          setStatus({ kind: "error", message: "Choose a nonempty schematic up to 128 MB." });
+          return;
+        }
+        void openLatest.current(file, undefined, undefined, null);
       }
     };
     window.addEventListener("message", receive);
+    if (window.parent !== window) window.parent.postMessage({ type: "nucleation-atlas-ready", sessionId: bridgeSession.current }, window.location.origin);
     return () => window.removeEventListener("message", receive);
   }, []);
 

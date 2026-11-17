@@ -1,3 +1,4 @@
+import './local-live.js';
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const nf = new Intl.NumberFormat();
@@ -572,8 +573,10 @@ function updateLive(event) {
 function closeDetails() { if ($('#detail').open) $('#detail').close(); }
 $('#detail').addEventListener('close', () => {
   state.entryAbort?.abort(); clearReplay(); clearLive(); state.selected = null; state.detail = null;
-  document.body.style.overflow = ''; if (location.hash.startsWith('#entry=')) history.replaceState(null, '', collectionURL());
-  if (state.opener?.isConnected) state.opener.focus(); else $('#search').focus(); state.opener = null;
+  if (!$('#local-live').open) document.body.style.overflow = '';
+  if (location.hash.startsWith('#entry=')) history.replaceState(null, '', collectionURL());
+  if (!$('#local-live').open) { if (state.opener?.isConnected) state.opener.focus(); else $('#search').focus(); }
+  state.opener = null;
 });
 $('#detail').addEventListener('click', event => { const r = $('#detail').getBoundingClientRect(); if (event.target === $('#detail') && (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom)) closeDetails(); });
 $('#close-detail').addEventListener('click', closeDetails);
@@ -597,7 +600,7 @@ $('#validation-filter').addEventListener('change', event => { state.filter = eve
 $('#sort').addEventListener('change', event => { state.sort = event.target.value; state.limit = PAGE_SIZE; renderResults(); });
 $('#load-more').addEventListener('click', () => { state.limit += PAGE_SIZE; renderResults(); });
 for (const view of ['grid', 'table']) $(`#${view}-view`).addEventListener('click', () => { state.view = view; for (const v of ['grid', 'table']) { $(`#${v}-view`).classList.toggle('active', v === view); $(`#${v}-view`).setAttribute('aria-pressed', String(v === view)); } renderResults(); });
-document.addEventListener('keydown', event => { if (event.key === '/' && !$('#detail').open && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) { event.preventDefault(); $('#search').focus(); } });
+document.addEventListener('keydown', event => { if (event.key === '/' && !$('#detail').open && !$('#local-live').open && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) { event.preventDefault(); $('#search').focus(); } });
 window.addEventListener('hashchange', handleHash); window.addEventListener('message', updateLive);
 
 async function boot() {

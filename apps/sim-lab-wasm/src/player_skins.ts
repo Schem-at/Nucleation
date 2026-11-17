@@ -18,7 +18,8 @@ async function download(hash: string): Promise<Uint8Array> {
     pending = (async () => {
       // Atlas keeps a persistent local copy; standalone Sim Lab uses Mojang's
       // CORS-enabled texture CDN directly. Old saved http URLs become HTTPS.
-      const url = new URLSearchParams(location.search).has('archive')
+      const params = new URLSearchParams(location.search);
+      const url = params.has('archive') || params.get('local') === '1'
         ? `/api/player-skin/${hash}` : `https://textures.minecraft.net/texture/${hash}`;
       const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
       if (!response.ok) throw new Error(`skin ${hash}: HTTP ${response.status}`);
