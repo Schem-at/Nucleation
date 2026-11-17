@@ -1,5 +1,10 @@
 # Note-triggered extender: wall shape signals
 
+**Endpoint follow-up:** [extender-endpoint.md](extender-endpoint.md) proves that
+the original also fails to extend in vanilla: the honey payload adheres to
+extra piston bases and exceeds the push limit. Earlier trace parity did not
+establish a working full extension.
+
 Verified 17 November 2026. The wall update gap is fixed in the shared Rust
 engine and the local Atlas WASM. The original 9,821-block schematic now matches
 all **1,101 frames** (initial state plus 1,100 ticks) of the retained playerless

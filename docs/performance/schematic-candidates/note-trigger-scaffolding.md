@@ -1,5 +1,10 @@
 # Note-triggered piston mechanism: missing scaffolding updates
 
+**Endpoint follow-up:** [extender-endpoint.md](extender-endpoint.md) proves that
+the original also fails to extend in vanilla: the honey payload adheres to
+extra piston bases and exceeds the push limit. Earlier trace parity did not
+establish a working full extension.
+
 **Later fix:** the remaining wall-update mismatch is now fixed; see
 [note-trigger-walls.md](note-trigger-walls.md) for the 1,100-tick original replay
 and current Atlas engine. The sections below retain the historical diagnosis.

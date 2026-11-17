@@ -1,0 +1,592 @@
+{
+  "format_version": 1,
+  "data_version": 4671,
+  "case": "honey_piston_bank",
+  "negative_control": false,
+  "size": [
+    6,
+    3,
+    60
+  ],
+  "origin": [
+    0,
+    100,
+    0
+  ],
+  "watch": {
+    "min": [
+      -2,
+      -2,
+      -2
+    ],
+    "max": [
+      7,
+      4,
+      61
+    ]
+  },
+  "rng_seed": 0,
+  "capture_ticks": 24,
+  "source": {
+    "data_version": 4671,
+    "sha256": "609631ff044d59050946aa0810ddbb3c103c149fd6faa30f13a070b5b12a5e18",
+    "path": "tools/gametest/samples/honey_piston_bank.snbt",
+    "description": "Hand-authored push-limit controls: 12 honey +12 adjacent bases; 12 honey +one base; one honey +12 adjacent bases; 12 honey +two bases (13-block load). Only the last base receives power."
+  },
+  "fixture": [
+    {
+      "pos": [
+        2,
+        1,
+        0
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        0
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        1
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        1
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        2
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        2
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        3
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        3
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        4
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        4
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        5
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        5
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        6
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        6
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        7
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        7
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        8
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        8
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        9
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        9
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        10
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        10
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        11
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        11
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        16
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        17
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        18
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        19
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        20
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        21
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        22
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        23
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        24
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        25
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        26
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        27
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        27
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        32
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        33
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        34
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        35
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        36
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        37
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        38
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        39
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        40
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        41
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        42
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        43
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        43
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        48
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        49
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        50
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        51
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        52
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        53
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        54
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        55
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        56
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        57
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        58
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        58
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        59
+      ],
+      "state": "minecraft:honey_block"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        59
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=west]"
+    }
+  ],
+  "actions": [
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        4,
+        1,
+        11
+      ],
+      "state": "minecraft:redstone_block"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        4,
+        1,
+        27
+      ],
+      "state": "minecraft:redstone_block"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        4,
+        1,
+        43
+      ],
+      "state": "minecraft:redstone_block"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        4,
+        1,
+        59
+      ],
+      "state": "minecraft:redstone_block"
+    }
+  ]
+}
