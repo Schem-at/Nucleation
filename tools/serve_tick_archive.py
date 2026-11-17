@@ -256,7 +256,7 @@ class Archive:
                 record['dimensions'] = [284, 208, 295]
             rows.append(record)
         summary = {k: v for k, v in self.library.items() if k not in ['entries', 'unmatched_curation']}
-        summary.update(sources=len({r['source'] for r in rows}), validated=len({r['sha256'] for r in rows if r.get('validation_status') in ['functional_pass', 'vanilla_tick_end_parity_pass']}))
+        summary.update(sources=len({r['source'] for r in rows}), validated=len({r['sha256'] for r in rows if r.get('validation_status') in ['functional_pass', 'vanilla_tick_end_parity_pass', 'vanilla_sampled_block_parity_pass']}))
         return {'summary': summary, 'entries': rows}
 
 

@@ -1,5 +1,9 @@
 # Note-triggered extender: wall shape signals
 
+**Corrected source now works:** the author-supplied replacement adds missing
+barriers and replaces the honey payload with concrete. Its full 149-block
+extension and return are [verified separately](extender-corrected.md).
+
 **Endpoint follow-up:** [extender-endpoint.md](extender-endpoint.md) proves that
 the original also fails to extend in vanilla: the honey payload adheres to
 extra piston bases and exceeds the push limit. Earlier trace parity did not
