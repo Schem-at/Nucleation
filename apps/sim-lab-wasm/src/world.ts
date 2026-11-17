@@ -11,6 +11,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { loadMeshEnv } from "./mesher";
+import { VisualStates, MeshInvalidation, affectedChunks, finalChanges } from "./mesh_invalidation";
 import { loadPlayerSkins, type SkinStatus } from "./player_skins";
 import { hasMinecartModel, minecartModelFor, minecartRotation } from "./entity_models";
 
@@ -261,7 +262,12 @@ export class World {
   group = new THREE.Group();
   /** One three.js object per chunk, by chunk coordinate. */
   private chunks = new Map<string, THREE.Object3D>();
-  private dirty = new Set<string>();
+  private invalidation = new MeshInvalidation();
+  private dirty = this.invalidation.dirty;
+  private visualStates: VisualStates;
+  private meshing = new Set<string>();
+  private flushPromise: Promise<number> | null = null;
+  readonly renderStats = { changeRecords: 0, mirrorWrites: 0, visualChanges: 0, chunkRebuilds: 0 };
   /** Solid cells, for the player's raycast and collision. */
   private solid = new Set<string>();
   /** One object per live entity, by engine id. Kept apart from the chunk
@@ -287,6 +293,7 @@ export class World {
     this.eng = eng;
     this.pack = pack;
     this.cfg = cfg;
+    this.visualStates = new VisualStates(name => pack.getBlockstateJson(name));
     this.group.add(this.entityGroup);
   }
 
@@ -623,10 +630,11 @@ export class World {
    * variants are prepared before play to avoid missing first-stroke geometry.
    */
   private blockMesh(state: string): THREE.Object3D | null {
-    const have = this.blockMeshes.get(state);
+    const visual = this.visualStates.key(state);
+    const have = this.blockMeshes.get(visual);
     if (have !== undefined) return have;
-    if (this.pendingMeshes.has(state)) return null;
-    this.pendingMeshes.add(state);
+    if (this.pendingMeshes.has(visual)) return null;
+    this.pendingMeshes.add(visual);
     void (async () => {
       let object: THREE.Object3D | null = null;
       try {
@@ -649,8 +657,8 @@ export class World {
       } catch {
         object = null;
       }
-      this.blockMeshes.set(state, object);
-      this.pendingMeshes.delete(state);
+      this.blockMeshes.set(visual, object);
+      this.pendingMeshes.delete(visual);
     })();
     return null;
   }
@@ -743,6 +751,11 @@ export class World {
       Math.floor(y / this.chunkSize),
       Math.floor(z / this.chunkSize),
     );
+    if (!this.dirty.has(chunk) && !this.meshing.has(chunk)) {
+      this.dispose(f.object);
+      this.dispose(f.stillObject);
+      return;
+    }
     this.handover.push({
       cell: k,
       chunk,
@@ -982,46 +995,35 @@ export class World {
     // changes no block at all, so gating this on `changes.length` would freeze
     // a boat drifting through still air.
     this.syncEntities();
-    for (const c of changes) {
+    this.renderStats.changeRecords += changes.length;
+    const touched = new Set<string>();
+    for (const c of finalChanges(changes)) {
       const [x, y, z] = c.pos;
-      // A placeholder is not a block anyone should see. The chunk shows a
-      // hole for the two ticks the stroke lasts and the sliding mesh fills
-      // it — meshing `moving_piston` instead drew a stand-in that popped.
-      // Anything the simulation writes is a candidate for flying later — a
-      // `piston_head` that has just landed will fly again the next time that
-      // piston retracts. Warming here is what covers the states the build's
-      // palette never contained.
-      this.warmState(c.to);
+      const cell = key(x, y, z);
+      // The mirror is current render truth; intermediate simulation writes
+      // still exist in the engine/recording but need never cross this bridge.
       const solidified = c.to.startsWith("minecraft:moving_piston") ? "minecraft:air" : c.to;
+      let before = "minecraft:air";
+      try { before = this.schem.getBlockString(x, y, z) || "minecraft:air"; } catch { /* new space */ }
+      if (before === solidified) continue;
       try {
         this.schem.setBlockFromString(x, y, z, solidified);
       } catch {
-        /* a state the schematic cannot express is still simulated */
+        continue; // don't mark a mirror write that failed as drawn
       }
-      if (solidified === "minecraft:air") this.solid.delete(key(x, y, z));
-      else this.solid.add(key(x, y, z));
-      // The block's own chunk, plus any neighbour whose face meshing it
-      // changes — a block on a seam alters the chunk next door.
-      //
-      // Deliberately *not* clamped to the build's own chunks. The engine's
-      // region grows to follow a machine that travels, so the loaded
-      // dimensions stop describing where blocks are the moment a flying
-      // machine sets off; clamping to them left it flying somewhere the
-      // screen could not show. This set is self-limiting anyway — a chunk
-      // only enters it because a block in it actually changed — and
-      // `remeshChunk` skips any box that turns out empty, which is what
-      // stops the stray geometry a clamp was once used for.
-      for (let dx = -1; dx <= 1; dx++)
-        for (let dy = -1; dy <= 1; dy++)
-          for (let dz = -1; dz <= 1; dz++) {
-            const k = key(
-              Math.floor((x + dx) / this.chunkSize),
-              Math.floor((y + dy) / this.chunkSize),
-              Math.floor((z + dz) / this.chunkSize),
-            );
-            this.dirty.add(k);
-            this.chunkRevision.set(k, (this.chunkRevision.get(k) ?? 0) + 1);
-          }
+      this.renderStats.mirrorWrites++;
+      if (solidified === "minecraft:air") this.solid.delete(cell);
+      else this.solid.add(cell);
+      const oldVisual = this.visualStates.key(before), newVisual = this.visualStates.key(solidified);
+      if (oldVisual === newVisual) continue;
+      this.renderStats.visualChanges++;
+      this.warmState(c.to);
+      // Preserve seam/AO dependencies and growth beyond the original bounds.
+      for (const k of affectedChunks(c.pos, this.chunkSize)) {
+        touched.add(k);
+        this.invalidation.change(k, cell, oldVisual, newVisual);
+        this.chunkRevision.set(k, (this.chunkRevision.get(k) ?? 0) + 1);
+      }
     }
     // *After* the writes, not before. A retiring flight has to know whether the
     // cell it is vacating now holds a real block — if it does, the flight hands
@@ -1030,29 +1032,43 @@ export class World {
     // answers live in `solid` and `chunkRevision`, which the loop above has
     // just brought up to date.
     this.syncFlights();
+    // A pending reversal can make the installed mesh current again without
+    // any rebuild. Retired flights must not wait forever for that cancelled job.
+    for (const k of touched) if (!this.dirty.has(k) && !this.meshing.has(k)) {
+      this.releaseHandovers(k, this.chunkRevision.get(k) ?? 0);
+    }
   }
+
+  /** Whether the animation loop has any block geometry to rebuild. */
+  needsRemesh(): boolean { return this.dirty.size > 0; }
 
   /** Re-mesh everything marked dirty. Called once per animation frame, not
    * per tick, so a fast-forward costs one re-mesh rather than dozens. */
-  async flush(): Promise<number> {
-    if (this.dirty.size === 0) return 0;
-    const todo = [...this.dirty];
-    this.dirty.clear();
-    // The schematic already holds every change these chunks are being re-meshed
-    // for, so this is the revision each one is about to catch up to. Captured
-    // before the first `await`: a change landing mid-flush belongs to the next
-    // pass, and a hand-off must not be released on a mesh that predates it.
-    const caughtUpTo = new Map(todo.map((k) => [k, this.chunkRevision.get(k) ?? 0]));
-    for (const k of todo) {
-      const [cx, cy, cz] = k.split(",").map(Number);
-      await this.remeshChunk(cx, cy, cz);
-      // Same turn as the chunk swap inside `installChunk`: the new geometry is
-      // in the scene, so whatever was standing in for it can go now. A frame
-      // later would show both; the retirement that queued it would have shown
-      // neither.
-      this.releaseHandovers(k, caughtUpTo.get(k) ?? 0);
+  flush(): Promise<number> {
+    if (this.flushPromise) return this.flushPromise;
+    if (this.dirty.size === 0) return Promise.resolve(0);
+    this.flushPromise = this.flushPending().finally(() => { this.flushPromise = null; });
+    return this.flushPromise;
+  }
+
+  private async flushPending(): Promise<number> {
+    let rebuilt = 0;
+    for (const k of [...this.dirty]) {
+      // Take each snapshot when its mesh actually starts, not when the first
+      // chunk starts. Updates while earlier GLBs parse are already included.
+      if (!this.invalidation.take(k)) continue;
+      const revision = this.chunkRevision.get(k) ?? 0;
+      this.meshing.add(k);
+      try {
+        const [cx, cy, cz] = k.split(",").map(Number);
+        await this.remeshChunk(cx, cy, cz);
+        this.renderStats.chunkRebuilds++;
+        rebuilt++;
+      } finally { this.meshing.delete(k); }
+      // If newer writes cancelled one another, this mesh represents them too.
+      this.releaseHandovers(k, this.dirty.has(k) ? revision : this.chunkRevision.get(k) ?? revision);
     }
-    return todo.length;
+    return rebuilt;
   }
 
   /** Drop the stand-ins for `chunk` that `revision` has now drawn for real. */
