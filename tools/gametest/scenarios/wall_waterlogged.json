@@ -1,0 +1,458 @@
+{
+  "format_version": 1,
+  "data_version": 4671,
+  "case": "wall_waterlogged",
+  "negative_control": false,
+  "size": [
+    6,
+    3,
+    3
+  ],
+  "origin": [
+    -40,
+    100,
+    -20
+  ],
+  "watch": {
+    "min": [
+      -2,
+      -2,
+      -2
+    ],
+    "max": [
+      7,
+      4,
+      4
+    ]
+  },
+  "rng_seed": 0,
+  "capture_ticks": 24,
+  "source": {
+    "sha256": "05109389759034ebea7c4d7581a1e6eacc5c2b0728a5fad665063be7bbd3e9f2",
+    "data_version": 4671,
+    "path": "tools/gametest/samples/wall_waterlogged.snbt",
+    "description": "Hand-authored enclosed waterlogged wall, shape update and three-cell flow channel."
+  },
+  "fixture": [
+    {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        0,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        0,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        2,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        2,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        2,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        0,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        2,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        2,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        2,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        0,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        1,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        2,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        2,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        2,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        0,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        1,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        1,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        2,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        2,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        2,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=none,north=low,south=low,up=true,waterlogged=true,west=low]"
+    }
+  ],
+  "actions": [
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        1,
+        2,
+        1
+      ],
+      "state": "minecraft:glass"
+    }
+  ]
+}

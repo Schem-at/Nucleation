@@ -1,5 +1,9 @@
 # Note-triggered piston mechanism: missing scaffolding updates
 
+**Later fix:** the remaining wall-update mismatch is now fixed; see
+[note-trigger-walls.md](note-trigger-walls.md) for the 1,100-tick original replay
+and current Atlas engine. The sections below retain the historical diagnosis.
+
 Original diagnosis checked on 17 November 2026. See the shared-engine follow-up
 below for the subsequent fix. The supplied mechanism activates and continues
 running in **vanilla Java 1.21.11**. Nucleation 0.12.3 accepts the input and

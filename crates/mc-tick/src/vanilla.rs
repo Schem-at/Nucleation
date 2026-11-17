@@ -211,6 +211,12 @@ pub struct VanillaRules {
     leaf_distance: StateTable<u8>,
     scaffold_distances: StateTable<u8>,
     scaffold_supports: StateSet,
+    wall_boxes: StateTable<Vec<crate::wall::ShapeBox>>,
+    wall_coverage: StateTable<[bool; 5]>,
+    wall_moving: StateSet,
+    wall_connections: StateTable<u8>,
+    wall_posts: StateSet,
+    wall_post_override: StateSet,
     logs: StateSet,
     /// Repeater states, which dust faces only along their axis.
     repeaters: StateSet,
@@ -2205,6 +2211,37 @@ impl crate::scaffolding::ScaffoldingWorld for Arc<VanillaRules> {
     }
 }
 
+impl crate::wall::WallWorld for Arc<VanillaRules> {
+    fn wall_connects(&self, ctx: &crate::TickCtx<'_>, pos: Pos, face: Dir) -> bool {
+        self.wall_connections.get(&ctx.world.get(pos)).is_some_and(|mask| mask & (1 << face as u8) != 0)
+    }
+    fn wall_cover(&self, ctx: &crate::TickCtx<'_>, pos: Pos) -> ([bool; 5], bool) {
+        let state = ctx.world.get(pos);
+        let mut coverage = if self.wall_moving.contains(&state) {
+            let Some(movement) = ctx.moves.iter().find(|m| m.pos == pos) else { return ([false; 5], false); };
+            let Some(sweep) = movement.sweep else { return ([false; 5], false); };
+            let progress = (1.0 - movement.resolve_on.saturating_sub(ctx.tick) as f64 * 0.5).max(0.0);
+            let mut boxes = if movement.source_piston {
+                crate::piston::shove_shape_boxes(Pos::new(0,0,0), sweep, progress, true)
+                    .into_iter().map(|b| (b.min,b.max)).collect::<Vec<_>>()
+            } else {
+                let (x,y,z) = sweep.travel.delta();
+                let offset = [x,y,z].map(|v| -f64::from(v) * (1.0-progress));
+                self.wall_boxes.get(&movement.state).into_iter().flatten().map(|(lo,hi)|
+                    (std::array::from_fn(|i| lo[i]+offset[i]), std::array::from_fn(|i| hi[i]+offset[i]))).collect()
+            };
+            if movement.source_piston && !sweep.extending {
+                boxes.push(crate::piston::retracting_base_box(Pos::new(0,0,0), sweep.travel));
+            }
+            crate::wall::bottom_cover(&boxes)
+        } else {
+            self.wall_coverage.get(&state).copied().unwrap_or([false; 5])
+        };
+        coverage[4] |= self.wall_post_override.contains(&state);
+        (coverage, self.wall_posts.contains(&state))
+    }
+}
+
 impl PowerSource for VanillaRules {
     #[cfg(feature = "experiment-piston-plan")]
     fn planned_piston_power(&self, world: &World, outputs: &crate::behaviour::ComparatorOutputs,
@@ -3322,12 +3359,43 @@ pub fn register_all_at(
         }
     }
 
+    // Only circuits containing walls need the collision-face lookup table.
+    if descriptors.iter().any(|(_, d)| d.name.ends_with("_wall")) {
+        for (id, d) in &descriptors {
+            let boxes = crate::wall::boxes(d, is_full_cube(d));
+            let mut connections = 0;
+            let n = d.name.as_str();
+            let exception = n.ends_with("_leaves") || is_shulker_box(n)
+                || matches!(n, "minecraft:barrier" | "minecraft:pumpkin" | "minecraft:carved_pumpkin"
+                    | "minecraft:jack_o_lantern" | "minecraft:melon");
+            for face in crate::wall::SIDES {
+                let gate = n.ends_with("_fence_gate") && d.facing().is_some_and(|f|
+                    matches!(f, Dir::North | Dir::South) != matches!(face, Dir::North | Dir::South));
+                if n.ends_with("_wall") || matches!(n, "minecraft:iron_bars" | "minecraft:glass_pane") || n.ends_with("_glass_pane")
+                    || gate || (!exception && crate::wall::covers(&boxes, face, [0.;2], [1.;2])) {
+                    connections |= 1 << face as u8;
+                }
+            }
+            if n.ends_with("_wall") && d.flag("up") { rules.wall_posts.push(*id); }
+            if n == "minecraft:moving_piston" { rules.wall_moving.push(*id); }
+            if matches!(n, "minecraft:torch" | "minecraft:soul_torch" | "minecraft:redstone_torch"
+                | "minecraft:copper_torch" | "minecraft:tripwire" | "minecraft:cactus_flower")
+                || n.ends_with("_sign") || n.ends_with("_banner") || n.ends_with("_pressure_plate") {
+                rules.wall_post_override.push(*id);
+            }
+            rules.wall_coverage.insert(*id, crate::wall::bottom_cover(&boxes));
+            rules.wall_boxes.insert(*id, boxes);
+            rules.wall_connections.insert(*id, connections);
+        }
+    }
+
     // Behaviours only read the completed rules. Share that immutable table
     // instead of deep-cloning every map into every registered state.
     let rules = Arc::new(rules);
 
     // Second pass: register behaviour, resolving paired states through the
     // registry so a block can find its own opposite.
+    let mut wall_families = HashMap::<String, Arc<[Option<StateId>; 162]>>::new();
     for (id, descriptor) in &descriptors {
         let name = descriptor.name.as_str();
 
@@ -3647,6 +3715,27 @@ pub fn register_all_at(
                         power: rules.clone(),
                     }),
                 );
+            }
+            n if n.ends_with("_wall") => {
+                let key = descriptor.with_values([("north", "none"), ("east", "none"),
+                    ("south", "none"), ("west", "none"), ("up", "false")]);
+                let family = wall_families.entry(key).or_insert_with(|| {
+                    let mut family = [None; 162];
+                    for a in 0..3 { for b in 0..3 { for c in 0..3 { for d in 0..3 {
+                        for up in [false, true] {
+                            let v = crate::wall::VALUES;
+                            family[crate::wall::index([a,b,c,d],up)] = registry.get(&descriptor.with_values([
+                                ("north",v[a as usize]), ("east",v[b as usize]), ("south",v[c as usize]),
+                                ("west",v[d as usize]), ("up",if up { "true" } else { "false" })]));
+                        }
+                    }}}}
+                    Arc::new(family)
+                }).clone();
+                table.register(*id, Box::new(crate::wall::Wall {
+                    sides: crate::wall::PROPERTIES.map(|p| crate::wall::VALUES.iter()
+                        .position(|v| Some(*v) == descriptor.get(p)).unwrap_or(0) as u8),
+                    waterlogged: descriptor.flag("waterlogged"), family, rules: rules.clone(),
+                }));
             }
             "minecraft:scaffolding" => {
                 let mut family = [None; 16];
@@ -4829,6 +4918,7 @@ pub fn is_simulation_component(descriptor: &str) -> bool {
         || short.ends_with("_door")
         || short.ends_with("_trapdoor")
         || short.ends_with("_fence_gate")
+        || short.ends_with("_wall")
         || short.contains("copper_bulb")
     {
         return true;
@@ -4995,6 +5085,7 @@ pub fn intern_companions(registry: &mut StateRegistry) {
         .filter_map(|i| registry.descriptor(StateId(i as u16)).map(str::to_string))
         .collect();
     let mut wire_families = HashSet::new();
+    let mut wall_families = HashSet::new();
 
     for text in existing {
         let descriptor = Descriptor::parse(&text);
@@ -5079,6 +5170,21 @@ pub fn intern_companions(registry: &mut StateRegistry) {
             // would exist as a state with no behaviour attached. A leaf pulled
             // to distance 1 by a log then went inert: it could no longer book
             // its own re-check, and the observer watching it never fired again.
+            n if n.ends_with("_wall") => {
+                let key = descriptor.with_values([("north", "none"), ("east", "none"),
+                    ("south", "none"), ("west", "none"), ("up", "false"), ("waterlogged", "false")]);
+                if !wall_families.insert(key) { continue; }
+                let mut all: Vec<String> = (0..=8).map(|l| format!("minecraft:water[level={l}]")).collect();
+                for n in crate::wall::VALUES { for e in crate::wall::VALUES {
+                    for s in crate::wall::VALUES { for w in crate::wall::VALUES {
+                        for up in ["false", "true"] { for wet in ["false", "true"] {
+                            all.push(descriptor.with_values([("north",n), ("east",e), ("south",s),
+                                ("west",w), ("up",up), ("waterlogged",wet)]));
+                        }}
+                    }}
+                }}
+                all
+            }
             "minecraft:scaffolding" => {
                 let mut all: Vec<String> = (0..=8).map(|l| format!("minecraft:water[level={l}]")).collect();
                 for distance in 0..=7 {
