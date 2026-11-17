@@ -17,7 +17,12 @@ const captureBytes = capturePath.endsWith('.gz') ? gunzipSync(raw) : raw;
 const c = JSON.parse(captureBytes);
 assert.equal(c.mc_version, '1.21.11');
 assert.equal(c.settle, 'in_world');
-assert.equal(c.snapshots.length, c.capture_ticks);
+const stride = c.capture_stride ?? 1;
+assert.ok(Number.isInteger(stride) && stride >= 1 && stride <= c.capture_ticks, 'Valid capture stride');
+const sampledTicks = [0];
+for (let t = 1; t <= c.capture_ticks; t++) if (t % stride === 0 || t === c.capture_ticks) sampledTicks.push(t);
+assert.deepEqual([c.initial.tick, ...c.snapshots.map(s => s.tick)], sampledTicks, 'Exact snapshot schedule');
+if (Object.hasOwn(c, 'capture_stride')) assert.deepEqual(c.sampled_ticks, sampledTicks);
 assert.ok(c.fixture.every(b => !b.nbt), 'Block-entity payloads need a richer comparison');
 assert.ok(!c.entities?.length && !c.item_entities?.length, 'Entity equality is outside this checker');
 const { Schematic, TickSimulation, TickSettleMode } = await import(pathToFileURL(`${engine}/index.mjs`));
@@ -44,8 +49,9 @@ const expectedHash = createHash('sha256'), actualHash = createHash('sha256');
 let frames = 0, changes = 0;
 for (const expected of [c.initial, ...c.snapshots]) {
   assert.equal(expected.players, 0);
-  if (expected.tick > 0) {
-    for (const action of c.actions.filter(a => a.tick === expected.tick)) {
+  while (Number(sim.tickCount()) < expected.tick) {
+    const tick = Number(sim.tickCount()) + 1;
+    for (const action of c.actions.filter(a => a.tick === tick)) {
       if (action.type === 'use_note_block' || action.type === 'pull_lever') sim.useBlock(...action.pos);
       else if (action.type === 'set_block') sim.placeBlock(...action.pos, action.state);
       else throw new Error(`Unsupported test action ${action.type}`);
@@ -63,10 +69,12 @@ for (const expected of [c.initial, ...c.snapshots]) {
   sim.clearChanges();
   frames++;
 }
-console.log(JSON.stringify({ case: c.case, status: 'matches_vanilla_blocks', matching_frames: frames,
+console.log(JSON.stringify({ case: c.case, status: stride === 1 ? 'matches_vanilla_blocks' : 'matches_vanilla_sampled_blocks', matching_frames: frames,
+  simulated_ticks: Number(sim.tickCount()), capture_stride: stride, engine_quiescent: sim.isQuiescent(),
+  final_honey_positions: JSON.parse(sim.worldSnapshotJson()).filter(b => b.state === 'minecraft:honey_block').map(b => b.pos),
   changes, source_data_version: c.source.data_version, reference_version: c.mc_version,
   source_sha256: c.source.sha256, capture_sha256: hash(captureBytes),
   engine_sha256: hash(await readFile(`${engine}/nucleation.wasm`)),
   expected_sha256: expectedHash.digest('hex'), actual_sha256: actualHash.digest('hex'),
   importer: process.argv[4] ? 'original_schematic' : 'capture_fixture',
-  scope: 'Every tick-end block within watch, including air; no entity, inventory, moving-BE or intra-tick equality.' }));
+  scope: `${stride === 1 ? 'Every' : 'Sampled'} tick-end block within watch, including air; every simulation tick and action is executed. No entity, inventory, moving-BE or intra-tick equality.` }));

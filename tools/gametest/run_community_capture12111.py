@@ -23,6 +23,10 @@ For a different source version, explicitly set source_mode=exact_states_no_dataf
 That mode rejects block entities and preserves source.data_version; every state
 must load unchanged in 1.21.11. It tests that version, not the source's version.
 No DFU, entity loading, item-component capture or moving-BE capture is provided.
+
+Optional capture_stride (positive integer, at most capture_ticks) retains tick
+zero, every stride-th tick and the final tick. All ticks/actions still execute.
+Sparse output declares sampled_ticks and cannot establish behavior between them.
 """
 import argparse
 import datetime
@@ -66,6 +70,19 @@ def vector(value, label):
     return [int32(v, label) for v in value]
 
 
+def sampled_ticks(data):
+    ticks = int32(data.get('capture_ticks'), 'capture_ticks')
+    stride = int32(data.get('capture_stride', 1), 'capture_stride')
+    if not 1 <= ticks <= 5000:
+        raise ValueError('Capture exceeds bounded simulated-tick budget')
+    if not 1 <= stride <= ticks:
+        raise ValueError('capture_stride must be positive and at most capture_ticks')
+    result = list(range(0, ticks + 1, stride))
+    if result[-1] != ticks:
+        result.append(ticks)
+    return result
+
+
 def validate_scenario(data):
     if not isinstance(data, dict) or data.get('format_version') != 1:
         raise ValueError('Expected scenario format_version 1')
@@ -101,8 +118,11 @@ def validate_scenario(data):
     if not -64 <= origin[1] + lower[1] <= origin[1] + upper[1] < 320:
         raise ValueError('Watch outside overworld build height')
     ticks = int32(data.get('capture_ticks'), 'capture_ticks')
-    if volume > 262144 or not 1 <= ticks <= 5000 or volume * ticks > 50000000:
-        raise ValueError('Capture exceeds bounded cell/tick budget')
+    frames = sampled_ticks(data)
+    # The existing budget counts post-initial snapshots. Sparse sampling reduces
+    # retained/scanned cells, not the number of simulated ticks (still <=5000).
+    if volume > 262144 or volume * (len(frames) - 1) > 50000000:
+        raise ValueError('Capture exceeds bounded cell/snapshot budget')
     x_chunks = ((origin[0] + upper[0]) >> 4) - ((origin[0] + lower[0]) >> 4) + 3
     z_chunks = ((origin[2] + upper[2]) >> 4) - ((origin[2] + lower[2]) >> 4) + 3
     if x_chunks * z_chunks > 1024:
@@ -157,9 +177,19 @@ def validate_capture(path, scenario, scenario_sha256):
             raise ValueError(f'Capture changed {key}')
     if data.get('source_mode') != scenario.get('source_mode'):
         raise ValueError('Capture changed source_mode')
+    expected_ticks = sampled_ticks(scenario)
+    if 'capture_stride' in scenario:
+        if data.get('capture_stride') != scenario['capture_stride']:
+            raise ValueError('Capture changed capture_stride')
+        if data.get('sampled_ticks') != expected_ticks:
+            raise ValueError('Capture changed sampled_ticks')
+        if scenario['capture_stride'] > 1 and 'sampled tick-end' not in data.get('scope', ''):
+            raise ValueError('Sparse capture must declare its sampled tick-end scope')
+    elif 'capture_stride' in data or 'sampled_ticks' in data:
+        raise ValueError('Capture introduced undeclared sampling')
     frames = [data['initial'], *data['snapshots']]
-    if [frame['tick'] for frame in frames] != list(range(scenario['capture_ticks'] + 1)):
-        raise ValueError('Capture is not contiguous from tick zero')
+    if [frame['tick'] for frame in frames] != expected_ticks:
+        raise ValueError('Capture does not contain the exact declared tick sequence')
     lower, upper = scenario['watch']['min'], scenario['watch']['max']
     for frame in frames:
         if frame['players'] != 0:
@@ -192,9 +222,28 @@ def validate_capture(path, scenario, scenario_sha256):
     expected_blocks = {tuple(b['pos']): b['state'] for b in scenario['fixture'] if b['state'] != 'minecraft:air'}
     if initial != expected_blocks:
         raise ValueError('Initial blocks do not equal the input fixture')
-    return {'sha256': digest(path), 'ticks': scenario['capture_ticks'], 'players': 0,
+    if scenario.get('capture_stride', 1) > 1:
+        activity = data.get('final_activity', {})
+        if activity.get('tick') != scenario['capture_ticks']:
+            raise ValueError('Sparse capture requires final activity at the last tick')
+        for name in ['block_ticks', 'fluid_ticks', 'block_events',
+                     'rescheduled_block_events', 'moving_pistons_in_watch']:
+            if type(activity.get(name)) is not int or activity[name] < 0:
+                raise ValueError(f'Invalid final activity counter: {name}')
+        moving = sum(row[3].startswith('minecraft:moving_piston[') for row in frames[-1]['blocks'])
+        if activity['moving_pistons_in_watch'] != moving:
+            raise ValueError('Final moving-piston count disagrees with final frame')
+        if not isinstance(activity.get('scope'), str) or not activity['scope']:
+            raise ValueError('Final activity must declare its scope')
+    result = {'sha256': digest(path), 'ticks': scenario['capture_ticks'], 'players': 0,
             'warmup_ticks': data['warmup_ticks'], 'java': data['java_runtime_version'],
             'structural_capture_checks': 'passed', 'functional_checks': 'not performed'}
+    if 'capture_stride' in scenario:
+        result.update(capture_stride=scenario['capture_stride'], sampled_ticks=expected_ticks,
+                      every_tick_captured=scenario['capture_stride'] == 1)
+    if scenario.get('capture_stride', 1) > 1:
+        result['final_activity'] = data['final_activity']
+    return result
 
 
 def main():
@@ -249,6 +298,10 @@ def main():
                 'version': version, 'java_version': java_version, 'javac_version': javac_version,
                 'jdk_archive_verified': bool(args.jdk_archive), 'watch_cells': cells,
                 'commands': [], 'functional_checks': 'not performed'}
+    if 'capture_stride' in scenario:
+        metadata.update(capture_stride=scenario['capture_stride'],
+                        sampled_ticks=sampled_ticks(scenario),
+                        every_tick_captured=scenario['capture_stride'] == 1)
 
     def save():
         (output / 'metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
