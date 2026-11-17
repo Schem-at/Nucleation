@@ -177,3 +177,21 @@ The native capture checker now accepts the explicit `exact_states_no_datafix`
 projection and actual note-block actions. It preserves the source's data version
 and rejects block-entity NBT in projection mode; default native-reference checks
 remain in place.
+
+
+Final validation: **429** engine/scenario/doc tests and **30** bridge tests passed
+on harrison-work (7 ignored). Seven Python scenario guards also passed. The
+release WASM build completed on that laptop with Rust 1.98.0 and the existing
+`bridge,mc-tick,meshing` features. The Atlas's actual JS glue replayed all three
+captures successfully, and HTTP retrieval verified that the live server serves
+WASM SHA-256 `c3361e60a4ea982ba4ded2219404d548db53bc81079c5191d6c8bced2bee18d6`.
+
+Importing the original litematic through that WASM produces the same first wall
+mismatch at tick 30. It records 20,590 ordered block changes over 160 ticks and
+remains active at tick 160. That count is not directly comparable with vanilla's
+tick-end changed-cell sum, and activity does not establish intended operation.
+Compact results and engine provenance are in
+`validation/scaffolding-shared-engine.json`. The previous WASM/metadata pair is
+retained under the external archive's `validation/scaffolding-engine/rollback/`
+directory, keyed by its SHA-256. The source is checkpointed separately from any
+future wall fix. Published package versions have not changed.
