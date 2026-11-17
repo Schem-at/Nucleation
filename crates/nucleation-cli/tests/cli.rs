@@ -341,3 +341,88 @@ fn the_man_page_is_mandoc_clean() {
         );
     }
 }
+
+#[test]
+fn scene_authors_edits_and_pipes_standard_schematic_files() {
+    use std::io::Write;
+    use std::process::Stdio;
+    let dir = std::env::temp_dir().join(format!("nucleation-scene-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("authored.litematic");
+    let out = run_cli(&[
+        "scene",
+        "--name",
+        "authored",
+        "--data-version",
+        "4671",
+        "--set",
+        "-8,0,2=minecraft:stone",
+        "--set",
+        "-8,1,2=minecraft:sticky_piston[facing=east,extended=false]",
+        "-o",
+        file.to_str().unwrap(),
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let original = std::fs::read(&file).unwrap();
+    let manager = nucleation::formats::manager::get_manager();
+    let scene = manager.lock().unwrap().read(&original).unwrap();
+    assert_eq!(scene.metadata.name.as_deref(), Some("authored"));
+    assert_eq!(
+        scene
+            .metadata
+            .source_data_version
+            .or(scene.metadata.mc_version),
+        Some(4671)
+    );
+    assert_eq!(scene.get_block(-8, 0, 2).unwrap().name, "minecraft:stone");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_nucleation"))
+        .args([
+            "scene",
+            "-",
+            "--name",
+            "edited",
+            "--set",
+            "-8,0,2=minecraft:gold_block",
+            "--to",
+            "litematic",
+            "-o",
+            "-",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(&original).unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let edited = manager.lock().unwrap().read(&out.stdout).unwrap();
+    assert_eq!(
+        edited.get_block(-8, 0, 2).unwrap().name,
+        "minecraft:gold_block"
+    );
+    assert_eq!(edited.metadata.name.as_deref(), Some("edited"));
+    assert_eq!(
+        std::fs::read(&file).unwrap(),
+        original,
+        "editing a pipe preserves the original file"
+    );
+    let out = run_cli(&[
+        "scene",
+        "--set",
+        "1,2=minecraft:stone",
+        "-o",
+        file.to_str().unwrap(),
+    ]);
+    assert!(!out.status.success());
+    assert_eq!(std::fs::read(&file).unwrap(), original);
+    std::fs::remove_dir_all(dir).unwrap();
+}
