@@ -19,6 +19,8 @@ struct Capture {
     mc_version: String,
     data_version: i32,
     source: Source,
+    #[serde(default)]
+    source_mode: Option<String>,
     case: String,
     negative_control: bool,
     origin: [i32; 3],
@@ -151,8 +153,12 @@ fn validate(c: &Capture) -> Result<()> {
         "format 1 / Minecraft 1.21.11",
     )?;
     schema(
-        c.data_version == 4671 && c.source.data_version == 4671,
-        "capture and source must both be native DataVersion 4671; no version substitution",
+        c.data_version == 4671 && match c.source_mode.as_deref() {
+            None => c.source.data_version == 4671,
+            Some("exact_states_no_datafix") => c.fixture.iter().all(|b| b.nbt.is_none()),
+            _ => false,
+        },
+        "native reference and source, or explicit exact-state projection without block entities",
     )?;
     schema(
         c.source.sha256.len() == 64
@@ -300,10 +306,10 @@ fn validate(c: &Capture) -> Result<()> {
         schema(
             match a.kind.as_str() {
                 "set_block" => a.state.as_ref().is_some_and(|s| !s.is_empty()),
-                "notify_neighbors" | "pull_lever" => a.state.is_none(),
+                "notify_neighbors" | "pull_lever" | "use_note_block" => a.state.is_none(),
                 _ => false,
             },
-            "only set_block, AIR-source notify_neighbors, or pull_lever actions",
+            "only set_block, AIR-source notify_neighbors, pull_lever, or use_note_block actions",
         )?;
         prior_tick = a.tick;
     }
@@ -335,7 +341,7 @@ fn simulation(c: &Capture) -> Result<Simulation> {
     let [x, y, z] = c.size;
     let text = format!(
         "{{DataVersion:{},size:[{x},{y},{z}],palette:[{palette}],blocks:[{blocks}],entities:[]}}",
-        c.data_version
+        c.source.data_version
     );
     let structure = Structure::parse(&text).map_err(|e| {
         fail(
@@ -347,8 +353,8 @@ fn simulation(c: &Capture) -> Result<Simulation> {
         )
     })?;
     schema(
-        structure.data_version == Some(4671),
-        "native fixture save version preserved",
+        structure.data_version == Some(c.source.data_version),
+        "original fixture save version preserved",
     )?;
     let extras = c
         .actions
@@ -577,17 +583,18 @@ fn run(path: &PathBuf, bytes: &[u8], c: &Capture) -> Value {
                             sim.place_block(pos(action.pos), state);
                         }
                         "notify_neighbors" => sim.notify_neighbors(pos(action.pos)),
-                        "pull_lever" => {
+                        "pull_lever" | "use_note_block" => {
+                            let target = if action.kind == "pull_lever" { "minecraft:lever[" } else { "minecraft:note_block[" };
                             let actual = sim
                                 .registry()
                                 .descriptor(sim.world().get(pos(action.pos)))
                                 .unwrap_or("<unknown>");
-                            if !actual.starts_with("minecraft:lever[") {
+                            if !actual.starts_with(target) {
                                 return Err(fail(
                                     Some(expected.tick),
                                     Some(action.pos),
                                     "action_target",
-                                    json!("lever"),
+                                    json!(target),
                                     json!(actual),
                                 ));
                             }
@@ -658,4 +665,18 @@ fn main() {
     if !passed {
         std::process::exit(1);
     }
+}
+
+#[cfg(test)]
+pub(crate) fn assert_matches_capture(bytes: &[u8]) {
+    let capture: Capture = serde_json::from_slice(bytes).unwrap();
+    let result = run(&PathBuf::from("embedded vanilla capture"), bytes, &capture);
+    assert_eq!(result["status"], "matches_capture", "{result}");
+}
+
+#[cfg(test)]
+pub(crate) fn fixture_sim(bytes: &[u8]) -> Simulation {
+    let capture: Capture = serde_json::from_slice(bytes).unwrap();
+    validate(&capture).unwrap();
+    simulation(&capture).unwrap()
 }

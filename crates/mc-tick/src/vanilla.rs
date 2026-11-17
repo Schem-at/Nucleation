@@ -209,6 +209,8 @@ pub struct VanillaRules {
     destroyed_by_push: StateSet,
     /// A leaf state's `distance`, and the log states that count as distance 0.
     leaf_distance: StateTable<u8>,
+    scaffold_distances: StateTable<u8>,
+    scaffold_supports: StateSet,
     logs: StateSet,
     /// Repeater states, which dust faces only along their axis.
     repeaters: StateSet,
@@ -2174,6 +2176,35 @@ fn clockwise(dir: Dir) -> Dir {
     }
 }
 
+impl crate::scaffolding::ScaffoldingWorld for Arc<VanillaRules> {
+    fn scaffold_distance(&self, world: &World, pos: Pos) -> Option<u8> {
+        self.scaffold_distances.get(&world.get(pos)).copied()
+    }
+    fn scaffold_support(&self, ctx: &crate::TickCtx<'_>, pos: Pos) -> bool {
+        let state = ctx.world.get(pos);
+        if !ctx.states.descriptor(state).is_some_and(|s| s.starts_with("minecraft:moving_piston[")) {
+            return self.scaffold_supports.contains(&state);
+        }
+        let Some(movement) = ctx.moves.iter().find(|m| m.pos == pos) else { return false; };
+        let Some(sweep) = movement.sweep else { return false; };
+        let progress = (1.0 - movement.resolve_on.saturating_sub(ctx.tick) as f64 * 0.5).max(0.0);
+        if movement.source_piston {
+            let mut boxes: Vec<_> = crate::piston::shove_shape_boxes(Pos::new(0, 0, 0), sweep, progress, true)
+                .into_iter().map(|b| (b.min, b.max)).collect();
+            if !sweep.extending {
+                boxes.push(crate::piston::retracting_base_box(Pos::new(0, 0, 0), sweep.travel));
+            }
+            crate::scaffolding::full_top_face(&boxes)
+        } else if self.full_cubes.contains(&movement.state) {
+            let (x, y, z) = sweep.travel.delta();
+            let lo = [x, y, z].map(|v| -f64::from(v) * (1.0 - progress));
+            crate::scaffolding::full_top_face(&[(lo, lo.map(|v| v + 1.0))])
+        } else {
+            progress == 1.0 && self.scaffold_supports.contains(&movement.state)
+        }
+    }
+}
+
 impl PowerSource for VanillaRules {
     #[cfg(feature = "experiment-piston-plan")]
     fn planned_piston_power(&self, world: &World, outputs: &crate::behaviour::ComparatorOutputs,
@@ -3135,6 +3166,25 @@ pub fn register_all_at(
                 rules.observer_facing.insert(*id, facing);
             }
         }
+        if descriptor.name == "minecraft:scaffolding" {
+            rules.scaffold_distances.insert(*id,
+                descriptor.get("distance").and_then(|v| v.parse().ok()).unwrap_or(7));
+        }
+        // Scaffolding asks for a full support face, not a conductor or dust's
+        // moving-piston approximation. Up-facing heads and closed top trapdoors
+        // have a complete top face even though they are not full cubes.
+        if (is_full_cube(descriptor) && !descriptor.name.ends_with("_leaves"))
+            || descriptor.name == "minecraft:soul_sand"
+            || (matches!(descriptor.name.as_str(), "minecraft:piston" | "minecraft:sticky_piston")
+                && descriptor.facing() == Some(Dir::Down))
+            || (descriptor.name == "minecraft:piston_head" && descriptor.facing() == Some(Dir::Up))
+            || (descriptor.name.ends_with("_slab") && descriptor.get("type") == Some("top"))
+            || (descriptor.name.ends_with("_stairs") && descriptor.get("half") == Some("top"))
+            || (descriptor.name.ends_with("_trapdoor") && descriptor.get("half") == Some("top")
+                && !descriptor.flag("open"))
+        {
+            rules.scaffold_supports.push(*id);
+        }
         // `canSurviveOn`: dust sits on, and climbs, anything with a sturdy top
         // face — full cubes, plus the top halves of slabs and stairs.
         //
@@ -3597,6 +3647,20 @@ pub fn register_all_at(
                         power: rules.clone(),
                     }),
                 );
+            }
+            "minecraft:scaffolding" => {
+                let mut family = [None; 16];
+                for distance in 0..=7 {
+                    for bottom in [false, true] {
+                        family[distance * 2 + usize::from(bottom)] = registry.get(
+                            &descriptor.with_values([("distance", &distance.to_string()),
+                                ("bottom", if bottom { "true" } else { "false" })]));
+                    }
+                }
+                table.register(*id, Box::new(crate::scaffolding::Scaffolding {
+                    distance: descriptor.get("distance").and_then(|v| v.parse().ok()).unwrap_or(7),
+                    waterlogged: descriptor.flag("waterlogged"), family, rules: rules.clone(),
+                }));
             }
             n if n.ends_with("_leaves") => {
                 let distance = descriptor
@@ -4740,6 +4804,7 @@ pub fn is_simulation_component(descriptor: &str) -> bool {
             | "moving_piston"
             | "redstone_lamp"
             | "note_block"
+            | "scaffolding"
             | "lectern"
             | "jukebox"
             | "hopper"
@@ -5014,6 +5079,18 @@ pub fn intern_companions(registry: &mut StateRegistry) {
             // would exist as a state with no behaviour attached. A leaf pulled
             // to distance 1 by a log then went inert: it could no longer book
             // its own re-check, and the observer watching it never fired again.
+            "minecraft:scaffolding" => {
+                let mut all: Vec<String> = (0..=8).map(|l| format!("minecraft:water[level={l}]")).collect();
+                for distance in 0..=7 {
+                    for bottom in ["false", "true"] {
+                        for waterlogged in ["false", "true"] {
+                            all.push(descriptor.with_values([("distance", &distance.to_string()),
+                                ("bottom", bottom), ("waterlogged", waterlogged)]));
+                        }
+                    }
+                }
+                all
+            }
             n if n.ends_with("_leaves") => (1u8..=7)
                 .map(|d| descriptor.with("distance", &d.to_string()))
                 .collect(),
