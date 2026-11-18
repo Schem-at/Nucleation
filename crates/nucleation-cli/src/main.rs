@@ -39,6 +39,7 @@ pub(crate) fn usage_and_exit() -> ! {
          \x20 inspect  view a schematic (TUI when on a terminal, text otherwise)\n\
          \x20 info     one file's overview on stdout: `info <file> [--json]`\n\
          \x20 convert  re-encode: `convert <in> -o <out> [--to FORMAT] [--format-version V]`\n\
+         \x20 query    stream entities or block-entities as JSON Lines (query --help)\n\
          \x20 scene    build/edit: `scene [file] --set X,Y,Z=STATE... -o scene.litematic`\n\
          \x20 diff     compare two builds: `diff <a> <b> [--preset exact] [--json]`\n\
          \x20 render   image/video: `render <file> -o out.png|out.mp4 [--pack P] [--ticks N]`; `render --help`\n\
@@ -127,6 +128,7 @@ fn main() {
             std::process::exit(2);
         }
         Some("convert") => commands::convert::convert_main(args),
+        Some("query") => commands::query::query_main(args),
         Some("scene") => commands::scene::scene_main(args),
         Some("diff") => commands::diff::diff_main(args),
         #[cfg(feature = "render")]

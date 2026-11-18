@@ -104,6 +104,26 @@ With output
 .Ql - ,
 .Fl -to
 is required.
+Use
+.Fl -sphere Ar x,y,z ,
+.Fl -cuboid Ar corner:corner ,
+or
+.Fl -curve Ar formula
+to fill shapes with the building library.
+.Fl -block Ar state ,
+.Fl -radius Ar blocks ,
+and
+.Fl -steps Ar intervals
+configure the shape operations. A curve formula is a jq expression yielding
+three coordinates, with t running from zero through two pi.
+.It Cm query Ar entities|block-entities Ar file
+Write one JSON object per matching record. Use
+.Fl -id Ar id
+to filter,
+.Fl -limit Ar count
+to bound the output, and
+.Fl -nbt
+to include the saved payload. Input decoding loads the schematic into memory.
 .It Cm render Ar file
 Render a static PNG or a simulated MP4, WebM or MOV.
 Video streams RGBA frames to external FFmpeg; select its executable with

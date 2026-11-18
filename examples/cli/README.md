@@ -4,6 +4,8 @@ Run these shell helpers from the repository root with the installed `nucleation`
 and `jq` on PATH. The chest, block-entity and entity queries also use the `nbt` command
 from the Python package `nbtlib` (for example, `uv tool install nbtlib`).
 
+For the built-in `nucleation scene --curve` and `nucleation query` commands, see [the CLI guide](../../docs/cli-scenes-and-video.md).
+
 ## Curves
 
 ```sh

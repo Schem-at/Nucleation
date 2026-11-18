@@ -19,3 +19,6 @@ pub(crate) mod render;
 #[cfg(feature = "render")]
 pub(crate) mod video;
 pub(crate) mod test;
+
+pub(crate) mod geometry;
+pub(crate) mod query;

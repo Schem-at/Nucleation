@@ -426,3 +426,74 @@ fn scene_authors_edits_and_pipes_standard_schematic_files() {
     assert_eq!(std::fs::read(&file).unwrap(), original);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn native_scene_combines_shapes_and_single_block_edits_in_order() {
+    let result = run_cli(&[
+        "scene",
+        "--sphere",
+        "0,0,0",
+        "--radius",
+        "1",
+        "--cuboid",
+        "-4,0,0:-3,0,0",
+        "--block",
+        "minecraft:gold_block",
+        "--set",
+        "0,0,0=minecraft:air",
+        "--to",
+        "litematic",
+        "-o",
+        "-",
+    ]);
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let scene = nucleation::formats::manager::get_manager()
+        .lock()
+        .unwrap()
+        .read(&result.stdout)
+        .unwrap();
+    assert_eq!(
+        scene.get_block(-4, 0, 0).unwrap().name,
+        "minecraft:gold_block"
+    );
+    assert_eq!(
+        scene.get_block(0, 1, 0).unwrap().name,
+        "minecraft:gold_block"
+    );
+    assert_eq!(scene.get_block(0, 0, 0).unwrap().name, "minecraft:air");
+}
+
+#[test]
+fn query_filters_before_emitting_json_lines_and_nbt_is_opt_in() {
+    let file = std::env::temp_dir().join(format!("query-{}.snbt", std::process::id()));
+    std::fs::write(&file,r#"{DataVersion:4671,size:[2,1,1],entities:[],palette:["minecraft:chest","minecraft:barrel"],data:[{pos:[0,0,0],state:"minecraft:chest",nbt:{id:"minecraft:chest",Items:[{Slot:2b,id:"minecraft:apple",count:3}]}},{pos:[1,0,0],state:"minecraft:barrel",nbt:{id:"minecraft:barrel",Items:[]}}]}"#).unwrap();
+    let file_arg = file.to_str().unwrap();
+    let out = run_cli(&["query", "block-entities", file_arg]);
+    assert!(out.status.success());
+    let rows: Vec<serde_json::Value> = serde_json::Deserializer::from_slice(&out.stdout)
+        .into_iter()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(rows.len(), 2);
+    assert!(rows.iter().all(|r| r.get("nbt").is_none()));
+    let out = run_cli(&[
+        "query",
+        "tile-entities",
+        file_arg,
+        "--id",
+        "minecraft:chest",
+        "--limit",
+        "1",
+        "--nbt",
+    ]);
+    let row: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(row["nbt"]["Items"][0]["count"], 3);
+    assert_eq!(row["pos"], serde_json::json!([0, 0, 0]));
+    let out = run_cli(&["query", "block-entities", file_arg, "--limit", "0"]);
+    assert!(out.status.success() && out.stdout.is_empty());
+    std::fs::remove_file(file).unwrap();
+}

@@ -1,4 +1,5 @@
 //! Author a saved scene with the same block descriptors the simulator reads.
+use super::geometry::{BrushOptions, Operation};
 use nucleation::UniversalSchematic;
 use std::path::PathBuf;
 
@@ -15,10 +16,11 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
     let mut format = None;
     let mut name = None;
     let mut version = None;
-    let mut blocks = Vec::new();
+    let mut operations = Vec::new();
+    let mut brush = BrushOptions::default();
     while let Some(arg) = args.next() {
         if arg == "--help" {
-            println!("nucleation scene [input] --set 'X,Y,Z=BLOCK_STATE'... -o scene.litematic\n  --name NAME  --data-version N  --to FORMAT  (- reads/writes a pipe)");
+            println!("nucleation scene [input] --set 'X,Y,Z=BLOCK_STATE'... -o scene.litematic\n  --sphere X,Y,Z  --cuboid X,Y,Z:X,Y,Z  --curve '[12*cos(t),4*t,12*sin(t)]' (jq)\n  --block STATE  --radius R  --steps N (global shape settings)\n  --name NAME  --data-version N  --to FORMAT  (- reads/writes a pipe)");
             return Ok(());
         }
         match arg.as_str() {
@@ -35,7 +37,27 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
             "--set" => {
                 let v = value(&mut args, &arg)?;
                 let (pos, state) = v.split_once('=').ok_or("--set needs X,Y,Z=BLOCK_STATE")?;
-                blocks.push((position(pos)?, state.to_string()));
+                operations.push(Operation::Set(position(pos)?, state.to_string()));
+            }
+            "--block" => brush.block = value(&mut args, &arg)?,
+            "--radius" => {
+                brush.radius = value(&mut args, &arg)?
+                    .parse()
+                    .map_err(|_| "invalid radius")?
+            }
+            "--steps" => {
+                brush.steps = value(&mut args, &arg)?
+                    .parse()
+                    .map_err(|_| "invalid steps")?
+            }
+            "--curve" => operations.push(Operation::Curve(value(&mut args, &arg)?)),
+            "--sphere" => operations.push(Operation::Sphere(position(&value(&mut args, &arg)?)?)),
+            "--cuboid" => {
+                let corners = value(&mut args, &arg)?;
+                let (a, b) = corners
+                    .split_once(':')
+                    .ok_or("--cuboid needs x,y,z:x,y,z")?;
+                operations.push(Operation::Cuboid(position(a)?, position(b)?));
             }
             "-" => {
                 if input.replace(PathBuf::from(arg)).is_some() {
@@ -68,8 +90,8 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
         scene.metadata.mc_version = Some(version);
         scene.metadata.source_data_version = Some(version);
     }
-    for (pos, state) in blocks {
-        scene.set_block_from_string(pos[0], pos[1], pos[2], &state)?;
+    for operation in operations {
+        operation.apply(&mut scene, &brush)?;
     }
     if scene.iter_blocks().all(|(_, s)| s.name == "minecraft:air") {
         return Err("Scene has no blocks; add --set X,Y,Z=STATE".into());

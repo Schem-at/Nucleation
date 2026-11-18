@@ -56,6 +56,36 @@ extensions choose the exporter, or use `--to FORMAT`. `--data-version` stamps
 the authored block states; it does not translate state names to another version.
 Imported save metadata is preserved unless explicitly changed.
 
+## Shape brushes and formulas
+
+```sh
+nucleation scene --cuboid '0,0,0:20,0,20' --block minecraft:stone -o base.schem
+nucleation scene base.schem --sphere '10,5,10' --radius 4 --block minecraft:glass -o dome.schem
+nucleation scene --curve '[12*cos(t), 4*t, 12*sin(t)]' \
+  --block minecraft:oxidized_copper --radius 1.5 --steps 128 -o helix.litematic
+```
+
+Shapes and single-block edits apply in argument order. The shape brush settings
+apply to all shapes in the invocation. The solid brush defaults to stone, the
+radius to 1.5 blocks, and curves to 128 intervals. The formula receives a jq
+input from zero through one. The shorthand `t` spans zero through 2π and the
+formula returns three coordinates in schematic space (Y up). Curve sampling
+requires jq on PATH. The building library connects the samples with straight
+segments and fills the resulting tube with the selected block.
+
+## Select records from a schematic
+
+```sh
+nucleation query entities build.litematic --limit 10
+nucleation query block-entities build.litematic --id minecraft:chest --nbt |
+  jq -c '{pos, items: .nbt.Items}'
+```
+
+Each matching record occupies one line, with its region, ID and position.
+`tile-entities` is an alias for `block-entities`. Add `--nbt` for decoded
+payload data. ID filtering and the optional result limit apply before JSON
+serialization. Input decoding still loads the schematic into memory.
+
 ## Video controls
 
 | Option | Meaning |
