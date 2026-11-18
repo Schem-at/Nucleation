@@ -22,3 +22,5 @@ pub(crate) mod test;
 
 pub(crate) mod geometry;
 pub(crate) mod query;
+
+pub(crate) mod door;

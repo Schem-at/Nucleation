@@ -86,6 +86,56 @@ Each matching record occupies one line, with its region, ID and position.
 payload data. ID filtering and the optional result limit apply before JSON
 serialization. Input decoding still loads the schematic into memory.
 
+## Measure a door
+
+```sh
+nucleation door-stats door.litematic
+nucleation door-stats door.litematic --list-inputs
+nucleation door-stats door.litematic --input 12,7,13 --ticks 160 --json
+```
+
+The simulator loads in-world, seeds its RNG with zero, warms up for ten game ticks,
+then takes a checkpoint. It observes two equal windows with no input, restores
+the checkpoint, and observes the same windows with one interaction at the start
+of each. Each window defaults to 160 game ticks. Use `--warmup` and `--ticks`
+to change these durations. Inputs use saved schematic coordinates. The default
+redstone hash origin is the schematic minimum and can be set with `--origin`.
+
+Detection considers levers, buttons and note blocks. It selects the only
+candidate, or prefers a single lever among other candidates. Multiple equally
+plausible inputs require `--input`. Use `--list-inputs` for their coordinates
+and states after warmup.
+
+Each use reports block writes, distinct positions written, successful piston
+extensions and retractions (including drops), recorded slot and entity events,
+the last write, and whether engine queues are quiet at the endpoint. The JSON
+includes endpoint block differences from both the initial layout and idle
+replay. Layout restoration compares block states and positions. A changed
+note pitch, for example, counts as a difference. If queues are still active at
+the end, extend the observation window.
+
+When the first use settles, the CLI looks for a single complete rectangular
+sheet (at least 2×2) that changed between air and one propertyless block state.
+It groups face-connected cells with the same transition and excludes cells
+whose idle endpoint differed from their initial state. A unique sheet is
+reported as an **inferred** panel. Mixed materials, several panels, or a moving
+endpoint can leave the aperture undetermined. An explicit box overrides inference.
+
+Use `--aperture x1,y1,z1:x2,y2,z2` to watch the inclusive box containing
+the actual passage. The result gives its endpoint occupancy (clear, filled,
+or partial) and when that occupied-cell count last changed. A separate timestamp reports when the exact endpoint block states last changed. This samples air
+versus non-air at tick ends. Collision shapes, traversability and mechanical
+settling have different meanings. Without an aperture the two phases are
+reported as uses 1 and 2.
+
+Add `--timeline cycle.jsonl` to save one JSON object per observed cycle tick.
+Each row includes ordered block changes, piston events with their place in
+that row's change order, queue status, and optional aperture occupancy. Positions
+are in input coordinates. The first row of each window includes the interaction.
+Use a new filename. Ticks in events are absolute simulation ticks. Elapsed
+ticks count completed steps since the interaction (20 game ticks per second
+at normal playback speed).
+
 ## Video controls
 
 | Option | Meaning |

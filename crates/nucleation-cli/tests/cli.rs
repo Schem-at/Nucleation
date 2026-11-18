@@ -497,3 +497,96 @@ fn query_filters_before_emitting_json_lines_and_nbt_is_opt_in() {
     assert!(out.status.success() && out.stdout.is_empty());
     std::fs::remove_file(file).unwrap();
 }
+
+#[test]
+fn door_stats_measures_a_known_aperture_and_lists_ambiguous_controls() {
+    let dir = std::env::temp_dir().join(format!("door-stats-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("door.litematic");
+    let file = file.to_str().unwrap();
+    let create = run_cli(&[
+        "scene",
+        "--set",
+        "-8,0,0=minecraft:stone",
+        "--set",
+        "-8,0,1=minecraft:stone",
+        "--set",
+        "-8,1,0=minecraft:sticky_piston[facing=east,extended=false]",
+        "--set",
+        "-7,1,0=minecraft:gold_block",
+        "--set",
+        "-8,1,1=minecraft:lever[face=floor,facing=north,powered=false]",
+        "-o",
+        file,
+    ]);
+    assert!(create.status.success());
+    let trace = dir.join("cycle.jsonl");
+    let out = run_cli(&[
+        "door-stats",
+        file,
+        "--aperture",
+        "-6,1,0:-6,1,0",
+        "--ticks",
+        "20",
+        "--json",
+        "--timeline",
+        trace.to_str().unwrap(),
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stats: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(stats["input"], serde_json::json!([-8, 1, 1]));
+    assert_eq!(stats["phases"][0]["aperture"]["endpoint"], "filled");
+    assert_eq!(stats["phases"][0]["piston_extensions"], 1);
+    assert_eq!(stats["phases"][1]["aperture"]["endpoint"], "clear");
+    assert_eq!(stats["phases"][1]["piston_retractions_including_drops"], 1);
+    assert_eq!(stats["phases"][0]["idle_block_writes"], 0);
+    assert_eq!(stats["cycle_restores_block_layout"], true);
+    let rows: Vec<serde_json::Value> = std::fs::read_to_string(trace)
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(rows.len(), 40);
+    assert_eq!(rows.iter().filter(|r| r["clicked"] == true).count(), 2);
+    assert_eq!(
+        rows[..20]
+            .iter()
+            .map(|r| r["changes"].as_array().unwrap().len())
+            .sum::<usize>() as u64,
+        stats["phases"][0]["block_writes"].as_u64().unwrap()
+    );
+    let second = dir.join("two.litematic");
+    let second = second.to_str().unwrap();
+    assert!(run_cli(&[
+        "scene",
+        file,
+        "--set",
+        "-8,0,2=minecraft:stone",
+        "--set",
+        "-8,1,2=minecraft:lever[face=floor,facing=north,powered=false]",
+        "-o",
+        second
+    ])
+    .status
+    .success());
+    assert!(!run_cli(&["door-stats", second]).status.success());
+    let list = run_cli(&["door-stats", second, "--list-inputs"]);
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&list.stdout)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(
+        run_cli(&["door-stats", second, "--input", "-8,1,1", "--ticks", "20"])
+            .status
+            .success()
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+}
