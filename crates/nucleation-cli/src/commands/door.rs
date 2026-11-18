@@ -1,6 +1,10 @@
 //! Observe two uses of a door control and compare with an unactivated replay.
+mod hints;
+mod preview;
 use super::scene::{load, position, value};
+use hints::Hints;
 use mc_test::mc_tick::{Pos, Simulation, StateId, Structure};
+use preview::{Diagram, Recording};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
 use std::fs::OpenOptions;
@@ -11,6 +15,15 @@ const HELP: &str = "nucleation door-stats FILE [--list-inputs | --input X,Y,Z] [
   --warmup N       ticks before measurement (default 10)
   --ticks N        ticks to observe after EACH of two uses (default 160)
   --aperture A:B   inclusive corners x,y,z:x,y,z of the passage to watch
+  --size WxH       filter detected panels, or set the size of an anchored rectangle
+  --plane xy|yz|xz filter orientation (anchored rectangles default to xy)
+  --near X,Y,Z     select the unique nearest matching panel
+  --candidate N    choose a numbered panel from the filtered list (starts at 1)
+  --center X,Y,Z   place rectangle around this cell (even sizes use lower middle)
+  --corner X,Y,Z   place rectangle from its minimum corner toward positive axes
+  --preview PNG    draw aperture and input over three schematic projections
+  --preview-only   save preview and skip measuring the cycle
+  --record MP4     record both measured uses at 20 frames/s (one diagram per tick)
   --origin X,Y,Z   world hash origin (defaults to schematic minimum)
   --timeline FILE  save per-tick JSON Lines, including ordered block writes and piston events";
 type Point = [i32; 3];
@@ -152,6 +165,17 @@ fn inferred_panels(sim: &Simulation, initial: &Layout, idle: &Layout) -> Vec<Vec
     panels
 }
 
+fn cell_bounds(cells: &[Pos], offset: Point) -> Value {
+    json!(cells
+        .first()
+        .zip(cells.last())
+        .map(|(&a, &b)| [source_pos(a, offset), source_pos(b, offset)]))
+}
+fn print_panels(panels: &[Value]) {
+    for p in panels {
+        println!("  Candidate {}: {}", p["candidate"], p["bounds"]);
+    }
+}
 struct Observation<'a> {
     offset: Point,
     cells: &'a [Pos],
@@ -164,6 +188,8 @@ impl Observation<'_> {
         sim: &mut Simulation,
         phase: u64,
         mut timeline: Option<&mut BufWriter<std::fs::File>>,
+        diagram: &Diagram,
+        mut recording: Option<&mut Recording>,
     ) -> Result<Value, String> {
         let start = sim.tick_count();
         sim.record_timeline();
@@ -221,6 +247,9 @@ impl Observation<'_> {
                 serde_json::to_writer(&mut *w, &row).map_err(|e| e.to_string())?;
                 w.write_all(b"\n").map_err(|e| e.to_string())?;
             }
+            if let Some(r) = recording.as_deref_mut() {
+                r.frame(diagram, sim, phase, elapsed)?;
+            }
             writes = view.changes.len();
             strokes = view.pistons.len();
         }
@@ -248,6 +277,8 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
     let (mut file, mut input, mut watch, mut timeline, mut origin) = (None, None, None, None, None);
     let (mut ticks, mut warmup) = (160u64, 10u64);
     let (mut json_out, mut list) = (false, false);
+    let mut hints = Hints::default();
+    let (mut preview, mut record, mut preview_only) = (None, None, false);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" => {
@@ -259,6 +290,21 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
             "--input" => input = Some(position(&value(&mut args, &arg)?)?),
             "--origin" => origin = Some(position(&value(&mut args, &arg)?)?),
             "--aperture" => watch = Some(value(&mut args, &arg)?),
+            "--size" => hints.size = Some(hints::size(&value(&mut args, &arg)?)?),
+            "--plane" => hints.plane = Some(hints::plane(&value(&mut args, &arg)?)?),
+            "--corner" => hints.corner = Some(position(&value(&mut args, &arg)?)?),
+            "--center" => hints.center = Some(position(&value(&mut args, &arg)?)?),
+            "--near" => hints.near = Some(position(&value(&mut args, &arg)?)?),
+            "--candidate" => {
+                hints.candidate = Some(
+                    value(&mut args, &arg)?
+                        .parse()
+                        .map_err(|_| "invalid candidate number")?,
+                )
+            }
+            "--preview" => preview = Some(PathBuf::from(value(&mut args, &arg)?)),
+            "--record" => record = Some(PathBuf::from(value(&mut args, &arg)?)),
+            "--preview-only" => preview_only = true,
             "--timeline" => timeline = Some(PathBuf::from(value(&mut args, &arg)?)),
             "--ticks" => {
                 ticks = value(&mut args, &arg)?
@@ -280,6 +326,41 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
         return Err("use 1..100000 observation ticks and 0..100000 warmup ticks".into());
     }
     let file = file.ok_or(HELP)?;
+    hints.validate(watch.is_some())?;
+    if preview_only && (preview.is_none() || record.is_some() || timeline.is_some()) {
+        return Err("--preview-only needs --preview and cannot record a measured cycle".into());
+    }
+    if list && (preview.is_some() || record.is_some() || timeline.is_some()) {
+        return Err("--list-inputs cannot export a preview, video or timeline".into());
+    }
+    let mut paths = HashSet::new();
+    for path in [&file]
+        .into_iter()
+        .chain(preview.iter())
+        .chain(record.iter())
+        .chain(timeline.iter())
+    {
+        let full = if path.exists() {
+            std::fs::canonicalize(path)
+        } else {
+            let parent = path
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .unwrap_or(std::path::Path::new("."));
+            std::fs::canonicalize(parent).map(|p| p.join(path.file_name().unwrap_or_default()))
+        }
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+        if !paths.insert(full) {
+            return Err("input, preview, recording and timeline need distinct paths".into());
+        }
+    }
+    if preview.as_ref().is_some_and(|p| {
+        !p.extension()
+            .and_then(|v| v.to_str())
+            .is_some_and(|v| v.eq_ignore_ascii_case("png"))
+    }) {
+        return Err("--preview requires a .png path".into());
+    }
     let source = load(&file)?;
     let bounds = source.get_bounding_box();
     let offset: Point = bounds.min.into();
@@ -321,18 +402,25 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
         .iter()
         .filter(|(_, s)| s.split('[').next() == Some("minecraft:lever"))
         .collect();
-    let (p, selection) = if let Some(input) = input {
+    let explicit = if let Some(raw) = watch.as_deref() {
+        Some(aperture(raw, offset)?)
+    } else {
+        hints.rectangle(offset)?
+    };
+    let (input_pos, selection) = if let Some(input) = input {
         let p = local(input, offset)?;
         if !controls.iter().any(|(c, _)| *c == p) {
             return Err(format!(
                 "no supported lever, button or note block at {input:?}; use --list-inputs"
             ));
         }
-        (p, "explicit")
+        (Some(p), "explicit")
     } else if controls.len() == 1 {
-        (controls[0].0, "only_candidate")
+        (Some(controls[0].0), "only_candidate")
     } else if levers.len() == 1 {
-        (levers[0].0, "only_lever")
+        (Some(levers[0].0), "only_lever")
+    } else if preview_only && explicit.is_some() {
+        (None, "unselected")
     } else {
         return Err(format!(
             "{} input candidates ({} levers); use --list-inputs and --input X,Y,Z",
@@ -340,11 +428,35 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
             levers.len()
         ));
     };
+    if preview_only {
+        if let Some(cells) = &explicit {
+            let path = preview.as_ref().unwrap();
+            Diagram::new(&initial, cells, &[], input_pos, None, offset).save(
+                &sim,
+                path,
+                "Preview   |   explicit aperture",
+            )?;
+            let bounds = cell_bounds(cells, offset);
+            if json_out {
+                println!(
+                    "{}",
+                    json!({"preview":path,"aperture_selection":"explicit","aperture_bounds":bounds,"aperture_candidates":[],"input":input_pos.map(|p|source_pos(p,offset))})
+                );
+            } else {
+                println!(
+                    "Explicit aperture {bounds}. Preview saved to {}",
+                    path.display()
+                );
+            }
+            return Ok(());
+        }
+    }
+    let p = input_pos.ok_or("no selected input")?;
     sim.set_rng_seed(0);
     let checkpoint = sim.checkpoint();
     sim.record();
     let mut idle = Vec::new();
-    for _ in 0..2 {
+    for _ in 0..if preview_only { 1 } else { 2 } {
         let before = sim.recorded().len();
         for _ in 0..ticks {
             step(&mut sim)?;
@@ -353,27 +465,57 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
     }
     sim.restore(&checkpoint);
     sim.set_rng_seed(0);
-    let (cells, aperture_selection) = if let Some(raw) = watch.as_deref() {
-        (aperture(raw, offset)?, "explicit")
+    let mut panels = Vec::new();
+    let (cells, aperture_selection) = if let Some(cells) = explicit {
+        (cells, "explicit")
     } else {
         sim.discard_recording();
         sim.use_block(p);
         for _ in 0..ticks {
             step(&mut sim)?;
         }
-        let mut panels = if sim.is_quiescent() {
+        panels = if sim.is_quiescent() {
             inferred_panels(&sim, &initial, &idle[0].0)
         } else {
             Vec::new()
         };
         sim.restore(&checkpoint);
         sim.set_rng_seed(0);
-        match panels.len() {
-            1 => (panels.pop().unwrap(), "inferred_rectangular_panel"),
-            0 => (Vec::new(), "undetermined"),
-            _ => (Vec::new(), "ambiguous"),
-        }
+        panels.retain(|panel| hints.matches(panel));
+        let (chosen, mode) = hints.pick(&panels, offset)?;
+        (chosen.map(|i| panels[i].clone()).unwrap_or_default(), mode)
     };
+    let panel_list: Vec<_> = panels
+        .iter()
+        .enumerate()
+        .map(|(i, p)| json!({"candidate":i+1,"bounds":cell_bounds(p,offset),"cells":p.len()}))
+        .collect();
+    let near = hints.near.map(|q| local(q, offset)).transpose()?;
+    let diagram = Diagram::new(&initial, &cells, &panels, Some(p), near, offset);
+    if let Some(path) = &preview {
+        diagram.save(
+            &sim,
+            path,
+            &format!("Preview   |   {}", aperture_selection.replace('_', " ")),
+        )?;
+    }
+    if preview_only {
+        if json_out {
+            println!(
+                "{}",
+                json!({"preview":preview,"aperture_selection":aperture_selection,"aperture_bounds":cell_bounds(&cells,offset),"aperture_candidates":panel_list,"input":source_pos(p,offset)})
+            );
+        } else {
+            println!(
+                "Aperture {aperture_selection} {}. Preview saved to {}",
+                cell_bounds(&cells, offset),
+                preview.as_ref().unwrap().display()
+            );
+            print_panels(&panel_list);
+        }
+        return Ok(());
+    }
+    let mut recording = record.as_deref().map(Recording::start).transpose()?;
     let trial = Observation {
         offset,
         cells: &cells,
@@ -394,7 +536,13 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
     let execute = (|| -> Result<Vec<Value>, String> {
         let mut phases = Vec::new();
         for (i, (idle_layout, idle_writes)) in idle.iter().enumerate() {
-            let mut phase = trial.phase(&mut sim, i as u64 + 1, dest.as_mut())?;
+            let mut phase = trial.phase(
+                &mut sim,
+                i as u64 + 1,
+                dest.as_mut(),
+                &diagram,
+                recording.as_mut(),
+            )?;
             let endpoint = layout(&sim);
             phase["endpoint_blocks_different_from_initial"] =
                 json!(difference(&initial, &endpoint));
@@ -405,6 +553,9 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
         }
         if let Some(w) = &mut dest {
             w.flush().map_err(|e| e.to_string())?
+        }
+        if let Some(r) = recording {
+            r.finish()?;
         }
         Ok(phases)
     })();
@@ -418,7 +569,7 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
             return Err(e);
         }
     };
-    let report = json!({"dimensions":bounds.get_dimensions(),"initial_non_air_blocks":initial.len(),"input":source_pos(p,offset),"selection":selection,"input_candidates":candidates.len(),"hash_origin":origin,"warmup_ticks":warmup,"ticks_per_use":ticks,"aperture_selection":aperture_selection,"aperture_bounds":cells.first().zip(cells.last()).map(|(&a,&b)| [source_pos(a,offset),source_pos(b,offset)]),"phases":phases,"cycle_restores_block_layout":phases[1]["endpoint_blocks_different_from_initial"]==0,"timeline":timeline});
+    let report = json!({"dimensions":bounds.get_dimensions(),"initial_non_air_blocks":initial.len(),"input":source_pos(p,offset),"selection":selection,"input_candidates":candidates.len(),"hash_origin":origin,"warmup_ticks":warmup,"ticks_per_use":ticks,"aperture_selection":aperture_selection,"aperture_bounds":cell_bounds(&cells,offset),"aperture_candidates":panel_list,"preview":preview,"recording":record,"phases":phases,"cycle_restores_block_layout":phases[1]["endpoint_blocks_different_from_initial"]==0,"timeline":timeline});
     if json_out {
         println!("{report}");
     } else {
@@ -433,6 +584,9 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
             "Aperture: {aperture_selection} {}",
             report["aperture_bounds"]
         );
+        if cells.is_empty() {
+            print_panels(&panel_list);
+        }
         for phase in phases {
             println!("Use {}: {} block writes (idle {}), {} extensions, {} retractions. Last write at +{} game ticks. Queues quiet at end: {}.",phase["use"],phase["block_writes"],phase["idle_block_writes"],phase["piston_extensions"],phase["piston_retractions_including_drops"],phase["last_block_write_tick_offset"],phase["quiescent_at_end"]);
             if !cells.is_empty() {

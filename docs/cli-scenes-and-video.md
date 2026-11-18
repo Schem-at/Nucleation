@@ -128,6 +128,40 @@ versus non-air at tick ends. Collision shapes, traversability and mechanical
 settling have different meanings. Without an aperture the two phases are
 reported as uses 1 and 2.
 
+### Locate and preview a passage
+
+Start with the dimensions you know. Add a plane or a point near the passage to
+narrow the matching panels. A distance tie stays ambiguous. The JSON report
+lists matching bounds and one-based candidate numbers in schematic coordinates.
+
+```sh
+nucleation door-stats door.litematic --size 3x3 --preview door.png --preview-only
+nucleation door-stats door.litematic --size 3x3 --near 5,9,8 --preview door.png --json
+```
+
+With several matches, keep the same size and plane filters and add
+`--candidate 2` to select the second. If detection misses the panel entirely,
+supply one corner or centre plus its size. These placements also work on mixed
+materials and one-cell-wide passages. An explicit preview works before choosing
+an input, even on a schematic with several levers.
+
+```sh
+nucleation door-stats door.litematic --plane yz --center 5,9,8 --size 3x3 --preview door.png --preview-only
+nucleation door-stats door.litematic --plane yz --corner 5,8,7 --size 3x3 --record cycle.mp4 --timeline cycle.jsonl --json
+```
+
+Width and height follow X/Y on `xy` (the anchored default), Z/Y on `yz`, and
+X/Z on `xz`. A corner is the minimum on both axes. For an even dimension, the
+centre coordinate selects the lower of the two middle cells on that axis.
+
+The PNG shows front, side and plan views after warmup. Teal outlines mark open
+passage cells, orange marks occupied cells, and a yellow cross locates the
+selected control. Unresolved candidates are numbered in purple. The diagnostic
+MP4 shows these same projections at the end of each measured game tick, with
+the use number, time and occupancy. The standard CLI streams frames to FFmpeg
+at 20 fps. Warmup and idle replays are excluded. PNG previews also work in the
+lightweight build.
+
 Add `--timeline cycle.jsonl` to save one JSON object per observed cycle tick.
 Each row includes ordered block changes, piston events with their place in
 that row's change order, queue status, and optional aperture occupancy. Positions

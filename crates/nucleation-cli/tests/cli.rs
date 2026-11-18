@@ -588,5 +588,42 @@ fn door_stats_measures_a_known_aperture_and_lists_ambiguous_controls() {
             .status
             .success()
     );
+    let png = dir.join("hint.png");
+    let preview = run_cli(&[
+        "door-stats",
+        second,
+        "--size",
+        "1x1",
+        "--corner",
+        "-6,1,0",
+        "--preview",
+        png.to_str().unwrap(),
+        "--preview-only",
+        "--json",
+    ]);
+    assert!(
+        preview.status.success(),
+        "{}",
+        String::from_utf8_lossy(&preview.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&preview.stdout).unwrap();
+    assert_eq!(result["aperture_bounds"], stats["aperture_bounds"]);
+    assert!(result["input"].is_null());
+    assert!(result.get("phases").is_none());
+    assert_eq!(image::image_dimensions(png).unwrap(), (1032, 468));
+    let anchored = run_cli(&[
+        "door-stats",
+        file,
+        "--center",
+        "-6,1,0",
+        "--size",
+        "1x1",
+        "--ticks",
+        "20",
+        "--json",
+    ]);
+    assert!(anchored.status.success());
+    let anchored: serde_json::Value = serde_json::from_slice(&anchored.stdout).unwrap();
+    assert_eq!(anchored["phases"], stats["phases"]);
     std::fs::remove_dir_all(dir).unwrap();
 }

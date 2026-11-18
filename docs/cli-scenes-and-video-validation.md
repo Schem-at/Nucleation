@@ -62,3 +62,21 @@ They do not add a fresh vanilla server capture or establish a simulation
 speedup. Simulation mechanics and dependency versions are unchanged. Rendering
 now belongs to the default CLI build; `--no-default-features` retains the smaller
 build. Video encoding still requires external FFmpeg.
+
+## Aperture hints and diagnostic video
+
+On the SpaceWalker and SoulBanished hipster door, a 3×3 YZ filter and a nearby
+point at (5,9,8) selected the passage from (5,8,7) to (5,10,9). Selecting
+candidate 1, anchoring the centre at (5,9,8), and anchoring the minimum corner
+at (5,8,7) independently produced the same bounds. The input was the lever at
+(12,7,13). The first use filled all nine cells after seven ticks, and the
+second cleared them after 39 ticks.
+
+FFprobe counted 320 H.264 frames at 20 fps. For every decoded frame, the
+number of orange cell centres in the side view matched the corresponding JSONL
+occupancy count. Both phase reports matched the earlier CLI measurements and
+the entire ordered trace matched byte for byte (SHA-256
+`4ad1182c5305239112bbd311a2153b6f4c087ed40d0bf4c0675344979986729d`).
+The PNG, MP4, JSONL and comparison script are in the laptop's
+`cli-scene-video/aperture-review/` validation directory. The Mac archive copy
+is under `validation/cli-door-stats/aperture/`.
