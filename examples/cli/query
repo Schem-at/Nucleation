@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Emit a JSON array. Use jq '.[]' for one record at a time.
+set -euo pipefail
+if (( $# != 2 )); then
+    echo "usage: query {parts|entities|chests} FILE" >&2
+    exit 2
+fi
+case "$1" in
+    parts)
+        nucleation info "$2" --json | jq '
+          [.palette[] | {block:(.[0] | split("[")[0]), count:.[1]}]
+          | group_by(.block) | map({block:.[0].block, count:(map(.count)|add)})
+          | sort_by(-.count, .block)'
+        ;;
+    entities)
+        nucleation convert "$2" --to schematic --format-version v3 -o - |
+            nbt -r --json /dev/stdin | jq '[.Schematic.Entities[]? | {id:.Id,pos:.Pos,nbt:.Data}]'
+        ;;
+    chests)
+        nucleation convert "$2" --to structure_snbt -o - |
+            nbt -s --json /dev/stdin | jq '
+              [.data[] | select(.state | split("{")[0] | IN("minecraft:chest","minecraft:trapped_chest"))
+               | {pos, state, items:.nbt.Items, loot_table:.nbt.LootTable}]'
+        ;;
+    *) echo "expected parts, entities or chests" >&2; exit 2 ;;
+esac
