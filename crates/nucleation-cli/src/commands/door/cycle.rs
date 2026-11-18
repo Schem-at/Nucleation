@@ -66,11 +66,32 @@ impl Reading {
     }
 }
 
+// A scheduled pause is still busy. An empty queue can also coexist with a
+// moving entity or hopper activity. Track the last observed change as well.
+#[derive(Default, Clone, Copy)]
+struct Settling {
+    counts: [usize; 3],
+    quiet_since: Option<u64>,
+    confirmed: Option<u64>,
+}
+impl Settling {
+    fn observe(&mut self, elapsed: u64, quiet: bool, counts: [usize; 3]) {
+        if !quiet {
+            self.quiet_since = None;
+        } else if self.counts != counts || self.quiet_since.is_none() {
+            self.quiet_since = Some(elapsed);
+        }
+        self.counts = counts;
+        self.confirmed = self.quiet_since.filter(|&start| start < elapsed);
+    }
+}
+
 #[derive(Default, Clone, Copy)]
 pub(super) struct Clock {
     delay: Option<u64>,
     complete: Option<u64>,
-    touched: bool,
+    first_arrival: Option<u64>,
+    settling: Settling,
     flickered: bool,
 }
 impl Clock {
@@ -79,18 +100,35 @@ impl Clock {
             self.delay.get_or_insert(elapsed);
         }
         if at == Some(target) {
-            self.touched = true;
+            self.first_arrival.get_or_insert(elapsed);
             self.complete.get_or_insert(elapsed);
         } else {
-            self.flickered |= self.touched;
+            self.flickered |= self.first_arrival.is_some();
             self.complete = None;
         }
+    }
+    pub fn observe_mechanism(&mut self, elapsed: u64, sim: &Simulation) {
+        self.settling.observe(
+            elapsed,
+            sim.is_quiescent(),
+            [
+                sim.recorded().len(),
+                sim.recorded_inventory().len(),
+                sim.recorded_entities().len(),
+            ],
+        );
+    }
+    pub fn mechanism_settled(self) -> Option<u64> {
+        self.settling.confirmed
     }
     fn clean(self) -> bool {
         self.complete.is_some() && !self.flickered
     }
     pub fn report(self, target: Endpoint) -> Value {
         json!({"action":target.action(),"delay_ticks":self.delay,"completion_ticks":self.complete,
+        "aperture_first_ticks":self.first_arrival,"aperture_stable_ticks":self.complete,
+        "mechanism_settled_ticks":self.mechanism_settled(),
+        "settle_tail_ticks":self.mechanism_settled().zip(self.complete).and_then(|(settled,aperture)|settled.checked_sub(aperture)),
         "motion_ticks":self.complete.zip(self.delay).map(|(end,start)|end-start),"lost_target_after_first_arrival":self.flickered})
     }
 }
@@ -120,8 +158,10 @@ impl Sweep<'_> {
         }
         sim.use_block(self.input);
         let mut clock = Clock::default();
+        clock.observe_mechanism(0, sim);
         for elapsed in 1..=dwell {
             step(sim)?;
+            clock.observe_mechanism(elapsed as u64, sim);
             clock.sample(
                 elapsed as u64,
                 Reading::sample(sim, self.cells).endpoint(self.cells.len()),
@@ -158,6 +198,7 @@ impl Sweep<'_> {
         for cycle in 1..=self.cycles {
             let mut row = json!({"cycle":cycle});
             for (target, dwell) in [(initial.opposite(), first), (initial, second)] {
+                sim.record();
                 let clock = self.window(sim, target, dwell, |_, _| {})?;
                 if !clock.clean() {
                     return Ok(Trial::FailedAt(cycle));
@@ -269,6 +310,35 @@ mod tests {
             max_dwell: 44,
         };
         sweep.reset(&mut sim, &checkpoint);
+        for (target, first, settled) in [(Endpoint::Closed, 9, 16), (Endpoint::Open, 39, 47)] {
+            sim.record();
+            let clock = sweep.window(&mut sim, target, 160, |_, _| {}).unwrap();
+            assert_eq!(clock.first_arrival, Some(first));
+            assert_eq!(clock.complete, Some(first));
+            assert_eq!(clock.mechanism_settled(), Some(settled));
+        }
+        // The lower two rows clear, are obstructed again, then stay clear.
+        sweep.reset(&mut sim, &checkpoint);
+        sweep
+            .window(&mut sim, Endpoint::Closed, 160, |_, _| {})
+            .unwrap();
+        let lower_rows: Vec<_> = cells.iter().copied().filter(|p| p.y <= 9).collect();
+        let mut opening = Clock::default();
+        sim.use_block(sweep.input);
+        for tick in 1..=160 {
+            step(&mut sim).unwrap();
+            opening.sample(
+                tick,
+                Reading::sample(&sim, &lower_rows).endpoint(lower_rows.len()),
+                Endpoint::Open,
+            );
+        }
+        assert_eq!(
+            (opening.first_arrival, opening.complete),
+            (Some(15), Some(39))
+        );
+        assert!(opening.flickered);
+        sweep.reset(&mut sim, &checkpoint);
         assert_eq!(
             sweep.repeats(&mut sim, Endpoint::Open, 9, 39).unwrap(),
             Trial::FailedAt(2)
@@ -305,5 +375,15 @@ mod tests {
         clock.sample(6, filled, Endpoint::Closed);
         assert!(!clock.clean());
         assert_eq!(clock.complete, Some(6));
+        assert_eq!(clock.first_arrival, Some(3));
+        let mut settling = Settling::default();
+        settling.observe(6, false, [0, 0, 0]);
+        settling.observe(7, true, [0, 0, 0]);
+        settling.observe(8, true, [0, 0, 0]);
+        assert_eq!(settling.confirmed, Some(7));
+        settling.observe(9, true, [0, 1, 0]);
+        assert_eq!(settling.confirmed, None);
+        settling.observe(10, true, [0, 1, 0]);
+        assert_eq!(settling.confirmed, Some(9));
     }
 }

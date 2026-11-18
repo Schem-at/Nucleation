@@ -167,6 +167,11 @@ fn cell_bounds(cells: &[Pos], offset: Point) -> Value {
         .zip(cells.last())
         .map(|(&a, &b)| [source_pos(a, offset), source_pos(b, offset)]))
 }
+fn tick_label(value: &Value) -> String {
+    value
+        .as_u64()
+        .map_or_else(|| "unobserved".into(), |tick| format!("at +{tick} ticks"))
+}
 fn print_panels(panels: &[Value]) {
     for p in panels {
         println!("  Candidate {}: {}", p["candidate"], p["bounds"]);
@@ -207,6 +212,7 @@ impl Observation<'_> {
         let before = state(sim, sim.world().get(self.input)).to_owned();
         sim.use_block(self.input);
         let after = state(sim, sim.world().get(self.input)).to_owned();
+        clock.observe_mechanism(0, sim);
         for elapsed in 1..=self.ticks {
             if !sim.is_quiescent() {
                 last_busy = elapsed;
@@ -234,6 +240,7 @@ impl Observation<'_> {
                     *previous = next;
                 }
             }
+            clock.observe_mechanism(elapsed, sim);
             let reading = cycle::Reading::sample(sim, self.cells);
             if let Some(start) = initial_endpoint {
                 clock.sample(
@@ -269,7 +276,7 @@ impl Observation<'_> {
         "last_block_write_tick_offset":last_write,"piston_extensions":extensions,"piston_retractions_including_drops":retractions,
         "inventory_slot_changes":sim.recorded_inventory().len(),"entity_events":sim.recorded_entities().len(),
         "quiescent_at_end":sim.is_quiescent(),"queues_quiet_since_elapsed_tick":if sim.is_quiescent(){Some(last_busy)}else{None},
-        "aperture":aperture}),
+        "mechanism_settled_ticks":clock.mechanism_settled(),"aperture":aperture}),
         )
     }
 }
@@ -636,9 +643,12 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
                 let a = &phase["aperture"];
                 if let Some(action) = a["timing"]["action"].as_str() {
                     let t = &a["timing"];
+                    let endpoint = if action == "open" { "clear" } else { "filled" };
                     println!(
-                        "  {action}: delay {} ticks, motion {} ticks, complete at +{} ticks.",
-                        t["delay_ticks"], t["motion_ticks"], t["completion_ticks"]
+                        "  {action}: first {endpoint} {}, stays {endpoint} {} (response {}).",
+                        tick_label(&t["aperture_first_ticks"]),
+                        tick_label(&t["aperture_stable_ticks"]),
+                        tick_label(&t["delay_ticks"])
                     );
                 }
                 println!(
@@ -649,6 +659,10 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
                     a["endpoint_occupancy_since_elapsed_tick"]
                 );
             }
+            println!(
+                "  Mechanism settled {}.",
+                tick_label(&phase["mechanism_settled_ticks"])
+            );
         }
         if let Some(f) = frequency_report {
             println!(

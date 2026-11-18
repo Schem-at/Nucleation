@@ -134,14 +134,23 @@ reported as uses 1 and 2.
 nucleation door-stats door.litematic --frequency --cycles 16 --max-dwell 80 --json
 ```
 
-Each use starting from a fully open or closed aperture reports three times in
-game ticks. **Delay** runs from input to the first observed departure from the
-starting endpoint. **Completion** runs from input to the opposite endpoint
-holding through the end of the observation. **Motion** is completion minus
-delay. Every sample is taken at tick end, starting at +1. An incomplete phase
-has a null completion. A moving-piston placeholder counts toward raw occupancy
-but keeps the aperture in transit until it disappears. These are block-state
-measurements, sampled at 20 game ticks per simulated second.
+Each use reports separate elapsed game ticks from the input:
+
+| JSON field | What it measures |
+|---|---|
+| `delay_ticks` | First departure from the starting aperture state |
+| `aperture_first_ticks` | First tick the entire aperture is clear on opening or fully filled with landed blocks on closing |
+| `aperture_stable_ticks` | First tick of the final uninterrupted run at that target through the observation window |
+| `mechanism_settled_ticks` | Start of the final quiet interval for the simulated build, confirmed by a following quiet tick |
+| `settle_tail_ticks` | Additional ticks from the stable aperture to mechanism settlement |
+
+The aperture is sampled at tick ends, starting at +1. Mechanism settlement
+requires the scheduled tick, fluid, block event and piston move queues to be
+empty, with no subsequent recorded block, inventory or entity changes during
+the window. For a continuously active build or a short dwell, settlement can
+be null even when the passage is clear. An unobserved aperture milestone is
+also null. `completion_ticks` retains its original meaning of stable aperture
+time, and `motion_ticks` measures from initial response to that time.
 
 `--frequency` searches periodic schedules with one use to open and one to close.
 Each dwell ranges from one through `--max-dwell` ticks (default 80).

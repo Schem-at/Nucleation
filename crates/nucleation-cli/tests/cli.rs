@@ -651,6 +651,16 @@ fn door_stats_measures_a_known_aperture_and_lists_ambiguous_controls() {
     for (i, action) in [(0, "close"), (1, "open")] {
         let t = &sweep["phases"][i]["aperture"]["timing"];
         assert_eq!(t["action"], action);
+        assert!(
+            t["aperture_first_ticks"].as_u64().unwrap()
+                <= t["aperture_stable_ticks"].as_u64().unwrap()
+        );
+        assert_eq!(t["aperture_stable_ticks"], t["completion_ticks"]);
+        assert!(t["mechanism_settled_ticks"].is_number());
+        assert_eq!(
+            t["mechanism_settled_ticks"],
+            sweep["phases"][i]["mechanism_settled_ticks"]
+        );
         assert!(t["delay_ticks"].as_u64().unwrap() <= t["completion_ticks"].as_u64().unwrap());
     }
     for key in ["fastest", "fastest_evenly_spaced"] {

@@ -104,3 +104,15 @@ A moving-piston cell kept the aperture in transit.
 These frequencies describe the simulated aperture. The existing vanilla
 capture covers the slower reference inputs. The high-frequency schedules were
 measured with the released simulator.
+
+### Hipster aperture and mechanism settling
+
+Using the stored Minecraft 1.21.11 tick-end trace and a replay with the 0.12.3
+wheel, the landed 3×3 closes at +9 game ticks and is fully clear at +39 after
+the opening input. The last observed vanilla block change and the start of
+continuous simulator queue quiescence occur at +16 on closing and +47 on
+opening. Offsets count completed ticks since each input.
+
+Watching only the lower two rows (`--corner 5,8,7 --size 3x2 --plane yz`)
+gives an earlier first clearance on opening, +15. Those rows are obstructed at
++24 and stay clear from +39. This is cell occupancy in the selected plane.
