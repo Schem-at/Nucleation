@@ -6,7 +6,12 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use ratatui::Frame;
 use serde_json::Value;
-use std::{io, path::Path, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    io,
+    path::Path,
+    time::Duration,
+};
 
 #[derive(Clone, Copy)]
 pub(super) struct Sample {
@@ -27,17 +32,6 @@ fn level(n: usize, max: usize) -> char {
     }]
 }
 
-// Bucket maxima retain short activity spikes on narrow displays.
-fn spark(samples: &[Sample], width: usize, max: usize, value: impl Fn(&Sample) -> usize) -> String {
-    let cols = width.min(samples.len());
-    (0..cols)
-        .map(|x| {
-            let lo = x * samples.len() / cols;
-            let hi = (x + 1) * samples.len() / cols;
-            level(samples[lo..hi].iter().map(&value).max().unwrap_or(0), max)
-        })
-        .collect()
-}
 /// Expand short runs to use the available columns; take the peak when several
 /// ticks share a column. The inspector below the plot still uses the exact tick.
 fn buckets(samples: &[Sample], cols: usize, value: impl Fn(&Sample) -> usize) -> Vec<usize> {
@@ -78,21 +72,92 @@ fn action(p: &Value) -> String {
         _ => format!("Use {}", p["use"]),
     }
 }
-fn metric(v: &Value) -> String {
-    v.as_u64().map_or_else(|| "—".into(), |n| n.to_string())
-}
-fn timing_row(p: &Value) -> String {
+type Milestones = BTreeMap<usize, String>;
+
+fn milestones(p: &Value, trace: &[Sample]) -> Milestones {
+    let mut rows = Milestones::new();
+    let mut add = |tick: usize, label: &str| {
+        rows.entry(tick)
+            .and_modify(|v| {
+                v.push_str(" · ");
+                v.push_str(label)
+            })
+            .or_insert_with(|| label.to_owned());
+    };
+    add(0, "Input");
     let t = &p["aperture"]["timing"];
-    format!(
-        "{:<7}{:>8}{:>8}{:>8}{:>9}",
-        action(p),
-        metric(&t["delay_ticks"]),
-        metric(&t["aperture_first_ticks"]),
-        metric(&t["aperture_stable_ticks"]),
-        metric(&p["mechanism_settled_ticks"])
-    )
+    if let Some(action) = t["action"].as_str() {
+        let opening = action == "open";
+        let target = if opening { "open" } else { "closed" };
+        if let Some(tick) = t["delay_ticks"].as_u64() {
+            add(
+                tick as usize,
+                if opening {
+                    "Starts opening"
+                } else {
+                    "Starts closing"
+                },
+            );
+        }
+        let first = t["aperture_first_ticks"].as_u64();
+        let stable = t["aperture_stable_ticks"].as_u64();
+        if let Some(first) = first {
+            let label = if stable == Some(first) {
+                format!("Fully {target}, stays {target}")
+            } else {
+                format!("First fully {target}")
+            };
+            add(first as usize, &label);
+            if t["lost_target_after_first_arrival"] == true {
+                let n = p["aperture"]["cells"].as_u64().unwrap_or(0) as usize;
+                if let Some((tick, _)) =
+                    trace
+                        .iter()
+                        .enumerate()
+                        .skip(first as usize + 1)
+                        .find(|(_, s)| {
+                            if opening {
+                                s.filled != 0
+                            } else {
+                                s.moving || s.filled != n
+                            }
+                        })
+                {
+                    add(
+                        tick,
+                        if opening {
+                            "Obstructed again"
+                        } else {
+                            "No longer fully closed"
+                        },
+                    );
+                }
+            }
+        }
+        if let Some(tick) = stable.filter(|v| Some(*v) != first) {
+            add(tick as usize, &format!("Stays {target}"));
+        }
+    }
+    if let Some(tick) = p["mechanism_settled_ticks"].as_u64() {
+        add(tick as usize, "Mechanism settled");
+    }
+    rows
 }
-const HEADER: &str = "Phase     Delay   First  Stable  Settled";
+fn unobserved(p: &Value) -> Option<String> {
+    let t = &p["aperture"]["timing"];
+    let mut missing = vec![];
+    if t.is_null() {
+        missing.push("opening/closing direction unknown");
+    } else if t["aperture_first_ticks"].is_null() {
+        missing.push("full target unobserved");
+    } else if t["aperture_stable_ticks"].is_null() {
+        missing.push("stable target unobserved");
+    }
+    if p["mechanism_settled_ticks"].is_null() {
+        missing.push("settlement unobserved");
+    }
+    (!missing.is_empty()).then(|| missing.join(" · "))
+}
 fn coords(v: &Value) -> String {
     v.as_array()
         .map(|a| a.iter().map(Value::to_string).collect::<Vec<_>>().join(","))
@@ -107,6 +172,13 @@ fn bounds(r: &Value) -> String {
         );
     }
     format!("{} to {}", coords(&b[0]), coords(&b[1]))
+}
+fn phase_color(p: &Value) -> &'static str {
+    if action(p) == "Open" {
+        "36"
+    } else {
+        "33"
+    }
 }
 fn frequency(r: &Value) -> Vec<String> {
     let f = &r["frequency"];
@@ -172,58 +244,46 @@ impl View<'_> {
     }
     pub fn print(&self, width: usize) {
         println!("{}", self.paint(&self.title(), "1"));
-        println!(
-            "Input {}  ·  Aperture {}",
-            coords(&self.report["input"]),
-            bounds(self.report)
-        );
-        println!("\n{}", self.paint("Timing · game ticks after input", "1"));
-        println!("{HEADER}");
-        for p in self.phases() {
-            println!(
-                "{}",
-                self.paint(
-                    &timing_row(p),
-                    if action(p) == "Open" { "36" } else { "33" }
-                )
-            )
-        }
-        let end = (0..self.phases().len())
-            .map(|i| self.active_end(i))
-            .max()
-            .unwrap_or(0);
-        let known = self.cells(0) > 0;
-        let label = if known {
-            "Aperture occupancy"
-        } else {
-            "Block writes"
-        };
-        println!("\n{}  +0 … +{end} gt", self.paint(label, "1"));
-        let max = if known {
-            self.cells(0)
-        } else {
-            self.traces
-                .iter()
-                .flatten()
-                .map(|s| s.writes)
+        println!("Door timeline · game ticks after each input");
+        let phases = self.phases();
+        let rows = self.milestone_rows();
+        if width >= 76 {
+            let col = rows[0]
+                .values()
+                .map(|s| s.chars().count())
                 .max()
-                .unwrap_or(1)
-        };
-        for (i, p) in self.phases().iter().enumerate() {
-            let chart = spark(
-                &self.traces[i][..=end],
-                width.saturating_sub(9).clamp(8, 72),
-                max,
-                |s| if known { s.filled } else { s.writes },
-            );
+                .unwrap_or(0)
+                .max(12)
+                + 3;
             println!(
-                "{:<7} {}",
-                action(p),
-                self.paint(&chart, if action(p) == "Open" { "36" } else { "33" })
+                "\n{:<8}{:<col$}{}",
+                "Tick",
+                action(&phases[0]),
+                action(&phases[1])
             );
+            let ticks: BTreeSet<_> = rows.iter().flat_map(|r| r.keys()).collect();
+            for tick in ticks {
+                let left = rows[0].get(tick).map(String::as_str).unwrap_or("");
+                let right = rows[1].get(tick).map(String::as_str).unwrap_or("");
+                println!(
+                    "{:<8}{}{}",
+                    format!("+{tick}"),
+                    self.paint(&format!("{left:<col$}"), phase_color(&phases[0])),
+                    self.paint(right, phase_color(&phases[1]))
+                );
+            }
+        } else {
+            for (p, rows) in phases.iter().zip(&rows) {
+                println!("\n{}", self.paint(&action(p), phase_color(p)));
+                for (tick, label) in rows {
+                    println!("  {:<7}{label}", format!("+{tick}"));
+                }
+            }
         }
-        if known {
-            println!("        · empty   █ full ({} cells)", self.cells(0));
+        for p in phases {
+            if let Some(note) = unobserved(p) {
+                println!("{}: {note}", action(p));
+            }
         }
         if !self.report["frequency"].is_null() {
             println!(
@@ -240,20 +300,20 @@ impl View<'_> {
         for line in frequency(self.report) {
             println!("{line}")
         }
-        println!(
-            "\nBlock layout restored: {}",
-            if self.report["cycle_restores_block_layout"] == true {
-                "yes"
-            } else {
-                "no"
-            }
-        );
-        if std::io::IsTerminal::is_terminal(&std::io::stdout()) {
-            println!("Explore individual ticks with --tui");
-        }
-        if !known {
+        if self.cells(0) == 0 {
+            println!("Aperture {}", bounds(self.report));
             super::print_panels(self.report["aperture_candidates"].as_array().unwrap());
         }
+        if std::io::IsTerminal::is_terminal(&std::io::stdout()) {
+            println!("\nExplore individual ticks with --tui");
+        }
+    }
+    fn milestone_rows(&self) -> Vec<Milestones> {
+        self.phases()
+            .iter()
+            .zip(self.traces)
+            .map(|(p, s)| milestones(p, s))
+            .collect()
     }
     fn style(&self, c: Color) -> Style {
         if self.color {
@@ -262,7 +322,7 @@ impl View<'_> {
             Style::default()
         }
     }
-    fn draw(&self, f: &mut Frame, state: &Cursor) {
+    fn draw(&self, f: &mut Frame, state: &Cursor, rows: &Milestones) {
         let area = f.area();
         if area.width < 41 || area.height < 16 {
             f.render_widget(
@@ -290,7 +350,7 @@ impl View<'_> {
         let inner = block.inner(area);
         f.render_widget(block, area);
         if state.help {
-            let lines=vec!["Timing definitions","", "Delay   First departure from the starting aperture state.","First   First tick all watched cells reach the target.","Stable  First tick they stay at target through this use.","Settled  Start of the final quiet interval, confirmed one tick later.","","Open means all watched cells are air. Closed means all are filled and piston payloads have landed.","","Timeline columns show the peak sample in each bucket. The cursor reads one exact tick. +0 is immediately before input.","","Tab phase · Left/Right step · Home/End bounds · [/] milestones · Space play/pause · a toggle active/full range · q quit","","? or Esc to return"];
+            let lines=vec!["Timing definitions","", "Delay   First departure from the starting aperture state.","First   First tick all watched cells reach the target.","Stable  First tick they stay at target through this use.","Settled  Start of the final quiet interval, confirmed one tick later.","","Open means all watched cells are air. Closed means all are filled and piston payloads have landed.","","Timeline columns show the peak sample in each bucket. The cursor reads one exact tick. +0 is immediately before input.","","Tab phase · Left/Right step · Home/End bounds · [/] milestones · Space play/pause · a toggle active/full range · d mechanics details · q quit","","? or Esc to return"];
             f.render_widget(
                 Paragraph::new(lines.join("\n")).wrap(Wrap { trim: false }),
                 inner,
@@ -308,31 +368,6 @@ impl View<'_> {
                 y += 1;
             }
         };
-        line(
-            f,
-            format!(
-                "Input {}   Aperture {}",
-                coords(&self.report["input"]),
-                bounds(self.report)
-            )
-            .into(),
-        );
-        line(f, Span::styled(HEADER, muted).into());
-        for (i, phase) in self.phases().iter().enumerate() {
-            line(
-                f,
-                Span::styled(
-                    timing_row(phase),
-                    if state.phase == i {
-                        accent.add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default()
-                    },
-                )
-                .into(),
-            );
-        }
-        line(f, Line::default());
         let trace = &self.traces[state.phase];
         let end = if state.full {
             trace.len() - 1
@@ -348,132 +383,188 @@ impl View<'_> {
             )
             .into(),
         );
-        let cols = usize::from(inner.width.saturating_sub(11));
-        let x = if cols >= samples.len() {
-            (state.tick * cols).div_ceil(samples.len())
-        } else {
-            ((state.tick + 1) * cols).div_ceil(samples.len()) - 1
-        };
-        let cells = self.cells(state.phase);
-        if cells > 0 {
-            let bars = buckets(samples, cols, |s| s.filled);
-            let height = if area.height >= 24 { 3 } else { 1 };
-            for row in (0..height).rev() {
-                let label = if row == height - 1 {
-                    format!("{cells} cells")
-                } else if row == 0 {
-                    "0 cells".into()
-                } else {
-                    String::new()
-                };
+        if !state.details {
+            line(f, Span::styled("Tick      Door event", muted).into());
+            let current = rows.range(..=state.tick).next_back().map(|(t, _)| *t);
+            for (&tick, event) in rows {
+                let selected = current == Some(tick);
                 line(
                     f,
-                    track(
-                        label,
-                        bars.iter().map(|&n| {
-                            let band = (n * height).saturating_sub(row * cells).min(cells);
-                            if band == 0 && row > 0 {
-                                ' '
-                            } else {
-                                level(band, cells)
-                            }
-                        }),
-                        x,
-                        accent,
+                    Span::styled(
+                        format!(
+                            "{} {:<7} {event}",
+                            if selected { "▸" } else { " " },
+                            format!("+{tick}")
+                        ),
+                        if selected {
+                            accent.add_modifier(Modifier::BOLD)
+                        } else {
+                            Style::default()
+                        },
+                    )
+                    .into(),
+                );
+            }
+            if let Some(note) = unobserved(p) {
+                line(f, note.into());
+            }
+            line(f, Line::default());
+            let next = rows
+                .range((state.tick + 1)..)
+                .next()
+                .map(|(t, _)| format!(" · next event +{t}"))
+                .unwrap_or_default();
+            line(
+                f,
+                Span::styled(format!("Cursor +{} gt{next}", state.tick), accent).into(),
+            );
+            let cols = usize::from(inner.width.saturating_sub(2));
+            let column = |t: usize| t * (cols - 1) / end.max(1);
+            let mut axis = vec!['─'; cols];
+            for &tick in rows.keys() {
+                axis[column(tick.min(end))] = '◆';
+            }
+            axis[column(state.tick)] = '▲';
+            line(
+                f,
+                Span::styled(axis.into_iter().collect::<String>(), accent).into(),
+            );
+            if area.height >= 21 {
+                for text in frequency(self.report) {
+                    line(f, text.into());
+                }
+            }
+        } else {
+            line(
+                f,
+                format!(
+                    "Input {} · Aperture {}",
+                    coords(&self.report["input"]),
+                    bounds(self.report)
+                )
+                .into(),
+            );
+            let cols = usize::from(inner.width.saturating_sub(11));
+            let x = if cols >= samples.len() {
+                (state.tick * cols).div_ceil(samples.len())
+            } else {
+                ((state.tick + 1) * cols).div_ceil(samples.len()) - 1
+            };
+            let cells = self.cells(state.phase);
+            if cells > 0 {
+                let bars = buckets(samples, cols, |s| s.filled);
+                let height = if area.height >= 24 { 3 } else { 1 };
+                for row in (0..height).rev() {
+                    let label = if row == height - 1 {
+                        format!("{cells} cells")
+                    } else if row == 0 {
+                        "0 cells".into()
+                    } else {
+                        String::new()
+                    };
+                    line(
+                        f,
+                        track(
+                            label,
+                            bars.iter().map(|&n| {
+                                let band = (n * height).saturating_sub(row * cells).min(cells);
+                                if band == 0 && row > 0 {
+                                    ' '
+                                } else {
+                                    level(band, cells)
+                                }
+                            }),
+                            x,
+                            accent,
+                        ),
+                    );
+                }
+            }
+            let writes = buckets(samples, cols, |s| s.writes);
+            let peak = writes.iter().copied().max().unwrap_or(1);
+            line(
+                f,
+                track(
+                    "Writes".into(),
+                    writes.iter().map(|&n| level(n, peak)),
+                    x,
+                    self.style(Color::Blue),
+                ),
+            );
+            let mut axis = vec!['─'; cols];
+            axis[x] = '▲';
+            line(
+                f,
+                Span::styled(
+                    format!("         {}", axis.iter().collect::<String>()),
+                    muted,
+                )
+                .into(),
+            );
+            let sample = trace[state.tick];
+            let phase_note = if sample.moving {
+                " · piston in transit"
+            } else {
+                ""
+            };
+            line(
+                f,
+                Span::styled(
+                    format!(
+                        "+{} gt   {} writes · {} piston events",
+                        state.tick, sample.writes, sample.pistons
                     ),
+                    Style::default().add_modifier(Modifier::BOLD),
+                )
+                .into(),
+            );
+            let queues = if sample.quiet { "quiet" } else { "busy" };
+            line(
+                f,
+                if cells > 0 {
+                    format!(
+                        "{}/{} cells filled{} · queues {queues}",
+                        sample.filled, cells, phase_note
+                    )
+                } else {
+                    format!("Aperture unknown · queues {queues}")
+                }
+                .into(),
+            );
+            if let Some(event) = rows.get(&state.tick) {
+                line(f, Span::styled(event.as_str(), accent).into());
+            }
+            if area.height >= 21 {
+                line(
+                    f,
+                    format!(
+                        "Pistons  {} extend / {} retract    Inventory  {} slot changes",
+                        p["piston_extensions"],
+                        p["piston_retractions_including_drops"],
+                        p["inventory_slot_changes"]
+                    )
+                    .into(),
+                );
+                line(f, Line::default());
+                for text in frequency(self.report) {
+                    line(f, text.into())
+                }
+                line(
+                    f,
+                    format!(
+                        "{} observed ticks/use · {} block writes this use",
+                        self.report["ticks_per_use"], p["block_writes"]
+                    )
+                    .into(),
                 );
             }
         }
-        let writes = buckets(samples, cols, |s| s.writes);
-        let peak = writes.iter().copied().max().unwrap_or(1);
-        line(
-            f,
-            track(
-                "Writes".into(),
-                writes.iter().map(|&n| level(n, peak)),
-                x,
-                self.style(Color::Blue),
-            ),
-        );
-        let mut axis = vec!['─'; cols];
-        axis[x] = '▲';
-        line(
-            f,
-            Span::styled(
-                format!("         {}", axis.iter().collect::<String>()),
-                muted,
-            )
-            .into(),
-        );
-        let sample = trace[state.tick];
-        let phase_note = if sample.moving {
-            " · piston in transit"
-        } else {
-            ""
-        };
-        line(
-            f,
-            Span::styled(
-                format!(
-                    "+{} gt   {} writes · {} piston events",
-                    state.tick, sample.writes, sample.pistons
-                ),
-                Style::default().add_modifier(Modifier::BOLD),
-            )
-            .into(),
-        );
-        let queues = if sample.quiet { "quiet" } else { "busy" };
-        line(
-            f,
-            if cells > 0 {
-                format!(
-                    "{}/{} cells filled{} · queues {queues}",
-                    sample.filled, cells, phase_note
-                )
-            } else {
-                format!("Aperture unknown · queues {queues}")
-            }
-            .into(),
-        );
-        let stamps = state.milestones(self);
-        let now: Vec<_> = stamps
-            .iter()
-            .filter(|(_, t)| *t == state.tick)
-            .map(|(n, _)| *n)
-            .collect();
-        if !now.is_empty() {
-            line(f, Span::styled(now.join(" / "), accent).into())
-        }
-        if area.height >= 21 {
-            line(
-                f,
-                format!(
-                    "Pistons  {} extend / {} retract    Inventory  {} slot changes",
-                    p["piston_extensions"],
-                    p["piston_retractions_including_drops"],
-                    p["inventory_slot_changes"]
-                )
-                .into(),
-            );
-            line(f, Line::default());
-            for text in frequency(self.report) {
-                line(f, text.into())
-            }
-            line(
-                f,
-                format!(
-                    "{} observed ticks/use · {} block writes this use",
-                    self.report["ticks_per_use"], p["block_writes"]
-                )
-                .into(),
-            );
-        }
         let keys = if area.width >= 86 {
-            "Tab phase   ← → tick   [ ] milestone   Space play   a range   ? help   q quit"
+            "Tab phase  ← → tick  [ ] event  Space play  d details  a range  ? help  q quit"
         } else if area.width >= 60 {
-            "Tab phase  ← → tick  [ ] jump  Space play  ? help  q quit"
+            "Tab phase  ← → tick  [ ] event  d details  ? help  q quit"
         } else {
-            "Tab phase  ← → tick  ? help  q quit"
+            "Tab phase  ← → tick  d details  q quit"
         };
         f.render_widget(
             Paragraph::new(Span::styled(keys, emph)),
@@ -483,9 +574,10 @@ impl View<'_> {
     pub fn explore(&self) -> io::Result<()> {
         let mut terminal = ratatui::try_init().inspect_err(|_| ratatui::restore())?;
         let mut state = Cursor::default();
+        let rows = self.milestone_rows();
         let result = (|| {
             loop {
-                terminal.draw(|f| self.draw(f, &state))?;
+                terminal.draw(|f| self.draw(f, &state, &rows[state.phase]))?;
                 let end = if state.full {
                     self.traces[state.phase].len() - 1
                 } else {
@@ -518,6 +610,7 @@ impl View<'_> {
                 match k.code {
                     KeyCode::Esc => break,
                     KeyCode::Char('?') => state.help = true,
+                    KeyCode::Char('d') => state.details = !state.details,
                     KeyCode::Tab | KeyCode::BackTab => {
                         state.phase = 1 - state.phase;
                         state.tick = 0;
@@ -539,21 +632,17 @@ impl View<'_> {
                         state.playing = !was_playing;
                     }
                     KeyCode::Char(']') => {
-                        state.tick = state
-                            .milestones(self)
-                            .iter()
-                            .map(|(_, t)| *t)
-                            .filter(|&t| t > state.tick)
-                            .min()
+                        state.tick = rows[state.phase]
+                            .range((state.tick + 1)..)
+                            .next()
+                            .map(|(t, _)| *t)
                             .unwrap_or(end)
                     }
                     KeyCode::Char('[') => {
-                        state.tick = state
-                            .milestones(self)
-                            .iter()
-                            .map(|(_, t)| *t)
-                            .filter(|&t| t < state.tick)
-                            .max()
+                        state.tick = rows[state.phase]
+                            .range(..state.tick)
+                            .next_back()
+                            .map(|(t, _)| *t)
                             .unwrap_or(0)
                     }
                     _ => {}
@@ -571,27 +660,6 @@ struct Cursor {
     tick: usize,
     full: bool,
     help: bool,
+    details: bool,
     playing: bool,
-}
-impl Cursor {
-    fn milestones(&self, view: &View) -> Vec<(&'static str, usize)> {
-        let p = &view.phases()[self.phase];
-        let t = &p["aperture"]["timing"];
-        [
-            ("Input", &serde_json::Value::Null),
-            ("Response", &t["delay_ticks"]),
-            ("First", &t["aperture_first_ticks"]),
-            ("Stable", &t["aperture_stable_ticks"]),
-            ("Settled", &p["mechanism_settled_ticks"]),
-        ]
-        .into_iter()
-        .filter_map(|(name, v)| {
-            if name == "Input" {
-                Some((name, 0))
-            } else {
-                v.as_u64().map(|n| (name, n as usize))
-            }
-        })
-        .collect()
-    }
 }

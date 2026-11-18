@@ -688,9 +688,15 @@ fn door_stats_measures_a_known_aperture_and_lists_ambiguous_controls() {
     ]);
     assert!(plain.status.success());
     let text = String::from_utf8(plain.stdout).unwrap();
-    for label in ["Stable", "Settled", "Aperture occupancy", "Open", "Close"] {
+    for label in [
+        "Door timeline",
+        "Mechanism settled",
+        "Fully open",
+        "Fully closed",
+    ] {
         assert!(text.contains(label));
     }
+    assert!(!text.contains("Aperture occupancy"));
     assert!(!text.contains('\x1b'));
     let non_terminal = run_cli(&["door-stats", file, "--tui"]);
     assert!(!non_terminal.status.success());
