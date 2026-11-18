@@ -1,5 +1,9 @@
 # Animation and Video Rendering API
 
+For terminal use, the standard `nucleation scene` and `nucleation render`
+commands can author blocks, schedule interactions and animate the camera.
+See [CLI scenes and video](cli-scenes-and-video.md) for a complete piston/lever example.
+
 Nucleation can animate an existing schematic as one rigid model, light it in world
 space, and stream rendered RGBA frames directly to FFmpeg. The streaming path
 reuses the parsed resource pack, generated mesh, GPU renderer, and GPU staging

@@ -180,7 +180,8 @@ fn drain_stderr(mut stderr: impl Read) -> (Vec<u8>, bool) {
     (captured, truncated)
 }
 
-pub(crate) struct VideoEncoder {
+/// Streams fixed-size RGBA frames to FFmpeg and publishes the video on finish.
+pub struct VideoEncoder {
     child: Option<Child>,
     stdin: Option<ChildStdin>,
     stderr_thread: Option<JoinHandle<(Vec<u8>, bool)>>,
@@ -190,7 +191,8 @@ pub(crate) struct VideoEncoder {
 }
 
 impl VideoEncoder {
-    pub(crate) fn start(
+    /// Start an encoder for frames of the supplied dimensions.
+    pub fn start(
         config: &VideoConfig,
         width: u32,
         height: u32,
@@ -270,7 +272,8 @@ impl VideoEncoder {
         stderr
     }
 
-    pub(crate) fn write_frame(&mut self, rgba: &[u8]) -> Result<(), RenderError> {
+    /// Append one tightly packed RGBA frame.
+    pub fn write_frame(&mut self, rgba: &[u8]) -> Result<(), RenderError> {
         if rgba.len() != self.expected_frame_bytes {
             return Err(RenderError::VideoEncode(format!(
                 "RGBA frame has {} bytes; expected {}",
@@ -295,7 +298,8 @@ impl VideoEncoder {
         Ok(())
     }
 
-    pub(crate) fn finish(mut self) -> Result<(), RenderError> {
+    /// Wait for encoding and publish the completed video.
+    pub fn finish(mut self) -> Result<(), RenderError> {
         self.stdin.take();
         let status = self
             .child

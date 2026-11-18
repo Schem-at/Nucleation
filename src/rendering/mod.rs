@@ -133,6 +133,26 @@ impl RenderConfig {
         }
     }
 
+    fn camera_with_pose(
+        &self,
+        pose: Option<&crate::animation::CameraPose>,
+        bounds: ([f32; 3], [f32; 3]),
+    ) -> CameraConfig {
+        let mut camera = self.to_camera();
+        if let Some(pose) = pose {
+            camera.yaw_deg += pose.yaw;
+            camera.pitch_deg += pose.pitch;
+            camera.zoom *= pose.zoom;
+            if pose.target_offset != [0.0; 3] {
+                let target = camera
+                    .target
+                    .unwrap_or(std::array::from_fn(|i| (bounds.0[i] + bounds.1[i]) * 0.5));
+                camera.target = Some(std::array::from_fn(|i| target[i] + pose.target_offset[i]));
+            }
+        }
+        camera
+    }
+
     pub fn set_directional_light(
         &mut self,
         direction: [f32; 3],
@@ -258,15 +278,32 @@ pub fn render_animation_stream(
     frames: &[crate::animation::Frame],
     config: &RenderConfig,
     hdri: Option<&HdriData>,
-    mut consume: impl FnMut(usize, &[u8]) -> Result<(), RenderError>,
+    consume: impl FnMut(usize, &[u8]) -> Result<(), RenderError>,
 ) -> Result<(), RenderError> {
+    render_animation_stream_iter(meshes, frames, config, hdri, consume)
+}
+
+/// Stream lazily sampled animation descriptors without retaining every frame.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn render_animation_stream_iter<I, F>(
+    meshes: &[MeshOutput],
+    frames: I,
+    config: &RenderConfig,
+    hdri: Option<&HdriData>,
+    mut consume: impl FnMut(usize, &[u8]) -> Result<(), RenderError>,
+) -> Result<(), RenderError>
+where
+    I: IntoIterator<Item = F>,
+    F: std::borrow::Borrow<crate::animation::Frame>,
+{
     pollster::block_on(async {
         let renderer = GpuRenderer::new(meshes, config.width, config.height, hdri).await?;
         renderer.set_grid(config.grid);
-        let base = config.to_camera();
+        let bounds = camera::merged_bounds(meshes);
         let mut poses = vec![crate::animation::Pose::IDENTITY; meshes.len()];
 
-        for (index, frame) in frames.iter().enumerate() {
+        for (index, frame) in frames.into_iter().enumerate() {
+            let frame = frame.borrow();
             poses
                 .iter_mut()
                 .for_each(|pose| *pose = crate::animation::Pose::IDENTITY);
@@ -278,16 +315,7 @@ pub fn render_animation_stream(
             renderer.set_poses(&poses);
             renderer.set_gizmos(&frame.gizmos);
 
-            let camera = match &frame.camera {
-                Some(camera_pose) => {
-                    let mut frame_config = config.clone();
-                    frame_config.yaw += camera_pose.yaw;
-                    frame_config.pitch += camera_pose.pitch;
-                    frame_config.zoom *= camera_pose.zoom;
-                    frame_config.to_camera()
-                }
-                None => base.clone(),
-            };
+            let camera = config.camera_with_pose(frame.camera.as_ref(), bounds);
             let pixels = renderer.render_frame(&camera)?;
             consume(index, &pixels)?;
         }
@@ -343,8 +371,25 @@ pub fn render_animation_to_video(
     video: &VideoConfig,
     output: &std::path::Path,
 ) -> Result<(), RenderError> {
+    render_animation_to_video_iter(meshes, frames, config, hdri, video, output)
+}
+
+/// Encode lazily sampled frames with bounded pixel/frame-descriptor memory.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn render_animation_to_video_iter<I, F>(
+    meshes: &[MeshOutput],
+    frames: I,
+    config: &RenderConfig,
+    hdri: Option<&HdriData>,
+    video: &VideoConfig,
+    output: &std::path::Path,
+) -> Result<(), RenderError>
+where
+    I: IntoIterator<Item = F>,
+    F: std::borrow::Borrow<crate::animation::Frame>,
+{
     let mut encoder = video::VideoEncoder::start(video, config.width, config.height, output)?;
-    render_animation_stream(meshes, frames, config, hdri, |_, pixels| {
+    render_animation_stream_iter(meshes, frames, config, hdri, |_, pixels| {
         encoder.write_frame(pixels)
     })?;
     encoder.finish()
@@ -367,12 +412,7 @@ pub fn animation_view_projs(
     frames
         .iter()
         .map(|frame| {
-            let mut cam = config.to_camera();
-            if let Some(c) = &frame.camera {
-                cam.yaw_deg += c.yaw;
-                cam.pitch_deg += c.pitch;
-                cam.zoom *= c.zoom;
-            }
+            let cam = config.camera_with_pose(frame.camera.as_ref(), (bmin, bmax));
             camera::compute_view_proj(bmin, bmax, aspect, &cam).0
         })
         .collect()
@@ -589,5 +629,27 @@ mod config_tests {
         let cam = c.to_camera();
         assert_eq!(cam.projection, Projection::Orthographic);
         assert_eq!(cam.background, Some([1.0, 0.0, 0.0, 0.5]));
+    }
+
+    #[test]
+    fn camera_pan_moves_the_fitted_or_explicit_target() {
+        let mut config = RenderConfig::isometric();
+        let pose = crate::animation::CameraPose {
+            yaw: 90.0,
+            pitch: 10.0,
+            zoom: 2.0,
+            target_offset: [3.0, -1.0, 4.0],
+        };
+        let bounds = ([-2.0, 0.0, 0.0], [2.0, 2.0, 4.0]);
+        let camera = config.camera_with_pose(Some(&pose), bounds);
+        assert_eq!(camera.target, Some([3.0, 0.0, 6.0]));
+        assert_eq!(camera.yaw_deg, 135.0);
+        assert_eq!(camera.zoom, 2.0);
+        config.target = Some([10.0, 20.0, 30.0]);
+        assert_eq!(
+            config.camera_with_pose(Some(&pose), bounds).target,
+            Some([13.0, 19.0, 34.0])
+        );
+        assert_eq!(config.camera_with_pose(None, bounds).target, config.target);
     }
 }
