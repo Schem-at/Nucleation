@@ -27,7 +27,7 @@ impl Endpoint {
 #[derive(Clone, Copy)]
 pub(super) struct Reading {
     pub occupied: usize,
-    moving: bool,
+    pub(super) moving: bool,
 }
 impl Reading {
     pub fn sample(sim: &Simulation, cells: &[Pos]) -> Self {

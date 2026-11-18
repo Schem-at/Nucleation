@@ -128,6 +128,27 @@ versus non-air at tick ends. Collision shapes, traversability and mechanical
 settling have different meanings. Without an aperture the two phases are
 reported as uses 1 and 2.
 
+### Read the timeline in the terminal
+
+```sh
+nucleation door-stats hipster.litematic
+nucleation door-stats hipster.litematic --tui --frequency
+```
+
+The text report shows both uses on the same elapsed-tick scale. Each sparkline
+column shows the highest number of occupied aperture cells in its interval.
+When the aperture is unknown, the chart shows block writes instead. Piped text
+is plain; `--no-color` or `NO_COLOR=1` disables color in a terminal.
+
+`--tui` opens an interactive timeline after measurement. **Tab** switches uses,
+**← / →** moves one game tick, **[ / ]** jumps between milestones, and **Space**
+plays or pauses at 20 ticks per second. **a** toggles between the active portion
+and the whole observation. **Home / End** jumps to the bounds. **?** explains
+the timing definitions and **q** returns to the shell. Tick +0 shows the state
+immediately before the input; +1 includes the interaction and first step.
+The cursor shows exact occupancy, writes, piston events, and queue status.
+`--json` retains its machine-readable format.
+
 ### Benchmark opening, closing and repeat frequency
 
 ```sh

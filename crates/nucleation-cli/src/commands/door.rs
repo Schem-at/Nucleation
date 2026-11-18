@@ -1,5 +1,6 @@
 //! Observe two uses of a door control and compare with an unactivated replay.
 mod cycle;
+mod display;
 mod hints;
 mod preview;
 use super::scene::{load, position, value};
@@ -9,10 +10,12 @@ use preview::{Diagram, Recording};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
 use std::fs::OpenOptions;
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, IsTerminal, Write};
 use std::path::PathBuf;
 
 const HELP: &str = "nucleation door-stats FILE [--list-inputs | --input X,Y,Z] [--json]
+  --tui            explore the measured timeline in a full-screen terminal
+  --no-color       disable color (also honors NO_COLOR)
   --warmup N       ticks before measurement (default 10)
   --ticks N        ticks to observe after EACH of two uses (default 160)
   --aperture A:B   inclusive corners x,y,z:x,y,z of the passage to watch
@@ -167,11 +170,6 @@ fn cell_bounds(cells: &[Pos], offset: Point) -> Value {
         .zip(cells.last())
         .map(|(&a, &b)| [source_pos(a, offset), source_pos(b, offset)]))
 }
-fn tick_label(value: &Value) -> String {
-    value
-        .as_u64()
-        .map_or_else(|| "unobserved".into(), |tick| format!("at +{tick} ticks"))
-}
 fn print_panels(panels: &[Value]) {
     for p in panels {
         println!("  Candidate {}: {}", p["candidate"], p["bounds"]);
@@ -191,6 +189,7 @@ impl Observation<'_> {
         mut timeline: Option<&mut BufWriter<std::fs::File>>,
         diagram: &Diagram,
         mut recording: Option<&mut Recording>,
+        mut trace: Option<&mut Vec<display::Sample>>,
     ) -> Result<Value, String> {
         let start = sim.tick_count();
         sim.record_timeline();
@@ -210,6 +209,15 @@ impl Observation<'_> {
         let mut occupancy_since = 0;
         let mut last_busy = 0;
         let before = state(sim, sim.world().get(self.input)).to_owned();
+        if let Some(samples) = trace.as_deref_mut() {
+            samples.push(display::Sample {
+                filled: initial,
+                moving: initial_reading.moving,
+                writes: 0,
+                pistons: 0,
+                quiet: sim.is_quiescent(),
+            });
+        }
         sim.use_block(self.input);
         let after = state(sim, sim.world().get(self.input)).to_owned();
         clock.observe_mechanism(0, sim);
@@ -250,6 +258,15 @@ impl Observation<'_> {
                 );
             }
             let count = reading.occupied;
+            if let Some(samples) = trace.as_deref_mut() {
+                samples.push(display::Sample {
+                    filled: count,
+                    moving: reading.moving,
+                    writes: delta.len(),
+                    pistons: events.len(),
+                    quiet: sim.is_quiescent(),
+                });
+            }
             if count != last_occupancy {
                 last_occupancy = count;
                 occupancy_since = elapsed;
@@ -293,6 +310,7 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
     let (mut json_out, mut list) = (false, false);
     let mut hints = Hints::default();
     let mut frequency = false;
+    let (mut tui, mut no_color) = (false, false);
     let (mut cycles, mut max_dwell) = (8usize, 80usize);
     let (mut preview, mut record, mut preview_only) = (None, None, false);
     while let Some(arg) = args.next() {
@@ -303,6 +321,8 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
             }
             "--list-inputs" => list = true,
             "--json" => json_out = true,
+            "--tui" => tui = true,
+            "--no-color" => no_color = true,
             "--input" => input = Some(position(&value(&mut args, &arg)?)?),
             "--origin" => origin = Some(position(&value(&mut args, &arg)?)?),
             "--aperture" => watch = Some(value(&mut args, &arg)?),
@@ -362,7 +382,20 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
     {
         return Err("frequency measurement needs a measured run, 2..10000 cycles and 1..512 max dwell ticks".into());
     }
+    if tui && (json_out || list || preview_only) {
+        return Err("--tui requires a measured text report; choose one output mode".into());
+    }
+    if tui
+        && (!std::io::stdin().is_terminal()
+            || !std::io::stdout().is_terminal()
+            || std::env::var("TERM").as_deref() == Ok("dumb"))
+    {
+        return Err("--tui requires an interactive terminal".into());
+    }
     let file = file.ok_or(HELP)?;
+    if tui && file.as_os_str() == "-" {
+        return Err("--tui needs a schematic file path".into());
+    }
     hints.validate(watch.is_some())?;
     if preview_only && (preview.is_none() || record.is_some() || timeline.is_some()) {
         return Err("--preview-only needs --preview and cannot record a measured cycle".into());
@@ -570,6 +603,7 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
                 .map_err(|e| format!("{}: {e}", path.display()))
         })
         .transpose()?;
+    let mut traces = [Vec::new(), Vec::new()];
     let execute = (|| -> Result<Vec<Value>, String> {
         let mut phases = Vec::new();
         for (i, (idle_layout, idle_writes)) in idle.iter().enumerate() {
@@ -579,6 +613,7 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
                 dest.as_mut(),
                 &diagram,
                 recording.as_mut(),
+                (!json_out).then_some(&mut traces[i]),
             )?;
             let endpoint = layout(&sim);
             phase["endpoint_blocks_different_from_initial"] =
@@ -623,68 +658,28 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
     if json_out {
         println!("{report}");
     } else {
-        println!(
-            "Door stats for {}\nDimensions {:?}, {} non-air blocks. Input {:?} ({selection}).",
-            file.display(),
-            bounds.get_dimensions(),
-            initial.len(),
-            source_pos(p, offset)
-        );
-        println!(
-            "Aperture: {aperture_selection} {}",
-            report["aperture_bounds"]
-        );
-        if cells.is_empty() {
-            print_panels(&panel_list);
+        let color = std::io::stdout().is_terminal()
+            && std::env::var("TERM").as_deref() != Ok("dumb")
+            && !no_color
+            && std::env::var_os("NO_COLOR").is_none_or(|v| v.is_empty());
+        let view = display::View {
+            path: &file,
+            report: &report,
+            traces: &traces,
+            color,
+        };
+        if tui {
+            view.explore().map_err(|e| e.to_string())?;
+        } else {
+            let width = if std::io::stdout().is_terminal() {
+                ratatui::crossterm::terminal::size()
+                    .ok()
+                    .map(|(w, _)| usize::from(w))
+            } else {
+                None
+            };
+            view.print(width.unwrap_or(80));
         }
-        for phase in phases {
-            println!("Use {}: {} block writes (idle {}), {} extensions, {} retractions. Last write at +{} game ticks. Queues quiet at end: {}.",phase["use"],phase["block_writes"],phase["idle_block_writes"],phase["piston_extensions"],phase["piston_retractions_including_drops"],phase["last_block_write_tick_offset"],phase["quiescent_at_end"]);
-            if !cells.is_empty() {
-                let a = &phase["aperture"];
-                if let Some(action) = a["timing"]["action"].as_str() {
-                    let t = &a["timing"];
-                    let endpoint = if action == "open" { "clear" } else { "filled" };
-                    println!(
-                        "  {action}: first {endpoint} {}, stays {endpoint} {} (response {}).",
-                        tick_label(&t["aperture_first_ticks"]),
-                        tick_label(&t["aperture_stable_ticks"]),
-                        tick_label(&t["delay_ticks"])
-                    );
-                }
-                println!(
-                    "  Aperture {} / {} occupied, {} since +{} elapsed ticks.",
-                    a["occupied_after"],
-                    cells.len(),
-                    a["endpoint"],
-                    a["endpoint_occupancy_since_elapsed_tick"]
-                );
-            }
-            println!(
-                "  Mechanism settled {}.",
-                tick_label(&phase["mechanism_settled_ticks"])
-            );
-        }
-        if let Some(f) = frequency_report {
-            println!(
-                "Frequency search: {} ({} cycles, up to {} ticks per input).",
-                f["status"], cycles, max_dwell
-            );
-            for (key, label) in [
-                ("fastest", "Fastest"),
-                ("fastest_evenly_spaced", "Evenly spaced"),
-            ] {
-                if let Some(rate) = f[key]["cycles_per_second"].as_f64() {
-                    let v = &f[key];
-                    println!("  {label}: {rate:.4} cycles/s, {} ticks per cycle ({} after open input, {} after close input).",v["period_ticks"],v["open_dwell_ticks"],v["close_dwell_ticks"]);
-                } else {
-                    println!("  {label}: no verified rate in this search.");
-                }
-            }
-        }
-        println!(
-            "Initial block layout restored: {}",
-            report["cycle_restores_block_layout"]
-        );
     }
     Ok(())
 }

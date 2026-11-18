@@ -676,6 +676,27 @@ fn door_stats_measures_a_known_aperture_and_lists_ambiguous_controls() {
             }
         }
     }
+    let plain = run_cli(&[
+        "door-stats",
+        file,
+        "--center",
+        "-6,1,0",
+        "--size",
+        "1x1",
+        "--ticks",
+        "20",
+    ]);
+    assert!(plain.status.success());
+    let text = String::from_utf8(plain.stdout).unwrap();
+    for label in ["Stable", "Settled", "Aperture occupancy", "Open", "Close"] {
+        assert!(text.contains(label));
+    }
+    assert!(!text.contains('\x1b'));
+    let non_terminal = run_cli(&["door-stats", file, "--tui"]);
+    assert!(!non_terminal.status.success());
+    assert!(String::from_utf8(non_terminal.stderr)
+        .unwrap()
+        .contains("interactive terminal"));
     let fixed = run_cli(&[
         "door-stats",
         file,
