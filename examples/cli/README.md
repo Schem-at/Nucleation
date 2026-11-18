@@ -1,7 +1,7 @@
 # Formula and query examples
 
 Run these shell helpers from the repository root with the installed `nucleation`
-and `jq` on PATH. The chest and full entity queries also use the `nbt` command
+and `jq` on PATH. The chest, block-entity and entity queries also use the `nbt` command
 from the Python package `nbtlib` (for example, `uv tool install nbtlib`).
 
 ## Curves
@@ -24,10 +24,18 @@ stroke.
 ## Queries
 
 ```sh
+examples/cli/query block-entities build.litematic | jq 'group_by(.id) | map({id: .[0].id, count: length})'
+examples/cli/query block-entities build.litematic | jq '.[] | select(.nbt.Items != null) | {id, pos, items: .nbt.Items}'
 examples/cli/query chests build.litematic | jq '.[] | {pos, items}'
 examples/cli/query entities build.schem | jq '.[] | {id, pos}'
 examples/cli/query parts build.schem | jq -r '.[] | [.count, .block] | @tsv'
 ```
+
+Use `block-entities` (alias `tile-entities`) for every saved block-entity
+record. Each row contains its `id`, schematic-local `pos`, and the Sponge v3
+`Data` compound decoded as JSON under `nbt`. The inventory filter above
+includes any block entity with a saved item list, including empty lists.
+Regular entities such as minecarts use the same row format under `entities`.
 
 Chest rows use structure-local coordinates and retain the raw item stacks,
 including slot, item ID, count and saved components. A double chest has one
