@@ -1,4 +1,5 @@
 //! Observe two uses of a door control and compare with an unactivated replay.
+mod cycle;
 mod hints;
 mod preview;
 use super::scene::{load, position, value};
@@ -24,6 +25,9 @@ const HELP: &str = "nucleation door-stats FILE [--list-inputs | --input X,Y,Z] [
   --preview PNG    draw aperture and input over three schematic projections
   --preview-only   save preview and skip measuring the cycle
   --record MP4     record both measured uses at 20 frames/s (one diagram per tick)
+  --frequency      find fastest repeated cycle, testing equal and unequal dwell times
+  --cycles N       consecutive cycles required per schedule (default 8, minimum 2)
+  --max-dwell N    largest wait after either input to search (default 80 game ticks)
   --origin X,Y,Z   world hash origin (defaults to schematic minimum)
   --timeline FILE  save per-tick JSON Lines, including ordered block writes and piston events";
 type Point = [i32; 3];
@@ -92,15 +96,7 @@ fn aperture(raw: &str, offset: Point) -> Result<Vec<Pos>, String> {
     Ok(cells)
 }
 fn occupied(sim: &Simulation, cells: &[Pos]) -> usize {
-    cells
-        .iter()
-        .filter(|&&p| {
-            !matches!(
-                state(sim, sim.world().get(p)),
-                "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air"
-            )
-        })
-        .count()
+    cycle::Reading::sample(sim, cells).occupied
 }
 
 // A complete rectangular sheet that appeared/disappeared as a unit is a
@@ -199,7 +195,10 @@ impl Observation<'_> {
         let (mut writes, mut strokes) = (0, 0);
         let mut last_write = None;
         let mut first_stroke = None;
-        let initial = occupied(sim, self.cells);
+        let initial_reading = cycle::Reading::sample(sim, self.cells);
+        let initial = initial_reading.occupied;
+        let initial_endpoint = initial_reading.endpoint(self.cells.len());
+        let mut clock = cycle::Clock::default();
         let mut last_states: Vec<_> = self.cells.iter().map(|&p| sim.world().get(p)).collect();
         let mut states_since = 0;
         let mut last_occupancy = initial;
@@ -235,7 +234,15 @@ impl Observation<'_> {
                     *previous = next;
                 }
             }
-            let count = occupied(sim, self.cells);
+            let reading = cycle::Reading::sample(sim, self.cells);
+            if let Some(start) = initial_endpoint {
+                clock.sample(
+                    elapsed,
+                    reading.endpoint(self.cells.len()),
+                    start.opposite(),
+                );
+            }
+            let count = reading.occupied;
             if count != last_occupancy {
                 last_occupancy = count;
                 occupancy_since = elapsed;
@@ -255,7 +262,7 @@ impl Observation<'_> {
         }
         let aperture=(!self.cells.is_empty()).then(|| json!({"cells":self.cells.len(),"occupied_before":initial,"occupied_after":last_occupancy,
         "endpoint":if last_occupancy==0{"clear"}else if last_occupancy==self.cells.len(){"filled"}else{"partial"},
-        "endpoint_states_since_elapsed_tick":states_since,"endpoint_occupancy_since_elapsed_tick":occupancy_since}));
+        "timing":initial_endpoint.map(|start|clock.report(start.opposite())),"endpoint_states_since_elapsed_tick":states_since,"endpoint_occupancy_since_elapsed_tick":occupancy_since}));
         Ok(
             json!({"use":phase,"input_at_tick":start,"control_before":before,"control_immediately_after":after,
         "block_writes":writes,"unique_positions_written":positions.len(),"first_stroke_tick_offset":first_stroke,
@@ -278,6 +285,8 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
     let (mut ticks, mut warmup) = (160u64, 10u64);
     let (mut json_out, mut list) = (false, false);
     let mut hints = Hints::default();
+    let mut frequency = false;
+    let (mut cycles, mut max_dwell) = (8usize, 80usize);
     let (mut preview, mut record, mut preview_only) = (None, None, false);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -304,6 +313,19 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
             }
             "--preview" => preview = Some(PathBuf::from(value(&mut args, &arg)?)),
             "--record" => record = Some(PathBuf::from(value(&mut args, &arg)?)),
+            "--frequency" => frequency = true,
+            "--cycles" => {
+                frequency = true;
+                cycles = value(&mut args, &arg)?
+                    .parse()
+                    .map_err(|_| "invalid cycle count")?;
+            }
+            "--max-dwell" => {
+                frequency = true;
+                max_dwell = value(&mut args, &arg)?
+                    .parse()
+                    .map_err(|_| "invalid max dwell")?;
+            }
             "--preview-only" => preview_only = true,
             "--timeline" => timeline = Some(PathBuf::from(value(&mut args, &arg)?)),
             "--ticks" => {
@@ -324,6 +346,14 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
     }
     if !(1..=100000).contains(&ticks) || warmup > 100000 {
         return Err("use 1..100000 observation ticks and 0..100000 warmup ticks".into());
+    }
+    if frequency
+        && (preview_only
+            || list
+            || !(2..=10000).contains(&cycles)
+            || !(1..=512).contains(&max_dwell))
+    {
+        return Err("frequency measurement needs a measured run, 2..10000 cycles and 1..512 max dwell ticks".into());
     }
     let file = file.ok_or(HELP)?;
     hints.validate(watch.is_some())?;
@@ -569,7 +599,20 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
             return Err(e);
         }
     };
-    let report = json!({"dimensions":bounds.get_dimensions(),"initial_non_air_blocks":initial.len(),"input":source_pos(p,offset),"selection":selection,"input_candidates":candidates.len(),"hash_origin":origin,"warmup_ticks":warmup,"ticks_per_use":ticks,"aperture_selection":aperture_selection,"aperture_bounds":cell_bounds(&cells,offset),"aperture_candidates":panel_list,"preview":preview,"recording":record,"phases":phases,"cycle_restores_block_layout":phases[1]["endpoint_blocks_different_from_initial"]==0,"timeline":timeline});
+    let frequency_report = if frequency {
+        Some(
+            cycle::Sweep {
+                cells: &cells,
+                input: p,
+                max_dwell,
+                cycles,
+            }
+            .measure(&mut sim, &checkpoint)?,
+        )
+    } else {
+        None
+    };
+    let report = json!({"frequency":frequency_report,"dimensions":bounds.get_dimensions(),"initial_non_air_blocks":initial.len(),"input":source_pos(p,offset),"selection":selection,"input_candidates":candidates.len(),"hash_origin":origin,"warmup_ticks":warmup,"ticks_per_use":ticks,"aperture_selection":aperture_selection,"aperture_bounds":cell_bounds(&cells,offset),"aperture_candidates":panel_list,"preview":preview,"recording":record,"phases":phases,"cycle_restores_block_layout":phases[1]["endpoint_blocks_different_from_initial"]==0,"timeline":timeline});
     if json_out {
         println!("{report}");
     } else {
@@ -591,6 +634,13 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
             println!("Use {}: {} block writes (idle {}), {} extensions, {} retractions. Last write at +{} game ticks. Queues quiet at end: {}.",phase["use"],phase["block_writes"],phase["idle_block_writes"],phase["piston_extensions"],phase["piston_retractions_including_drops"],phase["last_block_write_tick_offset"],phase["quiescent_at_end"]);
             if !cells.is_empty() {
                 let a = &phase["aperture"];
+                if let Some(action) = a["timing"]["action"].as_str() {
+                    let t = &a["timing"];
+                    println!(
+                        "  {action}: delay {} ticks, motion {} ticks, complete at +{} ticks.",
+                        t["delay_ticks"], t["motion_ticks"], t["completion_ticks"]
+                    );
+                }
                 println!(
                     "  Aperture {} / {} occupied, {} since +{} elapsed ticks.",
                     a["occupied_after"],
@@ -598,6 +648,23 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
                     a["endpoint"],
                     a["endpoint_occupancy_since_elapsed_tick"]
                 );
+            }
+        }
+        if let Some(f) = frequency_report {
+            println!(
+                "Frequency search: {} ({} cycles, up to {} ticks per input).",
+                f["status"], cycles, max_dwell
+            );
+            for (key, label) in [
+                ("fastest", "Fastest"),
+                ("fastest_evenly_spaced", "Evenly spaced"),
+            ] {
+                if let Some(rate) = f[key]["cycles_per_second"].as_f64() {
+                    let v = &f[key];
+                    println!("  {label}: {rate:.4} cycles/s, {} ticks per cycle ({} after open input, {} after close input).",v["period_ticks"],v["open_dwell_ticks"],v["close_dwell_ticks"]);
+                } else {
+                    println!("  {label}: no verified rate in this search.");
+                }
             }
         }
         println!(

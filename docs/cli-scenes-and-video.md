@@ -128,6 +128,39 @@ versus non-air at tick ends. Collision shapes, traversability and mechanical
 settling have different meanings. Without an aperture the two phases are
 reported as uses 1 and 2.
 
+### Benchmark opening, closing and repeat frequency
+
+```sh
+nucleation door-stats door.litematic --frequency --cycles 16 --max-dwell 80 --json
+```
+
+Each use starting from a fully open or closed aperture reports three times in
+game ticks. **Delay** runs from input to the first observed departure from the
+starting endpoint. **Completion** runs from input to the opposite endpoint
+holding through the end of the observation. **Motion** is completion minus
+delay. Every sample is taken at tick end, starting at +1. An incomplete phase
+has a null completion. A moving-piston placeholder counts toward raw occupancy
+but keeps the aperture in transit until it disappears. These are block-state
+measurements, sampled at 20 game ticks per simulated second.
+
+`--frequency` searches periodic schedules with one use to open and one to close.
+Each dwell ranges from one through `--max-dwell` ticks (default 80).
+The result gives both the fastest passing schedule and the fastest with equally
+spaced inputs. One hertz means one full open/close pair per second.
+`--cycles` (default 8, minimum 2) sets the number of uninterrupted cycles a
+schedule must pass. Either numeric flag enables the search.
+
+Each schedule starts from the same warm checkpoint and RNG seed. Within a
+schedule, inventory, queues and the entire mechanism carry forward between uses.
+Every half-cycle must reach its full target by the next input and hold from its
+first arrival to that input. Reaching the target on the final tick qualifies.
+Intermediate partial motion may reverse direction. A different block material
+in the doorway or a shuffled mechanism elsewhere is allowed. The separate
+full-layout restoration statistic is informational. Results apply to the
+tested starting state, dwell bounds and cycle count. The JSON includes the
+per-cycle opening and closing times for each winning schedule. Preview, video
+and JSONL timeline continue to describe the original two-use measurement.
+
 ### Locate and preview a passage
 
 Start with the dimensions you know. Add a plane or a point near the passage to

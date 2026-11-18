@@ -625,5 +625,63 @@ fn door_stats_measures_a_known_aperture_and_lists_ambiguous_controls() {
     assert!(anchored.status.success());
     let anchored: serde_json::Value = serde_json::from_slice(&anchored.stdout).unwrap();
     assert_eq!(anchored["phases"], stats["phases"]);
+    let sweep = run_cli(&[
+        "door-stats",
+        file,
+        "--center",
+        "-6,1,0",
+        "--size",
+        "1x1",
+        "--ticks",
+        "20",
+        "--cycles",
+        "5",
+        "--max-dwell",
+        "12",
+        "--json",
+    ]);
+    assert!(
+        sweep.status.success(),
+        "{}",
+        String::from_utf8_lossy(&sweep.stderr)
+    );
+    let sweep: serde_json::Value = serde_json::from_slice(&sweep.stdout).unwrap();
+    assert_eq!(sweep["frequency"]["status"], "measured");
+    assert_eq!(sweep["phases"], stats["phases"]);
+    for (i, action) in [(0, "close"), (1, "open")] {
+        let t = &sweep["phases"][i]["aperture"]["timing"];
+        assert_eq!(t["action"], action);
+        assert!(t["delay_ticks"].as_u64().unwrap() <= t["completion_ticks"].as_u64().unwrap());
+    }
+    for key in ["fastest", "fastest_evenly_spaced"] {
+        let f = &sweep["frequency"][key];
+        assert_eq!(f["cycles"].as_array().unwrap().len(), 5);
+        assert_eq!(
+            f["period_ticks"].as_u64().unwrap(),
+            f["open_dwell_ticks"].as_u64().unwrap() + f["close_dwell_ticks"].as_u64().unwrap()
+        );
+        for row in f["cycles"].as_array().unwrap() {
+            for action in ["open", "close"] {
+                assert!(row[action]["completion_ticks"].is_number());
+            }
+        }
+    }
+    let fixed = run_cli(&[
+        "door-stats",
+        file,
+        "--center",
+        "-8,0,0",
+        "--size",
+        "1x1",
+        "--cycles",
+        "3",
+        "--max-dwell",
+        "4",
+        "--json",
+    ]);
+    assert!(fixed.status.success());
+    let fixed: serde_json::Value = serde_json::from_slice(&fixed.stdout).unwrap();
+    assert_eq!(fixed["frequency"]["status"], "no_passing_schedule");
+    assert!(fixed["frequency"]["fastest"].is_null());
     std::fs::remove_dir_all(dir).unwrap();
 }

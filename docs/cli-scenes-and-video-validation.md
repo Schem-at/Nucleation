@@ -80,3 +80,27 @@ the entire ordered trace matched byte for byte (SHA-256
 The PNG, MP4, JSONL and comparison script are in the laptop's
 `cli-scene-video/aperture-review/` validation directory. The Mac archive copy
 is under `validation/cli-door-stats/aperture/`.
+
+## Hipster repeat-frequency reference
+
+An independent check used the released 0.12.3 Python wheel with the user's
+SpaceWalker and SoulBanished Litematic, seed zero, in-world settling, origin
+(0,0,0) and ten warmup ticks. The slow 320-tick run matched all saved aperture
+occupancy counts. The frequency search covered integer dwell times from 1 to
+80 ticks after either input. Each candidate started at the same checkpoint.
+A moving-piston cell kept the aperture in transit.
+
+| Input | First aperture response | Completed endpoint | Motion |
+|---|---:|---:|---:|
+| Close | 1 tick | 9 ticks | 8 ticks |
+| Open | 1 tick | 39 ticks | 38 ticks |
+
+| Periodic schedule | Ticks after close | Ticks after open | Period | Result |
+|---|---:|---:|---:|---|
+| Use the isolated completion times | 9 | 39 | 48 | Failed on cycle 2 |
+| Fastest verified | 9 | 44 | 53 | Passed 128 cycles, 0.3774 Hz |
+| Fastest evenly spaced | 44 | 44 | 88 | Passed 128 cycles, 0.2273 Hz |
+
+These frequencies describe the simulated aperture. The existing vanilla
+capture covers the slower reference inputs. The high-frequency schedules were
+measured with the released simulator.
