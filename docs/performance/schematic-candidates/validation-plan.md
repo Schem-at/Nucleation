@@ -135,9 +135,7 @@ are covered. Storage/crafting shortlist notes identify those required extensions
 
 ## Note-triggered scaffolding regression
 
-The [17 November scaffolding investigation](note-trigger-scaffolding.md) records
-a known simulator mismatch, an eight-block native-1.21.11 reproducer, and commands
-for replaying the real note-block use. Its explicit cross-version mode preserves
-the original saved version and requires exact vanilla block-state round trips;
-it does not provide general datafixing. Keep this failure outside accepted
-benchmark scores until the engine matches the reference.
+The [scaffolding investigation](note-trigger-scaffolding.md) records the original
+mismatch, an eight-block reproducer, and the shared-engine fix. The subsequent
+[wall investigation](note-trigger-walls.md) and [corrected extender replay](extender-corrected.md)
+cover wall propagation and the full extension and return against Minecraft 1.21.11.

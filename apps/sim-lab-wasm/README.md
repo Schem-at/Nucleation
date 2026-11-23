@@ -43,8 +43,7 @@ npm run build && npx vite preview --port 8455
   piston arm lengths, are prepared before play; clones retain their shared GPU
   geometry when an arm switches length.
 - **Saved player-head skins.** Saved `SkullOwner`/`profile` texture URLs are
-  downloaded and registered before meshing. Atlas uses its persistent local
-  skin cache; standalone Sim Lab uses HTTPS on Mojang's texture CDN. The load
+  downloaded and registered before meshing. Sim Lab fetches saved textures over HTTPS from Mojang's texture CDN. The load
   status reports skins loaded and any defaults used after a failed request.
   A reload retries failures. Name-only/UUID-only profiles without saved texture
   URLs use the engine's default skin; no player-account lookup is performed.
@@ -127,10 +126,8 @@ not simulation events, recording, inventories or physics.
 
 ```sh
 node verify-mesh-invalidation.mjs
-CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
-  node verify-mesh-updates.mjs http://127.0.0.1:8767
+node verify-presentation-clock.mjs
 ```
 
 `world.renderStats` exposes record, mirror-write, visible-change and chunk-rebuild
-counts for diagnostics. See `docs/performance/atlas-mesh-invalidation.md` at the
-repository root for the retained same-engine comparisons and their limits.
+counts for diagnostics.

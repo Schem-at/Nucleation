@@ -124,3 +124,5 @@ Sparse comparisons establish equality of sampled tick-end block states and the
 endpoint, not every intermediate state, moving-block-entity payload or runtime
 entity. Native small-control comparisons also check captured comparator outputs
 and occupied inventory slots. The final activity counters do not census entities.
+
+The browser verification commands above use the [historical viewer test checkout](https://github.com/Schem-at/Nucleation/tree/6d1f5f1f/apps/sim-lab-wasm).

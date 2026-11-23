@@ -1,6 +1,6 @@
 [package]
 name = "nucleation-cli"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "The nucleation CLI: inspect, test, convert, render — with a TUI shell"
 license = "MIT"

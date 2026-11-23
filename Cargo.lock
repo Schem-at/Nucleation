@@ -3460,7 +3460,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.12.3"
+version = "0.12.4"
 dependencies = [
  "anyhow",
  "aws-sdk-s3",
@@ -3527,7 +3527,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "font8x8",
  "image 0.25.10",

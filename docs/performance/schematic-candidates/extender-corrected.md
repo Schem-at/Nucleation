@@ -117,3 +117,5 @@ The local archive retains the original by hash and adds a separate corrected
 entry, without replacing other designs:
 [open the corrected extender in Atlas](http://127.0.0.1:8767/#entry=ef09579af4818c2629b2aa894a3e7074ee620d0cdea8bb082baebee79c26bbee).
 It is a functional benchmark candidate; no timing comparison was run here.
+
+The browser verification commands above use the [historical viewer test checkout](https://github.com/Schem-at/Nucleation/tree/6d1f5f1f/apps/sim-lab-wasm).
