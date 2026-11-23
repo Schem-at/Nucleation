@@ -1,0 +1,322 @@
+{
+  "DataVersion": 4671,
+  "size": [
+    45,
+    3,
+    4
+  ],
+  "palette": [
+    {
+      "Name": "minecraft:cobblestone_wall",
+      "Properties": {
+        "east": "low",
+        "north": "none",
+        "south": "none",
+        "up": "false",
+        "waterlogged": "false",
+        "west": "low"
+      }
+    },
+    {
+      "Name": "minecraft:stone"
+    },
+    {
+      "Name": "minecraft:observer",
+      "Properties": {
+        "facing": "north",
+        "powered": "false"
+      }
+    }
+  ],
+  "blocks": [
+    {
+      "pos": [
+        1,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        0,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        2,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        1,
+        0,
+        2
+      ],
+      "state": 2
+    },
+    {
+      "pos": [
+        6,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        5,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        7,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        6,
+        0,
+        2
+      ],
+      "state": 2
+    },
+    {
+      "pos": [
+        11,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        10,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        12,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        11,
+        0,
+        2
+      ],
+      "state": 2
+    },
+    {
+      "pos": [
+        16,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        15,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        17,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        16,
+        0,
+        2
+      ],
+      "state": 2
+    },
+    {
+      "pos": [
+        21,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        20,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        22,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        21,
+        0,
+        2
+      ],
+      "state": 2
+    },
+    {
+      "pos": [
+        26,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        25,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        27,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        26,
+        0,
+        2
+      ],
+      "state": 2
+    },
+    {
+      "pos": [
+        31,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        30,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        32,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        31,
+        0,
+        2
+      ],
+      "state": 2
+    },
+    {
+      "pos": [
+        36,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        35,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        37,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        36,
+        0,
+        2
+      ],
+      "state": 2
+    },
+    {
+      "pos": [
+        41,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        40,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        42,
+        0,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        41,
+        0,
+        2
+      ],
+      "state": 2
+    }
+  ],
+  "entities": []
+}

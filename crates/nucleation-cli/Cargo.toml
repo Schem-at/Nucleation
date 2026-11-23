@@ -1,6 +1,6 @@
 [package]
 name = "nucleation-cli"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "The nucleation CLI: inspect, test, convert, render — with a TUI shell"
 license = "MIT"
@@ -16,10 +16,12 @@ serde_json = "1"
 ratatui = "0.29"
 ratatui-image = "8"
 image = "0.25.10"
+font8x8 = "0.3.1"
 
 [features]
-# The `render` subcommand needs nucleation's GPU pipeline (wgpu). Off by
-# default so the CLI builds fast; everything else works without it.
+# The standard CLI includes image/video rendering. A lightweight build remains
+# available with --no-default-features (or --no-default-features --features mesh).
+default = ["render"]
 render = ["mesh", "nucleation/rendering"]
 # The `mesh` subcommand needs only the mesher, no GPU. `render` implies it
 # (nucleation's rendering feature builds on meshing) — and `animate` (gated on

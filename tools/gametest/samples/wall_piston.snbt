@@ -1,0 +1,96 @@
+{
+  "DataVersion": 4671,
+  "size": [
+    6,
+    3,
+    4
+  ],
+  "palette": [
+    {
+      "Name": "minecraft:sticky_piston",
+      "Properties": {
+        "extended": "false",
+        "facing": "east"
+      }
+    },
+    {
+      "Name": "minecraft:observer",
+      "Properties": {
+        "facing": "down",
+        "powered": "false"
+      }
+    },
+    {
+      "Name": "minecraft:cobblestone_wall",
+      "Properties": {
+        "east": "low",
+        "north": "none",
+        "south": "none",
+        "up": "false",
+        "waterlogged": "false",
+        "west": "low"
+      }
+    },
+    {
+      "Name": "minecraft:stone"
+    },
+    {
+      "Name": "minecraft:observer",
+      "Properties": {
+        "facing": "north",
+        "powered": "false"
+      }
+    }
+  ],
+  "blocks": [
+    {
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        2,
+        1,
+        1
+      ],
+      "state": 1
+    },
+    {
+      "pos": [
+        3,
+        0,
+        1
+      ],
+      "state": 2
+    },
+    {
+      "pos": [
+        2,
+        0,
+        1
+      ],
+      "state": 3
+    },
+    {
+      "pos": [
+        4,
+        0,
+        1
+      ],
+      "state": 3
+    },
+    {
+      "pos": [
+        3,
+        0,
+        2
+      ],
+      "state": 4
+    }
+  ],
+  "entities": []
+}

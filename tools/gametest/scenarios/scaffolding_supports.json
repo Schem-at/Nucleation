@@ -1,0 +1,760 @@
+{
+  "format_version": 1,
+  "data_version": 4671,
+  "case": "scaffolding_supports",
+  "negative_control": false,
+  "size": [
+    56,
+    3,
+    3
+  ],
+  "origin": [
+    0,
+    100,
+    0
+  ],
+  "watch": {
+    "min": [
+      -2,
+      -2,
+      -2
+    ],
+    "max": [
+      57,
+      5,
+      4
+    ]
+  },
+  "rng_seed": 0,
+  "capture_ticks": 24,
+  "source": {
+    "sha256": "0d288eb6e7396bdbdfa8b5a6d254e3fd1a62c5ed447bc829274ccd445400a18c",
+    "data_version": 4671,
+    "path": "tools/gametest/samples/scaffolding_supports.snbt",
+    "description": "Hand-authored support-face matrix, vertical propagation, support removal and restoration."
+  },
+  "fixture": [
+    {
+      "pos": [
+        0,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        4,
+        0,
+        1
+      ],
+      "state": "minecraft:glass"
+    },
+    {
+      "pos": [
+        5,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        4,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        4,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        8,
+        0,
+        1
+      ],
+      "state": "minecraft:oak_leaves[distance=7,persistent=true,waterlogged=false]"
+    },
+    {
+      "pos": [
+        9,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        9,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        8,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        8,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        12,
+        0,
+        1
+      ],
+      "state": "minecraft:smooth_stone_slab[type=top,waterlogged=false]"
+    },
+    {
+      "pos": [
+        13,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        13,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        12,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        12,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        16,
+        0,
+        1
+      ],
+      "state": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]"
+    },
+    {
+      "pos": [
+        17,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        17,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        16,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        16,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        20,
+        0,
+        1
+      ],
+      "state": "minecraft:oak_stairs[facing=north,half=top,shape=straight,waterlogged=false]"
+    },
+    {
+      "pos": [
+        21,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        21,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        20,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        20,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        24,
+        0,
+        1
+      ],
+      "state": "minecraft:oak_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]"
+    },
+    {
+      "pos": [
+        25,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        25,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        24,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        24,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        28,
+        0,
+        1
+      ],
+      "state": "minecraft:oak_trapdoor[facing=north,half=top,open=false,powered=false,waterlogged=false]"
+    },
+    {
+      "pos": [
+        29,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        29,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        28,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        28,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        32,
+        0,
+        1
+      ],
+      "state": "minecraft:oak_trapdoor[facing=north,half=bottom,open=false,powered=false,waterlogged=false]"
+    },
+    {
+      "pos": [
+        33,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        33,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        32,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        32,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        36,
+        0,
+        1
+      ],
+      "state": "minecraft:observer[facing=north,powered=false]"
+    },
+    {
+      "pos": [
+        37,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        37,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        36,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        36,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        40,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]"
+    },
+    {
+      "pos": [
+        41,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        41,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        40,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        40,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        44,
+        0,
+        1
+      ],
+      "state": "minecraft:soul_sand"
+    },
+    {
+      "pos": [
+        45,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        45,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        44,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        44,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        48,
+        0,
+        1
+      ],
+      "state": "minecraft:iron_block"
+    },
+    {
+      "pos": [
+        49,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        49,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        48,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        48,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        52,
+        0,
+        1
+      ],
+      "state": "minecraft:piston[extended=false,facing=north]"
+    },
+    {
+      "pos": [
+        53,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        53,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+    },
+    {
+      "pos": [
+        52,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    },
+    {
+      "pos": [
+        52,
+        2,
+        1
+      ],
+      "state": "minecraft:scaffolding[bottom=false,distance=6,waterlogged=false]"
+    }
+  ],
+  "actions": [
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        0,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        4,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        8,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        12,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        16,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        20,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        24,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        28,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        32,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        36,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        40,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        44,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        48,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        52,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 8,
+      "type": "set_block",
+      "pos": [
+        0,
+        0,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 14,
+      "type": "set_block",
+      "pos": [
+        0,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    }
+  ]
+}

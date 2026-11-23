@@ -1910,6 +1910,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
+name = "font8x8"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "875488b8711a968268c7cf5d139578713097ca4635a76044e8fe8eedf831d07e"
+
+[[package]]
 name = "foreign-types"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3454,7 +3460,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.12.3"
+version = "0.12.4"
 dependencies = [
  "anyhow",
  "aws-sdk-s3",
@@ -3521,8 +3527,9 @@ dependencies = [
 
 [[package]]
 name = "nucleation-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
+ "font8x8",
  "image 0.25.10",
  "mc-test",
  "nucleation",

@@ -1,0 +1,423 @@
+{
+  "DataVersion": 4671,
+  "size": [
+    6,
+    3,
+    3
+  ],
+  "data": [
+    {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        0,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        0,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        2,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        2,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        2,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        0,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        2,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        2,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        2,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        0,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        1,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        2,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        2,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        2,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        0,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        0,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        1,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        1,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        1,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        2,
+        0
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        2,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        5,
+        2,
+        2
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "state": "minecraft:scaffolding{bottom:false,distance:0,waterlogged:true}"
+    }
+  ],
+  "palette": [
+    "minecraft:scaffolding{bottom:false,distance:0,waterlogged:true}",
+    "minecraft:stone"
+  ],
+  "entities": []
+}

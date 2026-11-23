@@ -55,6 +55,7 @@ Every capability, with its own deep-dive doc:
   <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/tick-sim/subtick-wave.gif?v=2" width="470" alt="One game tick played in dispatch order: after a button press, the update cursor sweeps a 13x13 field of redstone dust in the engine's position-hash order">
 
 - [Meshing and rendering](docs/features/meshing-and-rendering.md) — GLB/glTF/USDZ and the headless renderer
+- [CLI scenes and video](docs/cli-scenes-and-video.md) — place blocks, run timed interactions, and film them with an animated camera
 - [Animating a build](docs/features/animation.md) — assembly, layer printing, reveals along a curve
 - [Analysis](docs/features/analysis.md) — diff, fingerprint, auto-stack
 - [Versions and translation](docs/features/versions-and-translation.md) — data-version migration, Java <-> Bedrock

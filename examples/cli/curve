@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# curve OUTPUT '[x(t),y(t),z(t)]' [BLOCK [STEPS [RADIUS]]]
+set -euo pipefail
+if (( $# < 2 || $# > 5 )); then
+    echo "usage: curve OUTPUT 'jq expression yielding [x,y,z], with t in radians' [BLOCK [STEPS [RADIUS]]]" >&2
+    exit 2
+fi
+# The caller supplies jq code. Pass data (block, steps, radius) as arguments.
+jq -cn -L "$(dirname "$0")" --arg block "${3:-minecraft:oxidized_copper}" \
+    --argjson steps "${4:-720}" --argjson radius "${5:-1.5}" \
+    'include "curves"; curve($steps; $radius; $block; ('"$2"'))' |
+    nucleation convert - -o "$1"

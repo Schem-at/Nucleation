@@ -127,3 +127,22 @@ disabled by default. They preserve the same ordered callbacks and recordings.
 for immutable rules. `MC_TICK_TRANSITION_SIGNATURES=off|on|shadow` is sampled once
 per process; shadow compares classifications with the reference implementation.
 Its 512 KiB table is initialized on first use and resets on rules cloning.
+
+### Scaffolding
+
+Scaffolding is an active simulation component in every shared-engine caller.
+Raw `InWorld` loading preserves saved states. Placement and shape notifications
+schedule support recomputation for the next block tick; vertical stacks inherit
+distance, horizontal neighbours add one, and flag-3 state changes notify
+observers. All distance/bottom/waterlogged companions are registered. Waterlogged
+scaffolding schedules and runs water spread through the existing fluid model.
+Piston support checks use the moving head/base geometry at the current progress.
+
+The committed `scaffolding12111` captures cover observer activation, retraction,
+14 support configurations, vertical propagation, support removal/restoration,
+and enclosed water spread. They compare every tick-end block, not complete
+entity state or intra-tick update order. Newly unsupported scaffolding drops an
+item. An already-distance-7 scaffold that remains unsupported needs falling-block
+entities, which are not implemented; the scheduled path is reported through
+`unknown_report()` instead of being certified as supported. General water shape
+occlusion and moving partial-block support retain the engine's existing limits.

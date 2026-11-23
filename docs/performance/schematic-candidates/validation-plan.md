@@ -132,3 +132,10 @@ occupied inventory slots inside the watch box. It does not independently census
 vanilla entities, nested item components, moving BE payloads or intra-tick
 notifications. Extend that observation model before claiming those mechanics
 are covered. Storage/crafting shortlist notes identify those required extensions.
+
+## Note-triggered scaffolding regression
+
+The [scaffolding investigation](note-trigger-scaffolding.md) records the original
+mismatch, an eight-block reproducer, and the shared-engine fix. The subsequent
+[wall investigation](note-trigger-walls.md) and [corrected extender replay](extender-corrected.md)
+cover wall propagation and the full extension and return against Minecraft 1.21.11.

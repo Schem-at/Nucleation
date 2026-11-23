@@ -31,26 +31,29 @@ npm run build && npx vite preview --port 8455
   (default — at rest, nothing fires), *as if pasted* (vanilla's full
   placement pass, so observers pulse), or *quiet* (`onPlace` only, the
   gametest framework's knownShape placement).
-- **Run / step / rate.** Free-run at 1–60 tps, or single-step and watch one
-  tick at a time.
-- **Pistons slide.** A stroke takes two game ticks, and the blocks it carries
-  are drawn moving across them instead of jumping twice. The engine only
-  says *a block is in flight here* — a `moving_piston` placeholder — so the
-  carried block's identity comes from the mirror schematic, which is still a
-  batch behind and therefore still remembers. Each distinct block state is
-  meshed once on its own and cloned per moving copy, so a hundred sliding
-  slime blocks cost one mesh. A piston's own head is drawn as a head rather
-  than a second copy of its base.
-
-  Only while a stroke outlasts a frame: past ~30 tps it is over before it
-  could be drawn, and interpolating then smears the machine rather than
-  clarifying it. Single-stepping uses a fixed quarter-second beat, because
-  that is the case where you most want to see the stroke.
+- **Run / step / rate.** Use a fractional viewing rate, fast-forward or uncapped
+  simulation, or step an exact number of game ticks.
+- **Pistons slide.** The engine supplies each carried block, stationary base,
+  short/long arm state, source, destination and stroke timing. The viewer
+  interpolates the last completed tick, so a new stroke starts at its source
+  instead of skipping its first half-step. Pausing holds the fractional pose;
+  explicit steps show the completed state. Fast-forward samples the same clock
+  without changing physics or adding artificial easing. Landing meshes remain
+  until their chunk replacement is ready. Shared prototypes, including both
+  piston arm lengths, are prepared before play; clones retain their shared GPU
+  geometry when an arm switches length.
+- **Saved player-head skins.** Saved `SkullOwner`/`profile` texture URLs are
+  downloaded and registered before meshing. Sim Lab fetches saved textures over HTTPS from Mojang's texture CDN. The load
+  status reports skins loaded and any defaults used after a failed request.
+  A reload retries failures. Name-only/UUID-only profiles without saved texture
+  URLs use the engine's default skin; no player-account lookup is performed.
 
 ## Rebuilding the engine
 
 `public/engine` holds a compiled wasm core. It does **not** rebuild when the
-app does, so a Rust change needs:
+app does. Run any Rust build on **harrison-work**, then copy the generated
+engine assets back before building the JavaScript app. The `engine` script
+below invokes Rust and belongs on that build host:
 
 ```sh
 npm run engine && npm run build
@@ -96,3 +99,35 @@ This compares the render mirror, picking grid, mesh coordinates and live state
 against the original-source simulation at its saved origin, including piston
 movement, positive/negative origins, multiple regions, a container and a cart.
 It checks coordinate consistency, not a new vanilla reference capture.
+
+
+## Mesh invalidation
+
+Block meshes are rebuilt on visible changes, independently of simulation ticks
+and camera draws. `applyChanges` keeps the last state per cell in a presentation
+batch, updates the render schematic once, and dirties only chunks whose geometry
+may change. A pending A→B→A reversal cancels its rebuild. Each chunk captures its
+revision when its own meshing starts; later changes remain pending, and concurrent
+flush requests share one job. Seam neighbours (including diagonals for AO) and
+negative-coordinate growth are retained. Piston stand-ins retire when the matching
+chunk is installed, or immediately when a cancelled rebuild leaves it current.
+
+Scaffolding distance, leaf distance/persistence, and note-block pitch/instrument/
+power can be visually inert. They are ignored **only** when the loaded resource
+pack's blockstate conditions do not reference them. Missing or unrecognised pack
+definitions fall back to complete state identity. Other fields, including dust
+power/tint, waterlogging and piston poses, remain significant. The pack's
+blockstate definitions must stay fixed during a World; load a new World after
+replacing them. Cached flight models share these same visual identities.
+
+Entities still synchronise on batches with no block changes. Camera drawing and
+piston interpolation remain per animation frame. This changes presentation work,
+not simulation events, recording, inventories or physics.
+
+```sh
+node verify-mesh-invalidation.mjs
+node verify-presentation-clock.mjs
+```
+
+`world.renderStats` exposes record, mirror-write, visible-change and chunk-rebuild
+counts for diagnostics.

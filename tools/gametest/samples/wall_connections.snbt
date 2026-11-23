@@ -1,0 +1,96 @@
+{
+  "DataVersion": 4671,
+  "size": [
+    45,
+    2,
+    3
+  ],
+  "palette": [
+    {
+      "Name": "minecraft:cobblestone_wall",
+      "Properties": {
+        "east": "none",
+        "north": "none",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    }
+  ],
+  "blocks": [
+    {
+      "pos": [
+        1,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        6,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        11,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        16,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        21,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        26,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        31,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        36,
+        0,
+        1
+      ],
+      "state": 0
+    },
+    {
+      "pos": [
+        41,
+        0,
+        1
+      ],
+      "state": 0
+    }
+  ],
+  "entities": []
+}

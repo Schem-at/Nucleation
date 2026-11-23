@@ -1,3 +1,11 @@
+# Nucleation v0.12.4
+
+- The CLI measures door opening and closing independently. Its terminal timeline shows input delay, first and stable aperture completion, and mechanism settle time. Optional multi-cycle frequency scans, aperture previews and JSON output are documented in the [CLI guide](docs/cli-scenes-and-video.md).
+- Use the standard CLI to author scenes with shapes and parametric curves, query block entities and inventories, and film timed simulation inputs with camera keyframes and FFmpeg.
+- The shared simulator propagates scaffolding support and wall shapes through piston-driven mechanisms. Regression fixtures cover waterlogged states and the honey piston push limit. The [corrected extender report](docs/performance/schematic-candidates/extender-corrected.md) records the 149-block extension and return against Minecraft Java 1.21.11.
+- Standalone Sim Lab loads saved player-head textures, interpolates piston strokes through pause and resume, and rebuilds only chunks affected by visual changes.
+- Rust, Python and npm packages use version 0.12.4. The workspace CLI uses version 0.1.1 and can be installed from this tag with `cargo install --locked --git https://github.com/Schem-at/Nucleation --tag v0.12.4 nucleation-cli`. The crates.io library retains its existing reduced feature set. Use the Git dependency for the Rust tick engine.
+
 # Nucleation v0.12.3
 
 - Faster default tick simulation through cached diagnostic settings, dense state
