@@ -1,0 +1,118 @@
+{
+  "format_version": 1,
+  "data_version": 4671,
+  "case": "wall_piston",
+  "negative_control": false,
+  "size": [
+    6,
+    3,
+    4
+  ],
+  "origin": [
+    -40,
+    100,
+    -20
+  ],
+  "watch": {
+    "min": [
+      -2,
+      -2,
+      -2
+    ],
+    "max": [
+      7,
+      4,
+      5
+    ]
+  },
+  "rng_seed": 0,
+  "capture_ticks": 24,
+  "source": {
+    "sha256": "51c2701d6f37ca87888820724ae3e5c5cc949f0e3a5690e494d530a1338a5c0e",
+    "data_version": 4671,
+    "path": "tools/gametest/samples/wall_piston.snbt",
+    "description": "Hand-authored sticky piston moving an observer over a wall, with a wall-watching observer. Two extensions and one retraction."
+  },
+  "fixture": [
+    {
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "state": "minecraft:sticky_piston[extended=false,facing=east]"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        1
+      ],
+      "state": "minecraft:observer[facing=down,powered=false]"
+    },
+    {
+      "pos": [
+        3,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=false,waterlogged=false,west=low]"
+    },
+    {
+      "pos": [
+        2,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        4,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        3,
+        0,
+        2
+      ],
+      "state": "minecraft:observer[facing=north,powered=false]"
+    }
+  ],
+  "actions": [
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        0,
+        1,
+        1
+      ],
+      "state": "minecraft:redstone_block"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        0,
+        1,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        0,
+        1,
+        1
+      ],
+      "state": "minecraft:redstone_block"
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "date": "2026-11-17",
+  "host": "harrison-work",
+  "source_commit": "0f7d1d669e9693b414487ffca79d2be861f6c3d2",
+  "wasm": {
+    "host": "harrison-work",
+    "rustc": "1.98.0 (88d9e12ae 2026-08-18)",
+    "engine_commit": "0f7d1d669e9693b414487ffca79d2be861f6c3d2",
+    "target": "wasm32-unknown-unknown",
+    "features": [
+      "bridge",
+      "mc-tick",
+      "meshing"
+    ],
+    "profile": "release",
+    "wasm_sha256": "c3361e60a4ea982ba4ded2219404d548db53bc81079c5191d6c8bced2bee18d6",
+    "wasm_bytes": 16610552,
+    "asset_pack_sha256": "2c5fdf060e26e3b5ff1cd7bff5e661bd3eb312c57865da64ed5cc16ec71c2dd1",
+    "asset_pack_note": "Retained visualization pack; not a physics reference version.",
+    "simulation": "Single-threaded browser mc-tick reference configuration; not the native PGO benchmark binary.",
+    "build_revision_note": "Built on harrison-work from the equivalent Rust source tree before checkpoint commit. Three 24-tick scaffolding captures match through existing Atlas JS glue.",
+    "previous_wasm_sha256": "3e01cc423394ff67268e78d63b0fa771059c1a2020c2142ba45e8687660892b0"
+  },
+  "wasm_capture_comparison": {
+    "status": "matches_vanilla_block_captures",
+    "results": [
+      {
+        "case": "note_trigger",
+        "matching_frames": 25,
+        "changes": 12
+      },
+      {
+        "case": "supports",
+        "matching_frames": 25,
+        "changes": 48
+      },
+      {
+        "case": "waterlogged",
+        "matching_frames": 25,
+        "changes": 4
+      }
+    ]
+  },
+  "original_schematic_wasm": {
+    "source": "NanoLovesExtendingHisStickyPiston.litematic",
+    "engine_commit": "0f7d1d669e9693b414487ffca79d2be861f6c3d2",
+    "ticks": 160,
+    "matching_frames": 30,
+    "first_difference": {
+      "tick": 30,
+      "pos": "0,0,19",
+      "expected": "minecraft:cobblestone_wall[east=tall,north=none,south=tall,up=true,waterlogged=false,west=none]",
+      "actual": "minecraft:cobblestone_wall[east=low,north=none,south=low,up=true,waterlogged=false,west=none]"
+    },
+    "ordered_changes": 20590,
+    "last_change": 160,
+    "scope": "Actual litematic importer and served WASM; block snapshots only; not full-function validation"
+  },
+  "validation": {
+    "engine_tests_passed": 429,
+    "engine_tests_ignored": 7,
+    "bridge_tests_passed": 30,
+    "scenario_guard_tests_passed": 7
+  },
+  "scope": "Tick-end block parity in three hand-authored captures, not all scaffolding mechanics or full original-mechanism parity."
+}

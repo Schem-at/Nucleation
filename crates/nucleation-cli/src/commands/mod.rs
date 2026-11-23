@@ -13,6 +13,14 @@ pub(crate) mod mesh;
 #[cfg(any(feature = "mesh", feature = "render"))]
 pub(crate) mod pack;
 pub(crate) mod port;
+pub(crate) mod scene;
 #[cfg(feature = "render")]
 pub(crate) mod render;
+#[cfg(feature = "render")]
+pub(crate) mod video;
 pub(crate) mod test;
+
+pub(crate) mod geometry;
+pub(crate) mod query;
+
+pub(crate) mod door;

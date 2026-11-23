@@ -1,0 +1,675 @@
+{
+  "verified_date": "2026-11-17",
+  "conclusion": "Original fails full extension in vanilla1.21.11 and Atlas; adhesive load exceeds12blocks.",
+  "rust_engine_changes": false,
+  "source_unchanged_sha256": "e3f1466374535f9eda361b0745dd6a81aa090aba5a961e3b93944b0d320e457b",
+  "checks": {
+    "python_harness_tests": 16,
+    "new_native_push_limit_tests": 2
+  },
+  "runs": {
+    "original": {
+      "source": {
+        "sha256": "e3f1466374535f9eda361b0745dd6a81aa090aba5a961e3b93944b0d320e457b",
+        "data_version": 5023,
+        "version": "26.3",
+        "filename": "NanoLovesExtendingHisStickyPiston.litematic"
+      },
+      "reference_version": "1.21.11",
+      "capture_ticks": 2000,
+      "capture_stride": 20,
+      "sampled_frames": 101,
+      "final_activity": {
+        "tick": 2000,
+        "block_ticks": 0,
+        "fluid_ticks": 0,
+        "block_events": 0,
+        "rescheduled_block_events": 0,
+        "moving_pistons_in_watch": 0,
+        "scope": "Queue counts cover the server level; moving-piston count covers only the declared watch. No runtime-entity census."
+      },
+      "initial_honey": [
+        [
+          147,
+          3,
+          8
+        ],
+        [
+          147,
+          3,
+          9
+        ],
+        [
+          147,
+          3,
+          10
+        ],
+        [
+          147,
+          3,
+          11
+        ],
+        [
+          147,
+          3,
+          12
+        ],
+        [
+          147,
+          3,
+          13
+        ],
+        [
+          147,
+          3,
+          14
+        ],
+        [
+          147,
+          3,
+          15
+        ],
+        [
+          147,
+          3,
+          16
+        ],
+        [
+          147,
+          3,
+          17
+        ],
+        [
+          147,
+          3,
+          18
+        ],
+        [
+          147,
+          3,
+          19
+        ]
+      ],
+      "final_honey": [
+        [
+          147,
+          3,
+          8
+        ],
+        [
+          147,
+          3,
+          9
+        ],
+        [
+          147,
+          3,
+          10
+        ],
+        [
+          147,
+          3,
+          11
+        ],
+        [
+          147,
+          3,
+          12
+        ],
+        [
+          147,
+          3,
+          13
+        ],
+        [
+          147,
+          3,
+          14
+        ],
+        [
+          147,
+          3,
+          15
+        ],
+        [
+          147,
+          3,
+          16
+        ],
+        [
+          147,
+          3,
+          17
+        ],
+        [
+          147,
+          3,
+          18
+        ],
+        [
+          147,
+          3,
+          19
+        ]
+      ],
+      "wasm_comparison": {
+        "case": "extender_endpoint_original",
+        "status": "matches_vanilla_sampled_blocks",
+        "matching_frames": 101,
+        "simulated_ticks": 2000,
+        "capture_stride": 20,
+        "engine_quiescent": true,
+        "final_honey_positions": [
+          [
+            147,
+            3,
+            8
+          ],
+          [
+            147,
+            3,
+            9
+          ],
+          [
+            147,
+            3,
+            10
+          ],
+          [
+            147,
+            3,
+            11
+          ],
+          [
+            147,
+            3,
+            12
+          ],
+          [
+            147,
+            3,
+            13
+          ],
+          [
+            147,
+            3,
+            14
+          ],
+          [
+            147,
+            3,
+            15
+          ],
+          [
+            147,
+            3,
+            16
+          ],
+          [
+            147,
+            3,
+            17
+          ],
+          [
+            147,
+            3,
+            18
+          ],
+          [
+            147,
+            3,
+            19
+          ]
+        ],
+        "changes": 2364802,
+        "source_data_version": 5023,
+        "reference_version": "1.21.11",
+        "source_sha256": "e3f1466374535f9eda361b0745dd6a81aa090aba5a961e3b93944b0d320e457b",
+        "capture_sha256": "398659b794203a02b6b1a959883107ef0154f54551618cd41ddced6b07baaa8d",
+        "engine_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+        "expected_sha256": "339b68f26005e9eff01584b48b8cda55892e3cda6279f2cef7999cc454c8c727",
+        "actual_sha256": "339b68f26005e9eff01584b48b8cda55892e3cda6279f2cef7999cc454c8c727",
+        "importer": "original_schematic",
+        "scope": "Sampled tick-end block within watch, including air; every simulation tick and action is executed. No entity, inventory, moving-BE or intra-tick equality."
+      },
+      "runtime_identity": {
+        "mappings_sha1": "5621e9253f05fd57872bbe7f8ddf5f9a7d525955",
+        "server_inner_sha256": "ec47239a8de246335e1d54f6ac319bd35641778eb4b6a6da06372840d02fcebc",
+        "java_runtime_version": "21.0.13+9-LTS",
+        "scenario_sha256": "fb55f32f98cf42e60e4906b4df2577607f951f7b719ee3b730791846016d8e81"
+      }
+    },
+    "single_honey_diagnostic": {
+      "source": {
+        "sha256": "9a9567106d42715bc91f3caa2e84b6904f34246529f913ec93ce4e2def6db891",
+        "data_version": 5023,
+        "version": "26.3",
+        "filename": "diagnostic-single-honey.litematic",
+        "description": "Diagnostic copy only: remove eleven honey blocks at x147,y3,z8..18; retain honey147,3,19. Original preserved. Tests isolation of adhesive overload, not a validated repair.",
+        "original_sha256": "e3f1466374535f9eda361b0745dd6a81aa090aba5a961e3b93944b0d320e457b"
+      },
+      "reference_version": "1.21.11",
+      "capture_ticks": 2000,
+      "capture_stride": 20,
+      "sampled_frames": 101,
+      "final_activity": {
+        "tick": 2000,
+        "block_ticks": 0,
+        "fluid_ticks": 0,
+        "block_events": 0,
+        "rescheduled_block_events": 0,
+        "moving_pistons_in_watch": 0,
+        "scope": "Queue counts cover the server level; moving-piston count covers only the declared watch. No runtime-entity census."
+      },
+      "initial_honey": [
+        [
+          147,
+          3,
+          19
+        ]
+      ],
+      "final_honey": [
+        [
+          1,
+          3,
+          19
+        ]
+      ],
+      "wasm_comparison": {
+        "case": "extender_endpoint_single_honey",
+        "status": "matches_vanilla_sampled_blocks",
+        "matching_frames": 101,
+        "simulated_ticks": 2000,
+        "capture_stride": 20,
+        "engine_quiescent": true,
+        "final_honey_positions": [
+          [
+            1,
+            3,
+            19
+          ]
+        ],
+        "changes": 2414206,
+        "source_data_version": 5023,
+        "reference_version": "1.21.11",
+        "source_sha256": "9a9567106d42715bc91f3caa2e84b6904f34246529f913ec93ce4e2def6db891",
+        "capture_sha256": "eb5e82a2bd2e436490dc377b73ee62ea1fe81dd2327d9732e57665d3144a8f87",
+        "engine_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+        "expected_sha256": "dce347442c04d1a55fe2ca64e0024e4672214a70c7c168c8973388b12e833aae",
+        "actual_sha256": "dce347442c04d1a55fe2ca64e0024e4672214a70c7c168c8973388b12e833aae",
+        "importer": "original_schematic",
+        "scope": "Sampled tick-end block within watch, including air; every simulation tick and action is executed. No entity, inventory, moving-BE or intra-tick equality."
+      },
+      "runtime_identity": {
+        "mappings_sha1": "5621e9253f05fd57872bbe7f8ddf5f9a7d525955",
+        "server_inner_sha256": "ec47239a8de246335e1d54f6ac319bd35641778eb4b6a6da06372840d02fcebc",
+        "java_runtime_version": "21.0.13+9-LTS",
+        "scenario_sha256": "ab83a5b7ed3d58db49abdac470f62dc159ef05e1ee0a10f2515edb79e84d6362"
+      }
+    }
+  },
+  "small_wasm_controls": {
+    "case": "honey_piston_bank",
+    "status": "matches_vanilla_blocks",
+    "matching_frames": 25,
+    "simulated_ticks": 24,
+    "capture_stride": 1,
+    "engine_quiescent": true,
+    "final_honey_positions": [
+      [
+        2,
+        1,
+        0
+      ],
+      [
+        2,
+        1,
+        1
+      ],
+      [
+        2,
+        1,
+        2
+      ],
+      [
+        2,
+        1,
+        3
+      ],
+      [
+        2,
+        1,
+        4
+      ],
+      [
+        2,
+        1,
+        5
+      ],
+      [
+        2,
+        1,
+        6
+      ],
+      [
+        2,
+        1,
+        7
+      ],
+      [
+        2,
+        1,
+        8
+      ],
+      [
+        2,
+        1,
+        9
+      ],
+      [
+        2,
+        1,
+        10
+      ],
+      [
+        2,
+        1,
+        11
+      ],
+      [
+        1,
+        1,
+        16
+      ],
+      [
+        1,
+        1,
+        17
+      ],
+      [
+        1,
+        1,
+        18
+      ],
+      [
+        1,
+        1,
+        19
+      ],
+      [
+        1,
+        1,
+        20
+      ],
+      [
+        1,
+        1,
+        21
+      ],
+      [
+        1,
+        1,
+        22
+      ],
+      [
+        1,
+        1,
+        23
+      ],
+      [
+        1,
+        1,
+        24
+      ],
+      [
+        1,
+        1,
+        25
+      ],
+      [
+        1,
+        1,
+        26
+      ],
+      [
+        1,
+        1,
+        27
+      ],
+      [
+        1,
+        1,
+        43
+      ],
+      [
+        2,
+        1,
+        48
+      ],
+      [
+        2,
+        1,
+        49
+      ],
+      [
+        2,
+        1,
+        50
+      ],
+      [
+        2,
+        1,
+        51
+      ],
+      [
+        2,
+        1,
+        52
+      ],
+      [
+        2,
+        1,
+        53
+      ],
+      [
+        2,
+        1,
+        54
+      ],
+      [
+        2,
+        1,
+        55
+      ],
+      [
+        2,
+        1,
+        56
+      ],
+      [
+        2,
+        1,
+        57
+      ],
+      [
+        2,
+        1,
+        58
+      ],
+      [
+        2,
+        1,
+        59
+      ]
+    ],
+    "changes": 47,
+    "source_data_version": 4671,
+    "reference_version": "1.21.11",
+    "source_sha256": "609631ff044d59050946aa0810ddbb3c103c149fd6faa30f13a070b5b12a5e18",
+    "capture_sha256": "0d91872abfea4d006215241d950d6d51dc953d9c519528426d621ae0315fedec",
+    "engine_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+    "expected_sha256": "522d7e229e9a434492ad8d4aabde7af61518de28da5e39b33a2d21973db4e0b8",
+    "actual_sha256": "522d7e229e9a434492ad8d4aabde7af61518de28da5e39b33a2d21973db4e0b8",
+    "importer": "capture_fixture",
+    "scope": "Every tick-end block within watch, including air; every simulation tick and action is executed. No entity, inventory, moving-BE or intra-tick equality."
+  },
+  "browser_original": {
+    "case": "extender_endpoint_original",
+    "source_sha256": "e3f1466374535f9eda361b0745dd6a81aa090aba5a961e3b93944b0d320e457b",
+    "browser": "157.0.8103.79",
+    "engine": {
+      "host": "harrison-work",
+      "rustc": "1.98.0 (88d9e12ae 2026-08-18)",
+      "engine_commit": "6e1bd6714129948e51344dec781b0e1ac295e8c9",
+      "target": "wasm32-unknown-unknown",
+      "features": [
+        "bridge",
+        "mc-tick",
+        "meshing"
+      ],
+      "profile": "release",
+      "wasm_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+      "wasm_bytes": 16661332,
+      "asset_pack_sha256": "2c5fdf060e26e3b5ff1cd7bff5e661bd3eb312c57865da64ed5cc16ec71c2dd1",
+      "asset_pack_note": "Retained visualization pack; not a physics reference version.",
+      "simulation": "Single-threaded browser mc-tick reference configuration; not the native PGO benchmark binary.",
+      "build_revision_note": "Built on harrison-work from matching Rust source before checkpoint commit. Four 24-tick wall captures and the original litematic 160-tick capture match through the existing Atlas JS glue. Native original matches 1100 ticks.",
+      "previous_wasm_sha256": "c3361e60a4ea982ba4ded2219404d548db53bc81079c5191d6c8bced2bee18d6"
+    },
+    "ticks": 2000,
+    "first_quiescent_tick": 1368,
+    "quiescent": true,
+    "honey": [
+      [
+        147,
+        3,
+        8
+      ],
+      [
+        147,
+        3,
+        9
+      ],
+      [
+        147,
+        3,
+        10
+      ],
+      [
+        147,
+        3,
+        11
+      ],
+      [
+        147,
+        3,
+        12
+      ],
+      [
+        147,
+        3,
+        13
+      ],
+      [
+        147,
+        3,
+        14
+      ],
+      [
+        147,
+        3,
+        15
+      ],
+      [
+        147,
+        3,
+        16
+      ],
+      [
+        147,
+        3,
+        17
+      ],
+      [
+        147,
+        3,
+        18
+      ],
+      [
+        147,
+        3,
+        19
+      ]
+    ],
+    "endpoint_matches_vanilla": true,
+    "render_mirror_matches_simulation": true,
+    "origin": [
+      0,
+      0,
+      0
+    ],
+    "render_stats": {
+      "changeRecords": 2364802,
+      "mirrorWrites": 28783,
+      "visualChanges": 28782,
+      "chunkRebuilds": 990
+    },
+    "remaining_flights": 0,
+    "errors": []
+  },
+  "diagnostic_second_click": {
+    "scope": "WASM only; not a validated cycle",
+    "honey_x_after_first_click": 1,
+    "honey_x_after_second_click": 19,
+    "original_honey_x": 147
+  },
+  "browser_single_honey": {
+    "case": "extender_endpoint_single_honey",
+    "source_sha256": "9a9567106d42715bc91f3caa2e84b6904f34246529f913ec93ce4e2def6db891",
+    "browser": "157.0.8103.79",
+    "engine": {
+      "host": "harrison-work",
+      "rustc": "1.98.0 (88d9e12ae 2026-08-18)",
+      "engine_commit": "6e1bd6714129948e51344dec781b0e1ac295e8c9",
+      "target": "wasm32-unknown-unknown",
+      "features": [
+        "bridge",
+        "mc-tick",
+        "meshing"
+      ],
+      "profile": "release",
+      "wasm_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+      "wasm_bytes": 16661332,
+      "asset_pack_sha256": "2c5fdf060e26e3b5ff1cd7bff5e661bd3eb312c57865da64ed5cc16ec71c2dd1",
+      "asset_pack_note": "Retained visualization pack; not a physics reference version.",
+      "simulation": "Single-threaded browser mc-tick reference configuration; not the native PGO benchmark binary.",
+      "build_revision_note": "Built on harrison-work from matching Rust source before checkpoint commit. Four 24-tick wall captures and the original litematic 160-tick capture match through the existing Atlas JS glue. Native original matches 1100 ticks.",
+      "previous_wasm_sha256": "c3361e60a4ea982ba4ded2219404d548db53bc81079c5191d6c8bced2bee18d6"
+    },
+    "ticks": 2000,
+    "first_quiescent_tick": 1368,
+    "quiescent": true,
+    "honey": [
+      [
+        1,
+        3,
+        19
+      ]
+    ],
+    "endpoint_matches_vanilla": true,
+    "render_mirror_matches_simulation": true,
+    "origin": [
+      0,
+      0,
+      0
+    ],
+    "render_stats": {
+      "changeRecords": 2414206,
+      "mirrorWrites": 29359,
+      "visualChanges": 29358,
+      "chunkRebuilds": 991
+    },
+    "remaining_flights": 0,
+    "errors": []
+  }
+}

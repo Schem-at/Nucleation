@@ -1,0 +1,226 @@
+{
+  "date": "2026-11-17",
+  "source_sha256": "e3f1466374535f9eda361b0745dd6a81aa090aba5a961e3b93944b0d320e457b",
+  "source_version": "26.3",
+  "reference_version": "1.21.11",
+  "status": "known_simulation_mismatch",
+  "functional_completion": "not established; vanilla still active after 1100 ticks",
+  "captures": {
+    "vanilla-active-v1": {
+      "raw_sha256": "7aa923b94b65fcba86ed22a4669f406ab3f1aac027f9fc51d841dfe526c2ca98",
+      "gzip_sha256": "b655e6f89d3db62c0542b5dccd183dda358303b364a5bf8727ededc8539d1b79",
+      "gzip_bytes": 4774382
+    },
+    "vanilla-idle-v1": {
+      "raw_sha256": "4b09b9fcce625c6cf1c0fbfef3926147e114667fbd430b9efacf57cfcf61f48c",
+      "gzip_sha256": "1c7e9855f5db766cc9e47addb5f671510137ff27cf6c4ced80083fc05e2a543e",
+      "gzip_bytes": 4540170
+    },
+    "vanilla-full-v1": {
+      "raw_sha256": "5364a556e5b660d59ef5dd4446a84fff88d188883c98d71e6ed9e4140e08d1cf",
+      "gzip_sha256": "0d8cb145993c78f4f24bd061b789c3c04e724b85c81b3f8efed181c0c31f70fa",
+      "gzip_bytes": 16467207
+    },
+    "vanilla-complete-v2": {
+      "raw_sha256": "61bb11738fcc4305123ce96c6b86bde06d465278d1dfac240bac64b64e0b8120",
+      "gzip_sha256": "93858cdec4bc7f945d7ea8e6beb326a20a0f5f21a3a0fc68bbe3982962679053",
+      "gzip_bytes": 35154110
+    },
+    "vanilla-minimal-v1": {
+      "raw_sha256": "62bb73b2035ebf60d33a83dd08c65cb3a6172f750064185229140748a51d0eff",
+      "gzip_sha256": "585b274a4c77a6d34f83dfe7d65ff18f22e424b7430ceaf0f8c0f596a96c7c54",
+      "gzip_bytes": 1306
+    }
+  },
+  "native_binary": {
+    "package": "0.12.3",
+    "extension": "/home/harrison/nucleation-perf/release-installed-venv/lib/python3.14/site-packages/nucleation/nucleation.abi3.so",
+    "sha256": "02e58b6d3ebcff663b7aee8947e2ea919f0b0026cd896a9bb8e77832954d8b53"
+  },
+  "native-vs-vanilla-active": {
+    "status": "mismatch",
+    "host": "harrison-work",
+    "package": "0.12.3",
+    "source_sha256": "e3f1466374535f9eda361b0745dd6a81aa090aba5a961e3b93944b0d320e457b",
+    "source_data_version": 5023,
+    "reference_version": "1.21.11",
+    "capture_sha256": "7aa923b94b65fcba86ed22a4669f406ab3f1aac027f9fc51d841dfe526c2ca98",
+    "initial_state_matches": true,
+    "ticks": 160,
+    "first_divergence": {
+      "tick": 23,
+      "positions": 1,
+      "examples": [
+        {
+          "pos": [
+            0,
+            1,
+            0
+          ],
+          "vanilla": "minecraft:scaffolding[bottom=true,distance=2,waterlogged=false]",
+          "nucleation": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+        }
+      ]
+    },
+    "scope": "Tick-end blocks within capture watch box, including air; no entity or intra-tick equality.",
+    "vanilla_tick_end_changes": 55000,
+    "vanilla_last_change_tick": 160,
+    "nucleation_tick_end_changes": 81,
+    "nucleation_last_change_tick": 36
+  },
+  "native-vs-vanilla-idle": {
+    "status": "pass",
+    "host": "harrison-work",
+    "package": "0.12.3",
+    "source_sha256": "e3f1466374535f9eda361b0745dd6a81aa090aba5a961e3b93944b0d320e457b",
+    "source_data_version": 5023,
+    "reference_version": "1.21.11",
+    "capture_sha256": "4b09b9fcce625c6cf1c0fbfef3926147e114667fbd430b9efacf57cfcf61f48c",
+    "initial_state_matches": true,
+    "ticks": 160,
+    "first_divergence": null,
+    "scope": "Tick-end blocks within capture watch box, including air; no entity or intra-tick equality.",
+    "vanilla_tick_end_changes": 0,
+    "vanilla_last_change_tick": null,
+    "nucleation_tick_end_changes": 0,
+    "nucleation_last_change_tick": null
+  },
+  "native-vs-vanilla-minimal": {
+    "status": "mismatch",
+    "host": "harrison-work",
+    "package": "0.12.3",
+    "source_sha256": "1ba59372f786697fa96ffe46cfa4524785f9cc66b614fe7a1265767909407498",
+    "source_data_version": 4671,
+    "reference_version": "1.21.11",
+    "capture_sha256": "62bb73b2035ebf60d33a83dd08c65cb3a6172f750064185229140748a51d0eff",
+    "initial_state_matches": true,
+    "ticks": 24,
+    "first_divergence": {
+      "tick": 3,
+      "positions": 1,
+      "examples": [
+        {
+          "pos": [
+            0,
+            1,
+            0
+          ],
+          "vanilla": "minecraft:scaffolding[bottom=true,distance=2,waterlogged=false]",
+          "nucleation": "minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]"
+        }
+      ]
+    },
+    "scope": "Tick-end blocks within capture watch box, including air; no entity or intra-tick equality.",
+    "vanilla_tick_end_changes": 12,
+    "vanilla_last_change_tick": 7,
+    "nucleation_tick_end_changes": 8,
+    "nucleation_last_change_tick": 6
+  },
+  "complete-summary": {
+    "reference_version": "1.21.11",
+    "ticks": 1100,
+    "source_version": "26.3",
+    "initial_blocks": 9821,
+    "initial_matches_original": true,
+    "actions": [
+      {
+        "tick": 21,
+        "type": "use_note_block",
+        "pos": [
+          0,
+          3,
+          0
+        ]
+      }
+    ],
+    "tick_end_changes": 1725136,
+    "last_change_tick": 1100,
+    "stable_tail_ticks": 0,
+    "changed_bounds": [
+      [
+        -1,
+        0,
+        0
+      ],
+      [
+        296,
+        3,
+        21
+      ]
+    ],
+    "boundary_changes": [],
+    "final_moving_pistons": 899,
+    "final_extended_sticky_pistons": 0,
+    "final_honey_positions": [
+      [
+        147,
+        3,
+        8
+      ],
+      [
+        147,
+        3,
+        9
+      ],
+      [
+        147,
+        3,
+        10
+      ],
+      [
+        147,
+        3,
+        11
+      ],
+      [
+        147,
+        3,
+        12
+      ],
+      [
+        147,
+        3,
+        13
+      ],
+      [
+        147,
+        3,
+        14
+      ],
+      [
+        147,
+        3,
+        15
+      ],
+      [
+        147,
+        3,
+        16
+      ],
+      [
+        147,
+        3,
+        17
+      ],
+      [
+        147,
+        3,
+        18
+      ],
+      [
+        147,
+        3,
+        19
+      ]
+    ],
+    "repeat_frames_after900": []
+  },
+  "atlas_wasm": {
+    "source_sha256": "e3f1466374535f9eda361b0745dd6a81aa090aba5a961e3b93944b0d320e457b",
+    "engine_sha256": "3e01cc423394ff67268e78d63b0fa771059c1a2020c2142ba45e8687660892b0",
+    "source_data_version": 5023,
+    "changes": 81,
+    "last_change_tick": 36,
+    "scaffolding": "[\"minecraft:scaffolding[bottom=false,distance=0,waterlogged=false]\"]"
+  }
+}

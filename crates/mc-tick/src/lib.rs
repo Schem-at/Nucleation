@@ -48,6 +48,8 @@ pub mod pos;
 pub mod redstone;
 pub mod rng;
 pub mod schedule;
+mod scaffolding;
+mod wall;
 pub mod sim;
 pub mod state;
 pub mod structure;

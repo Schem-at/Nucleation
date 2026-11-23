@@ -1,0 +1,598 @@
+{
+  "format_version": 1,
+  "data_version": 4671,
+  "case": "wall_heights",
+  "negative_control": false,
+  "size": [
+    45,
+    3,
+    4
+  ],
+  "origin": [
+    -40,
+    100,
+    -20
+  ],
+  "watch": {
+    "min": [
+      -2,
+      -2,
+      -2
+    ],
+    "max": [
+      46,
+      4,
+      5
+    ]
+  },
+  "rng_seed": 0,
+  "capture_ticks": 24,
+  "source": {
+    "sha256": "2c1f3dadebd4d45754ab419e7f12572e238b70baefb78783df370ff9af06b5fc",
+    "data_version": 4671,
+    "path": "tools/gametest/samples/wall_heights.snbt",
+    "description": "Hand-authored overhead wall-height/post matrix with observers, negative world origin, removal and replacement."
+  },
+  "fixture": [
+    {
+      "pos": [
+        1,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=false,waterlogged=false,west=low]"
+    },
+    {
+      "pos": [
+        0,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        2,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1,
+        0,
+        2
+      ],
+      "state": "minecraft:observer[facing=north,powered=false]"
+    },
+    {
+      "pos": [
+        6,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=false,waterlogged=false,west=low]"
+    },
+    {
+      "pos": [
+        5,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        7,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        6,
+        0,
+        2
+      ],
+      "state": "minecraft:observer[facing=north,powered=false]"
+    },
+    {
+      "pos": [
+        11,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=false,waterlogged=false,west=low]"
+    },
+    {
+      "pos": [
+        10,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        12,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        11,
+        0,
+        2
+      ],
+      "state": "minecraft:observer[facing=north,powered=false]"
+    },
+    {
+      "pos": [
+        16,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=false,waterlogged=false,west=low]"
+    },
+    {
+      "pos": [
+        15,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        17,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        16,
+        0,
+        2
+      ],
+      "state": "minecraft:observer[facing=north,powered=false]"
+    },
+    {
+      "pos": [
+        21,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=false,waterlogged=false,west=low]"
+    },
+    {
+      "pos": [
+        20,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        22,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        21,
+        0,
+        2
+      ],
+      "state": "minecraft:observer[facing=north,powered=false]"
+    },
+    {
+      "pos": [
+        26,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=false,waterlogged=false,west=low]"
+    },
+    {
+      "pos": [
+        25,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        27,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        26,
+        0,
+        2
+      ],
+      "state": "minecraft:observer[facing=north,powered=false]"
+    },
+    {
+      "pos": [
+        31,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=false,waterlogged=false,west=low]"
+    },
+    {
+      "pos": [
+        30,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        32,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        31,
+        0,
+        2
+      ],
+      "state": "minecraft:observer[facing=north,powered=false]"
+    },
+    {
+      "pos": [
+        36,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=false,waterlogged=false,west=low]"
+    },
+    {
+      "pos": [
+        35,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        37,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        36,
+        0,
+        2
+      ],
+      "state": "minecraft:observer[facing=north,powered=false]"
+    },
+    {
+      "pos": [
+        41,
+        0,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=false,waterlogged=false,west=low]"
+    },
+    {
+      "pos": [
+        40,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        42,
+        0,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "pos": [
+        41,
+        0,
+        2
+      ],
+      "state": "minecraft:observer[facing=north,powered=false]"
+    }
+  ],
+  "actions": [
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        6,
+        1,
+        1
+      ],
+      "state": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        11,
+        1,
+        1
+      ],
+      "state": "minecraft:smooth_stone_slab[type=top,waterlogged=false]"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        16,
+        1,
+        1
+      ],
+      "state": "minecraft:oak_trapdoor[facing=north,half=bottom,open=false,powered=false,waterlogged=false]"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        21,
+        1,
+        1
+      ],
+      "state": "minecraft:oak_trapdoor[facing=north,half=top,open=false,powered=false,waterlogged=false]"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        26,
+        1,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=true,waterlogged=false,west=low]"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        31,
+        1,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=false,waterlogged=false,west=low]"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        36,
+        1,
+        1
+      ],
+      "state": "minecraft:soul_sand"
+    },
+    {
+      "tick": 1,
+      "type": "set_block",
+      "pos": [
+        41,
+        1,
+        1
+      ],
+      "state": "minecraft:oak_leaves[distance=7,persistent=true,waterlogged=false]"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        6,
+        1,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        11,
+        1,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        16,
+        1,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        21,
+        1,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        26,
+        1,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        31,
+        1,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        36,
+        1,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 9,
+      "type": "set_block",
+      "pos": [
+        41,
+        1,
+        1
+      ],
+      "state": "minecraft:air"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "state": "minecraft:stone"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        6,
+        1,
+        1
+      ],
+      "state": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        11,
+        1,
+        1
+      ],
+      "state": "minecraft:smooth_stone_slab[type=top,waterlogged=false]"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        16,
+        1,
+        1
+      ],
+      "state": "minecraft:oak_trapdoor[facing=north,half=bottom,open=false,powered=false,waterlogged=false]"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        21,
+        1,
+        1
+      ],
+      "state": "minecraft:oak_trapdoor[facing=north,half=top,open=false,powered=false,waterlogged=false]"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        26,
+        1,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=true,waterlogged=false,west=low]"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        31,
+        1,
+        1
+      ],
+      "state": "minecraft:cobblestone_wall[east=low,north=none,south=none,up=false,waterlogged=false,west=low]"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        36,
+        1,
+        1
+      ],
+      "state": "minecraft:soul_sand"
+    },
+    {
+      "tick": 17,
+      "type": "set_block",
+      "pos": [
+        41,
+        1,
+        1
+      ],
+      "state": "minecraft:oak_leaves[distance=7,persistent=true,waterlogged=false]"
+    }
+  ]
+}

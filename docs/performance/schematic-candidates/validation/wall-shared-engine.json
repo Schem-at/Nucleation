@@ -1,0 +1,149 @@
+{
+  "verified_date": "2026-11-17",
+  "source_commit": "6e1bd6714129948e51344dec781b0e1ac295e8c9",
+  "rust_tests": {
+    "passed": 436,
+    "failed": 0,
+    "ignored": 7
+  },
+  "bridge_tests": {
+    "passed": 30,
+    "failed": 0
+  },
+  "engine": {
+    "host": "harrison-work",
+    "rustc": "1.98.0 (88d9e12ae 2026-08-18)",
+    "engine_commit": "6e1bd6714129948e51344dec781b0e1ac295e8c9",
+    "target": "wasm32-unknown-unknown",
+    "features": [
+      "bridge",
+      "mc-tick",
+      "meshing"
+    ],
+    "profile": "release",
+    "wasm_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+    "wasm_bytes": 16661332,
+    "asset_pack_sha256": "2c5fdf060e26e3b5ff1cd7bff5e661bd3eb312c57865da64ed5cc16ec71c2dd1",
+    "asset_pack_note": "Retained visualization pack; not a physics reference version.",
+    "simulation": "Single-threaded browser mc-tick reference configuration; not the native PGO benchmark binary.",
+    "build_revision_note": "Built on harrison-work from matching Rust source before checkpoint commit. Four 24-tick wall captures and the original litematic 160-tick capture match through the existing Atlas JS glue. Native original matches 1100 ticks.",
+    "previous_wasm_sha256": "c3361e60a4ea982ba4ded2219404d548db53bc81079c5191d6c8bced2bee18d6"
+  },
+  "original_native_1100": {
+    "actions": 1,
+    "capture": "/home/harrison/nucleation-perf/sticky-piston-note-trigger/vanilla-complete-v2/capture.json",
+    "capture_blake3": "77410ab208ea7ff286bd45a001ec94c607abd18e27999c10050ddd9e3ec13c64",
+    "case": "sticky_piston_note_complete",
+    "compared_capture_state_blake3": "4281e43b9d544cebd7503c089f686c90496bce0f5b7d07e318f9d85ff3c765be",
+    "compared_engine_state_blake3": "4281e43b9d544cebd7503c089f686c90496bce0f5b7d07e318f9d85ff3c765be",
+    "declared_source_sha256": "e3f1466374535f9eda361b0745dd6a81aa090aba5a961e3b93944b0d320e457b",
+    "engine_block_changes": 2221936,
+    "entity_guard": "Authored entities rejected; engine runtime entities rejected. Java capture does not independently census runtime entities.",
+    "expected_frames": 1101,
+    "first_difference": null,
+    "fixture_blocks": 9821,
+    "matching_frames_including_initial": 1101,
+    "negative_control": false,
+    "scope": "Initial and every tick-end block state, comparator output and occupied flat inventory slot within watch; no intra-tick, item-component, moving-BE or vanilla runtime-entity equality.",
+    "status": "matches_capture"
+  },
+  "original_wasm_160": {
+    "case": "sticky_piston_note_active",
+    "status": "matches_vanilla_blocks",
+    "matching_frames": 161,
+    "changes": 70144,
+    "source_data_version": 5023,
+    "reference_version": "1.21.11",
+    "source_sha256": "e3f1466374535f9eda361b0745dd6a81aa090aba5a961e3b93944b0d320e457b",
+    "capture_sha256": "7aa923b94b65fcba86ed22a4669f406ab3f1aac027f9fc51d841dfe526c2ca98",
+    "engine_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+    "expected_sha256": "11764e2b2c6e91d804010d7349e15486cd9be6288a7ea9ac485e889df5e1b9ca",
+    "actual_sha256": "11764e2b2c6e91d804010d7349e15486cd9be6288a7ea9ac485e889df5e1b9ca",
+    "importer": "original_schematic",
+    "scope": "Every tick-end block within watch, including air; no entity, inventory, moving-BE or intra-tick equality."
+  },
+  "small_wasm_cases": [
+    {
+      "case": "wall_heights",
+      "status": "matches_vanilla_blocks",
+      "matching_frames": 25,
+      "changes": 97,
+      "source_data_version": 4671,
+      "reference_version": "1.21.11",
+      "source_sha256": "2c1f3dadebd4d45754ab419e7f12572e238b70baefb78783df370ff9af06b5fc",
+      "capture_sha256": "4de789567076d371b32be35fb39eede39399a09be38fcce6a58b83035991a03e",
+      "engine_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+      "expected_sha256": "180c2e72c805396882a7dddb3ba64e242e3ab3345fb66f64a0eb733eb8d89e69",
+      "actual_sha256": "180c2e72c805396882a7dddb3ba64e242e3ab3345fb66f64a0eb733eb8d89e69",
+      "importer": "capture_fixture",
+      "scope": "Every tick-end block within watch, including air; no entity, inventory, moving-BE or intra-tick equality."
+    },
+    {
+      "case": "wall_connections",
+      "status": "matches_vanilla_blocks",
+      "matching_frames": 25,
+      "changes": 39,
+      "source_data_version": 4671,
+      "reference_version": "1.21.11",
+      "source_sha256": "44c3d03d9d15f51cb8d02cb66065b68e9a1c009666919134985768cedf7d631d",
+      "capture_sha256": "90e1c2b9c16308378b921625bd2db79ee42ce280691887c13f04b2b7a7ff6ce2",
+      "engine_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+      "expected_sha256": "69663ccfba1547da5e09951ab3b0598602d6041685443e9da4f4f2115dd9b6b1",
+      "actual_sha256": "69663ccfba1547da5e09951ab3b0598602d6041685443e9da4f4f2115dd9b6b1",
+      "importer": "capture_fixture",
+      "scope": "Every tick-end block within watch, including air; no entity, inventory, moving-BE or intra-tick equality."
+    },
+    {
+      "case": "wall_waterlogged",
+      "status": "matches_vanilla_blocks",
+      "matching_frames": 25,
+      "changes": 5,
+      "source_data_version": 4671,
+      "reference_version": "1.21.11",
+      "source_sha256": "05109389759034ebea7c4d7581a1e6eacc5c2b0728a5fad665063be7bbd3e9f2",
+      "capture_sha256": "4da2d9d0a483511cb38a09ceb21a4c933e0ffcc52777d8c299abf7289da475ce",
+      "engine_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+      "expected_sha256": "4e10612a514cec065a44fbc4c4a706d46b4e542f06b7643c4b597ddc5b726013",
+      "actual_sha256": "4e10612a514cec065a44fbc4c4a706d46b4e542f06b7643c4b597ddc5b726013",
+      "importer": "capture_fixture",
+      "scope": "Every tick-end block within watch, including air; no entity, inventory, moving-BE or intra-tick equality."
+    },
+    {
+      "case": "wall_piston",
+      "status": "matches_vanilla_blocks",
+      "matching_frames": 25,
+      "changes": 35,
+      "source_data_version": 4671,
+      "reference_version": "1.21.11",
+      "source_sha256": "51c2701d6f37ca87888820724ae3e5c5cc949f0e3a5690e494d530a1338a5c0e",
+      "capture_sha256": "7173c9a217a5a1e452acb255bf40648320d9b5fbc123d0b3a5a95c54e5a2d83d",
+      "engine_sha256": "f3469a884704684e445770d814e8b9ac98450d7c9658ff26b4e5cbd904519d74",
+      "expected_sha256": "c332fed5d6ec00dd8b6caf0a75fa8d3c739e10cfcca678ac5b503cf8d9d4479a",
+      "actual_sha256": "c332fed5d6ec00dd8b6caf0a75fa8d3c739e10cfcca678ac5b503cf8d9d4479a",
+      "importer": "capture_fixture",
+      "scope": "Every tick-end block within watch, including air; no entity, inventory, moving-BE or intra-tick equality."
+    }
+  ],
+  "browser": {
+    "scenario": "note",
+    "results": [
+      {
+        "variant": "candidate",
+        "ticks": 160,
+        "batch_ticks": 8,
+        "change_records": 70144,
+        "mirror_writes": 6651,
+        "chunk_rebuilds": 346,
+        "max_rendered_piston_flights": 826,
+        "render_mirror_matches_simulation": true,
+        "render_mirror_sha256": "1b4acc767beeb9046fff12cf57636118f1daa712ff80c324f8f595c3f4c21ad2",
+        "final_state_sha256": "e4afe59f477170ec02ecb2cca18c19603fb587df2725139ab9a32c1a5f70ef28"
+      }
+    ]
+  },
+  "endpoint": "Still active in vanilla at tick 1100; no completed extension/retraction assertion.",
+  "remote_source_comparison": {
+    "checked_files": 797,
+    "differences": []
+  }
+}

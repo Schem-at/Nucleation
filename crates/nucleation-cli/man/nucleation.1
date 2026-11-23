@@ -1,7 +1,7 @@
 .\" nucleation(1) — mdoc, mandoc-native.
 .\" Regenerate nothing: this page is the source of truth, embedded into the
 .\" binary and shown by `nucleation man`.
-.Dd August 4, 2026
+.Dd November 18, 2026
 .Dt NUCLEATION 1
 .Os
 .Sh NAME
@@ -46,10 +46,18 @@
 .Nm
 .Cm render
 .Ar file | -
-.Fl -pack Ar pack
-.Fl o Ar out.png | -
+.Op Fl -pack Ar pack
+.Fl o Ar out.png | out.mp4 | out.webm | out.mov | -
 .Op Fl -width Ar n
 .Op Fl -height Ar n
+.Op Fl -ticks Ar n
+.Op Fl -use Ar tick:x,y,z
+.Op Fl -camera Ar tick:yaw,pitch,zoom
+.Nm
+.Cm scene
+.Op Ar file | -
+.Fl -set Ar x,y,z=state
+.Fl o Ar output
 .Nm
 .Cm mesh
 .Ar file | -
@@ -81,6 +89,70 @@ means stdin or stdout in any position that names a file, in the manner of
 payload bytes own stdout, status lines go to stderr.
 .Sh SUBCOMMANDS
 .Bl -tag -width Ds
+.It Cm scene Op Ar file
+Create a schematic, or edit a copy of an existing one.
+Repeat
+.Fl -set Ar x,y,z=state
+to place blocks in command-line order. Air removes a block.
+Use
+.Fl -name Ar name ,
+.Fl -data-version Ar integer ,
+and
+.Fl -to Ar format
+to select metadata and exporter. State descriptors should be shell-quoted.
+With output
+.Ql - ,
+.Fl -to
+is required.
+Use
+.Fl -sphere Ar x,y,z ,
+.Fl -cuboid Ar corner:corner ,
+or
+.Fl -curve Ar formula
+to fill shapes with the building library.
+.Fl -block Ar state ,
+.Fl -radius Ar blocks ,
+and
+.Fl -steps Ar intervals
+configure the shape operations. A curve formula is a jq expression yielding
+three coordinates, with t running from zero through two pi.
+.It Cm query Ar entities|block-entities Ar file
+Write one JSON object per matching record. Use
+.Fl -id Ar id
+to filter,
+.Fl -limit Ar count
+to bound the output, and
+.Fl -nbt
+to include the saved payload. Input decoding loads the schematic into memory.
+.It Cm render Ar file
+Render a static PNG or a simulated MP4, WebM or MOV.
+Video streams RGBA frames to external FFmpeg; select its executable with
+.Fl -ffmpeg Ar path .
+Schedule interactions using
+.Fl -use Ar tick:x,y,z ,
+.Fl -place Ar tick:x,y,z=state ,
+and
+.Fl -break Ar tick:x,y,z .
+Coordinates belong to the input schematic. Actions run before the named tick,
+in command-line order within a tick.
+Repeat
+.Fl -camera Ar tick:yaw,pitch,zoom[,pan_x,pan_y,pan_z]
+for linearly interpolated camera keyframes; pan offsets the fitted target.
+Video defaults to 100 ticks, 50 ms per tick, 60 FPS, 1280 by 720 pixels,
+seed 0 and in-world loading. Use
+.Fl -ticks , Fl -tick-ms , Fl -fps , Fl -seed , Fl -settle
+to override. The settle modes are in-world, quiet and placement.
+The default camera is isometric; use
+.Fl -yaw , Fl -pitch , Fl -zoom , Fl -tight
+for framing.
+.Fl -transparent
+requires WebM or MOV for video.
+.Fl -report Ar file.json
+writes final blocks, quiescence and camera endpoints.
+PNG remains a static snapshot and accepts stdout; video requires a filename.
+Run
+.Ql nucleation render --help
+for all options. Rendering is included in the default CLI build.
 .It Cm test Op Ar paths...
 Discover and run every test suite under the given paths: schematics
 carrying an embedded
@@ -125,11 +197,6 @@ names it explicitly
 Structural diff of two builds.
 One side may be
 .Ql - .
-.It Cm render Ar file
-A PNG snapshot through the GPU pipeline
-.Pq compiled with the Ql render feature .
-.Fl o Ar -
-streams the PNG to stdout.
 .It Cm mesh Ar file
 Mesh a schematic into a 3D model through the same pipeline the 3D view and
 .Cm render
