@@ -37,7 +37,7 @@ nucleation render piston.litematic -o piston.mp4 \
 This makes a four-second video: the lever powers the piston at 0.5 seconds,
 then releases it at 2.5 seconds, while the camera orbits and zooms. The gold
 block is pushed out and pulled back. The shell script
-[`examples/cli/piston-camera.sh`](../examples/cli/piston-camera.sh) runs these same
+[`examples/cli/piston-camera.sh`](https://github.com/Schem-at/Nucleation/blob/17215840a107fa1b5608805174e6f64abb78e013/examples/cli/piston-camera.sh) runs these same
 standard commands and keeps its output in a chosen directory.
 
 ## Authoring
