@@ -341,3 +341,384 @@ fn the_man_page_is_mandoc_clean() {
         );
     }
 }
+
+#[test]
+fn scene_authors_edits_and_pipes_standard_schematic_files() {
+    use std::io::Write;
+    use std::process::Stdio;
+    let dir = std::env::temp_dir().join(format!("nucleation-scene-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("authored.litematic");
+    let out = run_cli(&[
+        "scene",
+        "--name",
+        "authored",
+        "--data-version",
+        "4671",
+        "--set",
+        "-8,0,2=minecraft:stone",
+        "--set",
+        "-8,1,2=minecraft:sticky_piston[facing=east,extended=false]",
+        "-o",
+        file.to_str().unwrap(),
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let original = std::fs::read(&file).unwrap();
+    let manager = nucleation::formats::manager::get_manager();
+    let scene = manager.lock().unwrap().read(&original).unwrap();
+    assert_eq!(scene.metadata.name.as_deref(), Some("authored"));
+    assert_eq!(
+        scene
+            .metadata
+            .source_data_version
+            .or(scene.metadata.mc_version),
+        Some(4671)
+    );
+    assert_eq!(scene.get_block(-8, 0, 2).unwrap().name, "minecraft:stone");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_nucleation"))
+        .args([
+            "scene",
+            "-",
+            "--name",
+            "edited",
+            "--set",
+            "-8,0,2=minecraft:gold_block",
+            "--to",
+            "litematic",
+            "-o",
+            "-",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(&original).unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let edited = manager.lock().unwrap().read(&out.stdout).unwrap();
+    assert_eq!(
+        edited.get_block(-8, 0, 2).unwrap().name,
+        "minecraft:gold_block"
+    );
+    assert_eq!(edited.metadata.name.as_deref(), Some("edited"));
+    assert_eq!(
+        std::fs::read(&file).unwrap(),
+        original,
+        "editing a pipe preserves the original file"
+    );
+    let out = run_cli(&[
+        "scene",
+        "--set",
+        "1,2=minecraft:stone",
+        "-o",
+        file.to_str().unwrap(),
+    ]);
+    assert!(!out.status.success());
+    assert_eq!(std::fs::read(&file).unwrap(), original);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn native_scene_combines_shapes_and_single_block_edits_in_order() {
+    let result = run_cli(&[
+        "scene",
+        "--sphere",
+        "0,0,0",
+        "--radius",
+        "1",
+        "--cuboid",
+        "-4,0,0:-3,0,0",
+        "--block",
+        "minecraft:gold_block",
+        "--set",
+        "0,0,0=minecraft:air",
+        "--to",
+        "litematic",
+        "-o",
+        "-",
+    ]);
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let scene = nucleation::formats::manager::get_manager()
+        .lock()
+        .unwrap()
+        .read(&result.stdout)
+        .unwrap();
+    assert_eq!(
+        scene.get_block(-4, 0, 0).unwrap().name,
+        "minecraft:gold_block"
+    );
+    assert_eq!(
+        scene.get_block(0, 1, 0).unwrap().name,
+        "minecraft:gold_block"
+    );
+    assert_eq!(scene.get_block(0, 0, 0).unwrap().name, "minecraft:air");
+}
+
+#[test]
+fn query_filters_before_emitting_json_lines_and_nbt_is_opt_in() {
+    let file = std::env::temp_dir().join(format!("query-{}.snbt", std::process::id()));
+    std::fs::write(&file,r#"{DataVersion:4671,size:[2,1,1],entities:[],palette:["minecraft:chest","minecraft:barrel"],data:[{pos:[0,0,0],state:"minecraft:chest",nbt:{id:"minecraft:chest",Items:[{Slot:2b,id:"minecraft:apple",count:3}]}},{pos:[1,0,0],state:"minecraft:barrel",nbt:{id:"minecraft:barrel",Items:[]}}]}"#).unwrap();
+    let file_arg = file.to_str().unwrap();
+    let out = run_cli(&["query", "block-entities", file_arg]);
+    assert!(out.status.success());
+    let rows: Vec<serde_json::Value> = serde_json::Deserializer::from_slice(&out.stdout)
+        .into_iter()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(rows.len(), 2);
+    assert!(rows.iter().all(|r| r.get("nbt").is_none()));
+    let out = run_cli(&[
+        "query",
+        "tile-entities",
+        file_arg,
+        "--id",
+        "minecraft:chest",
+        "--limit",
+        "1",
+        "--nbt",
+    ]);
+    let row: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(row["nbt"]["Items"][0]["count"], 3);
+    assert_eq!(row["pos"], serde_json::json!([0, 0, 0]));
+    let out = run_cli(&["query", "block-entities", file_arg, "--limit", "0"]);
+    assert!(out.status.success() && out.stdout.is_empty());
+    std::fs::remove_file(file).unwrap();
+}
+
+#[test]
+fn door_stats_measures_a_known_aperture_and_lists_ambiguous_controls() {
+    let dir = std::env::temp_dir().join(format!("door-stats-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("door.litematic");
+    let file = file.to_str().unwrap();
+    let create = run_cli(&[
+        "scene",
+        "--set",
+        "-8,0,0=minecraft:stone",
+        "--set",
+        "-8,0,1=minecraft:stone",
+        "--set",
+        "-8,1,0=minecraft:sticky_piston[facing=east,extended=false]",
+        "--set",
+        "-7,1,0=minecraft:gold_block",
+        "--set",
+        "-8,1,1=minecraft:lever[face=floor,facing=north,powered=false]",
+        "-o",
+        file,
+    ]);
+    assert!(create.status.success());
+    let trace = dir.join("cycle.jsonl");
+    let out = run_cli(&[
+        "door-stats",
+        file,
+        "--aperture",
+        "-6,1,0:-6,1,0",
+        "--ticks",
+        "20",
+        "--json",
+        "--timeline",
+        trace.to_str().unwrap(),
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stats: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(stats["input"], serde_json::json!([-8, 1, 1]));
+    assert_eq!(stats["phases"][0]["aperture"]["endpoint"], "filled");
+    assert_eq!(stats["phases"][0]["piston_extensions"], 1);
+    assert_eq!(stats["phases"][1]["aperture"]["endpoint"], "clear");
+    assert_eq!(stats["phases"][1]["piston_retractions_including_drops"], 1);
+    assert_eq!(stats["phases"][0]["idle_block_writes"], 0);
+    assert_eq!(stats["cycle_restores_block_layout"], true);
+    let rows: Vec<serde_json::Value> = std::fs::read_to_string(trace)
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(rows.len(), 40);
+    assert_eq!(rows.iter().filter(|r| r["clicked"] == true).count(), 2);
+    assert_eq!(
+        rows[..20]
+            .iter()
+            .map(|r| r["changes"].as_array().unwrap().len())
+            .sum::<usize>() as u64,
+        stats["phases"][0]["block_writes"].as_u64().unwrap()
+    );
+    let second = dir.join("two.litematic");
+    let second = second.to_str().unwrap();
+    assert!(run_cli(&[
+        "scene",
+        file,
+        "--set",
+        "-8,0,2=minecraft:stone",
+        "--set",
+        "-8,1,2=minecraft:lever[face=floor,facing=north,powered=false]",
+        "-o",
+        second
+    ])
+    .status
+    .success());
+    assert!(!run_cli(&["door-stats", second]).status.success());
+    let list = run_cli(&["door-stats", second, "--list-inputs"]);
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&list.stdout)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(
+        run_cli(&["door-stats", second, "--input", "-8,1,1", "--ticks", "20"])
+            .status
+            .success()
+    );
+    let png = dir.join("hint.png");
+    let preview = run_cli(&[
+        "door-stats",
+        second,
+        "--size",
+        "1x1",
+        "--corner",
+        "-6,1,0",
+        "--preview",
+        png.to_str().unwrap(),
+        "--preview-only",
+        "--json",
+    ]);
+    assert!(
+        preview.status.success(),
+        "{}",
+        String::from_utf8_lossy(&preview.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&preview.stdout).unwrap();
+    assert_eq!(result["aperture_bounds"], stats["aperture_bounds"]);
+    assert!(result["input"].is_null());
+    assert!(result.get("phases").is_none());
+    assert_eq!(image::image_dimensions(png).unwrap(), (1032, 468));
+    let anchored = run_cli(&[
+        "door-stats",
+        file,
+        "--center",
+        "-6,1,0",
+        "--size",
+        "1x1",
+        "--ticks",
+        "20",
+        "--json",
+    ]);
+    assert!(anchored.status.success());
+    let anchored: serde_json::Value = serde_json::from_slice(&anchored.stdout).unwrap();
+    assert_eq!(anchored["phases"], stats["phases"]);
+    let sweep = run_cli(&[
+        "door-stats",
+        file,
+        "--center",
+        "-6,1,0",
+        "--size",
+        "1x1",
+        "--ticks",
+        "20",
+        "--cycles",
+        "5",
+        "--max-dwell",
+        "12",
+        "--json",
+    ]);
+    assert!(
+        sweep.status.success(),
+        "{}",
+        String::from_utf8_lossy(&sweep.stderr)
+    );
+    let sweep: serde_json::Value = serde_json::from_slice(&sweep.stdout).unwrap();
+    assert_eq!(sweep["frequency"]["status"], "measured");
+    assert_eq!(sweep["phases"], stats["phases"]);
+    for (i, action) in [(0, "close"), (1, "open")] {
+        let t = &sweep["phases"][i]["aperture"]["timing"];
+        assert_eq!(t["action"], action);
+        assert!(
+            t["aperture_first_ticks"].as_u64().unwrap()
+                <= t["aperture_stable_ticks"].as_u64().unwrap()
+        );
+        assert_eq!(t["aperture_stable_ticks"], t["completion_ticks"]);
+        assert!(t["mechanism_settled_ticks"].is_number());
+        assert_eq!(
+            t["mechanism_settled_ticks"],
+            sweep["phases"][i]["mechanism_settled_ticks"]
+        );
+        assert!(t["delay_ticks"].as_u64().unwrap() <= t["completion_ticks"].as_u64().unwrap());
+    }
+    for key in ["fastest", "fastest_evenly_spaced"] {
+        let f = &sweep["frequency"][key];
+        assert_eq!(f["cycles"].as_array().unwrap().len(), 5);
+        assert_eq!(
+            f["period_ticks"].as_u64().unwrap(),
+            f["open_dwell_ticks"].as_u64().unwrap() + f["close_dwell_ticks"].as_u64().unwrap()
+        );
+        for row in f["cycles"].as_array().unwrap() {
+            for action in ["open", "close"] {
+                assert!(row[action]["completion_ticks"].is_number());
+            }
+        }
+    }
+    let plain = run_cli(&[
+        "door-stats",
+        file,
+        "--center",
+        "-6,1,0",
+        "--size",
+        "1x1",
+        "--ticks",
+        "20",
+    ]);
+    assert!(plain.status.success());
+    let text = String::from_utf8(plain.stdout).unwrap();
+    for label in [
+        "Door timeline",
+        "Mechanism settled",
+        "Fully open",
+        "Fully closed",
+    ] {
+        assert!(text.contains(label));
+    }
+    assert!(!text.contains("Aperture occupancy"));
+    assert!(!text.contains('\x1b'));
+    let non_terminal = run_cli(&["door-stats", file, "--tui"]);
+    assert!(!non_terminal.status.success());
+    assert!(String::from_utf8(non_terminal.stderr)
+        .unwrap()
+        .contains("interactive terminal"));
+    let fixed = run_cli(&[
+        "door-stats",
+        file,
+        "--center",
+        "-8,0,0",
+        "--size",
+        "1x1",
+        "--cycles",
+        "3",
+        "--max-dwell",
+        "4",
+        "--json",
+    ]);
+    assert!(fixed.status.success());
+    let fixed: serde_json::Value = serde_json::from_slice(&fixed.stdout).unwrap();
+    assert_eq!(fixed["frequency"]["status"], "no_passing_schedule");
+    assert!(fixed["frequency"]["fastest"].is_null());
+    std::fs::remove_dir_all(dir).unwrap();
+}
