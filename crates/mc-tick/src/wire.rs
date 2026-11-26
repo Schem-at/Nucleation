@@ -69,6 +69,17 @@ pub trait WireWorld: Send + Sync {
     /// `isCollisionShapeFullBlock`: a wire climbing a *full* block renders as
     /// `up`; climbing anything shallower stays `side`.
     fn full_block(&self, world: &World, pos: Pos) -> bool;
+
+    /// `getIncomingWireSignal`: the strongest neighbouring wire, minus one.
+    ///
+    /// Concrete rule tables may override this to fuse world reads without
+    /// changing the result.
+    fn incoming_signal(&self, world: &World, pos: Pos) -> u8
+    where
+        Self: Sized,
+    {
+        incoming(self, world, pos)
+    }
 }
 
 /// A dust connection: `RedstoneSide`.
@@ -93,8 +104,15 @@ impl WireSide {
 pub const WIRE_SIDES: [Dir; 4] = [Dir::North, Dir::South, Dir::West, Dir::East];
 
 /// The index into a connection array for a horizontal direction.
+#[inline]
 fn side_index(dir: Dir) -> Option<usize> {
-    WIRE_SIDES.iter().position(|d| *d == dir)
+    match dir {
+        Dir::North => Some(0),
+        Dir::South => Some(1),
+        Dir::West => Some(2),
+        Dir::East => Some(3),
+        Dir::Down | Dir::Up => None,
+    }
 }
 
 /// `RedStoneWireBlock.getConnectingSide`: what the wire at `pos` does on the
@@ -119,7 +137,9 @@ pub fn connecting_side(
         } else {
             WireSide::Side
         };
-        trace_side(rules, world, pos, dir, out, can_connect_up, true);
+        if crate::diagnostics::trace_side_enabled() {
+            trace_side(rules, world, pos, dir, out, can_connect_up, true);
+        }
         return out;
     }
     // Otherwise the wire faces the block only if that block takes a signal, or
@@ -133,7 +153,9 @@ pub fn connecting_side(
     } else {
         WireSide::Side
     };
-    trace_side(rules, world, pos, dir, out, can_connect_up, false);
+    if crate::diagnostics::trace_side_enabled() {
+        trace_side(rules, world, pos, dir, out, can_connect_up, false);
+    }
     out
 }
 
@@ -216,10 +238,82 @@ pub fn connection_state(
     sides
 }
 
+#[inline]
+fn connecting_side_vanilla(
+    rules: &crate::vanilla::VanillaRules,
+    world: &World,
+    pos: Pos,
+    dir: Dir,
+    can_connect_up: bool,
+) -> WireSide {
+    use crate::vanilla::{INFO_CONDUCTOR, INFO_FULL_CUBE, INFO_STURDY_UP, INFO_WIRE};
+    let side = pos.offset(dir);
+    let side_info = rules.info(world.get(side));
+    let climbs = can_connect_up
+        && (side_info & INFO_STURDY_UP != 0)
+        && (rules.info(world.get(side.offset(Dir::Up))) & INFO_WIRE != 0);
+    if climbs {
+        let out = if side_info & INFO_FULL_CUBE != 0 {
+            WireSide::Up
+        } else {
+            WireSide::Side
+        };
+        if crate::diagnostics::trace_side_enabled() {
+            trace_side(rules, world, pos, dir, out, can_connect_up, true);
+        }
+        return out;
+    }
+    let out = if !rules.should_connect_info(side_info, Some(dir))
+        && ((side_info & INFO_CONDUCTOR != 0)
+            || (rules.info(world.get(side.offset(Dir::Down))) & INFO_WIRE == 0))
+    {
+        WireSide::None
+    } else {
+        WireSide::Side
+    };
+    if crate::diagnostics::trace_side_enabled() {
+        trace_side(rules, world, pos, dir, out, can_connect_up, false);
+    }
+    out
+}
+
+#[inline]
+fn connection_state_vanilla(
+    rules: &crate::vanilla::VanillaRules,
+    world: &World,
+    pos: Pos,
+    current: [WireSide; 4],
+    can_connect_up: bool,
+) -> [WireSide; 4] {
+    let was_dot = current.iter().all(|s| !s.connected());
+    let mut sides = [WireSide::None; 4];
+    for (index, dir) in WIRE_SIDES.iter().enumerate() {
+        sides[index] = connecting_side_vanilla(rules, world, pos, *dir, can_connect_up);
+    }
+    if was_dot && sides.iter().all(|s| !s.connected()) {
+        return sides;
+    }
+    let [north, south, west, east] = sides;
+    let no_north_south = !north.connected() && !south.connected();
+    let no_west_east = !west.connected() && !east.connected();
+    if !west.connected() && no_north_south {
+        sides[2] = WireSide::Side;
+    }
+    if !east.connected() && no_north_south {
+        sides[3] = WireSide::Side;
+    }
+    if !north.connected() && no_west_east {
+        sides[0] = WireSide::Side;
+    }
+    if !south.connected() && no_west_east {
+        sides[1] = WireSide::Side;
+    }
+    sides
+}
+
 /// Demand-driven connectedness for the concrete vanilla rules. The public
 /// `WireWorld` trait does not promise pure queries, so its generic full-shape
 /// operation deliberately retains its original calls and order.
-#[cfg(feature = "experiment-directional")]
 pub(crate) fn connects_toward(
     rules: &crate::vanilla::VanillaRules,
     world: &World,
@@ -227,15 +321,49 @@ pub(crate) fn connects_toward(
     current: [WireSide; 4],
     toward: Dir,
 ) -> bool {
-    let can_connect_up = !rules.conductor(world, pos.offset(Dir::Up));
-    connected_toward_by(current, toward, |dir| {
-        connecting_side(rules, world, pos, dir, can_connect_up)
-    })
+    connects_toward_fast(
+        rules,
+        world,
+        pos,
+        current.iter().any(|side| side.connected()),
+        toward,
+    )
 }
 
-#[cfg(feature = "experiment-directional")]
+#[inline]
+pub(crate) fn connects_toward_fast(
+    rules: &crate::vanilla::VanillaRules,
+    world: &World,
+    pos: Pos,
+    has_stored_conn: bool,
+    toward: Dir,
+) -> bool {
+    if rules.has_power_info() {
+        let can_connect_up =
+            rules.info(world.get(pos.offset(Dir::Up))) & crate::vanilla::INFO_CONDUCTOR == 0;
+        connected_toward_flag(has_stored_conn, toward, |dir| {
+            connecting_side_vanilla(rules, world, pos, dir, can_connect_up)
+        })
+    } else {
+        let can_connect_up = !rules.conductor(world, pos.offset(Dir::Up));
+        connected_toward_flag(has_stored_conn, toward, |dir| {
+            connecting_side(rules, world, pos, dir, can_connect_up)
+        })
+    }
+}
+
+#[cfg(all(test, feature = "experiment-directional"))]
 fn connected_toward_by(
     current: [WireSide; 4],
+    toward: Dir,
+    raw_side: impl FnMut(Dir) -> WireSide,
+) -> bool {
+    connected_toward_flag(current.iter().any(|side| side.connected()), toward, raw_side)
+}
+
+#[inline]
+fn connected_toward_flag(
+    has_stored_conn: bool,
     toward: Dir,
     mut raw_side: impl FnMut(Dir) -> WireSide,
 ) -> bool {
@@ -252,7 +380,7 @@ fn connected_toward_by(
     }
     // With no perpendicular connection, symmetry fills this side unless the
     // stored state was a dot and every raw side remains disconnected.
-    current.iter().any(|side| side.connected()) || raw_side(toward.opposite()).connected()
+    has_stored_conn || raw_side(toward.opposite()).connected()
 }
 
 /// `getIncomingWireSignal`: the strongest neighbouring wire, minus one.
@@ -286,36 +414,72 @@ pub fn java_hash_order(pos: Pos, origin: Pos) -> Vec<Pos> {
     java_hash_order_array(pos, origin).to_vec()
 }
 
+#[inline]
+fn java_bucket(p: Pos, origin: Pos) -> u8 {
+    let x = p.x.wrapping_add(origin.x);
+    let y = p.y.wrapping_add(origin.y);
+    let z = p.z.wrapping_add(origin.z);
+    let hash = y.wrapping_add(z.wrapping_mul(31)).wrapping_mul(31).wrapping_add(x);
+    ((hash ^ (((hash as u32) >> 16) as i32)) & 15) as u8
+}
+
+#[inline]
 fn java_hash_order_array(pos: Pos, origin: Pos) -> [Pos; 7] {
-    let mut entries = [pos; 7];
+    let mut keyed = [(0u8, pos); 7];
+    keyed[0] = (java_bucket(pos, origin), pos);
     for (i, dir) in crate::pos::JAVA_DIRECTIONS.into_iter().enumerate() {
-        entries[i + 1] = pos.offset(dir);
+        let p = pos.offset(dir);
+        keyed[i + 1] = (java_bucket(p, origin), p);
     }
-    // Stable sorting retains insertion order within a Java bucket collision.
-    // Seven entries cannot resize the sixteen-bucket table.
-    entries.sort_by_key(|p| {
-        let x = p.x.wrapping_add(origin.x);
-        let y = p.y.wrapping_add(origin.y);
-        let z = p.z.wrapping_add(origin.z);
-        let hash = y.wrapping_add(z.wrapping_mul(31)).wrapping_mul(31).wrapping_add(x);
-        (hash ^ (((hash as u32) >> 16) as i32)) & 15
-    });
-    entries
+    // Stable insertion sort over 7 precomputed buckets retains insertion order
+    // within a Java bucket collision without re-hashing or drift-sort overhead.
+    for i in 1..7 {
+        let entry = keyed[i];
+        let mut j = i;
+        while j > 0 && keyed[j - 1].0 > entry.0 {
+            keyed[j] = keyed[j - 1];
+            j -= 1;
+        }
+        keyed[j] = entry;
+    }
+    [
+        keyed[0].1, keyed[1].1, keyed[2].1, keyed[3].1, keyed[4].1, keyed[5].1, keyed[6].1,
+    ]
 }
 
 /// `DefaultRedstoneWireEvaluator.updatePowerStrength` for the wire at `pos`.
 pub fn update_power_strength(rules: &dyn WireWorld, ctx: &mut TickCtx<'_>, pos: Pos, current: u8) {
+    update_power_strength_with(rules, ctx, pos, current, |w, p| incoming(rules, w, p));
+}
+
+pub(crate) fn update_power_strength_concrete<R: WireWorld>(
+    rules: &R,
+    ctx: &mut TickCtx<'_>,
+    pos: Pos,
+    current: u8,
+) {
+    update_power_strength_with(rules, ctx, pos, current, |w, p| rules.incoming_signal(w, p));
+}
+
+#[inline]
+fn update_power_strength_with<R: WireWorld + ?Sized>(
+    rules: &R,
+    ctx: &mut TickCtx<'_>,
+    pos: Pos,
+    current: u8,
+    incoming_fn: impl FnOnce(&World, Pos) -> u8,
+) {
     #[cfg(feature = "experiment-wire-plan")]
     let planned = rules.planned_target(ctx.world, ctx.comparator_out, pos);
     #[cfg(not(feature = "experiment-wire-plan"))]
     let planned: Option<u8> = None;
     let target = planned.unwrap_or_else(|| {
-    let block = rules.block_signal(ctx, pos);
-    if block == 15 {
-        15
-    } else {
-        block.max(incoming(rules, ctx.world, pos))
-    }
+        let block = rules.block_signal(ctx, pos);
+        if block == 15 {
+            15
+        } else {
+            block.max(incoming_fn(ctx.world, pos))
+        }
     });
     if target == current {
         return;
@@ -373,6 +537,137 @@ pub struct Wire<R: WireWorld + Clone> {
     pub rules: R,
 }
 
+impl Wire<std::sync::Arc<crate::vanilla::VanillaRules>> {
+    /// Zero-allocation fast path for `TickCtx::indirect_shapes` on vanilla wire.
+    #[inline]
+    pub(crate) fn enqueue_indirect_shapes(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        use crate::vanilla::{INFO_WIRE, SHIFT_WIRE_SIDES};
+        let rules = self.rules.as_ref();
+        if !rules.has_power_info() {
+            for (target, from) in self.indirect_shape_targets(ctx.world, pos) {
+                crate::behaviour::trace_update("shape", target);
+                ctx.enqueue_shape_one(target, from);
+            }
+            return;
+        }
+        let info = rules.info(ctx.world.get(pos));
+        if info & INFO_WIRE == 0 {
+            return;
+        }
+        let side_mask = (info >> SHIFT_WIRE_SIDES) & 0b1111;
+        if side_mask == 0 {
+            return;
+        }
+        // `Direction.Plane.HORIZONTAL` clockwise order: North (bit 0), East (bit 3),
+        // South (bit 1), West (bit 2).
+        const ORDER: [(Dir, u32, i32, i32); 4] = [
+            (Dir::North, 1 << 0, 0, -1),
+            (Dir::East, 1 << 3, 1, 0),
+            (Dir::South, 1 << 1, 0, 1),
+            (Dir::West, 1 << 2, -1, 0),
+        ];
+        if let Some(reader) = ctx.world.local_reader(pos) {
+            let states = reader.states;
+            let base = reader.base;
+            let row = reader.row;
+            let layer = reader.layer;
+            let steps: [(Dir, u32, isize); 4] = [
+                (Dir::North, 1 << 0, -row),
+                (Dir::East, 1 << 3, 1),
+                (Dir::South, 1 << 1, row),
+                (Dir::West, 1 << 2, -1),
+            ];
+            let mut found = smallvec::SmallVec::<[(Pos, Dir); 8]>::new();
+            for (dir, bit, step) in steps {
+                if side_mask & bit == 0 {
+                    continue;
+                }
+                let side_idx = base.wrapping_add_signed(step);
+                if rules.info(states[side_idx]) & INFO_WIRE != 0 {
+                    continue;
+                }
+                let side = pos.offset(dir);
+                let opp = dir.opposite();
+                if rules.info(states[side_idx.wrapping_add_signed(-layer)]) & INFO_WIRE != 0 {
+                    found.push((side.offset(Dir::Down), opp));
+                }
+                if rules.info(states[side_idx.wrapping_add_signed(layer)]) & INFO_WIRE != 0 {
+                    found.push((side.offset(Dir::Up), opp));
+                }
+            }
+            for (target, from) in found {
+                crate::behaviour::trace_update("shape", target);
+                ctx.enqueue_shape_one(target, from);
+            }
+            return;
+        }
+        let mut found = smallvec::SmallVec::<[(Pos, Dir); 8]>::new();
+        for (dir, bit, _, _) in ORDER {
+            if side_mask & bit == 0 {
+                continue;
+            }
+            let side = pos.offset(dir);
+            if rules.info(ctx.world.get(side)) & INFO_WIRE != 0 {
+                continue;
+            }
+            let opp = dir.opposite();
+            let down = side.offset(Dir::Down);
+            if rules.info(ctx.world.get(down)) & INFO_WIRE != 0 {
+                found.push((down, opp));
+            }
+            let up = side.offset(Dir::Up);
+            if rules.info(ctx.world.get(up)) & INFO_WIRE != 0 {
+                found.push((up, opp));
+            }
+        }
+        for (target, from) in found {
+            crate::behaviour::trace_update("shape", target);
+            ctx.enqueue_shape_one(target, from);
+        }
+    }
+
+    /// Concrete vanilla shape-update path avoiding `WireWorld` vtable dispatch.
+    #[inline]
+    pub(crate) fn on_shape_update_vanilla(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
+        if from == Dir::Down {
+            return;
+        }
+        let rules = self.rules.as_ref();
+        if !rules.has_power_info() {
+            <Self as BlockBehaviour>::on_shape_update(self, ctx, pos, from);
+            return;
+        }
+        let Some((power, current)) = rules.wire_shape(ctx.world, pos) else {
+            return;
+        };
+        let can_connect_up =
+            rules.info(ctx.world.get(pos.offset(Dir::Up))) & crate::vanilla::INFO_CONDUCTOR == 0;
+        let sides = if from == Dir::Up {
+            connection_state_vanilla(rules, ctx.world, pos, current, can_connect_up)
+        } else {
+            let Some(index) = side_index(from) else {
+                return;
+            };
+            let is_cross = current.iter().all(|s| s.connected());
+            let side = connecting_side_vanilla(rules, ctx.world, pos, from, can_connect_up);
+            if side.connected() == current[index].connected() && !is_cross {
+                let mut sides = current;
+                sides[index] = side;
+                sides
+            } else {
+                connection_state_vanilla(rules, ctx.world, pos, current, can_connect_up)
+            }
+        };
+        if sides == current {
+            return;
+        }
+        let Some(state) = rules.wire_with_shape(power, sides) else {
+            return;
+        };
+        ctx.set_shape_only(pos, state);
+    }
+}
+
 impl<R: WireWorld + Clone + 'static> BlockBehaviour for Wire<R> {
     /// `RedStoneWireBlock.onRemove`: with the wire gone, update the
     /// neighbours of each of its six neighbours — the two-step sweep that
@@ -426,7 +721,7 @@ impl<R: WireWorld + Clone + 'static> BlockBehaviour for Wire<R> {
     }
 
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
-        update_power_strength(&self.rules, ctx, pos, self.power_level);
+        update_power_strength_concrete(&self.rules, ctx, pos, self.power_level);
     }
 
     /// `RedStoneWireBlock.onPlace` runs `updatePowerStrength` too, so dust
@@ -444,7 +739,7 @@ impl<R: WireWorld + Clone + 'static> BlockBehaviour for Wire<R> {
     /// barrel's far side — and it is the only thing that wakes diodes during a
     /// `knownShape` placement, where no update pass runs.
     fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
-        update_power_strength(&self.rules, ctx, pos, self.power_level);
+        update_power_strength_concrete(&self.rules, ctx, pos, self.power_level);
         for dir in [Dir::Down, Dir::Up] {
             ctx.update_neighbors_at(pos.offset(dir));
         }

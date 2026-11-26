@@ -30,6 +30,9 @@
 //! }
 //! ```
 
+use std::borrow::Cow;
+use std::collections::HashSet;
+
 use crate::pos::{Bounds, Pos};
 use crate::state::{StateId, StateRegistry};
 use crate::world::World;
@@ -401,27 +404,43 @@ impl Structure {
         is_full_cube: impl Fn(&str) -> bool,
         has_dynamic_shape: impl Fn(&str) -> bool,
     ) -> Vec<Pos> {
-        let mut solid: Vec<Pos> = Vec::new();
+        let palette_is_solid: Vec<bool> = self
+            .palette
+            .iter()
+            .map(|descriptor| !has_dynamic_shape(descriptor) && is_full_cube(descriptor))
+            .collect();
+        let entity_set: Option<HashSet<Pos>> = if self.block_entities.len() > 8 {
+            Some(self.block_entities.iter().copied().collect())
+        } else {
+            None
+        };
+        let mut solid: Vec<Pos> = Vec::with_capacity(self.blocks.len());
         let mut other: Vec<Pos> = Vec::new();
-        let mut entities: Vec<Pos> = Vec::new();
-        for (pos, entry) in &self.blocks {
-            let descriptor = &self.palette[*entry];
+        let mut entities: Vec<Pos> = Vec::with_capacity(self.block_entities.len());
+        for &(pos, entry) in &self.blocks {
             //  splits on `info.nbt != null` — *any* block entity,
             // not just one holding items. A comparator carrying its saved
             // OutputSignal belongs in this group too, and putting it in the
             // "other" group instead places it earlier than the game does.
-            if self.block_entities.contains(pos) {
-                entities.push(*pos);
-            } else if !has_dynamic_shape(descriptor) && is_full_cube(descriptor) {
-                solid.push(*pos);
+            let is_be = match &entity_set {
+                Some(set) => set.contains(&pos),
+                None => self.block_entities.contains(&pos),
+            };
+            if is_be {
+                entities.push(pos);
+            } else if palette_is_solid[entry] {
+                solid.push(pos);
             } else {
-                other.push(*pos);
+                other.push(pos);
             }
         }
         for group in [&mut solid, &mut other, &mut entities] {
             group.sort_by_key(|p| (p.y, p.x, p.z));
         }
-        solid.into_iter().chain(other).chain(entities).collect()
+        solid.reserve(other.len() + entities.len());
+        solid.extend(other);
+        solid.extend(entities);
+        solid
     }
 
     /// Place this structure into `world`, interning states as it goes.
@@ -478,17 +497,20 @@ impl<'a> Parser<'a> {
         })
     }
 
+    #[inline]
     fn skip_ws(&mut self) {
-        while self.at < self.text.len() && (self.text[self.at] as char).is_whitespace() {
+        while self.at < self.text.len() && self.text[self.at].is_ascii_whitespace() {
             self.at += 1;
         }
     }
 
+    #[inline]
     fn peek(&mut self) -> Option<u8> {
         self.skip_ws();
         self.text.get(self.at).copied()
     }
 
+    #[inline]
     fn eat(&mut self, byte: u8) -> Result<(), StructureError> {
         if self.peek() == Some(byte) {
             self.at += 1;
@@ -498,16 +520,17 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// A bare or quoted key.
-    fn key(&mut self) -> Result<String, StructureError> {
+    /// A bare or quoted key, borrowing directly from input when bare.
+    #[inline]
+    fn key(&mut self) -> Result<Cow<'a, str>, StructureError> {
         self.skip_ws();
-        if matches!(self.peek(), Some(b'"' | b'\'')) {
-            return self.string();
+        if matches!(self.text.get(self.at), Some(b'"' | b'\'')) {
+            return self.string().map(Cow::Owned);
         }
         let start = self.at;
         while self.at < self.text.len() {
-            let c = self.text[self.at] as char;
-            if c.is_alphanumeric() || c == '_' || c == '.' || c == '-' || c == '+' {
+            let b = self.text[self.at];
+            if b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'-' | b'+') {
                 self.at += 1;
             } else {
                 break;
@@ -516,7 +539,9 @@ impl<'a> Parser<'a> {
         if start == self.at {
             return self.err("expected a key");
         }
-        Ok(String::from_utf8_lossy(&self.text[start..self.at]).into_owned())
+        Ok(std::str::from_utf8(&self.text[start..self.at])
+            .map(Cow::Borrowed)
+            .unwrap_or_else(|_| String::from_utf8_lossy(&self.text[start..self.at])))
     }
 
     /// A quoted string. SNBT permits either quote character, and writers pick
@@ -529,47 +554,148 @@ impl<'a> Parser<'a> {
             _ => return self.err("expected a quoted string"),
         };
         self.at += 1;
-        let mut out = String::new();
+        let start = self.at;
         while self.at < self.text.len() {
-            match self.text[self.at] {
-                b if b == quote => {
-                    self.at += 1;
-                    return Ok(out);
+            let b = self.text[self.at];
+            if b == quote {
+                let slice = &self.text[start..self.at];
+                self.at += 1;
+                if let Ok(s) = std::str::from_utf8(slice) {
+                    return Ok(s.to_owned());
                 }
-                b'\\' if self.at + 1 < self.text.len() => {
-                    out.push(self.text[self.at + 1] as char);
-                    self.at += 2;
+                return Ok(slice.iter().map(|&c| c as char).collect());
+            }
+            if b == b'\\' {
+                let mut out = String::with_capacity(self.at - start + 16);
+                let prefix = &self.text[start..self.at];
+                if let Ok(s) = std::str::from_utf8(prefix) {
+                    out.push_str(s);
+                } else {
+                    for &c in prefix {
+                        out.push(c as char);
+                    }
                 }
-                byte => {
-                    out.push(byte as char);
-                    self.at += 1;
+                while self.at < self.text.len() {
+                    match self.text[self.at] {
+                        c if c == quote => {
+                            self.at += 1;
+                            return Ok(out);
+                        }
+                        b'\\' if self.at + 1 < self.text.len() => {
+                            out.push(self.text[self.at + 1] as char);
+                            self.at += 2;
+                        }
+                        byte => {
+                            out.push(byte as char);
+                            self.at += 1;
+                        }
+                    }
                 }
+                return self.err("unterminated string");
+            }
+            self.at += 1;
+        }
+        self.err("unterminated string")
+    }
+
+    fn skip_string(&mut self) -> Result<(), StructureError> {
+        let quote = match self.peek() {
+            Some(q @ (b'"' | b'\'')) => q,
+            _ => return self.err("expected a quoted string"),
+        };
+        self.at += 1;
+        while self.at < self.text.len() {
+            let b = self.text[self.at];
+            if b == quote {
+                self.at += 1;
+                return Ok(());
+            }
+            if b == b'\\' && self.at + 1 < self.text.len() {
+                self.at += 2;
+            } else {
+                self.at += 1;
             }
         }
         self.err("unterminated string")
     }
 
     /// An integer, tolerating NBT's type suffixes (`1b`, `2s`, `3L`).
+    #[inline]
     fn int(&mut self) -> Result<i64, StructureError> {
         self.skip_ws();
         let start = self.at;
-        if self.peek() == Some(b'-') {
+        let negative = if self.text.get(self.at) == Some(&b'-') {
             self.at += 1;
-        }
-        while self.at < self.text.len() && (self.text[self.at] as char).is_ascii_digit() {
-            self.at += 1;
+            true
+        } else {
+            false
+        };
+        let digits_start = self.at;
+        let mut value: u64 = 0;
+        let mut overflow = false;
+        while self.at < self.text.len() {
+            let b = self.text[self.at];
+            if b.is_ascii_digit() {
+                let d = u64::from(b - b'0');
+                match value.checked_mul(10).and_then(|v| v.checked_add(d)) {
+                    Some(v) => value = v,
+                    None => overflow = true,
+                }
+                self.at += 1;
+            } else {
+                break;
+            }
         }
         if start == self.at {
             return self.err("expected an integer");
         }
-        let digits = String::from_utf8_lossy(&self.text[start..self.at]).into_owned();
         // Skip a trailing type suffix if present.
-        if self.at < self.text.len() && (self.text[self.at] as char).is_alphabetic() {
+        if self.at < self.text.len() && self.text[self.at].is_ascii_alphabetic() {
             self.at += 1;
         }
-        digits
-            .parse()
-            .map_or_else(|_| self.err("integer out of range"), Ok)
+        if digits_start == self.at || overflow {
+            return self.err("integer out of range");
+        }
+        if negative {
+            if value == (i64::MAX as u64) + 1 {
+                Ok(i64::MIN)
+            } else if value <= i64::MAX as u64 {
+                Ok(-(value as i64))
+            } else {
+                self.err("integer out of range")
+            }
+        } else if value <= i64::MAX as u64 {
+            Ok(value as i64)
+        } else {
+            self.err("integer out of range")
+        }
+    }
+
+    /// `[x, y, z]` of three integers without allocating a `Vec`.
+    #[inline]
+    fn int_triple(&mut self, what: &str) -> Result<[i32; 3], StructureError> {
+        self.eat(b'[')?;
+        let mut out = [0i32; 3];
+        let mut count = 0usize;
+        loop {
+            if self.peek() == Some(b']') {
+                self.at += 1;
+                if count != 3 {
+                    return self.err(format!("{what} must have three elements"));
+                }
+                return Ok(out);
+            }
+            let v = self.int()? as i32;
+            if count < 3 {
+                out[count] = v;
+            }
+            count += 1;
+            match self.peek() {
+                Some(b',') => self.at += 1,
+                Some(b']') => {}
+                _ => return self.err("expected `,` or `]`"),
+            }
+        }
     }
 
     /// Skip any value without interpreting it — used for keys we ignore.
@@ -582,7 +708,7 @@ impl<'a> Parser<'a> {
                 while self.at < self.text.len() {
                     match self.text[self.at] {
                         b'"' | b'\'' => {
-                            self.string()?;
+                            self.skip_string()?;
                             continue;
                         }
                         b if b == open => depth += 1,
@@ -599,11 +725,11 @@ impl<'a> Parser<'a> {
                 }
                 self.err("unterminated value")
             }
-            Some(b'"' | b'\'') => self.string().map(|_| ()),
+            Some(b'"' | b'\'') => self.skip_string(),
             Some(_) => {
                 while self.at < self.text.len() {
-                    let c = self.text[self.at] as char;
-                    if c == ',' || c == '}' || c == ']' {
+                    let b = self.text[self.at];
+                    if b == b',' || b == b'}' || b == b']' {
                         break;
                     }
                     self.at += 1;
@@ -611,24 +737,6 @@ impl<'a> Parser<'a> {
                 Ok(())
             }
             None => self.err("expected a value"),
-        }
-    }
-
-    /// `[a, b, c]` of integers.
-    fn int_list(&mut self) -> Result<Vec<i64>, StructureError> {
-        self.eat(b'[')?;
-        let mut out = Vec::new();
-        loop {
-            if self.peek() == Some(b']') {
-                self.at += 1;
-                return Ok(out);
-            }
-            out.push(self.int()?);
-            match self.peek() {
-                Some(b',') => self.at += 1,
-                Some(b']') => {}
-                _ => return self.err("expected `,` or `]`"),
-            }
         }
     }
 
@@ -747,10 +855,14 @@ impl<'a> Parser<'a> {
                 self.at = mark;
             }
         }
-        let text = String::from_utf8_lossy(&self.text[start..self.at]).into_owned();
+        let text = std::str::from_utf8(&self.text[start..self.at]);
         self.eat_type_suffix();
-        text.parse()
-            .map_or_else(|_| self.err("number out of range"), Ok)
+        match text {
+            Ok(s) => s
+                .parse()
+                .map_or_else(|_| self.err("number out of range"), Ok),
+            Err(_) => self.err("number out of range"),
+        }
     }
 
     /// `[a, b, c]` of floats.
@@ -807,7 +919,7 @@ impl<'a> Parser<'a> {
             }
             let field = self.key()?;
             self.eat(b':')?;
-            match field.as_str() {
+            match field.as_ref() {
                 "id" => id = self.string()?,
                 "Pos" => {
                     let values = self.float_list()?;
@@ -879,7 +991,7 @@ impl<'a> Parser<'a> {
             }
             let key = self.key()?;
             self.eat(b':')?;
-            match key.as_str() {
+            match key.as_ref() {
                 "pos" => {
                     let values = self.float_list()?;
                     if values.len() != 3 {
@@ -898,7 +1010,7 @@ impl<'a> Parser<'a> {
                         }
                         let field = self.key()?;
                         self.eat(b':')?;
-                        match field.as_str() {
+                        match field.as_ref() {
                             "id" => entity_id = self.string()?,
                             "Motion" => {
                                 let values = self.float_list()?;
@@ -1145,7 +1257,7 @@ impl<'a> Parser<'a> {
             }
             let key = self.key()?;
             self.eat(b':')?;
-            match key.as_str() {
+            match key.as_ref() {
                 "Slot" => slot = self.int()? as u8,
                 "id" => id = self.string()?,
                 // Both spellings: `Count` before the components rework, `count` after.
@@ -1217,7 +1329,7 @@ impl<'a> Parser<'a> {
                 }
                 let key = self.key()?;
                 self.eat(b':')?;
-                match key.as_str() {
+                match key.as_ref() {
                     "slot" | "Slot" => slot = self.int()? as u8,
                     "item" => {
                         self.eat(b'{')?;
@@ -1229,7 +1341,7 @@ impl<'a> Parser<'a> {
                             }
                             let inner = self.key()?;
                             self.eat(b':')?;
-                            match inner.as_str() {
+                            match inner.as_ref() {
                                 "id" => id = self.string()?,
                                 "count" | "Count" => count = self.int()? as u8,
                                 _ => self.skip_value()?,
@@ -1274,7 +1386,7 @@ impl<'a> Parser<'a> {
             }
             let key = self.key()?;
             self.eat(b':')?;
-            match key.as_str() {
+            match key.as_ref() {
                 // `Name`/`Properties` up to 26.2; 26.3 (data version 5006+)
                 // spells them `id`/`properties` (Mojang BlockStateFieldNamesFix).
                 "Name" | "id" => name = self.string()?,
@@ -1285,7 +1397,7 @@ impl<'a> Parser<'a> {
                             self.at += 1;
                             break;
                         }
-                        let property = self.key()?;
+                        let property = self.key()?.into_owned();
                         self.eat(b':')?;
                         let value = self.string()?;
                         properties.push((property, value));
@@ -1337,7 +1449,7 @@ impl<'a> Parser<'a> {
             }
             let key = self.key()?;
             self.eat(b':')?;
-            match key.as_str() {
+            match key.as_ref() {
                 // Read rather than skipped, because `Entity.load`'s treatment of
                 // a non-finite `Motion` changed at 1.21.11 and the tag is the
                 // only record of which side of that a file sits on. Skipping it
@@ -1346,11 +1458,8 @@ impl<'a> Parser<'a> {
                 // together by.
                 "DataVersion" => data_version = Some(self.int()? as i32),
                 "size" => {
-                    let values = self.int_list()?;
-                    if values.len() != 3 {
-                        return self.err("size must have three elements");
-                    }
-                    size = Some((values[0] as i32, values[1] as i32, values[2] as i32));
+                    let [x, y, z] = self.int_triple("size")?;
+                    size = Some((x, y, z));
                 }
                 "palette" => {
                     self.eat(b'[')?;
@@ -1403,17 +1512,10 @@ impl<'a> Parser<'a> {
                             }
                             let field = self.key()?;
                             self.eat(b':')?;
-                            match field.as_str() {
+                            match field.as_ref() {
                                 "pos" => {
-                                    let values = self.int_list()?;
-                                    if values.len() != 3 {
-                                        return self.err("pos must have three elements");
-                                    }
-                                    pos = Some(Pos::new(
-                                        values[0] as i32,
-                                        values[1] as i32,
-                                        values[2] as i32,
-                                    ));
+                                    let [x, y, z] = self.int_triple("pos")?;
+                                    pos = Some(Pos::new(x, y, z));
                                 }
                                 "state" => state = Some(self.int()? as usize),
                                 "nbt" => {

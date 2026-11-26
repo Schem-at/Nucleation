@@ -12,7 +12,7 @@
 //! looks plausible and gets every piston door wrong.
 
 use crate::pos::Pos;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 /// Ordering class for a scheduled tick.
 ///
@@ -63,13 +63,36 @@ pub struct ScheduledTick {
 /// The ring is faster but needs a bounded lookahead and an overflow path, and
 /// nothing here is measured yet. Correctness first; the benchmark suite is the
 /// gate that decides whether this ever needs replacing.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Default)]
 pub struct TickQueue {
     buckets: BTreeMap<u64, Vec<ScheduledTick>>,
     next_sequence: u64,
     /// Collected for this tick and not yet run — vanilla's `toRunThisTickSet`.
     running: Vec<Pos>,
+    /// O(1) membership index mirroring all positions currently in `buckets`.
+    /// Excluded from `Debug` and `PartialEq` so snapshots stay deterministic.
+    pending_set: HashSet<Pos>,
 }
+
+impl std::fmt::Debug for TickQueue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TickQueue")
+            .field("buckets", &self.buckets)
+            .field("next_sequence", &self.next_sequence)
+            .field("running", &self.running)
+            .finish()
+    }
+}
+
+impl PartialEq for TickQueue {
+    fn eq(&self, other: &Self) -> bool {
+        self.buckets == other.buckets
+            && self.next_sequence == other.next_sequence
+            && self.running == other.running
+    }
+}
+
+impl Eq for TickQueue {}
 
 impl TickQueue {
     /// An empty queue.
@@ -90,7 +113,7 @@ impl TickQueue {
     /// phase has not run yet; the game permits this and some contraptions rely
     /// on it, so it is not rejected here.
     pub fn schedule(&mut self, pos: Pos, now: u64, delay: u64, priority: TickPriority) {
-        if self.is_pending(pos) {
+        if !self.pending_set.insert(pos) {
             return;
         }
         let entry = ScheduledTick {
@@ -105,10 +128,9 @@ impl TickQueue {
 
     /// Whether `pos` holds an uncollected tick — `LevelChunkTicks`' own
     /// deduplication, which [`Self::schedule`] applies for the caller.
+    #[inline]
     pub fn is_pending(&self, pos: Pos) -> bool {
-        self.buckets
-            .values()
-            .any(|entries| entries.iter().any(|entry| entry.pos == pos))
+        !self.pending_set.is_empty() && self.pending_set.contains(&pos)
     }
 
     /// `LevelTicks.willTickThisTick`: collected for this tick and not yet run.
@@ -120,8 +142,9 @@ impl TickQueue {
     /// reschedule a block makes during its own tick — a leaf whose tick already
     /// ran this tick then never re-checks its distance, and the observer
     /// watching it never fires.
+    #[inline]
     pub fn will_tick_this_tick(&self, pos: Pos) -> bool {
-        self.running.iter().any(|entry| *entry == pos)
+        !self.running.is_empty() && self.running.iter().any(|entry| *entry == pos)
     }
 
     /// Take everything due, keeping it visible to
@@ -134,7 +157,10 @@ impl TickQueue {
     /// tick runs books a second tick vanilla never books.
     pub fn collect_due(&mut self, tick: u64) -> Vec<ScheduledTick> {
         let due = self.drain_due(tick);
-        self.running = due.iter().map(|entry| entry.pos).collect();
+        self.running.clear();
+        if !due.is_empty() {
+            self.running.extend(due.iter().map(|entry| entry.pos));
+        }
         due
     }
 
@@ -151,25 +177,41 @@ impl TickQueue {
     /// earlier tick that was somehow missed is included rather than stranded —
     /// a stuck entry would silently freeze part of a contraption.
     pub fn drain_due(&mut self, tick: u64) -> Vec<ScheduledTick> {
-        let due: Vec<u64> = self.buckets.range(..=tick).map(|(k, _)| *k).collect();
-        let mut out = Vec::new();
-        for key in due {
-            if let Some(entries) = self.buckets.remove(&key) {
+        let Some((&first, _)) = self.buckets.first_key_value() else {
+            return Vec::new();
+        };
+        if first > tick {
+            return Vec::new();
+        }
+        let mut out = self.buckets.pop_first().map(|(_, entries)| entries).unwrap_or_default();
+        while self
+            .buckets
+            .first_key_value()
+            .is_some_and(|(&key, _)| key <= tick)
+        {
+            if let Some((_, entries)) = self.buckets.pop_first() {
                 out.extend(entries);
             }
         }
-        out.sort_by_key(|entry| (entry.target, entry.priority, entry.sequence));
+        for entry in &out {
+            self.pending_set.remove(&entry.pos);
+        }
+        if out.len() > 1 {
+            out.sort_by_key(|entry| (entry.target, entry.priority, entry.sequence));
+        }
         out
     }
 
     /// Whether anything is scheduled.
+    #[inline]
     pub fn is_empty(&self) -> bool {
-        self.buckets.values().all(|entries| entries.is_empty())
+        self.pending_set.is_empty()
     }
 
     /// Total scheduled entries.
+    #[inline]
     pub fn len(&self) -> usize {
-        self.buckets.values().map(Vec::len).sum()
+        self.pending_set.len()
     }
 
     /// Every pending tick as `(tick it fires on, position)`, ascending.

@@ -54,23 +54,30 @@ impl std::fmt::Debug for World {
     }
 }
 
-#[cfg(feature = "experiment-cursor")]
 pub(crate) struct LocalReadCursor<'a> {
-    states: &'a [StateId],
-    base: usize,
-    row: isize,
-    layer: isize,
+    pub(crate) states: &'a [StateId],
+    pub(crate) base: usize,
+    pub(crate) row: isize,
+    pub(crate) layer: isize,
 }
 
-#[cfg(feature = "experiment-cursor")]
 impl LocalReadCursor<'_> {
     /// Offsets are restricted to the radius-two cube proven interior at creation.
     #[inline]
     pub(crate) fn get(&self, offset: [i32; 3]) -> StateId {
-        assert!(offset.into_iter().all(|v| (-2..=2).contains(&v)));
+        debug_assert!(offset.into_iter().all(|v| (-2..=2).contains(&v)));
         let delta = offset[0] as isize + offset[1] as isize * self.layer + offset[2] as isize * self.row;
         self.states[self.base.wrapping_add_signed(delta)]
     }
+}
+
+/// Borrow-scoped reader for piston direct + QC power checks (`x, z in -2..=2`,
+/// `y in -2..=3`).
+pub(crate) struct PistonReadCursor<'a> {
+    pub(crate) states: &'a [StateId],
+    pub(crate) base: usize,
+    pub(crate) row: isize,
+    pub(crate) layer: isize,
 }
 
 impl World {
@@ -219,7 +226,6 @@ impl World {
     }
 
     /// A borrow-scoped address calculation; no derived power or state is cached.
-    #[cfg(feature = "experiment-cursor")]
     #[inline]
     pub(crate) fn local_reader(&self, pos: Pos) -> Option<LocalReadCursor<'_>> {
         let x = pos.x.wrapping_sub(self.bounds.min.x) as u32;
@@ -233,6 +239,47 @@ impl World {
                 base: y as usize * self.layer_stride + z as usize * self.size[0] as usize + x as usize,
                 row: self.size[0] as isize, layer: self.layer_stride as isize })
         } else { None }
+    }
+
+    /// Borrow-scoped reader for piston direct + QC checks (`x, z in -2..=2`,
+    /// `y in -2..=3`).
+    #[inline]
+    pub(crate) fn piston_reader(&self, pos: Pos) -> Option<PistonReadCursor<'_>> {
+        let x = pos.x.wrapping_sub(self.bounds.min.x) as u32;
+        let y = pos.y.wrapping_sub(self.bounds.min.y) as u32;
+        let z = pos.z.wrapping_sub(self.bounds.min.z) as u32;
+        if x.wrapping_sub(2) < self.size[0].saturating_sub(4)
+            && y.wrapping_sub(2) < self.size[1].saturating_sub(5)
+            && z.wrapping_sub(2) < self.size[2].saturating_sub(4)
+        {
+            Some(PistonReadCursor {
+                states: &self.states,
+                base: y as usize * self.layer_stride + z as usize * self.size[0] as usize + x as usize,
+                row: self.size[0] as isize,
+                layer: self.layer_stride as isize,
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Precomputed base index and strides when `pos` and all 6 immediate
+    /// neighbours lie strictly inside the region.
+    #[inline]
+    pub(crate) fn interior_neighbors_base(&self, pos: Pos) -> Option<(usize, isize, isize)> {
+        let x = pos.x.wrapping_sub(self.bounds.min.x) as u32;
+        let y = pos.y.wrapping_sub(self.bounds.min.y) as u32;
+        let z = pos.z.wrapping_sub(self.bounds.min.z) as u32;
+        if x.wrapping_sub(1) < self.size[0].saturating_sub(2)
+            && y.wrapping_sub(1) < self.size[1].saturating_sub(2)
+            && z.wrapping_sub(1) < self.size[2].saturating_sub(2)
+        {
+            let row = self.size[0] as usize;
+            let base = y as usize * self.layer_stride + z as usize * row + x as usize;
+            Some((base, row as isize, self.layer_stride as isize))
+        } else {
+            None
+        }
     }
 
     /// The region this world covers.
@@ -253,6 +300,7 @@ impl World {
     /// therefore simulate differently than it would in-game. The fix is to load
     /// structures with a margin of padding, not to complicate this call — and it
     /// is the trace differ's job to catch it if we forget.
+    #[inline]
     pub fn get(&self, pos: Pos) -> StateId {
         match self.index(pos) {
             Some(index) => self.states[index],

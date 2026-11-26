@@ -21,7 +21,10 @@
 //! rather than simulating a contraption with a hole in it. Growing the coverage is
 //! a matter of adding arms below, each backed by a captured trace.
 
-use crate::behaviour::{BehaviourTable, Inert};
+use crate::behaviour::{
+    BehaviourTable, Inert, FLAG_HAS_ON_REMOVED, FLAG_HAS_ON_STATE_CHANGED, FLAG_NO_NEIGHBOR,
+    FLAG_NO_SHAPE_UPDATE,
+};
 use crate::components::{
     Button, CommandBlock, Comparator, ComparatorMode, CopperBulb, Door, Dropper, Hopper, Ice, Lamp,
     NoteBlock, PowerSource, PressurePlate, Repeater, StatePair, TestAccept, Torch, Trapdoor,
@@ -107,29 +110,181 @@ impl Descriptor {
 
     /// Rebuild a descriptor after replacing several properties.
     fn with_values<const N: usize>(&self, values: [(&str, &str); N]) -> String {
-        let mut properties = self.properties.clone();
+        let mut props: smallvec::SmallVec<[(&str, &str); 8]> = self
+            .properties
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
         for (key, value) in values {
             let mut found = false;
-            for (existing_key, existing_value) in &mut properties {
-                if existing_key == key {
-                    existing_value.clear();
-                    existing_value.push_str(value);
+            for (existing_key, existing_value) in &mut props {
+                if *existing_key == key {
+                    *existing_value = value;
                     found = true;
                 }
             }
             if !found {
-                properties.push((key.to_string(), value.to_string()));
+                props.push((key, value));
             }
         }
-        properties.sort();
-        if properties.is_empty() {
-            return self.name.clone();
+        format_descriptor(&self.name, &mut props)
+    }
+}
+
+fn format_descriptor(name: &str, props: &mut [(&str, &str)]) -> String {
+    if props.is_empty() {
+        return name.to_string();
+    }
+    props.sort_unstable();
+    let cap = name.len()
+        + 2
+        + props
+            .iter()
+            .map(|(k, v)| k.len() + v.len() + 2)
+            .sum::<usize>();
+    let mut out = String::with_capacity(cap);
+    out.push_str(name);
+    out.push('[');
+    for (i, (k, v)) in props.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
         }
-        let rendered: Vec<String> = properties
-            .into_iter()
-            .map(|(k, v)| format!("{k}={v}"))
-            .collect();
-        format!("{}[{}]", self.name, rendered.join(","))
+        out.push_str(k);
+        out.push('=');
+        out.push_str(v);
+    }
+    out.push(']');
+    out
+}
+
+/// Zero-allocation borrowed view of a parsed block descriptor for internal
+/// registration and table-building passes.
+struct DescriptorRef<'a> {
+    name: &'a str,
+    properties: smallvec::SmallVec<[(&'a str, &'a str); 6]>,
+}
+
+impl<'a> DescriptorRef<'a> {
+    fn parse(text: &'a str) -> Self {
+        match text.split_once('[') {
+            None => Self {
+                name: text,
+                properties: smallvec::SmallVec::new(),
+            },
+            Some((name, rest)) => {
+                let rest = rest.strip_suffix(']').unwrap_or(rest);
+                let mut properties = smallvec::SmallVec::new();
+                for part in rest.split(',') {
+                    if let Some((k, v)) = part.split_once('=') {
+                        properties.push((k, v));
+                    }
+                }
+                Self { name, properties }
+            }
+        }
+    }
+
+    #[inline]
+    fn get(&self, key: &str) -> Option<&'a str> {
+        self.properties
+            .iter()
+            .find(|(k, _)| *k == key)
+            .map(|(_, v)| *v)
+    }
+
+    #[inline]
+    fn flag(&self, key: &str) -> bool {
+        self.get(key) == Some("true")
+    }
+
+    #[inline]
+    fn facing(&self) -> Option<Dir> {
+        match self.get("facing")? {
+            "down" => Some(Dir::Down),
+            "up" => Some(Dir::Up),
+            "north" => Some(Dir::North),
+            "south" => Some(Dir::South),
+            "west" => Some(Dir::West),
+            "east" => Some(Dir::East),
+            _ => None,
+        }
+    }
+
+    fn with(&self, key: &str, value: &str) -> String {
+        self.with_values([(key, value)])
+    }
+
+    fn with_values<const N: usize>(&self, values: [(&str, &str); N]) -> String {
+        let mut props: smallvec::SmallVec<[(&str, &str); 8]> =
+            self.properties.iter().copied().collect();
+        for (key, value) in values {
+            let mut found = false;
+            for (existing_key, existing_value) in &mut props {
+                if *existing_key == key {
+                    *existing_value = value;
+                    found = true;
+                }
+            }
+            if !found {
+                props.push((key, value));
+            }
+        }
+        format_descriptor(self.name, &mut props)
+    }
+
+    fn to_owned(&self) -> Descriptor {
+        Descriptor {
+            name: self.name.to_string(),
+            properties: self
+                .properties
+                .iter()
+                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+                .collect(),
+        }
+    }
+}
+
+pub(crate) const INFO_CONDUCTOR: u32 = 1 << 0;
+pub(crate) const INFO_WIRE: u32 = 1 << 1;
+pub(crate) const INFO_POWERED: u32 = 1 << 2;
+pub(crate) const INFO_COMPARATOR: u32 = 1 << 3;
+pub(crate) const INFO_REDSTONE_BLOCK: u32 = 1 << 4;
+pub(crate) const INFO_SIGNAL_SOURCE: u32 = 1 << 5;
+pub(crate) const INFO_STURDY_UP: u32 = 1 << 6;
+pub(crate) const INFO_FULL_CUBE: u32 = 1 << 7;
+pub(crate) const SHIFT_STRONG_INTO: u32 = 8;
+pub(crate) const SHIFT_EMIT_ONLY: u32 = 11;
+pub(crate) const SHIFT_EMIT_EXCEPT: u32 = 14;
+pub(crate) const SHIFT_LEVEL: u32 = 17;
+pub(crate) const INFO_REPEATER: u32 = 1 << 21;
+pub(crate) const INFO_OBSERVER: u32 = 1 << 22;
+pub(crate) const SHIFT_FACING: u32 = 23;
+pub(crate) const INFO_WIRE_CONNECTED: u32 = 1 << 26;
+pub(crate) const SHIFT_WIRE_SIDES: u32 = 27;
+pub(crate) const INFO_DIODE: u32 = 1 << 31;
+
+#[inline]
+pub(crate) const fn dir_code(dir: Dir) -> u32 {
+    match dir {
+        Dir::Down => 1,
+        Dir::Up => 2,
+        Dir::North => 3,
+        Dir::South => 4,
+        Dir::West => 5,
+        Dir::East => 6,
+    }
+}
+
+#[inline]
+pub(crate) const fn code_to_dir(code: u32) -> Option<Dir> {
+    match code {
+        1 => Some(Dir::Down),
+        2 => Some(Dir::Up),
+        3 => Some(Dir::North),
+        4 => Some(Dir::South),
+        5 => Some(Dir::West),
+        6 => Some(Dir::East),
+        _ => None,
     }
 }
 
@@ -140,6 +295,10 @@ impl Descriptor {
 #[cfg_attr(not(any(feature = "experiment-wire-plan", feature = "experiment-piston-plan")), derive(Debug))]
 #[derive(Clone, Default)]
 pub struct VanillaRules {
+    /// Compact 4-byte packed power/connection metadata per `StateId` so hot
+    /// redstone queries read a single L1-resident `u32` instead of chasing
+    /// eight separate rule tables.
+    power_info: Vec<u32>,
     /// Where this world's `(0, 0, 0)` sits in the game's coordinates — see
     /// [`crate::wire::WireWorld::hash_origin`]. Zero unless a capture says
     /// otherwise.
@@ -246,6 +405,9 @@ pub struct VanillaRules {
     /// States whose comparator read comes from the block state itself —
     /// a composter's `level` (0-8).
     state_analog: StateTable<u8>,
+    /// Powered and activator rail metadata `(is_activator, shape, powered)` for
+    /// O(1) chain traversal without parsing block descriptors.
+    powered_rails: StateTable<(bool, crate::minecart::RailShape, bool)>,
     #[cfg(all(feature = "experiment-wire-plan", not(feature = "experiment-world-plan-cache")))]
     plan_cache: crate::wire_plan::Cache,
     #[cfg(feature = "experiment-world-plan-cache")]
@@ -1255,6 +1417,143 @@ impl VanillaRules {
 }
 
 impl VanillaRules {
+    #[inline]
+    pub(crate) fn has_power_info(&self) -> bool {
+        !self.power_info.is_empty()
+    }
+
+    #[inline]
+    pub(crate) fn info(&self, state: StateId) -> u32 {
+        self.power_info.get(state.raw() as usize).copied().unwrap_or(0)
+    }
+
+    #[inline]
+    pub(crate) fn should_connect_info(&self, info: u32, from: Option<Dir>) -> bool {
+        if info & INFO_WIRE != 0 {
+            return true;
+        }
+        if info & INFO_REPEATER != 0 {
+            let f = (info >> SHIFT_FACING) & 7;
+            return from.is_some_and(|dir| {
+                f != 0 && (f == dir_code(dir) || f == dir_code(dir.opposite()))
+            });
+        }
+        if info & INFO_OBSERVER != 0 {
+            let f = (info >> SHIFT_FACING) & 7;
+            return from.is_some_and(|dir| f == dir_code(dir));
+        }
+        (info & INFO_SIGNAL_SOURCE != 0) && from.is_some()
+    }
+
+    fn build_power_info(&mut self, state_count: usize) {
+        let mut table = vec![0u32; state_count];
+        for raw in 0..state_count {
+            let id = StateId(raw as u16);
+            let mut bits = 0u32;
+            if self.conductors.contains(&id) {
+                bits |= INFO_CONDUCTOR;
+            }
+            if let Some(&(power, sides)) = self.wires.get(&id) {
+                bits |= INFO_WIRE | (u32::from(power & 15) << SHIFT_LEVEL);
+                let mut side_mask = 0u32;
+                for (idx, side) in sides.into_iter().enumerate() {
+                    if side.connected() {
+                        side_mask |= 1u32 << idx;
+                    }
+                }
+                if side_mask != 0 {
+                    bits |= INFO_WIRE_CONNECTED | (side_mask << SHIFT_WIRE_SIDES);
+                }
+            }
+            if self.powered.contains(&id) {
+                bits |= INFO_POWERED;
+                if self.comparators.contains(&id) {
+                    bits |= INFO_COMPARATOR;
+                } else {
+                    let level = self.analog_emission.get(&id).copied().unwrap_or(15);
+                    bits |= u32::from(level & 15) << SHIFT_LEVEL;
+                }
+            }
+            if self.redstone_blocks.contains(&id) {
+                bits |= INFO_REDSTONE_BLOCK;
+            }
+            if self.signal_sources.contains(&id) {
+                bits |= INFO_SIGNAL_SOURCE;
+            }
+            if self.sturdy_up.contains(&id) {
+                bits |= INFO_STURDY_UP;
+            }
+            if self.full_cubes.contains(&id) {
+                bits |= INFO_FULL_CUBE;
+            }
+            if let Some(&dir) = self.strong_into.get(&id) {
+                bits |= dir_code(dir) << SHIFT_STRONG_INTO;
+            }
+            if let Some(&dir) = self.emit_only.get(&id) {
+                bits |= dir_code(dir) << SHIFT_EMIT_ONLY;
+            }
+            if let Some(&dir) = self.emit_except.get(&id) {
+                bits |= dir_code(dir) << SHIFT_EMIT_EXCEPT;
+            }
+            if self.repeaters.contains(&id) {
+                bits |= INFO_REPEATER;
+            }
+            if let Some(&dir) = self.diodes.get(&id) {
+                bits |= INFO_DIODE | (dir_code(dir) << SHIFT_FACING);
+            } else if let Some(&dir) = self.observer_facing.get(&id) {
+                bits |= INFO_OBSERVER | (dir_code(dir) << SHIFT_FACING);
+            }
+            table[raw] = bits;
+        }
+        self.power_info = table;
+    }
+
+    #[inline]
+    fn emitted_info(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        info: u32,
+        toward: Dir,
+        with_wires: bool,
+    ) -> u8 {
+        if info & INFO_POWERED != 0 {
+            let tc = dir_code(toward);
+            let only = (info >> SHIFT_EMIT_ONLY) & 7;
+            let except = (info >> SHIFT_EMIT_EXCEPT) & 7;
+            if (only == 0 || only == tc) && (except == 0 || except != tc) {
+                return if info & INFO_COMPARATOR != 0 {
+                    outs.get(&pos).copied().unwrap_or(0)
+                } else {
+                    ((info >> SHIFT_LEVEL) & 15) as u8
+                };
+            }
+        }
+        if !with_wires || (info & INFO_WIRE == 0) {
+            return 0;
+        }
+        let power = ((info >> SHIFT_LEVEL) & 15) as u8;
+        if power > 0 {
+            match toward {
+                Dir::Down => return power,
+                Dir::Up => return 0,
+                side => {
+                    if crate::wire::connects_toward_fast(
+                        self,
+                        world,
+                        pos,
+                        info & INFO_WIRE_CONNECTED != 0,
+                        side,
+                    ) {
+                        return power;
+                    }
+                }
+            }
+        }
+        0
+    }
+
     /// What the block at `pos` emits toward `toward` on its own — vanilla's
     /// `BlockState.getSignal`, plus dust's own emission rules.
     ///
@@ -1272,6 +1571,7 @@ impl VanillaRules {
         self.emitted_state(world, outs, pos, world.get(pos), toward, with_wires)
     }
 
+    #[inline]
     fn emitted_state(
         &self,
         world: &World,
@@ -1281,6 +1581,12 @@ impl VanillaRules {
         toward: Dir,
         with_wires: bool,
     ) -> u8 {
+        if state == StateId::AIR {
+            return 0;
+        }
+        if !self.power_info.is_empty() {
+            return self.emitted_info(world, outs, pos, self.info(state), toward, with_wires);
+        }
         if self.powered.contains(&state)
             && self
                 .emit_only
@@ -1307,37 +1613,14 @@ impl VanillaRules {
         }
         // Dust powers the block beneath it and the sides it connects to,
         // never the block above.
-        //
-        // The connections are **recomputed here**, not read from the state.
-        // `RedStoneWireBlock.getSignal` calls `getConnectionState(level, state,
-        // pos)` on every query, so what a wire powers follows the world as it
-        // is now — not the shape the schematic was saved with. It matters
-        // during placement: a wire saved climbing a block only powers that
-        // block once the dust it climbs toward exists, and until then the
-        // block is dark. A torch beside it reads that darkness and books the
-        // tick that vanilla books.
         if let Some((power, stored)) = self.wires.get(&state) {
             if *power > 0 {
                 match toward {
                     Dir::Down => return *power,
                     Dir::Up => return 0,
                     side => {
-                        #[cfg(feature = "experiment-directional")]
                         if crate::wire::connects_toward(self, world, pos, *stored, side) {
                             return *power;
-                        }
-                        #[cfg(not(feature = "experiment-directional"))]
-                        {
-                        let connections = crate::wire::connection_state(self, world, pos, *stored);
-                        let index = match side {
-                            Dir::North => 0,
-                            Dir::South => 1,
-                            Dir::West => 2,
-                            _ => 3,
-                        };
-                        if connections[index] != crate::wire::WireSide::None {
-                            return *power;
-                        }
                         }
                     }
                 }
@@ -1361,16 +1644,41 @@ impl VanillaRules {
         with_wires: bool,
     ) -> u8 {
         let mut best = 0u8;
+        if !self.power_info.is_empty() {
+            for (dir, state) in crate::pos::ALL_DIRS.into_iter().zip(world.neighbours(pos)) {
+                if state == StateId::AIR {
+                    continue;
+                }
+                let info = self.info(state);
+                let toward = dir.opposite();
+                if (with_wires && (info & INFO_WIRE != 0))
+                    || (((info >> SHIFT_STRONG_INTO) & 7) == dir_code(toward))
+                {
+                    let strong =
+                        self.emitted_info(world, outs, pos.offset(dir), info, toward, with_wires);
+                    best = best.max(strong);
+                    if best == 15 {
+                        break;
+                    }
+                }
+            }
+            return best;
+        }
         for (dir, state) in crate::pos::ALL_DIRS.into_iter().zip(world.neighbours(pos)) {
-            let neighbour = pos.offset(dir);
+            if state == StateId::AIR {
+                continue;
+            }
             let toward = dir.opposite();
-            let strong = if (with_wires && self.wires.contains_key(&state))
-                || self.strong_into.get(&state) == Some(&toward) {
-                self.emitted_state(world, outs, neighbour, state, toward, with_wires)
-            } else {
-                0
-            };
-            best = best.max(strong);
+            if (with_wires && self.wires.contains_key(&state))
+                || self.strong_into.get(&state) == Some(&toward)
+            {
+                let neighbour = pos.offset(dir);
+                let strong = self.emitted_state(world, outs, neighbour, state, toward, with_wires);
+                best = best.max(strong);
+                if best == 15 {
+                    break;
+                }
+            }
         }
         best
     }
@@ -1378,6 +1686,7 @@ impl VanillaRules {
     /// `signal_strength` with `shouldSignal` off — every wire contribution
     /// muted, including dust strongly powering the conductor it sits on. This
     /// is what the dust evaluator's `getBlockSignal` reads.
+    #[inline]
     fn signal_no_wire(
         &self,
         world: &World,
@@ -1386,30 +1695,128 @@ impl VanillaRules {
         toward: Dir,
     ) -> u8 {
         let state = world.get(pos);
+        if state == StateId::AIR {
+            return 0;
+        }
+        if !self.power_info.is_empty() {
+            let info = self.info(state);
+            let mut strength = self.emitted_info(world, outs, pos, info, toward, false);
+            if strength < 15 && (info & INFO_CONDUCTOR != 0) {
+                strength = strength.max(self.direct_signal_to(world, outs, pos, false));
+            }
+            return strength;
+        }
         let mut strength = self.emitted_state(world, outs, pos, state, toward, false);
-        if self.conductors.contains(&state) {
+        if strength < 15 && self.conductors.contains(&state) {
             strength = strength.max(self.direct_signal_to(world, outs, pos, false));
         }
         strength
     }
 
-    #[cfg(feature = "experiment-cursor")]
     fn block_signal_cursor(&self, world: &World, outs: &crate::behaviour::ComparatorOutputs, pos: Pos) -> Option<u8> {
         let reader = world.local_reader(pos)?;
         let mut best = 0u8;
+        if !self.power_info.is_empty() {
+            let states = reader.states;
+            let base = reader.base;
+            let row = reader.row;
+            let layer = reader.layer;
+            let steps: [(Dir, isize, u32); 6] = [
+                (Dir::Down, -layer, 2),
+                (Dir::Up, layer, 1),
+                (Dir::North, -row, 4),
+                (Dir::South, row, 3),
+                (Dir::West, -1, 6),
+                (Dir::East, 1, 5),
+            ];
+            for (dir, step, toward_code) in steps {
+                let n_idx = base.wrapping_add_signed(step);
+                let state = states[n_idx];
+                if state == StateId::AIR {
+                    continue;
+                }
+                let info = self.info(state);
+                if info & (INFO_POWERED | INFO_CONDUCTOR) == 0 {
+                    continue;
+                }
+                let mut signal = if info & INFO_POWERED != 0 {
+                    let only = (info >> SHIFT_EMIT_ONLY) & 7;
+                    let except = (info >> SHIFT_EMIT_EXCEPT) & 7;
+                    if (only == 0 || only == toward_code) && (except == 0 || except != toward_code)
+                    {
+                        if info & INFO_COMPARATOR != 0 {
+                            outs.get(&pos.offset(dir)).copied().unwrap_or(0)
+                        } else {
+                            ((info >> SHIFT_LEVEL) & 15) as u8
+                        }
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                };
+                if signal < 15 && (info & INFO_CONDUCTOR != 0) {
+                    for (sdir, sstep, st_code) in steps {
+                        let source = states[n_idx.wrapping_add_signed(sstep)];
+                        if source == StateId::AIR {
+                            continue;
+                        }
+                        let sinfo = self.info(source);
+                        if ((sinfo >> SHIFT_STRONG_INTO) & 7) == st_code
+                            && (sinfo & INFO_POWERED != 0)
+                        {
+                            let only = (sinfo >> SHIFT_EMIT_ONLY) & 7;
+                            let except = (sinfo >> SHIFT_EMIT_EXCEPT) & 7;
+                            if (only == 0 || only == st_code) && (except == 0 || except != st_code)
+                            {
+                                let emitted = if sinfo & INFO_COMPARATOR != 0 {
+                                    outs.get(&pos.offset(dir).offset(sdir))
+                                        .copied()
+                                        .unwrap_or(0)
+                                } else {
+                                    ((sinfo >> SHIFT_LEVEL) & 15) as u8
+                                };
+                                if emitted > signal {
+                                    signal = emitted;
+                                    if signal == 15 {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if signal > best {
+                    best = signal;
+                    if best == 15 {
+                        break;
+                    }
+                }
+            }
+            return Some(best);
+        }
         for dir in crate::pos::ALL_DIRS {
             let (x, y, z) = dir.delta();
             let state = reader.get([x, y, z]);
+            if state == StateId::AIR {
+                continue;
+            }
             let neighbour = pos.offset(dir);
             let mut signal = self.emitted_state(world, outs, neighbour, state, dir.opposite(), false);
-            if self.conductors.contains(&state) {
+            if signal < 15 && self.conductors.contains(&state) {
                 for strong_dir in crate::pos::ALL_DIRS {
                     let (dx, dy, dz) = strong_dir.delta();
                     let source = reader.get([x + dx, y + dy, z + dz]);
+                    if source == StateId::AIR {
+                        continue;
+                    }
                     let toward = strong_dir.opposite();
                     if self.strong_into.get(&source) == Some(&toward) {
                         signal = signal.max(self.emitted_state(world, outs,
                             neighbour.offset(strong_dir), source, toward, false));
+                        if signal == 15 {
+                            break;
+                        }
                     }
                 }
             }
@@ -1662,8 +2069,9 @@ impl crate::wire::WireWorld for VanillaRules {
     /// special-case comparators and answer a flat 15 for everything else,
     /// which lit a whole door's dust from a comparator that was emitting 0.
     fn block_signal(&self, ctx: &crate::behaviour::TickCtx<'_>, pos: Pos) -> u8 {
-        #[cfg(feature = "experiment-cursor")]
-        if let Some(signal) = self.block_signal_cursor(ctx.world, ctx.comparator_out, pos) { return signal; }
+        if let Some(signal) = self.block_signal_cursor(ctx.world, ctx.comparator_out, pos) {
+            return signal;
+        }
         let mut best = 0u8;
         for dir in crate::pos::ALL_DIRS {
             best = best.max(self.signal_no_wire(
@@ -1705,14 +2113,12 @@ impl crate::wire::WireWorld for VanillaRules {
 
     fn should_connect_to(&self, world: &World, pos: Pos, from: Option<Dir>) -> bool {
         let state = world.get(pos);
+        if !self.power_info.is_empty() {
+            return self.should_connect_info(self.info(state), from);
+        }
         if self.wires.contains_key(&state) {
             return true;
         }
-        // A repeater takes a signal on its input face and gives one on its
-        // output face, so dust faces it along its axis and not across it. An
-        // observer only counts on the face it looks along. A comparator has no
-        // special case in `shouldConnectTo` — it connects like any other
-        // source, which is why dust wraps around its sides.
         if self.repeaters.contains(&state) {
             let facing = self.diodes.get(&state);
             return from
@@ -1721,17 +2127,105 @@ impl crate::wire::WireWorld for VanillaRules {
         if let Some(facing) = self.observer_facing.get(&state) {
             return from == Some(*facing);
         }
-        // Everything else that can emit connects, but only when asked about a
-        // real direction: the diagonal checks pass `None` and want dust only.
         self.signal_sources.contains(&state) && from.is_some()
     }
 
     fn sturdy_up(&self, world: &World, pos: Pos) -> bool {
-        self.sturdy_up.contains(&world.get(pos))
+        let state = world.get(pos);
+        if !self.power_info.is_empty() {
+            return self.info(state) & INFO_STURDY_UP != 0;
+        }
+        self.sturdy_up.contains(&state)
     }
 
     fn full_block(&self, world: &World, pos: Pos) -> bool {
-        self.full_cubes.contains(&world.get(pos))
+        let state = world.get(pos);
+        if !self.power_info.is_empty() {
+            return self.info(state) & INFO_FULL_CUBE != 0;
+        }
+        self.full_cubes.contains(&state)
+    }
+
+    fn incoming_signal(&self, world: &World, pos: Pos) -> u8 {
+        let mut best = 0u8;
+        if !self.power_info.is_empty() {
+            if let Some(reader) = world.local_reader(pos) {
+                let states = reader.states;
+                let base = reader.base;
+                let row = reader.row;
+                let layer = reader.layer;
+                let covered =
+                    self.info(states[base.wrapping_add_signed(layer)]) & INFO_CONDUCTOR != 0;
+                for step in [-row, row, -1, 1] {
+                    let side_idx = base.wrapping_add_signed(step);
+                    let sstate = states[side_idx];
+                    let sinfo = self.info(sstate);
+                    if sinfo & INFO_WIRE != 0 {
+                        best = best.max(((sinfo >> SHIFT_LEVEL) & 15) as u8);
+                    }
+                    if sinfo & INFO_CONDUCTOR != 0 {
+                        if !covered {
+                            let ustate = states[side_idx.wrapping_add_signed(layer)];
+                            if ustate != StateId::AIR {
+                                let uinfo = self.info(ustate);
+                                if uinfo & INFO_WIRE != 0 {
+                                    best = best.max(((uinfo >> SHIFT_LEVEL) & 15) as u8);
+                                }
+                            }
+                        }
+                    } else {
+                        let dstate = states[side_idx.wrapping_add_signed(-layer)];
+                        if dstate != StateId::AIR {
+                            let dinfo = self.info(dstate);
+                            if dinfo & INFO_WIRE != 0 {
+                                best = best.max(((dinfo >> SHIFT_LEVEL) & 15) as u8);
+                            }
+                        }
+                    }
+                }
+                return best.saturating_sub(1);
+            }
+            let covered = self.info(world.get(pos.offset(Dir::Up))) & INFO_CONDUCTOR != 0;
+            for dir in [Dir::North, Dir::South, Dir::West, Dir::East] {
+                let side = pos.offset(dir);
+                let sinfo = self.info(world.get(side));
+                if sinfo & INFO_WIRE != 0 {
+                    best = best.max(((sinfo >> SHIFT_LEVEL) & 15) as u8);
+                }
+                if sinfo & INFO_CONDUCTOR != 0 {
+                    if !covered {
+                        let uinfo = self.info(world.get(side.offset(Dir::Up)));
+                        if uinfo & INFO_WIRE != 0 {
+                            best = best.max(((uinfo >> SHIFT_LEVEL) & 15) as u8);
+                        }
+                    }
+                } else {
+                    let dinfo = self.info(world.get(side.offset(Dir::Down)));
+                    if dinfo & INFO_WIRE != 0 {
+                        best = best.max(((dinfo >> SHIFT_LEVEL) & 15) as u8);
+                    }
+                }
+            }
+            return best.saturating_sub(1);
+        }
+        let covered = self.conductors.contains(&world.get(pos.offset(Dir::Up)));
+        for dir in [Dir::North, Dir::South, Dir::West, Dir::East] {
+            let side = pos.offset(dir);
+            let side_state = world.get(side);
+            if let Some((power, _)) = self.wires.get(&side_state) {
+                best = best.max(*power);
+            }
+            if self.conductors.contains(&side_state) {
+                if !covered {
+                    if let Some((power, _)) = self.wires.get(&world.get(side.offset(Dir::Up))) {
+                        best = best.max(*power);
+                    }
+                }
+            } else if let Some((power, _)) = self.wires.get(&world.get(side.offset(Dir::Down))) {
+                best = best.max(*power);
+            }
+        }
+        best.saturating_sub(1)
     }
 }
 
@@ -1779,6 +2273,10 @@ impl crate::wire::WireWorld for Arc<VanillaRules> {
 
     fn full_block(&self, world: &World, pos: Pos) -> bool {
         <VanillaRules as crate::wire::WireWorld>::full_block(self.as_ref(), world, pos)
+    }
+
+    fn incoming_signal(&self, world: &World, pos: Pos) -> u8 {
+        <VanillaRules as crate::wire::WireWorld>::incoming_signal(self.as_ref(), world, pos)
     }
 }
 
@@ -2242,6 +2740,106 @@ impl crate::wall::WallWorld for Arc<VanillaRules> {
     }
 }
 
+impl VanillaRules {
+    #[inline(always)]
+    #[allow(clippy::too_many_arguments)]
+    fn piston_cell_powers(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        states: &[StateId],
+        steps: &[(Dir, isize, Dir, u32); 6],
+        cell_idx: usize,
+        cell_pos: Pos,
+        toward: Dir,
+        toward_code: u32,
+    ) -> bool {
+        let state = states[cell_idx];
+        if state == StateId::AIR {
+            return false;
+        }
+        let info = self.info(state);
+        if info & (INFO_POWERED | INFO_WIRE | INFO_CONDUCTOR) == 0 {
+            return false;
+        }
+        let powered_matches = (info & INFO_POWERED != 0) && {
+            let only = (info >> SHIFT_EMIT_ONLY) & 7;
+            let except = (info >> SHIFT_EMIT_EXCEPT) & 7;
+            (only == 0 || only == toward_code) && (except == 0 || except != toward_code)
+        };
+        if powered_matches {
+            let emitted = if info & INFO_COMPARATOR != 0 {
+                outs.get(&cell_pos).copied().unwrap_or(0)
+            } else {
+                ((info >> SHIFT_LEVEL) & 15) as u8
+            };
+            if emitted > 0 {
+                return true;
+            }
+        } else if (info & INFO_WIRE != 0) && ((info >> SHIFT_LEVEL) & 15) != 0 {
+            match toward {
+                Dir::Down => return true,
+                Dir::Up => {}
+                side => {
+                    if crate::wire::connects_toward_fast(
+                        self,
+                        world,
+                        cell_pos,
+                        info & INFO_WIRE_CONNECTED != 0,
+                        side,
+                    ) {
+                        return true;
+                    }
+                }
+            }
+        }
+        if info & INFO_CONDUCTOR != 0 {
+            for &(sdir, sstep, st, st_code) in steps {
+                let sstate = states[cell_idx.wrapping_add_signed(sstep)];
+                if sstate == StateId::AIR {
+                    continue;
+                }
+                let sinfo = self.info(sstate);
+                let is_wire = sinfo & INFO_WIRE != 0;
+                if is_wire || (((sinfo >> SHIFT_STRONG_INTO) & 7) == st_code) {
+                    let s_powered = (sinfo & INFO_POWERED != 0) && {
+                        let only = (sinfo >> SHIFT_EMIT_ONLY) & 7;
+                        let except = (sinfo >> SHIFT_EMIT_EXCEPT) & 7;
+                        (only == 0 || only == st_code) && (except == 0 || except != st_code)
+                    };
+                    if s_powered {
+                        let emitted = if sinfo & INFO_COMPARATOR != 0 {
+                            outs.get(&cell_pos.offset(sdir)).copied().unwrap_or(0)
+                        } else {
+                            ((sinfo >> SHIFT_LEVEL) & 15) as u8
+                        };
+                        if emitted > 0 {
+                            return true;
+                        }
+                    } else if is_wire && ((sinfo >> SHIFT_LEVEL) & 15) != 0 {
+                        match st {
+                            Dir::Down => return true,
+                            Dir::Up => {}
+                            side => {
+                                if crate::wire::connects_toward_fast(
+                                    self,
+                                    world,
+                                    cell_pos.offset(sdir),
+                                    sinfo & INFO_WIRE_CONNECTED != 0,
+                                    side,
+                                ) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+}
+
 impl PowerSource for VanillaRules {
     #[cfg(feature = "experiment-piston-plan")]
     fn planned_piston_power(&self, world: &World, outputs: &crate::behaviour::ComparatorOutputs,
@@ -2386,8 +2984,96 @@ impl PowerSource for VanillaRules {
         self.sturdy_up.contains(&world.get(pos))
     }
 
+    #[inline]
+    fn powered_rail_at(
+        &self,
+        world: &World,
+        pos: Pos,
+        block: &str,
+    ) -> Option<Option<(crate::minecart::RailShape, bool)>> {
+        if self.power_info.is_empty() {
+            return None;
+        }
+        let want_activator = match block {
+            "minecraft:powered_rail" => false,
+            "minecraft:activator_rail" => true,
+            _ => return None,
+        };
+        let found = self
+            .powered_rails
+            .get(&world.get(pos))
+            .filter(|&&(is_activator, _, _)| is_activator == want_activator)
+            .map(|&(_, shape, powered)| (shape, powered));
+        Some(found)
+    }
+
     fn is_solid_at(&self, world: &World, pos: Pos) -> bool {
         self.full_cubes.contains(&world.get(pos))
+    }
+
+    fn piston_is_powered(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        facing: Dir,
+    ) -> bool {
+        if !self.power_info.is_empty() {
+            if let Some(reader) = world.piston_reader(pos) {
+                let states = reader.states;
+                let base = reader.base;
+                let row = reader.row;
+                let layer = reader.layer;
+                let steps: [(Dir, isize, Dir, u32); 6] = [
+                    (Dir::Down, -layer, Dir::Up, 2),
+                    (Dir::Up, layer, Dir::Down, 1),
+                    (Dir::North, -row, Dir::South, 4),
+                    (Dir::South, row, Dir::North, 3),
+                    (Dir::West, -1, Dir::East, 6),
+                    (Dir::East, 1, Dir::West, 5),
+                ];
+                for &(dir, step, toward, toward_code) in &steps {
+                    if dir != facing
+                        && self.piston_cell_powers(
+                            world,
+                            outs,
+                            states,
+                            &steps,
+                            base.wrapping_add_signed(step),
+                            pos.offset(dir),
+                            toward,
+                            toward_code,
+                        )
+                    {
+                        return true;
+                    }
+                }
+                let up_base = base.wrapping_add_signed(layer);
+                let up_pos = Pos::new(pos.x, pos.y + 1, pos.z);
+                for &(dir, step, toward, toward_code) in &steps[1..] {
+                    if self.piston_cell_powers(
+                        world,
+                        outs,
+                        states,
+                        &steps,
+                        up_base.wrapping_add_signed(step),
+                        up_pos.offset(dir),
+                        toward,
+                        toward_code,
+                    ) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+        let has_signal = |base: Pos, skip: Dir| {
+            crate::pos::ALL_DIRS
+                .into_iter()
+                .filter(|&dir| dir != skip)
+                .any(|dir| self.is_powered(world, outs, base.offset(dir), dir.opposite()))
+        };
+        has_signal(pos, facing) || has_signal(pos.offset(Dir::Up), Dir::Down)
     }
 
     fn is_powered(
@@ -2398,16 +3084,58 @@ impl PowerSource for VanillaRules {
         toward: Dir,
     ) -> bool {
         let state = world.get(pos);
+        if state == StateId::AIR {
+            return false;
+        }
+        if !self.power_info.is_empty() {
+            let info = self.info(state);
+            if info & (INFO_POWERED | INFO_WIRE | INFO_CONDUCTOR) == 0 {
+                return false;
+            }
+            if (info & (INFO_POWERED | INFO_WIRE) != 0)
+                && self.emitted_info(world, outs, pos, info, toward, true) > 0
+            {
+                return true;
+            }
+            return (info & INFO_CONDUCTOR != 0)
+                && crate::pos::ALL_DIRS
+                    .into_iter()
+                    .zip(world.neighbours(pos))
+                    .any(|(dir, nstate)| {
+                        if nstate == StateId::AIR {
+                            return false;
+                        }
+                        let ninfo = self.info(nstate);
+                        let toward = dir.opposite();
+                        ((ninfo & INFO_WIRE != 0)
+                            || (((ninfo >> SHIFT_STRONG_INTO) & 7) == dir_code(toward)))
+                            && self.emitted_info(world, outs, pos.offset(dir), ninfo, toward, true)
+                                > 0
+                    });
+        }
         if self.emitted_state(world, outs, pos, state, toward, true) > 0 {
             return true;
         }
-        self.conductors.contains(&state) && crate::pos::ALL_DIRS.into_iter().any(|dir| {
-            let neighbour = pos.offset(dir);
-            let state = world.get(neighbour);
-            let toward = dir.opposite();
-            (self.wires.contains_key(&state) || self.strong_into.get(&state) == Some(&toward))
-                && self.emitted_state(world, outs, neighbour, state, toward, true) > 0
-        })
+        self.conductors.contains(&state)
+            && crate::pos::ALL_DIRS
+                .into_iter()
+                .zip(world.neighbours(pos))
+                .any(|(dir, nstate)| {
+                    if nstate == StateId::AIR {
+                        return false;
+                    }
+                    let toward = dir.opposite();
+                    (self.wires.contains_key(&nstate)
+                        || self.strong_into.get(&nstate) == Some(&toward))
+                        && self.emitted_state(
+                            world,
+                            outs,
+                            pos.offset(dir),
+                            nstate,
+                            toward,
+                            true,
+                        ) > 0
+                })
     }
 
     /// `Level.getSignal`: the block's own emission, and — when it conducts —
@@ -2420,8 +3148,19 @@ impl PowerSource for VanillaRules {
         toward: Dir,
     ) -> u8 {
         let state = world.get(pos);
+        if state == StateId::AIR {
+            return 0;
+        }
+        if !self.power_info.is_empty() {
+            let info = self.info(state);
+            let mut strength = self.emitted_info(world, outs, pos, info, toward, true);
+            if strength < 15 && (info & INFO_CONDUCTOR != 0) {
+                strength = strength.max(self.direct_signal_to(world, outs, pos, true));
+            }
+            return strength;
+        }
         let mut strength = self.emitted_state(world, outs, pos, state, toward, true);
-        if self.conductors.contains(&state) {
+        if strength < 15 && self.conductors.contains(&state) {
             strength = strength.max(self.direct_signal_to(world, outs, pos, true));
         }
         strength
@@ -2435,6 +3174,24 @@ impl PowerSource for VanillaRules {
         toward: Dir,
     ) -> u8 {
         let state = world.get(pos);
+        if state == StateId::AIR {
+            return 0;
+        }
+        if !self.power_info.is_empty() {
+            let info = self.info(state);
+            if info & INFO_REDSTONE_BLOCK != 0 {
+                return 15;
+            }
+            if info & INFO_WIRE != 0 {
+                return ((info >> SHIFT_LEVEL) & 15) as u8;
+            }
+            if (info & INFO_SIGNAL_SOURCE != 0)
+                && (((info >> SHIFT_STRONG_INTO) & 7) == dir_code(toward))
+            {
+                return self.emitted_info(world, outs, pos, info, toward, false);
+            }
+            return 0;
+        }
         if self.redstone_blocks.contains(&state) {
             15
         } else if let Some((power, _)) = self.wires.get(&state) {
@@ -2442,16 +3199,29 @@ impl PowerSource for VanillaRules {
         } else if self.signal_sources.contains(&state)
             && self.strong_into.get(&state) == Some(&toward)
         {
-            self.emitted(world, outs, pos, toward, false)
+            self.emitted_state(world, outs, pos, state, toward, false)
         } else {
             0
         }
     }
     fn is_diode(&self, world: &World, pos: Pos) -> bool {
-        self.diodes.contains_key(&world.get(pos))
+        let state = world.get(pos);
+        if !self.power_info.is_empty() {
+            return self.info(state) & INFO_DIODE != 0;
+        }
+        self.diodes.contains_key(&state)
     }
     fn diode_facing(&self, world: &World, pos: Pos) -> Option<Dir> {
-        self.diodes.get(&world.get(pos)).copied()
+        let state = world.get(pos);
+        if !self.power_info.is_empty() {
+            let info = self.info(state);
+            return if info & INFO_DIODE != 0 {
+                code_to_dir((info >> SHIFT_FACING) & 7)
+            } else {
+                None
+            };
+        }
+        self.diodes.get(&state).copied()
     }
 }
 
@@ -2473,6 +3243,16 @@ impl PowerSource for Arc<VanillaRules> {
     }
     fn leaf_distance(&self, world: &World, pos: Pos) -> u8 {
         <VanillaRules as PowerSource>::leaf_distance(self.as_ref(), world, pos)
+    }
+
+    fn piston_is_powered(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        facing: Dir,
+    ) -> bool {
+        <VanillaRules as PowerSource>::piston_is_powered(self.as_ref(), world, outs, pos, facing)
     }
 
     fn is_powered(
@@ -2513,6 +3293,15 @@ impl PowerSource for Arc<VanillaRules> {
 
     fn rail_support_at(&self, world: &World, pos: Pos) -> bool {
         <VanillaRules as PowerSource>::rail_support_at(self.as_ref(), world, pos)
+    }
+
+    fn powered_rail_at(
+        &self,
+        world: &World,
+        pos: Pos,
+        block: &str,
+    ) -> Option<Option<(crate::minecart::RailShape, bool)>> {
+        <VanillaRules as PowerSource>::powered_rail_at(self.as_ref(), world, pos, block)
     }
 
     fn max_stack_of(&self, id: &str) -> u8 {
@@ -2933,9 +3722,13 @@ pub fn register_all_at(
     // Two passes. The first classifies every state, because a piston's behaviour
     // needs to know which blocks are sticky and which emit power — facts about
     // *other* states that may not have been seen yet when it is reached.
-    let descriptors: Vec<(StateId, Descriptor)> = (0..registry.len())
+    let raw_descriptors: Vec<(StateId, Arc<str>)> = (0..registry.len())
         .map(|i| StateId(i as u16))
-        .filter_map(|id| registry.descriptor(id).map(|d| (id, Descriptor::parse(d))))
+        .filter_map(|id| registry.descriptor_arc(id).map(|d| (id, d)))
+        .collect();
+    let descriptors: Vec<(StateId, DescriptorRef<'_>)> = raw_descriptors
+        .iter()
+        .map(|(id, d)| (*id, DescriptorRef::parse(d)))
         .collect();
 
     let mut rules = VanillaRules {
@@ -2943,7 +3736,7 @@ pub fn register_all_at(
         ..VanillaRules::default()
     };
     for (id, descriptor) in &descriptors {
-        match descriptor.name.as_str() {
+        match descriptor.name {
             n if CONSTANT_SOURCES.contains(&n) => {
                 rules.powered.push(*id);
                 rules.redstone_blocks.push(*id);
@@ -2982,7 +3775,7 @@ pub fn register_all_at(
             }
             _ => {}
         }
-        if IMMOVABLE.contains(&descriptor.name.as_str()) || is_shulker_box(&descriptor.name) {
+        if IMMOVABLE.contains(&descriptor.name) || is_shulker_box(descriptor.name) {
             rules.immovable.push(*id);
         }
         // Glazed terracotta is the whole of `PushReaction.PUSH_ONLY` in the
@@ -3000,7 +3793,7 @@ pub fn register_all_at(
         // structure happily dragged an extended piston along, and a flying
         // machine performed a push the game refuses.
         if matches!(
-            descriptor.name.as_str(),
+            descriptor.name,
             "minecraft:piston" | "minecraft:sticky_piston"
         ) && descriptor.flag("extended")
         {
@@ -3012,7 +3805,7 @@ pub fn register_all_at(
         if is_conductor(descriptor) {
             rules.conductors.push(*id);
         }
-        match descriptor.name.as_str() {
+        match descriptor.name {
             "minecraft:water" => {
                 let level = descriptor
                     .get("level")
@@ -3077,7 +3870,7 @@ pub fn register_all_at(
             rules.wire_shapes[index] = Some(*id);
         }
         // A powered diode, torch or observer is itself a source.
-        let emits = match descriptor.name.as_str() {
+        let emits = match descriptor.name {
             "minecraft:repeater" | "minecraft:comparator" | "minecraft:observer" => {
                 descriptor.flag("powered")
             }
@@ -3099,7 +3892,7 @@ pub fn register_all_at(
         // an unlit torch and an unpowered lever are still signal sources, and
         // dust connects to them either way.
         if matches!(
-            descriptor.name.as_str(),
+            descriptor.name,
             "minecraft:repeater"
                 | "minecraft:comparator"
                 | "minecraft:observer"
@@ -3129,7 +3922,7 @@ pub fn register_all_at(
                 // that reshaped away from the accept never delivers the
                 // plate's pulse.
                 | "minecraft:test_block"
-        ) || is_button_or_plate(&descriptor.name)
+        ) || is_button_or_plate(descriptor.name)
         {
             rules.signal_sources.push(*id);
         }
@@ -3148,7 +3941,7 @@ pub fn register_all_at(
         if descriptor.name.ends_with("_log")
             || descriptor.name.ends_with("_wood")
             || matches!(
-                descriptor.name.as_str(),
+                descriptor.name,
                 "minecraft:crimson_stem"
                     | "minecraft:warped_stem"
                     | "minecraft:stripped_crimson_stem"
@@ -3162,7 +3955,7 @@ pub fn register_all_at(
         // redstone: a piston pushing into them breaks them, and the break is a
         // power change the circuit has to hear about.
         if matches!(
-            descriptor.name.as_str(),
+            descriptor.name,
             "minecraft:redstone_wire"
                 | "minecraft:redstone_torch"
                 | "minecraft:redstone_wall_torch"
@@ -3193,8 +3986,8 @@ pub fn register_all_at(
             // Shulker boxes register `PushReaction.DESTROY` in their block
             // properties (`Blocks` bytecode) — a piston breaks one, and the
             // break drops the box as an item that keeps its slots.
-            || is_shulker_box(&descriptor.name)
-            || is_button_or_plate(&descriptor.name)
+            || is_shulker_box(descriptor.name)
+            || is_button_or_plate(descriptor.name)
         {
             rules.destroyed_by_push.push(*id);
         }
@@ -3212,7 +4005,7 @@ pub fn register_all_at(
         // have a complete top face even though they are not full cubes.
         if (is_full_cube(descriptor) && !descriptor.name.ends_with("_leaves"))
             || descriptor.name == "minecraft:soul_sand"
-            || (matches!(descriptor.name.as_str(), "minecraft:piston" | "minecraft:sticky_piston")
+            || (matches!(descriptor.name, "minecraft:piston" | "minecraft:sticky_piston")
                 && descriptor.facing() == Some(Dir::Down))
             || (descriptor.name == "minecraft:piston_head" && descriptor.facing() == Some(Dir::Up))
             || (descriptor.name.ends_with("_slab") && descriptor.get("type") == Some("top"))
@@ -3242,7 +4035,7 @@ pub fn register_all_at(
         // `up` to `side` rather than to `none`, since the box is still not a
         // full cube.
         let extended_base_facing_down = matches!(
-            descriptor.name.as_str(),
+            descriptor.name,
             "minecraft:piston" | "minecraft:sticky_piston"
         ) && descriptor.flag("extended")
             && descriptor.facing() == Some(Dir::Down);
@@ -3273,7 +4066,7 @@ pub fn register_all_at(
             // golden, and the reason the community doors' settle came out
             // fully powered.
             if matches!(
-                descriptor.name.as_str(),
+                descriptor.name,
                 "minecraft:repeater" | "minecraft:comparator"
             ) {
                 if let Some(facing) = descriptor.facing() {
@@ -3320,7 +4113,7 @@ pub fn register_all_at(
             // under a solid block feeds dust sitting on that block, the
             // signal path a whole community door was missing.
             if matches!(
-                descriptor.name.as_str(),
+                descriptor.name,
                 "minecraft:redstone_torch" | "minecraft:redstone_wall_torch"
             ) {
                 // A torch powers everything around it *except the block it is
@@ -3350,11 +4143,29 @@ pub fn register_all_at(
             }
         }
         if matches!(
-            descriptor.name.as_str(),
+            descriptor.name,
             "minecraft:repeater" | "minecraft:comparator"
         ) {
             if let Some(facing) = descriptor.facing() {
                 rules.diodes.insert(*id, facing);
+            }
+        }
+        if matches!(
+            descriptor.name,
+            "minecraft:powered_rail" | "minecraft:activator_rail"
+        ) {
+            if let Some(shape) = descriptor
+                .get("shape")
+                .and_then(crate::minecart::RailShape::from_name)
+            {
+                rules.powered_rails.insert(
+                    *id,
+                    (
+                        descriptor.name == "minecraft:activator_rail",
+                        shape,
+                        descriptor.flag("powered"),
+                    ),
+                );
             }
         }
     }
@@ -3362,9 +4173,10 @@ pub fn register_all_at(
     // Only circuits containing walls need the collision-face lookup table.
     if descriptors.iter().any(|(_, d)| d.name.ends_with("_wall")) {
         for (id, d) in &descriptors {
-            let boxes = crate::wall::boxes(d, is_full_cube(d));
+            let owned = d.to_owned();
+            let boxes = crate::wall::boxes(&owned, is_full_cube(d));
             let mut connections = 0;
-            let n = d.name.as_str();
+            let n = d.name;
             let exception = n.ends_with("_leaves") || is_shulker_box(n)
                 || matches!(n, "minecraft:barrier" | "minecraft:pumpkin" | "minecraft:carved_pumpkin"
                     | "minecraft:jack_o_lantern" | "minecraft:melon");
@@ -3389,6 +4201,9 @@ pub fn register_all_at(
         }
     }
 
+    // Build the compact packed power/connection table once all rules are ready.
+    rules.build_power_info(registry.len());
+
     // Behaviours only read the completed rules. Share that immutable table
     // instead of deep-cloning every map into every registered state.
     let rules = Arc::new(rules);
@@ -3397,10 +4212,27 @@ pub fn register_all_at(
     // registry so a block can find its own opposite.
     let mut wall_families = HashMap::<String, Arc<[Option<StateId>; 162]>>::new();
     for (id, descriptor) in &descriptors {
-        let name = descriptor.name.as_str();
+        let name = descriptor.name;
+
+        // Wire is the largest family (1,296 states) — check it first so it
+        // skips the 60-element INERT scan on every wire state.
+        if name == "minecraft:redstone_wire" {
+            let power = descriptor
+                .get("power")
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(0);
+            table.register_vanilla_wire(
+                *id,
+                crate::wire::Wire {
+                    power_level: power,
+                    rules: rules.clone(),
+                },
+            );
+            continue;
+        }
 
         if INERT.contains(&name) || is_shulker_box(name) {
-            table.register(*id, Box::new(Inert::new("vanilla")));
+            table.register_inert(*id, Inert::new("vanilla"));
             continue;
         }
 
@@ -3415,7 +4247,7 @@ pub fn register_all_at(
                 let Some(states) = powered_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(Repeater {
                         facing,
@@ -3433,6 +4265,7 @@ pub fn register_all_at(
                         )),
                         power: rules.clone(),
                     }),
+                    0,
                 );
             }
             "minecraft:comparator" => {
@@ -3442,7 +4275,7 @@ pub fn register_all_at(
                 let Some(states) = powered_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(Comparator {
                         facing,
@@ -3454,6 +4287,7 @@ pub fn register_all_at(
                         states,
                         power: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE,
                 );
             }
             "minecraft:observer" => {
@@ -3463,13 +4297,14 @@ pub fn register_all_at(
                 let Some(states) = powered_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(Observer {
                         facing,
                         powered: descriptor.flag("powered"),
                         states,
                     }),
+                    FLAG_NO_NEIGHBOR | FLAG_HAS_ON_REMOVED,
                 );
             }
             n if n.ends_with("_button") => {
@@ -3479,7 +4314,7 @@ pub fn register_all_at(
                 let Some(attached) = lever_attachment(descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(Button {
                         powered: descriptor.flag("powered"),
@@ -3490,34 +4325,41 @@ pub fn register_all_at(
                         attached,
                         power: rules.clone(),
                     }),
+                    FLAG_NO_NEIGHBOR | FLAG_NO_SHAPE_UPDATE,
                 );
             }
             "minecraft:redstone_lamp" => {
                 let Some(states) = lit_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(Lamp {
                         lit: descriptor.flag("lit"),
                         states,
                         power: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE,
                 );
             }
             "minecraft:command_block" => {
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(CommandBlock {
                         power: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE,
                 );
             }
             "minecraft:ice" => {
                 let Some(water) = registry.get("minecraft:water[level=0]") else {
                     continue;
                 };
-                table.register(*id, Box::new(Ice { water }));
+                table.register_vanilla(
+                    *id,
+                    Box::new(Ice { water }),
+                    FLAG_NO_NEIGHBOR | FLAG_NO_SHAPE_UPDATE,
+                );
             }
             "minecraft:test_block" => {
                 // A gametest structure's own assertion carrier. `accept`
@@ -3529,22 +4371,23 @@ pub fn register_all_at(
                     let Some(fired) = registry.get(&descriptor.with("fired", "true")) else {
                         continue;
                     };
-                    table.register(
+                    table.register_vanilla(
                         *id,
                         Box::new(TestAccept {
                             fired,
                             power: rules.clone(),
                         }),
+                        FLAG_NO_SHAPE_UPDATE,
                     );
                 } else {
-                    table.register(*id, Box::new(Inert::new("test_block")));
+                    table.register_inert(*id, Inert::new("test_block"));
                 }
             }
             n if n.contains("copper_bulb") => {
                 let Some(states) = bulb_states(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(CopperBulb {
                         lit: descriptor.flag("lit"),
@@ -3552,6 +4395,7 @@ pub fn register_all_at(
                         states,
                         power: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE,
                 );
             }
             n if n.ends_with("_door") => {
@@ -3575,7 +4419,7 @@ pub fn register_all_at(
                     })
                     .map(|(sid, _)| *sid)
                     .collect();
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(Door {
                         powered: descriptor.flag("powered"),
@@ -3584,6 +4428,7 @@ pub fn register_all_at(
                         power: rules.clone(),
                         partner,
                     }),
+                    0,
                 );
             }
             // A fence gate's power response is a trapdoor's exactly: `open` and
@@ -3592,26 +4437,28 @@ pub fn register_all_at(
                 let Some(states) = trapdoor_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(Trapdoor {
                         powered: descriptor.flag("powered"),
                         states,
                         power: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE,
                 );
             }
             n if n.ends_with("_trapdoor") => {
                 let Some(states) = trapdoor_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(Trapdoor {
                         powered: descriptor.flag("powered"),
                         states,
                         power: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE,
                 );
             }
             // Weighted plates carry `power` rather than `powered`, so they must
@@ -3622,7 +4469,7 @@ pub fn register_all_at(
                 let Some(states) = powered_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(PressurePlate {
                         powered: descriptor.flag("powered"),
@@ -3632,19 +4479,7 @@ pub fn register_all_at(
                         senses_items: !is_stone_button(n),
                         power: rules.clone(),
                     }),
-                );
-            }
-            "minecraft:redstone_wire" => {
-                let power = descriptor
-                    .get("power")
-                    .and_then(|p| p.parse().ok())
-                    .unwrap_or(0);
-                table.register_vanilla_wire(
-                    *id,
-                    crate::wire::Wire {
-                        power_level: power,
-                        rules: rules.clone(),
-                    },
+                    FLAG_NO_NEIGHBOR | FLAG_NO_SHAPE_UPDATE,
                 );
             }
             "minecraft:note_block" => {
@@ -3671,7 +4506,7 @@ pub fn register_all_at(
                     Some("basedrum") => "basedrum",
                     _ => "harp",
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(NoteBlock {
                         powered: descriptor.flag("powered"),
@@ -3681,13 +4516,14 @@ pub fn register_all_at(
                         instrument_states,
                         power: rules.clone(),
                     }),
+                    0,
                 );
             }
             "minecraft:redstone_torch" => {
                 let Some(states) = lit_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(Torch {
                         attached: Dir::Down,
@@ -3695,6 +4531,7 @@ pub fn register_all_at(
                         states,
                         power: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE | FLAG_HAS_ON_STATE_CHANGED,
                 );
             }
             "minecraft:redstone_wall_torch" => {
@@ -3706,7 +4543,7 @@ pub fn register_all_at(
                 let Some(states) = lit_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(Torch {
                         attached: facing.opposite(),
@@ -3714,6 +4551,7 @@ pub fn register_all_at(
                         states,
                         power: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE | FLAG_HAS_ON_STATE_CHANGED,
                 );
             }
             n if n.ends_with("_wall") => {
@@ -3731,11 +4569,15 @@ pub fn register_all_at(
                     }}}}
                     Arc::new(family)
                 }).clone();
-                table.register(*id, Box::new(crate::wall::Wall {
-                    sides: crate::wall::PROPERTIES.map(|p| crate::wall::VALUES.iter()
-                        .position(|v| Some(*v) == descriptor.get(p)).unwrap_or(0) as u8),
-                    waterlogged: descriptor.flag("waterlogged"), family, rules: rules.clone(),
-                }));
+                table.register_vanilla(
+                    *id,
+                    Box::new(crate::wall::Wall {
+                        sides: crate::wall::PROPERTIES.map(|p| crate::wall::VALUES.iter()
+                            .position(|v| Some(*v) == descriptor.get(p)).unwrap_or(0) as u8),
+                        waterlogged: descriptor.flag("waterlogged"), family, rules: rules.clone(),
+                    }),
+                    FLAG_NO_NEIGHBOR,
+                );
             }
             "minecraft:scaffolding" => {
                 let mut family = [None; 16];
@@ -3746,10 +4588,14 @@ pub fn register_all_at(
                                 ("bottom", if bottom { "true" } else { "false" })]));
                     }
                 }
-                table.register(*id, Box::new(crate::scaffolding::Scaffolding {
-                    distance: descriptor.get("distance").and_then(|v| v.parse().ok()).unwrap_or(7),
-                    waterlogged: descriptor.flag("waterlogged"), family, rules: rules.clone(),
-                }));
+                table.register_vanilla(
+                    *id,
+                    Box::new(crate::scaffolding::Scaffolding {
+                        distance: descriptor.get("distance").and_then(|v| v.parse().ok()).unwrap_or(7),
+                        waterlogged: descriptor.flag("waterlogged"), family, rules: rules.clone(),
+                    }),
+                    FLAG_NO_NEIGHBOR | FLAG_HAS_ON_STATE_CHANGED,
+                );
             }
             n if n.ends_with("_leaves") => {
                 let distance = descriptor
@@ -3765,13 +4611,14 @@ pub fn register_all_at(
                         .intern(&descriptor.with("distance", &want.to_string()))
                         .ok();
                 }
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(crate::components::Leaves {
                         distance,
                         family,
                         rules: rules.clone(),
                     }),
+                    FLAG_NO_NEIGHBOR,
                 );
             }
             "minecraft:piston_head" => {
@@ -3787,14 +4634,18 @@ pub fn register_all_at(
                 let bases: Vec<StateId> = descriptors
                     .iter()
                     .filter(|(_, d)| d.facing() == Some(facing))
-                    .filter(|(_, d)| match d.name.as_str() {
+                    .filter(|(_, d)| match d.name {
                         "minecraft:piston" | "minecraft:sticky_piston" => d.flag("extended"),
                         "minecraft:moving_piston" => true,
                         _ => false,
                     })
                     .map(|(id, _)| *id)
                     .collect();
-                table.register(*id, Box::new(crate::piston::PistonHead { bases, facing }));
+                table.register_vanilla(
+                    *id,
+                    Box::new(crate::piston::PistonHead { bases, facing }),
+                    FLAG_NO_SHAPE_UPDATE,
+                );
             }
             "minecraft:piston" | "minecraft:sticky_piston" => {
                 let Some(facing) = descriptor.facing() else {
@@ -3842,7 +4693,7 @@ pub fn register_all_at(
                         face_name(facing)
                     ))
                     .unwrap_or(StateId::AIR);
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(Piston {
                         facing,
@@ -3856,6 +4707,7 @@ pub fn register_all_at(
                         power: rules.clone(),
                         movability: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE,
                 );
             }
             "minecraft:hopper" => {
@@ -3865,7 +4717,7 @@ pub fn register_all_at(
                 let Some(states) = enabled_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(Hopper {
                         facing,
@@ -3873,6 +4725,7 @@ pub fn register_all_at(
                         states,
                         power: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE,
                 );
             }
             // The decorated elevator uses this as a passive nine-slot
@@ -3882,7 +4735,7 @@ pub fn register_all_at(
             "minecraft:crafter"
                 if !descriptor.flag("triggered") && !descriptor.flag("crafting") =>
             {
-                table.register(*id, Box::new(Inert::new("idle-crafter-container")));
+                table.register_inert(*id, Inert::new("idle-crafter-container"));
             }
             "minecraft:dropper" | "minecraft:dispenser" => {
                 let Some(facing) = descriptor.facing() else {
@@ -3891,7 +4744,7 @@ pub fn register_all_at(
                 let Some(states) = triggered_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(Dropper {
                         facing,
@@ -3900,6 +4753,7 @@ pub fn register_all_at(
                         dispenser: name == "minecraft:dispenser",
                         power: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE,
                 );
             }
             "minecraft:lever" => {
@@ -3909,37 +4763,40 @@ pub fn register_all_at(
                 let Some(states) = powered_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(crate::components::Lever {
                         powered: descriptor.flag("powered"),
                         states,
                         attached,
                     }),
+                    FLAG_NO_NEIGHBOR | FLAG_NO_SHAPE_UPDATE,
                 );
             }
             "minecraft:rail" => {
                 // Cart physics reads rails through the rail tables; the only
                 // block behaviour a plain rail has is popping off a vanished
                 // support.
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(crate::components::PlainRail {
                         power: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE,
                 );
             }
             "minecraft:detector_rail" => {
                 let Some(states) = powered_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(crate::components::DetectorRail {
                         powered: descriptor.flag("powered"),
                         states,
                         power: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE,
                 );
             }
             "minecraft:powered_rail" | "minecraft:activator_rail" => {
@@ -3952,7 +4809,7 @@ pub fn register_all_at(
                 let Some(states) = powered_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(crate::minecart::PoweredRail {
                         block: if descriptor.name == "minecraft:activator_rail" {
@@ -3965,6 +4822,7 @@ pub fn register_all_at(
                         states,
                         power: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE | FLAG_HAS_ON_STATE_CHANGED,
                 );
             }
             "minecraft:water" => {
@@ -3972,19 +4830,20 @@ pub fn register_all_at(
                     .get("level")
                     .and_then(|l| l.parse().ok())
                     .unwrap_or(0);
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(crate::fluid::Water {
                         kind: crate::fluid::WaterKind::from_level(level),
                         rules: rules.clone(),
                     }),
+                    FLAG_NO_SHAPE_UPDATE | FLAG_HAS_ON_STATE_CHANGED,
                 );
             }
             // Bubble columns are inert as *blocks* here; their column-integrity
             // ticks are not modelled. Their water and their entity effects live
             // in the rules and the item physics.
             "minecraft:bubble_column" => {
-                table.register(*id, Box::new(Inert::new("bubble_column")));
+                table.register_inert(*id, Inert::new("bubble_column"));
             }
             // Building material, checked only once every implemented block has
             // had its say. Order matters: `minecraft:piston_head` ends in
@@ -4008,17 +4867,17 @@ pub fn register_all_at(
             // A cauldron only fills or empties by hand or by weather. Its
             // `level` is read by a comparator and otherwise never moves.
             n if n.ends_with("cauldron") => {
-                table.register(*id, Box::new(Inert::new("cauldron")));
+                table.register_inert(*id, Inert::new("cauldron"));
             }
             // A campfire lights, smokes and cooks; none of that is redstone,
             // and nothing in a door can extinguish it.
             "minecraft:campfire" | "minecraft:soul_campfire" => {
-                table.register(*id, Box::new(Inert::new("campfire")));
+                table.register_inert(*id, Inert::new("campfire"));
             }
             // A lectern pulses and feeds a comparator when a *player* turns a
             // page. With no book there is no page and no signal, ever.
             "minecraft:lectern" if !descriptor.flag("has_book") => {
-                table.register(*id, Box::new(Inert::new("lectern")));
+                table.register_inert(*id, Inert::new("lectern"));
             }
             // Tripwire is pressed by entities intersecting it. An unpressed
             // string in an entity-free world stays unpressed.
@@ -4026,12 +4885,13 @@ pub fn register_all_at(
                 let Some(states) = powered_pair(registry, descriptor) else {
                     continue;
                 };
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(crate::components::TripWire {
                         powered: descriptor.flag("powered"),
                         states,
                     }),
+                    FLAG_NO_NEIGHBOR | FLAG_NO_SHAPE_UPDATE,
                 );
             }
             // A weighted plate's `power` is the number of entities standing on
@@ -4056,7 +4916,7 @@ pub fn register_all_at(
                 if states.len() != 16 {
                     continue;
                 }
-                table.register(
+                table.register_vanilla(
                     *id,
                     Box::new(crate::components::WeightedPlate {
                         power,
@@ -4068,10 +4928,11 @@ pub fn register_all_at(
                         },
                         states,
                     }),
+                    FLAG_NO_NEIGHBOR | FLAG_NO_SHAPE_UPDATE,
                 );
             }
             n if decor_kind(n).is_some() => {
-                table.register(*id, Box::new(Inert::new("material")));
+                table.register_inert(*id, Inert::new("material"));
             }
             // Anything else stays unregistered, and will be named in the report.
             _ => {}
@@ -4117,12 +4978,12 @@ pub fn container_slots(name: &str) -> Option<u32> {
 /// implies not conducting one. It does not — `TARGET` and `REDSTONE_LAMP`
 /// register with no override at all, and the vault door turns a torch off by
 /// strongly powering the target block the torch stands on.
-fn is_conductor(descriptor: &Descriptor) -> bool {
+fn is_conductor(descriptor: &DescriptorRef<'_>) -> bool {
     if !is_full_cube(descriptor) {
         return false;
     }
     !matches!(
-        descriptor.name.as_str(),
+        descriptor.name,
         "minecraft:glass"
             | "minecraft:white_stained_glass"
             | "minecraft:sea_lantern"
@@ -4145,7 +5006,7 @@ fn is_conductor(descriptor: &Descriptor) -> bool {
     // new judgement — `glass`, `white_stained_glass`, `sea_lantern` and
     // `oak_leaves` were each read off a capture, and their siblings share the
     // registration that produced them.
-    && decor_kind(&descriptor.name) != Some(Decor::Glassy)
+    && decor_kind(descriptor.name) != Some(Decor::Glassy)
 }
 
 /// Whether a block state is a full collision cube.
@@ -4155,8 +5016,8 @@ fn is_conductor(descriptor: &Descriptor) -> bool {
 /// chests and hoppers are close-but-not-full and count as not-full, which
 /// matches `isCollisionShapeFullBlock` for suction. An extended piston base is
 /// not a full cube; a retracted one is.
-fn is_full_cube(descriptor: &Descriptor) -> bool {
-    match descriptor.name.as_str() {
+fn is_full_cube(descriptor: &DescriptorRef<'_>) -> bool {
+    match descriptor.name {
         "minecraft:air" | "minecraft:water" | "minecraft:lava" | "minecraft:bubble_column" => false,
         // Soul sand's collision column tops at 14/16: not a full cube, so it
         // neither conducts nor blocks hopper suction (isCollisionShapeFullBlock).
@@ -4218,18 +5079,18 @@ pub fn physics_tables(registry: &StateRegistry) -> (Vec<bool>, Vec<f32>, Vec<f32
     physics_tables_from(&descriptors)
 }
 
-fn parsed_descriptors(registry: &StateRegistry) -> Vec<Option<Descriptor>> {
+fn parsed_descriptors(registry: &StateRegistry) -> Vec<Option<DescriptorRef<'_>>> {
     (0..registry.len())
         .map(|index| {
             registry
                 .descriptor(StateId(index as u16))
-                .map(Descriptor::parse)
+                .map(DescriptorRef::parse)
         })
         .collect()
 }
 
 fn physics_tables_from(
-    descriptors: &[Option<Descriptor>],
+    descriptors: &[Option<DescriptorRef<'_>>],
 ) -> (Vec<bool>, Vec<f32>, Vec<f32>, Vec<bool>) {
     let mut solidity = Vec::with_capacity(descriptors.len());
     let mut frictions = Vec::with_capacity(descriptors.len());
@@ -4239,66 +5100,25 @@ fn physics_tables_from(
         let (solid, friction, height, web) = match descriptor {
             None => (false, 0.6, 1.0, false),
             Some(d) => {
-                let friction = match d.name.as_str() {
+                let friction = match d.name {
                     "minecraft:slime_block" => 0.8,
                     "minecraft:ice" | "minecraft:packed_ice" | "minecraft:frosted_ice" => 0.98,
                     "minecraft:blue_ice" => 0.989,
                     _ => 0.6,
                 };
-                match d.name.as_str() {
+                match d.name {
                     "minecraft:soul_sand" => (true, friction, 0.875, false),
                     "minecraft:cobweb" => (false, friction, 1.0, true),
-                    // An extended piston base is still something to stand on.
-                    //
-                    // `is_full_cube` answers the *conduction* question —
-                    // `isCollisionShapeFullBlock`, which an extended base fails
-                    // because `PistonBaseBlock` opens a 4-pixel slot on its
-                    // facing side for the head's stem. Entity collision asks
-                    // `getCollisionShape` instead, and that shape is the rest of
-                    // the block: a real surface. Routing entity solidity through
-                    // the conduction answer made a piston delete the support of
-                    // anything standing on it the tick it fired, which is how
-                    // three of the record door's furnace carts left the world.
-                    //
-                    // Measured by `piston_cart_support.json`: a furnace cart on
-                    // a west-facing piston at y=1 does not move for forty ticks
-                    // across a full extend/retract, while its negative-control
-                    // twin over air falls immediately.
-                    //
-                    // Height stays 1.0 for every facing. The slot is on the
-                    // facing side, so a horizontal or downward piston's top face
-                    // is untouched; for `facing=up` the slot is the top 4 pixels,
-                    // but whenever a base reads `extended=true` the cell above it
-                    // holds the head (or the `moving_piston` becoming it), so
-                    // nothing can rest on that face to tell 0.75 from 1.0. That
-                    // makes the difference unobservable rather than verified —
-                    // it is **not** measured here.
                     "minecraft:piston" | "minecraft:sticky_piston" => (true, friction, 1.0, false),
-                    // A carpet is a 1/16-high surface an item rests on —
-                    // lithium's hopper_item_datacommand parks its test item
-                    // on one, inside a /data selector's radius. Falling
-                    // through put the item out of range and out of the
-                    // hopper's suck column both.
                     n if n.ends_with("_carpet") || n == "minecraft:moss_carpet" => {
                         (true, friction, 0.0625, false)
                     }
-                    // A *closed, top-half* trapdoor is a surface flush with
-                    // the cell's top — lithium's interaction_change_v2 lands
-                    // a chest cart on one. Open or bottom-half trapdoors stay
-                    // pass-through: their real shapes are unmeasured here.
                     n if n.ends_with("_trapdoor")
                         && d.get("half") == Some("top")
                         && d.get("open") == Some("false") =>
                     {
                         (true, friction, 1.0, false)
                     }
-                    // A hopper is something to rest on, at the funnel floor —
-                    // 11/16, `HopperBlock`'s interaction bowl. Lithium's
-                    // hopper_interaction_change drops a chest cart onto one
-                    // when the rail under it pops; falling through the cell
-                    // put the cart a block below both hoppers' reach. An item
-                    // that lands here sits exactly at the suck column's floor,
-                    // which is the same 0.6875 — collected, as vanilla does.
                     "minecraft:hopper" => (true, friction, 0.6875, false),
                     _ => (is_full_cube(d), friction, 1.0, false),
                 }
@@ -4322,14 +5142,14 @@ pub fn fluid_tables(
 }
 
 fn fluid_tables_from(
-    descriptors: &[Option<Descriptor>],
+    descriptors: &[Option<DescriptorRef<'_>>],
 ) -> (Vec<Option<crate::fluid::WaterKind>>, Vec<Option<bool>>) {
     let mut water_kinds = Vec::with_capacity(descriptors.len());
     let mut bubble_kinds = Vec::with_capacity(descriptors.len());
     for descriptor in descriptors {
         let (water, bubble) = match descriptor {
             None => (None, None),
-            Some(d) => match d.name.as_str() {
+            Some(d) => match d.name {
                 "minecraft:water" => {
                     let level = d.get("level").and_then(|l| l.parse().ok()).unwrap_or(0);
                     (Some(crate::fluid::WaterKind::from_level(level)), None)
@@ -4359,7 +5179,7 @@ pub fn lava_table(registry: &StateRegistry) -> Vec<Option<crate::fluid::WaterKin
     lava_table_from(&descriptors)
 }
 
-fn lava_table_from(descriptors: &[Option<Descriptor>]) -> Vec<Option<crate::fluid::WaterKind>> {
+fn lava_table_from(descriptors: &[Option<DescriptorRef<'_>>]) -> Vec<Option<crate::fluid::WaterKind>> {
     let mut lava_kinds = Vec::with_capacity(descriptors.len());
     for descriptor in descriptors {
         lava_kinds.push(match descriptor {
@@ -4401,7 +5221,7 @@ fn is_button_or_plate(name: &str) -> bool {
 }
 
 /// A weighted pressure plate's `power`, or `None` for any other block.
-fn weighted_plate_power(descriptor: &Descriptor) -> Option<u8> {
+fn weighted_plate_power(descriptor: &DescriptorRef<'_>) -> Option<u8> {
     if !descriptor.name.ends_with("_weighted_pressure_plate") {
         return None;
     }
@@ -4426,7 +5246,7 @@ fn is_stone_button(name: &str) -> bool {
 /// Both blocks strongly power exactly this neighbour, captured for the lever in
 /// `lever_lamp.json` and for the button in all six orientations by
 /// `button_strong.snbt` (`button_wall.json`, `button_ceiling.json`).
-fn lever_attachment(descriptor: &Descriptor) -> Option<Dir> {
+fn lever_attachment(descriptor: &DescriptorRef<'_>) -> Option<Dir> {
     match descriptor.get("face") {
         Some("floor") => Some(Dir::Down),
         Some("ceiling") => Some(Dir::Up),
@@ -4438,7 +5258,7 @@ fn lever_attachment(descriptor: &Descriptor) -> Option<Dir> {
 /// against an empty world, which is what `StructureTemplate.addToLists` uses to
 /// decide a placed block's update-pass group.
 pub fn is_collision_full_cube(descriptor: &str) -> bool {
-    is_full_cube(&Descriptor::parse(descriptor))
+    is_full_cube(&DescriptorRef::parse(descriptor))
 }
 
 /// Whether a block's shape depends on its surroundings (`hasDynamicShape`).
@@ -4965,7 +5785,7 @@ pub fn rail_tables(registry: &StateRegistry) -> (Vec<Option<crate::minecart::Rai
 }
 
 fn rail_tables_from(
-    descriptors: &[Option<Descriptor>],
+    descriptors: &[Option<DescriptorRef<'_>>],
 ) -> (Vec<Option<crate::minecart::Rail>>, Vec<bool>) {
     let mut rails = Vec::with_capacity(descriptors.len());
     let mut conductors = Vec::with_capacity(descriptors.len());
@@ -4973,7 +5793,7 @@ fn rail_tables_from(
         let (rail, conductor) = match descriptor {
             None => (None, false),
             Some(d) => {
-                let rail = match d.name.as_str() {
+                let rail = match d.name {
                     "minecraft:rail"
                     | "minecraft:powered_rail"
                     | "minecraft:detector_rail"
@@ -4997,21 +5817,21 @@ fn rail_tables_from(
 }
 
 /// The unpowered/powered pair for a descriptor, if both states are interned.
-fn powered_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<StatePair> {
+fn powered_pair(registry: &StateRegistry, descriptor: &DescriptorRef<'_>) -> Option<StatePair> {
     Some(StatePair {
         off: registry.get(&descriptor.with("powered", "false"))?,
         on: registry.get(&descriptor.with("powered", "true"))?,
     })
 }
 
-fn lit_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<StatePair> {
+fn lit_pair(registry: &StateRegistry, descriptor: &DescriptorRef<'_>) -> Option<StatePair> {
     Some(StatePair {
         off: registry.get(&descriptor.with("lit", "false"))?,
         on: registry.get(&descriptor.with("lit", "true"))?,
     })
 }
 
-fn enabled_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<StatePair> {
+fn enabled_pair(registry: &StateRegistry, descriptor: &DescriptorRef<'_>) -> Option<StatePair> {
     Some(StatePair {
         off: registry.get(&descriptor.with("enabled", "false"))?,
         on: registry.get(&descriptor.with("enabled", "true"))?,
@@ -5020,13 +5840,13 @@ fn enabled_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<Sta
 
 /// The four `(lit, powered)` states a copper bulb cycles through, indexed
 /// `lit * 2 + powered` to match [`CopperBulb::states`].
-fn bulb_states(registry: &StateRegistry, descriptor: &Descriptor) -> Option<[StateId; 4]> {
+fn bulb_states(registry: &StateRegistry, descriptor: &DescriptorRef<'_>) -> Option<[StateId; 4]> {
     let mut states = [StateId(0); 4];
     for lit in [false, true] {
-        let with_lit =
-            Descriptor::parse(&descriptor.with("lit", if lit { "true" } else { "false" }));
+        let lit_str = if lit { "true" } else { "false" };
         for powered in [false, true] {
-            let name = with_lit.with("powered", if powered { "true" } else { "false" });
+            let pow_str = if powered { "true" } else { "false" };
+            let name = descriptor.with_values([("lit", lit_str), ("powered", pow_str)]);
             states[usize::from(lit) * 2 + usize::from(powered)] = registry.get(&name)?;
         }
     }
@@ -5035,10 +5855,9 @@ fn bulb_states(registry: &StateRegistry, descriptor: &Descriptor) -> Option<[Sta
 
 /// A trapdoor's power response sets `open` and `powered` together (see
 /// [`Trapdoor`]): off is both-false, on is both-true.
-fn trapdoor_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<StatePair> {
+fn trapdoor_pair(registry: &StateRegistry, descriptor: &DescriptorRef<'_>) -> Option<StatePair> {
     let both = |value: &str| {
-        let opened = Descriptor::parse(&descriptor.with("open", value));
-        registry.get(&opened.with("powered", value))
+        registry.get(&descriptor.with_values([("open", value), ("powered", value)]))
     };
     Some(StatePair {
         off: both("false")?,
@@ -5046,14 +5865,14 @@ fn trapdoor_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<St
     })
 }
 
-fn triggered_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<StatePair> {
+fn triggered_pair(registry: &StateRegistry, descriptor: &DescriptorRef<'_>) -> Option<StatePair> {
     Some(StatePair {
         off: registry.get(&descriptor.with("triggered", "false"))?,
         on: registry.get(&descriptor.with("triggered", "true"))?,
     })
 }
 
-fn extended_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<StatePair> {
+fn extended_pair(registry: &StateRegistry, descriptor: &DescriptorRef<'_>) -> Option<StatePair> {
     Some(StatePair {
         off: registry.get(&descriptor.with("extended", "false"))?,
         on: registry.get(&descriptor.with("extended", "true"))?,
@@ -5081,23 +5900,25 @@ const WIRE_SIDE_VALUES: [&str; 3] = ["none", "side", "up"];
 /// `moving_piston` at all. Without their counterparts a block cannot change state,
 /// so a simulation would silently freeze.
 pub fn intern_companions(registry: &mut StateRegistry) {
-    let existing: Vec<String> = (0..registry.len())
-        .filter_map(|i| registry.descriptor(StateId(i as u16)).map(str::to_string))
+    let existing: Vec<Arc<str>> = (0..registry.len())
+        .filter_map(|i| registry.descriptor_arc(StateId(i as u16)))
         .collect();
     let mut wire_families = HashSet::new();
     let mut wall_families = HashSet::new();
+    const POWER_STRS: [&str; 16] = [
+        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
+    ];
 
-    for text in existing {
-        let descriptor = Descriptor::parse(&text);
-        let companions: Vec<String> = match descriptor.name.as_str() {
+    for text in &existing {
+        let descriptor = DescriptorRef::parse(text);
+        let companions: Vec<String> = match descriptor.name {
             "minecraft:repeater" => {
                 // Both powered *and* both locked variants: `locked` is derived
                 // by updateShape, so either value may be needed at runtime.
-                let mut all = Vec::new();
+                let mut all = Vec::with_capacity(4);
                 for locked in ["false", "true"] {
-                    let at = Descriptor::parse(&descriptor.with("locked", locked));
-                    all.push(at.with("powered", "false"));
-                    all.push(at.with("powered", "true"));
+                    all.push(descriptor.with_values([("locked", locked), ("powered", "false")]));
+                    all.push(descriptor.with_values([("locked", locked), ("powered", "true")]));
                 }
                 all
             }
@@ -5116,42 +5937,58 @@ pub fn intern_companions(registry: &mut StateRegistry) {
                     descriptor.with("lit", "true"),
                 ]
             }
-            // Every state a wire can take: sixteen powers across all eighty-one
-            // combinations of the four sides. Interning only the powers was
-            // enough for as long as a wire's *connections* never changed, and
-            // they do — `getConnectionState` reshapes a wire whenever a
-            // neighbour appears or leaves. A shape the schematic never happened
-            // to contain simply did not exist, and the rewrite was dropped: the
-            // wire kept a connection to a block a piston had pulled away, which
-            // then suppressed the symmetry rule that would have run it straight.
-            // Silent, because a missing state is indistinguishable from no
-            // change at the call site.
             "minecraft:redstone_wire" => {
                 // Every member of one wire family reaches the same 1,296
                 // `(power, north, south, east, west)` states. Preserve any
                 // future non-wire properties in the key rather than assuming
                 // the mutable five are the whole descriptor.
-                let mut family: Vec<(String, String)> = descriptor
+                let mut family: smallvec::SmallVec<[(&str, &str); 2]> = descriptor
                     .properties
                     .iter()
+                    .copied()
                     .filter(|(key, _)| {
-                        !matches!(key.as_str(), "power" | "north" | "south" | "east" | "west")
+                        !matches!(*key, "power" | "north" | "south" | "east" | "west")
                     })
-                    .cloned()
                     .collect();
-                family.sort();
-                if !wire_families.insert(family) {
+                family.sort_unstable();
+                let family_key: Vec<(String, String)> = family
+                    .iter()
+                    .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+                    .collect();
+                if !wire_families.insert(family_key) {
                     continue;
                 }
-                let mut all = Vec::new();
-                for power in 0u8..16 {
-                    let power = power.to_string();
+                if family.is_empty() {
+                    // Fast path: format directly into a single reusable buffer
+                    // in canonical sorted key order (east, north, power, south, west).
+                    use std::fmt::Write as _;
+                    let mut buf = String::with_capacity(72);
+                    for power in POWER_STRS {
+                        for north in WIRE_SIDE_VALUES {
+                            for south in WIRE_SIDE_VALUES {
+                                for east in WIRE_SIDE_VALUES {
+                                    for west in WIRE_SIDE_VALUES {
+                                        buf.clear();
+                                        let _ = write!(
+                                            buf,
+                                            "minecraft:redstone_wire[east={east},north={north},power={power},south={south},west={west}]"
+                                        );
+                                        let _ = registry.intern(&buf);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    continue;
+                }
+                let mut all = Vec::with_capacity(16 * 81);
+                for power in POWER_STRS {
                     for north in WIRE_SIDE_VALUES {
                         for south in WIRE_SIDE_VALUES {
                             for east in WIRE_SIDE_VALUES {
                                 for west in WIRE_SIDE_VALUES {
                                     all.push(descriptor.with_values([
-                                        ("power", &power),
+                                        ("power", power),
                                         ("north", north),
                                         ("south", south),
                                         ("east", east),
@@ -5938,11 +6775,11 @@ mod tests {
                 "{name} is not a full cell"
             );
             assert!(
-                !is_full_cube(&Descriptor::parse(name)),
+                !is_full_cube(&DescriptorRef::parse(name)),
                 "{name} must not fill its cell"
             );
             assert!(
-                !is_conductor(&Descriptor::parse(name)),
+                !is_conductor(&DescriptorRef::parse(name)),
                 "{name} must not conduct"
             );
         }
@@ -5957,11 +6794,11 @@ mod tests {
                 "{name} is glass-like"
             );
             assert!(
-                is_full_cube(&Descriptor::parse(name)),
+                is_full_cube(&DescriptorRef::parse(name)),
                 "{name} still fills its cell"
             );
             assert!(
-                !is_conductor(&Descriptor::parse(name)),
+                !is_conductor(&DescriptorRef::parse(name)),
                 "{name} must not conduct"
             );
         }
@@ -5974,7 +6811,7 @@ mod tests {
             "minecraft:pumpkin",
         ] {
             assert!(
-                is_conductor(&Descriptor::parse(name)),
+                is_conductor(&DescriptorRef::parse(name)),
                 "{name} is an ordinary solid"
             );
         }

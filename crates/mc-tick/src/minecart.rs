@@ -1257,8 +1257,12 @@ impl<P: PowerSource> PoweredRail<P> {
         })
     }
 
-    /// The powered rail at `pos`, from its descriptor.
+    /// The powered rail at `pos`, using the fast rule table when available.
+    #[inline]
     fn rail_at(&self, ctx: &TickCtx<'_>, pos: Pos) -> Option<(RailShape, bool)> {
+        if let Some(fast) = self.power.powered_rail_at(ctx.world, pos, self.block) {
+            return fast;
+        }
         let descriptor = ctx.states.descriptor(ctx.world.get(pos))?;
         if !descriptor.starts_with(self.block) {
             return None;

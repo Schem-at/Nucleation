@@ -30,13 +30,11 @@ use crate::world::World;
 /// generous enough that no real build should reach it.
 const MAX_EVENT_CHAIN: usize = 1024;
 
-#[cfg(feature = "experiment-moving-phase")]
 #[derive(Default)]
 struct MovingPhaseScratch {
     due: Vec<PendingMove>,
 }
 
-#[cfg(feature = "experiment-moving-phase")]
 impl std::fmt::Debug for MovingPhaseScratch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Reusable allocation capacity is not simulation state.
@@ -267,7 +265,6 @@ pub struct Simulation {
     update_arena: crate::behaviour::UpdateArena,
     /// Deferred writes awaiting their block-entities phase.
     moves: Vec<PendingMove>,
-    #[cfg(feature = "experiment-moving-phase")]
     moving_phase_scratch: MovingPhaseScratch,
     /// Torch toggle history for burnout, pruned as it ages out.
     toggles: Vec<(Pos, u64)>,
@@ -507,7 +504,6 @@ impl Simulation {
             #[cfg(feature = "experiment-update-arena")]
             update_arena: crate::behaviour::UpdateArena::default(),
             moves: Vec::new(),
-            #[cfg(feature = "experiment-moving-phase")]
             moving_phase_scratch: MovingPhaseScratch::default(),
             toggles: Vec::new(),
             comparator_out: std::collections::HashMap::new(),
@@ -1767,12 +1763,19 @@ impl Simulation {
         let tick = self.tick;
         let ticking = self.ticking;
         // `pistonDeltasGameTime`: the running per-axis totals reset once a tick.
-        self.piston_deltas.clear();
+        if !self.piston_deltas.is_empty() {
+            self.piston_deltas.clear();
+        }
         // With no possible target or outstanding probe, the reference loop
         // only builds/discards geometry and refreshes an already-empty view.
         // Recheck live lists every pass: callbacks can introduce entities.
-        #[cfg(feature = "experiment-moving-phase")]
-        if self.can_skip_piston_displacement() { return; }
+        if self.can_skip_piston_displacement() {
+            return;
+        }
+        if self.moves.is_empty() {
+            self.notify_piston_probes();
+            return;
+        }
         // Insertion order, which is what `tickBlockEntities` walks — and the
         // index rides along, because *when* another move's cell turns solid
         // depends on whether its block entity has already ticked this tick.
@@ -1927,7 +1930,7 @@ impl Simulation {
         self.notify_piston_probes();
     }
 
-    #[cfg(feature = "experiment-moving-phase")]
+    #[inline]
     fn can_skip_piston_displacement(&self) -> bool {
         self.minecarts.is_empty()
             && self.bodies.is_empty()
@@ -1937,10 +1940,12 @@ impl Simulation {
             && self.piston_probes.is_empty()
     }
 
-    #[cfg(feature = "experiment-moving-phase")]
     fn take_due_moves(&mut self) -> Vec<PendingMove> {
         let mut due = std::mem::take(&mut self.moving_phase_scratch.due);
         debug_assert!(due.is_empty());
+        if self.moves.is_empty() {
+            return due;
+        }
         let tick = self.tick;
         let ticking = self.ticking;
         // Stable extraction finishes before any callback. A callback can
@@ -2742,10 +2747,12 @@ impl Simulation {
         self.phase = None;
         self.tick += 1;
         // Burnout only looks back a fixed window, so anything older is dead weight.
-        let horizon = self
-            .tick
-            .saturating_sub(crate::components::TORCH_BURNOUT_WINDOW);
-        self.toggles.retain(|(_, t)| *t >= horizon);
+        if !self.toggles.is_empty() {
+            let horizon = self
+                .tick
+                .saturating_sub(crate::components::TORCH_BURNOUT_WINDOW);
+            self.toggles.retain(|(_, t)| *t >= horizon);
+        }
         StopReason::Completed
     }
 
@@ -2784,6 +2791,12 @@ impl Simulation {
     /// can see. A resting item's velocity oscillates as gravity accumulates and
     /// collisions flush it — invisible here, on both sides, by construction.
     fn emit_entity_events(&mut self) {
+        if self.item_entities.items.is_empty()
+            && self.minecarts.is_empty()
+            && self.entity_snapshot.is_empty()
+        {
+            return;
+        }
         if self.ent_log.is_none() {
             self.item_entities.items.retain(|item| !item.removed);
             self.minecarts.retain(|cart| !cart.removed);
@@ -2958,7 +2971,11 @@ impl Simulation {
     ///
     /// Bounded (vanilla's `maxChainedNeighborUpdates` is a million): a circuit
     /// that keeps re-notifying itself reports rather than hangs.
+    #[inline]
     fn propagate(&mut self) {
+        if self.updates.is_empty() && self.pending.is_empty() {
+            return;
+        }
         let mut ctx = self.ctx();
         ctx.drain();
     }
@@ -3094,8 +3111,58 @@ impl Simulation {
     /// change log, so it must not be used while a timeline is recording — see
     /// the invariant on [`Simulation::record_timeline`].
     pub fn place_on_place(&mut self, order: &[Pos]) {
-        let index: std::collections::HashMap<Pos, usize> =
-            order.iter().enumerate().map(|(i, pos)| (*pos, i)).collect();
+        if order.is_empty() {
+            return;
+        }
+        let mut min = order[0];
+        let mut max = order[0];
+        for &p in &order[1..] {
+            min = Pos::new(min.x.min(p.x), min.y.min(p.y), min.z.min(p.z));
+            max = Pos::new(max.x.max(p.x), max.y.max(p.y), max.z.max(p.z));
+        }
+        let sx = (i64::from(max.x) - i64::from(min.x) + 1) as u64;
+        let sy = (i64::from(max.y) - i64::from(min.y) + 1) as u64;
+        let sz = (i64::from(max.z) - i64::from(min.z) + 1) as u64;
+        let dense_vol = sx.saturating_mul(sy).saturating_mul(sz);
+        let (dense_index, sparse_index): (Option<Vec<u32>>, Option<std::collections::HashMap<Pos, usize>>) =
+            if dense_vol <= 2_000_000 {
+                let mut grid = vec![u32::MAX; dense_vol as usize];
+                let stride_y = (sx * sz) as usize;
+                let stride_z = sx as usize;
+                for (i, &pos) in order.iter().enumerate() {
+                    let idx = (pos.y - min.y) as usize * stride_y
+                        + (pos.z - min.z) as usize * stride_z
+                        + (pos.x - min.x) as usize;
+                    grid[idx] = i as u32;
+                }
+                (Some(grid), None)
+            } else {
+                let mut map = std::collections::HashMap::with_capacity(order.len());
+                for (i, &pos) in order.iter().enumerate() {
+                    map.insert(pos, i);
+                }
+                (None, Some(map))
+            };
+        let stride_y = (sx * sz) as usize;
+        let stride_z = sx as usize;
+        let placed_before = |target: Pos, current: usize| -> bool {
+            if let Some(ref grid) = dense_index {
+                let dx = target.x.wrapping_sub(min.x) as u32;
+                let dy = target.y.wrapping_sub(min.y) as u32;
+                let dz = target.z.wrapping_sub(min.z) as u32;
+                if (dx as u64) >= sx || (dy as u64) >= sy || (dz as u64) >= sz {
+                    return false;
+                }
+                let idx = dy as usize * stride_y + dz as usize * stride_z + dx as usize;
+                (grid[idx] as usize) < current
+            } else {
+                sparse_index
+                    .as_ref()
+                    .and_then(|m| m.get(&target))
+                    .is_some_and(|&placed| placed < current)
+            }
+        };
+
         let placed: Vec<StateId> = order.iter().map(|pos| self.world.get(*pos)).collect();
         for pos in order {
             self.world.set(*pos, StateId::AIR);
@@ -3108,24 +3175,22 @@ impl Simulation {
             // `knownShape`, and it is how an observer gets its pulse scheduled
             // in a build the game places "silently". Only blocks already down
             // can hear it.
-            let items: Vec<(Pos, crate::pos::Dir, crate::behaviour::UpdateKind)> =
-                crate::pos::UPDATE_SHAPE_ORDER
-                    .iter()
-                    .filter(|dir| {
-                        index
-                            .get(&pos.offset(**dir))
-                            .is_some_and(|placed| *placed < i)
-                    })
-                    .map(|dir| {
-                        (
-                            pos.offset(*dir),
-                            dir.opposite(),
-                            crate::behaviour::UpdateKind::Shape,
-                        )
-                    })
-                    .collect();
+            let mut items: smallvec::SmallVec<[(Pos, crate::pos::Dir, crate::behaviour::UpdateKind); 6]> =
+                smallvec::SmallVec::new();
+            for dir in crate::pos::UPDATE_SHAPE_ORDER {
+                let target = pos.offset(dir);
+                if placed_before(target, i) {
+                    items.push((target, dir.opposite(), crate::behaviour::UpdateKind::Shape));
+                }
+            }
             if !items.is_empty() {
-                self.updates.push(crate::behaviour::UpdateEntry::new(items));
+                let entry = if items.len() == 1 {
+                    let (p, d, k) = items[0];
+                    crate::behaviour::UpdateEntry::single(p, d, k)
+                } else {
+                    crate::behaviour::UpdateEntry::new(items.into_vec())
+                };
+                self.updates.push(entry);
                 self.propagate();
             }
 
@@ -3133,46 +3198,48 @@ impl Simulation {
             if state == StateId::AIR {
                 continue;
             }
-            let Some(behaviour) = self.behaviours.get(state) else {
-                self.unknown_seen.push(state);
-                continue;
-            };
-            let mut ctx = TickCtx {
-                #[cfg(feature = "experiment-update-arena")]
-                update_arena: &mut self.update_arena,
-                #[cfg(feature = "experiment-update-pool")]
-                update_pool: &mut self.update_pool,
-                drain: Some(crate::behaviour::Drain {
-                    pending: &mut self.pending,
-                    unknown_seen: &mut self.unknown_seen,
-                    upd_log: self.upd_log.as_mut(),
-                    phase: self.phase,
-                }),
-                behaviours: Some(&self.behaviours),
-                world: &mut self.world,
-                ticks: &mut self.ticks,
-                fluids: &mut self.fluids,
-                events: &mut self.events,
-                states: &self.registry,
-                tick: self.tick,
-                boundary: true,
-                updates: &mut self.updates,
-                moves: &mut self.moves,
-                toggles: &mut self.toggles,
-                comparator_out: &mut self.comparator_out,
-                inventories: &mut self.inventories,
-                hopper_state: &mut self.hopper_state,
-                commands: &self.commands,
-                command_powered: &mut self.command_powered,
-                tickers: &mut self.tickers,
-                item_entities: &mut self.item_entities,
-                minecarts: &mut self.minecarts,
-                conductors: &self.conductors,
-                inv_log: self.inv_log.as_mut(),
-                log: self.log.as_mut(),
-            };
-            behaviour.on_placed(&mut ctx, *pos);
-            self.propagate();
+            if self.behaviours.flags_of(state) & crate::behaviour::FLAG_INERT == 0 {
+                let Some(behaviour) = self.behaviours.get(state) else {
+                    self.unknown_seen.push(state);
+                    continue;
+                };
+                let mut ctx = TickCtx {
+                    #[cfg(feature = "experiment-update-arena")]
+                    update_arena: &mut self.update_arena,
+                    #[cfg(feature = "experiment-update-pool")]
+                    update_pool: &mut self.update_pool,
+                    drain: Some(crate::behaviour::Drain {
+                        pending: &mut self.pending,
+                        unknown_seen: &mut self.unknown_seen,
+                        upd_log: self.upd_log.as_mut(),
+                        phase: self.phase,
+                    }),
+                    behaviours: Some(&self.behaviours),
+                    world: &mut self.world,
+                    ticks: &mut self.ticks,
+                    fluids: &mut self.fluids,
+                    events: &mut self.events,
+                    states: &self.registry,
+                    tick: self.tick,
+                    boundary: true,
+                    updates: &mut self.updates,
+                    moves: &mut self.moves,
+                    toggles: &mut self.toggles,
+                    comparator_out: &mut self.comparator_out,
+                    inventories: &mut self.inventories,
+                    hopper_state: &mut self.hopper_state,
+                    commands: &self.commands,
+                    command_powered: &mut self.command_powered,
+                    tickers: &mut self.tickers,
+                    item_entities: &mut self.item_entities,
+                    minecarts: &mut self.minecarts,
+                    conductors: &self.conductors,
+                    inv_log: self.inv_log.as_mut(),
+                    log: self.log.as_mut(),
+                };
+                behaviour.on_placed(&mut ctx, *pos);
+                self.propagate();
+            }
 
             // `markAndNotifyBlock` after the write: flag 1 is set (the harness
             // places with flags 3), so every block notifies its neighbours as
@@ -3193,14 +3260,16 @@ impl Simulation {
         // pokes the comparators around it. Without it a comparator saved
         // `powered=true` over a barrel is never told to re-read, sits lit, and
         // locks the repeater beside it — which was the whole of the tick-1 gap.
-        let containers: Vec<Pos> = order
-            .iter()
-            .copied()
-            .filter(|pos| self.block_entities.contains(pos))
-            .collect();
-        for pos in containers {
-            self.update_neighbour_for_output_signal(pos);
-            self.propagate();
+        if !self.block_entities.is_empty() {
+            let containers: Vec<Pos> = order
+                .iter()
+                .copied()
+                .filter(|pos| self.block_entities.contains(pos))
+                .collect();
+            for pos in containers {
+                self.update_neighbour_for_output_signal(pos);
+                self.propagate();
+            }
         }
     }
 
@@ -3299,11 +3368,11 @@ impl Simulation {
         //     to the placed block, so anything input-driven schedules its own
         //     check. Idempotent for everything else (a wire just recomputes
         //     the power it already has).
-        self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
+        self.updates.push(crate::behaviour::UpdateEntry::single(
             pos,
             crate::pos::Dir::Down,
             crate::behaviour::UpdateKind::Neighbor,
-        )]));
+        ));
         self.propagate();
 
         // 3. markAndNotifyBlock, flag 3: neighbours and the observer pass.
@@ -3334,11 +3403,11 @@ impl Simulation {
             let side = pos.offset(dir);
             let state = self.world.get(side);
             if self.registry.descriptor(state).is_some_and(is_comparator) {
-                self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
+                self.updates.push(crate::behaviour::UpdateEntry::single(
                     side,
                     dir.opposite(),
                     crate::behaviour::UpdateKind::Neighbor,
-                )]));
+                ));
             } else if self
                 .conductors
                 .get(state.raw() as usize)
@@ -3348,11 +3417,11 @@ impl Simulation {
                 let beyond = side.offset(dir);
                 let state = self.world.get(beyond);
                 if self.registry.descriptor(state).is_some_and(is_comparator) {
-                    self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
+                    self.updates.push(crate::behaviour::UpdateEntry::single(
                         beyond,
                         dir.opposite(),
                         crate::behaviour::UpdateKind::Neighbor,
-                    )]));
+                    ));
                 }
             }
         }
@@ -3402,18 +3471,45 @@ impl Simulation {
     /// That is the order two observers on opposite faces of a build pulse in,
     /// so it decides races that placement order has no say in.
     fn update_shape_at_edge(&mut self, order: &[Pos]) {
-        let filled: std::collections::HashSet<Pos> = order.iter().copied().collect();
-        let (Some(min), Some(max)) = (
-            order
-                .iter()
-                .copied()
-                .reduce(|a, b| Pos::new(a.x.min(b.x), a.y.min(b.y), a.z.min(b.z))),
-            order
-                .iter()
-                .copied()
-                .reduce(|a, b| Pos::new(a.x.max(b.x), a.y.max(b.y), a.z.max(b.z))),
-        ) else {
+        if order.is_empty() {
             return;
+        }
+        let mut min = order[0];
+        let mut max = order[0];
+        for &p in &order[1..] {
+            min = Pos::new(min.x.min(p.x), min.y.min(p.y), min.z.min(p.z));
+            max = Pos::new(max.x.max(p.x), max.y.max(p.y), max.z.max(p.z));
+        }
+        let sx = (i64::from(max.x) - i64::from(min.x) + 1) as u64;
+        let sy = (i64::from(max.y) - i64::from(min.y) + 1) as u64;
+        let sz = (i64::from(max.z) - i64::from(min.z) + 1) as u64;
+        let dense_vol = sx.saturating_mul(sy).saturating_mul(sz);
+        let (dense_filled, sparse_filled): (Option<Vec<bool>>, Option<std::collections::HashSet<Pos>>) =
+            if dense_vol <= 2_000_000 {
+                let mut grid = vec![false; dense_vol as usize];
+                let stride_y = (sx * sz) as usize;
+                let stride_z = sx as usize;
+                for &pos in order {
+                    let idx = (pos.y - min.y) as usize * stride_y
+                        + (pos.z - min.z) as usize * stride_z
+                        + (pos.x - min.x) as usize;
+                    grid[idx] = true;
+                }
+                (Some(grid), None)
+            } else {
+                (None, Some(order.iter().copied().collect()))
+            };
+        let stride_y = (sx * sz) as usize;
+        let stride_z = sx as usize;
+        let is_filled = |p: Pos| -> bool {
+            if let Some(ref grid) = dense_filled {
+                let idx = (p.y - min.y) as usize * stride_y
+                    + (p.z - min.z) as usize * stride_z
+                    + (p.x - min.x) as usize;
+                grid[idx]
+            } else {
+                sparse_filled.as_ref().is_some_and(|set| set.contains(&p))
+            }
         };
 
         // (outer axis, middle axis, scan axis) per sweep, with the face pair the
@@ -3437,7 +3533,7 @@ impl Simulation {
                             c[scan] = v;
                             Pos::new(c[0], c[1], c[2])
                         };
-                        let full = s <= hi[scan] && filled.contains(&at(s));
+                        let full = s <= hi[scan] && is_filled(at(s));
                         if !inside && full {
                             self.shape_update_pair(at(s), negative);
                         }
@@ -3454,17 +3550,17 @@ impl Simulation {
     /// One face of the edge walk: the placed block hears from the world block
     /// across the face, then that block hears back.
     fn shape_update_pair(&mut self, pos: Pos, dir: crate::pos::Dir) {
-        self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
+        self.updates.push(crate::behaviour::UpdateEntry::single(
             pos,
             dir,
             crate::behaviour::UpdateKind::Shape,
-        )]));
+        ));
         self.propagate();
-        self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
+        self.updates.push(crate::behaviour::UpdateEntry::single(
             pos.offset(dir),
             dir.opposite(),
             crate::behaviour::UpdateKind::Shape,
-        )]));
+        ));
         self.propagate();
     }
 
@@ -3821,55 +3917,14 @@ impl Simulation {
                 // event that started them. Captured from vanilla:
                 //   tick 0  stone -> moving_piston
                 //   tick 2  moving_piston -> stone (at its destination)
-                #[cfg(not(feature = "experiment-moving-phase"))]
-                let ticking = self.ticking;
-                #[cfg(not(feature = "experiment-moving-phase"))]
-                let in_ticking =
-                    move |pos: Pos| ticking.as_ref().is_none_or(|bounds| bounds.contains(pos));
-                #[cfg(not(feature = "experiment-moving-phase"))]
-                let mut due: Vec<PendingMove> = self
-                    .moves
-                    .iter()
-                    .filter(|m| m.resolve_on <= self.tick && in_ticking(m.pos))
-                    .copied()
-                    .collect();
-                #[cfg(feature = "experiment-moving-phase")]
+                if self.moves.is_empty() {
+                    return None;
+                }
                 let mut due = self.take_due_moves();
-                // Insertion order, which is what `tickBlockEntities` walks: the
-                // moving block entities tick in the order they were added to the
-                // level, and `moveBlocks` creates them farthest-from-the-piston
-                // first, head slot last.
-                //
-                // The order is observable, because each landing notifies its
-                // neighbours. A column landing top-down tells the block above it
-                // while everything below is still a `moving_piston` placeholder —
-                // immovable — so a piston up there resolves *false* and queues
-                // nothing. Landing bottom-up instead hands that piston a fully
-                // solid column and it extends into a door vanilla leaves shut.
-                //
-                // A stable sort on the due tick alone preserves that order.
-                due.sort_by_key(|m| m.resolve_on);
-                // Landing order is this list's order, and this list's order is
-                // `moveBlocks`': each stroke appends `to_push` reversed, so the
-                // far end of a pushed line lands first. Both a blanket reverse
-                // and a per-stroke reverse were measured against the corpus:
-                // each makes BB's t34 piston race come out vanilla's way and
-                // each breaks `door_4x4_vault_cycle` and `door_6x6_cycle` — so
-                // the direction is not the variable. What differs is the
-                // *sequence* `resolve_push` builds for some structures, which
-                // is where a divergence from `getToPush` has to be chased.
-                // Frozen moves (outside the ticking bounds) stay pending: a
-                // block entity in a non-ticking chunk is suspended, not gone.
-                #[cfg(not(feature = "experiment-moving-phase"))]
-                self.moves
-                    .retain(|m| m.resolve_on > self.tick || !in_ticking(m.pos));
-                #[cfg(not(feature = "experiment-moving-phase"))]
-                let mut landed: Vec<Pos> = Vec::new();
-                #[cfg(not(feature = "experiment-moving-phase"))]
-                let entries = due;
-                #[cfg(feature = "experiment-moving-phase")]
-                let entries = due.drain(..);
-                for entry in entries {
+                if due.len() > 1 {
+                    due.sort_by_key(|m| m.resolve_on);
+                }
+                for entry in due.drain(..) {
                     let previous = self.world.get(entry.pos);
                     if previous == entry.state {
                         continue;
@@ -3911,33 +3966,11 @@ impl Simulation {
                     // column instead, and a piston above it extended into a door
                     // vanilla leaves shut.
                     self.propagate();
-                    #[cfg(not(feature = "experiment-moving-phase"))]
-                    landed.push(entry.pos);
-                    // `onPlace` for each landed block, *after* that block's own
-                    // landing updates have run but still inside its own landing.
-                    //
-                    // Ordering matters twice over. Within one landing it comes
-                    // last: vanilla's shape update reaches a moved observer while
-                    // it still carries its mid-pulse powered state, so it does not
-                    // re-schedule, and only then does onPlace clear the flag.
-                    // Dispatching it first would start a pulse vanilla never
-                    // starts.
-                    //
-                    // Across landings it must not be batched to the end. `onPlace`
-                    // is where a landed piston runs `checkIfExtend`, and that only
-                    // queues a block event if the push actually resolves — so a
-                    // piston must see the column above it as vanilla does, still
-                    // holding `moving_piston` placeholders that have not landed
-                    // yet. Immovable, so the push fails and no event is queued.
-                    // Running every onPlace after every landing showed it a solid
-                    // column instead, and the 6x6 door fired a piston vanilla
-                    // leaves alone.
-                    #[cfg(not(feature = "experiment-moving-phase"))]
-                    let placed = std::mem::take(&mut landed);
-                    #[cfg(feature = "experiment-moving-phase")]
-                    let placed = [entry.pos];
-                    for pos in placed {
+                    for pos in [entry.pos] {
                         let state = self.world.get(pos);
+                        if self.behaviours.flags_of(state) & crate::behaviour::FLAG_INERT != 0 {
+                            continue;
+                        }
                         let Some(behaviour) = self.behaviours.get(state) else {
                             if state != StateId::AIR {
                                 self.unknown_seen.push(state);
@@ -3998,20 +4031,28 @@ impl Simulation {
                     // its *own* position, after everything else. Vanilla passes
                     // no orientation; nothing that reacts to this reads the
                     // direction, so Down stands in for the absent one.
-                    self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
+                    self.updates.push(crate::behaviour::UpdateEntry::single(
                         entry.pos,
                         crate::pos::Dir::Down,
                         crate::behaviour::UpdateKind::Neighbor,
-                    )]));
+                    ));
                     crate::behaviour::trace_update("neighbor", entry.pos);
                     self.propagate();
                 }
-                #[cfg(feature = "experiment-moving-phase")]
-                { self.moving_phase_scratch.due = due; }
+                self.moving_phase_scratch.due = due;
                 None
             }
 
             Phase::Entities => {
+                if self.minecarts.is_empty()
+                    && self.item_entities.items.is_empty()
+                    && self.item_entities.others.is_empty()
+                    && self.bodies.is_empty()
+                    && self.tnts.is_empty()
+                    && self.item_entities.pending_spawns.is_empty()
+                {
+                    return None;
+                }
                 // Item entities tick in spawn order — vanilla's entity list
                 // order. Merging runs at the captured intervals: every 2 ticks
                 // while crossing block boundaries, every 40 at rest.
@@ -4177,25 +4218,15 @@ impl Simulation {
 
     /// The block-events phase: drain, handle, repeat until empty.
     fn run_block_events(&mut self) -> Option<StopReason> {
-        // `ServerLevel.runBlockEvents` reschedules only what it never *tried*:
-        //
-        //     if (shouldTickBlocksAt(pos)) { doBlockEvent(data); }
-        //     else { blockEventsToReschedule.add(data); }
-        //
-        // An event whose handler returns false — a piston that has lost its
-        // power, or whose position no longer holds the block the event names —
-        // is simply dropped. Re-queueing those instead gave a piston a second
-        // attempt a tick later, and a retracting piston re-extended into a door
-        // that vanilla leaves shut.
-        //
-        // Everything this engine simulates is inside a ticking region, so
-        // nothing is rescheduled at all; the distinction is recorded here for
-        // when ticking bounds start suspending block events too.
+        if self.events.is_empty() {
+            return None;
+        }
         let mut refused: Vec<BlockEvent> = Vec::new();
         self.drain_block_events(&mut refused)
     }
 
     fn drain_block_events(&mut self, refused: &mut Vec<BlockEvent>) -> Option<StopReason> {
+        let trace_events = crate::diagnostics::var("MC_TICK_TRACE_EVENTS").is_ok();
         for _ in 0..MAX_EVENT_CHAIN {
             let batch = self.events.take();
             if batch.is_empty() {
@@ -4209,7 +4240,6 @@ impl Simulation {
                 // `doBlockEvent`: an event whose position no longer holds the
                 // block it was queued for is refused and dropped. Properties may
                 // differ; only the block has to match.
-                let trace_events = crate::diagnostics::var("MC_TICK_TRACE_EVENTS").is_ok();
                 if !self.registry.same_block(state, event.block) {
                     if trace_events {
                         eprintln!(

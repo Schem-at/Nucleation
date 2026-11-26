@@ -355,13 +355,21 @@ pub fn try_build_sim(
             }
         }
     }
-    for (pos, entry) in &structure.blocks {
-        let state = sim.registry().get(&structure.palette[*entry]);
-        let is_ticker = state
-            .and_then(|s| sim.behaviours().get(s))
-            .is_some_and(|b| b.ticks_as_block_entity());
-        if is_ticker {
-            sim.add_block_entity_ticker(*pos);
+    let palette_is_ticker: Vec<bool> = structure
+        .palette
+        .iter()
+        .map(|desc| {
+            sim.registry()
+                .get(desc)
+                .and_then(|s| sim.behaviours().get(s))
+                .is_some_and(|b| b.ticks_as_block_entity())
+        })
+        .collect();
+    if palette_is_ticker.iter().any(|&t| t) {
+        for (pos, entry) in &structure.blocks {
+            if palette_is_ticker[*entry] {
+                sim.add_block_entity_ticker(*pos);
+            }
         }
     }
     let order = structure.placement_order(

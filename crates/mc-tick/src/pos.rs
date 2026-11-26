@@ -22,11 +22,13 @@ pub struct Pos {
 
 impl Pos {
     /// A position.
+    #[inline]
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
         Self { x, y, z }
     }
 
     /// This position offset `n` blocks in `dir` (`BlockPos.relative(dir, n)`).
+    #[inline]
     pub const fn offset_by(self, dir: Dir, n: i32) -> Self {
         let (dx, dy, dz) = dir.delta();
         Self {
@@ -37,6 +39,7 @@ impl Pos {
     }
 
     /// This position offset one block in `dir`.
+    #[inline]
     pub const fn offset(self, dir: Dir) -> Self {
         let (dx, dy, dz) = dir.delta();
         Self {
@@ -115,6 +118,7 @@ pub const ALL_DIRS: [Dir; 6] = [
 
 impl Dir {
     /// The unit offset for this direction.
+    #[inline]
     pub const fn delta(self) -> (i32, i32, i32) {
         match self {
             Dir::Down => (0, -1, 0),
@@ -128,6 +132,7 @@ impl Dir {
 
     /// The direction facing the other way.
     /// Which axis this direction runs along (`Direction.getAxis`).
+    #[inline]
     pub const fn axis(self) -> u8 {
         match self {
             Dir::West | Dir::East => 0,
@@ -137,6 +142,7 @@ impl Dir {
     }
 
     /// The opposite direction.
+    #[inline]
     pub const fn opposite(self) -> Dir {
         match self {
             Dir::Down => Dir::Up,
@@ -203,6 +209,7 @@ impl Bounds {
     }
 
     /// Whether `pos` lies inside the region.
+    #[inline]
     pub fn contains(&self, pos: Pos) -> bool {
         pos.x >= self.min.x
             && pos.x <= self.max.x

@@ -109,11 +109,109 @@ pub enum UpdateKind {
 /// entries queued while a notification dispatches run to completion (in call
 /// order) before the current entry's remaining notifications. The driver's
 /// `propagate` reproduces exactly that.
+#[cfg(feature = "experiment-update-pool")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdateEntry {
     items: Vec<(Pos, Dir, UpdateKind)>,
     cursor: usize,
 }
+
+#[cfg(not(feature = "experiment-update-pool"))]
+#[derive(Debug, Clone)]
+enum UpdateEntryRepr {
+    Single {
+        item: (Pos, Dir, UpdateKind),
+        done: bool,
+    },
+    NeighborsAt {
+        pos: Pos,
+        cursor: u8,
+    },
+    NeighborsExcept {
+        pos: Pos,
+        skip: Dir,
+        cursor: u8,
+    },
+    NeighborShapes {
+        pos: Pos,
+        cursor: u8,
+    },
+    OwnShapes {
+        pos: Pos,
+        cursor: u8,
+    },
+    Custom {
+        items: Vec<(Pos, Dir, UpdateKind)>,
+        cursor: usize,
+    },
+}
+
+/// One collected neighbour-update entry — vanilla's `NeighborUpdates` unit.
+///
+/// An `updateNeighborsAt` call is one entry of up to six notifications run in
+/// `UPDATE_ORDER`; `CollectingNeighborUpdater` runs entries depth-first:
+/// entries queued while a notification dispatches run to completion (in call
+/// order) before the current entry's remaining notifications. The driver's
+/// `propagate` reproduces exactly that.
+#[cfg(not(feature = "experiment-update-pool"))]
+#[derive(Debug, Clone)]
+pub struct UpdateEntry {
+    repr: UpdateEntryRepr,
+}
+
+#[cfg(not(feature = "experiment-update-pool"))]
+impl PartialEq for UpdateEntry {
+    fn eq(&self, other: &Self) -> bool {
+        match (&self.repr, &other.repr) {
+            (
+                UpdateEntryRepr::Single { item: a, done: da },
+                UpdateEntryRepr::Single { item: b, done: db },
+            ) => a == b && da == db,
+            (
+                UpdateEntryRepr::NeighborsAt { pos: a, cursor: ca },
+                UpdateEntryRepr::NeighborsAt { pos: b, cursor: cb },
+            ) => a == b && ca == cb,
+            (
+                UpdateEntryRepr::NeighborsExcept {
+                    pos: a,
+                    skip: sa,
+                    cursor: ca,
+                },
+                UpdateEntryRepr::NeighborsExcept {
+                    pos: b,
+                    skip: sb,
+                    cursor: cb,
+                },
+            ) => a == b && sa == sb && ca == cb,
+            (
+                UpdateEntryRepr::NeighborShapes { pos: a, cursor: ca },
+                UpdateEntryRepr::NeighborShapes { pos: b, cursor: cb },
+            ) => a == b && ca == cb,
+            (
+                UpdateEntryRepr::OwnShapes { pos: a, cursor: ca },
+                UpdateEntryRepr::OwnShapes { pos: b, cursor: cb },
+            ) => a == b && ca == cb,
+            (
+                UpdateEntryRepr::Custom { items: a, cursor: ca },
+                UpdateEntryRepr::Custom { items: b, cursor: cb },
+            ) => a.get(*ca..).unwrap_or(&[]) == b.get(*cb..).unwrap_or(&[]),
+            _ => {
+                let mut a = self.clone();
+                let mut b = other.clone();
+                loop {
+                    match (a.next(), b.next()) {
+                        (Some(x), Some(y)) if x == y => {}
+                        (None, None) => return true,
+                        _ => return false,
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(feature = "experiment-update-pool"))]
+impl Eq for UpdateEntry {}
 
 /// Bounded scratch storage for eagerly materialized notification batches.
 ///
@@ -263,19 +361,25 @@ impl UpdateArena {
     }
 
     fn import_added(&mut self, entries: &mut Vec<UpdateEntry>) {
-        for entry in entries.drain(..) {
-            let remaining = &entry.items[entry.cursor.min(entry.items.len())..];
-            if remaining.is_empty() { continue; }
-            let frame = self.store(remaining.len(), remaining.iter().copied());
+        for mut entry in entries.drain(..) {
+            let mut buf = smallvec::SmallVec::<[(Pos, Dir, UpdateKind); 6]>::new();
+            while let Some(item) = entry.next() {
+                buf.push(item);
+            }
+            if buf.is_empty() { continue; }
+            let frame = self.store(buf.len(), buf);
             self.added.push(frame);
         }
     }
 
     fn import_pending(&mut self, entries: &mut Vec<UpdateEntry>) {
-        for entry in entries.drain(..) {
-            let remaining = &entry.items[entry.cursor.min(entry.items.len())..];
-            if remaining.is_empty() { continue; }
-            let frame = self.store(remaining.len(), remaining.iter().copied());
+        for mut entry in entries.drain(..) {
+            let mut buf = smallvec::SmallVec::<[(Pos, Dir, UpdateKind); 6]>::new();
+            while let Some(item) = entry.next() {
+                buf.push(item);
+            }
+            if buf.is_empty() { continue; }
+            let frame = self.store(buf.len(), buf);
             self.pending.push(frame);
         }
     }
@@ -380,10 +484,16 @@ pub(crate) fn trace_write(kind: &str, pos: Pos, states: &StateRegistry, to: Stat
     }
 }
 
+#[cfg(feature = "experiment-update-pool")]
 impl UpdateEntry {
     /// An entry dispatching `items` in order.
     pub fn new(items: Vec<(Pos, Dir, UpdateKind)>) -> Self {
         Self { items, cursor: 0 }
+    }
+
+    /// A single-item notification entry.
+    pub(crate) fn single(pos: Pos, from: Dir, kind: UpdateKind) -> Self {
+        Self::new(vec![(pos, from, kind)])
     }
 
     /// One `updateNeighborsAt(pos)`: the six neighbours in `UPDATE_ORDER`.
@@ -426,10 +536,138 @@ impl UpdateEntry {
     }
 
     /// The next notification, if any.
+    #[inline]
     pub fn next(&mut self) -> Option<(Pos, Dir, UpdateKind)> {
         let item = self.items.get(self.cursor).copied();
         self.cursor += 1;
         item
+    }
+}
+
+#[cfg(not(feature = "experiment-update-pool"))]
+impl UpdateEntry {
+    /// An entry dispatching `items` in order.
+    pub fn new(items: Vec<(Pos, Dir, UpdateKind)>) -> Self {
+        Self {
+            repr: UpdateEntryRepr::Custom { items, cursor: 0 },
+        }
+    }
+
+    /// A single-item notification entry without heap allocation.
+    #[inline]
+    pub(crate) fn single(pos: Pos, from: Dir, kind: UpdateKind) -> Self {
+        Self {
+            repr: UpdateEntryRepr::Single {
+                item: (pos, from, kind),
+                done: false,
+            },
+        }
+    }
+
+    /// One `updateNeighborsAtExceptFromFacing(pos, skip)` without heap allocation.
+    #[inline]
+    pub(crate) fn neighbors_except(pos: Pos, skip: Dir) -> Self {
+        Self {
+            repr: UpdateEntryRepr::NeighborsExcept {
+                pos,
+                skip,
+                cursor: 0,
+            },
+        }
+    }
+
+    /// One `updateNeighborsAt(pos)`: the six neighbours in `UPDATE_ORDER`.
+    #[inline]
+    pub fn neighbors_at(pos: Pos) -> Self {
+        trace_update("neighbors_at", pos);
+        Self {
+            repr: UpdateEntryRepr::NeighborsAt { pos, cursor: 0 },
+        }
+    }
+
+    /// One `updateNeighbourShapes(pos)`: the six neighbours in
+    /// `UPDATE_SHAPE_ORDER`, each hearing a shape update from this side.
+    #[inline]
+    pub fn neighbor_shapes(pos: Pos) -> Self {
+        if crate::diagnostics::var_os("MC_TICK_TRACE_UPDATES").is_some() {
+            for dir in crate::pos::UPDATE_SHAPE_ORDER {
+                trace_update("shape", pos.offset(dir));
+            }
+        }
+        Self {
+            repr: UpdateEntryRepr::NeighborShapes { pos, cursor: 0 },
+        }
+    }
+
+    /// `updateFromNeighbourShapes(pos)`: the block at `pos` hears a shape
+    /// update from every side, in `UPDATE_SHAPE_ORDER`.
+    #[inline]
+    pub fn own_shapes(pos: Pos) -> Self {
+        if crate::diagnostics::var_os("MC_TICK_TRACE_UPDATES").is_some() {
+            for _ in crate::pos::UPDATE_SHAPE_ORDER {
+                trace_update("shape", pos);
+            }
+        }
+        Self {
+            repr: UpdateEntryRepr::OwnShapes { pos, cursor: 0 },
+        }
+    }
+
+    /// The next notification, if any.
+    #[inline]
+    pub fn next(&mut self) -> Option<(Pos, Dir, UpdateKind)> {
+        match &mut self.repr {
+            UpdateEntryRepr::Single { item, done } => {
+                if *done {
+                    None
+                } else {
+                    *done = true;
+                    Some(*item)
+                }
+            }
+            UpdateEntryRepr::NeighborsAt { pos, cursor } => {
+                let idx = *cursor as usize;
+                if idx >= 6 {
+                    return None;
+                }
+                *cursor += 1;
+                let dir = crate::pos::UPDATE_ORDER[idx];
+                Some((pos.offset(dir), dir.opposite(), UpdateKind::Neighbor))
+            }
+            UpdateEntryRepr::NeighborsExcept { pos, skip, cursor } => {
+                while (*cursor as usize) < 6 {
+                    let dir = crate::pos::UPDATE_ORDER[*cursor as usize];
+                    *cursor += 1;
+                    if dir != *skip {
+                        return Some((pos.offset(dir), dir.opposite(), UpdateKind::Neighbor));
+                    }
+                }
+                None
+            }
+            UpdateEntryRepr::NeighborShapes { pos, cursor } => {
+                let idx = *cursor as usize;
+                if idx >= 6 {
+                    return None;
+                }
+                *cursor += 1;
+                let dir = crate::pos::UPDATE_SHAPE_ORDER[idx];
+                Some((pos.offset(dir), dir.opposite(), UpdateKind::Shape))
+            }
+            UpdateEntryRepr::OwnShapes { pos, cursor } => {
+                let idx = *cursor as usize;
+                if idx >= 6 {
+                    return None;
+                }
+                *cursor += 1;
+                let dir = crate::pos::UPDATE_SHAPE_ORDER[idx];
+                Some((*pos, dir, UpdateKind::Shape))
+            }
+            UpdateEntryRepr::Custom { items, cursor } => {
+                let item = items.get(*cursor).copied();
+                *cursor += 1;
+                item
+            }
+        }
     }
 }
 
@@ -685,12 +923,302 @@ impl<'a> TickCtx<'a> {
             self.drain = Some(pump);
             return;
         };
+        let trace_notify = crate::diagnostics::trace_notify_enabled();
+        let fast_path = pump.upd_log.is_none() && !trace_notify;
+        #[cfg(not(feature = "experiment-update-pool"))]
+        let air_inert = table.flags_of(StateId::AIR) & FLAG_INERT != 0;
         let mut delivered = 0usize;
-        loop {
+        'outer: loop {
             // addedThisLayer joins the stack reversed, so the first-queued
             // entry ends on top and runs first.
             while let Some(entry) = self.updates.pop() {
                 pump.pending.push(entry);
+            }
+            #[cfg(not(feature = "experiment-update-pool"))]
+            if fast_path {
+                let Some(top) = pump.pending.last_mut() else {
+                    break;
+                };
+                match &mut top.repr {
+                    UpdateEntryRepr::NeighborsAt { pos, cursor } => {
+                        let origin = *pos;
+                        let mut dispatched: Option<(StateId, Pos, Dir)> = None;
+                        if let Some((base, row, layer)) = self.world.interior_neighbors_base(origin)
+                        {
+                            let raw = self.world.raw_states();
+                            let deltas = [-1, 1, -layer, layer, -row, row];
+                            while (*cursor as usize) < 6 {
+                                let idx = *cursor as usize;
+                                *cursor += 1;
+                                delivered += 1;
+                                if delivered > MAX_UPDATE_CASCADE {
+                                    self.updates.clear();
+                                    pump.pending.clear();
+                                    break 'outer;
+                                }
+                                let state = raw[base.wrapping_add_signed(deltas[idx])];
+                                if air_inert && state == StateId::AIR {
+                                    continue;
+                                }
+                                let flags = table.flags_of(state);
+                                if flags & (FLAG_INERT | FLAG_NO_NEIGHBOR) != 0 {
+                                    continue;
+                                }
+                                if flags == 0 {
+                                    if state != StateId::AIR {
+                                        pump.unknown_seen.push(state);
+                                    }
+                                    continue;
+                                }
+                                let dir = crate::pos::UPDATE_ORDER[idx];
+                                dispatched = Some((state, origin.offset(dir), dir.opposite()));
+                                break;
+                            }
+                        } else {
+                            while (*cursor as usize) < 6 {
+                                let dir = crate::pos::UPDATE_ORDER[*cursor as usize];
+                                *cursor += 1;
+                                delivered += 1;
+                                if delivered > MAX_UPDATE_CASCADE {
+                                    self.updates.clear();
+                                    pump.pending.clear();
+                                    break 'outer;
+                                }
+                                let target = origin.offset(dir);
+                                let state = self.world.get(target);
+                                if air_inert && state == StateId::AIR {
+                                    continue;
+                                }
+                                let flags = table.flags_of(state);
+                                if flags & (FLAG_INERT | FLAG_NO_NEIGHBOR) != 0 {
+                                    continue;
+                                }
+                                if flags == 0 {
+                                    if state != StateId::AIR {
+                                        pump.unknown_seen.push(state);
+                                    }
+                                    continue;
+                                }
+                                dispatched = Some((state, target, dir.opposite()));
+                                break;
+                            }
+                        }
+                        if let Some((state, target, from)) = dispatched {
+                            table.dispatch_active(state, self, target, from, UpdateKind::Neighbor);
+                        } else {
+                            pump.pending.pop();
+                        }
+                        continue;
+                    }
+                    UpdateEntryRepr::NeighborsExcept { pos, skip, cursor } => {
+                        let origin = *pos;
+                        let skip_dir = *skip;
+                        let mut dispatched: Option<(StateId, Pos, Dir)> = None;
+                        if let Some((base, row, layer)) = self.world.interior_neighbors_base(origin)
+                        {
+                            let raw = self.world.raw_states();
+                            let deltas = [-1, 1, -layer, layer, -row, row];
+                            while (*cursor as usize) < 6 {
+                                let idx = *cursor as usize;
+                                *cursor += 1;
+                                let dir = crate::pos::UPDATE_ORDER[idx];
+                                if dir == skip_dir {
+                                    continue;
+                                }
+                                delivered += 1;
+                                if delivered > MAX_UPDATE_CASCADE {
+                                    self.updates.clear();
+                                    pump.pending.clear();
+                                    break 'outer;
+                                }
+                                let state = raw[base.wrapping_add_signed(deltas[idx])];
+                                if air_inert && state == StateId::AIR {
+                                    continue;
+                                }
+                                let flags = table.flags_of(state);
+                                if flags & (FLAG_INERT | FLAG_NO_NEIGHBOR) != 0 {
+                                    continue;
+                                }
+                                if flags == 0 {
+                                    if state != StateId::AIR {
+                                        pump.unknown_seen.push(state);
+                                    }
+                                    continue;
+                                }
+                                dispatched = Some((state, origin.offset(dir), dir.opposite()));
+                                break;
+                            }
+                        } else {
+                            while (*cursor as usize) < 6 {
+                                let dir = crate::pos::UPDATE_ORDER[*cursor as usize];
+                                *cursor += 1;
+                                if dir == skip_dir {
+                                    continue;
+                                }
+                                delivered += 1;
+                                if delivered > MAX_UPDATE_CASCADE {
+                                    self.updates.clear();
+                                    pump.pending.clear();
+                                    break 'outer;
+                                }
+                                let target = origin.offset(dir);
+                                let state = self.world.get(target);
+                                if air_inert && state == StateId::AIR {
+                                    continue;
+                                }
+                                let flags = table.flags_of(state);
+                                if flags & (FLAG_INERT | FLAG_NO_NEIGHBOR) != 0 {
+                                    continue;
+                                }
+                                if flags == 0 {
+                                    if state != StateId::AIR {
+                                        pump.unknown_seen.push(state);
+                                    }
+                                    continue;
+                                }
+                                dispatched = Some((state, target, dir.opposite()));
+                                break;
+                            }
+                        }
+                        if let Some((state, target, from)) = dispatched {
+                            table.dispatch_active(state, self, target, from, UpdateKind::Neighbor);
+                        } else {
+                            pump.pending.pop();
+                        }
+                        continue;
+                    }
+                    UpdateEntryRepr::NeighborShapes { pos, cursor } => {
+                        let origin = *pos;
+                        let mut dispatched: Option<(StateId, Pos, Dir)> = None;
+                        if let Some((base, row, layer)) = self.world.interior_neighbors_base(origin)
+                        {
+                            let raw = self.world.raw_states();
+                            let deltas = [-1, 1, -row, row, -layer, layer];
+                            while (*cursor as usize) < 6 {
+                                let idx = *cursor as usize;
+                                *cursor += 1;
+                                delivered += 1;
+                                if delivered > MAX_UPDATE_CASCADE {
+                                    self.updates.clear();
+                                    pump.pending.clear();
+                                    break 'outer;
+                                }
+                                let state = raw[base.wrapping_add_signed(deltas[idx])];
+                                if air_inert && state == StateId::AIR {
+                                    continue;
+                                }
+                                let flags = table.flags_of(state);
+                                if flags & (FLAG_INERT | FLAG_NO_SHAPE_UPDATE) != 0 {
+                                    continue;
+                                }
+                                if flags == 0 {
+                                    if state != StateId::AIR {
+                                        pump.unknown_seen.push(state);
+                                    }
+                                    continue;
+                                }
+                                let dir = crate::pos::UPDATE_SHAPE_ORDER[idx];
+                                dispatched = Some((state, origin.offset(dir), dir.opposite()));
+                                break;
+                            }
+                        } else {
+                            while (*cursor as usize) < 6 {
+                                let dir = crate::pos::UPDATE_SHAPE_ORDER[*cursor as usize];
+                                *cursor += 1;
+                                delivered += 1;
+                                if delivered > MAX_UPDATE_CASCADE {
+                                    self.updates.clear();
+                                    pump.pending.clear();
+                                    break 'outer;
+                                }
+                                let target = origin.offset(dir);
+                                let state = self.world.get(target);
+                                if air_inert && state == StateId::AIR {
+                                    continue;
+                                }
+                                let flags = table.flags_of(state);
+                                if flags & (FLAG_INERT | FLAG_NO_SHAPE_UPDATE) != 0 {
+                                    continue;
+                                }
+                                if flags == 0 {
+                                    if state != StateId::AIR {
+                                        pump.unknown_seen.push(state);
+                                    }
+                                    continue;
+                                }
+                                dispatched = Some((state, target, dir.opposite()));
+                                break;
+                            }
+                        }
+                        if let Some((state, target, from)) = dispatched {
+                            table.dispatch_active(state, self, target, from, UpdateKind::Shape);
+                        } else {
+                            pump.pending.pop();
+                        }
+                        continue;
+                    }
+                    UpdateEntryRepr::OwnShapes { pos, cursor } => {
+                        let target = *pos;
+                        let mut dispatched: Option<(StateId, Dir)> = None;
+                        while (*cursor as usize) < 6 {
+                            let dir = crate::pos::UPDATE_SHAPE_ORDER[*cursor as usize];
+                            *cursor += 1;
+                            delivered += 1;
+                            if delivered > MAX_UPDATE_CASCADE {
+                                self.updates.clear();
+                                pump.pending.clear();
+                                break 'outer;
+                            }
+                            let state = self.world.get(target);
+                            if air_inert && state == StateId::AIR {
+                                continue;
+                            }
+                            let flags = table.flags_of(state);
+                            if flags & (FLAG_INERT | FLAG_NO_SHAPE_UPDATE) != 0 {
+                                continue;
+                            }
+                            if flags == 0 {
+                                if state != StateId::AIR {
+                                    pump.unknown_seen.push(state);
+                                }
+                                continue;
+                            }
+                            dispatched = Some((state, dir));
+                            break;
+                        }
+                        if let Some((state, from)) = dispatched {
+                            table.dispatch_active(state, self, target, from, UpdateKind::Shape);
+                        } else {
+                            pump.pending.pop();
+                        }
+                        continue;
+                    }
+                    UpdateEntryRepr::Single { item, done } => {
+                        if *done {
+                            pump.pending.pop();
+                            continue;
+                        }
+                        let (pos, from, kind) = *item;
+                        pump.pending.pop();
+                        delivered += 1;
+                        if delivered > MAX_UPDATE_CASCADE {
+                            self.updates.clear();
+                            pump.pending.clear();
+                            break;
+                        }
+                        let state = self.world.get(pos);
+                        if air_inert && state == StateId::AIR {
+                            continue;
+                        }
+                        if !table.dispatch_update(state, self, pos, from, kind)
+                            && state != StateId::AIR
+                        {
+                            pump.unknown_seen.push(state);
+                        }
+                        continue;
+                    }
+                    _ => {}
+                }
             }
             let Some(top) = pump.pending.last_mut() else {
                 break;
@@ -729,35 +1257,21 @@ impl<'a> TickCtx<'a> {
                     state,
                 });
             }
-            if let Some(filter) = crate::diagnostics::var_os("MC_TICK_TRACE_NOTIFY") {
-                let filter = filter.to_string_lossy().to_string();
-                let key = format!("{},{},{}", pos.x, pos.y, pos.z);
-                if filter.split(';').any(|want| want.trim() == key) {
-                    eprintln!(
-                        "[t{}] notify ({key}) {kind:?} from {from:?}  {}",
-                        self.tick,
-                        self.states.descriptor(state).unwrap_or("minecraft:air")
-                    );
-                }
-            }
-            #[cfg(feature = "experiment-wire-dispatch")]
-            {
-                if !table.dispatch_update(state, self, pos, from, kind) && state != StateId::AIR {
-                    pump.unknown_seen.push(state);
-                }
-            }
-            #[cfg(not(feature = "experiment-wire-dispatch"))]
-            {
-                let Some(behaviour) = table.get(state) else {
-                    if state != StateId::AIR {
-                        pump.unknown_seen.push(state);
+            if trace_notify {
+                if let Some(filter) = crate::diagnostics::trace_notify() {
+                    let filter = filter.to_string_lossy().to_string();
+                    let key = format!("{},{},{}", pos.x, pos.y, pos.z);
+                    if filter.split(';').any(|want| want.trim() == key) {
+                        eprintln!(
+                            "[t{}] notify ({key}) {kind:?} from {from:?}  {}",
+                            self.tick,
+                            self.states.descriptor(state).unwrap_or("minecraft:air")
+                        );
                     }
-                    continue;
-                };
-                match kind {
-                    UpdateKind::Neighbor => behaviour.on_neighbor_changed(self, pos, from),
-                    UpdateKind::Shape => behaviour.on_shape_update(self, pos, from),
                 }
+            }
+            if !table.dispatch_update(state, self, pos, from, kind) && state != StateId::AIR {
+                pump.unknown_seen.push(state);
             }
         }
         self.drain = Some(pump);
@@ -821,24 +1335,8 @@ impl<'a> TickCtx<'a> {
             }
             self.update_arena.native = kind == UpdateKind::Neighbor
                 && table.arena_wires.get(state.raw() as usize).copied().unwrap_or(false);
-            #[cfg(feature = "experiment-wire-dispatch")]
-            {
-                if !table.dispatch_update(state, self, pos, from, kind) && state != StateId::AIR {
-                    pump.unknown_seen.push(state);
-                }
-            }
-            #[cfg(not(feature = "experiment-wire-dispatch"))]
-            {
-                let Some(behaviour) = table.get(state) else {
-                    if state != StateId::AIR {
-                        pump.unknown_seen.push(state);
-                    }
-                    continue;
-                };
-                match kind {
-                    UpdateKind::Neighbor => behaviour.on_neighbor_changed(self, pos, from),
-                    UpdateKind::Shape => behaviour.on_shape_update(self, pos, from),
-                }
+            if !table.dispatch_update(state, self, pos, from, kind) && state != StateId::AIR {
+                pump.unknown_seen.push(state);
             }
         }
         self.update_arena.reset();
@@ -922,14 +1420,27 @@ impl<'a> TickCtx<'a> {
     /// that has just gone away still has to tell what it was reaching.
     fn indirect_shapes(&mut self, pos: Pos, state: StateId) {
         let Some(table) = self.behaviours else { return };
-        let Some(behaviour) = table.get(state) else {
+        if !table.has_indirect_shapes(state) {
             return;
-        };
-        let targets = behaviour.indirect_shape_targets(self.world, pos);
-        for (target, from) in targets {
-            trace_update("shape", target);
-            self.enqueue_one(target, from, UpdateKind::Shape);
         }
+        match table.entries.get(state.raw() as usize).and_then(Option::as_ref) {
+            Some(RegisteredBehaviour::VanillaWire(wire)) => {
+                wire.enqueue_indirect_shapes(self, pos);
+            }
+            Some(entry) => {
+                let targets = entry.as_behaviour().indirect_shape_targets(self.world, pos);
+                for (target, from) in targets {
+                    trace_update("shape", target);
+                    self.enqueue_one(target, from, UpdateKind::Shape);
+                }
+            }
+            None => {}
+        }
+    }
+
+    #[inline]
+    pub(crate) fn enqueue_shape_one(&mut self, pos: Pos, from: Dir) {
+        self.enqueue_one(pos, from, UpdateKind::Shape);
     }
 
     /// Queue one `updateNeighborsAt(pos)` entry.
@@ -974,13 +1485,16 @@ impl<'a> TickCtx<'a> {
                 .map(|dir| (pos.offset(dir), dir.opposite(), UpdateKind::Neighbor)));
             return;
         }
-        let items = crate::pos::UPDATE_ORDER.into_iter()
-            .filter(|dir| *dir != skip)
-            .map(|dir| (pos.offset(dir), dir.opposite(), UpdateKind::Neighbor));
         #[cfg(feature = "experiment-update-pool")]
-        let entry = self.update_pool.entry(6, items);
+        let entry = self.update_pool.entry(
+            6,
+            crate::pos::UPDATE_ORDER
+                .into_iter()
+                .filter(|dir| *dir != skip)
+                .map(|dir| (pos.offset(dir), dir.opposite(), UpdateKind::Neighbor)),
+        );
         #[cfg(not(feature = "experiment-update-pool"))]
-        let entry = UpdateEntry::new(items.collect());
+        let entry = UpdateEntry::neighbors_except(pos, skip);
         self.updates.push(entry);
     }
 
@@ -1013,7 +1527,7 @@ impl<'a> TickCtx<'a> {
         #[cfg(feature = "experiment-update-pool")]
         let entry = self.update_pool.entry(1, [(pos, from, kind)]);
         #[cfg(not(feature = "experiment-update-pool"))]
-        let entry = UpdateEntry::new(vec![(pos, from, kind)]);
+        let entry = UpdateEntry::single(pos, from, kind);
         self.updates.push(entry);
     }
 
@@ -1042,23 +1556,22 @@ impl<'a> TickCtx<'a> {
         // `LevelChunk.setBlockState`: `onRemove` runs first, and only when
         // the block *identity* changed — a wire flipping power stays a wire
         // and hears nothing.
-        let block_of = |states: &StateRegistry, id: StateId| {
-            states
-                .descriptor(id)
-                .map(|d| d.split('[').next().unwrap_or(d).to_string())
-        };
-        if block_of(self.states, previous) != block_of(self.states, state) {
+        if self.states.block_of_opt(previous) != self.states.block_of_opt(state) {
             if let Some(table) = self.behaviours {
-                if let Some(behaviour) = table.get(previous) {
-                    behaviour.on_removed(self, pos);
+                if table.has_on_removed(previous) {
+                    if let Some(behaviour) = table.get(previous) {
+                        behaviour.on_removed(self, pos);
+                    }
                 }
             }
         }
         // `LevelChunk.setBlockState` runs `onPlace` before `markAndNotifyBlock`
         // reaches the neighbours at all.
         if let Some(table) = self.behaviours {
-            if let Some(behaviour) = table.get(state) {
-                behaviour.on_state_changed(self, pos);
+            if table.has_on_state_changed(state) {
+                if let Some(behaviour) = table.get(state) {
+                    behaviour.on_state_changed(self, pos);
+                }
             }
         }
         // markAndNotifyBlock, flag 3: neighbour updates first, then the shape
@@ -1171,9 +1684,13 @@ impl<'a> TickCtx<'a> {
         }
         self.set_quiet(pos, state);
         if !self.states.same_block(previous, state) {
-            if let Some(behaviour) = self.behaviours.and_then(|table| table.get(previous)) {
-                behaviour.on_removed(self, pos);
-                self.drain();
+            if let Some(table) = self.behaviours {
+                if table.has_on_removed(previous) {
+                    if let Some(behaviour) = table.get(previous) {
+                        behaviour.on_removed(self, pos);
+                        self.drain();
+                    }
+                }
             }
         }
         if shapes {
@@ -1186,11 +1703,14 @@ impl<'a> TickCtx<'a> {
     /// Keep the block-entity tick list in step with a write — see
     /// [`TickCtx::tickers`]. Appended in write order, which is vanilla's
     /// creation order for freshly made block entities.
+    #[inline]
     fn reconcile_ticker(&mut self, pos: Pos, previous: StateId, state: StateId) {
         let Some(table) = self.behaviours else { return };
-        let ticks = |s: StateId| table.get(s).is_some_and(|b| b.ticks_as_block_entity());
-        let was = ticks(previous);
-        let is = ticks(state);
+        if !table.has_any_tickers() {
+            return;
+        }
+        let was = table.is_ticker(previous);
+        let is = table.is_ticker(state);
         if is && !was {
             if !self.tickers.contains(&pos) {
                 self.tickers.push(pos);
@@ -1715,24 +2235,36 @@ impl BlockBehaviour for Inert {
     }
 }
 
-#[cfg(feature = "experiment-wire-dispatch")]
+/// Per-state capability bits stored in [`BehaviourTable::flags`].
+///
+/// Any publicly registered custom [`BlockBehaviour`] receives the conservative
+/// full mask so every override executes identically; audited vanilla behaviours
+/// opt into tighter masks that skip known no-op callbacks on hot update paths.
+pub(crate) const FLAG_REGISTERED: u8 = 1 << 0;
+pub(crate) const FLAG_INERT: u8 = 1 << 1;
+pub(crate) const FLAG_TICKER: u8 = 1 << 2;
+pub(crate) const FLAG_INDIRECT_SHAPES: u8 = 1 << 3;
+pub(crate) const FLAG_NO_SHAPE_UPDATE: u8 = 1 << 4;
+pub(crate) const FLAG_NO_NEIGHBOR: u8 = 1 << 5;
+pub(crate) const FLAG_HAS_ON_REMOVED: u8 = 1 << 6;
+pub(crate) const FLAG_HAS_ON_STATE_CHANGED: u8 = 1 << 7;
+
 enum RegisteredBehaviour {
     Dynamic(Box<dyn BlockBehaviour>),
-    VanillaWire(Box<crate::wire::Wire<std::sync::Arc<crate::vanilla::VanillaRules>>>),
+    VanillaWire(crate::wire::Wire<std::sync::Arc<crate::vanilla::VanillaRules>>),
+    Inert(Inert),
 }
 
-#[cfg(feature = "experiment-wire-dispatch")]
 impl RegisteredBehaviour {
+    #[inline]
     fn as_behaviour(&self) -> &dyn BlockBehaviour {
         match self {
             Self::Dynamic(behaviour) => behaviour.as_ref(),
-            Self::VanillaWire(wire) => wire.as_ref(),
+            Self::VanillaWire(wire) => wire,
+            Self::Inert(inert) => inert,
         }
     }
 }
-
-#[cfg(not(feature = "experiment-wire-dispatch"))]
-type RegisteredBehaviour = Box<dyn BlockBehaviour>;
 
 /// Dispatch from a [`StateId`] to its behaviour.
 ///
@@ -1741,6 +2273,11 @@ type RegisteredBehaviour = Box<dyn BlockBehaviour>;
 pub struct BehaviourTable {
     /// Indexed by `StateId`; `None` means unregistered.
     entries: Vec<Option<RegisteredBehaviour>>,
+    /// Compact 1-byte capability mask per `StateId` for L1-cache-resident
+    /// pruning of inert/no-op dispatches.
+    flags: Vec<u8>,
+    /// Whether any registered state implements `ticks_as_block_entity`.
+    any_tickers: bool,
     #[cfg(feature = "experiment-update-arena")]
     arena_wires: Vec<bool>,
     /// States seen with no behaviour, in a deterministic order.
@@ -1756,32 +2293,67 @@ impl BehaviourTable {
     pub fn new() -> Self {
         let mut table = Self {
             entries: Vec::new(),
+            flags: Vec::new(),
+            any_tickers: false,
             #[cfg(feature = "experiment-update-arena")]
             arena_wires: Vec::new(),
             unknown: BTreeSet::new(),
         };
-        table.register(StateId::AIR, Box::new(Inert::new("air")));
+        table.register_inert(StateId::AIR, Inert::new("air"));
         table
     }
 
     /// Register `behaviour` for `state`, replacing any previous entry.
     pub fn register(&mut self, state: StateId, behaviour: Box<dyn BlockBehaviour>) {
-        #[cfg(feature = "experiment-wire-dispatch")]
-        let behaviour = RegisteredBehaviour::Dynamic(behaviour);
-        self.register_entry(state, behaviour);
+        let mut flags = FLAG_REGISTERED
+            | FLAG_INDIRECT_SHAPES
+            | FLAG_HAS_ON_REMOVED
+            | FLAG_HAS_ON_STATE_CHANGED;
+        if behaviour.ticks_as_block_entity() {
+            flags |= FLAG_TICKER;
+        }
+        self.register_entry(state, RegisteredBehaviour::Dynamic(behaviour), flags);
     }
 
-    fn register_entry(&mut self, state: StateId, behaviour: RegisteredBehaviour) {
+    /// Register an inert vanilla behaviour without heap boxing.
+    pub(crate) fn register_inert(&mut self, state: StateId, inert: Inert) {
+        self.register_entry(
+            state,
+            RegisteredBehaviour::Inert(inert),
+            FLAG_REGISTERED | FLAG_INERT | FLAG_NO_SHAPE_UPDATE | FLAG_NO_NEIGHBOR,
+        );
+    }
+
+    /// Register an audited vanilla behaviour with exact capability flags.
+    pub(crate) fn register_vanilla(
+        &mut self,
+        state: StateId,
+        behaviour: Box<dyn BlockBehaviour>,
+        extra_flags: u8,
+    ) {
+        let mut flags = FLAG_REGISTERED | extra_flags;
+        if behaviour.ticks_as_block_entity() {
+            flags |= FLAG_TICKER;
+        }
+        self.register_entry(state, RegisteredBehaviour::Dynamic(behaviour), flags);
+    }
+
+    fn register_entry(&mut self, state: StateId, behaviour: RegisteredBehaviour, flags: u8) {
         let index = state.raw() as usize;
         if self.entries.len() <= index {
             self.entries.resize_with(index + 1, || None);
+            self.flags.resize(index + 1, 0);
         }
         #[cfg(feature = "experiment-update-arena")]
         {
             self.arena_wires.resize(self.entries.len(), false);
             self.arena_wires[index] = false;
         }
+        if flags & FLAG_TICKER != 0 {
+            self.any_tickers = true;
+        }
         self.entries[index] = Some(behaviour);
+        self.flags[index] = flags;
         self.unknown.remove(&state);
     }
 
@@ -1793,15 +2365,74 @@ impl BehaviourTable {
         state: StateId,
         wire: crate::wire::Wire<std::sync::Arc<crate::vanilla::VanillaRules>>,
     ) {
-        #[cfg(feature = "experiment-wire-dispatch")]
-        self.register_entry(state, RegisteredBehaviour::VanillaWire(Box::new(wire)));
-        #[cfg(not(feature = "experiment-wire-dispatch"))]
-        self.register(state, Box::new(wire));
+        self.register_entry(
+            state,
+            RegisteredBehaviour::VanillaWire(wire),
+            FLAG_REGISTERED | FLAG_INDIRECT_SHAPES | FLAG_HAS_ON_REMOVED,
+        );
         #[cfg(feature = "experiment-update-arena")]
         { self.arena_wires[state.raw() as usize] = true; }
     }
 
-    #[cfg(feature = "experiment-wire-dispatch")]
+    #[inline]
+    pub(crate) fn flags_of(&self, state: StateId) -> u8 {
+        self.flags.get(state.raw() as usize).copied().unwrap_or(0)
+    }
+
+    #[inline]
+    pub(crate) fn has_any_tickers(&self) -> bool {
+        self.any_tickers
+    }
+
+    #[inline]
+    pub(crate) fn is_ticker(&self, state: StateId) -> bool {
+        self.flags_of(state) & FLAG_TICKER != 0
+    }
+
+    #[inline]
+    pub(crate) fn has_indirect_shapes(&self, state: StateId) -> bool {
+        self.flags_of(state) & FLAG_INDIRECT_SHAPES != 0
+    }
+
+    #[inline]
+    pub(crate) fn has_on_removed(&self, state: StateId) -> bool {
+        self.flags_of(state) & FLAG_HAS_ON_REMOVED != 0
+    }
+
+    #[inline]
+    pub(crate) fn has_on_state_changed(&self, state: StateId) -> bool {
+        self.flags_of(state) & FLAG_HAS_ON_STATE_CHANGED != 0
+    }
+
+    #[inline]
+    fn dispatch_active(
+        &self,
+        state: StateId,
+        ctx: &mut TickCtx<'_>,
+        pos: Pos,
+        from: Dir,
+        kind: UpdateKind,
+    ) {
+        let Some(entry) = self.entries[state.raw() as usize].as_ref() else {
+            return;
+        };
+        match (kind, entry) {
+            (UpdateKind::Neighbor, RegisteredBehaviour::VanillaWire(wire)) => {
+                wire.on_neighbor_changed(ctx, pos, from);
+            }
+            (UpdateKind::Shape, RegisteredBehaviour::VanillaWire(wire)) => {
+                wire.on_shape_update_vanilla(ctx, pos, from);
+            }
+            (UpdateKind::Neighbor, RegisteredBehaviour::Dynamic(behaviour)) => {
+                behaviour.on_neighbor_changed(ctx, pos, from);
+            }
+            (UpdateKind::Shape, RegisteredBehaviour::Dynamic(behaviour)) => {
+                behaviour.on_shape_update(ctx, pos, from);
+            }
+            (_, RegisteredBehaviour::Inert(_)) => {}
+        }
+    }
+
     #[inline]
     fn dispatch_update(
         &self,
@@ -1811,32 +2442,46 @@ impl BehaviourTable {
         from: Dir,
         kind: UpdateKind,
     ) -> bool {
-        let Some(entry) = self.entries.get(state.raw() as usize).and_then(Option::as_ref) else {
+        let index = state.raw() as usize;
+        let flags = self.flags.get(index).copied().unwrap_or(0);
+        if flags == 0 {
+            return false;
+        }
+        let skip = match kind {
+            UpdateKind::Neighbor => flags & (FLAG_INERT | FLAG_NO_NEIGHBOR) != 0,
+            UpdateKind::Shape => flags & (FLAG_INERT | FLAG_NO_SHAPE_UPDATE) != 0,
+        };
+        if skip {
+            return true;
+        }
+        let Some(entry) = self.entries[index].as_ref() else {
             return false;
         };
         match (kind, entry) {
             (UpdateKind::Neighbor, RegisteredBehaviour::VanillaWire(wire)) => {
-                // Concrete receiver preserves the exact implementation while
-                // permitting direct calls and compiler specialization.
                 wire.on_neighbor_changed(ctx, pos, from);
             }
-            (UpdateKind::Neighbor, _) => entry.as_behaviour().on_neighbor_changed(ctx, pos, from),
-            (UpdateKind::Shape, _) => entry.as_behaviour().on_shape_update(ctx, pos, from),
+            (UpdateKind::Shape, RegisteredBehaviour::VanillaWire(wire)) => {
+                wire.on_shape_update_vanilla(ctx, pos, from);
+            }
+            (UpdateKind::Neighbor, RegisteredBehaviour::Dynamic(behaviour)) => {
+                behaviour.on_neighbor_changed(ctx, pos, from);
+            }
+            (UpdateKind::Shape, RegisteredBehaviour::Dynamic(behaviour)) => {
+                behaviour.on_shape_update(ctx, pos, from);
+            }
+            (_, RegisteredBehaviour::Inert(_)) => {}
         }
         true
     }
 
     /// The behaviour for `state`, if registered.
+    #[inline]
     pub fn get(&self, state: StateId) -> Option<&dyn BlockBehaviour> {
-        #[cfg(feature = "experiment-wire-dispatch")]
-        {
-            self.entries.get(state.raw() as usize)
-                .and_then(Option::as_ref).map(RegisteredBehaviour::as_behaviour)
-        }
-        #[cfg(not(feature = "experiment-wire-dispatch"))]
         self.entries
             .get(state.raw() as usize)
-            .and_then(|slot| slot.as_deref())
+            .and_then(Option::as_ref)
+            .map(RegisteredBehaviour::as_behaviour)
     }
 
     #[cfg(all(test, feature = "experiment-update-arena"))]

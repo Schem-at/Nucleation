@@ -391,14 +391,8 @@ fn add_block_line(
 
 /// `PistonStructureResolver.reorderListAtCollision`: the collided run is moved
 /// ahead of the line that ran into it.
-fn reorder_at_collision(to_push: &mut Vec<Pos>, added: usize, collision: usize) {
-    let head: Vec<Pos> = to_push[..collision].to_vec();
-    let tail: Vec<Pos> = to_push[to_push.len() - added..].to_vec();
-    let middle: Vec<Pos> = to_push[collision..to_push.len() - added].to_vec();
-    to_push.clear();
-    to_push.extend(head);
-    to_push.extend(tail);
-    to_push.extend(middle);
+fn reorder_at_collision(to_push: &mut [Pos], added: usize, collision: usize) {
+    to_push[collision..].rotate_right(added);
 }
 
 /// `PistonStructureResolver.addBranchingBlocks`: a sticky block starts a line
@@ -632,25 +626,7 @@ impl<P: PowerSource, M: Movability> Piston<P, M> {
         // `getNeighborSignal` skips the direction the piston pushes at its own
         // position, and skips Down (back toward the piston) at the position
         // above. Read from the bytecode.
-        self.has_direct_signal(world, outs, pos, Some(self.facing))
-            || self.has_direct_signal(world, outs, pos.offset(Dir::Up), Some(Dir::Down))
-    }
-
-    /// Whether any neighbour of `pos` emits toward it, ignoring `skip`.
-    fn has_direct_signal(
-        &self,
-        world: &World,
-        outs: &crate::behaviour::ComparatorOutputs,
-        pos: Pos,
-        skip: Option<Dir>,
-    ) -> bool {
-        crate::pos::ALL_DIRS
-            .iter()
-            .filter(|dir| Some(**dir) != skip)
-            .any(|dir| {
-                self.power
-                    .is_powered(world, outs, pos.offset(*dir), dir.opposite())
-            })
+        self.power.piston_is_powered(world, outs, pos, self.facing)
     }
 }
 
@@ -828,7 +804,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 }
                 // Read every source state *before* writing anything: the writes
                 // below overwrite positions that later entries still need to read.
-                let carried: Vec<(Pos, StateId)> = plan
+                let carried: smallvec::SmallVec<[(Pos, StateId); MAX_PUSH_DEPTH]> = plan
                     .to_push
                     .iter()
                     .map(|from| (*from, ctx.world.get(*from)))
@@ -841,7 +817,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // every block but the last moves into a slot another block just
                 // vacated. Clearing those would wipe what had only just arrived, so
                 // only positions that purely lose a block become air.
-                let destinations: Vec<Pos> = carried
+                let destinations: smallvec::SmallVec<[Pos; MAX_PUSH_DEPTH]> = carried
                     .iter()
                     .map(|(from, _)| from.offset(self.facing))
                     .collect();
@@ -866,7 +842,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // A push breaks these outright — `setBlock(pos, AIR, 276)`,
                 // which carries UPDATE_KNOWN_SHAPE and so says nothing on its
                 // own. The notification comes from the tail pass below.
-                for pos in plan.to_destroy.clone() {
+                for &pos in &plan.to_destroy {
                     // A destroyed shulker box drops itself with its slots
                     // intact — `dropResources` through the box's loot table,
                     // whose container component survives the break. Spawn
@@ -1246,12 +1222,12 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                             );
                         }
                         if plan.possible {
-                            let carried: Vec<(Pos, StateId)> = plan
+                            let carried: smallvec::SmallVec<[(Pos, StateId); MAX_PUSH_DEPTH]> = plan
                                 .to_push
                                 .iter()
                                 .map(|from| (*from, ctx.world.get(*from)))
                                 .collect();
-                            let destinations: Vec<Pos> =
+                            let destinations: smallvec::SmallVec<[Pos; MAX_PUSH_DEPTH]> =
                                 carried.iter().map(|(from, _)| from.offset(back)).collect();
                             // Backwards, exactly as the extension path walks it.
                             // `moveBlocks` is one method for both strokes and

@@ -16,6 +16,7 @@
 //! today and something else later without a rebuild.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// An interned block state.
 ///
@@ -55,8 +56,8 @@ pub enum StateError {
 /// it as opaque: it never parses it, and equal strings mean the same state.
 #[derive(Debug, Clone)]
 pub struct StateRegistry {
-    descriptors: Vec<String>,
-    lookup: HashMap<String, StateId>,
+    descriptors: Vec<Arc<str>>,
+    lookup: HashMap<Arc<str>, StateId>,
     /// Which *block* each state belongs to — the descriptor with its
     /// properties stripped, interned separately.
     ///
@@ -65,17 +66,17 @@ pub struct StateRegistry {
     /// position no longer holds the **Block** it was queued for (the state may
     /// differ freely: a piston that became `extended=true` still passes).
     block_of: Vec<u16>,
-    block_lookup: HashMap<String, u16>,
+    block_lookup: HashMap<Arc<str>, u16>,
 }
 
 impl StateRegistry {
     /// A registry containing only air.
     pub fn new() -> Self {
-        let air = "minecraft:air".to_string();
+        let air: Arc<str> = Arc::from("minecraft:air");
         let mut lookup = HashMap::new();
-        lookup.insert(air.clone(), StateId::AIR);
+        lookup.insert(Arc::clone(&air), StateId::AIR);
         let mut block_lookup = HashMap::new();
-        block_lookup.insert("minecraft:air".to_string(), 0u16);
+        block_lookup.insert(Arc::clone(&air), 0u16);
         Self {
             descriptors: vec![air],
             lookup,
@@ -91,15 +92,16 @@ impl StateRegistry {
         }
         let next = u16::try_from(self.descriptors.len()).map_err(|_| StateError::TooManyStates)?;
         let id = StateId(next);
-        self.descriptors.push(descriptor.to_string());
-        self.lookup.insert(descriptor.to_string(), id);
+        let owned: Arc<str> = Arc::from(descriptor);
+        self.descriptors.push(Arc::clone(&owned));
+        self.lookup.insert(owned, id);
         let name = descriptor.split('[').next().unwrap_or(descriptor);
         let block = match self.block_lookup.get(name) {
             Some(block) => *block,
             None => {
                 let block = u16::try_from(self.block_lookup.len())
                     .map_err(|_| StateError::TooManyStates)?;
-                self.block_lookup.insert(name.to_string(), block);
+                self.block_lookup.insert(Arc::from(name), block);
                 block
             }
         };
@@ -108,6 +110,7 @@ impl StateRegistry {
     }
 
     /// The block `state` belongs to, ignoring its properties.
+    #[inline]
     pub fn block_of(&self, state: StateId) -> u16 {
         self.block_of
             .get(state.raw() as usize)
@@ -115,19 +118,34 @@ impl StateRegistry {
             .unwrap_or(0)
     }
 
+    /// The block `state` belongs to, or `None` if `state` is not interned.
+    #[inline]
+    pub(crate) fn block_of_opt(&self, state: StateId) -> Option<u16> {
+        self.block_of.get(state.raw() as usize).copied()
+    }
+
     /// Whether two states are the same **block** — `BlockState.is(Block)`.
+    #[inline]
     pub fn same_block(&self, a: StateId, b: StateId) -> bool {
         self.block_of(a) == self.block_of(b)
     }
 
     /// The id for `descriptor` if already interned.
+    #[inline]
     pub fn get(&self, descriptor: &str) -> Option<StateId> {
         self.lookup.get(descriptor).copied()
     }
 
     /// The descriptor an id refers to.
+    #[inline]
     pub fn descriptor(&self, id: StateId) -> Option<&str> {
-        self.descriptors.get(id.0 as usize).map(String::as_str)
+        self.descriptors.get(id.0 as usize).map(AsRef::as_ref)
+    }
+
+    /// Cheap ref-counted handle to the descriptor an id refers to.
+    #[inline]
+    pub(crate) fn descriptor_arc(&self, id: StateId) -> Option<Arc<str>> {
+        self.descriptors.get(id.0 as usize).map(Arc::clone)
     }
 
     /// How many distinct states are interned, air included.
@@ -235,6 +253,7 @@ impl StateSet {
     }
 
     /// Whether `state` is in the set.
+    #[inline]
     pub fn contains(&self, state: &StateId) -> bool {
         let index = state.0 as usize;
         self.bits
@@ -276,9 +295,11 @@ impl<T> StateTable<T> {
         }
         self.values[index].replace(value)
     }
+    #[inline]
     pub(crate) fn get(&self, id: &StateId) -> Option<&T> {
         self.values.get(id.0 as usize).and_then(Option::as_ref)
     }
+    #[inline]
     pub(crate) fn contains_key(&self, id: &StateId) -> bool {
         self.get(id).is_some()
     }

@@ -138,6 +138,25 @@ pub trait PowerSource: Send + Sync {
         7
     }
 
+    /// Whether a piston at `pos` facing `facing` is powered (direct + QC).
+    ///
+    /// Concrete rule tables may override this to fuse interior neighbour reads.
+    fn piston_is_powered(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        facing: Dir,
+    ) -> bool {
+        let has_signal = |base: Pos, skip: Dir| {
+            crate::pos::ALL_DIRS
+                .into_iter()
+                .filter(|&dir| dir != skip)
+                .any(|dir| self.is_powered(world, outs, base.offset(dir), dir.opposite()))
+        };
+        has_signal(pos, facing) || has_signal(pos.offset(Dir::Up), Dir::Down)
+    }
+
     /// Whether `pos` currently emits a signal toward `toward`.
     ///
     /// `outs` carries the comparator block-entity outputs, because a
@@ -197,6 +216,19 @@ pub trait PowerSource: Send + Sync {
     /// registers rails never asks.
     fn rail_support_at(&self, _world: &World, _pos: Pos) -> bool {
         false
+    }
+
+    /// Fast lookup for a powered/activator rail state's `(shape, powered)` when
+    /// it matches `block` (`"minecraft:powered_rail"` or
+    /// `"minecraft:activator_rail"`). Returns `None` to fall back to
+    /// descriptor parsing when unimplemented.
+    fn powered_rail_at(
+        &self,
+        _world: &World,
+        _pos: Pos,
+        _block: &str,
+    ) -> Option<Option<(crate::minecart::RailShape, bool)>> {
+        None
     }
 
     /// An item's max stack size — 64 unless the rules know better. Hopper
