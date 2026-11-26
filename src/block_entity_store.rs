@@ -124,6 +124,9 @@ impl BlockEntityStore {
     where
         F: Fn((i32, i32, i32)) -> (i32, i32, i32),
     {
+        if self.by_pos.is_empty() {
+            return;
+        }
         let old = std::mem::take(&mut self.by_pos);
         self.by_pos.reserve(old.len());
         for (pos, mut be) in old {

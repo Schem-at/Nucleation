@@ -1,3 +1,13 @@
+# Nucleation v0.12.5
+
+- Faster core block placement and string parsing: added 1-entry MRU caches on `Region` palette lookups and `UniversalSchematic::set_block_from_string`, single-lookup cache reads before `simulate=` scanning, single-point `expand_to_fit`, and empty-store guards on `BlockEntityStore`. Complex block-string placement rises from 11.6M to 48.0M blocks/s (4.15×), NBT chest placement from 8.5M to 18.5M blocks/s (2.2×), and `Region::set_block` by ~1.5×.
+- Faster region compaction, merging, stamping, and content rescans: `Region::to_compact` fast-paths already-compact regions and avoids Rayon thread-pool overhead for small copies (16.9× faster on 32³), `Dense::content` uses a division-free vectorized u32 count pass with saturated-layer fast path (2.6× faster on sparse 64³), `Region::merge` reuses `palette_index` in place with incremental bounds/counts (1.4× faster), and `Region::stamp_from` writes directly without intermediate row buffers (1.3× faster on 64³ `copy_region`).
+- Faster serialization and deserialization across all formats:
+  - Snapshot v4 streams packed blocks directly without an intermediate buffer or `serialized_size` pass (2.0× faster serialize) and borrows packed bytes zero-copy on decode with single-pass palette validation (4.0–5.6× faster deserialize, 4.5–7.2× faster roundtrip).
+  - Sponge `.schem` adds a 1-byte varint fast path for palettes with ≤ 128 entries and O(P) palette deduplication (3.0–3.1× faster serialize, 1.5–1.7× faster deserialize).
+  - `.litematic` skips cloning single-region schematics in `create_metadata`, uses a streaming 64-bit accumulator for non-power-of-two bit packing, and specializes `unpack_exact` for 2/4/8-bit and streaming bit widths (1.9× faster 128³ serialize).
+- Rust, Python and npm packages use version 0.12.5. Generated binding APIs remain unchanged. The workspace CLI remains at version 0.1.1 and can be installed from this tag with `cargo install --locked --git https://github.com/Schem-at/Nucleation --tag v0.12.5 nucleation-cli`.
+
 # Nucleation v0.12.4
 
 - The CLI measures door opening and closing independently. Its terminal timeline shows input delay, first and stable aperture completion, and mechanism settle time. Optional multi-cycle frequency scans, aperture previews and JSON output are documented in the [CLI guide](docs/cli-scenes-and-video.md).

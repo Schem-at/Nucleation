@@ -308,11 +308,19 @@ fn create_metadata(schematic: &UniversalSchematic, version: i32) -> NbtCompound 
     // Use content bounds (blocks + entities + block entities) for EnclosingSize
     // so entity positions fall inside the region bbox. Litematica filters out
     // entities outside the region bbox on load.
-    let merged_region = schematic.get_merged_region();
-    let (width, height, length) = if let Some(content_bounds) = merged_region.get_content_bounds() {
-        content_bounds.get_dimensions()
+    let (width, height, length) = if schematic.other_regions.is_empty() {
+        if let Some(content_bounds) = schematic.default_region.get_content_bounds() {
+            content_bounds.get_dimensions()
+        } else {
+            schematic.default_region.get_dimensions()
+        }
     } else {
-        merged_region.get_dimensions()
+        let merged_region = schematic.get_merged_region();
+        if let Some(content_bounds) = merged_region.get_content_bounds() {
+            content_bounds.get_dimensions()
+        } else {
+            merged_region.get_dimensions()
+        }
     };
 
     let mut enclosing_size = NbtCompound::new();
@@ -459,36 +467,74 @@ fn create_regions(
         let blocks = compact_region.dense_blocks();
         let block_count = blocks.len();
         let expected_len = (block_count * bits_per_block).div_ceil(64);
-
-        let mut packed_states = vec![0i64; expected_len];
         let mask = (1u64 << bits_per_block) - 1;
+        let identity_mapping = index_mapping
+            .iter()
+            .enumerate()
+            .all(|(i, &mapped)| mapped == i);
+
+        let mut packed_states = Vec::with_capacity(expected_len);
 
         if 64 % bits_per_block == 0 {
-            // Fast path: entries never cross i64 boundaries (bits_per_block = 2, 4, 8, 16, 32)
-            // Batch-pack without per-block division or branching
+            // Fast path: entries never cross i64 boundaries (bits_per_block = 2, 4, 8, 16, 32).
             let entries_per_long = 64 / bits_per_block;
-            for (chunk_idx, chunk) in blocks.chunks(entries_per_long).enumerate() {
-                let mut packed: u64 = 0;
-                for (i, &block_state) in chunk.iter().enumerate() {
-                    packed |= (index_mapping[block_state as usize] as u64 & mask)
-                        << (i * bits_per_block);
+            if identity_mapping {
+                for chunk in blocks.chunks(entries_per_long) {
+                    let mut packed: u64 = 0;
+                    for (i, &block_state) in chunk.iter().enumerate() {
+                        packed |= (block_state as u64 & mask) << (i * bits_per_block);
+                    }
+                    packed_states.push(packed as i64);
                 }
-                packed_states[chunk_idx] = packed as i64;
+            } else {
+                for chunk in blocks.chunks(entries_per_long) {
+                    let mut packed: u64 = 0;
+                    for (i, &block_state) in chunk.iter().enumerate() {
+                        packed |= (index_mapping[block_state as usize] as u64 & mask)
+                            << (i * bits_per_block);
+                    }
+                    packed_states.push(packed as i64);
+                }
             }
         } else {
-            // Slow path: entries may cross i64 boundaries (bits_per_block = 3, 5, 6, 7, etc.)
-            for (index, &block_state) in blocks.iter().enumerate() {
-                let mapped_state = index_mapping[block_state as usize];
-                let bit_index = index * bits_per_block;
-                let start_long_index = bit_index / 64;
-                let end_long_index = (bit_index + bits_per_block - 1) / 64;
-                let start_offset = bit_index % 64;
-                let value = (mapped_state as u64) & mask;
-
-                packed_states[start_long_index] |= (value << start_offset) as i64;
-                if start_long_index != end_long_index {
-                    packed_states[end_long_index] |= (value >> (64 - start_offset)) as i64;
+            // Streaming bit-accumulator for non-power-of-two widths (3, 5, 6, 7, ...):
+            // eliminates per-block multiply/div/mod and repeated read-modify-write.
+            let bits = bits_per_block as u32;
+            let mut acc: u64 = 0;
+            let mut bit_pos: u32 = 0;
+            if identity_mapping {
+                for &block_state in blocks.iter() {
+                    let value = (block_state as u64) & mask;
+                    acc |= value << bit_pos;
+                    bit_pos += bits;
+                    if bit_pos >= 64 {
+                        packed_states.push(acc as i64);
+                        bit_pos -= 64;
+                        acc = if bit_pos == 0 {
+                            0
+                        } else {
+                            value >> (bits - bit_pos)
+                        };
+                    }
                 }
+            } else {
+                for &block_state in blocks.iter() {
+                    let value = (index_mapping[block_state as usize] as u64) & mask;
+                    acc |= value << bit_pos;
+                    bit_pos += bits;
+                    if bit_pos >= 64 {
+                        packed_states.push(acc as i64);
+                        bit_pos -= 64;
+                        acc = if bit_pos == 0 {
+                            0
+                        } else {
+                            value >> (bits - bit_pos)
+                        };
+                    }
+                }
+            }
+            if bit_pos > 0 {
+                packed_states.push(acc as i64);
             }
         }
 
@@ -654,8 +700,8 @@ fn parse_regions_with_tiles(
             region.set_storage(bounds.min, bounds.get_dimensions(), blocks);
 
             // Rebuild caches after directly setting palette and blocks
+            // (`set_storage` already rebuilt `cached_air_index`).
             region.rebuild_palette_index();
-            region.rebuild_air_index();
             region.rescan_content();
 
             // Litematic entity/tile-entity coordinates are relative to the region's

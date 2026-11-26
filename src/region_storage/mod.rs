@@ -130,19 +130,19 @@ impl Storage {
         each!(self, s => s.row_mut(y, z, x0, x1, f))
     }
 
-    /// Reverse the cells `x0..=x1` of row `(y, z)`.
-    pub fn reverse_row(&mut self, y: i32, z: i32, x0: i32, x1: i32) {
-        each!(self, s => s.reverse_row(y, z, x0, x1))
+    /// Flip all cells inside `bbox` along the X axis in place.
+    pub fn flip_x(&mut self, bbox: &BoundingBox) {
+        each!(self, s => s.flip_x(bbox))
     }
 
-    /// Swap the full-width rows `(ya, za)` and `(yb, zb)`.
-    pub fn swap_rows(&mut self, a: (i32, i32), b: (i32, i32)) {
-        each!(self, s => s.swap_rows(a, b))
+    /// Flip all cells inside `bbox` along the Y axis in place.
+    pub fn flip_y(&mut self, bbox: &BoundingBox) {
+        each!(self, s => s.flip_y(bbox))
     }
 
-    /// Swap the full layers `ya` and `yb`.
-    pub fn swap_layers(&mut self, ya: i32, yb: i32) {
-        each!(self, s => s.swap_layers(ya, yb))
+    /// Flip all cells inside `bbox` along the Z axis in place.
+    pub fn flip_z(&mut self, bbox: &BoundingBox) {
+        each!(self, s => s.flip_z(bbox))
     }
 
     /// Set every cell to `value`.

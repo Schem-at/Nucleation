@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::fmt;
@@ -162,7 +163,8 @@ fn to_schematic_v3(schematic: &UniversalSchematic, compression: Compression) -> 
     let mut blocks_container = NbtCompound::new();
 
     // Create clean palette and mapping from compact region
-    let (palette_nbt, palette_mapping) = convert_palette_with_mapping(&compact_region.palette);
+    let (palette_nbt, palette_mapping, max_mapped_id) =
+        convert_palette_with_mapping(&compact_region.palette);
 
     // Store palette size before moving palette_nbt
     let _palette_size = palette_nbt.len();
@@ -171,14 +173,32 @@ fn to_schematic_v3(schematic: &UniversalSchematic, compression: Compression) -> 
     // Remap directly into the encoded stream instead of materializing a
     // second u32 buffer proportional to the schematic volume.
     let blocks = compact_region.dense_blocks();
-    let mut block_data: Vec<u8> = Vec::with_capacity(blocks.len() * 2);
-    for &original_id in blocks.iter() {
-        let block_id = palette_mapping
-            .get(original_id as usize)
-            .copied()
-            .unwrap_or(0) as u32;
-        encode_varint_into(block_id, &mut block_data);
-    }
+    let block_data: Vec<u8> = if max_mapped_id < 128 {
+        // Fast path: every palette id fits in a single varint byte (< 0x80).
+        let identity = palette_mapping
+            .iter()
+            .enumerate()
+            .all(|(i, &m)| m == i as i32);
+        if identity {
+            blocks.iter().map(|&id| id as u8).collect()
+        } else {
+            let map_u8: Vec<u8> = palette_mapping.iter().map(|&v| v as u8).collect();
+            blocks
+                .iter()
+                .map(|&id| map_u8.get(id as usize).copied().unwrap_or(0))
+                .collect()
+        }
+    } else {
+        let mut buf: Vec<u8> = Vec::with_capacity(blocks.len() + blocks.len() / 4);
+        for &original_id in blocks.iter() {
+            let block_id = palette_mapping
+                .get(original_id as usize)
+                .copied()
+                .unwrap_or(0) as u32;
+            encode_varint_into(block_id, &mut buf);
+        }
+        buf
+    };
 
     // Add block data to Blocks container (renamed from "BlockData" to "Data" in v3)
     // SAFETY: u8 and i8 have identical size, alignment, and representation
@@ -287,12 +307,17 @@ fn to_schematic_v2(schematic: &UniversalSchematic, compression: Compression) -> 
     schematic_data.insert("Palette", palette_nbt);
     schematic_data.insert("PaletteMax", max_id + 1);
 
-    // Encode block data — preallocated to avoid per-block Vec allocations
+    // Encode block data — 1-byte fast path when every palette index < 128.
     let blocks = compact_region.dense_blocks();
-    let mut block_data: Vec<u8> = Vec::with_capacity(blocks.len() * 2);
-    for &block_id in blocks.iter() {
-        encode_varint_into(block_id as u32, &mut block_data);
-    }
+    let block_data: Vec<u8> = if compact_region.palette.len() <= 128 {
+        blocks.iter().map(|&block_id| block_id as u8).collect()
+    } else {
+        let mut buf: Vec<u8> = Vec::with_capacity(blocks.len() + blocks.len() / 4);
+        for &block_id in blocks.iter() {
+            encode_varint_into(block_id, &mut buf);
+        }
+        buf
+    };
 
     // SAFETY: u8 and i8 have identical size, alignment, and representation
     let block_data_i8: Vec<i8> = unsafe {
@@ -353,18 +378,21 @@ fn to_schematic_v2(schematic: &UniversalSchematic, compression: Compression) -> 
 // Palette conversion for v3 (creates clean sequential indices)
 #[cfg(test)]
 fn convert_palette(palette: &Vec<BlockState>) -> (NbtCompound, i32) {
-    let (nbt_palette, _) = convert_palette_with_mapping(palette);
+    let (nbt_palette, _, _) = convert_palette_with_mapping(palette);
     let max_id = nbt_palette.len() as i32 - 1;
     (nbt_palette, max_id)
 }
 
-// Helper function that returns both palette and mapping for index conversion
-fn convert_palette_with_mapping(palette: &Vec<BlockState>) -> (NbtCompound, Vec<i32>) {
+// Helper function that returns palette, index mapping, and max assigned palette id.
+fn convert_palette_with_mapping(palette: &Vec<BlockState>) -> (NbtCompound, Vec<i32>, i32) {
     let mut nbt_palette = NbtCompound::new();
+    let mut seen: FxHashMap<String, i32> =
+        FxHashMap::with_capacity_and_hasher(palette.len() + 1, Default::default());
     let mut mapping = vec![0i32; palette.len()]; // Default all to air (index 0)
 
     // Always start with air at index 0
     nbt_palette.insert("minecraft:air", NbtTag::Int(0));
+    seen.insert("minecraft:air".to_string(), 0);
     let mut next_id = 1;
 
     for (original_id, block_state) in palette.iter().enumerate() {
@@ -395,30 +423,20 @@ fn convert_palette_with_mapping(palette: &Vec<BlockState>) -> (NbtCompound, Vec<
             )
         };
 
-        // Check if this block state already exists in the palette
-        let mut found_id = None;
-        for (existing_key, tag) in nbt_palette.inner() {
-            if existing_key == &key {
-                if let NbtTag::Int(id) = tag {
-                    found_id = Some(*id);
-                    break;
-                }
-            }
-        }
-
-        let assigned_id = if let Some(id) = found_id {
+        let assigned_id = if let Some(&id) = seen.get(&key) {
             id
         } else {
-            nbt_palette.insert(&key, NbtTag::Int(next_id));
             let id = next_id;
             next_id += 1;
+            nbt_palette.insert(&key, NbtTag::Int(id));
+            seen.insert(key, id);
             id
         };
 
         mapping[original_id] = assigned_id;
     }
 
-    (nbt_palette, mapping)
+    (nbt_palette, mapping, next_id - 1)
 }
 
 // Palette conversion for v2 (legacy behavior with air at index 0)
@@ -567,8 +585,8 @@ pub fn from_schematic_bounded(
     region.set_storage((0, 0, 0), (width as i32, height as i32, length as i32), block_data);
 
     // Rebuild caches after directly setting palette and blocks
+    // (`set_storage` already rebuilt `cached_air_index`).
     region.rebuild_palette_index();
-    region.rebuild_air_index();
     region.rescan_content();
 
     let block_entities = block_entities_from_raw(raw_block_entities);
@@ -1409,7 +1427,8 @@ mod tests {
             BlockState::new("minecraft:dirt".to_string()),
         ];
 
-        let (nbt_palette, mapping) = convert_palette_with_mapping(&palette);
+        let (nbt_palette, mapping, max_id) = convert_palette_with_mapping(&palette);
+        assert_eq!(max_id, 2);
 
         // Check palette structure
         assert_eq!(nbt_palette.get::<_, i32>("minecraft:air").unwrap(), 0);

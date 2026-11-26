@@ -274,6 +274,34 @@ impl Chunked {
         }
     }
 
+    /// Flip all cells inside `bbox` along the X axis in place.
+    pub(super) fn flip_x(&mut self, bbox: &BoundingBox) {
+        let (min, max) = (bbox.min, bbox.max);
+        for y in min.1..=max.1 {
+            for z in min.2..=max.2 {
+                self.reverse_row(y, z, min.0, max.0);
+            }
+        }
+    }
+
+    /// Flip all cells inside `bbox` along the Y axis in place.
+    pub(super) fn flip_y(&mut self, bbox: &BoundingBox) {
+        let (min_y, max_y) = (bbox.min.1, bbox.max.1);
+        for k in 0..(max_y - min_y + 1) / 2 {
+            self.swap_layers(min_y + k, max_y - k);
+        }
+    }
+
+    /// Flip all cells inside `bbox` along the Z axis in place.
+    pub(super) fn flip_z(&mut self, bbox: &BoundingBox) {
+        let (min, max) = (bbox.min, bbox.max);
+        for y in min.1..=max.1 {
+            for k in 0..(max.2 - min.2 + 1) / 2 {
+                self.swap_rows((y, min.2 + k), (y, max.2 - k));
+            }
+        }
+    }
+
     /// Set every cell to `value`.
     pub(super) fn fill(&mut self, value: u32) {
         self.chunks.fill(Chunk::uniform(value));

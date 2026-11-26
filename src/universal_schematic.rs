@@ -18,6 +18,18 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use std::collections::HashMap;
 
+/// 1-entry MRU cache for `set_block_from_string` so repeated placements of the
+/// same block string skip both `strip_simulate_tag` and `FxHashMap` hashing.
+/// Clones as empty so `UniversalSchematic::clone` never pays extra allocations.
+#[derive(Default)]
+struct BlockStringMru(Option<(String, BlockState, Option<std::sync::Arc<NbtMap>>)>);
+
+impl Clone for BlockStringMru {
+    fn clone(&self) -> Self {
+        Self(None)
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct UniversalSchematic {
     pub metadata: Metadata,
@@ -33,6 +45,8 @@ pub struct UniversalSchematic {
     /// write, so sharing is invisible to callers.
     #[serde(skip, default = "FxHashMap::default")]
     block_string_cache: FxHashMap<String, (BlockState, Option<std::sync::Arc<NbtMap>>)>,
+    #[serde(skip, default)]
+    last_block_string: BlockStringMru,
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +86,7 @@ impl UniversalSchematic {
             default_region_name,
             definition_regions: HashMap::new(),
             block_string_cache: FxHashMap::default(),
+            last_block_string: BlockStringMru::default(),
         }
     }
 
@@ -277,7 +292,13 @@ impl UniversalSchematic {
             .bytes()
             .any(|c| matches!(c, b'[' | b']' | b'{' | b'}'))
         {
-            let region = self.named_region_mut(region_name, (x, y, z));
+            let region = if let Some(region) = self.other_regions.get_mut(region_name) {
+                region
+            } else {
+                self.other_regions
+                    .entry(region_name.to_string())
+                    .or_insert_with(|| Region::new(region_name.to_string(), (x, y, z), (1, 1, 1)))
+            };
             region.recenter_if_empty_unit((x, y, z));
             if !region.is_in_region(x, y, z) {
                 region.expand_to_fit(x, y, z);
@@ -290,17 +311,16 @@ impl UniversalSchematic {
             return Ok(true);
         }
 
-        let (state, nbt) = Self::cached_block_string(&mut self.block_string_cache, block_name)?;
-        if !self.other_regions.contains_key(region_name) {
-            self.other_regions.insert(
-                region_name.to_string(),
-                Region::new(region_name.to_string(), (x, y, z), (1, 1, 1)),
-            );
+        if let Some((state, nbt)) = self.block_string_cache.get(block_name) {
+            if let Some(region) = self.other_regions.get_mut(region_name) {
+                return Ok(Self::write_parsed_block(region, (x, y, z), state, nbt));
+            }
         }
+        let (state, nbt) = Self::cached_block_string(&mut self.block_string_cache, block_name)?;
         let region = self
             .other_regions
-            .get_mut(region_name)
-            .expect("named region was just ensured");
+            .entry(region_name.to_string())
+            .or_insert_with(|| Region::new(region_name.to_string(), (x, y, z), (1, 1, 1)));
         Ok(Self::write_parsed_block(region, (x, y, z), state, nbt))
     }
 
@@ -1187,6 +1207,7 @@ impl UniversalSchematic {
             default_region_name,
             definition_regions,
             block_string_cache: FxHashMap::default(),
+            last_block_string: BlockStringMru::default(),
         })
     }
 
@@ -2159,6 +2180,11 @@ impl UniversalSchematic {
         block_string: &str,
     ) -> Result<&'c (BlockState, Option<std::sync::Arc<NbtMap>>), String> {
         if !cache.contains_key(block_string) {
+            if Self::strip_simulate_tag(block_string)?.is_some() {
+                return Err(
+                    "simulated placement is only supported via `set_block_from_string`".into(),
+                );
+            }
             let (mut block_state, nbt_data) = Self::parse_block_string(block_string)?;
             if block_state.name == "minecraft:jukebox" {
                 let has_record = nbt_data
@@ -2307,6 +2333,7 @@ impl UniversalSchematic {
     /// transactional with respect to block-entity state: a block string
     /// without NBT must not retain the previous entity. The NbtMap stays
     /// Arc-shared with the cache (copy-on-write via nbt_mut).
+    #[inline]
     fn write_parsed_block(
         region: &mut Region,
         (x, y, z): (i32, i32, i32),
@@ -2326,9 +2353,10 @@ impl UniversalSchematic {
                     nbt: std::sync::Arc::clone(nbt),
                 },
             ),
-            None => {
+            None if !region.block_entities.is_empty() => {
                 region.block_entities.discard(&(x, y, z));
             }
+            None => {}
         }
         true
     }
@@ -2340,6 +2368,29 @@ impl UniversalSchematic {
         z: i32,
         block_string: &str,
     ) -> Result<bool, String> {
+        // Fast path 1: 1-entry MRU hit skips `strip_simulate_tag` and
+        // `FxHashMap` hashing altogether (simulated strings are never cached).
+        if let Some((ref cached, ref state, ref nbt)) = self.last_block_string.0 {
+            if cached == block_string {
+                return Ok(Self::write_parsed_block(
+                    &mut self.default_region,
+                    (x, y, z),
+                    state,
+                    nbt,
+                ));
+            }
+        }
+        // Fast path 2: single-lookup hit in `block_string_cache` (no double
+        // hash, no `contains("simulate=")` scan).
+        if let Some((state, nbt)) = self.block_string_cache.get(block_string) {
+            return Ok(Self::write_parsed_block(
+                &mut self.default_region,
+                (x, y, z),
+                state,
+                nbt,
+            ));
+        }
+
         // `{simulate=true}` runs the active local component relative to a
         // read-only environment halo. `{simulate=world}` is the explicit
         // opt-in that lets resulting changes update the entire schematic.
@@ -2370,6 +2421,7 @@ impl UniversalSchematic {
             }
         }
         let (state, nbt) = Self::cached_block_string(&mut self.block_string_cache, block_string)?;
+        self.last_block_string.0 = Some((block_string.to_string(), state.clone(), nbt.clone()));
         Ok(Self::write_parsed_block(
             &mut self.default_region,
             (x, y, z),

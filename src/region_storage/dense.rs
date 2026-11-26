@@ -84,36 +84,72 @@ impl Dense {
         f(x0, &mut self.cells[start..start + (x1 - x0 + 1) as usize]);
     }
 
-    /// Reverse the cells `x0..=x1` of row `(y, z)`.
-    pub(super) fn reverse_row(&mut self, y: i32, z: i32, x0: i32, x1: i32) {
-        self.row_mut(y, z, x0, x1, |_, cells| cells.reverse());
-    }
-
-    /// Swap the full-width rows `(ya, za)` and `(yb, zb)`.
-    pub(super) fn swap_rows(&mut self, (ya, za): (i32, i32), (yb, zb): (i32, i32)) {
+    /// Flip all cells inside `bbox` along the X axis in place.
+    pub(super) fn flip_x(&mut self, bbox: &BoundingBox) {
         let w = self.width as usize;
-        let (a, b) = (self.index(self.bounds.min.0, ya, za), self.index(self.bounds.min.0, yb, zb));
-        if a == b {
+        if *bbox == self.bounds {
+            if w > 1 {
+                for row in self.cells.chunks_exact_mut(w) {
+                    row.reverse();
+                }
+            }
             return;
         }
-        let (lo, hi) = (a.min(b), a.max(b));
-        let (low, high) = self.cells.split_at_mut(hi);
-        low[lo..lo + w].swap_with_slice(&mut high[..w]);
+        let (min, max) = (bbox.min, bbox.max);
+        let row_len = (max.0 - min.0 + 1) as usize;
+        if row_len <= 1 {
+            return;
+        }
+        let layer = self.layer as usize;
+        let x_off = (min.0 - self.bounds.min.0) as usize;
+        let z0 = (min.2 - self.bounds.min.2) as usize;
+        let z1 = (max.2 - self.bounds.min.2) as usize;
+        let y0 = (min.1 - self.bounds.min.1) as usize;
+        let y1 = (max.1 - self.bounds.min.1) as usize;
+        for dy in y0..=y1 {
+            let layer_base = dy * layer;
+            for dz in z0..=z1 {
+                let start = layer_base + dz * w + x_off;
+                self.cells[start..start + row_len].reverse();
+            }
+        }
     }
 
-    /// Swap the full layers `ya` and `yb`.
-    pub(super) fn swap_layers(&mut self, ya: i32, yb: i32) {
+    /// Flip all cells inside `bbox` along the Y axis in place.
+    pub(super) fn flip_y(&mut self, bbox: &BoundingBox) {
         let l = self.layer as usize;
-        let (a, b) = (
-            (ya - self.bounds.min.1) as usize * l,
-            (yb - self.bounds.min.1) as usize * l,
-        );
-        if a == b {
+        let y0 = (bbox.min.1 - self.bounds.min.1) as usize;
+        let y1 = (bbox.max.1 - self.bounds.min.1) as usize;
+        let half = (y1 - y0 + 1) / 2;
+        for k in 0..half {
+            let a = (y0 + k) * l;
+            let b = (y1 - k) * l;
+            let (low, high) = self.cells.split_at_mut(b);
+            low[a..a + l].swap_with_slice(&mut high[..l]);
+        }
+    }
+
+    /// Flip all cells inside `bbox` along the Z axis in place.
+    pub(super) fn flip_z(&mut self, bbox: &BoundingBox) {
+        let w = self.width as usize;
+        let layer = self.layer as usize;
+        let z0 = (bbox.min.2 - self.bounds.min.2) as usize;
+        let z1 = (bbox.max.2 - self.bounds.min.2) as usize;
+        let half = (z1 - z0 + 1) / 2;
+        if half == 0 {
             return;
         }
-        let (lo, hi) = (a.min(b), a.max(b));
-        let (low, high) = self.cells.split_at_mut(hi);
-        low[lo..lo + l].swap_with_slice(&mut high[..l]);
+        let y0 = (bbox.min.1 - self.bounds.min.1) as usize;
+        let y1 = (bbox.max.1 - self.bounds.min.1) as usize;
+        for dy in y0..=y1 {
+            let layer_slice = &mut self.cells[dy * layer..(dy + 1) * layer];
+            for k in 0..half {
+                let a = (z0 + k) * w;
+                let b = (z1 - k) * w;
+                let (low, high) = layer_slice.split_at_mut(b);
+                low[a..a + w].swap_with_slice(&mut high[..w]);
+            }
+        }
     }
 
     /// Set every cell to `value`.
@@ -214,15 +250,42 @@ impl Dense {
 
     /// Copy the cells of `area` (inside both boxes) from `src`.
     pub(super) fn copy_box_from(&mut self, src: &Dense, area: &BoundingBox) {
+        if self.bounds == *area && src.bounds == *area {
+            self.cells.copy_from_slice(&src.cells);
+            return;
+        }
         let (min, max) = (area.min, area.max);
         let row_len = (max.0 - min.0 + 1) as usize;
-        #[cfg(not(target_arch = "wasm32"))]
+        let dst_w = self.width as usize;
+        let src_w = src.width as usize;
+        let full_x = row_len == dst_w
+            && row_len == src_w
+            && min.0 == self.bounds.min.0
+            && min.0 == src.bounds.min.0;
+        let z_rows = (max.2 - min.2 + 1) as usize;
+
+        if full_x
+            && z_rows == self.length as usize
+            && z_rows == src.length as usize
+            && min.2 == self.bounds.min.2
+            && min.2 == src.bounds.min.2
         {
+            let total = (max.1 - min.1 + 1) as usize * self.layer as usize;
+            let dst_start = self.index(min.0, min.1, min.2);
+            let src_start = src.index(min.0, min.1, min.2);
+            self.cells[dst_start..dst_start + total]
+                .copy_from_slice(&src.cells[src_start..src_start + total]);
+            return;
+        }
+
+        // Only pay Rayon thread-pool wake/sync overhead for large copies (≥ 1 MB).
+        #[cfg(not(target_arch = "wasm32"))]
+        if area.volume() >= 262_144 {
             use rayon::prelude::*;
-            // Destination layers are disjoint slices, so rows copy in parallel.
             let layer = self.layer as usize;
             let dst_min_y = self.bounds.min.1;
-            let (width, dst_min) = (self.width as usize, self.bounds.min);
+            let dst_min = self.bounds.min;
+            let block_len = z_rows * row_len;
             self.cells
                 .par_chunks_mut(layer)
                 .enumerate()
@@ -231,19 +294,51 @@ impl Dense {
                     if y < min.1 || y > max.1 {
                         return;
                     }
-                    for z in min.2..=max.2 {
-                        let start = (z - dst_min.2) as usize * width + (min.0 - dst_min.0) as usize;
-                        let src_start = src.index(min.0, y, z);
-                        dst_layer[start..start + row_len]
-                            .copy_from_slice(&src.cells[src_start..src_start + row_len]);
+                    if full_x {
+                        let start = (min.2 - dst_min.2) as usize * dst_w;
+                        let src_start = src.index(min.0, y, min.2);
+                        dst_layer[start..start + block_len]
+                            .copy_from_slice(&src.cells[src_start..src_start + block_len]);
+                    } else {
+                        let mut start =
+                            (min.2 - dst_min.2) as usize * dst_w + (min.0 - dst_min.0) as usize;
+                        let mut src_start = src.index(min.0, y, min.2);
+                        for _ in 0..z_rows {
+                            dst_layer[start..start + row_len]
+                                .copy_from_slice(&src.cells[src_start..src_start + row_len]);
+                            start += dst_w;
+                            src_start += src_w;
+                        }
                     }
                 });
+            return;
         }
-        #[cfg(target_arch = "wasm32")]
-        for y in min.1..=max.1 {
-            for z in min.2..=max.2 {
-                let (dst, from) = (self.index(min.0, y, z), src.index(min.0, y, z));
-                self.cells[dst..dst + row_len].copy_from_slice(&src.cells[from..from + row_len]);
+
+        let dst_layer = self.layer as usize;
+        let src_layer = src.layer as usize;
+        let mut dst_y = self.index(min.0, min.1, min.2);
+        let mut src_y = src.index(min.0, min.1, min.2);
+        let y_layers = (max.1 - min.1 + 1) as usize;
+        if full_x {
+            let block_len = z_rows * row_len;
+            for _ in 0..y_layers {
+                self.cells[dst_y..dst_y + block_len]
+                    .copy_from_slice(&src.cells[src_y..src_y + block_len]);
+                dst_y += dst_layer;
+                src_y += src_layer;
+            }
+        } else {
+            for _ in 0..y_layers {
+                let mut dst = dst_y;
+                let mut from = src_y;
+                for _ in 0..z_rows {
+                    self.cells[dst..dst + row_len]
+                        .copy_from_slice(&src.cells[from..from + row_len]);
+                    dst += dst_w;
+                    from += src_w;
+                }
+                dst_y += dst_layer;
+                src_y += src_layer;
             }
         }
     }
@@ -269,31 +364,65 @@ impl Dense {
 
     /// Count of cells that are not `air`, and the box they span.
     ///
-    /// Scans x-rows as slices, so there is no per-voxel coordinate division
-    /// and the comparisons vectorize; each occupied row touches the bounds
-    /// once.
+    /// Scans layers and x-rows as slices with no integer divisions and a
+    /// branchless u32 count loop that vectorizes cleanly; once `lo_x` or
+    /// `hi_x` reaches the edge of the box, endpoint scans are skipped.
     pub(super) fn content(&self, air: u32) -> (usize, Option<BoundingBox>) {
         let w = self.width as usize;
         let l = self.length as usize;
+        let layer = self.layer as usize;
+        if w == 0 || l == 0 || self.cells.is_empty() {
+            return (0, None);
+        }
         let mut count = 0usize;
-        let (mut lo_x, mut lo_y, mut lo_z) = (usize::MAX, usize::MAX, usize::MAX);
+        let (mut lo_x, mut lo_y, mut lo_z) = (w, usize::MAX, l);
         let (mut hi_x, mut hi_y, mut hi_z) = (0usize, 0usize, 0usize);
-        if w > 0 && l > 0 {
-            for (row_index, row) in self.cells.chunks_exact(w).enumerate() {
-                let row_count = row.iter().filter(|&&b| b != air).count();
+        for (dy, layer_cells) in self.cells.chunks_exact(layer).enumerate() {
+            // Once X and Z bounds have saturated the full box, subsequent layers
+            // only need a single flat vectorized count pass to update `count` and `hi_y`.
+            if lo_x == 0 && hi_x + 1 == w && lo_z == 0 && hi_z + 1 == l {
+                let mut layer_count = 0u32;
+                for &b in layer_cells {
+                    layer_count += u32::from(b != air);
+                }
+                if layer_count != 0 {
+                    count += layer_count as usize;
+                    hi_y = dy;
+                }
+                continue;
+            }
+            let layer_start_count = count;
+            for (dz, row) in layer_cells.chunks_exact(w).enumerate() {
+                let mut row_count = 0u32;
+                for &b in row {
+                    row_count += u32::from(b != air);
+                }
                 if row_count == 0 {
                     continue;
                 }
-                count += row_count;
-                let first = row.iter().position(|&b| b != air).unwrap_or(0);
-                let last = row.iter().rposition(|&b| b != air).unwrap_or(0);
-                let (dy, dz) = (row_index / l, row_index % l);
-                lo_x = lo_x.min(first);
-                hi_x = hi_x.max(last);
-                lo_y = lo_y.min(dy);
-                hi_y = hi_y.max(dy);
-                lo_z = lo_z.min(dz);
-                hi_z = hi_z.max(dz);
+                count += row_count as usize;
+                if dz < lo_z {
+                    lo_z = dz;
+                }
+                if dz > hi_z {
+                    hi_z = dz;
+                }
+                if lo_x > 0 {
+                    if let Some(first) = row[..lo_x].iter().position(|&b| b != air) {
+                        lo_x = first;
+                    }
+                }
+                if hi_x + 1 < w {
+                    if let Some(offset) = row[hi_x + 1..].iter().rposition(|&b| b != air) {
+                        hi_x = hi_x + 1 + offset;
+                    }
+                }
+            }
+            if count != layer_start_count {
+                if lo_y == usize::MAX {
+                    lo_y = dy;
+                }
+                hi_y = dy;
             }
         }
         let (bx, by, bz) = self.bounds.min;

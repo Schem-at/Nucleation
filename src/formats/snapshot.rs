@@ -94,6 +94,7 @@ struct SnapshotV3Ref<'a> {
 /// of a u64 per cell, so writing is a single pass into a pre-sized buffer and
 /// reading is a bounds-checked widen. Named regions are written sorted by
 /// name, so equal schematics produce equal bytes.
+#[cfg(test)]
 #[derive(Serialize)]
 struct SnapshotV4Ref<'a> {
     metadata: SnapshotMetadataV3,
@@ -104,14 +105,17 @@ struct SnapshotV4Ref<'a> {
 }
 
 #[derive(Deserialize)]
-struct SnapshotV4 {
+struct SnapshotV4<'a> {
     metadata: SnapshotMetadataV3,
     default_region_name: String,
-    default_region: RegionV4,
-    other_regions: Vec<(String, RegionV4)>,
+    #[serde(borrow)]
+    default_region: RegionV4<'a>,
+    #[serde(borrow)]
+    other_regions: Vec<(String, RegionV4<'a>)>,
     definition_regions: HashMap<String, DefinitionRegion>,
 }
 
+#[cfg(test)]
 #[derive(Serialize)]
 struct RegionV4Ref<'a> {
     name: &'a str,
@@ -124,16 +128,18 @@ struct RegionV4Ref<'a> {
 }
 
 #[derive(Deserialize)]
-struct RegionV4 {
+struct RegionV4<'a> {
     name: String,
     position: (i32, i32, i32),
     size: (i32, i32, i32),
     palette: Vec<BlockState>,
-    blocks: PackedBlocks,
+    #[serde(borrow)]
+    blocks: PackedBlocksBorrowed<'a>,
     entities: Vec<Entity>,
     block_entities: BlockEntityStore,
 }
 
+#[cfg(test)]
 impl<'a> RegionV4Ref<'a> {
     fn new(region: &'a Region) -> Self {
         RegionV4Ref {
@@ -148,9 +154,66 @@ impl<'a> RegionV4Ref<'a> {
     }
 }
 
+#[inline]
+fn packed_cell_width(palette_len: usize) -> u8 {
+    if palette_len <= 1 << 8 {
+        1
+    } else if palette_len <= 1 << 16 {
+        2
+    } else {
+        4
+    }
+}
+
+/// Stream a region's v4 wire representation directly into `buf` without
+/// allocating an intermediate `PackedBlocks` buffer or running a separate
+/// `serialized_size` pass. Byte-for-byte identical to `RegionV4Ref`.
+fn write_region_v4(buf: &mut Vec<u8>, region: &Region) -> Result<()> {
+    bincode::serialize_into(&mut *buf, region.name.as_str())?;
+    bincode::serialize_into(&mut *buf, &region.position)?;
+    bincode::serialize_into(&mut *buf, &region.size)?;
+    bincode::serialize_into(&mut *buf, region.palette.as_slice())?;
+
+    let blocks = region.dense_blocks();
+    let width = packed_cell_width(region.palette.len());
+    let byte_len = 1 + blocks.len() * width as usize;
+    buf.reserve(8 + byte_len);
+    buf.extend_from_slice(&(byte_len as u64).to_le_bytes());
+    buf.push(width);
+    match width {
+        1 => buf.extend(blocks.iter().map(|&b| b as u8)),
+        2 => {
+            for &b in blocks.iter() {
+                buf.extend_from_slice(&(b as u16).to_le_bytes());
+            }
+        }
+        _ => {
+            #[cfg(target_endian = "little")]
+            {
+                let raw = unsafe {
+                    std::slice::from_raw_parts(blocks.as_ptr() as *const u8, blocks.len() * 4)
+                };
+                buf.extend_from_slice(raw);
+            }
+            #[cfg(not(target_endian = "little"))]
+            {
+                for &b in blocks.iter() {
+                    buf.extend_from_slice(&b.to_le_bytes());
+                }
+            }
+        }
+    }
+
+    bincode::serialize_into(&mut *buf, region.entities.as_slice())?;
+    bincode::serialize_into(&mut *buf, &region.block_entities)?;
+    Ok(())
+}
+
 /// Palette indices as `[width, little-endian cells...]`, serialized as bytes.
+#[cfg(test)]
 struct PackedBlocks(Vec<u8>);
 
+#[cfg(test)]
 impl PackedBlocks {
     fn encode(blocks: &[u32], palette_len: usize) -> Self {
         let mut out;
@@ -173,49 +236,100 @@ impl PackedBlocks {
         }
         PackedBlocks(out)
     }
-
-    fn decode(&self, volume: usize) -> Result<Vec<u32>> {
-        let (&width, cells) = self.0.split_first().ok_or("Snapshot region has no block data")?;
-        let width = width as usize;
-        if !matches!(width, 1 | 2 | 4) || volume.checked_mul(width) != Some(cells.len()) {
-            return Err("Snapshot block data does not match the region volume".into());
-        }
-        Ok(match width {
-            1 => cells.iter().map(|&b| b as u32).collect(),
-            2 => cells
-                .chunks_exact(2)
-                .map(|c| u16::from_le_bytes([c[0], c[1]]) as u32)
-                .collect(),
-            _ => cells
-                .chunks_exact(4)
-                .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-                .collect(),
-        })
-    }
 }
 
+#[cfg(test)]
 impl Serialize for PackedBlocks {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
         serializer.serialize_bytes(&self.0)
     }
 }
 
-impl<'de> Deserialize<'de> for PackedBlocks {
+/// Zero-copy view of `[width, little-endian cells...]` when deserialized from a
+/// byte slice via bincode.
+struct PackedBlocksBorrowed<'de>(std::borrow::Cow<'de, [u8]>);
+
+impl<'de> PackedBlocksBorrowed<'de> {
+    fn decode_validated(&self, volume: usize, palette_len: usize) -> Result<Vec<u32>> {
+        let (&width, cells) = self
+            .0
+            .split_first()
+            .ok_or("Snapshot region has no block data")?;
+        let width = width as usize;
+        if !matches!(width, 1 | 2 | 4) || volume.checked_mul(width) != Some(cells.len()) {
+            return Err("Snapshot block data does not match the region volume".into());
+        }
+        match width {
+            1 => {
+                if palette_len < 256
+                    && cells
+                        .iter()
+                        .copied()
+                        .max()
+                        .is_some_and(|m| m as usize >= palette_len)
+                {
+                    return Err("Snapshot block data references a missing palette entry".into());
+                }
+                Ok(cells.iter().map(|&b| b as u32).collect())
+            }
+            2 => {
+                let mut out = Vec::with_capacity(volume);
+                let mut max_val = 0u32;
+                for c in cells.chunks_exact(2) {
+                    let v = u16::from_le_bytes([c[0], c[1]]) as u32;
+                    max_val = max_val.max(v);
+                    out.push(v);
+                }
+                if volume > 0 && max_val as usize >= palette_len {
+                    return Err("Snapshot block data references a missing palette entry".into());
+                }
+                Ok(out)
+            }
+            _ => {
+                let mut out = Vec::with_capacity(volume);
+                let mut max_val = 0u32;
+                for c in cells.chunks_exact(4) {
+                    let v = u32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+                    max_val = max_val.max(v);
+                    out.push(v);
+                }
+                if volume > 0 && max_val as usize >= palette_len {
+                    return Err("Snapshot block data references a missing palette entry".into());
+                }
+                Ok(out)
+            }
+        }
+    }
+}
+
+impl<'de: 'a, 'a> Deserialize<'de> for PackedBlocksBorrowed<'a> {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         struct BytesVisitor;
         impl<'de> serde::de::Visitor<'de> for BytesVisitor {
-            type Value = PackedBlocks;
+            type Value = PackedBlocksBorrowed<'de>;
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 f.write_str("packed block bytes")
             }
-            fn visit_bytes<E: serde::de::Error>(self, v: &[u8]) -> std::result::Result<Self::Value, E> {
-                Ok(PackedBlocks(v.to_vec()))
+            fn visit_borrowed_bytes<E: serde::de::Error>(
+                self,
+                v: &'de [u8],
+            ) -> std::result::Result<Self::Value, E> {
+                Ok(PackedBlocksBorrowed(std::borrow::Cow::Borrowed(v)))
             }
-            fn visit_byte_buf<E: serde::de::Error>(self, v: Vec<u8>) -> std::result::Result<Self::Value, E> {
-                Ok(PackedBlocks(v))
+            fn visit_bytes<E: serde::de::Error>(
+                self,
+                v: &[u8],
+            ) -> std::result::Result<Self::Value, E> {
+                Ok(PackedBlocksBorrowed(std::borrow::Cow::Owned(v.to_vec())))
+            }
+            fn visit_byte_buf<E: serde::de::Error>(
+                self,
+                v: Vec<u8>,
+            ) -> std::result::Result<Self::Value, E> {
+                Ok(PackedBlocksBorrowed(std::borrow::Cow::Owned(v)))
             }
         }
-        deserializer.deserialize_byte_buf(BytesVisitor)
+        deserializer.deserialize_bytes(BytesVisitor)
     }
 }
 
@@ -294,32 +408,37 @@ pub fn to_snapshot(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
         .map(|(name, region)| (name.as_str(), region))
         .collect();
     named.sort_unstable_by(|a, b| a.0.cmp(b.0));
-    let snapshot = SnapshotV4Ref {
-        metadata: SnapshotMetadataV3 {
-            name: schematic.metadata.name.clone(),
-            author: schematic.metadata.author.clone(),
-            description: schematic.metadata.description.clone(),
-            created: schematic.metadata.created,
-            modified: schematic.metadata.modified,
-            lm_version: schematic.metadata.lm_version,
-            mc_version: schematic.metadata.mc_version,
-            we_version: schematic.metadata.we_version,
-            provenance_json,
-            transformation_history_json,
-        },
-        default_region_name: &schematic.default_region_name,
-        default_region: RegionV4Ref::new(&schematic.default_region),
-        other_regions: named
-            .into_iter()
-            .map(|(name, region)| (name, RegionV4Ref::new(region)))
-            .collect(),
-        definition_regions: &schematic.definition_regions,
+
+    let metadata = SnapshotMetadataV3 {
+        name: schematic.metadata.name.clone(),
+        author: schematic.metadata.author.clone(),
+        description: schematic.metadata.description.clone(),
+        created: schematic.metadata.created,
+        modified: schematic.metadata.modified,
+        lm_version: schematic.metadata.lm_version,
+        mc_version: schematic.metadata.mc_version,
+        we_version: schematic.metadata.we_version,
+        provenance_json,
+        transformation_history_json,
     };
-    let payload_len = bincode::serialized_size(&snapshot)? as usize;
-    let mut buf = Vec::with_capacity(8 + payload_len);
+
+    let estimated_blocks: usize = std::iter::once(&schematic.default_region)
+        .chain(named.iter().map(|(_, r)| *r))
+        .map(|r| r.volume() * packed_cell_width(r.palette.len()) as usize + 128)
+        .sum();
+    let mut buf = Vec::with_capacity(256 + estimated_blocks);
     buf.extend_from_slice(MAGIC);
     buf.extend_from_slice(&VERSION.to_le_bytes());
-    bincode::serialize_into(&mut buf, &snapshot)?;
+
+    bincode::serialize_into(&mut buf, &metadata)?;
+    bincode::serialize_into(&mut buf, schematic.default_region_name.as_str())?;
+    write_region_v4(&mut buf, &schematic.default_region)?;
+    bincode::serialize_into(&mut buf, &(named.len() as u64))?;
+    for (name, region) in named {
+        bincode::serialize_into(&mut buf, name)?;
+        write_region_v4(&mut buf, region)?;
+    }
+    bincode::serialize_into(&mut buf, &schematic.definition_regions)?;
     Ok(buf)
 }
 
@@ -440,18 +559,15 @@ fn schematic_from_v2(snapshot: SnapshotV2) -> Result<UniversalSchematic> {
     ))
 }
 
-fn schematic_from_v4(snapshot: SnapshotV4) -> Result<UniversalSchematic> {
+fn schematic_from_v4(snapshot: SnapshotV4<'_>) -> Result<UniversalSchematic> {
     let metadata = metadata_from_v3(snapshot.metadata)?;
-    let region = |wire: RegionV4| -> Result<Region> {
+    let region = |wire: RegionV4<'_>| -> Result<Region> {
         let mut region = Region::new(wire.name, (0, 0, 0), (1, 1, 1));
         let volume = [wire.size.0, wire.size.1, wire.size.2]
             .iter()
             .try_fold(1usize, |acc, &d| usize::try_from(d).ok().and_then(|d| acc.checked_mul(d)))
             .ok_or("Snapshot region size is invalid")?;
-        let blocks = wire.blocks.decode(volume)?;
-        if blocks.iter().any(|&b| b as usize >= wire.palette.len()) {
-            return Err("Snapshot block data references a missing palette entry".into());
-        }
+        let blocks = wire.blocks.decode_validated(volume, wire.palette.len())?;
         region.palette = wire.palette;
         region.set_storage(wire.position, wire.size, blocks);
         region.entities = wire.entities;
@@ -630,6 +746,40 @@ mod tests {
         assert_eq!(u32::from_le_bytes(bytes[4..8].try_into().unwrap()), 4);
         assert_eq!(bytes, to_snapshot(&schematic.clone()).unwrap());
         assert_same_content(&schematic, &from_snapshot(&bytes).unwrap());
+
+        // Streaming writer must stay byte-for-byte identical to the reference struct layout.
+        let mut named: Vec<(&str, &Region)> = schematic
+            .other_regions
+            .iter()
+            .map(|(name, region)| (name.as_str(), region))
+            .collect();
+        named.sort_unstable_by(|a, b| a.0.cmp(b.0));
+        let reference = SnapshotV4Ref {
+            metadata: SnapshotMetadataV3 {
+                name: schematic.metadata.name.clone(),
+                author: schematic.metadata.author.clone(),
+                description: schematic.metadata.description.clone(),
+                created: schematic.metadata.created,
+                modified: schematic.metadata.modified,
+                lm_version: schematic.metadata.lm_version,
+                mc_version: schematic.metadata.mc_version,
+                we_version: schematic.metadata.we_version,
+                provenance_json: None,
+                transformation_history_json: None,
+            },
+            default_region_name: &schematic.default_region_name,
+            default_region: RegionV4Ref::new(&schematic.default_region),
+            other_regions: named
+                .into_iter()
+                .map(|(name, region)| (name, RegionV4Ref::new(region)))
+                .collect(),
+            definition_regions: &schematic.definition_regions,
+        };
+        let mut expected = Vec::new();
+        expected.extend_from_slice(MAGIC);
+        expected.extend_from_slice(&VERSION.to_le_bytes());
+        bincode::serialize_into(&mut expected, &reference).unwrap();
+        assert_eq!(bytes, expected);
     }
 
     #[test]

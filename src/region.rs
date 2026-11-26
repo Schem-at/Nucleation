@@ -129,6 +129,7 @@ impl TryFrom<RegionWire> for Region {
             tight_bounds: None,
             cached_air_index: 0,
             non_air_count: 0,
+            last_palette_idx: 0,
         };
         region.rebuild_air_index();
         region.storage = Storage::from_dense(bbox, wire.blocks, region.background());
@@ -171,6 +172,11 @@ pub struct Region {
     cached_air_index: u32,
     #[serde(skip)]
     non_air_count: usize,
+    /// 1-entry MRU cache of the last palette index looked up or inserted.
+    /// Avoids hashing `BlockState` or scanning the palette on repeated placements
+    /// of the same block.
+    #[serde(skip)]
+    last_palette_idx: usize,
 }
 
 impl Region {
@@ -221,6 +227,7 @@ impl Region {
             tight_bounds: None,
             cached_air_index: 0,
             non_air_count: 0,
+            last_palette_idx: 0,
         };
         region.rebuild_air_index();
         Ok(region)
@@ -291,8 +298,14 @@ impl Region {
         self.tight_bounds = bounds;
     }
 
+    #[inline]
     pub fn get_or_insert_in_palette(&mut self, block: &BlockState) -> usize {
-        match self.palette_index.get(block) {
+        if let Some(last) = self.palette.get(self.last_palette_idx) {
+            if last == block {
+                return self.last_palette_idx;
+            }
+        }
+        let index = match self.palette_index.get(block) {
             Some(&index) => index,
             None => {
                 let index = self.palette.len();
@@ -300,7 +313,9 @@ impl Region {
                 self.palette_index.insert(block.clone(), index);
                 index
             }
-        }
+        };
+        self.last_palette_idx = index;
+        index
     }
 
     pub fn is_empty(&self) -> bool {
@@ -543,12 +558,12 @@ impl Region {
     ///
     /// Returns a minimal 1x1x1 clone if the region has no content at all.
     pub fn to_compact(&self) -> Region {
+        if self.is_content_compact() {
+            return self.clone();
+        }
         let Some(content_bounds) = self.get_content_bounds() else {
-            let mut empty = Region::new(self.name.clone(), (0, 0, 0), (1, 1, 1));
-            empty.palette = self.palette.clone();
-            empty.rebuild_palette_index();
-            empty.rebuild_air_index();
-            return empty;
+            let bounds = BoundingBox::new((0, 0, 0), (0, 0, 0));
+            return self.empty_like(&bounds);
         };
 
         self.to_compact_with_content_bounds(&content_bounds)
@@ -557,15 +572,23 @@ impl Region {
     /// An empty region over `bounds` sharing this region's name and palette.
     fn empty_like(&self, bounds: &BoundingBox) -> Region {
         let (position, size) = bounds.to_position_and_size();
-        let mut region = Region::new(self.name.clone(), position, size);
-        region.palette = self.palette.clone();
-        region.rebuild_palette_index();
-        region.rebuild_air_index();
-        if region.background() != 0 {
-            region.storage = Storage::new(bounds.clone(), region.background())
-                .expect("bounds were just allocated");
+        let storage = Storage::new(bounds.clone(), self.background())
+            .expect("region bounds or allocation exceed supported limits");
+        Region {
+            name: self.name.clone(),
+            position,
+            size,
+            storage,
+            palette: self.palette.clone(),
+            entities: Vec::new(),
+            block_entities: BlockEntityStore::default(),
+            palette_index: self.palette_index.clone(),
+            bbox: bounds.clone(),
+            tight_bounds: None,
+            cached_air_index: self.cached_air_index,
+            non_air_count: 0,
+            last_palette_idx: self.last_palette_idx,
         }
-        region
     }
 
     /// Compaction to `content_bounds`: the tight bounds plus any entity and
@@ -580,13 +603,8 @@ impl Region {
         // over unchanged.
         compact.non_air_count = self.non_air_count;
         compact.tight_bounds = self.tight_bounds.clone();
-
-        for (pos, be) in self.block_entities.iter() {
-            compact.block_entities.insert(pos, be.clone());
-        }
-        for entity in &self.entities {
-            compact.entities.push(entity.clone());
-        }
+        compact.block_entities = self.block_entities.clone();
+        compact.entities = self.entities.clone();
 
         compact
     }
@@ -610,10 +628,25 @@ impl Region {
         self.size.0 as usize * self.size.1 as usize * self.size.2 as usize
     }
 
-    /// Grow the region so it contains `(x, y, z)`. See [`Self::ensure_bounds`].
+    /// Grow the region so it contains `(x, y, z)`. Fast path for single-point
+    /// growth (the dominant `set_block` path) that avoids checking a 2-corner
+    /// box twice.
     #[inline]
     pub fn expand_to_fit(&mut self, x: i32, y: i32, z: i32) {
-        self.ensure_bounds((x, y, z), (x, y, z));
+        let (lo, hi) = (self.bbox.min, self.bbox.max);
+        if self.bbox.contains((x, y, z)) {
+            return;
+        }
+        let wanted = BoundingBox::new(
+            (lo.0.min(x), lo.1.min(y), lo.2.min(z)),
+            (hi.0.max(x), hi.1.max(y), hi.2.max(z)),
+        );
+        let storage = self.storage.bounds();
+        if storage.contains((x, y, z)) {
+            self.set_bounds(wanted);
+        } else {
+            self.ensure_bounds_slow((x, y, z), (x, y, z), wanted);
+        }
     }
 
     /// Ensure the region covers the given bounds, expanding if necessary.
@@ -720,7 +753,7 @@ impl Region {
     }
 
     pub fn merge(&mut self, other: &Region) {
-        let combined_bounding_box = self.get_bounding_box().union(&other.get_bounding_box());
+        let combined_bounding_box = self.bbox.union(&other.bbox);
         let new_size = combined_bounding_box.get_dimensions();
         let new_position = combined_bounding_box.min;
 
@@ -728,56 +761,115 @@ impl Region {
         let new_w = new_w as usize;
         let new_l = new_l as usize;
 
-        let mut new_blocks = vec![0u32; combined_bounding_box.volume() as usize];
-        let mut new_palette = self.palette.clone();
-        let mut reverse_new_palette: HashMap<BlockState, usize> = HashMap::new();
-        for (index, block) in self.palette.iter().enumerate() {
-            reverse_new_palette.insert(block.clone(), index);
+        let volume = combined_bounding_box.volume() as usize;
+        let mut new_blocks =
+            try_zeroed_blocks(volume).expect("combined region volume exceeds addressable memory");
+        let bg = self.background();
+        if bg != 0 {
+            new_blocks.fill(bg);
         }
+
+        // Reuse `self.palette` and `self.palette_index` directly instead of
+        // building a throwaway HashMap and rebuilding the index afterward.
+        let mut other_remap: Vec<u32> = Vec::with_capacity(other.palette.len());
+        let mut other_remap_identity = true;
+        for (i, block) in other.palette.iter().enumerate() {
+            let mapped = if let Some(&existing) = self.palette_index.get(block) {
+                existing as u32
+            } else {
+                let new_idx = self.palette.len();
+                self.palette.push(block.clone());
+                self.palette_index.insert(block.clone(), new_idx);
+                new_idx as u32
+            };
+            if mapped as usize != i {
+                other_remap_identity = false;
+            }
+            other_remap.push(mapped);
+        }
+        if self.cached_air_index == u32::MAX {
+            self.rebuild_air_index();
+        }
+        let self_air = self.cached_air_index;
+        let other_air_index = other.cached_air_index;
+        let disjoint = self.bbox.intersection(&other.bbox).is_none();
 
         // Rows of `self` keep their palette indices.
         let (cx, cy, cz) = combined_bounding_box.min;
+        let new_layer = new_w * new_l;
         let combined_index = |x: i32, y: i32, z: i32| {
-            (y - cy) as usize * new_w * new_l + (z - cz) as usize * new_w + (x - cx) as usize
+            (y - cy) as usize * new_layer + (z - cz) as usize * new_w + (x - cx) as usize
         };
         for (x, y, z, cells) in self.bounded_rows() {
             let dst = combined_index(x, y, z);
             new_blocks[dst..dst + cells.len()].copy_from_slice(cells);
         }
 
-        // Phase 5: Pre-build remap table for other palette
-        let other_air_index = other.cached_air_index;
-        let mut other_remap: Vec<u32> = Vec::with_capacity(other.palette.len());
-        for block in &other.palette {
-            if let Some(&existing) = reverse_new_palette.get(block) {
-                other_remap.push(existing as u32);
-            } else {
-                let new_idx = new_palette.len();
-                new_palette.push(block.clone());
-                reverse_new_palette.insert(block.clone(), new_idx);
-                other_remap.push(new_idx as u32);
+        // Copy other blocks using remap table, row by row.
+        let fast_track = self_air == 0;
+        let mut added_non_air = 0usize;
+        if disjoint && other_remap_identity && other_air_index == bg {
+            for (x, y, z, cells) in other.bounded_rows() {
+                let dst = combined_index(x, y, z);
+                new_blocks[dst..dst + cells.len()].copy_from_slice(cells);
             }
-        }
-
-        // Copy other blocks using remap table, row by row
-        for (x, y, z, cells) in other.bounded_rows() {
-            let dst = combined_index(x, y, z);
-            for (dx, &src_idx) in cells.iter().enumerate() {
-                if src_idx != other_air_index {
-                    new_blocks[dst + dx] = other_remap[src_idx as usize];
+            added_non_air = other.non_air_count;
+        } else if disjoint {
+            for (x, y, z, cells) in other.bounded_rows() {
+                let dst = combined_index(x, y, z);
+                let out = &mut new_blocks[dst..dst + cells.len()];
+                for (slot, &src_idx) in out.iter_mut().zip(cells) {
+                    if src_idx != other_air_index {
+                        *slot = other_remap[src_idx as usize];
+                    }
+                }
+            }
+            added_non_air = other.non_air_count;
+        } else if fast_track {
+            for (x, y, z, cells) in other.bounded_rows() {
+                let dst = combined_index(x, y, z);
+                let out = &mut new_blocks[dst..dst + cells.len()];
+                for (slot, &src_idx) in out.iter_mut().zip(cells) {
+                    if src_idx != other_air_index {
+                        let mapped = other_remap[src_idx as usize];
+                        if mapped != 0 {
+                            if *slot == 0 {
+                                added_non_air += 1;
+                            }
+                            *slot = mapped;
+                        }
+                    }
+                }
+            }
+        } else {
+            for (x, y, z, cells) in other.bounded_rows() {
+                let dst = combined_index(x, y, z);
+                let out = &mut new_blocks[dst..dst + cells.len()];
+                for (slot, &src_idx) in out.iter_mut().zip(cells) {
+                    if src_idx != other_air_index {
+                        *slot = other_remap[src_idx as usize];
+                    }
                 }
             }
         }
 
-        // Update region properties
-        self.set_storage(new_position, new_size, new_blocks);
-        self.palette = new_palette;
+        // Update storage and bounds without redundant palette/air rebuilds.
+        self.position = new_position;
+        self.size = new_size;
+        self.bbox = combined_bounding_box;
+        self.storage = Storage::from_dense(self.bbox.clone(), new_blocks, self.background());
 
-        // Rebuild all caches
-        self.rebuild_palette_index();
-        self.rebuild_air_index();
-        // Compaction must include blocks added outside the original region.
-        self.rescan_content();
+        if fast_track {
+            self.non_air_count += added_non_air;
+            self.tight_bounds = match (self.tight_bounds.take(), &other.tight_bounds) {
+                (Some(a), Some(b)) => Some(a.union(b)),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b.clone()),
+                (None, None) => None,
+            };
+        } else {
+            self.rescan_content();
+        }
 
         // Merge entities and block entities
         self.merge_entities(other);
@@ -1026,6 +1118,7 @@ impl Region {
             tight_bounds: None,
             cached_air_index: 0,
             non_air_count: 0,
+            last_palette_idx: 0,
         };
 
         region.rebuild_palette_index();
@@ -1118,36 +1211,79 @@ impl Region {
     /// Unpack `volume` cells; `packed_states` must hold at least
     /// `ceil(volume * bits / 64)` longs.
     fn unpack_exact(packed_states: &[i64], bits_per_block: usize, volume: usize) -> Vec<u32> {
+        if volume == 0 {
+            return Vec::new();
+        }
         let mask: u64 = (1u64 << bits_per_block) - 1;
         let mut blocks = vec![0u32; volume];
 
-        if 64 % bits_per_block == 0 {
-            // Entries never cross i64 boundaries (bits_per_block = 2, 4, 8,
-            // 16, 32): a fixed number of cells per long, so the inner loop
-            // has a constant trip count.
-            let per_long = 64 / bits_per_block;
-            for (cells, &packed) in blocks.chunks_mut(per_long).zip(packed_states) {
-                let packed = packed as u64;
-                for (i, cell) in cells.iter_mut().enumerate() {
-                    *cell = ((packed >> (i * bits_per_block)) & mask) as u32;
+        match bits_per_block {
+            2 => {
+                for (cells, &packed) in blocks.chunks_mut(32).zip(packed_states) {
+                    let mut p = packed as u64;
+                    for cell in cells {
+                        *cell = (p & 0x3) as u32;
+                        p >>= 2;
+                    }
                 }
             }
-        } else {
-            // Entries may cross i64 boundaries.
-            for (index, cell) in blocks.iter_mut().enumerate() {
-                let bit_index = index * bits_per_block;
-                let start_long_index = bit_index / 64;
-                let start_offset = bit_index % 64;
-
-                let value = if start_offset + bits_per_block <= 64 {
-                    ((packed_states[start_long_index] as u64) >> start_offset) & mask
-                } else {
-                    let low_bits = (packed_states[start_long_index] as u64) >> start_offset;
-                    let high_bits = (packed_states[start_long_index + 1] as u64)
-                        & ((1u64 << (bits_per_block - (64 - start_offset))) - 1);
-                    low_bits | (high_bits << (64 - start_offset))
-                };
-                *cell = value as u32;
+            4 => {
+                for (cells, &packed) in blocks.chunks_mut(16).zip(packed_states) {
+                    let mut p = packed as u64;
+                    for cell in cells {
+                        *cell = (p & 0xF) as u32;
+                        p >>= 4;
+                    }
+                }
+            }
+            8 => {
+                for (cells, &packed) in blocks.chunks_mut(8).zip(packed_states) {
+                    let mut p = packed as u64;
+                    for cell in cells {
+                        *cell = (p & 0xFF) as u32;
+                        p >>= 8;
+                    }
+                }
+            }
+            _ if 64 % bits_per_block == 0 => {
+                let per_long = 64 / bits_per_block;
+                for (cells, &packed) in blocks.chunks_mut(per_long).zip(packed_states) {
+                    let mut p = packed as u64;
+                    for cell in cells {
+                        *cell = (p & mask) as u32;
+                        p >>= bits_per_block;
+                    }
+                }
+            }
+            _ => {
+                // Streaming bit reader for non-power-of-two widths (3, 5, 6, 7, ...):
+                // avoids per-cell multiply/div/mod.
+                let bits = bits_per_block as u32;
+                let mut long_idx = 0usize;
+                let mut bit_pos: u32 = 0;
+                let mut cur = packed_states[0] as u64;
+                for cell in &mut blocks {
+                    let val = if bit_pos + bits <= 64 {
+                        let v = (cur >> bit_pos) & mask;
+                        bit_pos += bits;
+                        if bit_pos == 64 {
+                            bit_pos = 0;
+                            long_idx += 1;
+                            if long_idx < packed_states.len() {
+                                cur = packed_states[long_idx] as u64;
+                            }
+                        }
+                        v
+                    } else {
+                        let low = cur >> bit_pos;
+                        let low_bits = 64 - bit_pos;
+                        long_idx += 1;
+                        cur = packed_states[long_idx] as u64;
+                        bit_pos = bits - low_bits;
+                        (low | (cur << low_bits)) & mask
+                    };
+                    *cell = val as u32;
+                }
             }
         }
 
@@ -1338,23 +1474,23 @@ impl Region {
     pub fn flip_x(&mut self) {
         use crate::transforms::{transform_block_state_flip, Axis};
 
-        // Reverse the bounds' span of each X-row in place.
-        let (min, max) = (self.bbox.min, self.bbox.max);
-        for y in min.1..=max.1 {
-            for z in min.2..=max.2 {
-                self.storage.reverse_row(y, z, min.0, max.0);
+        self.storage.flip_x(&self.bbox);
+
+        // Transform block state properties; only rebuild the reverse index when
+        // at least one palette entry actually changed.
+        let mut palette_changed = false;
+        for block_state in &mut self.palette {
+            if !block_state.properties.is_empty() {
+                let transformed = transform_block_state_flip(block_state, Axis::X);
+                if transformed != *block_state {
+                    *block_state = transformed;
+                    palette_changed = true;
+                }
             }
         }
-
-        // Transform block state properties
-        let mut new_palette = Vec::with_capacity(self.palette.len());
-        for block_state in &self.palette {
-            new_palette.push(transform_block_state_flip(block_state, Axis::X));
+        if palette_changed {
+            self.rebuild_palette_index();
         }
-
-        self.palette = new_palette;
-        self.rebuild_palette_index();
-        self.rebuild_air_index();
         // A flip permutes cells: the air count is unchanged and the content
         // bounds mirror within the region's bounds.
         self.mirror_tight_bounds(0);
@@ -1416,21 +1552,21 @@ impl Region {
     pub fn flip_y(&mut self) {
         use crate::transforms::{transform_block_state_flip, Axis};
 
-        // Swap whole storage layers across the bounds' mid-plane: cells
-        // outside the bounds are air in both layers.
-        let (min_y, max_y) = (self.bbox.min.1, self.bbox.max.1);
-        for k in 0..(max_y - min_y + 1) / 2 {
-            self.storage.swap_layers(min_y + k, max_y - k);
-        }
+        self.storage.flip_y(&self.bbox);
 
-        let mut new_palette = Vec::with_capacity(self.palette.len());
-        for block_state in &self.palette {
-            new_palette.push(transform_block_state_flip(block_state, Axis::Y));
+        let mut palette_changed = false;
+        for block_state in &mut self.palette {
+            if !block_state.properties.is_empty() {
+                let transformed = transform_block_state_flip(block_state, Axis::Y);
+                if transformed != *block_state {
+                    *block_state = transformed;
+                    palette_changed = true;
+                }
+            }
         }
-
-        self.palette = new_palette;
-        self.rebuild_palette_index();
-        self.rebuild_air_index();
+        if palette_changed {
+            self.rebuild_palette_index();
+        }
         // A flip permutes cells: the air count is unchanged and the content
         // bounds mirror within the region's bounds.
         self.mirror_tight_bounds(1);
@@ -1450,23 +1586,21 @@ impl Region {
     pub fn flip_z(&mut self) {
         use crate::transforms::{transform_block_state_flip, Axis};
 
-        // Swap whole storage rows across the bounds' mid-plane within each
-        // layer of the bounds: cells outside the bounds are air in both rows.
-        let (min, max) = (self.bbox.min, self.bbox.max);
-        for y in min.1..=max.1 {
-            for k in 0..(max.2 - min.2 + 1) / 2 {
-                self.storage.swap_rows((y, min.2 + k), (y, max.2 - k));
+        self.storage.flip_z(&self.bbox);
+
+        let mut palette_changed = false;
+        for block_state in &mut self.palette {
+            if !block_state.properties.is_empty() {
+                let transformed = transform_block_state_flip(block_state, Axis::Z);
+                if transformed != *block_state {
+                    *block_state = transformed;
+                    palette_changed = true;
+                }
             }
         }
-
-        let mut new_palette = Vec::with_capacity(self.palette.len());
-        for block_state in &self.palette {
-            new_palette.push(transform_block_state_flip(block_state, Axis::Z));
+        if palette_changed {
+            self.rebuild_palette_index();
         }
-
-        self.palette = new_palette;
-        self.rebuild_palette_index();
-        self.rebuild_air_index();
         // A flip permutes cells: the air count is unchanged and the content
         // bounds mirror within the region's bounds.
         self.mirror_tight_bounds(2);
@@ -1571,22 +1705,45 @@ impl Region {
         let new_size = (old_size_z, size_y, old_size_x);
         let new_bbox = BoundingBox::try_from_position_and_size(position, new_size)?;
 
-        // (dx, dy, dz) -> (sz-1-dz, dy, dx). Every cell is written, so the
-        // zeroed allocation's contents never survive.
+        // (dx, dy, dz) -> (sz-1-dz, dy, dx). Tile large layers in 16×16 blocks
+        // so power-of-two widths avoid L1 cache-set thrashing; small layers fit
+        // in L1 directly without tiling overhead.
         let (w, h, l) = (old_size_x as usize, size_y as usize, old_size_z as usize);
-        let (new_w, new_l) = (l, w);
-        let mut new_blocks = try_zeroed_blocks(w * h * l)?;
+        let new_w = l;
+        let layer_size = w * l;
+        let mut new_blocks = try_zeroed_blocks(layer_size * h)?;
         let old_storage = std::mem::replace(&mut self.storage, Storage::empty());
         let old_cells = old_storage.dense(&self.bbox);
-        let mut src = 0;
-        for dy in 0..h {
-            let layer = dy * new_w * new_l;
-            for dz in 0..l {
-                let column = layer + (l - 1 - dz);
-                for (dx, &block) in old_cells[src..src + w].iter().enumerate() {
-                    new_blocks[column + dx * new_w] = block;
+        if layer_size <= 4096 {
+            let mut src = 0;
+            for dy in 0..h {
+                let layer = dy * layer_size;
+                for dz in 0..l {
+                    let column = layer + (l - 1 - dz);
+                    for (dx, &block) in old_cells[src..src + w].iter().enumerate() {
+                        new_blocks[column + dx * new_w] = block;
+                    }
+                    src += w;
                 }
-                src += w;
+            }
+        } else {
+            const TILE: usize = 16;
+            for dy in 0..h {
+                let src_layer = &old_cells[dy * layer_size..(dy + 1) * layer_size];
+                let dst_layer = &mut new_blocks[dy * layer_size..(dy + 1) * layer_size];
+                for dz0 in (0..l).step_by(TILE) {
+                    let dz1 = (dz0 + TILE).min(l);
+                    for dx0 in (0..w).step_by(TILE) {
+                        let dx1 = (dx0 + TILE).min(w);
+                        for dz in dz0..dz1 {
+                            let dst_col = l - 1 - dz;
+                            let src_row = &src_layer[dz * w + dx0..dz * w + dx1];
+                            for (k, &block) in src_row.iter().enumerate() {
+                                dst_layer[(dx0 + k) * new_w + dst_col] = block;
+                            }
+                        }
+                    }
+                }
             }
         }
         let new_tight = self.tight_bounds.as_ref().map(|b| {
@@ -1600,20 +1757,27 @@ impl Region {
             BoundingBox::new((ax.min(bx), b.min.1, az.min(bz)), (ax.max(bx), b.max.1, az.max(bz)))
         });
 
-        let mut new_palette = Vec::with_capacity(self.palette.len());
-        for block_state in &self.palette {
-            new_palette.push(transform_block_state_rotate(block_state, Axis::Y, 90));
+        let mut palette_changed = false;
+        for block_state in &mut self.palette {
+            if !block_state.properties.is_empty() {
+                let transformed = transform_block_state_rotate(block_state, Axis::Y, 90);
+                if transformed != *block_state {
+                    *block_state = transformed;
+                    palette_changed = true;
+                }
+            }
         }
 
         let new_bbox_clone = new_bbox.clone();
 
         self.position = new_bbox.to_position_and_size().0;
         self.size = new_bbox.to_position_and_size().1;
-        self.palette = new_palette;
         drop(old_cells);
-        self.set_storage(self.position, self.size, new_blocks);
-        self.rebuild_palette_index();
-        self.rebuild_air_index();
+        self.bbox = new_bbox;
+        self.storage = Storage::from_dense(self.bbox.clone(), new_blocks, self.background());
+        if palette_changed {
+            self.rebuild_palette_index();
+        }
         // A rotation permutes cells: the air count is unchanged.
         self.tight_bounds = new_tight;
 
@@ -1834,13 +1998,19 @@ impl Region {
     // ── Fast-path methods for Python binding performance ──
 
     /// Look up or insert a block in the palette by name only (no properties).
-    /// Uses a linear scan of the palette (palettes are typically 2-20 entries).
-    /// Avoids creating a full BlockState + HashMap lookup on cache miss.
+    /// Checks the 1-entry MRU slot first, then scans the palette linearly
+    /// (palettes are typically 2-20 entries).
     #[inline]
     pub fn get_or_insert_palette_by_name(&mut self, name: &str) -> usize {
+        if let Some(last) = self.palette.get(self.last_palette_idx) {
+            if last.name == name && last.properties.is_empty() {
+                return self.last_palette_idx;
+            }
+        }
         // Linear scan is faster than HashMap for small palettes
         for (i, bs) in self.palette.iter().enumerate() {
             if bs.name == name && bs.properties.is_empty() {
+                self.last_palette_idx = i;
                 return i;
             }
         }
@@ -1849,21 +2019,15 @@ impl Region {
         let block = BlockState::new(name.to_string());
         self.palette_index.insert(block.clone(), index);
         self.palette.push(block);
+        self.last_palette_idx = index;
         index
     }
 
     /// Look up or insert a block in the palette by full BlockState
-    /// (id + properties). Mirrors `get_or_insert_palette_by_name` but for the
-    /// case where we have a complete state (e.g. from parsing a block string).
+    /// (id + properties). Delegates to [`Self::get_or_insert_in_palette`].
     #[inline]
     pub fn get_or_insert_palette_by_state(&mut self, state: &BlockState) -> usize {
-        if let Some(&i) = self.palette_index.get(state) {
-            return i;
-        }
-        let index = self.palette.len();
-        self.palette_index.insert(state.clone(), index);
-        self.palette.push(state.clone());
-        index
+        self.get_or_insert_in_palette(state)
     }
 
     /// Copy the cells of `src` inside `clip` into this region, translated by
@@ -1916,11 +2080,44 @@ impl Region {
         };
 
         let mut remap = vec![UNRESOLVED; src.palette.len()];
+        let dst_was_empty = self.non_air_count == 0;
+        let fast_empty_stamp = dst_was_empty && excluded.is_empty();
         let mut air_delta: i64 = 0;
         let mut cleared_edge = false;
         let mut added: Option<BoundingBox> = None;
         let mut intervals: Vec<(i32, i32)> = Vec::new();
-        let mut mapped_row: Vec<u32> = Vec::new();
+        let mut next_intervals: Vec<(i32, i32)> = Vec::new();
+
+        #[cold]
+        #[inline(never)]
+        fn resolve_state(
+            block: &BlockState,
+            palette: &mut Vec<BlockState>,
+            palette_index: &mut FxHashMap<BlockState, usize>,
+            last_palette_idx: &mut usize,
+            excluded: &[BlockState],
+        ) -> u32 {
+            if excluded.contains(block) {
+                SKIP
+            } else {
+                let idx = match palette_index.get(block) {
+                    Some(&index) => index,
+                    None => {
+                        let index = palette.len();
+                        palette.push(block.clone());
+                        palette_index.insert(block.clone(), index);
+                        index
+                    }
+                };
+                *last_palette_idx = idx;
+                idx as u32
+            }
+        }
+
+        let storage = &mut self.storage;
+        let palette = &mut self.palette;
+        let palette_index = &mut self.palette_index;
+        let last_palette_idx = &mut self.last_palette_idx;
 
         for y in clip.min.1..=clip.max.1 {
             for z in clip.min.2..=clip.max.2 {
@@ -1931,66 +2128,97 @@ impl Region {
                     if y < s.min.1 || y > s.max.1 || z < s.min.2 || z > s.max.2 {
                         continue;
                     }
-                    let mut next = Vec::with_capacity(intervals.len() + 1);
+                    next_intervals.clear();
                     for &(a, b) in &intervals {
                         if s.max.0 < a || s.min.0 > b {
-                            next.push((a, b));
+                            next_intervals.push((a, b));
                             continue;
                         }
                         if a < s.min.0 {
-                            next.push((a, s.min.0 - 1));
+                            next_intervals.push((a, s.min.0 - 1));
                         }
                         if b > s.max.0 {
-                            next.push((s.max.0 + 1, b));
+                            next_intervals.push((s.max.0 + 1, b));
                         }
                     }
-                    intervals = next;
+                    std::mem::swap(&mut intervals, &mut next_intervals);
                 }
 
                 for &(x0, x1) in &intervals {
                     let (dx0, dy, dz) = translate((x0, y, z));
-                    mapped_row.clear();
-                    for (_, cells) in src.storage.row(y, z, x0, x1) {
-                        for &state in cells {
-                            let state = state as usize;
-                            let mut mapped = remap[state];
-                            if mapped == UNRESOLVED {
-                                let block = &src.palette[state];
-                                mapped = if excluded.contains(block) {
-                                    SKIP
-                                } else {
-                                    self.get_or_insert_in_palette(block) as u32
-                                };
-                                remap[state] = mapped;
-                            }
-                            mapped_row.push(mapped);
-                        }
-                    }
                     let (mut lo, mut hi) = (usize::MAX, 0usize);
-                    let dx1 = dx0 + (x1 - x0);
-                    self.storage.row_mut(dy, dz, dx0, dx1, |seg_x, cells| {
-                        let base = (seg_x - dx0) as usize;
-                        for (j, cell) in cells.iter_mut().enumerate() {
-                            let i = base + j;
-                            let mapped = mapped_row[i];
-                            if mapped == SKIP {
-                                continue;
-                            }
-                            let old = std::mem::replace(cell, mapped);
-                            if mapped == air {
-                                if old != air {
-                                    air_delta -= 1;
-                                    cleared_edge |= on_old_edge((dx0 + i as i32, dy, dz));
+                    for (src_seg_x, src_cells) in src.storage.row(y, z, x0, x1) {
+                        let seg_dx0 = dx0 + (src_seg_x - x0);
+                        let seg_dx1 = seg_dx0 + src_cells.len() as i32 - 1;
+                        storage.row_mut(dy, dz, seg_dx0, seg_dx1, |dst_seg_x, dst_cells| {
+                            let src_off = (dst_seg_x - seg_dx0) as usize;
+                            let src_slice = &src_cells[src_off..src_off + dst_cells.len()];
+                            let col_base = (dst_seg_x - dx0) as usize;
+                            if fast_empty_stamp {
+                                for (j, (cell, &state)) in
+                                    dst_cells.iter_mut().zip(src_slice).enumerate()
+                                {
+                                    let state = state as usize;
+                                    let mut mapped = remap[state];
+                                    if mapped == UNRESOLVED {
+                                        mapped = resolve_state(
+                                            &src.palette[state],
+                                            palette,
+                                            palette_index,
+                                            last_palette_idx,
+                                            excluded,
+                                        );
+                                        remap[state] = mapped;
+                                    }
+                                    *cell = mapped;
+                                    if mapped != air {
+                                        air_delta += 1;
+                                        let col = col_base + j;
+                                        if col < lo {
+                                            lo = col;
+                                        }
+                                        if col > hi {
+                                            hi = col;
+                                        }
+                                    }
                                 }
                             } else {
-                                if old == air {
-                                    air_delta += 1;
+                                for (j, (cell, &state)) in
+                                    dst_cells.iter_mut().zip(src_slice).enumerate()
+                                {
+                                    let state = state as usize;
+                                    let mut mapped = remap[state];
+                                    if mapped == UNRESOLVED {
+                                        mapped = resolve_state(
+                                            &src.palette[state],
+                                            palette,
+                                            palette_index,
+                                            last_palette_idx,
+                                            excluded,
+                                        );
+                                        remap[state] = mapped;
+                                    }
+                                    if mapped == SKIP {
+                                        continue;
+                                    }
+                                    let col = col_base + j;
+                                    let old = std::mem::replace(cell, mapped);
+                                    if mapped == air {
+                                        if old != air {
+                                            air_delta -= 1;
+                                            cleared_edge |= on_old_edge((dx0 + col as i32, dy, dz));
+                                        }
+                                    } else {
+                                        if old == air {
+                                            air_delta += 1;
+                                        }
+                                        lo = lo.min(col);
+                                        hi = hi.max(col);
+                                    }
                                 }
-                                lo = lo.min(i);
-                                hi = hi.max(i);
                             }
-                        }
-                    });
+                        });
+                    }
                     if lo <= hi {
                         let row = BoundingBox::new(
                             (dx0 + lo as i32, dy, dz),
