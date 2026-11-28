@@ -2056,12 +2056,12 @@ async function mountPaletteStudio(root, ensureModelViewer) {
 }
 
 /* ============================================================================
- * WIDGET 5: INTERACTIVE MC-TICK REDSTONE STEP-THROUGH LAB (tick-simulation)
+ * WIDGET 5: FULL INTERACTIVE 3D MC-TICK + NUCLEATION MESHER LAB
  * ============================================================================ */
 
 const TICK_CIRCUITS = {
   delay: {
-    label: "1. Repeater delay line",
+    label: "1. Repeater delay",
     inputPos: [0, 1, 1],
     actionLabel: "Toggle lever",
     build(nuc) {
@@ -2083,7 +2083,7 @@ const TICK_CIRCUITS = {
     },
   },
   inverter: {
-    label: "2. Torch inverter (NOT)",
+    label: "2. Torch inverter",
     inputPos: [0, 1, 1],
     actionLabel: "Toggle lever",
     build(nuc) {
@@ -2121,17 +2121,159 @@ const TICK_CIRCUITS = {
       return s;
     },
   },
+  sandbox: {
+    label: "4. Observer piston + sandbox",
+    inputPos: [1, 1, 3],
+    actionLabel: "Toggle lever",
+    build(nuc) {
+      const s = nuc.Schematic.create("redstone_sandbox");
+      for (let x = 0; x <= 7; x += 1) {
+        for (let z = 0; z <= 5; z += 1) {
+          s.setBlock(x, 0, z, "minecraft:smooth_stone");
+        }
+      }
+      // Obsidian glide rail under slime block so piston slides cleanly without dragging the floor!
+      s.setBlock(5, 0, 3, "minecraft:obsidian");
+      s.setBlock(6, 0, 3, "minecraft:obsidian");
+      s.setBlockFromString(1, 1, 3, "minecraft:lever[face=floor,facing=east,powered=false]");
+      s.setBlockFromString(2, 1, 3, "minecraft:observer[facing=west,powered=false]");
+      s.setBlockFromString(3, 1, 3, "minecraft:redstone_wire[east=side,west=side,north=none,south=none,power=0]");
+      s.setBlockFromString(4, 1, 3, "minecraft:sticky_piston[facing=east,extended=false]");
+      s.setBlock(5, 1, 3, "minecraft:slime_block");
+      s.setBlock(5, 2, 3, "minecraft:gold_block");
+      s.setBlockFromString(3, 1, 1, "minecraft:redstone_lamp[lit=false]");
+      return s;
+    },
+  },
 };
 
-async function mountTickStudio(root, ensureModelViewer) {
-  if (root.dataset.mounted === "true") return () => {};
+const OPPOSITE_FACING = {
+  north: "south",
+  south: "north",
+  east: "west",
+  west: "east",
+};
+
+function faceToCardinal(face, fallback) {
+  if (face[0] === 1) return "east";
+  if (face[0] === -1) return "west";
+  if (face[2] === 1) return "south";
+  if (face[2] === -1) return "north";
+  return fallback;
+}
+
+const TICK_TOOLS = [
+  { id: "interact", label: "Interact", swatch: "#5fd38d", title: "Click levers, buttons, or repeaters in 3D" },
+  {
+    id: "dust",
+    label: "Dust",
+    swatch: "#e02b20",
+    state: () => "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]",
+  },
+  {
+    id: "repeater",
+    label: "Repeater",
+    swatch: "#b2b6bc",
+    // Repeater's `facing` points opposite the signal travel direction (vanilla convention)
+    state: (_face, facing) =>
+      `minecraft:repeater[delay=1,facing=${OPPOSITE_FACING[facing] || "west"},locked=false,powered=false]`,
+  },
+  {
+    id: "torch",
+    label: "Torch",
+    swatch: "#ff5533",
+    state: (face) => {
+      if (face[1] === 0 && (face[0] !== 0 || face[2] !== 0)) {
+        return `minecraft:redstone_wall_torch[facing=${faceToCardinal(face, "east")},lit=true]`;
+      }
+      return "minecraft:redstone_torch[lit=true]";
+    },
+  },
+  {
+    id: "lever",
+    label: "Lever",
+    swatch: "#9c7548",
+    state: (face, facing) => {
+      if (face[1] === 0 && (face[0] !== 0 || face[2] !== 0)) {
+        return `minecraft:lever[face=wall,facing=${faceToCardinal(face, facing)},powered=false]`;
+      }
+      return `minecraft:lever[face=floor,facing=${facing},powered=false]`;
+    },
+  },
+  {
+    id: "button",
+    label: "Button",
+    swatch: "#8e9296",
+    state: (face, facing) => {
+      if (face[1] === 0 && (face[0] !== 0 || face[2] !== 0)) {
+        return `minecraft:stone_button[face=wall,facing=${faceToCardinal(face, facing)},powered=false]`;
+      }
+      return `minecraft:stone_button[face=floor,facing=${facing},powered=false]`;
+    },
+  },
+  {
+    id: "piston",
+    label: "Sticky piston",
+    swatch: "#78c858",
+    state: (face, facing) => {
+      let dir = OPPOSITE_FACING[facing] || "east";
+      if (face[1] === 1) dir = facing;
+      return `minecraft:sticky_piston[extended=false,facing=${dir}]`;
+    },
+  },
+  {
+    id: "observer",
+    label: "Observer",
+    swatch: "#6a6e76",
+    state: (_face, facing) => `minecraft:observer[facing=${facing},powered=false]`,
+  },
+  {
+    id: "rsblock",
+    label: "Redstone block",
+    swatch: "#c81e16",
+    state: () => "minecraft:redstone_block",
+  },
+  {
+    id: "lamp",
+    label: "Lamp",
+    swatch: "#d69240",
+    state: () => "minecraft:redstone_lamp[lit=false]",
+  },
+  {
+    id: "slime",
+    label: "Slime",
+    swatch: "#70c45c",
+    state: () => "minecraft:slime_block",
+  },
+  {
+    id: "stone",
+    label: "Stone",
+    swatch: "#a8acb2",
+    state: () => "minecraft:smooth_stone",
+  },
+  { id: "break", label: "Break", swatch: "#e05252", danger: true, title: "Click any block to mine it (or Shift+Click)" },
+];
+
+async function mountTickStudio(root) {
+  if (root.dataset.mounted === "true") return { destroy: () => {} };
   root.dataset.mounted = "true";
 
   let circuitKey = "delay";
+  let activeTool = "interact";
   let nuc = null;
   let sim = null;
   let liveSchem = null;
-  let currentUrl = null;
+  let viewport = null;
+  let customFileBytes = null;
+  let customFileName = null;
+  let playing = false;
+  let tps = 10;
+  let tickCarry = 0;
+  let remeshing = false;
+  let needsRemesh = false;
+  let refitNext = false;
+  const solidSet = new Set();
+  const vKey = (x, y, z) => `${x},${y},${z}`;
 
   root.innerHTML = `
     <div class="sdf-studio__bar">
@@ -2147,32 +2289,59 @@ async function mountTickStudio(root, ensureModelViewer) {
       </div>
     </div>
 
-    <div class="sdf-studio__stage">
-      <model-viewer
-        class="sdf-studio__viewer"
-        alt="Live 3D Minecraft redstone circuit simulated in WebAssembly by mc-tick"
-        camera-controls
-        camera-orbit="26deg 56deg 116%"
-        field-of-view="28deg"
-        shadow-intensity="0.65"
-        exposure="1.05"
-        interaction-prompt="none"
-      ></model-viewer>
-      <div class="sdf-studio__overlay" data-role="tick-status">Loading mc-tick WASM...</div>
+    <div class="tick-stage" data-role="tick-stage">
+      <div class="tick-hud">
+        <div class="tick-hud__pill" data-role="tick-hover">Hover a block · Left-click interacts · Drag orbits · Shift+Click breaks</div>
+        <div class="tick-hud__pill tick-hud__pill--muted" data-role="tick-clock">tick 0 · paused</div>
+      </div>
+      <div class="tick-hud__bottom">
+        <span class="tick-hud__pill tick-hud__pill--muted" data-role="tick-hint">Drop .schem / .litematic / .nbt here</span>
+        <button type="button" class="sdf-pack-btn" data-role="tick-cam">Reset view</button>
+      </div>
+      <div class="sdf-studio__overlay" data-role="tick-status">Loading Nucleation WASM mesher + Three.js...</div>
+    </div>
+
+    <div class="tick-toolbar" role="radiogroup" aria-label="3D build & interact tool" data-role="tick-tools">
+      <span class="tick-toolbar__label">Tool</span>
+      ${TICK_TOOLS.map(
+        (t) =>
+          `<button type="button" class="tick-tool${t.danger ? " tick-tool--danger" : ""}" role="radio" aria-checked="${
+            t.id === activeTool
+          }" data-tool="${t.id}" title="${t.title || `Place ${t.label} on clicked block face`}"><span class="tick-tool__swatch" style="background:${t.swatch}"></span>${t.label}</button>`,
+      ).join("")}
     </div>
 
     <div class="tick-actions">
-      <button type="button" class="sdf-run-btn" data-role="tick-use">${TICK_CIRCUITS[circuitKey].actionLabel}</button>
-      <button type="button" class="sdf-pack-btn" data-role="tick-step1">Step +1 tick</button>
-      <button type="button" class="sdf-pack-btn" data-role="tick-step2">Step +2 ticks</button>
-      <button type="button" class="sdf-pack-btn" data-role="tick-settle">Run to settle</button>
-      <button type="button" class="sdf-pack-btn" data-role="tick-reset">Reset</button>
+      <div class="tick-actions__group">
+        <button type="button" class="sdf-run-btn" data-role="tick-play">Play</button>
+        <label class="tick-tps">
+          <span>Speed</span>
+          <select data-role="tick-tps" aria-label="Simulation ticks per second">
+            <option value="2">2 TPS</option>
+            <option value="5">5 TPS</option>
+            <option value="10" selected>10 TPS</option>
+            <option value="20">20 TPS</option>
+          </select>
+        </label>
+        <button type="button" class="sdf-pack-btn" data-role="tick-use">${TICK_CIRCUITS[circuitKey].actionLabel}</button>
+        <button type="button" class="sdf-pack-btn" data-role="tick-step1">+1 tick</button>
+        <button type="button" class="sdf-pack-btn" data-role="tick-step2">+2 ticks</button>
+        <button type="button" class="sdf-pack-btn" data-role="tick-settle">Settle</button>
+        <button type="button" class="sdf-pack-btn" data-role="tick-reset">Reset</button>
+      </div>
+      <div class="tick-actions__group">
+        <label class="sdf-pack-btn" title="Open any .schem, .litematic, .schematic, or .nbt file">
+          <span>Open schematic</span>
+          <input type="file" accept=".schem,.litematic,.schematic,.nbt,.snbt,.mcstructure" data-role="tick-schem-input" hidden>
+        </label>
+        <button type="button" class="sdf-pack-btn" data-role="tick-export">Download .schem</button>
+      </div>
     </div>
 
-    <pre class="tick-log" data-role="tick-log">Click Toggle lever, then Step +1 / +2 ticks to inspect mc-tick block transitions.</pre>
+    <pre class="tick-log" data-role="tick-log">Click directly on the lever in 3D (or click Toggle lever), then press Play or +1 tick.</pre>
 
     <div class="sdf-studio__footer">
-      <div class="sdf-telemetry" data-role="tick-telemetry">Initializing mc-tick simulator...</div>
+      <div class="sdf-telemetry" data-role="tick-telemetry">Initializing Nucleation WASM mesher & mc-tick...</div>
       <div class="sdf-footer-actions">
         <label class="sdf-pack-btn" title="Drop any Minecraft resource pack .zip or client.jar to render with vanilla textures">
           <span data-role="tick-pack-label">Load pack .zip</span>
@@ -2182,57 +2351,248 @@ async function mountTickStudio(root, ensureModelViewer) {
     </div>
   `;
 
-  const viewer = root.querySelector(".sdf-studio__viewer");
+  const stageEl = root.querySelector('[data-role="tick-stage"]');
   const statusEl = root.querySelector('[data-role="tick-status"]');
+  const hoverEl = root.querySelector('[data-role="tick-hover"]');
+  const clockEl = root.querySelector('[data-role="tick-clock"]');
+  const hintEl = root.querySelector('[data-role="tick-hint"]');
+  const playBtn = root.querySelector('[data-role="tick-play"]');
+  const tpsSel = root.querySelector('[data-role="tick-tps"]');
   const useBtn = root.querySelector('[data-role="tick-use"]');
   const logEl = root.querySelector('[data-role="tick-log"]');
   const telemetryEl = root.querySelector('[data-role="tick-telemetry"]');
   const packInput = root.querySelector('[data-role="tick-pack-input"]');
   const packLabel = root.querySelector('[data-role="tick-pack-label"]');
+  const schemInput = root.querySelector('[data-role="tick-schem-input"]');
 
-  function renderSim() {
-    if (!sim || !nuc || !liveSchem) return;
-    sim.bakeTo(liveSchem);
-    const cfg = nuc.MeshConfig.create();
-    cfg.setAmbientOcclusion(true);
-    cfg.setAoIntensity(0.45);
-    cfg.setGreedyMeshing(true);
-    const mesh = nuc.MeshResult.create(liveSchem, getActivePack(nuc), cfg);
-    const glbBytes = decodeBase64(mesh.glbDataB64());
-    const nextUrl = URL.createObjectURL(new Blob([glbBytes], { type: "model/gltf-binary" }));
-    if (currentUrl) URL.revokeObjectURL(currentUrl);
-    currentUrl = nextUrl;
-    viewer.src = nextUrl;
-
-    const changes = JSON.parse(sim.changesJson());
-    const recent = changes.slice(-8).reverse();
-    if (recent.length === 0) {
-      logEl.textContent = `Tick ${sim.tickCount()} · no block transitions yet. Click "${TICK_CIRCUITS[circuitKey].actionLabel}" to excite the circuit.`;
-    } else {
-      logEl.textContent = recent
-        .map(
-          (c) =>
-            `[t=${String(c.tick).padStart(2, " ")}] (${c.pos.join(",")})  ${c.from.replace("minecraft:", "")}  ->  ${c.to.replace("minecraft:", "")}`,
-        )
-        .join("\n");
+  function syncSolidAndSchemFromSim() {
+    if (!sim || !nuc) return;
+    const snap = JSON.parse(sim.worldSnapshotJson());
+    solidSet.clear();
+    const fresh = nuc.Schematic.create(customFileName || circuitKey);
+    for (const cell of snap) {
+      const [x, y, z] = cell.pos;
+      const st = cell.state;
+      if (!st || st === "minecraft:air") continue;
+      solidSet.add(vKey(x, y, z));
+      if (!st.startsWith("minecraft:moving_piston")) {
+        try {
+          fresh.setBlockFromString(x, y, z, st);
+        } catch {
+          /* blockstate not expressible in schematic */
+        }
+      }
     }
-    telemetryEl.textContent = `mc-tick WASM · tick ${sim.tickCount()} · ${sim.changesCount()} total transitions`;
-    statusEl.hidden = true;
+    liveSchem = fresh;
   }
 
-  async function initCircuit() {
-    statusEl.textContent = "Loading mc-tick WASM...";
-    statusEl.hidden = false;
-    useBtn.textContent = TICK_CIRCUITS[circuitKey].actionLabel;
-    try {
-      if (!nuc) {
-        await ensureModelViewer();
-        nuc = await loadNucleation();
+  function updateLogAndTelemetry(actionNote = null) {
+    if (!sim) return;
+    const tick = Number(sim.tickCount());
+    const total = Number(sim.changesCount());
+    clockEl.textContent = `tick ${tick} · ${playing ? `${tps} TPS` : sim.isQuiescent() ? "quiescent" : "paused"}`;
+
+    const changes = JSON.parse(sim.changesJson());
+    const recent = changes.slice(-7).reverse();
+    const lines = [];
+    if (actionNote) lines.push(actionNote);
+    if (recent.length === 0 && !actionNote) {
+      lines.push(`Tick ${tick} · click any 3D lever/button/repeater, pick a block to build, or press Play.`);
+    } else {
+      for (const c of recent) {
+        lines.push(
+          `[t=${String(c.tick).padStart(2, " ")}] (${c.pos.join(",")})  ${c.from.replace("minecraft:", "")}  ->  ${c.to.replace("minecraft:", "")}`,
+        );
       }
-      liveSchem = TICK_CIRCUITS[circuitKey].build(nuc);
-      sim = nuc.TickSimulation.fromSchematic(liveSchem, nuc.TickSettleMode.InWorld, 0, 0, 0, "");
+    }
+    logEl.textContent = lines.join("\n");
+
+    const stats = viewport?.lastMeshStats ?? { tris: 0, verts: 0, ms: 0 };
+    const packDesc = customPackName ? customPackName.slice(0, 20) : "built-in 3D pack";
+    telemetryEl.textContent = `Nucleation WASM MeshResult · ${stats.tris.toLocaleString()} tris · ${stats.ms.toFixed(1)} ms · ${packDesc} · ${total} transitions`;
+  }
+
+  async function flushRemesh() {
+    if (remeshing || !needsRemesh || !viewport || !nuc || !sim) return;
+    remeshing = true;
+    const doRefit = refitNext;
+    refitNext = false;
+    needsRemesh = false;
+    try {
+      syncSolidAndSchemFromSim();
+      const pack = getActivePack(nuc);
+      await viewport.updateSchematicMesh(nuc, liveSchem, pack, doRefit);
+      let moving = [];
+      try {
+        moving = JSON.parse(sim.movingBlocksJson() || "[]");
+      } catch {
+        moving = [];
+      }
+      viewport.syncFlights(nuc, pack, moving);
+      updateLogAndTelemetry();
+      statusEl.hidden = true;
+    } catch (err) {
+      statusEl.hidden = true;
+      telemetryEl.textContent = `Mesh error: ${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+      remeshing = false;
+      if (needsRemesh) void flushRemesh();
+    }
+  }
+
+  function scheduleRemesh(refit = false) {
+    needsRemesh = true;
+    if (refit) refitNext = true;
+    void flushRemesh();
+  }
+
+  function setPlaying(next) {
+    playing = Boolean(next);
+    tickCarry = 0;
+    playBtn.textContent = playing ? "Pause" : "Play";
+    updateLogAndTelemetry();
+  }
+
+  function handleVoxelClick(hit, meta) {
+    if (!sim || !nuc) return;
+    const [x, y, z] = hit.pos;
+    const isBreak = activeTool === "break" || meta.shiftKey;
+    const isInteract = activeTool === "interact" && !meta.shiftKey;
+    const short = (s) => String(s || "air").replace("minecraft:", "");
+
+    try {
+      if (isBreak) {
+        const before = sim.getBlock(x, y, z);
+        sim.placeBlock(x, y, z, "minecraft:air");
+        viewport?.flashVoxel(x, y, z, 0xff6b6b);
+        scheduleRemesh(false);
+        updateLogAndTelemetry(`Broke ${short(before)} @ (${x},${y},${z})`);
+        return;
+      }
+
+      if (isInteract) {
+        const before = sim.getBlock(x, y, z);
+        sim.useBlock(x, y, z);
+        const after = sim.getBlock(x, y, z);
+        const changed = after !== before;
+        viewport?.flashVoxel(x, y, z, changed ? 0x5fd38d : 0xe8c14a);
+        scheduleRemesh(false);
+        updateLogAndTelemetry(
+          changed
+            ? `Used (${x},${y},${z}): ${short(before)} -> ${short(after)}`
+            : `Clicked ${short(before)} @ (${x},${y},${z}) — not interactive (switch Tool to build or Shift+Click to break)`,
+        );
+        return;
+      }
+
+      const toolDef = TICK_TOOLS.find((t) => t.id === activeTool);
+      if (!toolDef?.state) return;
+      const nx = x + hit.face[0];
+      const ny = y + hit.face[1];
+      const nz = z + hit.face[2];
+      const state = toolDef.state(hit.face, meta.facing);
+      sim.placeBlock(nx, ny, nz, state);
+      viewport?.flashVoxel(nx, ny, nz, 0x53c7b4);
+      scheduleRemesh(false);
+      updateLogAndTelemetry(`Placed ${short(sim.getBlock(nx, ny, nz))} @ (${nx},${ny},${nz})`);
+    } catch (err) {
+      updateLogAndTelemetry(`Action error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  async function ensureEngineAndViewport() {
+    if (!nuc || !viewport) {
+      const [{ loadThree, TickSimViewport }, loadedNuc] = await Promise.all([
+        import("./tick-sim-viewport.js"),
+        loadNucleation(),
+      ]);
+      nuc = loadedNuc;
+      if (!viewport) {
+        const threeKit = await loadThree();
+        viewport = new TickSimViewport(stageEl, threeKit, {
+          isSolid: (x, y, z) => solidSet.has(vKey(x, y, z)),
+          getBlock: (x, y, z) => {
+            try {
+              return sim ? sim.getBlock(x, y, z) : "minecraft:air";
+            } catch {
+              return "minecraft:air";
+            }
+          },
+          onHover: (info) => {
+            if (!info) {
+              hoverEl.textContent =
+                activeTool === "interact"
+                  ? "Hover a block · Click lever/button/repeater · Drag orbits · Shift+Click breaks"
+                  : activeTool === "break"
+                    ? "Break mode · Click any block to mine it"
+                    : `Build (${TICK_TOOLS.find((t) => t.id === activeTool)?.label}) · Click a face to place`;
+              return;
+            }
+            const clean = String(info.state || "minecraft:air").replace("minecraft:", "");
+            hoverEl.textContent = `(${info.pos.join(", ")})  ${clean}`;
+          },
+          onVoxelClick: handleVoxelClick,
+          onFrame: (dt) => {
+            if (!sim || !nuc) return;
+            let subTick = 0;
+            if (playing) {
+              tickCarry += dt * tps;
+              const steps = Math.min(Math.floor(tickCarry), 8);
+              if (steps > 0) {
+                tickCarry -= steps;
+                const beforeCount = Number(sim.changesCount());
+                for (let i = 0; i < steps; i += 1) sim.step();
+                const afterCount = Number(sim.changesCount());
+                if (afterCount !== beforeCount || viewport.flights.length > 0) {
+                  scheduleRemesh(false);
+                } else {
+                  clockEl.textContent = `tick ${sim.tickCount()} · ${tps} TPS`;
+                }
+              }
+              subTick = Math.min(tickCarry, 1);
+            }
+            if (viewport.flights.length > 0) {
+              viewport.animateFlights(nuc, getActivePack(nuc), Number(sim.tickCount()) + subTick);
+            }
+          },
+        });
+        viewport.setTool(activeTool);
+      }
+    }
+  }
+
+  async function initCircuit(bytesOverride = null, fileLabel = null) {
+    setPlaying(false);
+    statusEl.textContent = fileLabel ? `Meshing ${fileLabel}...` : "Meshing circuit via Nucleation WASM...";
+    statusEl.hidden = false;
+    try {
+      await ensureEngineAndViewport();
+      let baseSchem;
+      if (bytesOverride) {
+        customFileBytes = bytesOverride;
+        customFileName = fileLabel || "custom.schem";
+        baseSchem = nuc.Schematic.fromData(bytesOverride);
+        useBtn.hidden = true;
+        hintEl.textContent = `Loaded ${customFileName}`;
+      } else {
+        customFileBytes = null;
+        customFileName = null;
+        baseSchem = TICK_CIRCUITS[circuitKey].build(nuc);
+        useBtn.hidden = false;
+        useBtn.textContent = TICK_CIRCUITS[circuitKey].actionLabel;
+        hintEl.textContent = "Drop .schem / .litematic / .nbt here";
+      }
+
+      sim = nuc.TickSimulation.fromSchematic(baseSchem, nuc.TickSettleMode.InWorld, 0, 0, 0, "");
       sim.recordUpdates(true);
-      renderSim();
+      scheduleRemesh(true);
+
+      globalThis.__nucleationTickLab = {
+        get sim() { return sim; },
+        get viewport() { return viewport; },
+        get activeTool() { return activeTool; },
+        projectVoxel: (x, y, z) => viewport?.projectVoxelToClient(x, y, z),
+      };
     } catch (err) {
       statusEl.hidden = true;
       telemetryEl.textContent = `mc-tick error: ${err instanceof Error ? err.message : String(err)}`;
@@ -2246,42 +2606,112 @@ async function mountTickStudio(root, ensureModelViewer) {
     for (const el of root.querySelectorAll("[data-circuit]")) {
       el.setAttribute("aria-checked", String(el === btn));
     }
-    void initCircuit();
+    void initCircuit(null, null);
+  });
+
+  root.querySelector('[data-role="tick-tools"]').addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-tool]");
+    if (!btn) return;
+    activeTool = btn.dataset.tool;
+    for (const el of root.querySelectorAll("[data-tool]")) {
+      el.setAttribute("aria-checked", String(el === btn));
+    }
+    viewport?.setTool(activeTool);
+  });
+
+  playBtn.addEventListener("click", () => setPlaying(!playing));
+  tpsSel.addEventListener("change", () => {
+    tps = Number(tpsSel.value) || 10;
+    if (playing) updateLogAndTelemetry();
   });
 
   useBtn.addEventListener("click", () => {
     if (!sim) return;
     const [x, y, z] = TICK_CIRCUITS[circuitKey].inputPos;
     sim.useBlock(x, y, z);
-    renderSim();
+    viewport?.flashVoxel(x, y, z, 0x5fd38d);
+    scheduleRemesh(false);
   });
   root.querySelector('[data-role="tick-step1"]').addEventListener("click", () => {
     if (!sim) return;
+    setPlaying(false);
     sim.step();
-    renderSim();
+    scheduleRemesh(false);
   });
   root.querySelector('[data-role="tick-step2"]').addEventListener("click", () => {
     if (!sim) return;
+    setPlaying(false);
     sim.run(2);
-    renderSim();
+    scheduleRemesh(false);
   });
   root.querySelector('[data-role="tick-settle"]').addEventListener("click", () => {
     if (!sim) return;
+    setPlaying(false);
     sim.runUntilQuiescent(120);
-    renderSim();
+    scheduleRemesh(false);
   });
   root.querySelector('[data-role="tick-reset"]').addEventListener("click", () => {
-    void initCircuit();
+    void initCircuit(customFileBytes, customFileName);
+  });
+  root.querySelector('[data-role="tick-cam"]').addEventListener("click", () => {
+    viewport?.resetCamera();
+  });
+
+  root.querySelector('[data-role="tick-export"]').addEventListener("click", () => {
+    if (!liveSchem) return;
+    const bytes = decodeBase64(liveSchem.toSchematicB64());
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(customFileName || circuitKey).replace(/\.[^.]+$/, "")}-tick${sim?.tickCount?.() ?? 0}.schem`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  });
+
+  async function openSchematicFile(file) {
+    if (!file) return;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await initCircuit(bytes, file.name);
+  }
+
+  schemInput.addEventListener("change", () => {
+    const file = schemInput.files?.[0];
+    schemInput.value = "";
+    if (file) void openSchematicFile(file);
+  });
+
+  stageEl.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    stageEl.dataset.dragover = "true";
+  });
+  stageEl.addEventListener("dragleave", () => {
+    stageEl.dataset.dragover = "false";
+  });
+  stageEl.addEventListener("drop", (e) => {
+    e.preventDefault();
+    stageEl.dataset.dragover = "false";
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    if (/\.(zip|jar)$/i.test(file.name)) {
+      void (async () => {
+        if (!nuc) nuc = await loadNucleation();
+        await loadCustomPackFile(nuc, file);
+      })();
+    } else {
+      void openSchematicFile(file);
+    }
   });
 
   const onPackUpdated = (name) => {
     packLabel.textContent = `Pack: ${name.slice(0, 18)}`;
-    renderSim();
+    viewport?.clearCaches();
+    scheduleRemesh(false);
   };
   packListeners.add(onPackUpdated);
 
   packInput.addEventListener("change", async () => {
     const file = packInput.files?.[0];
+    packInput.value = "";
     if (!file) return;
     try {
       if (!nuc) nuc = await loadNucleation();
@@ -2295,10 +2725,18 @@ async function mountTickStudio(root, ensureModelViewer) {
   });
 
   void initCircuit();
-  return () => {
-    packListeners.delete(onPackUpdated);
-    if (currentUrl) URL.revokeObjectURL(currentUrl);
-    root.dataset.mounted = "false";
+  return {
+    onThemeChange: () => {
+      viewport?.setTheme(document.body.getAttribute("data-md-color-scheme") === "vellum");
+    },
+    destroy: () => {
+      setPlaying(false);
+      packListeners.delete(onPackUpdated);
+      viewport?.destroy();
+      viewport = null;
+      if (globalThis.__nucleationTickLab) delete globalThis.__nucleationTickLab;
+      root.dataset.mounted = "false";
+    },
   };
 }
 
@@ -2328,8 +2766,9 @@ export async function mountSdfPlaygrounds(ensureModelViewer) {
   }
 
   for (const el of document.querySelectorAll("[data-tick-studio]")) {
-    const destroy = await mountTickStudio(el, ensureModelViewer);
-    cleanups.push(destroy);
+    const tick = await mountTickStudio(el);
+    if (tick?.onThemeChange) rerenders.push(tick.onThemeChange);
+    if (tick?.destroy) cleanups.push(tick.destroy);
   }
 
   return {

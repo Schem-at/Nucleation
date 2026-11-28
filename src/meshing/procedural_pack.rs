@@ -407,12 +407,72 @@ pub(crate) fn build_builtin_procedural_pack() -> ResourcePackSource {
         }),
     );
     add_cube_all(&mut pack, "lapis_block", solid_speckle([42.0, 82.0, 168.0], 20.0, 131));
-    add_cube_all(&mut pack, "gold_block", solid_speckle([246.0, 208.0, 68.0], 16.0, 132));
-    add_cube_all(&mut pack, "iron_block", solid_speckle([220.0, 222.0, 224.0], 10.0, 135));
+    add_cube_all(
+        &mut pack,
+        "gold_block",
+        make_tex(|x, y| {
+            let rim = x == 0 || y == 0 || x == 15 || y == 15;
+            let hi = (x == 1 || y == 1) && x < 15 && y < 15;
+            let lo = (x == 14 || y == 14) && x > 0 && y > 0;
+            let n = (tex_hash(x, y, 132) - 0.5) * 10.0;
+            if rim {
+                [214.0 + n, 162.0 + n, 36.0 + n, 255.0]
+            } else if hi {
+                [255.0, 238.0, 128.0, 255.0]
+            } else if lo {
+                [226.0 + n, 178.0 + n, 44.0 + n, 255.0]
+            } else {
+                [248.0 + n, 212.0 + n, 68.0 + n, 255.0]
+            }
+        }),
+    );
+    add_cube_all(
+        &mut pack,
+        "iron_block",
+        make_tex(|x, y| {
+            let rim = x == 0 || y == 0 || x == 15 || y == 15;
+            let hi = (x == 1 || y == 1) && x < 15 && y < 15;
+            let n = (tex_hash(x, y, 135) - 0.5) * 8.0;
+            if rim {
+                [178.0 + n, 182.0 + n, 186.0 + n, 255.0]
+            } else if hi {
+                [242.0, 244.0, 246.0, 255.0]
+            } else {
+                [222.0 + n, 224.0 + n, 228.0 + n, 255.0]
+            }
+        }),
+    );
     add_cube_all(&mut pack, "diamond_block", solid_speckle([98.0, 236.0, 228.0], 14.0, 136));
     add_cube_all(&mut pack, "emerald_block", solid_speckle([52.0, 206.0, 102.0], 16.0, 137));
-    add_cube_all(&mut pack, "redstone_block", solid_speckle([196.0, 26.0, 18.0], 18.0, 138));
-    add_cube_all(&mut pack, "slime_block", solid_speckle([114.0, 196.0, 92.0], 14.0, 139));
+    add_cube_all(
+        &mut pack,
+        "redstone_block",
+        make_tex(|x, y| {
+            let rim = x == 0 || y == 0 || x == 15 || y == 15;
+            let facet = ((x + y) % 5 == 0) || ((x + 16 - y) % 7 == 0);
+            let n = (tex_hash(x, y, 138) - 0.5) * 14.0;
+            if rim {
+                [142.0 + n, 18.0 + n * 0.4, 14.0 + n * 0.4, 255.0]
+            } else if facet {
+                [238.0 + n, 46.0 + n * 0.5, 26.0 + n * 0.5, 255.0]
+            } else {
+                [198.0 + n, 26.0 + n * 0.4, 18.0 + n * 0.4, 255.0]
+            }
+        }),
+    );
+    add_cube_all(
+        &mut pack,
+        "slime_block",
+        make_tex(|x, y| {
+            let core = (3..=12).contains(&x) && (3..=12).contains(&y);
+            let n = (tex_hash(x, y, 139) - 0.5) * 12.0;
+            if core {
+                [112.0 + n, 198.0 + n, 88.0 + n, 232.0]
+            } else {
+                [136.0 + n, 218.0 + n, 108.0 + n, 175.0]
+            }
+        }),
+    );
     add_cube_all(&mut pack, "honey_block", solid_speckle([242.0, 182.0, 48.0], 14.0, 141));
     add_cube_all(&mut pack, "netherrack", cobble_tex([112.0, 46.0, 46.0], [76.0, 28.0, 28.0], 133));
     add_cube_all(&mut pack, "blackstone", cobble_tex([44.0, 40.0, 48.0], [26.0, 24.0, 30.0], 134));
@@ -658,19 +718,126 @@ pub(crate) fn build_builtin_procedural_pack() -> ResourcePackSource {
         let _ = pack.add_blockstate_json("minecraft:redstone_wall_torch", &bs);
     }
 
-    // 5f. Stone button (crisp 6x2x4 stone button, depresses to 1px when pressed!)
-    let _ = pack.add_model_json(
-        "minecraft:block/stone_button_off",
-        r##"{"textures":{"all":"minecraft:block/stone"},"elements":[{"from":[5,0,6],"to":[11,2,10],"faces":{"down":{"texture":"#all"},"up":{"texture":"#all"},"north":{"texture":"#all"},"south":{"texture":"#all"},"west":{"texture":"#all"},"east":{"texture":"#all"}}}]}"##,
-    );
-    let _ = pack.add_model_json(
-        "minecraft:block/stone_button_on",
-        r##"{"textures":{"all":"minecraft:block/stone"},"elements":[{"from":[5,0,6],"to":[11,1,10],"faces":{"down":{"texture":"#all"},"up":{"texture":"#all"},"north":{"texture":"#all"},"south":{"texture":"#all"},"west":{"texture":"#all"},"east":{"texture":"#all"}}}]}"##,
-    );
-    let _ = pack.add_blockstate_json(
-        "minecraft:stone_button",
-        r##"{"variants":{"powered=false":{"model":"minecraft:block/stone_button_off"},"powered=true":{"model":"minecraft:block/stone_button_on"}}}"##,
-    );
+    // 5f. Stone & Oak buttons (crisp 6x2x4 button, depresses to 1px when pressed!)
+    for (bname, btex) in [
+        ("stone_button", "minecraft:block/stone"),
+        ("oak_button", "minecraft:block/oak_planks"),
+    ] {
+        let _ = pack.add_model_json(
+            &format!("minecraft:block/{bname}_off"),
+            &format!(
+                r##"{{"textures":{{"all":"{btex}"}},"elements":[{{"from":[5,0,6],"to":[11,2,10],"faces":{{"down":{{"texture":"#all"}},"up":{{"texture":"#all"}},"north":{{"texture":"#all"}},"south":{{"texture":"#all"}},"west":{{"texture":"#all"}},"east":{{"texture":"#all"}}}}}}]}}"##
+            ),
+        );
+        let _ = pack.add_model_json(
+            &format!("minecraft:block/{bname}_on"),
+            &format!(
+                r##"{{"textures":{{"all":"{btex}"}},"elements":[{{"from":[5,0,6],"to":[11,1,10],"faces":{{"down":{{"texture":"#all"}},"up":{{"texture":"#all"}},"north":{{"texture":"#all"}},"south":{{"texture":"#all"}},"west":{{"texture":"#all"}},"east":{{"texture":"#all"}}}}}}]}}"##
+            ),
+        );
+        let mut variants = Vec::new();
+        for (face, rx) in [("floor", 0), ("wall", 90), ("ceiling", 180)] {
+            for (facing, ry) in [("north", 0), ("east", 90), ("south", 180), ("west", 270)] {
+                for (powered, suf) in [("false", "off"), ("true", "on")] {
+                    variants.push(format!(
+                        r##""face={face},facing={facing},powered={powered}":{{"model":"minecraft:block/{bname}_{suf}","x":{rx},"y":{ry}}}"##
+                    ));
+                }
+            }
+        }
+        let bs = format!(r##"{{"variants":{{{}}}}}"##, variants.join(","));
+        let _ = pack.add_blockstate_json(&format!("minecraft:{bname}"), &bs);
+    }
+
+    // 5f2. Observer (iconic stone face on front, arrow on top, glowing redstone dot on back!)
+    let obs_front = make_tex(|x, y| {
+        let border = x == 0 || y == 0 || x == 15 || y == 15;
+        let brow = y == 4 && (2..=13).contains(&x);
+        let eye = (y == 6 || y == 7) && ((3..=5).contains(&x) || (10..=12).contains(&x));
+        let pupil = y == 7 && (x == 4 || x == 11);
+        let mouth = (10..=12).contains(&y) && (5..=10).contains(&x);
+        let n = (tex_hash(x, y, 185) - 0.5) * 10.0;
+        if pupil {
+            [18.0, 18.0, 20.0, 255.0]
+        } else if eye {
+            [218.0, 222.0, 226.0, 255.0]
+        } else if brow || mouth {
+            [42.0 + n * 0.5, 44.0 + n * 0.5, 48.0 + n * 0.5, 255.0]
+        } else if border {
+            [68.0 + n, 70.0 + n, 74.0 + n, 255.0]
+        } else {
+            [114.0 + n, 116.0 + n, 120.0 + n, 255.0]
+        }
+    });
+    let obs_top = make_tex(|x, y| {
+        let border = x == 0 || y == 0 || x == 15 || y == 15;
+        let dx = (x as i32 - 7).abs().min((x as i32 - 8).abs());
+        let arrow = (3..=9).contains(&y) && dx <= (y as i32 - 3).min(4);
+        let stem = (10..=12).contains(&y) && (x == 7 || x == 8);
+        let n = (tex_hash(x, y, 186) - 0.5) * 10.0;
+        if arrow || stem {
+            [62.0 + n, 64.0 + n, 68.0 + n, 255.0]
+        } else if border {
+            [72.0 + n, 74.0 + n, 78.0 + n, 255.0]
+        } else {
+            [122.0 + n, 124.0 + n, 128.0 + n, 255.0]
+        }
+    });
+    let obs_side = cobble_tex([96.0, 98.0, 102.0], [64.0, 66.0, 70.0], 187);
+    let obs_back_off = make_tex(|x, y| {
+        let dot = (6..=9).contains(&x) && (6..=9).contains(&y);
+        let n = (tex_hash(x, y, 188) - 0.5) * 10.0;
+        if dot {
+            [116.0, 26.0, 22.0, 255.0]
+        } else {
+            [86.0 + n, 88.0 + n, 92.0 + n, 255.0]
+        }
+    });
+    let obs_back_on = make_tex(|x, y| {
+        let dot = (5..=10).contains(&x) && (5..=10).contains(&y);
+        let hot = (6..=9).contains(&x) && (6..=9).contains(&y);
+        let n = (tex_hash(x, y, 189) - 0.5) * 10.0;
+        if hot {
+            [255.0, 72.0, 42.0, 255.0]
+        } else if dot {
+            [216.0, 34.0, 24.0, 255.0]
+        } else {
+            [86.0 + n, 88.0 + n, 92.0 + n, 255.0]
+        }
+    });
+    let _ = pack.add_texture("minecraft:block/observer_front", 16, 16, obs_front);
+    let _ = pack.add_texture("minecraft:block/observer_top", 16, 16, obs_top);
+    let _ = pack.add_texture("minecraft:block/observer_side", 16, 16, obs_side);
+    let _ = pack.add_texture("minecraft:block/observer_back", 16, 16, obs_back_off);
+    let _ = pack.add_texture("minecraft:block/observer_back_on", 16, 16, obs_back_on);
+    for (suf, back_tex) in [
+        ("off", "minecraft:block/observer_back"),
+        ("on", "minecraft:block/observer_back_on"),
+    ] {
+        let mjson = format!(
+            r##"{{"textures":{{"front":"minecraft:block/observer_front","back":"{back_tex}","top":"minecraft:block/observer_top","side":"minecraft:block/observer_side"}},"elements":[{{"from":[0,0,0],"to":[16,16,16],"faces":{{"north":{{"texture":"#front","cullface":"north"}},"south":{{"texture":"#back","cullface":"south"}},"up":{{"texture":"#top","cullface":"up"}},"down":{{"texture":"#top","cullface":"down"}},"west":{{"texture":"#side","cullface":"west"}},"east":{{"texture":"#side","cullface":"east"}}}}}}]}}"##
+        );
+        let _ = pack.add_model_json(&format!("minecraft:block/observer_{suf}"), &mjson);
+    }
+    {
+        let mut variants = Vec::new();
+        for (facing, rx, ry) in [
+            ("north", 0, 0),
+            ("east", 0, 90),
+            ("south", 0, 180),
+            ("west", 0, 270),
+            ("up", 270, 0),
+            ("down", 90, 0),
+        ] {
+            for (powered, suf) in [("false", "off"), ("true", "on")] {
+                variants.push(format!(
+                    r##""facing={facing},powered={powered}":{{"model":"minecraft:block/observer_{suf}","x":{rx},"y":{ry}}}"##
+                ));
+            }
+        }
+        let bs = format!(r##"{{"variants":{{{}}}}}"##, variants.join(","));
+        let _ = pack.add_blockstate_json("minecraft:observer", &bs);
+    }
 
     // 5g. Sticky piston, regular piston, and 3D T-shaped piston_head!
     let piston_side = make_tex(|x, y| {
@@ -741,7 +908,11 @@ pub(crate) fn build_builtin_procedural_pack() -> ResourcePackSource {
         let head = format!(
             r##"{{"textures":{{"face":"{face_tex}","wood":"minecraft:block/oak_planks"}},"elements":[{{"from":[0,0,0],"to":[16,16,4],"faces":{{"north":{{"texture":"#face"}},"south":{{"texture":"#wood"}},"up":{{"texture":"#wood"}},"down":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}},{{"from":[6,6,4],"to":[10,10,20],"faces":{{"up":{{"texture":"#wood"}},"down":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}}]}}"##
         );
+        let head_short = format!(
+            r##"{{"textures":{{"face":"{face_tex}","wood":"minecraft:block/oak_planks"}},"elements":[{{"from":[0,0,0],"to":[16,16,4],"faces":{{"north":{{"texture":"#face"}},"south":{{"texture":"#wood"}},"up":{{"texture":"#wood"}},"down":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}},{{"from":[6,6,4],"to":[10,10,16],"faces":{{"up":{{"texture":"#wood"}},"down":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}}]}}"##
+        );
         let _ = pack.add_model_json(&format!("minecraft:block/piston_head_{kind}"), &head);
+        let _ = pack.add_model_json(&format!("minecraft:block/piston_head_{kind}_short"), &head_short);
     }
     {
         let mut variants = Vec::new();
@@ -755,7 +926,10 @@ pub(crate) fn build_builtin_procedural_pack() -> ResourcePackSource {
         ] {
             for kind in ["normal", "sticky"] {
                 variants.push(format!(
-                    r##""facing={facing},type={kind}":{{"model":"minecraft:block/piston_head_{kind}","x":{rx},"y":{ry}}}"##
+                    r##""facing={facing},short=false,type={kind}":{{"model":"minecraft:block/piston_head_{kind}","x":{rx},"y":{ry}}}"##
+                ));
+                variants.push(format!(
+                    r##""facing={facing},short=true,type={kind}":{{"model":"minecraft:block/piston_head_{kind}_short","x":{rx},"y":{ry}}}"##
                 ));
             }
         }

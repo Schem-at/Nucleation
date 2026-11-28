@@ -22,11 +22,20 @@ and the implementation disagree, the capture is the reference. Version-gated
 entity loading, displacement laws, and measured hitboxes are documented in the
 [mechanics notes](tick-simulation-mechanics.md).
 
-## Try it live: interactive `mc-tick` step-through lab
+## Try it live: interactive 3D `mc-tick` + Nucleation mesher lab
 
-Click **Toggle input** (lever or button), then step **+1 tick** or **+2 ticks**
-to watch real `mc-tick` redstone propagation in WebAssembly — every block
-change is logged with its exact tick and state transition:
+This sandbox runs **Nucleation's actual Rust mesher (`MeshResult`)** and
+**`mc-tick` tick engine (`TickSimulation`)** live in WebAssembly inside an
+interactive Three.js viewport:
+
+- **Click directly on 3D blocks** in **Interact** mode to flip levers, press
+  buttons, or cycle repeater delays (`1 → 2 → 3 → 4`).
+- **Build or edit in 3D**: pick any redstone block from the hotbar to place it
+  on a block face (redstone dust connects automatically through `mc-tick`), or
+  use **Break** / `Shift+Click` to mine blocks.
+- **Play in real time** (`2–20 TPS`) with smooth piston animation, step tick by
+  tick, drop any `.schem` / `.litematic` / `.nbt` schematic onto the canvas, or
+  load your own Minecraft resource pack `.zip` / `client.jar`.
 
 <div class="sdf-studio" data-tick-studio>
   <noscript>

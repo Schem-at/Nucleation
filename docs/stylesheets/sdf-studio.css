@@ -624,20 +624,181 @@
   line-height: 1.55;
 }
 
+.tick-stage {
+  position: relative;
+  height: 440px;
+  background: var(--stage);
+  overflow: hidden;
+  user-select: none;
+}
+
+.tick-stage[data-dragover="true"] {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+}
+
+.tick-3d-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.tick-hud {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.tick-hud__pill {
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--rule-hi);
+  backdrop-filter: blur(6px);
+  color: var(--fg-hi);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.35;
+  padding: 5px 9px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tick-hud__pill--muted {
+  color: var(--mist);
+  flex: 0 0 auto;
+}
+
+.tick-hud__bottom {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.tick-hud__bottom button {
+  pointer-events: auto;
+}
+
+.tick-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel-2);
+}
+
+.tick-toolbar__label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--mist);
+  margin-right: 4px;
+}
+
+.tick-tool {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid var(--rule-hi);
+  background: var(--panel);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color var(--d1) var(--ease), background-color var(--d1) var(--ease), color var(--d1) var(--ease);
+}
+
+.tick-tool:hover {
+  border-color: var(--accent);
+  color: var(--fg-hi);
+}
+
+.tick-tool[aria-checked="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--inverse-fg-hi);
+  font-weight: 600;
+}
+
+[data-md-color-scheme="vellum"] .tick-tool[aria-checked="true"] {
+  color: #ffffff;
+}
+
+.tick-tool--danger[aria-checked="true"] {
+  background: #d64545;
+  border-color: #d64545;
+  color: #ffffff;
+}
+
+.tick-tool__swatch {
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
 .tick-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding: 12px 14px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--rule);
   background: var(--panel);
+}
+
+.tick-actions__group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.tick-tps {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mist);
+}
+
+.tick-tps select {
+  background: var(--stage);
+  border: 1px solid var(--rule-hi);
+  color: var(--fg-hi);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 7px;
+  cursor: pointer;
 }
 
 .tick-log {
   margin: 0;
   padding: 10px 14px;
-  max-height: 148px;
+  max-height: 142px;
   overflow-y: auto;
   background: var(--stage);
   font-family: var(--mono);
@@ -649,8 +810,9 @@
 
 @media screen and (max-width: 47.9375em) {
   .sdf-studio__stage,
-  .wg-stage {
-    height: 320px;
+  .wg-stage,
+  .tick-stage {
+    height: 340px;
   }
 
   .sdf-sliders,
