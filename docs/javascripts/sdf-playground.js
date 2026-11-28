@@ -785,7 +785,7 @@ schem = VoxelPipeline.create(geom, matcher.build()).to_schematic("temple")`;
   custom: {
     label: "5. Field.expr",
     p1: { label: "Scale", min: 0.7, max: 1.4, step: 0.05, value: 1.0 },
-    p2: { label: "Surface offset", min: -1.5, max: 1.5, step: 0.1, value: 0.0 },
+    p2: { label: "Surface offset", min: -0.8, max: 0.8, step: 0.05, value: 0.0 },
     p3: null,
     bounds: [-12, -12, -12, 12, 12, 12],
     code(lang, p1, p2) {
@@ -1026,6 +1026,24 @@ async function mountWorkbench(root, ensureModelViewer) {
       const schem = WORKBENCH_STEPS[presetKey].build(nuc, p1Val, p2Val, p3Val, customExpr);
       const tVox = performance.now();
 
+      if (seq !== buildSeq) return;
+
+      const blocks = schem.blockCount();
+      if (blocks === 0) {
+        lastSchematic = null;
+        if (currentUrl) {
+          URL.revokeObjectURL(currentUrl);
+          currentUrl = null;
+        }
+        viewer.removeAttribute("src");
+        downloadBtn.disabled = true;
+        statusEl.textContent =
+          "0 blocks inside bounds (d > 0 everywhere) — lower Surface offset or adjust the formula.";
+        statusEl.hidden = false;
+        telemetryEl.textContent = `0 blocks · 0 triangles · ${Math.round(tVox - t0)} ms voxelize`;
+        return;
+      }
+
       const cfg = nuc.MeshConfig.create();
       cfg.setAmbientOcclusion(true);
       cfg.setAoIntensity(0.55);
@@ -1045,7 +1063,7 @@ async function mountWorkbench(root, ensureModelViewer) {
       statusEl.hidden = true;
       downloadBtn.disabled = false;
       telemetryEl.textContent =
-        `${schem.blockCount().toLocaleString()} blocks · ${mesh.triangleCount().toLocaleString()} triangles · ` +
+        `${blocks.toLocaleString()} blocks · ${mesh.triangleCount().toLocaleString()} triangles · ` +
         `${Math.round(tVox - t0)} ms voxelize · ${Math.round(tEnd - tVox)} ms mesh`;
     } catch (err) {
       if (seq !== buildSeq) return;
@@ -2037,6 +2055,23 @@ async function mountWorldgenLab(root, ensureModelViewer) {
 
       renderGrid(null);
       if (seq !== runSeq) return;
+
+      const totalBlocks = combined.blockCount();
+      if (totalBlocks === 0) {
+        lastSchematic = null;
+        if (currentUrl) {
+          URL.revokeObjectURL(currentUrl);
+          currentUrl = null;
+        }
+        viewer.removeAttribute("src");
+        statusEl.textContent = "0 solid blocks in selected chunks — pan to another region.";
+        statusEl.hidden = false;
+        downloadBtn.disabled = true;
+        waveBtn.disabled = false;
+        telemetryEl.textContent =
+          `${coords.length} chunk${coords.length === 1 ? "" : "s"} · 0 blocks · ${(genMsTotal / coords.length).toFixed(1)} ms/chunk`;
+        return;
+      }
 
       const tMesh0 = performance.now();
       const cfg = nuc.MeshConfig.create();
