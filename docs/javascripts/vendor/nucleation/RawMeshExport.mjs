@@ -206,6 +206,172 @@ export class RawMeshExport {
     }
 
     /**
+     * Copy flat `[x,y,z,...]` vertex positions directly into `out` (zero Base64).
+     */
+    copyPositions(out) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const outBuf = diplomatRuntime.DiplomatBuf.slice(wasm, out, "f32");
+        const outSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, outBuf));
+
+        const result = wasm.RawMeshExport_copy_positions(this.ffiValue, outSlice.ptr);
+
+        try {
+            if (out && typeof out.set === "function") {
+                out.set(new Float32Array(wasm.memory.buffer, outBuf.ptr, result));
+            }
+            return result;
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+        }
+    }
+
+    /**
+     * Copy flat `[nx,ny,nz,...]` vertex normals directly into `out`.
+     */
+    copyNormals(out) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const outBuf = diplomatRuntime.DiplomatBuf.slice(wasm, out, "f32");
+        const outSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, outBuf));
+
+        const result = wasm.RawMeshExport_copy_normals(this.ffiValue, outSlice.ptr);
+
+        try {
+            if (out && typeof out.set === "function") {
+                out.set(new Float32Array(wasm.memory.buffer, outBuf.ptr, result));
+            }
+            return result;
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+        }
+    }
+
+    /**
+     * Copy flat `[u,v,...]` texture coordinates directly into `out`.
+     */
+    copyUvs(out) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const outBuf = diplomatRuntime.DiplomatBuf.slice(wasm, out, "f32");
+        const outSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, outBuf));
+
+        const result = wasm.RawMeshExport_copy_uvs(this.ffiValue, outSlice.ptr);
+
+        try {
+            if (out && typeof out.set === "function") {
+                out.set(new Float32Array(wasm.memory.buffer, outBuf.ptr, result));
+            }
+            return result;
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+        }
+    }
+
+    /**
+     * Copy flat `[r,g,b,a,...]` vertex colors directly into `out`.
+     */
+    copyColors(out) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const outBuf = diplomatRuntime.DiplomatBuf.slice(wasm, out, "f32");
+        const outSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, outBuf));
+
+        const result = wasm.RawMeshExport_copy_colors(this.ffiValue, outSlice.ptr);
+
+        try {
+            if (out && typeof out.set === "function") {
+                out.set(new Float32Array(wasm.memory.buffer, outBuf.ptr, result));
+            }
+            return result;
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+        }
+    }
+
+    /**
+     * Copy triangle indices directly into `out`.
+     */
+    copyIndices(out) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const outBuf = diplomatRuntime.DiplomatBuf.slice(wasm, out, "u32");
+        const outSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, outBuf));
+
+        const result = wasm.RawMeshExport_copy_indices(this.ffiValue, outSlice.ptr);
+
+        try {
+            if (out && typeof out.set === "function") {
+                out.set(new Uint32Array(wasm.memory.buffer, outBuf.ptr, result));
+            }
+            return result;
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+        }
+    }
+
+    /**
+     * Byte length of the baked RGBA texture atlas.
+     */
+    textureRgbaLen() {
+
+        const result = wasm.RawMeshExport_texture_rgba_len(this.ffiValue);
+
+        try {
+            return result;
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * Copy baked RGBA texture bytes directly into `out` (zero Base64).
+     */
+    copyTextureRgba(out) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const outBuf = diplomatRuntime.DiplomatBuf.slice(wasm, out, "u8");
+        const outSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, outBuf));
+
+        const result = wasm.RawMeshExport_copy_texture_rgba(this.ffiValue, outSlice.ptr);
+
+        try {
+            if (out && typeof out.set === "function") {
+                out.set(new Uint8Array(wasm.memory.buffer, outBuf.ptr, result));
+            }
+            return result;
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+        }
+    }
+
+    /**
      * Width of the baked texture in pixels.
      */
     textureWidth() {

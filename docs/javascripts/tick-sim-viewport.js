@@ -1,13 +1,14 @@
 /**
- * Real Three.js + Nucleation WASM MeshResult interactive 3D viewport for the
- * mc-tick redstone simulator.
+ * Unified Three.js + Nucleation WASM MeshResult interactive 3D viewport.
  *
- * Uses the exact same meshing + interaction pipeline as `apps/sim-lab-wasm`:
- *   - Real Rust/WASM `MeshResult.createOrEmpty(schematic, pack, cfg)` -> GLB
+ * Powers all four interactive Nucleation docs studios (SDF Workbench, Streaming
+ * WorldGenerator, Oklab Palette & Dithering, and mc-tick Redstone Simulator):
+ *   - Real Rust/WASM `MeshResult.createOrEmpty` -> zero-Base64 `toGlbBytes()`
  *   - `GLTFLoader.parseAsync` with `NearestFilter` pixel-crisp textures
  *   - FNV-1a embedded-atlas cache (`stripEmbeddedImages`) for ~1–4 ms re-meshes
  *   - Amanatides–Woo voxel raycasting matching schematic-mesher's `[i-0.5, i+0.5]` cells
  *   - Smooth `sim.movingBlocksJson()` piston interpolation across fractional ticks
+ *   - 3D update-heat/wave overlay boxes & interactive 3D drag gizmo (for SDF CSG)
  */
 
 let threePromise = null;
@@ -34,6 +35,22 @@ function decodeBase64(b64) {
   return out;
 }
 
+/**
+ * Extract raw GLB bytes from a `MeshResult` via the zero-Base64 `toGlbBytes()`
+ * binary buffer when available, falling back to `glbDataB64()` if older bindings.
+ */
+export function extractGlbBytes(meshRes) {
+  if (typeof meshRes.toGlbBytes === "function") {
+    const buf = meshRes.toGlbBytes();
+    const len = Number(buf.len());
+    const out = new Uint8Array(len);
+    if (len > 0) buf.copyInto(0, out);
+    return out;
+  }
+  const b64 = meshRes.glbDataB64();
+  return b64 && b64.length > 0 ? decodeBase64(b64) : new Uint8Array(0);
+}
+
 function hashBytes(bytes) {
   let h = 2166136261;
   for (let i = 0; i < bytes.length; i += 1) {
@@ -57,15 +74,10 @@ function configurePixelMaterial(THREE, mat) {
     mat.map.colorSpace = THREE.SRGBColorSpace;
     mat.map.needsUpdate = true;
   }
-  // Keep matte voxel finish so baked AO & pixel art shine cleanly
   if (typeof mat.roughness === "number") mat.roughness = 0.92;
   if (typeof mat.metalness === "number") mat.metalness = 0.0;
 }
 
-/**
- * Strip embedded atlas images/textures/samplers from a GLB so repeat re-meshes
- * with the same atlas hash skip redundant PNG decode (mirrors sim-lab-wasm).
- */
 function stripEmbeddedImages(bytes) {
   try {
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -152,42 +164,52 @@ function pickVoxel(ray, isSolid, reach = 48) {
   return null;
 }
 
-export class TickSimViewport {
-  constructor(container, threeKit, callbacks) {
+export class NucleationViewport {
+  constructor(container, threeKit, options = {}) {
     const { THREE, OrbitControls, GLTFLoader } = threeKit;
     this.THREE = THREE;
     this.loader = new GLTFLoader();
     this.container = container;
-    this.callbacks = callbacks;
+    this.callbacks = options;
+    this.interactive = options.interactive !== false;
+    this.showGrid = options.showGrid !== false;
+    this.cameraDir = options.cameraDir || [0.28, 0.72, 0.88];
+    this.cameraZoom = options.cameraZoom ?? 0.92;
+    this.greedyMeshing = Boolean(options.greedyMeshing);
+    this.aoIntensity = options.aoIntensity ?? 0.45;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 500);
+    this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 800);
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
-    this.renderer.domElement.className = "tick-3d-canvas";
+    this.renderer.domElement.className = this.interactive
+      ? "tick-3d-canvas"
+      : "tick-3d-canvas tick-3d-canvas--orbit";
     this.container.appendChild(this.renderer.domElement);
 
-    // Balanced lighting calibrated for Nucleation's baked vertex AO (matches sim-lab-wasm)
-    this.scene.add(new THREE.AmbientLight(0xffffff, 1.9));
+    // Balanced lighting calibrated for Nucleation's baked per-vertex AO
+    this.scene.add(new THREE.AmbientLight(0xffffff, 1.88));
     const key = new THREE.DirectionalLight(0xfffaf0, 1.45);
-    key.position.set(10, 18, 12);
+    key.position.set(12, 22, 14);
     this.scene.add(key);
     const fill = new THREE.DirectionalLight(0xd2e4ff, 0.55);
-    fill.position.set(-10, 11, -12);
+    fill.position.set(-12, 12, -14);
     this.scene.add(fill);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.09;
-    this.controls.maxDistance = 120;
-    this.controls.minDistance = 2.5;
+    this.controls.maxDistance = 240;
+    this.controls.minDistance = 2.0;
 
     this.worldGroup = new THREE.Group();
     this.flightGroup = new THREE.Group();
+    this.overlayGroup = new THREE.Group();
     this.scene.add(this.worldGroup);
     this.scene.add(this.flightGroup);
+    this.scene.add(this.overlayGroup);
 
     this.gridHelper = null;
 
@@ -232,6 +254,36 @@ export class TickSimViewport {
     this.flashUntil = 0;
     this.scene.add(this.flashMesh);
 
+    // Optional interactive 3D drag gizmo (used by SDF Workbench `2. Carve & blend`)
+    this.gizmoGroup = new THREE.Group();
+    this.gizmoMat = new THREE.MeshBasicMaterial({
+      color: 0x3ad1bd,
+      transparent: true,
+      opacity: 0.85,
+      depthTest: false,
+    });
+    this.gizmoHandle = new THREE.Mesh(new THREE.SphereGeometry(0.95, 18, 14), this.gizmoMat);
+    this.gizmoRing = new THREE.Mesh(
+      new THREE.TorusGeometry(1.45, 0.14, 10, 28),
+      new THREE.MeshBasicMaterial({ color: 0x3ad1bd, depthTest: false }),
+    );
+    this.gizmoRing.rotation.x = Math.PI / 2;
+    this.gizmoRail = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.11, 18, 8),
+      new THREE.MeshBasicMaterial({ color: 0x3ad1bd, transparent: true, opacity: 0.35, depthTest: false }),
+    );
+    this.gizmoRail.rotation.z = Math.PI / 2;
+    this.gizmoGroup.add(this.gizmoHandle);
+    this.gizmoGroup.add(this.gizmoRing);
+    this.gizmoGroup.renderOrder = 999;
+    this.gizmoGroup.visible = false;
+    this.gizmoRail.visible = false;
+    this.scene.add(this.gizmoGroup);
+    this.scene.add(this.gizmoRail);
+    this.gizmoConfig = null;
+    this.draggingGizmo = false;
+    this.gizmoPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
     this.raycaster = new THREE.Raycaster();
     this.ndc = new THREE.Vector2();
     this.pointerInside = false;
@@ -246,7 +298,7 @@ export class TickSimViewport {
     this.activeMeshObj = null;
     this.flights = [];
     this.meshSeq = 0;
-    this.lastMeshStats = { tris: 0, verts: 0, ms: 0 };
+    this.lastMeshStats = { tris: 0, verts: 0, ms: 0, bytes: 0 };
     this.lastBounds = null;
 
     this.setTheme(document.body.getAttribute("data-md-color-scheme") === "vellum");
@@ -265,7 +317,7 @@ export class TickSimViewport {
   setTheme(isLight) {
     const bg = isLight ? 0xe7e3d9 : 0x0e1318;
     this.scene.background = new this.THREE.Color(bg);
-    this._rebuildGrid(isLight);
+    if (this.showGrid) this._rebuildGrid(isLight);
   }
 
   _rebuildGrid(isLight) {
@@ -277,7 +329,12 @@ export class TickSimViewport {
     const major = isLight ? 0xbcb6a8 : 0x26323d;
     const minor = isLight ? 0xd3cec1 : 0x18212a;
     const grid = new this.THREE.GridHelper(32, 32, major, minor);
-    grid.position.set(3.5, -0.502, 1.5);
+    if (this.lastBounds) {
+      const b = this.lastBounds;
+      grid.position.set((b.minX + b.maxX) * 0.5, b.minY - 0.502, (b.minZ + b.maxZ) * 0.5);
+    } else {
+      grid.position.set(3.5, -0.502, 1.5);
+    }
     this.scene.add(grid);
     this.gridHelper = grid;
   }
@@ -293,6 +350,70 @@ export class TickSimViewport {
     this.pendingBlockMeshes.clear();
   }
 
+  clearMesh() {
+    if (this.activeMeshObj) {
+      this.worldGroup.remove(this.activeMeshObj);
+      this.activeMeshObj.traverse((o) => {
+        if (o.isMesh) o.geometry?.dispose?.();
+      });
+      this.activeMeshObj = null;
+    }
+    this.lastMeshStats = { tris: 0, verts: 0, ms: 0, bytes: 0 };
+  }
+
+  /** Show or hide an interactive X-axis 3D drag gizmo at `[x, y, z]`. */
+  setGizmo(config) {
+    this.gizmoConfig = config;
+    if (!config) {
+      this.gizmoGroup.visible = false;
+      this.gizmoRail.visible = false;
+      this.draggingGizmo = false;
+      return;
+    }
+    const [x, y, z] = config.pos;
+    this.gizmoGroup.position.set(x, y, z);
+    this.gizmoGroup.visible = true;
+    this.gizmoRail.position.set(0, y, z);
+    this.gizmoRail.visible = true;
+  }
+
+  /** Render translucent 3D heat / update-wave overlay boxes (`[{ pos: [x,y,z], heat: 0..1 }]`). */
+  setOverlayBoxes(entries) {
+    while (this.overlayGroup.children.length > 0) {
+      const child = this.overlayGroup.children[0];
+      this.overlayGroup.remove(child);
+      child.geometry?.dispose?.();
+      child.material?.dispose?.();
+    }
+    if (!entries || entries.length === 0) return;
+    const boxGeo = new this.THREE.BoxGeometry(1.06, 1.06, 1.06);
+    const edgeGeo = new this.THREE.EdgesGeometry(boxGeo);
+    for (const item of entries) {
+      const h = Math.max(0.15, Math.min(1, item.heat ?? 0.8));
+      const color = new this.THREE.Color().setHSL(0.12 - h * 0.12, 0.95, 0.54);
+      const mesh = new this.THREE.Mesh(
+        boxGeo,
+        new this.THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: 0.18 + h * 0.28,
+          depthWrite: false,
+        }),
+      );
+      mesh.position.set(item.pos[0], item.pos[1], item.pos[2]);
+      mesh.renderOrder = 10;
+      this.overlayGroup.add(mesh);
+
+      const wire = new this.THREE.LineSegments(
+        edgeGeo,
+        new this.THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 }),
+      );
+      wire.position.set(item.pos[0], item.pos[1], item.pos[2]);
+      wire.renderOrder = 11;
+      this.overlayGroup.add(wire);
+    }
+  }
+
   resize() {
     const w = Math.max(this.container.clientWidth, 1);
     const h = Math.max(this.container.clientHeight, 1);
@@ -301,7 +422,6 @@ export class TickSimViewport {
     this.camera.updateProjectionMatrix();
   }
 
-  /** Horizontal cardinal direction the camera is looking toward. */
   cameraFacing() {
     const dir = new this.THREE.Vector3();
     this.camera.getWorldDirection(dir);
@@ -311,7 +431,6 @@ export class TickSimViewport {
     return dir.z >= 0 ? "south" : "north";
   }
 
-  /** Frame the current schematic cleanly from a 3/4 isometric perspective. */
   frameBounds(minX, minY, minZ, maxX, maxY, maxZ) {
     const cx = (minX + maxX) * 0.5;
     const cy = (minY + maxY) * 0.5;
@@ -321,14 +440,14 @@ export class TickSimViewport {
     const dz = Math.max(1, maxZ - minZ + 1);
     const radius = Math.max(Math.hypot(dx, dy, dz) * 0.5, 2.8);
     const fovRad = (this.camera.fov * Math.PI) / 180;
-    const dist = (radius * 0.92) / Math.sin(fovRad * 0.5);
+    const dist = (radius * this.cameraZoom) / Math.sin(fovRad * 0.5);
 
     this.controls.target.set(cx, cy, cz);
-    // Front-south-east elevated angle so redstone rows along +X read left-to-right!
-    const offset = new this.THREE.Vector3(0.28, 0.72, 0.88).normalize().multiplyScalar(dist);
+    const [ox, oy, oz] = this.cameraDir;
+    const offset = new this.THREE.Vector3(ox, oy, oz).normalize().multiplyScalar(dist);
     this.camera.position.copy(this.controls.target).add(offset);
     this.camera.near = Math.max(0.05, dist / 200);
-    this.camera.far = Math.max(200, dist * 16);
+    this.camera.far = Math.max(250, dist * 16);
     this.camera.updateProjectionMatrix();
     this.controls.update();
 
@@ -355,26 +474,27 @@ export class TickSimViewport {
 
   /**
    * Mesh `schem` through Nucleation's real Rust/WASM `MeshResult.createOrEmpty`
-   * and swap it into the Three.js scene using the embedded-atlas material cache.
+   * using the zero-Base64 `toGlbBytes()` binary path and embedded-atlas cache.
    */
-  async updateSchematicMesh(nuc, schem, pack, refitCamera = false) {
+  async updateSchematicMesh(nuc, schem, pack, refitCamera = false, opts = {}) {
     const seq = ++this.meshSeq;
     const t0 = performance.now();
 
     const cfg = nuc.MeshConfig.create();
     cfg.setAmbientOcclusion(true);
-    cfg.setAoIntensity(0.45);
-    cfg.setGreedyMeshing(false);
+    cfg.setAoIntensity(opts.aoIntensity ?? this.aoIntensity);
+    cfg.setGreedyMeshing(opts.greedyMeshing ?? this.greedyMeshing);
 
     const meshRes = nuc.MeshResult.createOrEmpty(schem, pack, cfg);
     const tris = Number(meshRes.triangleCount());
     const verts = Number(meshRes.vertexCount());
     let nextObj = null;
+    let byteLen = 0;
 
     if (tris > 0) {
-      const glbB64 = meshRes.glbDataB64();
-      if (glbB64 && glbB64.length > 0) {
-        const bytes = decodeBase64(glbB64);
+      const bytes = extractGlbBytes(meshRes);
+      byteLen = bytes.byteLength;
+      if (byteLen > 0) {
         const lean = stripEmbeddedImages(bytes);
         const cached = lean ? this.atlasCache.get(lean.atlas) : undefined;
         const buffer = cached
@@ -425,7 +545,7 @@ export class TickSimViewport {
     if (nextObj) this.worldGroup.add(nextObj);
 
     const ms = performance.now() - t0;
-    this.lastMeshStats = { tris, verts, ms };
+    this.lastMeshStats = { tris, verts, ms, bytes: byteLen };
 
     if (refitCamera && nextObj) {
       const box = new this.THREE.Box3().setFromObject(nextObj);
@@ -443,7 +563,6 @@ export class TickSimViewport {
     return this.lastMeshStats;
   }
 
-  /** Cache a 1×1×1 Nucleation mesh for smooth moving piston interpolation. */
   _ensureBlockMesh(nuc, pack, state) {
     if (!state || state === "minecraft:air" || state.startsWith("minecraft:moving_piston")) {
       return null;
@@ -460,7 +579,7 @@ export class TickSimViewport {
         cfg.setAmbientOcclusion(false);
         const mr = nuc.MeshResult.createOrEmpty(scratch, pack, cfg);
         if (mr.triangleCount() > 0) {
-          const bytes = decodeBase64(mr.glbDataB64());
+          const bytes = extractGlbBytes(mr);
           const gltf = await this.loader.parseAsync(
             bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
             "",
@@ -482,10 +601,8 @@ export class TickSimViewport {
   }
 
   syncFlights(nuc, pack, movingList) {
-    // Clear old flight objects
     while (this.flightGroup.children.length > 0) {
-      const child = this.flightGroup.children[0];
-      this.flightGroup.remove(child);
+      this.flightGroup.remove(this.flightGroup.children[0]);
     }
     this.flights = (movingList || []).map((m) => {
       this._ensureBlockMesh(nuc, pack, m.carried);
@@ -534,7 +651,6 @@ export class TickSimViewport {
     }
   }
 
-  /** Project a world voxel center `(x, y, z)` to canvas CSS pixel coordinates. */
   projectVoxelToClient(x, y, z) {
     const v = new this.THREE.Vector3(x, y, z).project(this.camera);
     const rect = this.renderer.domElement.getBoundingClientRect();
@@ -545,16 +661,28 @@ export class TickSimViewport {
     };
   }
 
-  _pickAtClient(clientX, clientY) {
+  _setRayFromClient(clientX, clientY) {
     const rect = this.renderer.domElement.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return null;
+    if (rect.width <= 0 || rect.height <= 0) return false;
     this.ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     this.ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.ndc, this.camera);
+    return true;
+  }
+
+  _pickAtClient(clientX, clientY) {
+    if (!this.callbacks.isSolid || !this._setRayFromClient(clientX, clientY)) return null;
     return pickVoxel(this.raycaster.ray, (x, y, z) => this.callbacks.isSolid(x, y, z));
   }
 
+  _hitGizmo(clientX, clientY) {
+    if (!this.gizmoConfig || !this.gizmoGroup.visible) return false;
+    if (!this._setRayFromClient(clientX, clientY)) return false;
+    return this.raycaster.intersectObjects([this.gizmoHandle, this.gizmoRing], false).length > 0;
+  }
+
   _updateHoverVisuals() {
+    if (!this.interactive) return;
     const hit = this.currentHit;
     if (!hit) {
       this.outline.visible = false;
@@ -563,7 +691,7 @@ export class TickSimViewport {
       return;
     }
 
-    const state = this.callbacks.getBlock(hit.pos[0], hit.pos[1], hit.pos[2]);
+    const state = this.callbacks.getBlock?.(hit.pos[0], hit.pos[1], hit.pos[2]) ?? "minecraft:air";
     const isBreak = this.currentTool === "break" || this.shiftHeld;
     const isInteract = this.currentTool === "interact" && !this.shiftHeld;
 
@@ -591,6 +719,28 @@ export class TickSimViewport {
     const dom = this.renderer.domElement;
 
     this._onPointerMove = (e) => {
+      if (this.draggingGizmo && this.gizmoConfig) {
+        if (this._setRayFromClient(e.clientX, e.clientY)) {
+          const hitPt = new this.THREE.Vector3();
+          if (this.raycaster.ray.intersectPlane(this.gizmoPlane, hitPt)) {
+            const minX = this.gizmoConfig.minX ?? -8;
+            const maxX = this.gizmoConfig.maxX ?? 8;
+            const step = this.gizmoConfig.step ?? 0.5;
+            const clamped = Math.max(minX, Math.min(maxX, Math.round(hitPt.x / step) * step));
+            this.gizmoGroup.position.x = clamped;
+            this.gizmoConfig.onDrag?.(clamped);
+          }
+        }
+        return;
+      }
+
+      if (this.gizmoConfig && this.gizmoGroup.visible) {
+        const over = this._hitGizmo(e.clientX, e.clientY);
+        dom.style.cursor = over ? "ew-resize" : this.interactive ? "crosshair" : "grab";
+        this.gizmoMat.color.setHex(over ? 0x7ff5e3 : 0x3ad1bd);
+      }
+
+      if (!this.interactive) return;
       this.pointerInside = true;
       this.shiftHeld = e.shiftKey;
       this.currentHit = this._pickAtClient(e.clientX, e.clientY);
@@ -598,23 +748,41 @@ export class TickSimViewport {
     };
 
     this._onPointerLeave = () => {
+      if (!this.interactive) return;
       this.pointerInside = false;
       this.currentHit = null;
       this._updateHoverVisuals();
     };
 
     this._onPointerDown = (e) => {
+      if (e.button === 0 && this._hitGizmo(e.clientX, e.clientY)) {
+        this.draggingGizmo = true;
+        this.controls.enabled = false;
+        const y = this.gizmoGroup.position.y;
+        this.gizmoPlane.set(new this.THREE.Vector3(0, 1, 0), -y);
+        dom.setPointerCapture?.(e.pointerId);
+        dom.style.cursor = "ew-resize";
+        return;
+      }
+      if (!this.interactive) return;
       if (e.button === 0 || e.button === 2) {
         this.pointerDownPos = { x: e.clientX, y: e.clientY, button: e.button };
       }
     };
 
     this._onPointerUp = (e) => {
-      if (!this.pointerDownPos) return;
+      if (this.draggingGizmo) {
+        this.draggingGizmo = false;
+        this.controls.enabled = true;
+        dom.releasePointerCapture?.(e.pointerId);
+        dom.style.cursor = this.interactive ? "crosshair" : "grab";
+        return;
+      }
+      if (!this.interactive || !this.pointerDownPos) return;
       const dist = Math.hypot(e.clientX - this.pointerDownPos.x, e.clientY - this.pointerDownPos.y);
       const btn = this.pointerDownPos.button;
       this.pointerDownPos = null;
-      if (dist > 5) return; // Dragged to orbit/pan
+      if (dist > 5) return;
 
       const hit = this._pickAtClient(e.clientX, e.clientY);
       this.currentHit = hit;
@@ -629,7 +797,14 @@ export class TickSimViewport {
       this._updateHoverVisuals();
     };
 
+    this._onContextMenu = (e) => {
+      if (this.interactive && this.pointerDownPos === null) {
+        // Allow quick right-click interact without popping browser menu on single clicks
+      }
+    };
+
     this._onKey = (e) => {
+      if (!this.interactive) return;
       if (this.shiftHeld !== e.shiftKey) {
         this.shiftHeld = e.shiftKey;
         if (this.pointerInside) this._updateHoverVisuals();
@@ -640,6 +815,7 @@ export class TickSimViewport {
     dom.addEventListener("pointerleave", this._onPointerLeave);
     dom.addEventListener("pointerdown", this._onPointerDown);
     dom.addEventListener("pointerup", this._onPointerUp);
+    dom.addEventListener("contextmenu", this._onContextMenu);
     window.addEventListener("keydown", this._onKey);
     window.addEventListener("keyup", this._onKey);
   }
@@ -674,6 +850,7 @@ export class TickSimViewport {
     dom.removeEventListener("pointerleave", this._onPointerLeave);
     dom.removeEventListener("pointerdown", this._onPointerDown);
     dom.removeEventListener("pointerup", this._onPointerUp);
+    dom.removeEventListener("contextmenu", this._onContextMenu);
     window.removeEventListener("keydown", this._onKey);
     window.removeEventListener("keyup", this._onKey);
     this.controls.dispose();
@@ -681,3 +858,6 @@ export class TickSimViewport {
     if (dom.parentNode === this.container) this.container.removeChild(dom);
   }
 }
+
+// Backwards-compatible alias
+export { NucleationViewport as TickSimViewport };

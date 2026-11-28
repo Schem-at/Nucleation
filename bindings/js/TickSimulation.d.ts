@@ -123,8 +123,13 @@ export class TickSimulation {
     useBlock(x: number, y: number, z: number): void;
 
     /**
-     * Write a block state (`minecraft:air` breaks). The state must be in
-     * the structure, in `extra_states`, or `minecraft:redstone_block`.
+     * Write a block state (`minecraft:air` breaks).
+     *
+     * Property ordering is canonicalized automatically, and supported
+     * vanilla states not yet in the simulation's palette are interned on
+     * demand together with their companion states and behaviour/physics
+     * tables. Unsupported block states fail with `NotFound` and populate
+     * `last_error_detail()`.
      */
     placeBlock(x: number, y: number, z: number, state: string): void;
 

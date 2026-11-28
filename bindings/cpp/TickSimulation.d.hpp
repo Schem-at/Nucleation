@@ -142,8 +142,13 @@ public:
   inline void use_block(int32_t x, int32_t y, int32_t z);
 
   /**
-   * Write a block state (`minecraft:air` breaks). The state must be in
-   * the structure, in `extra_states`, or `minecraft:redstone_block`.
+   * Write a block state (`minecraft:air` breaks).
+   *
+   * Property ordering is canonicalized automatically, and supported
+   * vanilla states not yet in the simulation's palette are interned on
+   * demand together with their companion states and behaviour/physics
+   * tables. Unsupported block states fail with `NotFound` and populate
+   * `last_error_detail()`.
    */
   inline diplomat::result<std::monostate, NucleationError> place_block(int32_t x, int32_t y, int32_t z, std::string_view state);
 

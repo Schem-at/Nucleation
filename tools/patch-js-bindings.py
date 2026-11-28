@@ -136,6 +136,41 @@ def main() -> None:
         "regionBlockIndices(regionName: string, start: number, count: number): Uint32Array",
     ))
 
+    # Same Diplomat JS limitation for `&mut [u8]` / `&mut [f32]` / `&mut [u32]`
+    # out-slice copy methods on `MeshBytes` and `RawMeshExport`: copy written
+    # elements back into the caller's TypedArray before the arena frees `outBuf`.
+    copy_patches = [
+        (ROOT / "MeshBytes.mjs", "u8", "Uint8Array"),
+        (ROOT / "RawMeshExport.mjs", "f32", "Float32Array"),
+        (ROOT / "RawMeshExport.mjs", "u32", "Uint32Array"),
+        (ROOT / "RawMeshExport.mjs", "u8", "Uint8Array"),
+    ]
+    for path, dtype, typed_arr in copy_patches:
+        if not path.exists():
+            continue
+        src = path.read_text()
+        pattern = re.compile(
+            rf'const outSlice = functionCleanupArena\.alloc\(diplomatRuntime\.DiplomatBuf\.sliceWrapper\(wasm, diplomatRuntime\.DiplomatBuf\.slice\(wasm, out, "{dtype}"\)\)\);\n'
+            r'\n'
+            r'        const result = (wasm\.[A-Za-z0-9_]+\([^)]+\));\n'
+            r'\n'
+            r'        try \{\n'
+            r'            return result;'
+        )
+        replacement = (
+            f'const outBuf = diplomatRuntime.DiplomatBuf.slice(wasm, out, "{dtype}");\n'
+            f'        const outSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, outBuf));\n\n'
+            f'        const result = \\1;\n\n'
+            f'        try {{\n'
+            f'            if (out && typeof out.set === "function") {{\n'
+            f'                out.set(new {typed_arr}(wasm.memory.buffer, outBuf.ptr, result));\n'
+            f'            }}\n'
+            f'            return result;'
+        )
+        src, n = pattern.subn(replacement, src)
+        if n > 0:
+            path.write_text(src)
+
     # Node16/NodeNext resolves an imported `./Thing.mjs` declaration to
     # `Thing.d.mts`. Keep Diplomat's `.d.ts` files for bundler compatibility
     # and emit ESM declaration companions from the same patched source.

@@ -45,6 +45,24 @@ final class ResourcePack {
         return new ResourcePack($ret, true);
     }
 
+    public static function fromBytesWithFallback(array $data) {
+        $__n0 = count($data);
+        $__view0 = Lib::ffi()->new('DiplomatU8View');
+        if ($__n0 > 0) {
+            $__arr0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            foreach ($data as $__i0 => $__v0) { $__arr0[$__i0] = $__v0; }
+            $__view0->data = \FFI::addr($__arr0[0]);
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->ResourcePack_from_bytes_with_fallback($__view0);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new ResourcePack($result->ok, true);
+    }
+
     public function blockstateCount() {
         $ret = Lib::ffi()->ResourcePack_blockstate_count($this->ptr);
         return $ret;

@@ -72,6 +72,8 @@ export { ItemModelPackBuilder } from "./ItemModelPackBuilder.mjs"
 
 export { ItemModelResult } from "./ItemModelResult.mjs"
 
+export { MeshBytes } from "./MeshBytes.mjs"
+
 export { MeshConfig } from "./MeshConfig.mjs"
 
 export { MeshJob } from "./MeshJob.mjs"

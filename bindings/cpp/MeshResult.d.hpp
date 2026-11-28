@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include "diplomat_runtime.hpp"
 
+namespace diplomat::capi { struct MeshBytes; }
+class MeshBytes;
 namespace diplomat::capi { struct MeshConfig; }
 class MeshConfig;
 namespace diplomat::capi { struct ResourcePack; }
@@ -72,11 +74,21 @@ public:
   inline diplomat::result<std::monostate, NucleationError> glb_data_b64_write(W& writeable_output) const;
 
   /**
+   * The mesh as a raw binary GLB buffer (zero Base64 encoding overhead).
+   */
+  inline diplomat::result<std::unique_ptr<MeshBytes>, NucleationError> to_glb_bytes() const;
+
+  /**
    * The mesh as a USDZ archive, base64-encoded.
    */
   inline diplomat::result<std::string, NucleationError> usdz_data_b64() const;
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> usdz_data_b64_write(W& writeable_output) const;
+
+  /**
+   * The mesh as a raw binary USDZ buffer (zero Base64 encoding overhead).
+   */
+  inline diplomat::result<std::unique_ptr<MeshBytes>, NucleationError> to_usdz_bytes() const;
 
   /**
    * The mesh serialized in the NUCM cache format, base64-encoded.

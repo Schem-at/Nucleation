@@ -14,20 +14,10 @@
   let activeHandle = null;
   let themeObserver = null;
   let mountGen = 0;
-  let modelViewerPromise = null;
 
   function ensureModelViewer() {
-    if (customElements.get("model-viewer") !== undefined) return Promise.resolve(true);
-    modelViewerPromise ??= import(
-      "https://ajax.googleapis.com/ajax/libs/model-viewer/4.3.1/model-viewer.min.js"
-    )
-      .then(() => customElements.whenDefined("model-viewer"))
-      .then(() => true)
-      .catch((error) => {
-        console.warn("Could not load <model-viewer>:", error);
-        return false;
-      });
-    return modelViewerPromise;
+    // All 4 Nucleation studios now render natively via Three.js + Nucleation WASM MeshResult.
+    return Promise.resolve(true);
   }
 
   function syncAdaptiveDiagrams() {

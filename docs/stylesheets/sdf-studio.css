@@ -644,6 +644,102 @@
   cursor: crosshair;
 }
 
+.tick-3d-canvas--orbit {
+  cursor: grab;
+}
+
+.tick-3d-canvas--orbit:active {
+  cursor: grabbing;
+}
+
+.sdf-mesh-pane {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  background: var(--stage);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sdf-mesh-pane[hidden] {
+  display: none;
+}
+
+.sdf-gizmo-badge {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--accent);
+  backdrop-filter: blur(6px);
+  color: var(--fg-hi);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 5px 9px;
+  pointer-events: none;
+}
+
+.sdf-gizmo-badge[hidden] {
+  display: none;
+}
+
+.tick-timeline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel-2);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mist);
+}
+
+.tick-timeline[hidden] {
+  display: none;
+}
+
+.tick-timeline__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 26px;
+  flex: 1 1 200px;
+  min-width: 120px;
+  overflow: hidden;
+  padding: 2px 4px;
+  border: 1px solid var(--rule);
+  background: var(--stage);
+}
+
+.tick-timeline__bar {
+  flex: 1 1 3px;
+  max-width: 10px;
+  background: var(--accent);
+  min-height: 2px;
+}
+
+.tick-timeline__meta {
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.sdf-pack-btn[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--inverse-fg-hi);
+  font-weight: 600;
+}
+
+[data-md-color-scheme="vellum"] .sdf-pack-btn[aria-pressed="true"] {
+  color: #ffffff;
+}
+
 .tick-hud {
   position: absolute;
   left: 12px;

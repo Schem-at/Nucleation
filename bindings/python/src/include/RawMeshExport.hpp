@@ -41,6 +41,20 @@ namespace capi {
 
     void RawMeshExport_texture_rgba_b64(const nucleation::capi::RawMeshExport* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    uint32_t RawMeshExport_copy_positions(const nucleation::capi::RawMeshExport* self, nucleation::diplomat::capi::DiplomatF32ViewMut out);
+
+    uint32_t RawMeshExport_copy_normals(const nucleation::capi::RawMeshExport* self, nucleation::diplomat::capi::DiplomatF32ViewMut out);
+
+    uint32_t RawMeshExport_copy_uvs(const nucleation::capi::RawMeshExport* self, nucleation::diplomat::capi::DiplomatF32ViewMut out);
+
+    uint32_t RawMeshExport_copy_colors(const nucleation::capi::RawMeshExport* self, nucleation::diplomat::capi::DiplomatF32ViewMut out);
+
+    uint32_t RawMeshExport_copy_indices(const nucleation::capi::RawMeshExport* self, nucleation::diplomat::capi::DiplomatU32ViewMut out);
+
+    uint32_t RawMeshExport_texture_rgba_len(const nucleation::capi::RawMeshExport* self);
+
+    uint32_t RawMeshExport_copy_texture_rgba(const nucleation::capi::RawMeshExport* self, nucleation::diplomat::capi::DiplomatU8ViewMut out);
+
     uint32_t RawMeshExport_texture_width(const nucleation::capi::RawMeshExport* self);
 
     uint32_t RawMeshExport_texture_height(const nucleation::capi::RawMeshExport* self);
@@ -150,6 +164,47 @@ inline void nucleation::RawMeshExport::texture_rgba_b64_write(W& writeable) cons
     nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
     nucleation::capi::RawMeshExport_texture_rgba_b64(this->AsFFI(),
         &write);
+}
+
+inline uint32_t nucleation::RawMeshExport::copy_positions(nucleation::diplomat::span<float> out) const {
+    auto result = nucleation::capi::RawMeshExport_copy_positions(this->AsFFI(),
+        {out.data(), out.size()});
+    return result;
+}
+
+inline uint32_t nucleation::RawMeshExport::copy_normals(nucleation::diplomat::span<float> out) const {
+    auto result = nucleation::capi::RawMeshExport_copy_normals(this->AsFFI(),
+        {out.data(), out.size()});
+    return result;
+}
+
+inline uint32_t nucleation::RawMeshExport::copy_uvs(nucleation::diplomat::span<float> out) const {
+    auto result = nucleation::capi::RawMeshExport_copy_uvs(this->AsFFI(),
+        {out.data(), out.size()});
+    return result;
+}
+
+inline uint32_t nucleation::RawMeshExport::copy_colors(nucleation::diplomat::span<float> out) const {
+    auto result = nucleation::capi::RawMeshExport_copy_colors(this->AsFFI(),
+        {out.data(), out.size()});
+    return result;
+}
+
+inline uint32_t nucleation::RawMeshExport::copy_indices(nucleation::diplomat::span<uint32_t> out) const {
+    auto result = nucleation::capi::RawMeshExport_copy_indices(this->AsFFI(),
+        {out.data(), out.size()});
+    return result;
+}
+
+inline uint32_t nucleation::RawMeshExport::texture_rgba_len() const {
+    auto result = nucleation::capi::RawMeshExport_texture_rgba_len(this->AsFFI());
+    return result;
+}
+
+inline uint32_t nucleation::RawMeshExport::copy_texture_rgba(nucleation::diplomat::span<uint8_t> out) const {
+    auto result = nucleation::capi::RawMeshExport_copy_texture_rgba(this->AsFFI(),
+        {out.data(), out.size()});
+    return result;
 }
 
 inline uint32_t nucleation::RawMeshExport::texture_width() const {

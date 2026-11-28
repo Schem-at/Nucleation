@@ -92,6 +92,41 @@ public:
   inline void texture_rgba_b64_write(W& writeable_output) const;
 
   /**
+   * Copy flat `[x,y,z,...]` vertex positions directly into `out` (zero Base64).
+   */
+  inline uint32_t copy_positions(diplomat::span<float> out) const;
+
+  /**
+   * Copy flat `[nx,ny,nz,...]` vertex normals directly into `out`.
+   */
+  inline uint32_t copy_normals(diplomat::span<float> out) const;
+
+  /**
+   * Copy flat `[u,v,...]` texture coordinates directly into `out`.
+   */
+  inline uint32_t copy_uvs(diplomat::span<float> out) const;
+
+  /**
+   * Copy flat `[r,g,b,a,...]` vertex colors directly into `out`.
+   */
+  inline uint32_t copy_colors(diplomat::span<float> out) const;
+
+  /**
+   * Copy triangle indices directly into `out`.
+   */
+  inline uint32_t copy_indices(diplomat::span<uint32_t> out) const;
+
+  /**
+   * Byte length of the baked RGBA texture atlas.
+   */
+  inline uint32_t texture_rgba_len() const;
+
+  /**
+   * Copy baked RGBA texture bytes directly into `out` (zero Base64).
+   */
+  inline uint32_t copy_texture_rgba(diplomat::span<uint8_t> out) const;
+
+  /**
    * Width of the baked texture in pixels.
    */
   inline uint32_t texture_width() const;

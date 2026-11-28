@@ -27,6 +27,9 @@ ResourcePack_from_list_result ResourcePack_from_list(const ResourcePackList* lis
 
 ResourcePack* ResourcePack_builtin_procedural(void);
 
+typedef struct ResourcePack_from_bytes_with_fallback_result {union {ResourcePack* ok; NucleationError err;}; bool is_ok;} ResourcePack_from_bytes_with_fallback_result;
+ResourcePack_from_bytes_with_fallback_result ResourcePack_from_bytes_with_fallback(DiplomatU8View data);
+
 uint32_t ResourcePack_blockstate_count(const ResourcePack* self);
 
 uint32_t ResourcePack_model_count(const ResourcePack* self);

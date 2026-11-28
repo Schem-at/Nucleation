@@ -38,6 +38,20 @@ void RawMeshExport_indices_b64(const RawMeshExport* self, DiplomatWrite* write);
 
 void RawMeshExport_texture_rgba_b64(const RawMeshExport* self, DiplomatWrite* write);
 
+uint32_t RawMeshExport_copy_positions(const RawMeshExport* self, DiplomatF32ViewMut out);
+
+uint32_t RawMeshExport_copy_normals(const RawMeshExport* self, DiplomatF32ViewMut out);
+
+uint32_t RawMeshExport_copy_uvs(const RawMeshExport* self, DiplomatF32ViewMut out);
+
+uint32_t RawMeshExport_copy_colors(const RawMeshExport* self, DiplomatF32ViewMut out);
+
+uint32_t RawMeshExport_copy_indices(const RawMeshExport* self, DiplomatU32ViewMut out);
+
+uint32_t RawMeshExport_texture_rgba_len(const RawMeshExport* self);
+
+uint32_t RawMeshExport_copy_texture_rgba(const RawMeshExport* self, DiplomatU8ViewMut out);
+
 uint32_t RawMeshExport_texture_width(const RawMeshExport* self);
 
 uint32_t RawMeshExport_texture_height(const RawMeshExport* self);

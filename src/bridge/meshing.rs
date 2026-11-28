@@ -122,6 +122,14 @@ pub mod ffi {
             ))
         }
 
+        /// Load a resource pack ZIP/JAR layered on top of the built-in
+        /// procedural pack so any omitted blocks still render cleanly.
+        pub fn from_bytes_with_fallback(data: &[u8]) -> Result<Box<ResourcePack>, NucleationError> {
+            crate::meshing::ResourcePackSource::from_bytes_with_builtin_fallback(data)
+                .map(|p| Box::new(ResourcePack(p)))
+                .map_err(|_| NucleationError::Parse)
+        }
+
         /// Number of blockstate definitions in the pack.
         pub fn blockstate_count(&self) -> u32 {
             self.0.stats().blockstate_count as u32
@@ -421,6 +429,29 @@ pub mod ffi {
         pub max_z: f32,
     }
 
+    /// Owned binary byte buffer returned by zero-Base64 binary export methods
+    /// (e.g. [`MeshResult::to_glb_bytes`]). Query [`Self::len`] and copy straight
+    /// into a caller-allocated byte buffer / `Uint8Array` via [`Self::copy_into`].
+    #[diplomat::opaque]
+    pub struct MeshBytes(pub(crate) Vec<u8>);
+
+    impl MeshBytes {
+        /// Byte length of the encoded payload.
+        pub fn len(&self) -> u32 {
+            self.0.len() as u32
+        }
+
+        /// Copy up to `out.len()` bytes starting at `offset` into `out`.
+        /// Returns the number of bytes written.
+        pub fn copy_into(&self, offset: u32, out: &mut [u8]) -> u32 {
+            let start = (offset as usize).min(self.0.len());
+            let available = &self.0[start..];
+            let n = available.len().min(out.len());
+            out[..n].copy_from_slice(&available[..n]);
+            n as u32
+        }
+    }
+
     /// A single mesh output. Wraps [`crate::meshing::MeshResult`].
     #[diplomat::opaque]
     pub struct MeshResult(pub(crate) crate::meshing::MeshResult);
@@ -496,11 +527,23 @@ pub mod ffi {
             Ok(())
         }
 
+        /// The mesh as a raw binary GLB buffer (zero Base64 encoding overhead).
+        pub fn to_glb_bytes(&self) -> Result<Box<MeshBytes>, NucleationError> {
+            let data = self.0.to_glb().map_err(|_| NucleationError::Serialize)?;
+            Ok(Box::new(MeshBytes(data)))
+        }
+
         /// The mesh as a USDZ archive, base64-encoded.
         pub fn usdz_data_b64(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
             let data = self.0.to_usdz().map_err(|_| NucleationError::Serialize)?;
             super::write_b64(&data, out);
             Ok(())
+        }
+
+        /// The mesh as a raw binary USDZ buffer (zero Base64 encoding overhead).
+        pub fn to_usdz_bytes(&self) -> Result<Box<MeshBytes>, NucleationError> {
+            let data = self.0.to_usdz().map_err(|_| NucleationError::Serialize)?;
+            Ok(Box::new(MeshBytes(data)))
         }
 
         /// The mesh serialized in the NUCM cache format, base64-encoded.
@@ -772,6 +815,59 @@ pub mod ffi {
         /// Raw RGBA texture pixels, base64-encoded.
         pub fn texture_rgba_b64(&self, out: &mut DiplomatWrite) {
             super::write_b64(self.0.texture_rgba(), out);
+        }
+
+        /// Copy flat `[x,y,z,...]` vertex positions directly into `out` (zero Base64).
+        pub fn copy_positions(&self, out: &mut [f32]) -> u32 {
+            let src = self.0.positions_flat();
+            let n = src.len().min(out.len());
+            out[..n].copy_from_slice(&src[..n]);
+            n as u32
+        }
+
+        /// Copy flat `[nx,ny,nz,...]` vertex normals directly into `out`.
+        pub fn copy_normals(&self, out: &mut [f32]) -> u32 {
+            let src = self.0.normals_flat();
+            let n = src.len().min(out.len());
+            out[..n].copy_from_slice(&src[..n]);
+            n as u32
+        }
+
+        /// Copy flat `[u,v,...]` texture coordinates directly into `out`.
+        pub fn copy_uvs(&self, out: &mut [f32]) -> u32 {
+            let src = self.0.uvs_flat();
+            let n = src.len().min(out.len());
+            out[..n].copy_from_slice(&src[..n]);
+            n as u32
+        }
+
+        /// Copy flat `[r,g,b,a,...]` vertex colors directly into `out`.
+        pub fn copy_colors(&self, out: &mut [f32]) -> u32 {
+            let src = self.0.colors_flat();
+            let n = src.len().min(out.len());
+            out[..n].copy_from_slice(&src[..n]);
+            n as u32
+        }
+
+        /// Copy triangle indices directly into `out`.
+        pub fn copy_indices(&self, out: &mut [u32]) -> u32 {
+            let src = self.0.indices();
+            let n = src.len().min(out.len());
+            out[..n].copy_from_slice(&src[..n]);
+            n as u32
+        }
+
+        /// Byte length of the baked RGBA texture atlas.
+        pub fn texture_rgba_len(&self) -> u32 {
+            self.0.texture_rgba().len() as u32
+        }
+
+        /// Copy baked RGBA texture bytes directly into `out` (zero Base64).
+        pub fn copy_texture_rgba(&self, out: &mut [u8]) -> u32 {
+            let src = self.0.texture_rgba();
+            let n = src.len().min(out.len());
+            out[..n].copy_from_slice(&src[..n]);
+            n as u32
         }
 
         /// Width of the baked texture in pixels.

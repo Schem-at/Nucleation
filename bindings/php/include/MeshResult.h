@@ -8,6 +8,7 @@
 #include "diplomat_runtime.h"
 
 #include "MeshBounds.d.h"
+#include "MeshBytes.d.h"
 #include "MeshConfig.d.h"
 #include "NucleationError.d.h"
 #include "ResourcePack.d.h"
@@ -35,8 +36,14 @@ MeshResult_animated_glb_b64_result MeshResult_animated_glb_b64(const Schematic* 
 typedef struct MeshResult_glb_data_b64_result {union { NucleationError err;}; bool is_ok;} MeshResult_glb_data_b64_result;
 MeshResult_glb_data_b64_result MeshResult_glb_data_b64(const MeshResult* self, DiplomatWrite* write);
 
+typedef struct MeshResult_to_glb_bytes_result {union {MeshBytes* ok; NucleationError err;}; bool is_ok;} MeshResult_to_glb_bytes_result;
+MeshResult_to_glb_bytes_result MeshResult_to_glb_bytes(const MeshResult* self);
+
 typedef struct MeshResult_usdz_data_b64_result {union { NucleationError err;}; bool is_ok;} MeshResult_usdz_data_b64_result;
 MeshResult_usdz_data_b64_result MeshResult_usdz_data_b64(const MeshResult* self, DiplomatWrite* write);
+
+typedef struct MeshResult_to_usdz_bytes_result {union {MeshBytes* ok; NucleationError err;}; bool is_ok;} MeshResult_to_usdz_bytes_result;
+MeshResult_to_usdz_bytes_result MeshResult_to_usdz_bytes(const MeshResult* self);
 
 void MeshResult_nucm_data_b64(const MeshResult* self, DiplomatWrite* write);
 

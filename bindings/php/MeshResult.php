@@ -66,6 +66,14 @@ final class MeshResult {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function toGlbBytes() {
+        $result = Lib::ffi()->MeshResult_to_glb_bytes($this->ptr);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new MeshBytes($result->ok, true);
+    }
+
     public function usdzDataB64() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         $result = Lib::ffi()->MeshResult_usdz_data_b64($this->ptr, $write);
@@ -73,6 +81,14 @@ final class MeshResult {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }
         return Lib::readAndFreeWrite($write);
+    }
+
+    public function toUsdzBytes() {
+        $result = Lib::ffi()->MeshResult_to_usdz_bytes($this->ptr);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new MeshBytes($result->ok, true);
     }
 
     public function nucmDataB64() {

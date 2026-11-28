@@ -1143,6 +1143,77 @@ fn check_volume(size: (i32, i32, i32)) -> Result<(), String> {
     Ok(())
 }
 
+pub(crate) fn canonicalize_state_descriptor(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let (name_raw, props_raw) = match trimmed.find('[') {
+        Some(idx) if trimmed.ends_with(']') => (&trimmed[..idx], Some(&trimmed[idx + 1..trimmed.len() - 1])),
+        _ => (trimmed, None),
+    };
+    let name = if name_raw.contains(':') {
+        name_raw.to_string()
+    } else {
+        format!("minecraft:{name_raw}")
+    };
+    let Some(props_str) = props_raw else {
+        return name;
+    };
+    let mut pairs: Vec<&str> = props_str
+        .split(',')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .collect();
+    if pairs.is_empty() {
+        return name;
+    }
+    pairs.sort_by_key(|p| p.split('=').next().unwrap_or(*p));
+    format!("{name}[{}]", pairs.join(","))
+}
+
+pub(crate) fn ensure_state_interned(
+    sim: &mut mc_tick::Simulation,
+    hash_origin: mc_tick::Pos,
+    canonical: &str,
+) -> Result<mc_tick::StateId, String> {
+    if let Some(id) = sim.registry().get(canonical) {
+        return Ok(id);
+    }
+    // Validate against a scratch registry+table first so unsupported blocks
+    // never pollute the live simulation's state palette.
+    let mut probe_reg = mc_tick::StateRegistry::new();
+    let probe_id = probe_reg
+        .intern(canonical)
+        .map_err(|e| format!("interning {canonical}: {e:?}"))?;
+    mc_tick::intern_companions(&mut probe_reg);
+    let mut probe_table = mc_tick::BehaviourTable::default();
+    mc_tick::register_all_at(&mut probe_reg, &mut probe_table, hash_origin);
+    if !probe_table.is_registered(probe_id) {
+        return Err(format!("unsupported block state: {canonical}"));
+    }
+
+    let id = sim
+        .registry_mut()
+        .intern(canonical)
+        .map_err(|e| format!("interning {canonical}: {e:?}"))?;
+    mc_tick::intern_companions(sim.registry_mut());
+    {
+        let mut table = mc_tick::BehaviourTable::default();
+        mc_tick::register_all_at(sim.registry_mut(), &mut table, hash_origin);
+        *sim.behaviours_mut() = table;
+    }
+    {
+        let (solidity, frictions, heights, webs) = mc_tick::vanilla::physics_tables(sim.registry());
+        sim.set_physics_tables(solidity, frictions, heights, webs);
+        let (water_kinds, bubble_kinds) = mc_tick::vanilla::fluid_tables(sim.registry());
+        sim.set_fluid_tables(water_kinds, bubble_kinds);
+        let (rails, conductors) = mc_tick::vanilla::rail_tables(sim.registry());
+        sim.set_rail_tables(rails, conductors);
+    }
+    Ok(id)
+}
+
 pub(crate) fn wire_simulation(
     structure: &mc_tick::Structure,
     hash_origin: mc_tick::Pos,
@@ -1594,6 +1665,7 @@ pub mod ffi {
     #[diplomat::opaque_mut]
     pub struct TickSimulation {
         pub(crate) sim: mc_tick::Simulation,
+        pub(crate) hash_origin: mc_tick::Pos,
         pub(crate) checkpoints: Vec<mc_tick::sim::Checkpoint>,
         /// The span the last [`TickSimulation::stop_timeline`] ended.
         ///
@@ -1696,6 +1768,7 @@ pub mod ffi {
             })?;
             Ok(Box::new(TickSimulation {
                 sim,
+                hash_origin: mc_tick::Pos::new(origin_x, origin_y, origin_z),
                 checkpoints: Vec::new(),
                 stopped_timeline: None,
             }))
@@ -1762,6 +1835,7 @@ pub mod ffi {
             })?;
             Ok(Box::new(TickSimulation {
                 sim,
+                hash_origin: mc_tick::Pos::new(origin_x, origin_y, origin_z),
                 checkpoints: Vec::new(),
                 stopped_timeline: None,
             }))
@@ -1820,6 +1894,7 @@ pub mod ffi {
             })?;
             Ok(Box::new(TickSimulation {
                 sim,
+                hash_origin: mc_tick::Pos::new(origin_x, origin_y, origin_z),
                 checkpoints: Vec::new(),
                 stopped_timeline: None,
             }))
@@ -1974,8 +2049,13 @@ pub mod ffi {
             self.sim.use_block(mc_tick::Pos::new(x, y, z));
         }
 
-        /// Write a block state (`minecraft:air` breaks). The state must be in
-        /// the structure, in `extra_states`, or `minecraft:redstone_block`.
+        /// Write a block state (`minecraft:air` breaks).
+        ///
+        /// Property ordering is canonicalized automatically, and supported
+        /// vanilla states not yet in the simulation's palette are interned on
+        /// demand together with their companion states and behaviour/physics
+        /// tables. Unsupported block states fail with `NotFound` and populate
+        /// `last_error_detail()`.
         pub fn place_block(
             &mut self,
             x: i32,
@@ -1983,12 +2063,21 @@ pub mod ffi {
             z: i32,
             state: &DiplomatStr,
         ) -> Result<(), NucleationError> {
-            let state = std::str::from_utf8(state).map_err(|_| NucleationError::InvalidArgument)?;
-            let id = self
-                .sim
-                .registry()
-                .get(state)
-                .ok_or(NucleationError::NotFound)?;
+            super::clear_last_error();
+            let raw = std::str::from_utf8(state).map_err(|_| {
+                super::set_last_error("block state is not valid UTF-8");
+                NucleationError::InvalidArgument
+            })?;
+            let canonical = super::canonicalize_state_descriptor(raw);
+            if canonical.is_empty() {
+                super::set_last_error("block state must not be empty");
+                return Err(NucleationError::InvalidArgument);
+            }
+            let id = super::ensure_state_interned(&mut self.sim, self.hash_origin, &canonical)
+                .map_err(|e| {
+                    super::set_last_error(e);
+                    NucleationError::NotFound
+                })?;
             self.sim.place_block(mc_tick::Pos::new(x, y, z), id);
             Ok(())
         }
@@ -4070,5 +4159,48 @@ mod tests {
         let detail = super::structure_parse_detail(&err, true);
         assert!(detail.contains("minecraft:creeper"), "{detail}");
         assert!(!detail.contains("engine fault"), "{detail}");
+    }
+
+    #[test]
+    fn place_block_dynamically_interns_new_states_and_canonicalizes_props() {
+        // Start with a schematic containing ONLY smooth_stone and NO extra_states.
+        let mut schem = UniversalSchematic::new("plain_pad".into());
+        for x in 0..=4 {
+            schem.set_block(x, 0, 0, &BlockState::new("minecraft:smooth_stone"));
+        }
+        let bridge_schem = crate::bridge::schematic::ffi::Schematic(schem);
+        let mut sim = super::ffi::TickSimulation::from_schematic(
+            &bridge_schem,
+            super::ffi::TickSettleMode::InWorld,
+            0,
+            0,
+            0,
+            b"",
+        )
+        .expect("base schematic loads");
+
+        // Unsorted property order + no `minecraft:` prefix + not in initial palette!
+        sim.place_block(1, 1, 0, b"sticky_piston[facing=east,extended=false]")
+            .expect("sticky_piston should intern dynamically");
+        sim.place_block(2, 1, 0, b"minecraft:gold_block")
+            .expect("gold_block should intern dynamically");
+        sim.place_block(0, 1, 0, b"minecraft:redstone_block")
+            .expect("redstone_block should place");
+
+        sim.run(6);
+
+        let head_id = sim.sim.world().get(mc_tick::Pos::new(2, 1, 0));
+        let head = sim.sim.registry().descriptor(head_id).unwrap_or("");
+        assert!(head.contains("piston_head"), "expected piston_head, got {head}");
+
+        let pushed_id = sim.sim.world().get(mc_tick::Pos::new(3, 1, 0));
+        let pushed = sim.sim.registry().descriptor(pushed_id).unwrap_or("");
+        assert_eq!(pushed, "minecraft:gold_block");
+
+        // Genuinely unsupported block must fail cleanly without corrupting the sim.
+        let err = sim.place_block(0, 2, 0, b"minecraft:totally_unknown_widget");
+        assert!(err.is_err(), "unknown block should be rejected");
+        let detail = crate::bridge::last_error_detail();
+        assert!(detail.contains("totally_unknown_widget"), "unexpected detail: {detail}");
     }
 }

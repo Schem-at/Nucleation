@@ -426,6 +426,15 @@ debug = true
 lto = true
 opt-level = 3
 
+# Size-optimized profile for browser WebAssembly builds (`tools/package-npm.sh`).
+[profile.wasm-release]
+inherits = "release"
+opt-level = "s"
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
 # Debug-info budget. This is the single biggest lever on iteration speed here,
 # and it is a disk problem before it is a CPU problem.
 #

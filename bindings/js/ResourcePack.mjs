@@ -113,6 +113,35 @@ export class ResourcePack {
     }
 
     /**
+     * Load a resource pack ZIP/JAR layered on top of the built-in
+     * procedural pack so any omitted blocks still render cleanly.
+     */
+    static fromBytesWithFallback(data) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const dataSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, data, "u8")));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.ResourcePack_from_bytes_with_fallback(diplomatReceive.buffer, dataSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new ResourcePack(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
      * Number of blockstate definitions in the pack.
      */
     blockstateCount() {

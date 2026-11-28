@@ -223,6 +223,15 @@ impl ResourcePackSource {
         procedural_pack::build_builtin_procedural_pack()
     }
 
+    /// Load a user resource pack ZIP/JAR layered on top of
+    /// [`Self::builtin_procedural`], so partial packs inherit built-in 3D
+    /// textures/models for any blocks they omit.
+    pub fn from_bytes_with_builtin_fallback(data: &[u8]) -> Result<Self> {
+        let mut pack = Self::builtin_procedural().pack;
+        pack.overlay(Self::from_bytes(data)?.pack);
+        Ok(Self::with_mesher_texture_aliases(pack))
+    }
+
     /// Get a reference to the underlying ResourcePack.
     pub fn pack(&self) -> &ResourcePack {
         &self.pack

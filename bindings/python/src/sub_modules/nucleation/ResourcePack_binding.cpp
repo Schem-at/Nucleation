@@ -21,6 +21,7 @@ void add_ResourcePack_binding(nb::module_ mod) {
         .def("blockstate_count", &nucleation::ResourcePack::blockstate_count)
         .def_static("builtin_procedural", std::move(maybe_op_unwrap(&nucleation::ResourcePack::builtin_procedural)))
         .def_static("from_bytes", std::move(maybe_op_unwrap(&nucleation::ResourcePack::from_bytes)), "data"_a)
+        .def_static("from_bytes_with_fallback", std::move(maybe_op_unwrap(&nucleation::ResourcePack::from_bytes_with_fallback)), "data"_a)
         .def_static("from_list", std::move(maybe_op_unwrap(&nucleation::ResourcePack::from_list)), "list"_a)
         .def("get_blockstate_json", &nucleation::ResourcePack::get_blockstate_json, "name"_a)
         .def("get_model_json", &nucleation::ResourcePack::get_model_json, "name"_a)

@@ -62,12 +62,15 @@ if [[ -z "${NUCLEATION_FORCE_REBUILD:-}" \
   exit 0
 fi
 
-cargo build --release --target wasm32-unknown-unknown --lib --features "$FEATURES"
+cargo build --profile wasm-release --target wasm32-unknown-unknown --lib --features "$FEATURES"
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
 cp bindings/js/*.mjs bindings/js/*.d.ts bindings/js/*.d.mts "$OUT"/
-cp target/wasm32-unknown-unknown/release/nucleation.wasm "$OUT/"
+cp target/wasm32-unknown-unknown/wasm-release/nucleation.wasm "$OUT/"
+if command -v wasm-opt >/dev/null 2>&1; then
+  wasm-opt -Oz --enable-bulk-memory --enable-sign-ext "$OUT/nucleation.wasm" -o "$OUT/nucleation.wasm"
+fi
 cp bindings/npm/package.json "$OUT/"
 cp bindings/npm/README.md "$OUT/"
 # Hand-written veneers overlaying the generated core (mirrors of the Python

@@ -12,6 +12,7 @@
 #include <optional>
 #include <cstdlib>
 #include "MeshBounds.hpp"
+#include "MeshBytes.hpp"
 #include "MeshConfig.hpp"
 #include "NucleationError.hpp"
 #include "ResourcePack.hpp"
@@ -38,8 +39,14 @@ namespace capi {
     typedef struct MeshResult_glb_data_b64_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} MeshResult_glb_data_b64_result;
     MeshResult_glb_data_b64_result MeshResult_glb_data_b64(const nucleation::capi::MeshResult* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    typedef struct MeshResult_to_glb_bytes_result {union {nucleation::capi::MeshBytes* ok; nucleation::capi::NucleationError err;}; bool is_ok;} MeshResult_to_glb_bytes_result;
+    MeshResult_to_glb_bytes_result MeshResult_to_glb_bytes(const nucleation::capi::MeshResult* self);
+
     typedef struct MeshResult_usdz_data_b64_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} MeshResult_usdz_data_b64_result;
     MeshResult_usdz_data_b64_result MeshResult_usdz_data_b64(const nucleation::capi::MeshResult* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    typedef struct MeshResult_to_usdz_bytes_result {union {nucleation::capi::MeshBytes* ok; nucleation::capi::NucleationError err;}; bool is_ok;} MeshResult_to_usdz_bytes_result;
+    MeshResult_to_usdz_bytes_result MeshResult_to_usdz_bytes(const nucleation::capi::MeshResult* self);
 
     void MeshResult_nucm_data_b64(const nucleation::capi::MeshResult* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
@@ -112,6 +119,11 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::MeshBytes>, nucleation::NucleationError> nucleation::MeshResult::to_glb_bytes() const {
+    auto result = nucleation::capi::MeshResult_to_glb_bytes(this->AsFFI());
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::MeshBytes>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::MeshBytes>>(std::unique_ptr<nucleation::MeshBytes>(nucleation::MeshBytes::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::MeshBytes>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
 inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::MeshResult::usdz_data_b64() const {
     std::string output;
     nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
@@ -125,6 +137,11 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
     auto result = nucleation::capi::MeshResult_usdz_data_b64(this->AsFFI(),
         &write);
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::MeshBytes>, nucleation::NucleationError> nucleation::MeshResult::to_usdz_bytes() const {
+    auto result = nucleation::capi::MeshResult_to_usdz_bytes(this->AsFFI());
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::MeshBytes>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::MeshBytes>>(std::unique_ptr<nucleation::MeshBytes>(nucleation::MeshBytes::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::MeshBytes>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
 inline std::string nucleation::MeshResult::nucm_data_b64() const {

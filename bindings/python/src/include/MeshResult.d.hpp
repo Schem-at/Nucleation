@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include "diplomat_runtime.hpp"
 namespace nucleation {
+namespace capi { struct MeshBytes; }
+class MeshBytes;
 namespace capi { struct MeshConfig; }
 class MeshConfig;
 namespace capi { struct MeshResult; }
@@ -75,11 +77,21 @@ public:
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> glb_data_b64_write(W& writeable_output) const;
 
   /**
+   * The mesh as a raw binary GLB buffer (zero Base64 encoding overhead).
+   */
+  inline nucleation::diplomat::result<std::unique_ptr<nucleation::MeshBytes>, nucleation::NucleationError> to_glb_bytes() const;
+
+  /**
    * The mesh as a USDZ archive, base64-encoded.
    */
   inline nucleation::diplomat::result<std::string, nucleation::NucleationError> usdz_data_b64() const;
   template<typename W>
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> usdz_data_b64_write(W& writeable_output) const;
+
+  /**
+   * The mesh as a raw binary USDZ buffer (zero Base64 encoding overhead).
+   */
+  inline nucleation::diplomat::result<std::unique_ptr<nucleation::MeshBytes>, nucleation::NucleationError> to_usdz_bytes() const;
 
   /**
    * The mesh serialized in the NUCM cache format, base64-encoded.

@@ -52,7 +52,10 @@ function getActivePack(nuc) {
 
 async function loadCustomPackFile(nuc, file) {
   const bytes = new Uint8Array(await file.arrayBuffer());
-  activePack = nuc.ResourcePack.fromBytes(bytes);
+  activePack =
+    typeof nuc.ResourcePack.fromBytesWithFallback === "function"
+      ? nuc.ResourcePack.fromBytesWithFallback(bytes)
+      : nuc.ResourcePack.fromBytes(bytes);
   customPackName = file.name;
   for (const fn of packListeners) fn(customPackName);
 }
@@ -111,6 +114,71 @@ const CUSTOM_SNIPPETS = [
   {
     label: "Orbital rings",
     expr: `let r1 = torus(p, 9.0, 1.8);\nlet r2 = torus(vec3(x, z, y), 9.0, 1.8);\nlet r3 = torus(vec3(y, x, z), 9.0, 1.8);\nsmin(smin(r1, r2, 1.6), r3, 1.6)`,
+  },
+];
+
+const SAMPLE_MESHES = [
+  {
+    label: "Crystal octahedron",
+    obj: `
+v 0 10 0
+v 9 0 0
+v 0 0 9
+v -9 0 0
+v 0 0 -9
+v 0 -10 0
+f 1 2 3
+f 1 3 4
+f 1 4 5
+f 1 5 2
+f 6 3 2
+f 6 4 3
+f 6 5 4
+f 6 2 5
+`,
+  },
+  {
+    label: "Stepped pyramid",
+    obj: `
+v -10 -7 -10
+v 10 -7 -10
+v 10 -7 10
+v -10 -7 10
+v -6 1 -6
+v 6 1 -6
+v 6 1 6
+v -6 1 6
+v 0 10 0
+f 1 3 2
+f 1 4 3
+f 1 2 6 5
+f 2 3 7 6
+f 3 4 8 7
+f 4 1 5 8
+f 5 6 9
+f 6 7 9
+f 7 8 9
+f 8 5 9
+`,
+  },
+  {
+    label: "Diamond monolith",
+    obj: `
+v 0 11 0
+v 7 2 5
+v -7 2 5
+v -7 2 -5
+v 7 2 -5
+v 0 -10 0
+f 1 3 2
+f 1 4 3
+f 1 5 4
+f 1 2 5
+f 6 2 3
+f 6 3 4
+f 6 4 5
+f 6 5 2
+`,
   },
 ];
 
@@ -451,10 +519,82 @@ schem = VoxelPipeline.create(field, oklab_crystal_mat).to_schematic("custom_expr
       return nuc.VoxelPipeline.create(field, mat).toSchematicBounded("custom_expr", ...this.bounds);
     },
   },
+  mesh2sdf: {
+    label: "6. Mesh → SDF",
+    p1: { label: "Surface bevel / offset", min: -1.5, max: 2.0, step: 0.25, value: 0.25 },
+    p2: { label: "Hollow shell (0 = solid)", min: 0, max: 2.5, step: 0.5, value: 0 },
+    p3: null,
+    bounds: [-12, -12, -12, 12, 12, 12],
+    code(lang, p1, p2, _p3, meshName = "model.glb") {
+      const isObj = /\.obj$/i.test(meshName);
+      const mods =
+        (Math.abs(p1) > 1e-3 ? (lang === "js" ? `.addConst(${(-p1).toFixed(2)})` : `.add_const(${(-p1).toFixed(2)})`) : "") +
+        (p2 > 0 ? `.shell(${p2})` : "");
+      if (lang === "js") {
+        const loader = isObj
+          ? `Field.fromObjStr(objText, 22, 2)`
+          : `Field.fromGlbBytes(glbBytes, 22, 2)`;
+        return `// Exact linear-time 3D EDT converts any .glb or .obj mesh into a signed distance field
+const field = ${loader}${mods};
+const schem = VoxelPipeline.create(field, oklabCrystalMat).toSchematic("mesh_sdf");`;
+      }
+      const loader = isObj
+        ? `Field.from_obj_str(obj_text, 22, 2)`
+        : `Field.from_glb_bytes(glb_bytes, 22, 2)`;
+      return `# Exact linear-time 3D EDT converts any .glb or .obj mesh into a signed distance field
+field = ${loader}${mods}
+schem = VoxelPipeline.create(field, oklab_crystal_mat).to_schematic("mesh_sdf")`;
+    },
+    build(nuc, p1, p2, _p3, _customSource, meshAsset) {
+      let baseField;
+      if (meshAsset?.glbBytes) {
+        baseField = nuc.Field.fromGlbBytes(meshAsset.glbBytes, 20, 2);
+      } else {
+        const objText = meshAsset?.objText || SAMPLE_MESHES[0].obj;
+        baseField = nuc.Field.fromObjStr(objText, 20, 2);
+      }
+      const b = baseField.bounds();
+      const margin = Math.ceil(Math.abs(p1) + p2) + 2;
+      const minX = Math.floor(b.minX) - margin;
+      const minY = Math.floor(b.minY) - margin;
+      const minZ = Math.floor(b.minZ) - margin;
+      const maxX = Math.ceil(b.maxX) + margin;
+      const maxY = Math.ceil(b.maxY) + margin;
+      const maxZ = Math.ceil(b.maxZ) + margin;
+
+      let field = baseField;
+      if (Math.abs(p1) > 1e-3) field = field.addConst(-p1);
+      if (p2 > 0) field = field.shell(p2);
+
+      const spanY = Math.max(1.0, b.maxY - b.minY);
+      const colorField = nuc.Field.expr(
+        `clamp((y - (${b.minY.toFixed(2)})) / ${spanY.toFixed(2)}, 0.0, 1.0)`,
+      );
+      const pal = nuc.Palette.fromBlockIds(GRADIENT_PALETTE_IDS).dithered();
+      const mat = nuc.Material.fieldGradient(
+        colorField,
+        [0.0, 0.35, 0.72, 1.0],
+        [44, 52, 148, 82, 164, 146, 206, 240, 234, 246, 208, 68],
+        0.0,
+        1.0,
+        pal,
+        nuc.InterpolationSpace.Oklab,
+      );
+      return nuc.VoxelPipeline.create(field, mat).toSchematicBounded(
+        "mesh_sdf",
+        minX,
+        minY,
+        minZ,
+        maxX,
+        maxY,
+        maxZ,
+      );
+    },
+  },
 };
 
-async function mountWorkbench(root, ensureModelViewer) {
-  if (root.dataset.mounted === "true") return () => {};
+async function mountWorkbench(root) {
+  if (root.dataset.mounted === "true") return { destroy: () => {} };
   root.dataset.mounted = "true";
 
   let presetKey = "island";
@@ -463,11 +603,13 @@ async function mountWorkbench(root, ensureModelViewer) {
   let p2Val = WORKBENCH_STEPS.island.p2.value;
   let p3Val = WORKBENCH_STEPS.island.p3 ? WORKBENCH_STEPS.island.p3.value : 0;
   let customExpr = CUSTOM_SNIPPETS[0].expr;
-  let currentUrl = null;
+  let meshAsset = { name: "crystal_octahedron.obj", objText: SAMPLE_MESHES[0].obj, glbBytes: null };
   let lastSchematic = null;
   let buildSeq = 0;
   let debounceTimer = null;
   let nuc = null;
+  let viewport = null;
+  let framedPreset = null;
 
   root.innerHTML = `
     <div class="sdf-studio__bar">
@@ -484,24 +626,9 @@ async function mountWorkbench(root, ensureModelViewer) {
     </div>
 
     <div class="sdf-studio__body">
-      <div class="sdf-studio__stage">
-        <model-viewer
-          class="sdf-studio__viewer"
-          alt="Interactive 3D Minecraft schematic generated in the browser by Nucleation WebAssembly"
-          camera-controls
-          auto-rotate
-          auto-rotate-delay="1800"
-          rotation-per-second="13deg"
-          camera-orbit="38deg 64deg 118%"
-          field-of-view="28deg"
-          min-camera-orbit="auto auto 68%"
-          max-camera-orbit="auto auto 220%"
-          shadow-intensity="0.7"
-          shadow-softness="0.85"
-          exposure="1.05"
-          interaction-prompt="none"
-        ></model-viewer>
-        <div class="sdf-studio__overlay" data-role="status">Loading Nucleation WASM...</div>
+      <div class="sdf-studio__stage" data-role="sdf-stage">
+        <div class="sdf-gizmo-badge" data-role="gizmo-badge" hidden>Drag cyan 3D sphere handle to slide Sphere X live</div>
+        <div class="sdf-studio__overlay" data-role="status">Loading Nucleation WASM + Three.js...</div>
       </div>
 
       <div class="sdf-studio__controls">
@@ -542,6 +669,18 @@ async function mountWorkbench(root, ensureModelViewer) {
           <textarea class="sdf-expr-input" data-role="expr-input" rows="4" spellcheck="false" aria-label="Field.expr source code">${customExpr}</textarea>
           <div class="sdf-expr-error" data-role="expr-error" hidden></div>
         </div>
+
+        <div class="sdf-mesh-pane" data-role="mesh-pane" hidden>
+          <div class="sdf-expr-presets" role="group" aria-label="Built-in sample meshes" data-role="mesh-samples">
+            ${SAMPLE_MESHES.map(
+              (m, i) => `<button type="button" class="sdf-expr-snippet" data-mesh-sample="${i}">${m.label}</button>`,
+            ).join("")}
+          </div>
+          <label class="sdf-pack-btn" title="Drop or select any .glb or .obj 3D mesh to convert via exact 3D EDT">
+            <span data-role="mesh-file-label">Open .glb / .obj</span>
+            <input type="file" accept=".glb,.obj" data-role="mesh-file-input" hidden>
+          </label>
+        </div>
       </div>
 
       <div class="sdf-code-panel">
@@ -562,7 +701,7 @@ async function mountWorkbench(root, ensureModelViewer) {
     <div class="sdf-studio__footer">
       <div class="sdf-telemetry" data-role="telemetry">Initializing Nucleation WebAssembly...</div>
       <div class="sdf-footer-actions">
-        <label class="sdf-pack-btn" title="Drop any Minecraft resource pack .zip or client.jar to render with its exact block textures (stays 100% local in your browser)">
+        <label class="sdf-pack-btn" title="Drop any Minecraft resource pack .zip or client.jar (overlays onto built-in 3D pack)">
           <span data-role="pack-label">Load pack .zip</span>
           <input type="file" accept=".zip,.jar" data-role="pack-input" hidden>
         </label>
@@ -571,7 +710,8 @@ async function mountWorkbench(root, ensureModelViewer) {
     </div>
   `;
 
-  const viewer = root.querySelector(".sdf-studio__viewer");
+  const stageEl = root.querySelector('[data-role="sdf-stage"]');
+  const gizmoBadge = root.querySelector('[data-role="gizmo-badge"]');
   const statusEl = root.querySelector('[data-role="status"]');
   const liveCodeEl = root.querySelector('[data-role="live-code"]');
   const codeCopyBtn = root.querySelector('[data-role="code-copy"]');
@@ -594,9 +734,36 @@ async function mountWorkbench(root, ensureModelViewer) {
   const exprInput = root.querySelector('[data-role="expr-input"]');
   const exprError = root.querySelector('[data-role="expr-error"]');
   const exprRun = root.querySelector('[data-role="expr-run"]');
+  const meshPane = root.querySelector('[data-role="mesh-pane"]');
+  const meshFileInput = root.querySelector('[data-role="mesh-file-input"]');
+  const meshFileLabel = root.querySelector('[data-role="mesh-file-label"]');
 
   function updateCode() {
-    liveCodeEl.textContent = WORKBENCH_STEPS[presetKey].code(codeLang, p1Val, p2Val, p3Val);
+    liveCodeEl.textContent = WORKBENCH_STEPS[presetKey].code(codeLang, p1Val, p2Val, p3Val, meshAsset.name);
+  }
+
+  function syncGizmo() {
+    if (!viewport) return;
+    if (presetKey === "arch") {
+      gizmoBadge.hidden = false;
+      viewport.setGizmo({
+        pos: [p1Val, 5.5, 0],
+        minX: WORKBENCH_STEPS.arch.p1.min,
+        maxX: WORKBENCH_STEPS.arch.p1.max,
+        step: WORKBENCH_STEPS.arch.p1.step,
+        onDrag: (newX) => {
+          if (Math.abs(newX - p1Val) < 1e-3) return;
+          p1Val = newX;
+          p1Input.value = String(p1Val);
+          p1ValEl.textContent = String(p1Val);
+          updateCode();
+          scheduleRebuild(45);
+        },
+      });
+    } else {
+      gizmoBadge.hidden = true;
+      viewport.setGizmo(null);
+    }
   }
 
   function syncSliderConfig() {
@@ -630,7 +797,31 @@ async function mountWorkbench(root, ensureModelViewer) {
     }
 
     exprPane.hidden = presetKey !== "custom";
+    meshPane.hidden = presetKey !== "mesh2sdf";
     updateCode();
+    syncGizmo();
+  }
+
+  async function ensureViewport() {
+    if (!nuc || !viewport) {
+      const [{ loadThree, NucleationViewport }, loadedNuc] = await Promise.all([
+        import("./tick-sim-viewport.js"),
+        loadNucleation(),
+      ]);
+      nuc = loadedNuc;
+      if (!viewport) {
+        const threeKit = await loadThree();
+        viewport = new NucleationViewport(stageEl, threeKit, {
+          interactive: false,
+          showGrid: false,
+          cameraDir: [0.68, 0.56, 0.84],
+          cameraZoom: 1.05,
+          greedyMeshing: false,
+          aoIntensity: 0.52,
+        });
+        syncGizmo();
+      }
+    }
   }
 
   async function rebuild() {
@@ -641,14 +832,11 @@ async function mountWorkbench(root, ensureModelViewer) {
     updateCode();
 
     try {
-      if (!nuc) {
-        await ensureModelViewer();
-        nuc = await loadNucleation();
-      }
+      await ensureViewport();
       if (seq !== buildSeq) return;
 
       const t0 = performance.now();
-      const schem = WORKBENCH_STEPS[presetKey].build(nuc, p1Val, p2Val, p3Val, customExpr);
+      const schem = WORKBENCH_STEPS[presetKey].build(nuc, p1Val, p2Val, p3Val, customExpr, meshAsset);
       const tVox = performance.now();
 
       if (seq !== buildSeq) return;
@@ -656,11 +844,7 @@ async function mountWorkbench(root, ensureModelViewer) {
       const blocks = schem.blockCount();
       if (blocks === 0) {
         lastSchematic = null;
-        if (currentUrl) {
-          URL.revokeObjectURL(currentUrl);
-          currentUrl = null;
-        }
-        viewer.removeAttribute("src");
+        viewport.clearMesh();
         downloadBtn.disabled = true;
         statusEl.textContent =
           "0 blocks inside bounds (d > 0 everywhere) — lower Surface offset or adjust the formula.";
@@ -669,27 +853,18 @@ async function mountWorkbench(root, ensureModelViewer) {
         return;
       }
 
-      const cfg = nuc.MeshConfig.create();
-      cfg.setAmbientOcclusion(true);
-      cfg.setAoIntensity(0.55);
-      cfg.setGreedyMeshing(true);
-      const mesh = nuc.MeshResult.create(schem, getActivePack(nuc), cfg);
-      const glbBytes = decodeBase64(mesh.glbDataB64());
-      const tEnd = performance.now();
-
-      if (seq !== buildSeq) return;
+      const refit = framedPreset !== presetKey;
+      const stats = await viewport.updateSchematicMesh(nuc, schem, getActivePack(nuc), refit);
+      if (seq !== buildSeq || !stats) return;
+      framedPreset = presetKey;
 
       lastSchematic = schem;
-      const nextUrl = URL.createObjectURL(new Blob([glbBytes], { type: "model/gltf-binary" }));
-      if (currentUrl) URL.revokeObjectURL(currentUrl);
-      currentUrl = nextUrl;
-      viewer.src = nextUrl;
-
       statusEl.hidden = true;
       downloadBtn.disabled = false;
+      syncGizmo();
       telemetryEl.textContent =
-        `${blocks.toLocaleString()} blocks · ${mesh.triangleCount().toLocaleString()} triangles · ` +
-        `${Math.round(tVox - t0)} ms voxelize · ${Math.round(tEnd - tVox)} ms mesh`;
+        `${blocks.toLocaleString()} blocks · ${stats.tris.toLocaleString()} tris · ` +
+        `${Math.round(tVox - t0)} ms voxelize · ${stats.ms.toFixed(1)} ms mesh`;
     } catch (err) {
       if (seq !== buildSeq) return;
       statusEl.hidden = true;
@@ -710,9 +885,57 @@ async function mountWorkbench(root, ensureModelViewer) {
 
   const onPackUpdated = (name) => {
     packLabel.textContent = `Pack: ${name.slice(0, 18)}`;
+    viewport?.clearCaches();
     scheduleRebuild(0);
   };
   packListeners.add(onPackUpdated);
+
+  root.querySelector('[data-role="mesh-samples"]').addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-mesh-sample]");
+    if (!btn) return;
+    const sample = SAMPLE_MESHES[Number(btn.dataset.meshSample)];
+    meshAsset = { name: `${sample.label.toLowerCase().replace(/\s+/g, "_")}.obj`, objText: sample.obj, glbBytes: null };
+    meshFileLabel.textContent = "Open .glb / .obj";
+    framedPreset = null;
+    scheduleRebuild(0);
+  });
+
+  async function loadMeshFile(file) {
+    if (!file) return;
+    if (/\.glb$/i.test(file.name)) {
+      meshAsset = { name: file.name, objText: null, glbBytes: new Uint8Array(await file.arrayBuffer()) };
+    } else {
+      meshAsset = { name: file.name, objText: await file.text(), glbBytes: null };
+    }
+    meshFileLabel.textContent = file.name.slice(0, 18);
+    if (presetKey !== "mesh2sdf") {
+      presetKey = "mesh2sdf";
+      for (const el of root.querySelectorAll("[data-preset]")) {
+        el.setAttribute("aria-checked", String(el.dataset.preset === "mesh2sdf"));
+      }
+      p1Val = WORKBENCH_STEPS.mesh2sdf.p1.value;
+      p2Val = WORKBENCH_STEPS.mesh2sdf.p2.value;
+      p3Val = 0;
+      syncSliderConfig();
+    }
+    framedPreset = null;
+    scheduleRebuild(0);
+  }
+
+  meshFileInput.addEventListener("change", () => {
+    const file = meshFileInput.files?.[0];
+    meshFileInput.value = "";
+    if (file) void loadMeshFile(file);
+  });
+
+  stageEl.addEventListener("dragover", (e) => e.preventDefault());
+  stageEl.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (file && /\.(glb|obj)$/i.test(file.name)) {
+      void loadMeshFile(file);
+    }
+  });
 
   packInput.addEventListener("change", async () => {
     const file = packInput.files?.[0];
@@ -822,11 +1045,17 @@ async function mountWorkbench(root, ensureModelViewer) {
   syncSliderConfig();
   void rebuild();
 
-  return () => {
-    clearTimeout(debounceTimer);
-    packListeners.delete(onPackUpdated);
-    if (currentUrl) URL.revokeObjectURL(currentUrl);
-    root.dataset.mounted = "false";
+  return {
+    onThemeChange: () => {
+      viewport?.setTheme(document.body.getAttribute("data-md-color-scheme") === "vellum");
+    },
+    destroy: () => {
+      clearTimeout(debounceTimer);
+      packListeners.delete(onPackUpdated);
+      viewport?.destroy();
+      viewport = null;
+      root.dataset.mounted = "false";
+    },
   };
 }
 
@@ -1492,15 +1721,16 @@ const WORLD_PRESETS = {
   },
 };
 
-async function mountWorldgenLab(root, ensureModelViewer) {
-  if (root.dataset.mounted === "true") return () => {};
+async function mountWorldgenLab(root) {
+  if (root.dataset.mounted === "true") return { destroy: () => {} };
   root.dataset.mounted = "true";
 
   let presetKey = "archipelago";
   let originCx = 0;
   let originCz = 0;
   let selected = new Set();
-  let currentUrl = null;
+  let viewport = null;
+  let framedOnce = false;
   let lastSchematic = null;
   let runSeq = 0;
   let nuc = null;
@@ -1552,31 +1782,15 @@ async function mountWorldgenLab(root, ensureModelViewer) {
         <p class="wg-note">Click any chunk to toggle it, or pan anywhere in the infinite coordinate space. Every chunk is evaluated independently by <code>WorldGenerator</code> in Rust/WASM and stitched with zero seams.</p>
       </div>
 
-      <div class="wg-stage">
-        <model-viewer
-          class="sdf-studio__viewer"
-          alt="Interactive 3D multi-chunk Minecraft terrain streamed in the browser by Nucleation WorldGenerator"
-          camera-controls
-          auto-rotate
-          auto-rotate-delay="2200"
-          rotation-per-second="10deg"
-          camera-orbit="42deg 58deg 128%"
-          field-of-view="30deg"
-          min-camera-orbit="auto auto 68%"
-          max-camera-orbit="auto auto 240%"
-          shadow-intensity="0.7"
-          shadow-softness="0.85"
-          exposure="1.05"
-          interaction-prompt="none"
-        ></model-viewer>
-        <div class="sdf-studio__overlay" data-role="wg-status">Loading WorldGenerator WASM...</div>
+      <div class="wg-stage" data-role="wg-stage">
+        <div class="sdf-studio__overlay" data-role="wg-status">Loading WorldGenerator WASM + Three.js...</div>
       </div>
     </div>
 
     <div class="sdf-studio__footer">
       <div class="sdf-telemetry" data-role="wg-telemetry">Initializing infinite WorldGenerator...</div>
       <div class="sdf-footer-actions">
-        <label class="sdf-pack-btn" title="Drop any Minecraft resource pack .zip or client.jar to render with its exact block textures">
+        <label class="sdf-pack-btn" title="Drop any Minecraft resource pack .zip or client.jar (overlays onto built-in 3D pack)">
           <span data-role="wg-pack-label">Load pack .zip</span>
           <input type="file" accept=".zip,.jar" data-role="wg-pack-input" hidden>
         </label>
@@ -1587,7 +1801,7 @@ async function mountWorldgenLab(root, ensureModelViewer) {
 
   const gridEl = root.querySelector('[data-role="wg-grid"]');
   const originEl = root.querySelector('[data-role="wg-origin"]');
-  const viewer = root.querySelector(".sdf-studio__viewer");
+  const stageEl = root.querySelector('[data-role="wg-stage"]');
   const statusEl = root.querySelector('[data-role="wg-status"]');
   const telemetryEl = root.querySelector('[data-role="wg-telemetry"]');
   const downloadBtn = root.querySelector('[data-role="wg-download"]');
@@ -1612,9 +1826,23 @@ async function mountWorldgenLab(root, ensureModelViewer) {
   }
 
   async function ensureGenerator() {
-    if (!nuc) {
-      await ensureModelViewer();
-      nuc = await loadNucleation();
+    if (!nuc || !viewport) {
+      const [{ loadThree, NucleationViewport }, loadedNuc] = await Promise.all([
+        import("./tick-sim-viewport.js"),
+        loadNucleation(),
+      ]);
+      nuc = loadedNuc;
+      if (!viewport) {
+        const threeKit = await loadThree();
+        viewport = new NucleationViewport(stageEl, threeKit, {
+          interactive: false,
+          showGrid: false,
+          cameraDir: [0.76, 0.62, 0.78],
+          cameraZoom: 1.02,
+          greedyMeshing: true,
+          aoIntensity: 0.5,
+        });
+      }
     }
     if (!generator) generator = WORLD_PRESETS[presetKey].buildGenerator(nuc);
     return generator;
@@ -1684,11 +1912,7 @@ async function mountWorldgenLab(root, ensureModelViewer) {
       const totalBlocks = combined.blockCount();
       if (totalBlocks === 0) {
         lastSchematic = null;
-        if (currentUrl) {
-          URL.revokeObjectURL(currentUrl);
-          currentUrl = null;
-        }
-        viewer.removeAttribute("src");
+        viewport.clearMesh();
         statusEl.textContent = "0 solid blocks in selected chunks — pan to another region.";
         statusEl.hidden = false;
         downloadBtn.disabled = true;
@@ -1698,21 +1922,9 @@ async function mountWorldgenLab(root, ensureModelViewer) {
         return;
       }
 
-      const tMesh0 = performance.now();
-      const cfg = nuc.MeshConfig.create();
-      cfg.setAmbientOcclusion(true);
-      cfg.setAoIntensity(0.5);
-      cfg.setGreedyMeshing(true);
-      const mesh = nuc.MeshResult.create(combined, getActivePack(nuc), cfg);
-      const glbBytes = decodeBase64(mesh.glbDataB64());
-      const meshMs = performance.now() - tMesh0;
-
-      if (seq !== runSeq) return;
-
-      const nextUrl = URL.createObjectURL(new Blob([glbBytes], { type: "model/gltf-binary" }));
-      if (currentUrl) URL.revokeObjectURL(currentUrl);
-      currentUrl = nextUrl;
-      viewer.src = nextUrl;
+      const stats = await viewport.updateSchematicMesh(nuc, combined, getActivePack(nuc), !framedOnce);
+      if (seq !== runSeq || !stats) return;
+      framedOnce = true;
 
       lastSchematic = combined;
       statusEl.hidden = true;
@@ -1721,8 +1933,8 @@ async function mountWorldgenLab(root, ensureModelViewer) {
       telemetryEl.textContent =
         `${coords.length} chunk${coords.length === 1 ? "" : "s"} · ` +
         `${combined.blockCount().toLocaleString()} blocks · ` +
-        `${mesh.triangleCount().toLocaleString()} tris · ` +
-        `${(genMsTotal / coords.length).toFixed(1)} ms/chunk · ${Math.round(meshMs)} ms mesh`;
+        `${stats.tris.toLocaleString()} tris · ` +
+        `${(genMsTotal / coords.length).toFixed(1)} ms/chunk · ${stats.ms.toFixed(1)} ms mesh`;
     } catch (err) {
       if (seq !== runSeq) return;
       statusEl.hidden = true;
@@ -1733,6 +1945,7 @@ async function mountWorldgenLab(root, ensureModelViewer) {
 
   const onPackUpdated = (name) => {
     packLabel.textContent = `Pack: ${name.slice(0, 18)}`;
+    viewport?.clearCaches();
     void rebuildPatch(false);
   };
   packListeners.add(onPackUpdated);
@@ -1815,10 +2028,16 @@ async function mountWorldgenLab(root, ensureModelViewer) {
   renderGrid();
   void rebuildPatch(false);
 
-  return () => {
-    packListeners.delete(onPackUpdated);
-    if (currentUrl) URL.revokeObjectURL(currentUrl);
-    root.dataset.mounted = "false";
+  return {
+    onThemeChange: () => {
+      viewport?.setTheme(document.body.getAttribute("data-md-color-scheme") === "vellum");
+    },
+    destroy: () => {
+      packListeners.delete(onPackUpdated);
+      viewport?.destroy();
+      viewport = null;
+      root.dataset.mounted = "false";
+    },
   };
 }
 
@@ -1843,8 +2062,8 @@ const PALETTE_PRESETS = [
   { label: "Monochrome", a: "#181A20", b: "#EEF2F6" },
 ];
 
-async function mountPaletteStudio(root, ensureModelViewer) {
-  if (root.dataset.mounted === "true") return () => {};
+async function mountPaletteStudio(root) {
+  if (root.dataset.mounted === "true") return { destroy: () => {} };
   root.dataset.mounted = "true";
 
   let colorA = PALETTE_PRESETS[0].a;
@@ -1852,7 +2071,8 @@ async function mountPaletteStudio(root, ensureModelViewer) {
   let family = "concrete";
   let space = "Oklab";
   let dither = true;
-  let currentUrl = null;
+  let viewport = null;
+  let framedOnce = false;
   let lastSchematic = null;
   let seq = 0;
   let nuc = null;
@@ -1871,18 +2091,8 @@ async function mountPaletteStudio(root, ensureModelViewer) {
       </div>
     </div>
 
-    <div class="sdf-studio__stage">
-      <model-viewer
-        class="sdf-studio__viewer"
-        alt="Interactive 3D Minecraft block gradient wall generated by Nucleation Oklab palette mapping"
-        camera-controls
-        camera-orbit="12deg 78deg 112%"
-        field-of-view="26deg"
-        shadow-intensity="0.6"
-        exposure="1.05"
-        interaction-prompt="none"
-      ></model-viewer>
-      <div class="sdf-studio__overlay" data-role="pal-status">Loading Nucleation WASM...</div>
+    <div class="sdf-studio__stage" data-role="pal-stage">
+      <div class="sdf-studio__overlay" data-role="pal-status">Loading Nucleation WASM + Three.js...</div>
     </div>
 
     <div class="pal-controls">
@@ -1906,7 +2116,7 @@ async function mountPaletteStudio(root, ensureModelViewer) {
     </div>
   `;
 
-  const viewer = root.querySelector(".sdf-studio__viewer");
+  const stageEl = root.querySelector('[data-role="pal-stage"]');
   const statusEl = root.querySelector('[data-role="pal-status"]');
   const inputA = root.querySelector('[data-role="pal-a"]');
   const inputB = root.querySelector('[data-role="pal-b"]');
@@ -1920,9 +2130,23 @@ async function mountPaletteStudio(root, ensureModelViewer) {
     statusEl.textContent = "Mapping gradient in WASM...";
     statusEl.hidden = false;
     try {
-      if (!nuc) {
-        await ensureModelViewer();
-        nuc = await loadNucleation();
+      if (!nuc || !viewport) {
+        const [{ loadThree, NucleationViewport }, loadedNuc] = await Promise.all([
+          import("./tick-sim-viewport.js"),
+          loadNucleation(),
+        ]);
+        nuc = loadedNuc;
+        if (!viewport) {
+          const threeKit = await loadThree();
+          viewport = new NucleationViewport(stageEl, threeKit, {
+            interactive: false,
+            showGrid: false,
+            cameraDir: [0.16, 0.22, 1.0],
+            cameraZoom: 0.92,
+            greedyMeshing: false,
+            aoIntensity: 0.4,
+          });
+        }
       }
       if (mySeq !== seq) return;
 
@@ -1964,27 +2188,18 @@ async function mountPaletteStudio(root, ensureModelViewer) {
         1,
       );
 
-      const cfg = nuc.MeshConfig.create();
-      cfg.setAmbientOcclusion(true);
-      cfg.setAoIntensity(0.45);
-      cfg.setGreedyMeshing(true);
-      const mesh = nuc.MeshResult.create(schem, getActivePack(nuc), cfg);
-      const glbBytes = decodeBase64(mesh.glbDataB64());
+      const stats = await viewport.updateSchematicMesh(nuc, schem, getActivePack(nuc), !framedOnce);
       const ms = Math.round(performance.now() - t0);
-      if (mySeq !== seq) return;
+      if (mySeq !== seq || !stats) return;
+      framedOnce = true;
 
       lastSchematic = schem;
-      const nextUrl = URL.createObjectURL(new Blob([glbBytes], { type: "model/gltf-binary" }));
-      if (currentUrl) URL.revokeObjectURL(currentUrl);
-      currentUrl = nextUrl;
-      viewer.src = nextUrl;
-
       const paletteIds = JSON.parse(schem.countBlocksJson());
       const names = Object.entries(paletteIds)
         .sort((a, b) => b[1] - a[1])
         .map(([id, n]) => `${id.replace("minecraft:", "")} (${n})`);
       blocksEl.textContent = `Selected blocks (${names.length}): ${names.join(" · ")}`;
-      telemetryEl.textContent = `${schem.blockCount()} blocks · ${space} · ${dither ? "Bayer dithered" : "snapped"} · ${ms} ms`;
+      telemetryEl.textContent = `${schem.blockCount()} blocks · ${stats.tris.toLocaleString()} tris · ${space} · ${dither ? "Bayer dithered" : "snapped"} · ${ms} ms`;
       statusEl.hidden = true;
       downloadBtn.disabled = false;
     } catch (err) {
@@ -2049,9 +2264,15 @@ async function mountPaletteStudio(root, ensureModelViewer) {
   });
 
   void rebuild();
-  return () => {
-    if (currentUrl) URL.revokeObjectURL(currentUrl);
-    root.dataset.mounted = "false";
+  return {
+    onThemeChange: () => {
+      viewport?.setTheme(document.body.getAttribute("data-md-color-scheme") === "vellum");
+    },
+    destroy: () => {
+      viewport?.destroy();
+      viewport = null;
+      root.dataset.mounted = "false";
+    },
   };
 }
 
@@ -2163,7 +2384,7 @@ function faceToCardinal(face, fallback) {
 }
 
 const TICK_TOOLS = [
-  { id: "interact", label: "Interact", swatch: "#5fd38d", title: "Click levers, buttons, or repeaters in 3D" },
+  { id: "interact", label: "Interact", swatch: "#5fd38d", title: "Click levers, buttons, repeaters, comparators, or trapdoors in 3D" },
   {
     id: "dust",
     label: "Dust",
@@ -2174,9 +2395,15 @@ const TICK_TOOLS = [
     id: "repeater",
     label: "Repeater",
     swatch: "#b2b6bc",
-    // Repeater's `facing` points opposite the signal travel direction (vanilla convention)
     state: (_face, facing) =>
       `minecraft:repeater[delay=1,facing=${OPPOSITE_FACING[facing] || "west"},locked=false,powered=false]`,
+  },
+  {
+    id: "comparator",
+    label: "Comparator",
+    swatch: "#d67a5c",
+    state: (_face, facing) =>
+      `minecraft:comparator[facing=${OPPOSITE_FACING[facing] || "west"},mode=compare,powered=false]`,
   },
   {
     id: "torch",
@@ -2215,9 +2442,8 @@ const TICK_TOOLS = [
     id: "piston",
     label: "Sticky piston",
     swatch: "#78c858",
-    state: (face, facing) => {
-      let dir = OPPOSITE_FACING[facing] || "east";
-      if (face[1] === 1) dir = facing;
+    state: (face, facing, rotOverride) => {
+      const dir = rotOverride || (face[1] === 1 ? facing : OPPOSITE_FACING[facing] || "east");
       return `minecraft:sticky_piston[extended=false,facing=${dir}]`;
     },
   },
@@ -2225,7 +2451,8 @@ const TICK_TOOLS = [
     id: "observer",
     label: "Observer",
     swatch: "#6a6e76",
-    state: (_face, facing) => `minecraft:observer[facing=${facing},powered=false]`,
+    state: (_face, facing, rotOverride) =>
+      `minecraft:observer[facing=${rotOverride || facing},powered=false]`,
   },
   {
     id: "rsblock",
@@ -2238,6 +2465,25 @@ const TICK_TOOLS = [
     label: "Lamp",
     swatch: "#d69240",
     state: () => "minecraft:redstone_lamp[lit=false]",
+  },
+  {
+    id: "target",
+    label: "Target",
+    swatch: "#e8d6c0",
+    state: () => "minecraft:target[power=0]",
+  },
+  {
+    id: "noteblock",
+    label: "Note block",
+    swatch: "#764c30",
+    state: () => "minecraft:note_block[instrument=harp,note=0,powered=false]",
+  },
+  {
+    id: "trapdoor",
+    label: "Trapdoor",
+    swatch: "#a88654",
+    state: (_face, facing) =>
+      `minecraft:oak_trapdoor[facing=${facing},half=bottom,open=false,powered=false,waterlogged=false]`,
   },
   {
     id: "slime",
@@ -2254,33 +2500,7 @@ const TICK_TOOLS = [
   { id: "break", label: "Break", swatch: "#e05252", danger: true, title: "Click any block to mine it (or Shift+Click)" },
 ];
 
-const TICK_EXTRA_STATES = (() => {
-  const dirs4 = ["north", "south", "east", "west"];
-  const dirs6 = ["north", "south", "east", "west", "up", "down"];
-  const states = [
-    "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]",
-    "minecraft:redstone_torch[lit=true]",
-    "minecraft:redstone_block",
-    "minecraft:redstone_lamp[lit=false]",
-    "minecraft:slime_block",
-    "minecraft:smooth_stone",
-    "minecraft:gold_block",
-    "minecraft:obsidian",
-  ];
-  for (const d of dirs4) {
-    states.push(`minecraft:repeater[delay=1,facing=${d},locked=false,powered=false]`);
-    states.push(`minecraft:redstone_wall_torch[facing=${d},lit=true]`);
-    states.push(`minecraft:lever[face=floor,facing=${d},powered=false]`);
-    states.push(`minecraft:lever[face=wall,facing=${d},powered=false]`);
-    states.push(`minecraft:stone_button[face=floor,facing=${d},powered=false]`);
-    states.push(`minecraft:stone_button[face=wall,facing=${d},powered=false]`);
-  }
-  for (const d of dirs6) {
-    states.push(`minecraft:sticky_piston[extended=false,facing=${d}]`);
-    states.push(`minecraft:observer[facing=${d},powered=false]`);
-  }
-  return states.join(";");
-})();
+const ROTATE_CYCLE = [null, "north", "east", "south", "west", "up", "down"];
 
 async function mountTickStudio(root) {
   if (root.dataset.mounted === "true") return { destroy: () => {} };
@@ -2288,6 +2508,9 @@ async function mountTickStudio(root) {
 
   let circuitKey = "delay";
   let activeTool = "interact";
+  let rotateIdx = 0;
+  let showHeat = false;
+  let recording = false;
   let nuc = null;
   let sim = null;
   let liveSchem = null;
@@ -2319,7 +2542,7 @@ async function mountTickStudio(root) {
 
     <div class="tick-stage" data-role="tick-stage">
       <div class="tick-hud">
-        <div class="tick-hud__pill" data-role="tick-hover">Hover a block · Left-click interacts · Drag orbits · Shift+Click breaks</div>
+        <div class="tick-hud__pill" data-role="tick-hover">Hover a block · Left-click interacts · Drag orbits · R rotates · Shift+Click breaks</div>
         <div class="tick-hud__pill tick-hud__pill--muted" data-role="tick-clock">tick 0 · paused</div>
       </div>
       <div class="tick-hud__bottom">
@@ -2337,6 +2560,7 @@ async function mountTickStudio(root) {
             t.id === activeTool
           }" data-tool="${t.id}" title="${t.title || `Place ${t.label} on clicked block face`}"><span class="tick-tool__swatch" style="background:${t.swatch}"></span>${t.label}</button>`,
       ).join("")}
+      <button type="button" class="sdf-pack-btn" data-role="tick-rotate" title="Press R to cycle placement facing">Facing: Auto (R)</button>
     </div>
 
     <div class="tick-actions">
@@ -2358,6 +2582,9 @@ async function mountTickStudio(root) {
         <button type="button" class="sdf-pack-btn" data-role="tick-reset">Reset</button>
       </div>
       <div class="tick-actions__group">
+        <button type="button" class="sdf-pack-btn" data-role="tick-heat" aria-pressed="false" title="Highlight update heat map from mc-tick in 3D">Heat overlay</button>
+        <button type="button" class="sdf-pack-btn" data-role="tick-rec" aria-pressed="false" title="Record simulation timeline for activity & cycle detection">Record</button>
+        <button type="button" class="sdf-pack-btn" data-role="tick-cycles" disabled title="Detect repeating redstone clock periods in recorded timeline">Find cycles</button>
         <label class="sdf-pack-btn" title="Open any .schem, .litematic, .schematic, or .nbt file">
           <span>Open schematic</span>
           <input type="file" accept=".schem,.litematic,.schematic,.nbt,.snbt,.mcstructure" data-role="tick-schem-input" hidden>
@@ -2366,12 +2593,17 @@ async function mountTickStudio(root) {
       </div>
     </div>
 
+    <div class="tick-timeline" data-role="tick-timeline" hidden>
+      <div class="tick-timeline__bars" data-role="tick-bars"></div>
+      <span class="tick-timeline__meta" data-role="tick-timeline-meta">Recording timeline...</span>
+    </div>
+
     <pre class="tick-log" data-role="tick-log">Click directly on the lever in 3D (or click Toggle lever), then press Play or +1 tick.</pre>
 
     <div class="sdf-studio__footer">
       <div class="sdf-telemetry" data-role="tick-telemetry">Initializing Nucleation WASM mesher & mc-tick...</div>
       <div class="sdf-footer-actions">
-        <label class="sdf-pack-btn" title="Drop any Minecraft resource pack .zip or client.jar to render with vanilla textures">
+        <label class="sdf-pack-btn" title="Drop any Minecraft resource pack .zip or client.jar (overlays onto built-in 3D pack)">
           <span data-role="tick-pack-label">Load pack .zip</span>
           <input type="file" accept=".zip,.jar" data-role="tick-pack-input" hidden>
         </label>
@@ -2387,11 +2619,75 @@ async function mountTickStudio(root) {
   const playBtn = root.querySelector('[data-role="tick-play"]');
   const tpsSel = root.querySelector('[data-role="tick-tps"]');
   const useBtn = root.querySelector('[data-role="tick-use"]');
+  const rotateBtn = root.querySelector('[data-role="tick-rotate"]');
+  const heatBtn = root.querySelector('[data-role="tick-heat"]');
+  const recBtn = root.querySelector('[data-role="tick-rec"]');
+  const cyclesBtn = root.querySelector('[data-role="tick-cycles"]');
+  const timelineEl = root.querySelector('[data-role="tick-timeline"]');
+  const barsEl = root.querySelector('[data-role="tick-bars"]');
+  const timelineMetaEl = root.querySelector('[data-role="tick-timeline-meta"]');
   const logEl = root.querySelector('[data-role="tick-log"]');
   const telemetryEl = root.querySelector('[data-role="tick-telemetry"]');
   const packInput = root.querySelector('[data-role="tick-pack-input"]');
   const packLabel = root.querySelector('[data-role="tick-pack-label"]');
   const schemInput = root.querySelector('[data-role="tick-schem-input"]');
+
+  function syncHeatOverlay() {
+    if (!viewport || !sim) return;
+    if (!showHeat) {
+      viewport.setOverlayBoxes([]);
+      return;
+    }
+    try {
+      const tick = Number(sim.tickCount());
+      const raw = JSON.parse(sim.updatesHeatJson(0, tick + 1) || "{}");
+      const totals = new Map();
+      for (const t of raw.ticks || []) {
+        for (const c of t.cells || []) {
+          if (!Array.isArray(c.p)) continue;
+          const k = c.p.join(",");
+          const prev = totals.get(k);
+          if (prev) prev.n += Number(c.n || 1);
+          else totals.set(k, { pos: c.p, n: Number(c.n || 1) });
+        }
+      }
+      let maxCount = 1;
+      for (const v of totals.values()) {
+        if (v.n > maxCount) maxCount = v.n;
+      }
+      const boxes = [...totals.values()]
+        .sort((a, b) => b.n - a.n)
+        .slice(0, 120)
+        .map((v) => ({ pos: v.pos, heat: v.n / maxCount }));
+      viewport.setOverlayBoxes(boxes);
+    } catch {
+      viewport.setOverlayBoxes([]);
+    }
+  }
+
+  function refreshTimelineStrip() {
+    if (!sim || !sim.timelineActivityJson) return;
+    try {
+      const act = JSON.parse(sim.timelineActivityJson());
+      const ticks = act.ticks || [];
+      if (!recording && ticks.length === 0) return;
+      timelineEl.hidden = false;
+      const tail = ticks.slice(-48);
+      const maxVal = Math.max(1, ...tail.map((t) => Number(t.changes ?? t.count ?? t[1] ?? 1)));
+      barsEl.innerHTML = tail
+        .map((t) => {
+          const val = Number(t.changes ?? t.count ?? t[1] ?? 1);
+          const pct = Math.max(10, Math.round((val / maxVal) * 100));
+          return `<span class="tick-timeline__bar" style="height:${pct}%" title="tick ${t.tick ?? t[0]}: ${val} changes"></span>`;
+        })
+        .join("");
+      timelineMetaEl.textContent = recording
+        ? `REC · ${ticks.length} active ticks (${act.start ?? 0}..${act.end ?? sim.tickCount()})`
+        : `Recorded ${ticks.length} active ticks (${act.start ?? 0}..${act.end ?? sim.tickCount()})`;
+    } catch {
+      /* ignore */
+    }
+  }
 
   function syncSolidAndSchemFromSim() {
     if (!sim || !nuc) return;
@@ -2457,6 +2753,8 @@ async function mountTickStudio(root) {
         moving = [];
       }
       viewport.syncFlights(nuc, pack, moving);
+      syncHeatOverlay();
+      if (recording) refreshTimelineStrip();
       updateLogAndTelemetry();
       statusEl.hidden = true;
     } catch (err) {
@@ -2479,6 +2777,12 @@ async function mountTickStudio(root) {
     tickCarry = 0;
     playBtn.textContent = playing ? "Pause" : "Play";
     updateLogAndTelemetry();
+  }
+
+  function cycleRotation() {
+    rotateIdx = (rotateIdx + 1) % ROTATE_CYCLE.length;
+    const val = ROTATE_CYCLE[rotateIdx];
+    rotateBtn.textContent = val ? `Facing: ${val} (R)` : "Facing: Auto (R)";
   }
 
   function handleVoxelClick(hit, meta) {
@@ -2518,26 +2822,39 @@ async function mountTickStudio(root) {
       const nx = x + hit.face[0];
       const ny = y + hit.face[1];
       const nz = z + hit.face[2];
-      const state = toolDef.state(hit.face, meta.facing);
+      const rotOverride = ROTATE_CYCLE[rotateIdx];
+      const facing = rotOverride && ["north", "south", "east", "west"].includes(rotOverride)
+        ? rotOverride
+        : meta.facing;
+      const state = toolDef.state(hit.face, facing, rotOverride);
       sim.placeBlock(nx, ny, nz, state);
       viewport?.flashVoxel(nx, ny, nz, 0x53c7b4);
       scheduleRemesh(false);
       updateLogAndTelemetry(`Placed ${short(sim.getBlock(nx, ny, nz))} @ (${nx},${ny},${nz})`);
     } catch (err) {
-      updateLogAndTelemetry(`Action error: ${err instanceof Error ? err.message : String(err)}`);
+      const detail = nuc.TickSimulation.lastErrorDetail?.() || "";
+      updateLogAndTelemetry(
+        `Action error: ${err instanceof Error ? err.message : String(err)}${detail ? ` — ${detail}` : ""}`,
+      );
     }
   }
 
   async function ensureEngineAndViewport() {
     if (!nuc || !viewport) {
-      const [{ loadThree, TickSimViewport }, loadedNuc] = await Promise.all([
+      const [{ loadThree, NucleationViewport }, loadedNuc] = await Promise.all([
         import("./tick-sim-viewport.js"),
         loadNucleation(),
       ]);
       nuc = loadedNuc;
       if (!viewport) {
         const threeKit = await loadThree();
-        viewport = new TickSimViewport(stageEl, threeKit, {
+        viewport = new NucleationViewport(stageEl, threeKit, {
+          interactive: true,
+          showGrid: true,
+          cameraDir: [0.28, 0.72, 0.88],
+          cameraZoom: 0.92,
+          greedyMeshing: false,
+          aoIntensity: 0.45,
           isSolid: (x, y, z) => solidSet.has(vKey(x, y, z)),
           getBlock: (x, y, z) => {
             try {
@@ -2550,10 +2867,10 @@ async function mountTickStudio(root) {
             if (!info) {
               hoverEl.textContent =
                 activeTool === "interact"
-                  ? "Hover a block · Click lever/button/repeater · Drag orbits · Shift+Click breaks"
+                  ? "Hover a block · Click lever/button/repeater · Drag orbits · R rotates · Shift+Click breaks"
                   : activeTool === "break"
                     ? "Break mode · Click any block to mine it"
-                    : `Build (${TICK_TOOLS.find((t) => t.id === activeTool)?.label}) · Click a face to place`;
+                    : `Build (${TICK_TOOLS.find((t) => t.id === activeTool)?.label}) · Click a face to place · Press R to rotate`;
               return;
             }
             const clean = String(info.state || "minecraft:air").replace("minecraft:", "");
@@ -2591,6 +2908,11 @@ async function mountTickStudio(root) {
 
   async function initCircuit(bytesOverride = null, fileLabel = null) {
     setPlaying(false);
+    recording = false;
+    recBtn.textContent = "Record";
+    recBtn.setAttribute("aria-pressed", "false");
+    cyclesBtn.disabled = true;
+    timelineEl.hidden = true;
     statusEl.textContent = fileLabel ? `Meshing ${fileLabel}...` : "Meshing circuit via Nucleation WASM...";
     statusEl.hidden = false;
     try {
@@ -2611,14 +2933,8 @@ async function mountTickStudio(root) {
         hintEl.textContent = "Drop .schem / .litematic / .nbt here";
       }
 
-      sim = nuc.TickSimulation.fromSchematic(
-        baseSchem,
-        nuc.TickSettleMode.InWorld,
-        0,
-        0,
-        0,
-        TICK_EXTRA_STATES,
-      );
+      // Dynamic interning in TickSimulation::place_block handles new block types on demand!
+      sim = nuc.TickSimulation.fromSchematic(baseSchem, nuc.TickSettleMode.InWorld, 0, 0, 0, "");
       sim.recordUpdates(true);
       scheduleRemesh(true);
 
@@ -2633,6 +2949,60 @@ async function mountTickStudio(root) {
       telemetryEl.textContent = `mc-tick error: ${err instanceof Error ? err.message : String(err)}`;
     }
   }
+
+  const onKeyRotate = (e) => {
+    if (e.key !== "r" && e.key !== "R") return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+    cycleRotation();
+  };
+  window.addEventListener("keydown", onKeyRotate);
+
+  rotateBtn.addEventListener("click", cycleRotation);
+
+  heatBtn.addEventListener("click", () => {
+    showHeat = !showHeat;
+    heatBtn.setAttribute("aria-pressed", String(showHeat));
+    syncHeatOverlay();
+  });
+
+  recBtn.addEventListener("click", () => {
+    if (!sim) return;
+    if (!recording) {
+      sim.recordTimeline?.();
+      recording = true;
+      recBtn.textContent = "Stop rec";
+      recBtn.setAttribute("aria-pressed", "true");
+      cyclesBtn.disabled = true;
+      timelineEl.hidden = false;
+      timelineMetaEl.textContent = "REC · waiting for block transitions...";
+      barsEl.innerHTML = "";
+    } else {
+      sim.stopTimeline?.();
+      recording = false;
+      recBtn.textContent = "Record";
+      recBtn.setAttribute("aria-pressed", "false");
+      cyclesBtn.disabled = false;
+      refreshTimelineStrip();
+    }
+  });
+
+  cyclesBtn.addEventListener("click", () => {
+    if (!sim || !sim.timelineCyclesJson) return;
+    try {
+      const cyc = JSON.parse(sim.timelineCyclesJson());
+      const found = cyc.cycles || cyc.detected || (cyc.period ? [cyc] : []);
+      if (found.length > 0) {
+        const first = found[0];
+        const period = first.period ?? (first.end - first.start);
+        timelineMetaEl.textContent = `Cycle detected: period ${period} ticks (${first.start}..${first.end})`;
+      } else {
+        timelineMetaEl.textContent = "No repeating cycle in recorded span";
+      }
+    } catch (err) {
+      timelineMetaEl.textContent = `Cycle check: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  });
 
   root.querySelector('[data-role="tick-presets"]').addEventListener("click", (e) => {
     const btn = e.target.closest("[data-circuit]");
@@ -2766,6 +3136,7 @@ async function mountTickStudio(root) {
     },
     destroy: () => {
       setPlaying(false);
+      window.removeEventListener("keydown", onKeyRotate);
       packListeners.delete(onPackUpdated);
       viewport?.destroy();
       viewport = null;
@@ -2775,13 +3146,14 @@ async function mountTickStudio(root) {
   };
 }
 
-export async function mountSdfPlaygrounds(ensureModelViewer) {
+export async function mountSdfPlaygrounds() {
   const cleanups = [];
   const rerenders = [];
 
   for (const el of document.querySelectorAll("[data-sdf-workbench]")) {
-    const destroy = await mountWorkbench(el, ensureModelViewer);
-    cleanups.push(destroy);
+    const wb = await mountWorkbench(el);
+    if (wb?.onThemeChange) rerenders.push(wb.onThemeChange);
+    if (wb?.destroy) cleanups.push(wb.destroy);
   }
 
   for (const el of document.querySelectorAll("[data-sdf-csg-lab]")) {
@@ -2791,13 +3163,15 @@ export async function mountSdfPlaygrounds(ensureModelViewer) {
   }
 
   for (const el of document.querySelectorAll("[data-worldgen-lab]")) {
-    const destroy = await mountWorldgenLab(el, ensureModelViewer);
-    cleanups.push(destroy);
+    const wg = await mountWorldgenLab(el);
+    if (wg?.onThemeChange) rerenders.push(wg.onThemeChange);
+    if (wg?.destroy) cleanups.push(wg.destroy);
   }
 
   for (const el of document.querySelectorAll("[data-palette-studio]")) {
-    const destroy = await mountPaletteStudio(el, ensureModelViewer);
-    cleanups.push(destroy);
+    const pal = await mountPaletteStudio(el);
+    if (pal?.onThemeChange) rerenders.push(pal.onThemeChange);
+    if (pal?.destroy) cleanups.push(pal.destroy);
   }
 
   for (const el of document.querySelectorAll("[data-tick-studio]")) {

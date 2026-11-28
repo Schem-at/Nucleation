@@ -41,6 +41,20 @@ namespace capi {
 
     void RawMeshExport_texture_rgba_b64(const diplomat::capi::RawMeshExport* self, diplomat::capi::DiplomatWrite* write);
 
+    uint32_t RawMeshExport_copy_positions(const diplomat::capi::RawMeshExport* self, diplomat::capi::DiplomatF32ViewMut out);
+
+    uint32_t RawMeshExport_copy_normals(const diplomat::capi::RawMeshExport* self, diplomat::capi::DiplomatF32ViewMut out);
+
+    uint32_t RawMeshExport_copy_uvs(const diplomat::capi::RawMeshExport* self, diplomat::capi::DiplomatF32ViewMut out);
+
+    uint32_t RawMeshExport_copy_colors(const diplomat::capi::RawMeshExport* self, diplomat::capi::DiplomatF32ViewMut out);
+
+    uint32_t RawMeshExport_copy_indices(const diplomat::capi::RawMeshExport* self, diplomat::capi::DiplomatU32ViewMut out);
+
+    uint32_t RawMeshExport_texture_rgba_len(const diplomat::capi::RawMeshExport* self);
+
+    uint32_t RawMeshExport_copy_texture_rgba(const diplomat::capi::RawMeshExport* self, diplomat::capi::DiplomatU8ViewMut out);
+
     uint32_t RawMeshExport_texture_width(const diplomat::capi::RawMeshExport* self);
 
     uint32_t RawMeshExport_texture_height(const diplomat::capi::RawMeshExport* self);
@@ -150,6 +164,47 @@ inline void RawMeshExport::texture_rgba_b64_write(W& writeable) const {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     diplomat::capi::RawMeshExport_texture_rgba_b64(this->AsFFI(),
         &write);
+}
+
+inline uint32_t RawMeshExport::copy_positions(diplomat::span<float> out) const {
+    auto result = diplomat::capi::RawMeshExport_copy_positions(this->AsFFI(),
+        {out.data(), out.size()});
+    return result;
+}
+
+inline uint32_t RawMeshExport::copy_normals(diplomat::span<float> out) const {
+    auto result = diplomat::capi::RawMeshExport_copy_normals(this->AsFFI(),
+        {out.data(), out.size()});
+    return result;
+}
+
+inline uint32_t RawMeshExport::copy_uvs(diplomat::span<float> out) const {
+    auto result = diplomat::capi::RawMeshExport_copy_uvs(this->AsFFI(),
+        {out.data(), out.size()});
+    return result;
+}
+
+inline uint32_t RawMeshExport::copy_colors(diplomat::span<float> out) const {
+    auto result = diplomat::capi::RawMeshExport_copy_colors(this->AsFFI(),
+        {out.data(), out.size()});
+    return result;
+}
+
+inline uint32_t RawMeshExport::copy_indices(diplomat::span<uint32_t> out) const {
+    auto result = diplomat::capi::RawMeshExport_copy_indices(this->AsFFI(),
+        {out.data(), out.size()});
+    return result;
+}
+
+inline uint32_t RawMeshExport::texture_rgba_len() const {
+    auto result = diplomat::capi::RawMeshExport_texture_rgba_len(this->AsFFI());
+    return result;
+}
+
+inline uint32_t RawMeshExport::copy_texture_rgba(diplomat::span<uint8_t> out) const {
+    auto result = diplomat::capi::RawMeshExport_copy_texture_rgba(this->AsFFI(),
+        {out.data(), out.size()});
+    return result;
 }
 
 inline uint32_t RawMeshExport::texture_width() const {

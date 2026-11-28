@@ -12,6 +12,7 @@
 #include <optional>
 #include <cstdlib>
 #include "MeshBounds.hpp"
+#include "MeshBytes.hpp"
 #include "MeshConfig.hpp"
 #include "NucleationError.hpp"
 #include "ResourcePack.hpp"
@@ -38,8 +39,14 @@ namespace capi {
     typedef struct MeshResult_glb_data_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} MeshResult_glb_data_b64_result;
     MeshResult_glb_data_b64_result MeshResult_glb_data_b64(const diplomat::capi::MeshResult* self, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct MeshResult_to_glb_bytes_result {union {diplomat::capi::MeshBytes* ok; diplomat::capi::NucleationError err;}; bool is_ok;} MeshResult_to_glb_bytes_result;
+    MeshResult_to_glb_bytes_result MeshResult_to_glb_bytes(const diplomat::capi::MeshResult* self);
+
     typedef struct MeshResult_usdz_data_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} MeshResult_usdz_data_b64_result;
     MeshResult_usdz_data_b64_result MeshResult_usdz_data_b64(const diplomat::capi::MeshResult* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct MeshResult_to_usdz_bytes_result {union {diplomat::capi::MeshBytes* ok; diplomat::capi::NucleationError err;}; bool is_ok;} MeshResult_to_usdz_bytes_result;
+    MeshResult_to_usdz_bytes_result MeshResult_to_usdz_bytes(const diplomat::capi::MeshResult* self);
 
     void MeshResult_nucm_data_b64(const diplomat::capi::MeshResult* self, diplomat::capi::DiplomatWrite* write);
 
@@ -112,6 +119,11 @@ inline diplomat::result<std::monostate, NucleationError> MeshResult::glb_data_b6
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
+inline diplomat::result<std::unique_ptr<MeshBytes>, NucleationError> MeshResult::to_glb_bytes() const {
+    auto result = diplomat::capi::MeshResult_to_glb_bytes(this->AsFFI());
+    return result.is_ok ? diplomat::result<std::unique_ptr<MeshBytes>, NucleationError>(diplomat::Ok<std::unique_ptr<MeshBytes>>(std::unique_ptr<MeshBytes>(MeshBytes::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<MeshBytes>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
 inline diplomat::result<std::string, NucleationError> MeshResult::usdz_data_b64() const {
     std::string output;
     diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
@@ -125,6 +137,11 @@ inline diplomat::result<std::monostate, NucleationError> MeshResult::usdz_data_b
     auto result = diplomat::capi::MeshResult_usdz_data_b64(this->AsFFI(),
         &write);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<MeshBytes>, NucleationError> MeshResult::to_usdz_bytes() const {
+    auto result = diplomat::capi::MeshResult_to_usdz_bytes(this->AsFFI());
+    return result.is_ok ? diplomat::result<std::unique_ptr<MeshBytes>, NucleationError>(diplomat::Ok<std::unique_ptr<MeshBytes>>(std::unique_ptr<MeshBytes>(MeshBytes::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<MeshBytes>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline std::string MeshResult::nucm_data_b64() const {

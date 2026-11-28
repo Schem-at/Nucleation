@@ -38,6 +38,7 @@ void add_ChunkMeshResult_binding(nb::module_);
 void add_ItemModelConfig_binding(nb::module_);
 void add_ItemModelPackBuilder_binding(nb::module_);
 void add_ItemModelResult_binding(nb::module_);
+void add_MeshBytes_binding(nb::module_);
 void add_MeshConfig_binding(nb::module_);
 void add_MeshJob_binding(nb::module_);
 void add_MeshResult_binding(nb::module_);
@@ -200,6 +201,7 @@ NB_MODULE(nucleation, mod)
     add_ItemModelConfig_binding(mod);
     add_ItemModelPackBuilder_binding(mod);
     add_ItemModelResult_binding(mod);
+    add_MeshBytes_binding(mod);
     add_MeshConfig_binding(mod);
     add_MeshJob_binding(mod);
     add_MeshResult_binding(mod);

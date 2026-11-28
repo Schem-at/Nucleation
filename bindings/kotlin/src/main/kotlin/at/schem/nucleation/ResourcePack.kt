@@ -10,6 +10,7 @@ internal interface ResourcePackLib: Library {
     fun ResourcePack_from_bytes(data: Slice): ResultPointerInt
     fun ResourcePack_from_list(list: Pointer): ResultPointerInt
     fun ResourcePack_builtin_procedural(): Pointer
+    fun ResourcePack_from_bytes_with_fallback(data: Slice): ResultPointerInt
     fun ResourcePack_blockstate_count(handle: Pointer): FFIUint32
     fun ResourcePack_model_count(handle: Pointer): FFIUint32
     fun ResourcePack_texture_count(handle: Pointer): FFIUint32
@@ -109,6 +110,29 @@ class ResourcePack internal constructor (
             val handle = returnVal
             val returnOpaque = ResourcePack(handle, selfEdges, true)
             return returnOpaque
+        }
+        @JvmStatic
+
+        /** Load a resource pack ZIP/JAR layered on top of the built-in
+        *procedural pack so any omitted blocks still render cleanly.
+        */
+        fun fromBytesWithFallback(data: UByteArray): Result<ResourcePack> {
+            val dataSliceMemory = PrimitiveArrayTools.borrow(data)
+
+            val returnVal = lib.ResourcePack_from_bytes_with_fallback(dataSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = ResourcePack(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                dataSliceMemory.close()
+            }
         }
         @JvmStatic
 

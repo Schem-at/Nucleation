@@ -37,6 +37,7 @@ require_once __DIR__ . '/ChunkMeshResult.php';
 require_once __DIR__ . '/ItemModelConfig.php';
 require_once __DIR__ . '/ItemModelPackBuilder.php';
 require_once __DIR__ . '/ItemModelResult.php';
+require_once __DIR__ . '/MeshBytes.php';
 require_once __DIR__ . '/MeshConfig.php';
 require_once __DIR__ . '/MeshJob.php';
 require_once __DIR__ . '/MeshResult.php';

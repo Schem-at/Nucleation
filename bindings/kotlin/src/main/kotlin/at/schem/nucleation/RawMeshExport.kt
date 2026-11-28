@@ -16,6 +16,13 @@ internal interface RawMeshExportLib: Library {
     fun RawMeshExport_colors_b64(handle: Pointer, write: Pointer): Unit
     fun RawMeshExport_indices_b64(handle: Pointer, write: Pointer): Unit
     fun RawMeshExport_texture_rgba_b64(handle: Pointer, write: Pointer): Unit
+    fun RawMeshExport_copy_positions(handle: Pointer, out: Slice): FFIUint32
+    fun RawMeshExport_copy_normals(handle: Pointer, out: Slice): FFIUint32
+    fun RawMeshExport_copy_uvs(handle: Pointer, out: Slice): FFIUint32
+    fun RawMeshExport_copy_colors(handle: Pointer, out: Slice): FFIUint32
+    fun RawMeshExport_copy_indices(handle: Pointer, out: Slice): FFIUint32
+    fun RawMeshExport_texture_rgba_len(handle: Pointer): FFIUint32
+    fun RawMeshExport_copy_texture_rgba(handle: Pointer, out: Slice): FFIUint32
     fun RawMeshExport_texture_width(handle: Pointer): FFIUint32
     fun RawMeshExport_texture_height(handle: Pointer): FFIUint32
 }
@@ -140,6 +147,92 @@ class RawMeshExport internal constructor (
 
         val returnString = DW.writeToString(write)
         return returnString
+    }
+
+    /** Copy flat `[x,y,z,...]` vertex positions directly into `out` (zero Base64).
+    */
+    fun copyPositions(out: FloatArray): UInt {
+        val outSliceMemory = PrimitiveArrayTools.borrow(out)
+
+        val returnVal = lib.RawMeshExport_copy_positions(handle, outSliceMemory.slice);
+        try {
+            return (returnVal.toUInt())
+        } finally {
+            outSliceMemory.close()
+        }
+    }
+
+    /** Copy flat `[nx,ny,nz,...]` vertex normals directly into `out`.
+    */
+    fun copyNormals(out: FloatArray): UInt {
+        val outSliceMemory = PrimitiveArrayTools.borrow(out)
+
+        val returnVal = lib.RawMeshExport_copy_normals(handle, outSliceMemory.slice);
+        try {
+            return (returnVal.toUInt())
+        } finally {
+            outSliceMemory.close()
+        }
+    }
+
+    /** Copy flat `[u,v,...]` texture coordinates directly into `out`.
+    */
+    fun copyUvs(out: FloatArray): UInt {
+        val outSliceMemory = PrimitiveArrayTools.borrow(out)
+
+        val returnVal = lib.RawMeshExport_copy_uvs(handle, outSliceMemory.slice);
+        try {
+            return (returnVal.toUInt())
+        } finally {
+            outSliceMemory.close()
+        }
+    }
+
+    /** Copy flat `[r,g,b,a,...]` vertex colors directly into `out`.
+    */
+    fun copyColors(out: FloatArray): UInt {
+        val outSliceMemory = PrimitiveArrayTools.borrow(out)
+
+        val returnVal = lib.RawMeshExport_copy_colors(handle, outSliceMemory.slice);
+        try {
+            return (returnVal.toUInt())
+        } finally {
+            outSliceMemory.close()
+        }
+    }
+
+    /** Copy triangle indices directly into `out`.
+    */
+    fun copyIndices(out: UIntArray): UInt {
+        val outSliceMemory = PrimitiveArrayTools.borrow(out)
+
+        val returnVal = lib.RawMeshExport_copy_indices(handle, outSliceMemory.slice);
+        try {
+            return (returnVal.toUInt())
+        } finally {
+            outSliceMemory.close()
+        }
+    }
+
+    /** Byte length of the baked RGBA texture atlas.
+    */
+    fun textureRgbaLen(): UInt {
+
+        val returnVal = lib.RawMeshExport_texture_rgba_len(handle);
+        return (returnVal.toUInt())
+    }
+
+    /** Copy baked RGBA texture bytes directly into `out` (zero Base64).
+    */
+    fun copyTextureRgba(out: UByteArray): UInt {
+        val outSliceMemory = PrimitiveArrayTools.borrow(out)
+
+        val returnVal = lib.RawMeshExport_copy_texture_rgba(handle, outSliceMemory.slice);
+        try {
+            return (returnVal.toUInt())
+        } finally {
+            outSliceMemory.close()
+        }
     }
 
     /** Width of the baked texture in pixels.

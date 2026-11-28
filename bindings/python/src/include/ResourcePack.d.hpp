@@ -55,6 +55,12 @@ public:
   inline static std::unique_ptr<nucleation::ResourcePack> builtin_procedural();
 
   /**
+   * Load a resource pack ZIP/JAR layered on top of the built-in
+   * procedural pack so any omitted blocks still render cleanly.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::ResourcePack>, nucleation::NucleationError> from_bytes_with_fallback(nucleation::diplomat::span<const uint8_t> data);
+
+  /**
    * Number of blockstate definitions in the pack.
    */
   inline uint32_t blockstate_count() const;

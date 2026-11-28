@@ -30,6 +30,9 @@ namespace capi {
 
     nucleation::capi::ResourcePack* ResourcePack_builtin_procedural(void);
 
+    typedef struct ResourcePack_from_bytes_with_fallback_result {union {nucleation::capi::ResourcePack* ok; nucleation::capi::NucleationError err;}; bool is_ok;} ResourcePack_from_bytes_with_fallback_result;
+    ResourcePack_from_bytes_with_fallback_result ResourcePack_from_bytes_with_fallback(nucleation::diplomat::capi::DiplomatU8View data);
+
     uint32_t ResourcePack_blockstate_count(const nucleation::capi::ResourcePack* self);
 
     uint32_t ResourcePack_model_count(const nucleation::capi::ResourcePack* self);
@@ -92,6 +95,11 @@ inline nucleation::diplomat::result<std::unique_ptr<nucleation::ResourcePack>, n
 inline std::unique_ptr<nucleation::ResourcePack> nucleation::ResourcePack::builtin_procedural() {
     auto result = nucleation::capi::ResourcePack_builtin_procedural();
     return std::unique_ptr<nucleation::ResourcePack>(nucleation::ResourcePack::FromFFI(result));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::ResourcePack>, nucleation::NucleationError> nucleation::ResourcePack::from_bytes_with_fallback(nucleation::diplomat::span<const uint8_t> data) {
+    auto result = nucleation::capi::ResourcePack_from_bytes_with_fallback({data.data(), data.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::ResourcePack>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::ResourcePack>>(std::unique_ptr<nucleation::ResourcePack>(nucleation::ResourcePack::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::ResourcePack>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
 inline uint32_t nucleation::ResourcePack::blockstate_count() const {

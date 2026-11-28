@@ -30,6 +30,9 @@ namespace capi {
 
     diplomat::capi::ResourcePack* ResourcePack_builtin_procedural(void);
 
+    typedef struct ResourcePack_from_bytes_with_fallback_result {union {diplomat::capi::ResourcePack* ok; diplomat::capi::NucleationError err;}; bool is_ok;} ResourcePack_from_bytes_with_fallback_result;
+    ResourcePack_from_bytes_with_fallback_result ResourcePack_from_bytes_with_fallback(diplomat::capi::DiplomatU8View data);
+
     uint32_t ResourcePack_blockstate_count(const diplomat::capi::ResourcePack* self);
 
     uint32_t ResourcePack_model_count(const diplomat::capi::ResourcePack* self);
@@ -92,6 +95,11 @@ inline diplomat::result<std::unique_ptr<ResourcePack>, NucleationError> Resource
 inline std::unique_ptr<ResourcePack> ResourcePack::builtin_procedural() {
     auto result = diplomat::capi::ResourcePack_builtin_procedural();
     return std::unique_ptr<ResourcePack>(ResourcePack::FromFFI(result));
+}
+
+inline diplomat::result<std::unique_ptr<ResourcePack>, NucleationError> ResourcePack::from_bytes_with_fallback(diplomat::span<const uint8_t> data) {
+    auto result = diplomat::capi::ResourcePack_from_bytes_with_fallback({data.data(), data.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<ResourcePack>, NucleationError>(diplomat::Ok<std::unique_ptr<ResourcePack>>(std::unique_ptr<ResourcePack>(ResourcePack::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<ResourcePack>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline uint32_t ResourcePack::blockstate_count() const {

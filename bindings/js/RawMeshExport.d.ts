@@ -63,6 +63,41 @@ export class RawMeshExport {
     textureRgbaB64(): string;
 
     /**
+     * Copy flat `[x,y,z,...]` vertex positions directly into `out` (zero Base64).
+     */
+    copyPositions(out: Array<number>): number;
+
+    /**
+     * Copy flat `[nx,ny,nz,...]` vertex normals directly into `out`.
+     */
+    copyNormals(out: Array<number>): number;
+
+    /**
+     * Copy flat `[u,v,...]` texture coordinates directly into `out`.
+     */
+    copyUvs(out: Array<number>): number;
+
+    /**
+     * Copy flat `[r,g,b,a,...]` vertex colors directly into `out`.
+     */
+    copyColors(out: Array<number>): number;
+
+    /**
+     * Copy triangle indices directly into `out`.
+     */
+    copyIndices(out: Array<number>): number;
+
+    /**
+     * Byte length of the baked RGBA texture atlas.
+     */
+    textureRgbaLen(): number;
+
+    /**
+     * Copy baked RGBA texture bytes directly into `out` (zero Base64).
+     */
+    copyTextureRgba(out: Array<number>): number;
+
+    /**
      * Width of the baked texture in pixels.
      */
     textureWidth(): number;

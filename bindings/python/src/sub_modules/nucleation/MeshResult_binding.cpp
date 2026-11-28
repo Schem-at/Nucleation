@@ -23,6 +23,8 @@ void add_MeshResult_binding(nb::module_ mod) {
         .def("glb_data_b64", &nucleation::MeshResult::glb_data_b64)
         .def("has_transparency", &nucleation::MeshResult::has_transparency)
         .def("nucm_data_b64", &nucleation::MeshResult::nucm_data_b64)
+        .def("to_glb_bytes", std::move(maybe_op_unwrap(&nucleation::MeshResult::to_glb_bytes)))
+        .def("to_usdz_bytes", std::move(maybe_op_unwrap(&nucleation::MeshResult::to_usdz_bytes)))
         .def("triangle_count", &nucleation::MeshResult::triangle_count)
         .def("usdz_data_b64", &nucleation::MeshResult::usdz_data_b64)
         .def("vertex_count", &nucleation::MeshResult::vertex_count);

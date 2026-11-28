@@ -36,6 +36,12 @@ export class ResourcePack {
     static builtinProcedural(): ResourcePack;
 
     /**
+     * Load a resource pack ZIP/JAR layered on top of the built-in
+     * procedural pack so any omitted blocks still render cleanly.
+     */
+    static fromBytesWithFallback(data: Array<number>): ResourcePack;
+
+    /**
      * Number of blockstate definitions in the pack.
      */
     blockstateCount(): number;

@@ -12,7 +12,9 @@ internal interface MeshResultLib: Library {
     fun MeshResult_create_usdz(schematic: Pointer, pack: Pointer, config: Pointer): ResultPointerInt
     fun MeshResult_animated_glb_b64(schematic: Pointer, pack: Pointer, timelineJson: Slice, write: Pointer): ResultUnitInt
     fun MeshResult_glb_data_b64(handle: Pointer, write: Pointer): ResultUnitInt
+    fun MeshResult_to_glb_bytes(handle: Pointer): ResultPointerInt
     fun MeshResult_usdz_data_b64(handle: Pointer, write: Pointer): ResultUnitInt
+    fun MeshResult_to_usdz_bytes(handle: Pointer): ResultPointerInt
     fun MeshResult_nucm_data_b64(handle: Pointer, write: Pointer): Unit
     fun MeshResult_vertex_count(handle: Pointer): FFIUint32
     fun MeshResult_triangle_count(handle: Pointer): FFIUint32
@@ -143,6 +145,22 @@ class MeshResult internal constructor (
         }
     }
 
+    /** The mesh as a raw binary GLB buffer (zero Base64 encoding overhead).
+    */
+    fun toGlbBytes(): Result<MeshBytes> {
+
+        val returnVal = lib.MeshResult_to_glb_bytes(handle);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            val selfEdges: List<Any> = listOf()
+            val handle = nativeOkVal
+            val returnOpaque = MeshBytes(handle, selfEdges, true)
+            return returnOpaque.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
     /** The mesh as a USDZ archive, base64-encoded.
     */
     fun usdzDataB64(): Result<String> {
@@ -153,6 +171,22 @@ class MeshResult internal constructor (
 
             val returnString = DW.writeToString(write)
             return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** The mesh as a raw binary USDZ buffer (zero Base64 encoding overhead).
+    */
+    fun toUsdzBytes(): Result<MeshBytes> {
+
+        val returnVal = lib.MeshResult_to_usdz_bytes(handle);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            val selfEdges: List<Any> = listOf()
+            val handle = nativeOkVal
+            val returnOpaque = MeshBytes(handle, selfEdges, true)
+            return returnOpaque.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }

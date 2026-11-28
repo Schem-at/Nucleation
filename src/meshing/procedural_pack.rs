@@ -937,6 +937,202 @@ pub(crate) fn build_builtin_procedural_pack() -> ResourcePackSource {
         let _ = pack.add_blockstate_json("minecraft:piston_head", &bs);
     }
 
+    // 5h. Comparator (3D slab + triangle + 2 rear torch pegs + front compare/subtract peg)
+    for (mode, front_lit) in [("compare", false), ("subtract", true)] {
+        for (psuf, powered) in [("off", false), ("on", true)] {
+            let top_px = make_tex(|x, y| {
+                let n = (tex_hash(x, y, 190) - 0.5) * 8.0;
+                let border = x == 0 || y == 0 || x == 15 || y == 15;
+                // Triangle pointing North (toward y = 2)
+                let dx = (x as i32 - 7).abs().min((x as i32 - 8).abs());
+                let tri = (3..=11).contains(&y) && dx <= ((y as i32 - 3) / 2);
+                if border {
+                    [108.0 + n, 110.0 + n, 114.0 + n, 255.0]
+                } else if tri {
+                    if powered { [224.0, 48.0, 32.0, 255.0] } else { [126.0, 128.0, 132.0, 255.0] }
+                } else {
+                    [162.0 + n, 164.0 + n, 167.0 + n, 255.0]
+                }
+            });
+            let top_tex = format!("minecraft:block/comparator_top_{mode}_{psuf}");
+            let _ = pack.add_texture(&top_tex, 16, 16, top_px);
+            let rear_head = if powered { "minecraft:block/rs_head_on" } else { "minecraft:block/rs_head_off" };
+            let front_head = if front_lit { "minecraft:block/rs_head_on" } else { "minecraft:block/rs_head_off" };
+            let front_h = if front_lit { 7 } else { 5 };
+            let mjson = format!(
+                r##"{{"textures":{{"top":"{top_tex}","side":"minecraft:block/repeater_side","wood":"minecraft:block/rs_wood","rhead":"{rear_head}","fhead":"{front_head}"}},"elements":[{{"from":[0,0,0],"to":[16,2,16],"faces":{{"down":{{"texture":"#side","cullface":"down"}},"up":{{"texture":"#top"}},"north":{{"texture":"#side"}},"south":{{"texture":"#side"}},"west":{{"texture":"#side"}},"east":{{"texture":"#side"}}}}}},{{"from":[4,2,11],"to":[6,5,13],"faces":{{"north":{{"texture":"#wood"}},"south":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}},{{"from":[4,5,11],"to":[6,7,13],"faces":{{"up":{{"texture":"#rhead"}},"north":{{"texture":"#rhead"}},"south":{{"texture":"#rhead"}},"west":{{"texture":"#rhead"}},"east":{{"texture":"#rhead"}}}}}},{{"from":[10,2,11],"to":[12,5,13],"faces":{{"north":{{"texture":"#wood"}},"south":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}},{{"from":[10,5,11],"to":[12,7,13],"faces":{{"up":{{"texture":"#rhead"}},"north":{{"texture":"#rhead"}},"south":{{"texture":"#rhead"}},"west":{{"texture":"#rhead"}},"east":{{"texture":"#rhead"}}}}}},{{"from":[7,2,2],"to":[9,{},4],"faces":{{"north":{{"texture":"#wood"}},"south":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}},{{"from":[7,{},2],"to":[9,{front_h},4],"faces":{{"up":{{"texture":"#fhead"}},"north":{{"texture":"#fhead"}},"south":{{"texture":"#fhead"}},"west":{{"texture":"#fhead"}},"east":{{"texture":"#fhead"}}}}}}]}}"##,
+                front_h - 2,
+                front_h - 2
+            );
+            let _ = pack.add_model_json(&format!("minecraft:block/comparator_{mode}_{psuf}"), &mjson);
+        }
+    }
+    {
+        let mut variants = Vec::new();
+        for (facing, rot_y) in [("south", 0), ("west", 90), ("north", 180), ("east", 270)] {
+            for mode in ["compare", "subtract"] {
+                for (powered, psuf) in [("false", "off"), ("true", "on")] {
+                    variants.push(format!(
+                        r##""facing={facing},mode={mode},powered={powered}":{{"model":"minecraft:block/comparator_{mode}_{psuf}","y":{rot_y}}}"##
+                    ));
+                }
+            }
+        }
+        let bs = format!(r##"{{"variants":{{{}}}}}"##, variants.join(","));
+        let _ = pack.add_blockstate_json("minecraft:comparator", &bs);
+    }
+
+    // 5i. Target block (crisp red & white bullseye!)
+    add_cube_all(
+        &mut pack,
+        "target",
+        make_tex(|x, y| {
+            let d = (x as i32 - 7).abs().max((x as i32 - 8).abs()).max((y as i32 - 7).abs().max((y as i32 - 8).abs()));
+            let n = (tex_hash(x, y, 192) - 0.5) * 10.0;
+            if d <= 1 || d == 4 || d == 5 {
+                [214.0 + n, 44.0 + n * 0.4, 38.0 + n * 0.4, 255.0]
+            } else {
+                [238.0 + n, 224.0 + n, 206.0 + n, 255.0]
+            }
+        }),
+    );
+
+    // 5j. Note block (dark oak acoustic chamber with musical note icon)
+    add_cube_all(
+        &mut pack,
+        "note_block",
+        make_tex(|x, y| {
+            let border = x <= 1 || y <= 1 || x >= 14 || y >= 14;
+            let stem = x == 9 && (4..=10).contains(&y);
+            let flag = y == 4 && (9..=11).contains(&x);
+            let note = (x == 7 || x == 8) && (9..=11).contains(&y);
+            let n = (tex_hash(x, y, 193) - 0.5) * 10.0;
+            if stem || flag || note {
+                [38.0, 22.0, 14.0, 255.0]
+            } else if border {
+                [82.0 + n, 52.0 + n, 34.0 + n, 255.0]
+            } else {
+                [118.0 + n, 76.0 + n, 48.0 + n, 255.0]
+            }
+        }),
+    );
+
+    // 5k. Dropper & Dispenser (stone body + distinctive face across all 6 facings)
+    let furnace_side = cobble_tex([112.0, 114.0, 116.0], [78.0, 80.0, 84.0], 194);
+    let _ = pack.add_texture("minecraft:block/furnace_side", 16, 16, furnace_side);
+    for (kind, is_dispenser) in [("dropper", false), ("dispenser", true)] {
+        let front_px = make_tex(|x, y| {
+            let border = x == 0 || y == 0 || x == 15 || y == 15;
+            let hole = if is_dispenser {
+                ((5..=10).contains(&x) && (4..=8).contains(&y))
+                    || ((7..=8).contains(&x) && (10..=12).contains(&y))
+            } else {
+                ((6..=9).contains(&x) && (5..=9).contains(&y))
+                    || ((5..=10).contains(&x) && y == 11)
+            };
+            let n = (tex_hash(x, y, 195) - 0.5) * 10.0;
+            if hole {
+                [26.0, 26.0, 30.0, 255.0]
+            } else if border {
+                [84.0 + n, 86.0 + n, 90.0 + n, 255.0]
+            } else {
+                [122.0 + n, 124.0 + n, 128.0 + n, 255.0]
+            }
+        });
+        let ftex = format!("minecraft:block/{kind}_front");
+        let _ = pack.add_texture(&ftex, 16, 16, front_px);
+        let mjson = format!(
+            r##"{{"textures":{{"front":"{ftex}","side":"minecraft:block/furnace_side"}},"elements":[{{"from":[0,0,0],"to":[16,16,16],"faces":{{"north":{{"texture":"#front","cullface":"north"}},"south":{{"texture":"#side","cullface":"south"}},"up":{{"texture":"#side","cullface":"up"}},"down":{{"texture":"#side","cullface":"down"}},"west":{{"texture":"#side","cullface":"west"}},"east":{{"texture":"#side","cullface":"east"}}}}}}]}}"##
+        );
+        let _ = pack.add_model_json(&format!("minecraft:block/{kind}"), &mjson);
+        let mut variants = Vec::new();
+        for (facing, rx, ry) in [
+            ("north", 0, 0),
+            ("east", 0, 90),
+            ("south", 0, 180),
+            ("west", 0, 270),
+            ("up", 270, 0),
+            ("down", 90, 0),
+        ] {
+            variants.push(format!(
+                r##""facing={facing}":{{"model":"minecraft:block/{kind}","x":{rx},"y":{ry}}}"##
+            ));
+        }
+        let bs = format!(r##"{{"variants":{{{}}}}}"##, variants.join(","));
+        let _ = pack.add_blockstate_json(&format!("minecraft:{kind}"), &bs);
+    }
+
+    // 5l. Hopper (authentic 3D metal funnel bowl + neck + directional spout)
+    let hopper_px = solid_speckle([76.0, 78.0, 84.0], 10.0, 196);
+    let _ = pack.add_texture("minecraft:block/hopper_metal", 16, 16, hopper_px);
+    let hopper_down = r##"{"textures":{"m":"minecraft:block/hopper_metal"},"elements":[{"from":[0,10,0],"to":[16,16,2],"faces":{"up":{"texture":"#m"},"down":{"texture":"#m"},"north":{"texture":"#m"},"south":{"texture":"#m"},"west":{"texture":"#m"},"east":{"texture":"#m"}}},{"from":[0,10,14],"to":[16,16,16],"faces":{"up":{"texture":"#m"},"down":{"texture":"#m"},"north":{"texture":"#m"},"south":{"texture":"#m"},"west":{"texture":"#m"},"east":{"texture":"#m"}}},{"from":[0,10,2],"to":[2,16,14],"faces":{"up":{"texture":"#m"},"down":{"texture":"#m"},"west":{"texture":"#m"},"east":{"texture":"#m"}}},{"from":[14,10,2],"to":[16,16,14],"faces":{"up":{"texture":"#m"},"down":{"texture":"#m"},"west":{"texture":"#m"},"east":{"texture":"#m"}}},{"from":[2,10,2],"to":[14,11,14],"faces":{"up":{"texture":"#m"},"down":{"texture":"#m"}}},{"from":[4,4,4],"to":[12,10,12],"faces":{"down":{"texture":"#m"},"north":{"texture":"#m"},"south":{"texture":"#m"},"west":{"texture":"#m"},"east":{"texture":"#m"}}},{"from":[6,0,6],"to":[10,4,10],"faces":{"down":{"texture":"#m"},"north":{"texture":"#m"},"south":{"texture":"#m"},"west":{"texture":"#m"},"east":{"texture":"#m"}}}]}"##;
+    let hopper_side = r##"{"textures":{"m":"minecraft:block/hopper_metal"},"elements":[{"from":[0,10,0],"to":[16,16,2],"faces":{"up":{"texture":"#m"},"down":{"texture":"#m"},"north":{"texture":"#m"},"south":{"texture":"#m"},"west":{"texture":"#m"},"east":{"texture":"#m"}}},{"from":[0,10,14],"to":[16,16,16],"faces":{"up":{"texture":"#m"},"down":{"texture":"#m"},"north":{"texture":"#m"},"south":{"texture":"#m"},"west":{"texture":"#m"},"east":{"texture":"#m"}}},{"from":[0,10,2],"to":[2,16,14],"faces":{"up":{"texture":"#m"},"down":{"texture":"#m"},"west":{"texture":"#m"},"east":{"texture":"#m"}}},{"from":[14,10,2],"to":[16,16,14],"faces":{"up":{"texture":"#m"},"down":{"texture":"#m"},"west":{"texture":"#m"},"east":{"texture":"#m"}}},{"from":[2,10,2],"to":[14,11,14],"faces":{"up":{"texture":"#m"},"down":{"texture":"#m"}}},{"from":[4,4,4],"to":[12,10,12],"faces":{"down":{"texture":"#m"},"north":{"texture":"#m"},"south":{"texture":"#m"},"west":{"texture":"#m"},"east":{"texture":"#m"}}},{"from":[6,4,0],"to":[10,8,4],"faces":{"up":{"texture":"#m"},"down":{"texture":"#m"},"north":{"texture":"#m"},"west":{"texture":"#m"},"east":{"texture":"#m"}}}]}"##;
+    let _ = pack.add_model_json("minecraft:block/hopper_down", hopper_down);
+    let _ = pack.add_model_json("minecraft:block/hopper_side", hopper_side);
+    let _ = pack.add_blockstate_json(
+        "minecraft:hopper",
+        r##"{"variants":{"facing=down":{"model":"minecraft:block/hopper_down"},"facing=north":{"model":"minecraft:block/hopper_side","y":0},"facing=east":{"model":"minecraft:block/hopper_side","y":90},"facing=south":{"model":"minecraft:block/hopper_side","y":180},"facing=west":{"model":"minecraft:block/hopper_side","y":270}}}"##,
+    );
+
+    // 5m. Trapdoors (oak + iron, bottom / top / open across 4 facings)
+    for (td, tex) in [
+        ("oak_trapdoor", "minecraft:block/oak_planks"),
+        ("iron_trapdoor", "minecraft:block/iron_block"),
+    ] {
+        let _ = pack.add_model_json(
+            &format!("minecraft:block/{td}_bottom"),
+            &format!(r##"{{"textures":{{"t":"{tex}"}},"elements":[{{"from":[0,0,0],"to":[16,3,16],"faces":{{"up":{{"texture":"#t"}},"down":{{"texture":"#t"}},"north":{{"texture":"#t"}},"south":{{"texture":"#t"}},"west":{{"texture":"#t"}},"east":{{"texture":"#t"}}}}}}]}}"##),
+        );
+        let _ = pack.add_model_json(
+            &format!("minecraft:block/{td}_top"),
+            &format!(r##"{{"textures":{{"t":"{tex}"}},"elements":[{{"from":[0,13,0],"to":[16,16,16],"faces":{{"up":{{"texture":"#t"}},"down":{{"texture":"#t"}},"north":{{"texture":"#t"}},"south":{{"texture":"#t"}},"west":{{"texture":"#t"}},"east":{{"texture":"#t"}}}}}}]}}"##),
+        );
+        let _ = pack.add_model_json(
+            &format!("minecraft:block/{td}_open"),
+            &format!(r##"{{"textures":{{"t":"{tex}"}},"elements":[{{"from":[0,0,13],"to":[16,16,16],"faces":{{"up":{{"texture":"#t"}},"down":{{"texture":"#t"}},"north":{{"texture":"#t"}},"south":{{"texture":"#t"}},"west":{{"texture":"#t"}},"east":{{"texture":"#t"}}}}}}]}}"##),
+        );
+        let mut variants = Vec::new();
+        for (facing, ry) in [("north", 0), ("east", 90), ("south", 180), ("west", 270)] {
+            variants.push(format!(r##""facing={facing},half=bottom,open=false":{{"model":"minecraft:block/{td}_bottom","y":{ry}}}"##));
+            variants.push(format!(r##""facing={facing},half=top,open=false":{{"model":"minecraft:block/{td}_top","y":{ry}}}"##));
+            variants.push(format!(r##""facing={facing},open=true":{{"model":"minecraft:block/{td}_open","y":{ry}}}"##));
+        }
+        let bs = format!(r##"{{"variants":{{{}}}}}"##, variants.join(","));
+        let _ = pack.add_blockstate_json(&format!("minecraft:{td}"), &bs);
+    }
+
+    // 5n. Powered rail & regular rail
+    for (rname, has_power) in [("rail", false), ("powered_rail", true)] {
+        for (suf, lit) in if has_power { vec![("off", false), ("on", true)] } else { vec![("off", false)] } {
+            let px = make_tex(|x, y| {
+                let rail = x == 2 || x == 3 || x == 12 || x == 13;
+                let tie = y % 4 == 1 || y % 4 == 2;
+                let core = has_power && (x == 7 || x == 8);
+                if rail {
+                    if has_power { [226.0, 186.0, 62.0, 255.0] } else { [164.0, 168.0, 174.0, 255.0] }
+                } else if core {
+                    if lit { [252.0, 46.0, 26.0, 255.0] } else { [112.0, 24.0, 20.0, 255.0] }
+                } else if tie && (1..=14).contains(&x) {
+                    [136.0, 102.0, 64.0, 255.0]
+                } else {
+                    [0.0; 4]
+                }
+            });
+            let tname = format!("minecraft:block/{rname}_{suf}");
+            let _ = pack.add_texture(&tname, 16, 16, px);
+            let mjson = format!(
+                r##"{{"textures":{{"r":"{tname}"}},"elements":[{{"from":[0,0.4,0],"to":[16,0.4,16],"shade":false,"faces":{{"up":{{"texture":"#r"}},"down":{{"texture":"#r"}}}}}}]}}"##
+            );
+            let _ = pack.add_model_json(&format!("minecraft:block/{rname}_flat_{suf}"), &mjson);
+        }
+        let bs = if has_power {
+            r##"{"variants":{"powered=false,shape=north_south":{"model":"minecraft:block/powered_rail_flat_off"},"powered=false,shape=east_west":{"model":"minecraft:block/powered_rail_flat_off","y":90},"powered=true,shape=north_south":{"model":"minecraft:block/powered_rail_flat_on"},"powered=true,shape=east_west":{"model":"minecraft:block/powered_rail_flat_on","y":90}}}"##
+        } else {
+            r##"{"variants":{"shape=north_south":{"model":"minecraft:block/rail_flat_off"},"shape=east_west":{"model":"minecraft:block/rail_flat_off","y":90}}}"##
+        };
+        let _ = pack.add_blockstate_json(&format!("minecraft:{rname}"), bs);
+    }
+
     // 6. Fluids (water & lava)
     let water_px = make_tex(|x, y| {
         let wave = if (x + y * 2) % 6 < 2 { 18.0 } else { -8.0 };
