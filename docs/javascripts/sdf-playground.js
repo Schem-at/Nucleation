@@ -2103,12 +2103,12 @@ const TICK_CIRCUITS = {
     },
   },
   button: {
-    label: "3. Button pulse timer",
+    label: "3. Sticky piston",
     inputPos: [0, 1, 1],
     actionLabel: "Press button",
     build(nuc) {
-      const s = nuc.Schematic.create("button_pulse");
-      for (let x = 0; x <= 4; x += 1) {
+      const s = nuc.Schematic.create("sticky_piston_demo");
+      for (let x = 0; x <= 6; x += 1) {
         for (let z = 0; z <= 2; z += 1) {
           s.setBlock(x, 0, z, "minecraft:smooth_stone");
         }
@@ -2116,8 +2116,8 @@ const TICK_CIRCUITS = {
       s.setBlockFromString(0, 1, 1, "minecraft:stone_button[face=floor,facing=east,powered=false]");
       s.setBlockFromString(1, 1, 1, "minecraft:redstone_wire[east=side,west=side,north=none,south=none,power=0]");
       s.setBlockFromString(2, 1, 1, "minecraft:redstone_wire[east=side,west=side,north=none,south=none,power=0]");
-      s.setBlockFromString(3, 1, 1, "minecraft:redstone_wire[east=side,west=side,north=none,south=none,power=0]");
-      s.setBlockFromString(4, 1, 1, "minecraft:redstone_lamp[lit=false]");
+      s.setBlockFromString(3, 1, 1, "minecraft:sticky_piston[facing=east,extended=false]");
+      s.setBlock(4, 1, 1, "minecraft:gold_block");
       return s;
     },
   },
@@ -2173,6 +2173,12 @@ async function mountTickStudio(root, ensureModelViewer) {
 
     <div class="sdf-studio__footer">
       <div class="sdf-telemetry" data-role="tick-telemetry">Initializing mc-tick simulator...</div>
+      <div class="sdf-footer-actions">
+        <label class="sdf-pack-btn" title="Drop any Minecraft resource pack .zip or client.jar to render with vanilla textures">
+          <span data-role="tick-pack-label">Load pack .zip</span>
+          <input type="file" accept=".zip,.jar" data-role="tick-pack-input" hidden>
+        </label>
+      </div>
     </div>
   `;
 
@@ -2181,6 +2187,8 @@ async function mountTickStudio(root, ensureModelViewer) {
   const useBtn = root.querySelector('[data-role="tick-use"]');
   const logEl = root.querySelector('[data-role="tick-log"]');
   const telemetryEl = root.querySelector('[data-role="tick-telemetry"]');
+  const packInput = root.querySelector('[data-role="tick-pack-input"]');
+  const packLabel = root.querySelector('[data-role="tick-pack-label"]');
 
   function renderSim() {
     if (!sim || !nuc || !liveSchem) return;
@@ -2266,8 +2274,29 @@ async function mountTickStudio(root, ensureModelViewer) {
     void initCircuit();
   });
 
+  const onPackUpdated = (name) => {
+    packLabel.textContent = `Pack: ${name.slice(0, 18)}`;
+    renderSim();
+  };
+  packListeners.add(onPackUpdated);
+
+  packInput.addEventListener("change", async () => {
+    const file = packInput.files?.[0];
+    if (!file) return;
+    try {
+      if (!nuc) nuc = await loadNucleation();
+      statusEl.textContent = "Loading resource pack...";
+      statusEl.hidden = false;
+      await loadCustomPackFile(nuc, file);
+    } catch (err) {
+      statusEl.hidden = true;
+      telemetryEl.textContent = `Pack error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  });
+
   void initCircuit();
   return () => {
+    packListeners.delete(onPackUpdated);
     if (currentUrl) URL.revokeObjectURL(currentUrl);
     root.dataset.mounted = "false";
   };

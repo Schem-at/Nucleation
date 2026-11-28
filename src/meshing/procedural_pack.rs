@@ -162,22 +162,6 @@ fn add_cross_plant(pack: &mut ResourcePackSource, name: &str, pixels: Vec<u8>) {
     let _ = pack.add_texture(&tex, 16, 16, pixels);
 }
 
-fn add_flat_plate(
-    pack: &mut ResourcePackSource,
-    model_name: &str,
-    height: u32,
-    inset: u32,
-    pixels: Vec<u8>,
-) {
-    let tex = format!("minecraft:block/{model_name}");
-    let hi = 16 - inset;
-    let model = format!(
-        r##"{{"textures":{{"all":"{tex}"}},"elements":[{{"from":[{inset},0,{inset}],"to":[{hi},{height},{hi}],"faces":{{"down":{{"texture":"#all"}},"up":{{"texture":"#all"}},"north":{{"texture":"#all"}},"south":{{"texture":"#all"}},"west":{{"texture":"#all"}},"east":{{"texture":"#all"}}}}}}]}}"##
-    );
-    let _ = pack.add_model_json(&tex, &model);
-    let _ = pack.add_texture(&tex, 16, 16, pixels);
-}
-
 /// Build the built-in procedural Minecraft block resource pack.
 pub(crate) fn build_builtin_procedural_pack() -> ResourcePackSource {
     let mut pack = ResourcePackSource::from_resource_pack(ResourcePack::new());
@@ -312,7 +296,26 @@ pub(crate) fn build_builtin_procedural_pack() -> ResourcePackSource {
     add_cube_all(&mut pack, "sand", sand_px);
 
     add_cube_all(&mut pack, "stone", solid_speckle([130.0, 132.0, 134.0], 14.0, 101));
-    add_cube_all(&mut pack, "smooth_stone", solid_speckle([162.0, 164.0, 166.0], 8.0, 100));
+    add_cube_all(
+        &mut pack,
+        "smooth_stone",
+        make_tex(|x, y| {
+            let n = (tex_hash(x, y, 100) - 0.5) * 7.0;
+            let outer = x == 0 || y == 0 || x == 15 || y == 15;
+            let inner_hi = x == 1 || y == 1;
+            let inner_lo = x == 14 || y == 14;
+            let base = if outer {
+                138.0
+            } else if inner_hi {
+                172.0
+            } else if inner_lo {
+                150.0
+            } else {
+                160.0
+            };
+            [base + n, base + 1.0 + n, base + 3.0 + n, 255.0]
+        }),
+    );
     add_cube_all(&mut pack, "andesite", solid_speckle([144.0, 146.0, 144.0], 18.0, 102));
     add_cube_all(&mut pack, "diorite", solid_speckle([196.0, 196.0, 198.0], 26.0, 99));
     add_cube_all(&mut pack, "granite", solid_speckle([152.0, 108.0, 92.0], 20.0, 98));
@@ -426,21 +429,38 @@ pub(crate) fn build_builtin_procedural_pack() -> ResourcePackSource {
         }),
     );
 
-    // 5. Redstone components with powered/lit state variants (for tick-sim / redstone viewers!)
+    // 5. Authentic multi-element 3D Redstone components (for tick-sim & redstone viewers)
+    // 5a. Redstone lamp (dark lattice frame + warm amber / radiant golden glass panes)
     let lamp_off = make_tex(|x, y| {
-        let grid = x == 0 || y == 0 || x == 15 || y == 15 || (x + y) % 8 == 0 || (x + 16 - y) % 8 == 0;
-        if grid {
-            [62.0, 38.0, 24.0, 255.0]
+        let border = x == 0 || y == 0 || x == 15 || y == 15;
+        let lattice = (x + y) == 7 || (x + y) == 8 || (x + y) == 23 || (x + y) == 22
+            || x.abs_diff(y) == 8 || (x == 7 && y == 7) || (x == 8 && y == 8);
+        let n = (tex_hash(x, y, 145) - 0.5) * 10.0;
+        if border {
+            [56.0 + n * 0.5, 34.0 + n * 0.4, 20.0 + n * 0.3, 255.0]
+        } else if lattice {
+            [72.0 + n * 0.5, 44.0 + n * 0.4, 26.0 + n * 0.3, 255.0]
         } else {
-            [118.0, 74.0, 46.0, 255.0]
+            let cx = (x as f32 - 7.5).abs();
+            let cy = (y as f32 - 7.5).abs();
+            let glow = (1.0 - (cx.max(cy) / 8.0)) * 22.0;
+            [116.0 + glow + n, 76.0 + glow * 0.7 + n, 44.0 + glow * 0.4 + n, 255.0]
         }
     });
     let lamp_on = make_tex(|x, y| {
-        let grid = x == 0 || y == 0 || x == 15 || y == 15 || (x + y) % 8 == 0 || (x + 16 - y) % 8 == 0;
-        if grid {
-            [196.0, 128.0, 54.0, 255.0]
+        let border = x == 0 || y == 0 || x == 15 || y == 15;
+        let lattice = (x + y) == 7 || (x + y) == 8 || (x + y) == 23 || (x + y) == 22
+            || x.abs_diff(y) == 8;
+        let n = (tex_hash(x, y, 146) - 0.5) * 8.0;
+        if border {
+            [156.0 + n, 96.0 + n * 0.7, 42.0 + n * 0.4, 255.0]
+        } else if lattice {
+            [194.0 + n, 128.0 + n * 0.7, 58.0 + n * 0.5, 255.0]
         } else {
-            [255.0, 224.0, 126.0, 255.0]
+            let cx = (x as f32 - 7.5).abs();
+            let cy = (y as f32 - 7.5).abs();
+            let bloom = (1.0 - (cx * cx + cy * cy).sqrt() / 11.0).max(0.0) * 32.0;
+            [248.0 + bloom * 0.3, 212.0 + bloom * 0.9, 124.0 + bloom * 1.4, 255.0]
         }
     });
     let _ = pack.add_model_json(
@@ -455,97 +475,293 @@ pub(crate) fn build_builtin_procedural_pack() -> ResourcePackSource {
     let _ = pack.add_texture("minecraft:block/redstone_lamp_on", 16, 16, lamp_on);
     let _ = pack.add_blockstate_json(
         "minecraft:redstone_lamp",
-        r#"{"variants":{"lit=false":{"model":"minecraft:block/redstone_lamp"},"lit=true":{"model":"minecraft:block/redstone_lamp_on"}}}"#,
+        r##"{"variants":{"lit=false":{"model":"minecraft:block/redstone_lamp"},"lit=true":{"model":"minecraft:block/redstone_lamp_on"}}}"##,
     );
 
-    // Redstone wire (flat cross strip, dark crimson when power=0, bright glowing red when powered)
-    add_flat_plate(
-        &mut pack,
-        "redstone_wire_off",
-        1,
-        2,
-        make_tex(|x, y| {
-            let line = (6..=9).contains(&x) || (6..=9).contains(&y);
-            if line { [88.0, 14.0, 14.0, 255.0] } else { [0.0, 0.0, 0.0, 0.0] }
-        }),
-    );
-    add_flat_plate(
-        &mut pack,
-        "redstone_wire_on",
-        1,
-        2,
-        make_tex(|x, y| {
-            let line = (6..=9).contains(&x) || (6..=9).contains(&y);
-            if line { [252.0, 36.0, 24.0, 255.0] } else { [0.0, 0.0, 0.0, 0.0] }
-        }),
-    );
-    {
-        let mut variants = Vec::with_capacity(16);
-        for p in 0..=15 {
-            let m = if p == 0 {
-                "minecraft:block/redstone_wire_off"
-            } else {
-                "minecraft:block/redstone_wire_on"
-            };
-            variants.push(format!(r#""power={p}":{{"model":"{m}"}}"#));
+    // Shared redstone torch head & stick textures
+    let rs_wood = solid_speckle([132.0, 98.0, 62.0], 10.0, 160);
+    let rs_head_off = solid_speckle([98.0, 22.0, 18.0], 8.0, 161);
+    let rs_head_on = make_tex(|x, y| {
+        let hot = (5..=10).contains(&x) && (5..=10).contains(&y);
+        if hot { [255.0, 210.0, 96.0, 255.0] } else { [252.0, 48.0, 28.0, 255.0] }
+    });
+    let _ = pack.add_texture("minecraft:block/rs_wood", 16, 16, rs_wood);
+    let _ = pack.add_texture("minecraft:block/rs_head_off", 16, 16, rs_head_off);
+    let _ = pack.add_texture("minecraft:block/rs_head_on", 16, 16, rs_head_on);
+
+    // 5b. Redstone wire: true Minecraft multipart directional dust (straight lines stay straight!)
+    let dust_tiers: [(&str, [f32; 3], bool); 4] = [
+        ("t0", [84.0, 12.0, 12.0], false),
+        ("t1", [158.0, 18.0, 14.0], false),
+        ("t2", [218.0, 26.0, 18.0], false),
+        ("t3", [255.0, 42.0, 24.0], true),
+    ];
+    for (tag, rgb, sparks) in dust_tiers {
+        let tex_name = format!("minecraft:block/rs_dust_{tag}");
+        let px = make_tex(|x, y| {
+            let n = (tex_hash(x, y, 170) - 0.5) * 26.0;
+            if sparks && tex_hash(x, y, 171) > 0.86 {
+                return [255.0, 168.0, 64.0, 255.0];
+            }
+            [rgb[0] + n, rgb[1] + n * 0.4, rgb[2] + n * 0.4, 255.0]
+        });
+        let _ = pack.add_texture(&tex_name, 16, 16, px);
+        let parts: [(&str, [f32; 3], [f32; 3]); 5] = [
+            ("dot", [6.0, 0.0, 6.0], [10.0, 0.6, 10.0]),
+            ("n", [6.5, 0.0, 0.0], [9.5, 0.6, 6.5]),
+            ("s", [6.5, 0.0, 9.5], [9.5, 0.6, 16.0]),
+            ("w", [0.0, 0.0, 6.5], [6.5, 0.6, 9.5]),
+            ("e", [9.5, 0.0, 6.5], [16.0, 0.6, 9.5]),
+        ];
+        for (pname, f, t) in parts {
+            let mname = format!("minecraft:block/rs_wire_{pname}_{tag}");
+            let mjson = format!(
+                r##"{{"textures":{{"d":"{tex_name}"}},"elements":[{{"from":[{},{},{}],"to":[{},{},{}],"shade":false,"faces":{{"up":{{"texture":"#d"}},"north":{{"texture":"#d"}},"south":{{"texture":"#d"}},"west":{{"texture":"#d"}},"east":{{"texture":"#d"}}}}}}]}}"##,
+                f[0], f[1], f[2], t[0], t[1], t[2]
+            );
+            let _ = pack.add_model_json(&mname, &mjson);
         }
-        let bs = format!(r#"{{"variants":{{{}}}}}"#, variants.join(","));
+    }
+    {
+        let mut mp = Vec::new();
+        let tier_powers: [(&str, &str); 4] = [
+            ("t0", "0"),
+            ("t1", "1|2|3|4|5"),
+            ("t2", "6|7|8|9|10|11"),
+            ("t3", "12|13|14|15"),
+        ];
+        for (tag, pvals) in tier_powers {
+            mp.push(format!(
+                r##"{{"when":{{"power":"{pvals}"}},"apply":{{"model":"minecraft:block/rs_wire_dot_{tag}"}}}}"##
+            ));
+            for (dir, pshort) in [("north", "n"), ("south", "s"), ("west", "w"), ("east", "e")] {
+                mp.push(format!(
+                    r##"{{"when":{{"{dir}":"side|up","power":"{pvals}"}},"apply":{{"model":"minecraft:block/rs_wire_{pshort}_{tag}"}}}}"##
+                ));
+            }
+        }
+        let bs = format!(r##"{{"multipart":[{}]}}"##, mp.join(","));
         let _ = pack.add_blockstate_json("minecraft:redstone_wire", &bs);
     }
 
-    // Repeater (flat slab with directional arrow + lit indicator)
-    add_flat_plate(
-        &mut pack,
-        "repeater_off",
-        2,
-        0,
-        make_tex(|x, y| {
-            let torch = (x >= 6 && x <= 9) && (y == 4 || y == 5 || y == 11 || y == 12);
-            if torch { [96.0, 20.0, 20.0, 255.0] } else { [156.0, 158.0, 160.0, 255.0] }
-        }),
-    );
-    add_flat_plate(
-        &mut pack,
-        "repeater_on",
-        2,
-        0,
-        make_tex(|x, y| {
-            let torch = (x >= 6 && x <= 9) && (y == 4 || y == 5 || y == 11 || y == 12);
-            if torch { [255.0, 54.0, 34.0, 255.0] } else { [164.0, 166.0, 168.0, 255.0] }
-        }),
-    );
-    let _ = pack.add_blockstate_json(
-        "minecraft:repeater",
-        r#"{"variants":{"powered=false":{"model":"minecraft:block/repeater_off"},"powered=true":{"model":"minecraft:block/repeater_on"}}}"#,
-    );
+    // 5c. Repeater: 3D stone slab with directional arrow + 2 genuine 3D redstone torch pegs!
+    let rep_side = make_tex(|x, y| {
+        let n = (tex_hash(x, y, 175) - 0.5) * 10.0;
+        let b = if y < 2 { 134.0 } else { 118.0 };
+        [b + n, b + 1.0 + n, b + 3.0 + n, 255.0]
+    });
+    let _ = pack.add_texture("minecraft:block/repeater_side", 16, 16, rep_side);
+    for (suffix, lit) in [("off", false), ("on", true)] {
+        let top_px = make_tex(|x, y| {
+            let n = (tex_hash(x, y, 176) - 0.5) * 8.0;
+            let border = x == 0 || y == 0 || x == 15 || y == 15;
+            let track = (x == 7 || x == 8) && (5..=13).contains(&y);
+            // Directional arrow pointing North (toward y = 1)
+            let dx = (x as i32 - 7).abs().min((x as i32 - 8).abs());
+            let arrow = (2..=6).contains(&y) && dx <= (y as i32 - 2);
+            if border {
+                [108.0 + n, 110.0 + n, 114.0 + n, 255.0]
+            } else if track {
+                if lit { [212.0, 38.0, 26.0, 255.0] } else { [82.0, 74.0, 74.0, 255.0] }
+            } else if arrow {
+                if lit { [228.0, 56.0, 36.0, 255.0] } else { [122.0, 124.0, 128.0, 255.0] }
+            } else {
+                [162.0 + n, 164.0 + n, 167.0 + n, 255.0]
+            }
+        });
+        let top_tex = format!("minecraft:block/repeater_top_{suffix}");
+        let _ = pack.add_texture(&top_tex, 16, 16, top_px);
+        let head_tex = if lit {
+            "minecraft:block/rs_head_on"
+        } else {
+            "minecraft:block/rs_head_off"
+        };
+        for delay in 1..=4u32 {
+            let z2 = 4 + delay * 2; // 6, 8, 10, 12
+            let model_name = format!("minecraft:block/repeater_{delay}tick_{suffix}");
+            let model_json = format!(
+                r##"{{"textures":{{"top":"{top_tex}","side":"minecraft:block/repeater_side","wood":"minecraft:block/rs_wood","head":"{head_tex}"}},"elements":[{{"from":[0,0,0],"to":[16,2,16],"faces":{{"down":{{"texture":"#side","cullface":"down"}},"up":{{"texture":"#top"}},"north":{{"texture":"#side"}},"south":{{"texture":"#side"}},"west":{{"texture":"#side"}},"east":{{"texture":"#side"}}}}}},{{"from":[7,2,2],"to":[9,5,4],"faces":{{"north":{{"texture":"#wood"}},"south":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}},{{"from":[7,5,2],"to":[9,7,4],"faces":{{"up":{{"texture":"#head"}},"north":{{"texture":"#head"}},"south":{{"texture":"#head"}},"west":{{"texture":"#head"}},"east":{{"texture":"#head"}}}}}},{{"from":[7,2,{z2}],"to":[9,5,{}],"faces":{{"north":{{"texture":"#wood"}},"south":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}},{{"from":[7,5,{z2}],"to":[9,7,{}],"faces":{{"up":{{"texture":"#head"}},"north":{{"texture":"#head"}},"south":{{"texture":"#head"}},"west":{{"texture":"#head"}},"east":{{"texture":"#head"}}}}}}]}}"##,
+                z2 + 2,
+                z2 + 2
+            );
+            let _ = pack.add_model_json(&model_name, &model_json);
+        }
+    }
+    {
+        let mut variants = Vec::new();
+        for (facing, rot_y) in [("south", 0), ("west", 90), ("north", 180), ("east", 270)] {
+            for delay in 1..=4 {
+                for (powered, suf) in [("false", "off"), ("true", "on")] {
+                    variants.push(format!(
+                        r##""delay={delay},facing={facing},powered={powered}":{{"model":"minecraft:block/repeater_{delay}tick_{suf}","y":{rot_y}}}"##
+                    ));
+                }
+            }
+        }
+        let bs = format!(r##"{{"variants":{{{}}}}}"##, variants.join(","));
+        let _ = pack.add_blockstate_json("minecraft:repeater", &bs);
+    }
 
-    // Lever (base + handle block, green/red accent for on/off)
-    add_flat_plate(&mut pack, "lever_off", 5, 4, solid_speckle([110.0, 112.0, 116.0], 10.0, 151));
-    add_flat_plate(&mut pack, "lever_on", 5, 4, solid_speckle([238.0, 68.0, 44.0], 10.0, 152));
-    let _ = pack.add_blockstate_json(
-        "minecraft:lever",
-        r#"{"variants":{"powered=false":{"model":"minecraft:block/lever_off"},"powered=true":{"model":"minecraft:block/lever_on"}}}"#,
-    );
+    // 5d. Lever: cobblestone base + angled 3D oak stick handle (-45° off / +45° on)!
+    for (suf, angle, tip_tex) in [
+        ("off", -45.0f32, "minecraft:block/cobblestone"),
+        ("on", 45.0f32, "minecraft:block/rs_head_on"),
+    ] {
+        let model_name = format!("minecraft:block/lever_{suf}");
+        let model_json = format!(
+            r##"{{"textures":{{"base":"minecraft:block/cobblestone","wood":"minecraft:block/rs_wood","tip":"{tip_tex}"}},"elements":[{{"from":[5,0,4],"to":[11,3,12],"faces":{{"down":{{"texture":"#base"}},"up":{{"texture":"#base"}},"north":{{"texture":"#base"}},"south":{{"texture":"#base"}},"west":{{"texture":"#base"}},"east":{{"texture":"#base"}}}}}},{{"from":[7,1,7],"to":[9,10,9],"rotation":{{"origin":[8,1,8],"axis":"x","angle":{angle}}},"faces":{{"up":{{"texture":"#wood"}},"down":{{"texture":"#wood"}},"north":{{"texture":"#wood"}},"south":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}},{{"from":[6.8,9.8,6.8],"to":[9.2,11.6,9.2],"rotation":{{"origin":[8,1,8],"axis":"x","angle":{angle}}},"faces":{{"up":{{"texture":"#tip"}},"down":{{"texture":"#tip"}},"north":{{"texture":"#tip"}},"south":{{"texture":"#tip"}},"west":{{"texture":"#tip"}},"east":{{"texture":"#tip"}}}}}}]}}"##
+        );
+        let _ = pack.add_model_json(&model_name, &model_json);
+    }
+    {
+        let mut variants = Vec::new();
+        for (facing, rot_y) in [("north", 0), ("east", 90), ("south", 180), ("west", 270)] {
+            for (powered, suf) in [("false", "off"), ("true", "on")] {
+                variants.push(format!(
+                    r##""facing={facing},powered={powered}":{{"model":"minecraft:block/lever_{suf}","y":{rot_y}}}"##
+                ));
+            }
+        }
+        let bs = format!(r##"{{"variants":{{{}}}}}"##, variants.join(","));
+        let _ = pack.add_blockstate_json("minecraft:lever", &bs);
+    }
 
-    // Redstone torch (compact pillar, lit vs unlit)
-    add_flat_plate(&mut pack, "redstone_torch_off", 10, 6, solid_speckle([98.0, 64.0, 44.0], 8.0, 153));
-    add_flat_plate(&mut pack, "redstone_torch_on", 10, 6, solid_speckle([255.0, 62.0, 32.0], 12.0, 154));
+    // 5e. Redstone torch (floor + 22.5°-angled wall torch!)
+    for (suf, head_tex) in [
+        ("off", "minecraft:block/rs_head_off"),
+        ("on", "minecraft:block/rs_head_on"),
+    ] {
+        let floor_m = format!(
+            r##"{{"textures":{{"wood":"minecraft:block/rs_wood","head":"{head_tex}"}},"elements":[{{"from":[7,0,7],"to":[9,8,9],"faces":{{"down":{{"texture":"#wood"}},"north":{{"texture":"#wood"}},"south":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}},{{"from":[7,8,7],"to":[9,10,9],"faces":{{"up":{{"texture":"#head"}},"down":{{"texture":"#head"}},"north":{{"texture":"#head"}},"south":{{"texture":"#head"}},"west":{{"texture":"#head"}},"east":{{"texture":"#head"}}}}}}]}}"##
+        );
+        let _ = pack.add_model_json(&format!("minecraft:block/redstone_torch_{suf}"), &floor_m);
+
+        let wall_m = format!(
+            r##"{{"textures":{{"wood":"minecraft:block/rs_wood","head":"{head_tex}"}},"elements":[{{"from":[7,3,12],"to":[9,11,14],"rotation":{{"origin":[8,3,13],"axis":"x","angle":-22.5}},"faces":{{"down":{{"texture":"#wood"}},"north":{{"texture":"#wood"}},"south":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}},{{"from":[7,11,12],"to":[9,13,14],"rotation":{{"origin":[8,3,13],"axis":"x","angle":-22.5}},"faces":{{"up":{{"texture":"#head"}},"down":{{"texture":"#head"}},"north":{{"texture":"#head"}},"south":{{"texture":"#head"}},"west":{{"texture":"#head"}},"east":{{"texture":"#head"}}}}}}]}}"##
+        );
+        let _ = pack.add_model_json(&format!("minecraft:block/redstone_wall_torch_{suf}"), &wall_m);
+    }
     let _ = pack.add_blockstate_json(
         "minecraft:redstone_torch",
-        r#"{"variants":{"lit=false":{"model":"minecraft:block/redstone_torch_off"},"lit=true":{"model":"minecraft:block/redstone_torch_on"}}}"#,
+        r##"{"variants":{"lit=false":{"model":"minecraft:block/redstone_torch_off"},"lit=true":{"model":"minecraft:block/redstone_torch_on"}}}"##,
     );
-    let _ = pack.add_blockstate_json(
-        "minecraft:redstone_wall_torch",
-        r#"{"variants":{"lit=false":{"model":"minecraft:block/redstone_torch_off"},"lit=true":{"model":"minecraft:block/redstone_torch_on"}}}"#,
-    );
+    {
+        let mut variants = Vec::new();
+        for (facing, rot_y) in [("north", 0), ("east", 90), ("south", 180), ("west", 270)] {
+            for (lit, suf) in [("false", "off"), ("true", "on")] {
+                variants.push(format!(
+                    r##""facing={facing},lit={lit}":{{"model":"minecraft:block/redstone_wall_torch_{suf}","y":{rot_y}}}"##
+                ));
+            }
+        }
+        let bs = format!(r##"{{"variants":{{{}}}}}"##, variants.join(","));
+        let _ = pack.add_blockstate_json("minecraft:redstone_wall_torch", &bs);
+    }
 
-    // Stone button
-    add_flat_plate(&mut pack, "stone_button_off", 3, 5, solid_speckle([144.0, 146.0, 150.0], 8.0, 155));
-    add_flat_plate(&mut pack, "stone_button_on", 2, 5, solid_speckle([232.0, 96.0, 48.0], 8.0, 156));
+    // 5f. Stone button (crisp 6x2x4 stone button, depresses to 1px when pressed!)
+    let _ = pack.add_model_json(
+        "minecraft:block/stone_button_off",
+        r##"{"textures":{"all":"minecraft:block/stone"},"elements":[{"from":[5,0,6],"to":[11,2,10],"faces":{"down":{"texture":"#all"},"up":{"texture":"#all"},"north":{"texture":"#all"},"south":{"texture":"#all"},"west":{"texture":"#all"},"east":{"texture":"#all"}}}]}"##,
+    );
+    let _ = pack.add_model_json(
+        "minecraft:block/stone_button_on",
+        r##"{"textures":{"all":"minecraft:block/stone"},"elements":[{"from":[5,0,6],"to":[11,1,10],"faces":{"down":{"texture":"#all"},"up":{"texture":"#all"},"north":{"texture":"#all"},"south":{"texture":"#all"},"west":{"texture":"#all"},"east":{"texture":"#all"}}}]}"##,
+    );
     let _ = pack.add_blockstate_json(
         "minecraft:stone_button",
-        r#"{"variants":{"powered=false":{"model":"minecraft:block/stone_button_off"},"powered=true":{"model":"minecraft:block/stone_button_on"}}}"#,
+        r##"{"variants":{"powered=false":{"model":"minecraft:block/stone_button_off"},"powered=true":{"model":"minecraft:block/stone_button_on"}}}"##,
     );
+
+    // 5g. Sticky piston, regular piston, and 3D T-shaped piston_head!
+    let piston_side = make_tex(|x, y| {
+        let n = (tex_hash(x, y, 180) - 0.5) * 14.0;
+        if y < 4 {
+            // Oak wooden rim near piston face
+            [168.0 + n, 134.0 + n, 84.0 + n, 255.0]
+        } else if y == 4 || y == 5 {
+            // Dark iron band
+            [74.0 + n * 0.5, 76.0 + n * 0.5, 80.0 + n * 0.5, 255.0]
+        } else {
+            // Cobblestone housing
+            [118.0 + n, 120.0 + n, 122.0 + n, 255.0]
+        }
+    });
+    let piston_face_regular = planks_tex([174.0, 140.0, 88.0], [122.0, 92.0, 54.0], 181);
+    let piston_face_sticky = make_tex(|x, y| {
+        let slime = (3..=12).contains(&x) && (3..=12).contains(&y) && tex_hash(x >> 1, y >> 1, 182) > 0.22;
+        let n = (tex_hash(x, y, 183) - 0.5) * 16.0;
+        if slime {
+            [112.0 + n, 194.0 + n, 84.0 + n, 255.0]
+        } else {
+            [168.0 + n, 134.0 + n, 84.0 + n, 255.0]
+        }
+    });
+    let _ = pack.add_texture("minecraft:block/piston_side", 16, 16, piston_side);
+    let _ = pack.add_texture("minecraft:block/piston_top", 16, 16, piston_face_regular);
+    let _ = pack.add_texture("minecraft:block/piston_top_sticky", 16, 16, piston_face_sticky);
+
+    for (kind, face_tex) in [
+        ("piston", "minecraft:block/piston_top"),
+        ("sticky_piston", "minecraft:block/piston_top_sticky"),
+    ] {
+        // Unrotated faces North (-Z)
+        let retracted = format!(
+            r##"{{"textures":{{"face":"{face_tex}","side":"minecraft:block/piston_side","back":"minecraft:block/cobblestone"}},"elements":[{{"from":[0,0,0],"to":[16,16,16],"faces":{{"north":{{"texture":"#face"}},"south":{{"texture":"#back","cullface":"south"}},"up":{{"texture":"#side","cullface":"up"}},"down":{{"texture":"#side","cullface":"down"}},"west":{{"texture":"#side","cullface":"west"}},"east":{{"texture":"#side","cullface":"east"}}}}}}]}}"##
+        );
+        let extended = format!(
+            r##"{{"textures":{{"side":"minecraft:block/piston_side","back":"minecraft:block/cobblestone"}},"elements":[{{"from":[0,0,4],"to":[16,16,16],"faces":{{"north":{{"texture":"#back"}},"south":{{"texture":"#back","cullface":"south"}},"up":{{"texture":"#side"}},"down":{{"texture":"#side"}},"west":{{"texture":"#side"}},"east":{{"texture":"#side"}}}}}}]}}"##
+        );
+        let _ = pack.add_model_json(&format!("minecraft:block/{kind}_retracted"), &retracted);
+        let _ = pack.add_model_json(&format!("minecraft:block/{kind}_extended"), &extended);
+
+        let mut variants = Vec::new();
+        for (facing, rx, ry) in [
+            ("north", 0, 0),
+            ("east", 0, 90),
+            ("south", 0, 180),
+            ("west", 0, 270),
+            ("up", 270, 0),
+            ("down", 90, 0),
+        ] {
+            variants.push(format!(
+                r##""extended=false,facing={facing}":{{"model":"minecraft:block/{kind}_retracted","x":{rx},"y":{ry}}}"##
+            ));
+            variants.push(format!(
+                r##""extended=true,facing={facing}":{{"model":"minecraft:block/{kind}_extended","x":{rx},"y":{ry}}}"##
+            ));
+        }
+        let bs = format!(r##"{{"variants":{{{}}}}}"##, variants.join(","));
+        let _ = pack.add_blockstate_json(&format!("minecraft:{kind}"), &bs);
+    }
+
+    for (kind, face_tex) in [
+        ("normal", "minecraft:block/piston_top"),
+        ("sticky", "minecraft:block/piston_top_sticky"),
+    ] {
+        let head = format!(
+            r##"{{"textures":{{"face":"{face_tex}","wood":"minecraft:block/oak_planks"}},"elements":[{{"from":[0,0,0],"to":[16,16,4],"faces":{{"north":{{"texture":"#face"}},"south":{{"texture":"#wood"}},"up":{{"texture":"#wood"}},"down":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}},{{"from":[6,6,4],"to":[10,10,20],"faces":{{"up":{{"texture":"#wood"}},"down":{{"texture":"#wood"}},"west":{{"texture":"#wood"}},"east":{{"texture":"#wood"}}}}}}]}}"##
+        );
+        let _ = pack.add_model_json(&format!("minecraft:block/piston_head_{kind}"), &head);
+    }
+    {
+        let mut variants = Vec::new();
+        for (facing, rx, ry) in [
+            ("north", 0, 0),
+            ("east", 0, 90),
+            ("south", 0, 180),
+            ("west", 0, 270),
+            ("up", 270, 0),
+            ("down", 90, 0),
+        ] {
+            for kind in ["normal", "sticky"] {
+                variants.push(format!(
+                    r##""facing={facing},type={kind}":{{"model":"minecraft:block/piston_head_{kind}","x":{rx},"y":{ry}}}"##
+                ));
+            }
+        }
+        let bs = format!(r##"{{"variants":{{{}}}}}"##, variants.join(","));
+        let _ = pack.add_blockstate_json("minecraft:piston_head", &bs);
+    }
 
     // 6. Fluids (water & lava)
     let water_px = make_tex(|x, y| {

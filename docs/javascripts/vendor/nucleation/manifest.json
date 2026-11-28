@@ -4,7 +4,7 @@
     "meshing",
     "mc-tick"
   ],
-  "wasmSha256": "eb5b944c9bba4d8e864e173a006f48f5851fbd4ee90ca8ce7c2023a2f41c5543",
+  "wasmSha256": "1b3c2e921fb9b330ee6e6f5df23c3d4f202c851d258fc8a551cccf01f02fd9ad",
   "modules": [
     "BlockPos.mjs",
     "BlockState.mjs",
