@@ -54,12 +54,14 @@ composable type: **`Field`**.
 
 ## Try it live: from one sphere to a full Minecraft scene
 
-Start at **1. Sphere** and step across to **5. Field.expr**. Every
-preset runs the real Nucleation WebAssembly engine directly in your browser —
-building the `Field`, voxelizing it with `VoxelPipeline`, and greedy-meshing it
-with ambient occlusion. Drop any Minecraft resource pack `.zip` (or `client.jar`)
-with **Load pack .zip** to preview with your own exact textures, or export
-**Download `.schem`** to paste straight into Minecraft.
+Start at **1. Sphere** and step across to **5. Field.expr** — try dragging
+**Move sphere (X)** and **Smooth blend (k)** in **2. Carve & blend** to watch
+`smooth_union` pull blocks together like clay. Every preset runs the real
+Nucleation WebAssembly engine directly in your browser and shows the exact
+Python or JavaScript code driving it underneath. Drop any Minecraft resource
+pack `.zip` (or `client.jar`) with **Load pack .zip** to preview with your own
+exact textures, or export **Download `.schem`** to paste straight into
+Minecraft.
 
 <div class="sdf-studio" data-sdf-workbench>
   <noscript>

@@ -451,28 +451,6 @@ const GRADIENT_PALETTE_IDS = JSON.stringify([
   "minecraft:smooth_sandstone",
 ]);
 
-const NETHER_PALETTE_IDS = JSON.stringify([
-  "minecraft:obsidian",
-  "minecraft:blackstone",
-  "minecraft:netherrack",
-  "minecraft:magma_block",
-  "minecraft:orange_concrete",
-  "minecraft:glowstone",
-  "minecraft:gold_block",
-]);
-
-const SHADED_STONE_IDS = JSON.stringify([
-  "minecraft:deepslate_bricks",
-  "minecraft:deepslate",
-  "minecraft:tuff",
-  "minecraft:cobblestone",
-  "minecraft:stone",
-  "minecraft:stone_bricks",
-  "minecraft:andesite",
-  "minecraft:calcite",
-  "minecraft:snow_block",
-]);
-
 function decodeBase64(value) {
   const binary = globalThis.atob(value);
   const out = new Uint8Array(binary.length);
@@ -512,24 +490,45 @@ const WORKBENCH_STEPS = {
     label: "1. Sphere",
     p1: { label: "Radius", min: 4, max: 11, step: 0.5, value: 8.5 },
     p2: { label: "Hollow shell (0 = solid)", min: 0, max: 2.5, step: 0.5, value: 0 },
+    p3: null,
     bounds: [-12, -12, -12, 12, 12, 12],
-    code(p1, p2) {
-      return p2 > 0
-        ? `Field.sphere(${p1}).shell(${p2})  // stone_bricks + mossy_stone_bricks`
-        : `Field.sphere(${p1})  // stone_bricks + mossy_stone_bricks`;
+    code(lang, p1, p2) {
+      if (lang === "js") {
+        const shape =
+          p2 > 0
+            ? `const geom = Field.sphere(${p1})\n  .shell(${p2})\n  .subtract(Field.boxShape(8, 8, 8, 0).translate(7, 5, 7));`
+            : `const geom = Field.sphere(${p1});`;
+        return `${shape}
+const mat = Material.weighted(
+  '["minecraft:stone_bricks","minecraft:mossy_stone_bricks","minecraft:cobblestone"]',
+  [0.62, 0.24, 0.14], 17,
+);
+const schem = VoxelPipeline.create(geom, mat).toSchematic("first_sphere");`;
+      }
+      const shape =
+        p2 > 0
+          ? `geom = (
+    Field.sphere(${p1})
+    .shell(${p2})
+    .subtract(Field.box_shape(8, 8, 8, 0).translate(7, 5, 7))
+)`
+          : `geom = Field.sphere(${p1})`;
+      return `${shape}
+mat = Material.weighted(
+    '["minecraft:stone_bricks","minecraft:mossy_stone_bricks","minecraft:cobblestone"]',
+    [0.62, 0.24, 0.14], 17,
+)
+schem = VoxelPipeline.create(geom, mat).to_schematic("first_sphere")`;
     },
-    build(nuc, p1, p2, matMode) {
+    build(nuc, p1, p2) {
       let geom = nuc.Field.sphere(p1);
       if (p2 > 0) {
         geom = geom.shell(p2).subtract(nuc.Field.boxShape(8, 8, 8, 0).translate(7, 5, 7));
       }
-      const noise = nuc.Field.perlinFbm3(0.18, 7, 3);
-      const mat = buildWorkbenchMaterial(nuc, matMode, noise, () =>
-        nuc.Material.weighted(
-          '["minecraft:stone_bricks","minecraft:mossy_stone_bricks","minecraft:cobblestone"]',
-          [0.62, 0.24, 0.14],
-          17,
-        ),
+      const mat = nuc.Material.weighted(
+        '["minecraft:stone_bricks","minecraft:mossy_stone_bricks","minecraft:cobblestone"]',
+        [0.62, 0.24, 0.14],
+        17,
       );
       return nuc.VoxelPipeline.create(geom, mat).toSchematicBounded("first_sphere", ...this.bounds);
     },
@@ -537,46 +536,72 @@ const WORKBENCH_STEPS = {
 
   arch: {
     label: "2. Carve & blend",
-    p1: { label: "Archway width", min: 2.5, max: 6.0, step: 0.5, value: 4.0 },
-    p2: { label: "Smooth blend (k)", min: 0.2, max: 3.5, step: 0.3, value: 1.4 },
-    bounds: [-12, -8, -12, 12, 13, 12],
-    code(p1, p2) {
-      return `tower.smooth_union(dome.tag(2), ${p2}).subtract(archway(${p1}))`;
+    p1: { label: "Move sphere (X)", min: -8.0, max: 8.0, step: 0.5, value: 3.5 },
+    p2: { label: "Smooth blend (k)", min: 0.0, max: 4.0, step: 0.2, value: 2.2 },
+    p3: { label: "Archway carve", min: 0.0, max: 5.0, step: 0.5, value: 3.5 },
+    bounds: [-14, -8, -12, 14, 13, 12],
+    code(lang, p1, p2, p3) {
+      const k = Number(p2).toFixed(1);
+      const sx = Number(p1).toFixed(1);
+      if (lang === "js") {
+        const combine = p2 > 0.05 ? `tower.smoothUnion(sphere, ${k})` : `tower.unionWith(sphere)`;
+        const carve =
+          p3 > 0.1
+            ? `\nconst arch = Field.cappedCylinder(${p3}, 10).rotate(90, 0, 0).translate(0, -2.5, 0);\nconst geom = ${combine}.subtract(arch);`
+            : `\nconst geom = ${combine};`;
+        return `const tower  = Field.boxShape(6.5, 6.5, 6.5, 0.8).translate(0, -1, 0).tag(1);
+const sphere = Field.sphere(6.0).translate(${sx}, 5.0, 0).tag(2);${carve}
+
+// Smooth seam dithering across tag 1 (stone_bricks) & tag 2 (oxidized_copper)
+const m = MaterialBuilder.createTagMatcher(true, 41);
+m.addTagCase(1, stoneBricksMat);
+m.addTagCase(2, oxidizedCopperMat);
+const schem = VoxelPipeline.create(geom, m.build()).toSchematic("carve_and_blend");`;
+      }
+      const combine = p2 > 0.05 ? `tower.smooth_union(sphere, ${k})` : `tower.union_with(sphere)`;
+      const carve =
+        p3 > 0.1
+          ? `\narch = Field.capped_cylinder(${p3}, 10).rotate(90, 0, 0).translate(0, -2.5, 0)\ngeom = ${combine}.subtract(arch)`
+          : `\ngeom = ${combine}`;
+      return `tower  = Field.box_shape(6.5, 6.5, 6.5, 0.8).translate(0, -1, 0).tag(1)
+sphere = Field.sphere(6.0).translate(${sx}, 5.0, 0).tag(2)${carve}
+
+# Smooth seam dithering across tag 1 (stone_bricks) & tag 2 (oxidized_copper)
+m = MaterialBuilder.create_tag_matcher(True, 41)
+m.add_tag_case(1, stone_bricks_mat)
+m.add_tag_case(2, oxidized_copper_mat)
+schem = VoxelPipeline.create(geom, m.build()).to_schematic("carve_and_blend")`;
     },
-    build(nuc, p1, p2, matMode) {
-      const base = nuc.Field.boxShape(8.5, 6.5, 8.5, 0.8).translate(0, -1, 0).tag(1);
-      const dome = nuc.Field.sphere(7.6).translate(0, 6.0, 0).tag(2);
-      const doorwayX = nuc.Field.cappedCylinder(p1, 11.0).rotate(0, 0, 90).translate(0, -2.5, 0);
-      const doorwayZ = nuc.Field.cappedCylinder(p1, 11.0).rotate(90, 0, 0).translate(0, -2.5, 0);
-      const geom = base
-        .smoothUnion(dome, p2)
-        .subtract(doorwayX)
-        .subtract(doorwayZ);
+    build(nuc, p1, p2, p3) {
+      const tower = nuc.Field.boxShape(6.5, 6.5, 6.5, 0.8).translate(0, -1, 0).tag(1);
+      const sphere = nuc.Field.sphere(6.0).translate(p1, 5.0, 0).tag(2);
+      let geom = p2 > 0.05 ? tower.smoothUnion(sphere, p2) : tower.unionWith(sphere);
+      if (p3 > 0.1) {
+        const doorwayZ = nuc.Field.cappedCylinder(p3, 10.0).rotate(90, 0, 0).translate(0, -2.5, 0);
+        const doorwayX = nuc.Field.cappedCylinder(p3, 10.0).rotate(0, 0, 90).translate(0, -2.5, 0);
+        geom = geom.subtract(doorwayZ).subtract(doorwayX);
+      }
 
-      const noise = nuc.Field.perlinFbm3(0.16, 23, 3);
-      const mat = buildWorkbenchMaterial(nuc, matMode, noise, () => {
-        const m = nuc.MaterialBuilder.createTagMatcher(true, 41);
-        m.addTagCase(
-          1,
-          nuc.Material.weighted(
-            '["minecraft:stone_bricks","minecraft:mossy_stone_bricks","minecraft:stone"]',
-            [0.58, 0.24, 0.18],
-            11,
-          ),
-        );
-        m.addTagCase(
-          2,
-          nuc.Material.weighted(
-            '["minecraft:oxidized_copper","minecraft:weathered_copper","minecraft:prismarine_bricks"]',
-            [0.52, 0.28, 0.20],
-            29,
-          ),
-        );
-        m.setDefault(nuc.Material.solid("minecraft:stone_bricks"));
-        return m.build();
-      });
+      const m = nuc.MaterialBuilder.createTagMatcher(true, 41);
+      m.addTagCase(
+        1,
+        nuc.Material.weighted(
+          '["minecraft:stone_bricks","minecraft:mossy_stone_bricks","minecraft:stone"]',
+          [0.58, 0.24, 0.18],
+          11,
+        ),
+      );
+      m.addTagCase(
+        2,
+        nuc.Material.weighted(
+          '["minecraft:oxidized_copper","minecraft:weathered_copper","minecraft:prismarine_bricks"]',
+          [0.52, 0.28, 0.20],
+          29,
+        ),
+      );
+      m.setDefault(nuc.Material.solid("minecraft:stone_bricks"));
 
-      return nuc.VoxelPipeline.create(geom, mat).toSchematicBounded("carved_arch", ...this.bounds);
+      return nuc.VoxelPipeline.create(geom, m.build()).toSchematicBounded("carve_and_blend", ...this.bounds);
     },
   },
 
@@ -584,18 +609,61 @@ const WORKBENCH_STEPS = {
     label: "3. Island",
     p1: { label: "Terrain roughness", min: 0.5, max: 3.8, step: 0.25, value: 2.0 },
     p2: { label: "Lagoon water level", min: -1, max: 4, step: 1, value: 2 },
+    p3: null,
     bounds: [-14, -8, -14, 14, 14, 14],
-    code(p1, p2) {
-      return `ellipsoid.displace(fbm, ${p1}).subtract(lagoon) + grass/dirt/stone + water(${p2}) + trees`;
+    code(lang, p1, p2) {
+      if (lang === "js") {
+        return `const noise   = Field.perlinFbm3(0.09, 42, 4);
+const lagoon  = Field.sphere(6.2).translate(3.2, 5.8, 2.5);
+const terrain = Field.ellipsoid(13, 6.6, 13)
+  .displace(noise, ${p1}).subtract(lagoon).tag(1);
+const tree = trunk.tag(2).unionWith(crown.tag(3));
+
+// Exposed +Y flat tops -> grass_block; depth 1..2 -> dirt; stone below
+layers.addLayer(
+  MaterialCondition.exposedFace(1, true)
+    .andWith(MaterialCondition.slopeRange(true, 0, true, 0.72)),
+  Material.solid("minecraft:grass_block"),
+);
+layers.addLayer(
+  MaterialCondition.depthBelowSurface(true, 1, true, 2),
+  Material.solid("minecraft:dirt"),
+);
+
+const pipe = VoxelPipeline.create(terrain.unionWith(tree), matcher.build());
+pipe.addFluid(lagoon.intersectionWith(Field.plane(0, 1, 0, ${-p2})), "minecraft:water");
+pipe.addScatter(flora);  // short_grass, poppy, dandelion on grass_block`;
+      }
+      return `noise   = Field.perlin_fbm3(0.09, 42, 4)
+lagoon  = Field.sphere(6.2).translate(3.2, 5.8, 2.5)
+terrain = (
+    Field.ellipsoid(13, 6.6, 13)
+    .displace(noise, ${p1}).subtract(lagoon).tag(1)
+)
+tree = trunk.tag(2).union_with(crown.tag(3))
+
+# Exposed +Y flat tops -> grass_block; depth 1..2 -> dirt; stone below
+layers.add_layer(
+    MaterialCondition.exposed_face(1, True)
+    .and_with(MaterialCondition.slope_range(True, 0, True, 0.72)),
+    Material.solid("minecraft:grass_block"),
+)
+layers.add_layer(
+    MaterialCondition.depth_below_surface(True, 1, True, 2),
+    Material.solid("minecraft:dirt"),
+)
+
+pipe = VoxelPipeline.create(terrain.union_with(tree), matcher.build())
+pipe.add_fluid(lagoon.intersection_with(Field.plane(0, 1, 0, ${-p2})), "minecraft:water")
+pipe.add_scatter(flora)  # short_grass, poppy, dandelion on grass_block`;
     },
-    build(nuc, p1, p2, matMode) {
+    build(nuc, p1, p2) {
       const noise = nuc.Field.perlinFbm3(0.09, 42, 4);
       const crater = nuc.Field.sphere(6.2).translate(3.2, 5.8, 2.5);
       const terrain = nuc.Field.ellipsoid(13, 6.6, 13)
         .displace(noise, p1)
         .subtract(crater)
         .tag(1);
-      // Small Minecraft tree on the high ridge: oak_log trunk (tag 2) + oak_leaves crown (tag 3)
       const trunk = nuc.Field.cappedCylinder(0.95, 3.5).translate(-5.5, 7.2, -3.5).tag(2);
       const crown = nuc.Field.sphere(3.6)
         .displace(nuc.Field.perlinFbm3(0.35, 9, 2), 0.7)
@@ -603,49 +671,44 @@ const WORKBENCH_STEPS = {
         .tag(3);
       const geom = terrain.unionWith(trunk).unionWith(crown);
 
-      const mat = buildWorkbenchMaterial(nuc, matMode, noise, () => {
-        const layers = nuc.MaterialBuilder.createLayered();
-        layers.addLayer(
-          nuc.MaterialCondition.exposedFace(1, true).andWith(
-            nuc.MaterialCondition.slopeRange(true, 0.0, true, 0.72),
-          ),
-          nuc.Material.solid("minecraft:grass_block"),
-        );
-        layers.addLayer(
-          nuc.MaterialCondition.depthBelowSurface(true, 1.0, true, 2.0),
-          nuc.Material.solid("minecraft:dirt"),
-        );
-        layers.setDefault(
-          nuc.Material.channelRamp(
-            nuc.FieldChannel.WorldY,
-            -7.0,
-            6.0,
-            '["minecraft:deepslate","minecraft:tuff","minecraft:stone","minecraft:andesite"]',
-            true,
-          ),
-        );
-        const matcher = nuc.MaterialBuilder.createTagMatcher(false, 73);
-        matcher.addTagCase(1, layers.build());
-        matcher.addTagCase(2, nuc.Material.solid("minecraft:oak_log"));
-        matcher.addTagCase(3, nuc.Material.solid("minecraft:oak_leaves"));
-        matcher.setDefault(nuc.Material.solid("minecraft:stone"));
-        return matcher.build();
-      });
+      const layers = nuc.MaterialBuilder.createLayered();
+      layers.addLayer(
+        nuc.MaterialCondition.exposedFace(1, true).andWith(
+          nuc.MaterialCondition.slopeRange(true, 0.0, true, 0.72),
+        ),
+        nuc.Material.solid("minecraft:grass_block"),
+      );
+      layers.addLayer(
+        nuc.MaterialCondition.depthBelowSurface(true, 1.0, true, 2.0),
+        nuc.Material.solid("minecraft:dirt"),
+      );
+      layers.setDefault(
+        nuc.Material.channelRamp(
+          nuc.FieldChannel.WorldY,
+          -7.0,
+          6.0,
+          '["minecraft:deepslate","minecraft:tuff","minecraft:stone","minecraft:andesite"]',
+          true,
+        ),
+      );
+      const matcher = nuc.MaterialBuilder.createTagMatcher(false, 73);
+      matcher.addTagCase(1, layers.build());
+      matcher.addTagCase(2, nuc.Material.solid("minecraft:oak_log"));
+      matcher.addTagCase(3, nuc.Material.solid("minecraft:oak_leaves"));
+      matcher.setDefault(nuc.Material.solid("minecraft:stone"));
 
-      const pipe = nuc.VoxelPipeline.create(geom, mat);
-      if (matMode === "minecraft") {
-        const lagoonPool = crater.intersectionWith(nuc.Field.plane(0, 1, 0, -p2));
-        pipe.addFluid(lagoonPool, "minecraft:water");
-        const flora = nuc.ScatterRule.create(
-          nuc.ScatterFace.Top,
-          0.32,
-          '["minecraft:short_grass","minecraft:poppy","minecraft:dandelion"]',
-          [0.65, 0.18, 0.17],
-          19,
-        );
-        flora.setOnBlock("minecraft:grass_block");
-        pipe.addScatter(flora);
-      }
+      const pipe = nuc.VoxelPipeline.create(geom, matcher.build());
+      const lagoonPool = crater.intersectionWith(nuc.Field.plane(0, 1, 0, -p2));
+      pipe.addFluid(lagoonPool, "minecraft:water");
+      const flora = nuc.ScatterRule.create(
+        nuc.ScatterFace.Top,
+        0.32,
+        '["minecraft:short_grass","minecraft:poppy","minecraft:dandelion"]',
+        [0.65, 0.18, 0.17],
+        19,
+      );
+      flora.setOnBlock("minecraft:grass_block");
+      pipe.addScatter(flora);
       return pipe.toSchematicBounded("minecraft_island", ...this.bounds);
     },
   },
@@ -654,11 +717,35 @@ const WORKBENCH_STEPS = {
     label: "4. Temple",
     p1: { label: "Columns (repeat_polar)", min: 4, max: 10, step: 1, value: 6 },
     p2: { label: "Chamfer bevel (r)", min: 0.4, max: 2.8, step: 0.2, value: 1.4 },
+    p3: null,
     bounds: [-13, -9, -13, 13, 12, 13],
-    code(p1, p2) {
-      return `plinth.chamfer_union(col.repeat_polar(${p1}), ${p2}).smooth_union(copper_ring, 1.2)`;
+    code(lang, p1, p2) {
+      const cols = Math.round(p1);
+      if (lang === "js") {
+        return `const plinth = Field.cappedCylinder(11.2, 1.5).translate(0, -6.5, 0).tag(1);
+const col    = Field.cappedCylinder(1.4, 7.0)
+  .translate(7.8, 0.5, 0).repeatPolar(${cols}).tag(1);
+const ring   = Field.torus(7.8, 1.8).translate(0, 7.5, 0).tag(2);
+const altar  = Field.octahedron(3.8).translate(0, 0.5, 0).tag(3);
+
+const geom = plinth
+  .chamferUnion(col, ${p2}).smoothUnion(ring, 1.2).unionWith(altar);
+// Tag 1 = sandstone, Tag 2 = oxidized/cut copper, Tag 3 = sea_lantern
+const schem = VoxelPipeline.create(geom, matcher.build()).toSchematic("temple");`;
+      }
+      return `plinth = Field.capped_cylinder(11.2, 1.5).translate(0, -6.5, 0).tag(1)
+col    = (
+    Field.capped_cylinder(1.4, 7.0)
+    .translate(7.8, 0.5, 0).repeat_polar(${cols}).tag(1)
+)
+ring   = Field.torus(7.8, 1.8).translate(0, 7.5, 0).tag(2)
+altar  = Field.octahedron(3.8).translate(0, 0.5, 0).tag(3)
+
+geom = plinth.chamfer_union(col, ${p2}).smooth_union(ring, 1.2).union_with(altar)
+# Tag 1 = sandstone, Tag 2 = oxidized/cut copper, Tag 3 = sea_lantern
+schem = VoxelPipeline.create(geom, matcher.build()).to_schematic("temple")`;
     },
-    build(nuc, p1, p2, matMode) {
+    build(nuc, p1, p2) {
       const plinth = nuc.Field.cappedCylinder(11.2, 1.5).translate(0, -6.5, 0).tag(1);
       const col = nuc.Field.cappedCylinder(1.4, 7.0)
         .translate(7.8, 0.5, 0)
@@ -671,31 +758,27 @@ const WORKBENCH_STEPS = {
         .smoothUnion(ring, 1.2)
         .unionWith(altar);
 
-      const noise = nuc.Field.perlinFbm3(0.14, 17, 3);
-      const mat = buildWorkbenchMaterial(nuc, matMode, noise, () => {
-        const m = nuc.MaterialBuilder.createTagMatcher(true, 11);
-        m.addTagCase(
-          1,
-          nuc.Material.weighted(
-            '["minecraft:sandstone","minecraft:smooth_sandstone","minecraft:stone_bricks"]',
-            [0.50, 0.30, 0.20],
-            31,
-          ),
-        );
-        m.addTagCase(
-          2,
-          nuc.Material.weighted(
-            '["minecraft:oxidized_copper","minecraft:weathered_copper","minecraft:cut_copper"]',
-            [0.54, 0.28, 0.18],
-            53,
-          ),
-        );
-        m.addTagCase(3, nuc.Material.solid("minecraft:sea_lantern"));
-        m.setDefault(nuc.Material.solid("minecraft:sandstone"));
-        return m.build();
-      });
+      const m = nuc.MaterialBuilder.createTagMatcher(true, 11);
+      m.addTagCase(
+        1,
+        nuc.Material.weighted(
+          '["minecraft:sandstone","minecraft:smooth_sandstone","minecraft:stone_bricks"]',
+          [0.50, 0.30, 0.20],
+          31,
+        ),
+      );
+      m.addTagCase(
+        2,
+        nuc.Material.weighted(
+          '["minecraft:oxidized_copper","minecraft:weathered_copper","minecraft:cut_copper"]',
+          [0.54, 0.28, 0.18],
+          53,
+        ),
+      );
+      m.addTagCase(3, nuc.Material.solid("minecraft:sea_lantern"));
+      m.setDefault(nuc.Material.solid("minecraft:sandstone"));
 
-      return nuc.VoxelPipeline.create(geom, mat).toSchematicBounded("temple_colonnade", ...this.bounds);
+      return nuc.VoxelPipeline.create(geom, m.build()).toSchematicBounded("temple_colonnade", ...this.bounds);
     },
   },
 
@@ -703,11 +786,26 @@ const WORKBENCH_STEPS = {
     label: "5. Field.expr",
     p1: { label: "Scale", min: 0.7, max: 1.4, step: 0.05, value: 1.0 },
     p2: { label: "Surface offset", min: -1.5, max: 1.5, step: 0.1, value: 0.0 },
+    p3: null,
     bounds: [-12, -12, -12, 12, 12, 12],
-    code() {
-      return `Field.expr(source)  // edit any formula below and press Run (⌘↵)`;
+    code(lang, p1, p2) {
+      const mods =
+        (Math.abs(p1 - 1.0) > 1e-3 ? `.scale(${p1})` : "") +
+        (Math.abs(p2) > 1e-3 ? (lang === "js" ? `.addConst(${p2})` : `.add_const(${p2})`) : "");
+      if (lang === "js") {
+        return `const b = FieldExprBuilder.create();
+b.setBounds(-12, -12, -12, 12, 12, 12);
+b.setDistanceKind(FieldDistanceKind.Implicit);
+const field = b.compile(source)${mods};
+const schem = VoxelPipeline.create(field, oklabCrystalMat).toSchematic("custom_expr");`;
+      }
+      return `b = FieldExprBuilder.create()
+b.set_bounds(-12, -12, -12, 12, 12, 12)
+b.set_distance_kind(FieldDistanceKind.Implicit)
+field = b.compile(source)${mods}
+schem = VoxelPipeline.create(field, oklab_crystal_mat).to_schematic("custom_expr")`;
     },
-    build(nuc, p1, p2, matMode, customSource) {
+    build(nuc, p1, p2, _p3, customSource) {
       const b = nuc.FieldExprBuilder.create();
       b.setBounds(-12, -12, -12, 12, 12, 12);
       b.setDistanceKind(nuc.FieldDistanceKind.Implicit);
@@ -715,62 +813,30 @@ const WORKBENCH_STEPS = {
       if (Math.abs(p1 - 1.0) > 1e-3) field = field.scale(p1);
       if (Math.abs(p2) > 1e-3) field = field.addConst(p2);
       const colorField = nuc.Field.expr("clamp((length(p) - 2.0) / 10.0, 0.0, 1.0)");
-      const mat = buildWorkbenchMaterial(nuc, matMode, colorField, () => {
-        const pal = nuc.Palette.fromBlockIds(GRADIENT_PALETTE_IDS).dithered();
-        return nuc.Material.fieldGradient(
-          colorField,
-          [0.0, 0.35, 0.72, 1.0],
-          [206, 240, 234, 82, 164, 146, 148, 102, 206, 28, 22, 42],
-          0.0,
-          1.0,
-          pal,
-          nuc.InterpolationSpace.Oklab,
-        );
-      });
+      const pal = nuc.Palette.fromBlockIds(GRADIENT_PALETTE_IDS).dithered();
+      const mat = nuc.Material.fieldGradient(
+        colorField,
+        [0.0, 0.35, 0.72, 1.0],
+        [206, 240, 234, 82, 164, 146, 148, 102, 206, 28, 22, 42],
+        0.0,
+        1.0,
+        pal,
+        nuc.InterpolationSpace.Oklab,
+      );
       return nuc.VoxelPipeline.create(field, mat).toSchematicBounded("custom_expr", ...this.bounds);
     },
   },
 };
-
-function buildWorkbenchMaterial(nuc, mode, scalarField, defaultFactory) {
-  if (mode === "minecraft") return defaultFactory();
-  if (mode === "nether") {
-    const pal = nuc.Palette.fromBlockIds(NETHER_PALETTE_IDS).dithered();
-    return nuc.Material.channelGradient(
-      nuc.FieldChannel.WorldY,
-      [0.0, 0.45, 0.85, 1.0],
-      [24, 18, 40, 112, 46, 46, 224, 92, 24, 246, 208, 68],
-      -10.0,
-      10.0,
-      pal,
-      nuc.InterpolationSpace.Oklab,
-    );
-  }
-  if (mode === "shaded") {
-    const pal = nuc.Palette.fromBlockIds(SHADED_STONE_IDS).dithered();
-    return nuc.Material.shaded(215, 225, 220, 0.55, 0.75, 0.35, 0.16, pal);
-  }
-  // "oklab"
-  const pal = nuc.Palette.fromBlockIds(GRADIENT_PALETTE_IDS).dithered();
-  return nuc.Material.fieldGradient(
-    scalarField,
-    [0.0, 0.5, 1.0],
-    [42, 62, 158, 82, 164, 146, 246, 208, 68],
-    -1.0,
-    1.0,
-    pal,
-    nuc.InterpolationSpace.Oklab,
-  );
-}
 
 async function mountWorkbench(root, ensureModelViewer) {
   if (root.dataset.mounted === "true") return () => {};
   root.dataset.mounted = "true";
 
   let presetKey = "island";
-  let matMode = "minecraft";
+  let codeLang = "py";
   let p1Val = WORKBENCH_STEPS.island.p1.value;
   let p2Val = WORKBENCH_STEPS.island.p2.value;
+  let p3Val = WORKBENCH_STEPS.island.p3 ? WORKBENCH_STEPS.island.p3.value : 0;
   let customExpr = CUSTOM_SNIPPETS[0].expr;
   let currentUrl = null;
   let lastSchematic = null;
@@ -789,12 +855,6 @@ async function mountWorkbench(root, ensureModelViewer) {
               }" data-preset="${k}">${p.label}</button>`,
           )
           .join("")}
-      </div>
-      <div class="sdf-seg" role="radiogroup" aria-label="Block theme" data-role="materials">
-        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="true" data-mat="minecraft">Minecraft</button>
-        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="false" data-mat="nether">Nether</button>
-        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="false" data-mat="shaded">Stone</button>
-        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="false" data-mat="oklab">Oklab</button>
       </div>
     </div>
 
@@ -819,10 +879,8 @@ async function mountWorkbench(root, ensureModelViewer) {
         <div class="sdf-studio__overlay" data-role="status">Loading Nucleation WASM...</div>
       </div>
 
-      <div class="sdf-code-preview" data-role="live-code"></div>
-
       <div class="sdf-studio__controls">
-        <div class="sdf-sliders">
+        <div class="sdf-sliders" data-role="sliders">
           <label class="sdf-slider">
             <span class="sdf-slider__head">
               <span data-role="p1-label">${WORKBENCH_STEPS.island.p1.label}</span>
@@ -836,6 +894,13 @@ async function mountWorkbench(root, ensureModelViewer) {
               <output data-role="p2-val">${p2Val}</output>
             </span>
             <input type="range" data-role="p2-input" min="${WORKBENCH_STEPS.island.p2.min}" max="${WORKBENCH_STEPS.island.p2.max}" step="${WORKBENCH_STEPS.island.p2.step}" value="${p2Val}">
+          </label>
+          <label class="sdf-slider" data-role="p3-wrap" hidden>
+            <span class="sdf-slider__head">
+              <span data-role="p3-label"></span>
+              <output data-role="p3-val">0</output>
+            </span>
+            <input type="range" data-role="p3-input" min="0" max="5" step="0.5" value="0">
           </label>
         </div>
 
@@ -852,6 +917,20 @@ async function mountWorkbench(root, ensureModelViewer) {
           <textarea class="sdf-expr-input" data-role="expr-input" rows="4" spellcheck="false" aria-label="Field.expr source code">${customExpr}</textarea>
           <div class="sdf-expr-error" data-role="expr-error" hidden></div>
         </div>
+      </div>
+
+      <div class="sdf-code-panel">
+        <div class="sdf-code-panel__head">
+          <span class="sdf-code-panel__title">Underlying Nucleation code</span>
+          <div class="sdf-code-panel__actions">
+            <div class="sdf-seg" role="radiogroup" aria-label="Code language" data-role="code-lang">
+              <button type="button" class="sdf-seg__btn" role="radio" aria-checked="true" data-lang="py">Python</button>
+              <button type="button" class="sdf-seg__btn" role="radio" aria-checked="false" data-lang="js">JavaScript</button>
+            </div>
+            <button type="button" class="sdf-copy-btn" data-role="code-copy">Copy</button>
+          </div>
+        </div>
+        <pre class="sdf-code-panel__pre"><code data-role="live-code"></code></pre>
       </div>
     </div>
 
@@ -870,20 +949,30 @@ async function mountWorkbench(root, ensureModelViewer) {
   const viewer = root.querySelector(".sdf-studio__viewer");
   const statusEl = root.querySelector('[data-role="status"]');
   const liveCodeEl = root.querySelector('[data-role="live-code"]');
+  const codeCopyBtn = root.querySelector('[data-role="code-copy"]');
   const telemetryEl = root.querySelector('[data-role="telemetry"]');
   const downloadBtn = root.querySelector('[data-role="download"]');
   const packInput = root.querySelector('[data-role="pack-input"]');
   const packLabel = root.querySelector('[data-role="pack-label"]');
+  const slidersEl = root.querySelector('[data-role="sliders"]');
   const p1Label = root.querySelector('[data-role="p1-label"]');
   const p1ValEl = root.querySelector('[data-role="p1-val"]');
   const p1Input = root.querySelector('[data-role="p1-input"]');
   const p2Label = root.querySelector('[data-role="p2-label"]');
   const p2ValEl = root.querySelector('[data-role="p2-val"]');
   const p2Input = root.querySelector('[data-role="p2-input"]');
+  const p3Wrap = root.querySelector('[data-role="p3-wrap"]');
+  const p3Label = root.querySelector('[data-role="p3-label"]');
+  const p3ValEl = root.querySelector('[data-role="p3-val"]');
+  const p3Input = root.querySelector('[data-role="p3-input"]');
   const exprPane = root.querySelector('[data-role="expr-pane"]');
   const exprInput = root.querySelector('[data-role="expr-input"]');
   const exprError = root.querySelector('[data-role="expr-error"]');
   const exprRun = root.querySelector('[data-role="expr-run"]');
+
+  function updateCode() {
+    liveCodeEl.textContent = WORKBENCH_STEPS[presetKey].code(codeLang, p1Val, p2Val, p3Val);
+  }
 
   function syncSliderConfig() {
     const preset = WORKBENCH_STEPS[presetKey];
@@ -901,8 +990,22 @@ async function mountWorkbench(root, ensureModelViewer) {
     p2Input.value = String(p2Val);
     p2ValEl.textContent = String(p2Val);
 
+    if (preset.p3) {
+      p3Wrap.hidden = false;
+      slidersEl.classList.add("sdf-sliders--3");
+      p3Label.textContent = preset.p3.label;
+      p3Input.min = String(preset.p3.min);
+      p3Input.max = String(preset.p3.max);
+      p3Input.step = String(preset.p3.step);
+      p3Input.value = String(p3Val);
+      p3ValEl.textContent = String(p3Val);
+    } else {
+      p3Wrap.hidden = true;
+      slidersEl.classList.remove("sdf-sliders--3");
+    }
+
     exprPane.hidden = presetKey !== "custom";
-    liveCodeEl.textContent = preset.code(p1Val, p2Val);
+    updateCode();
   }
 
   async function rebuild() {
@@ -910,7 +1013,7 @@ async function mountWorkbench(root, ensureModelViewer) {
     statusEl.textContent = "Voxelizing in WASM...";
     statusEl.hidden = false;
     exprError.hidden = true;
-    liveCodeEl.textContent = WORKBENCH_STEPS[presetKey].code(p1Val, p2Val);
+    updateCode();
 
     try {
       if (!nuc) {
@@ -920,7 +1023,7 @@ async function mountWorkbench(root, ensureModelViewer) {
       if (seq !== buildSeq) return;
 
       const t0 = performance.now();
-      const schem = WORKBENCH_STEPS[presetKey].build(nuc, p1Val, p2Val, matMode, customExpr);
+      const schem = WORKBENCH_STEPS[presetKey].build(nuc, p1Val, p2Val, p3Val, customExpr);
       const tVox = performance.now();
 
       const cfg = nuc.MeshConfig.create();
@@ -989,34 +1092,55 @@ async function mountWorkbench(root, ensureModelViewer) {
     for (const el of root.querySelectorAll("[data-preset]")) {
       el.setAttribute("aria-checked", String(el === btn));
     }
-    p1Val = WORKBENCH_STEPS[presetKey].p1.value;
-    p2Val = WORKBENCH_STEPS[presetKey].p2.value;
+    const step = WORKBENCH_STEPS[presetKey];
+    p1Val = step.p1.value;
+    p2Val = step.p2.value;
+    p3Val = step.p3 ? step.p3.value : 0;
     syncSliderConfig();
     scheduleRebuild(0);
   });
 
-  root.querySelector('[data-role="materials"]').addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-mat]");
+  root.querySelector('[data-role="code-lang"]').addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-lang]");
     if (!btn) return;
-    matMode = btn.dataset.mat;
-    for (const el of root.querySelectorAll("[data-mat]")) {
+    codeLang = btn.dataset.lang;
+    for (const el of root.querySelectorAll("[data-lang]")) {
       el.setAttribute("aria-checked", String(el === btn));
     }
-    scheduleRebuild(0);
+    updateCode();
+  });
+
+  codeCopyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(liveCodeEl.textContent || "");
+      codeCopyBtn.textContent = "Copied";
+      setTimeout(() => {
+        codeCopyBtn.textContent = "Copy";
+      }, 1400);
+    } catch {
+      codeCopyBtn.textContent = "Copy";
+    }
   });
 
   p1Input.addEventListener("input", () => {
     p1Val = Number(p1Input.value);
     p1ValEl.textContent = String(p1Val);
-    liveCodeEl.textContent = WORKBENCH_STEPS[presetKey].code(p1Val, p2Val);
-    scheduleRebuild(75);
+    updateCode();
+    scheduleRebuild(65);
   });
 
   p2Input.addEventListener("input", () => {
     p2Val = Number(p2Input.value);
     p2ValEl.textContent = String(p2Val);
-    liveCodeEl.textContent = WORKBENCH_STEPS[presetKey].code(p1Val, p2Val);
-    scheduleRebuild(75);
+    updateCode();
+    scheduleRebuild(65);
+  });
+
+  p3Input.addEventListener("input", () => {
+    p3Val = Number(p3Input.value);
+    p3ValEl.textContent = String(p3Val);
+    updateCode();
+    scheduleRebuild(65);
   });
 
   exprPane.addEventListener("click", (e) => {
