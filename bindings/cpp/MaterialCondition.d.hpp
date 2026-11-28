@@ -57,6 +57,61 @@ public:
 
   inline static std::unique_ptr<MaterialCondition> exposed_face(uint8_t mask, bool require_all);
 
+  /**
+   * True when the voxel's top (`+Y`) face is exposed to air (`face_mask::TOP`).
+   */
+  inline static std::unique_ptr<MaterialCondition> exposed_top();
+
+  /**
+   * True when the voxel's bottom (`-Y`) face is exposed to air (`face_mask::BOTTOM`).
+   */
+  inline static std::unique_ptr<MaterialCondition> exposed_bottom();
+
+  /**
+   * True when any horizontal side face (`±X` or `±Z`) is exposed to air.
+   */
+  inline static std::unique_ptr<MaterialCondition> exposed_side();
+
+  /**
+   * True when any face of the voxel is exposed to air.
+   */
+  inline static std::unique_ptr<MaterialCondition> exposed_any();
+
+  /**
+   * True when all six neighbor voxels are solid (completely interior).
+   */
+  inline static std::unique_ptr<MaterialCondition> interior();
+
+  /**
+   * True when world `y >= min_y`.
+   */
+  inline static diplomat::result<std::unique_ptr<MaterialCondition>, NucleationError> y_above(float min_y);
+
+  /**
+   * True when world `y <= max_y`.
+   */
+  inline static diplomat::result<std::unique_ptr<MaterialCondition>, NucleationError> y_below(float max_y);
+
+  /**
+   * True when world `min_y <= y <= max_y`.
+   */
+  inline static diplomat::result<std::unique_ptr<MaterialCondition>, NucleationError> y_between(float min_y, float max_y);
+
+  /**
+   * True when surface slope (`1 - normal.y`) is `<= max_slope` (flatter than threshold).
+   */
+  inline static diplomat::result<std::unique_ptr<MaterialCondition>, NucleationError> slope_below(float max_slope);
+
+  /**
+   * True when surface slope (`1 - normal.y`) is `>= min_slope` (steeper than threshold).
+   */
+  inline static diplomat::result<std::unique_ptr<MaterialCondition>, NucleationError> slope_above(float min_slope);
+
+  /**
+   * True when column depth below the exposed surface is in `[min_depth, max_depth]`.
+   */
+  inline static std::unique_ptr<MaterialCondition> depth_between(int32_t min_depth, int32_t max_depth);
+
   inline static diplomat::result<std::unique_ptr<MaterialCondition>, NucleationError> chance(float probability, int32_t seed);
 
     inline const diplomat::capi::MaterialCondition* AsFFI() const;

@@ -203,7 +203,60 @@ pub mod ffi {
             Box::new(Field(crate::sdf::Field::z()))
         }
 
-        // ── Primitives ────────────────────────────────────────────────────
+        // ── Primitives & Grids ────────────────────────────────────────────
+
+        /// Convert any existing Minecraft schematic into a smooth, composable
+        /// 3D signed distance field via exact 3D Euclidean Distance Transform.
+        pub fn from_schematic(
+            schematic: &Schematic,
+            pad: u32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::from_schematic(&schematic.0, pad))
+        }
+
+        /// Convert binary glTF (`.glb`) bytes into a composable 3D signed
+        /// distance field fitted to `max_dim` blocks along its longest axis.
+        pub fn from_glb_bytes(
+            bytes: &[u8],
+            max_dim: u32,
+            pad: u32,
+        ) -> Result<Box<Field>, NucleationError> {
+            #[cfg(feature = "voxelize")]
+            {
+                wrap(crate::sdf::Field::from_glb_bytes(bytes, max_dim, pad))
+            }
+            #[cfg(not(feature = "voxelize"))]
+            {
+                let _ = (bytes, max_dim, pad);
+                crate::bridge::set_last_error_detail(
+                    "Field::from_glb_bytes requires the `voxelize` feature",
+                );
+                Err(NucleationError::InvalidArgument)
+            }
+        }
+
+        /// Convert a Wavefront `.obj` string into a composable 3D signed
+        /// distance field fitted to `max_dim` blocks along its longest axis.
+        pub fn from_obj_str(
+            obj_text: &DiplomatStr,
+            max_dim: u32,
+            pad: u32,
+        ) -> Result<Box<Field>, NucleationError> {
+            #[cfg(feature = "voxelize")]
+            {
+                let text =
+                    std::str::from_utf8(obj_text).map_err(|_| NucleationError::InvalidArgument)?;
+                wrap(crate::sdf::Field::from_obj_str(text, max_dim, pad))
+            }
+            #[cfg(not(feature = "voxelize"))]
+            {
+                let _ = (obj_text, max_dim, pad);
+                crate::bridge::set_last_error_detail(
+                    "Field::from_obj_str requires the `voxelize` feature",
+                );
+                Err(NucleationError::InvalidArgument)
+            }
+        }
 
         pub fn sphere(radius: f32) -> Result<Box<Field>, NucleationError> {
             wrap(crate::sdf::Field::sphere(radius))
@@ -1110,6 +1163,97 @@ pub mod ffi {
                 mask,
                 require_all,
             )))
+        }
+
+        /// True when the voxel's top (`+Y`) face is exposed to air (`face_mask::TOP`).
+        pub fn exposed_top() -> Box<MaterialCondition> {
+            Box::new(MaterialCondition(crate::sdf::Condition::exposed_face(
+                crate::sdf::face_mask::TOP,
+                true,
+            )))
+        }
+
+        /// True when the voxel's bottom (`-Y`) face is exposed to air (`face_mask::BOTTOM`).
+        pub fn exposed_bottom() -> Box<MaterialCondition> {
+            Box::new(MaterialCondition(crate::sdf::Condition::exposed_face(
+                crate::sdf::face_mask::BOTTOM,
+                true,
+            )))
+        }
+
+        /// True when any horizontal side face (`±X` or `±Z`) is exposed to air.
+        pub fn exposed_side() -> Box<MaterialCondition> {
+            Box::new(MaterialCondition(crate::sdf::Condition::exposed_face(
+                crate::sdf::face_mask::SIDE,
+                false,
+            )))
+        }
+
+        /// True when any face of the voxel is exposed to air.
+        pub fn exposed_any() -> Box<MaterialCondition> {
+            Box::new(MaterialCondition(crate::sdf::Condition::exposed_face(
+                crate::sdf::face_mask::ANY,
+                false,
+            )))
+        }
+
+        /// True when all six neighbor voxels are solid (completely interior).
+        pub fn interior() -> Box<MaterialCondition> {
+            Box::new(MaterialCondition(crate::sdf::Condition::exposed_face(
+                crate::sdf::face_mask::INTERIOR,
+                true,
+            )))
+        }
+
+        /// True when world `y >= min_y`.
+        pub fn y_above(min_y: f32) -> Result<Box<MaterialCondition>, NucleationError> {
+            let lo = opt_finite(true, min_y)?;
+            Ok(Box::new(MaterialCondition(crate::sdf::Condition::y_range(
+                lo, None,
+            ))))
+        }
+
+        /// True when world `y <= max_y`.
+        pub fn y_below(max_y: f32) -> Result<Box<MaterialCondition>, NucleationError> {
+            let hi = opt_finite(true, max_y)?;
+            Ok(Box::new(MaterialCondition(crate::sdf::Condition::y_range(
+                None, hi,
+            ))))
+        }
+
+        /// True when world `min_y <= y <= max_y`.
+        pub fn y_between(
+            min_y: f32,
+            max_y: f32,
+        ) -> Result<Box<MaterialCondition>, NucleationError> {
+            let lo = opt_finite(true, min_y)?;
+            let hi = opt_finite(true, max_y)?;
+            Ok(Box::new(MaterialCondition(crate::sdf::Condition::y_range(
+                lo, hi,
+            ))))
+        }
+
+        /// True when surface slope (`1 - normal.y`) is `<= max_slope` (flatter than threshold).
+        pub fn slope_below(max_slope: f32) -> Result<Box<MaterialCondition>, NucleationError> {
+            let hi = opt_finite(true, max_slope)?;
+            Ok(Box::new(MaterialCondition(
+                crate::sdf::Condition::slope_range(Some(0.0), hi),
+            )))
+        }
+
+        /// True when surface slope (`1 - normal.y`) is `>= min_slope` (steeper than threshold).
+        pub fn slope_above(min_slope: f32) -> Result<Box<MaterialCondition>, NucleationError> {
+            let lo = opt_finite(true, min_slope)?;
+            Ok(Box::new(MaterialCondition(
+                crate::sdf::Condition::slope_range(lo, None),
+            )))
+        }
+
+        /// True when column depth below the exposed surface is in `[min_depth, max_depth]`.
+        pub fn depth_between(min_depth: i32, max_depth: i32) -> Box<MaterialCondition> {
+            Box::new(MaterialCondition(
+                crate::sdf::Condition::depth_below_surface(Some(min_depth), Some(max_depth)),
+            ))
         }
 
         pub fn chance(probability: f32, seed: i32) -> Result<Box<MaterialCondition>, NucleationError> {

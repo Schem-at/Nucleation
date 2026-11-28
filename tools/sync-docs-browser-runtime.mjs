@@ -32,10 +32,13 @@ const entries = [
   "MeshConfig.mjs",
   "MeshResult.mjs",
   "Palette.mjs",
+  "PaletteBuilder.mjs",
   "ResourcePack.mjs",
   "ScatterFace.mjs",
   "ScatterRule.mjs",
   "Schematic.mjs",
+  "TickSettleMode.mjs",
+  "TickSimulation.mjs",
   "VoxelPipeline.mjs",
   "WorldChunkView.mjs",
   "WorldGenerator.mjs",
@@ -65,7 +68,7 @@ await writeFile(
   resolve(target, "manifest.json"),
   `${JSON.stringify(
     {
-      features: ["bridge", "meshing"],
+      features: ["bridge", "meshing", "mc-tick"],
       wasmSha256: createHash("sha256").update(wasm).digest("hex"),
       modules: [...modules].sort(),
     },

@@ -42,5 +42,60 @@ export class MaterialCondition {
 
     static exposedFace(mask: number, requireAll: boolean): MaterialCondition;
 
+    /**
+     * True when the voxel's top (`+Y`) face is exposed to air (`face_mask::TOP`).
+     */
+    static exposedTop(): MaterialCondition;
+
+    /**
+     * True when the voxel's bottom (`-Y`) face is exposed to air (`face_mask::BOTTOM`).
+     */
+    static exposedBottom(): MaterialCondition;
+
+    /**
+     * True when any horizontal side face (`±X` or `±Z`) is exposed to air.
+     */
+    static exposedSide(): MaterialCondition;
+
+    /**
+     * True when any face of the voxel is exposed to air.
+     */
+    static exposedAny(): MaterialCondition;
+
+    /**
+     * True when all six neighbor voxels are solid (completely interior).
+     */
+    static interior(): MaterialCondition;
+
+    /**
+     * True when world `y >= min_y`.
+     */
+    static yAbove(minY: number): MaterialCondition;
+
+    /**
+     * True when world `y <= max_y`.
+     */
+    static yBelow(maxY: number): MaterialCondition;
+
+    /**
+     * True when world `min_y <= y <= max_y`.
+     */
+    static yBetween(minY: number, maxY: number): MaterialCondition;
+
+    /**
+     * True when surface slope (`1 - normal.y`) is `<= max_slope` (flatter than threshold).
+     */
+    static slopeBelow(maxSlope: number): MaterialCondition;
+
+    /**
+     * True when surface slope (`1 - normal.y`) is `>= min_slope` (steeper than threshold).
+     */
+    static slopeAbove(minSlope: number): MaterialCondition;
+
+    /**
+     * True when column depth below the exposed surface is in `[min_depth, max_depth]`.
+     */
+    static depthBetween(minDepth: number, maxDepth: number): MaterialCondition;
+
     static chance(probability: number, seed: number): MaterialCondition;
 }

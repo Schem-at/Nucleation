@@ -16,6 +16,7 @@
 #include "FieldRange.d.h"
 #include "FieldSample.d.h"
 #include "NucleationError.d.h"
+#include "Schematic.d.h"
 #include "Shape.d.h"
 
 #include "Field.d.h"
@@ -33,6 +34,15 @@ Field* Field_coord_x(void);
 Field* Field_coord_y(void);
 
 Field* Field_coord_z(void);
+
+typedef struct Field_from_schematic_result {union {Field* ok; NucleationError err;}; bool is_ok;} Field_from_schematic_result;
+Field_from_schematic_result Field_from_schematic(const Schematic* schematic, uint32_t pad);
+
+typedef struct Field_from_glb_bytes_result {union {Field* ok; NucleationError err;}; bool is_ok;} Field_from_glb_bytes_result;
+Field_from_glb_bytes_result Field_from_glb_bytes(DiplomatU8View bytes, uint32_t max_dim, uint32_t pad);
+
+typedef struct Field_from_obj_str_result {union {Field* ok; NucleationError err;}; bool is_ok;} Field_from_obj_str_result;
+Field_from_obj_str_result Field_from_obj_str(DiplomatStringView obj_text, uint32_t max_dim, uint32_t pad);
 
 typedef struct Field_sphere_result {union {Field* ok; NucleationError err;}; bool is_ok;} Field_sphere_result;
 Field_sphere_result Field_sphere(float radius);

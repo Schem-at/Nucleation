@@ -46,6 +46,8 @@ pub(crate) fn usage_and_exit() -> ! {
          \x20 render   image/video: `render <file> -o out.png|out.mp4 [--pack P] [--ticks N]`; `render --help`\n\
          \x20 mesh     3D model: `mesh <file> [-o out.glb|out.usdz] [--to glb|usdz] [--pack P]`\n\
          \x20 animate  mc-tick replay: `animate <file.snbt> --ticks N [actions] [-o out.glb]`\n\
+         \x20 sdf      voxelize SDF formula or graph: `sdf --expr \"sphere(p, 8)\" -o out.schem`\n\
+         \x20 worldgen stream infinite SDF world to Anvil: `worldgen --preset archipelago --chunks -1,-1,1,1 -o world/`\n\
          \x20 man      the manual (mdoc); `man --install` puts it on the man path\n\
          \n\
          `-` is stdin/stdout wherever a file is named, ffmpeg-style: payload\n\
@@ -129,6 +131,8 @@ fn main() {
             std::process::exit(2);
         }
         Some("convert") => commands::convert::convert_main(args),
+        Some("sdf") => commands::sdf::sdf_main(args),
+        Some("worldgen") => commands::worldgen::worldgen_main(args),
         Some("door-stats") => commands::door::door_main(args),
         Some("query") => commands::query::query_main(args),
         Some("scene") => commands::scene::scene_main(args),

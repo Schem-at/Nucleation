@@ -50,6 +50,33 @@ MaterialCondition_normal_dot_result MaterialCondition_normal_dot(float dx, float
 
 MaterialCondition* MaterialCondition_exposed_face(uint8_t mask, bool require_all);
 
+MaterialCondition* MaterialCondition_exposed_top(void);
+
+MaterialCondition* MaterialCondition_exposed_bottom(void);
+
+MaterialCondition* MaterialCondition_exposed_side(void);
+
+MaterialCondition* MaterialCondition_exposed_any(void);
+
+MaterialCondition* MaterialCondition_interior(void);
+
+typedef struct MaterialCondition_y_above_result {union {MaterialCondition* ok; NucleationError err;}; bool is_ok;} MaterialCondition_y_above_result;
+MaterialCondition_y_above_result MaterialCondition_y_above(float min_y);
+
+typedef struct MaterialCondition_y_below_result {union {MaterialCondition* ok; NucleationError err;}; bool is_ok;} MaterialCondition_y_below_result;
+MaterialCondition_y_below_result MaterialCondition_y_below(float max_y);
+
+typedef struct MaterialCondition_y_between_result {union {MaterialCondition* ok; NucleationError err;}; bool is_ok;} MaterialCondition_y_between_result;
+MaterialCondition_y_between_result MaterialCondition_y_between(float min_y, float max_y);
+
+typedef struct MaterialCondition_slope_below_result {union {MaterialCondition* ok; NucleationError err;}; bool is_ok;} MaterialCondition_slope_below_result;
+MaterialCondition_slope_below_result MaterialCondition_slope_below(float max_slope);
+
+typedef struct MaterialCondition_slope_above_result {union {MaterialCondition* ok; NucleationError err;}; bool is_ok;} MaterialCondition_slope_above_result;
+MaterialCondition_slope_above_result MaterialCondition_slope_above(float min_slope);
+
+MaterialCondition* MaterialCondition_depth_between(int32_t min_depth, int32_t max_depth);
+
 typedef struct MaterialCondition_chance_result {union {MaterialCondition* ok; NucleationError err;}; bool is_ok;} MaterialCondition_chance_result;
 MaterialCondition_chance_result MaterialCondition_chance(float probability, int32_t seed);
 

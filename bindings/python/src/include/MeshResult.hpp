@@ -26,6 +26,9 @@ namespace capi {
     typedef struct MeshResult_create_result {union {nucleation::capi::MeshResult* ok; nucleation::capi::NucleationError err;}; bool is_ok;} MeshResult_create_result;
     MeshResult_create_result MeshResult_create(const nucleation::capi::Schematic* schematic, const nucleation::capi::ResourcePack* pack, const nucleation::capi::MeshConfig* config);
 
+    typedef struct MeshResult_create_or_empty_result {union {nucleation::capi::MeshResult* ok; nucleation::capi::NucleationError err;}; bool is_ok;} MeshResult_create_or_empty_result;
+    MeshResult_create_or_empty_result MeshResult_create_or_empty(const nucleation::capi::Schematic* schematic, const nucleation::capi::ResourcePack* pack, const nucleation::capi::MeshConfig* config);
+
     typedef struct MeshResult_create_usdz_result {union {nucleation::capi::MeshResult* ok; nucleation::capi::NucleationError err;}; bool is_ok;} MeshResult_create_usdz_result;
     MeshResult_create_usdz_result MeshResult_create_usdz(const nucleation::capi::Schematic* schematic, const nucleation::capi::ResourcePack* pack, const nucleation::capi::MeshConfig* config);
 
@@ -56,6 +59,13 @@ namespace capi {
 
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::MeshResult>, nucleation::NucleationError> nucleation::MeshResult::create(const nucleation::Schematic& schematic, const nucleation::ResourcePack& pack, const nucleation::MeshConfig& config) {
     auto result = nucleation::capi::MeshResult_create(schematic.AsFFI(),
+        pack.AsFFI(),
+        config.AsFFI());
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::MeshResult>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::MeshResult>>(std::unique_ptr<nucleation::MeshResult>(nucleation::MeshResult::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::MeshResult>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::MeshResult>, nucleation::NucleationError> nucleation::MeshResult::create_or_empty(const nucleation::Schematic& schematic, const nucleation::ResourcePack& pack, const nucleation::MeshConfig& config) {
+    auto result = nucleation::capi::MeshResult_create_or_empty(schematic.AsFFI(),
         pack.AsFFI(),
         config.AsFFI());
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::MeshResult>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::MeshResult>>(std::unique_ptr<nucleation::MeshResult>(nucleation::MeshResult::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::MeshResult>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));

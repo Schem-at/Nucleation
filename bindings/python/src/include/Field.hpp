@@ -20,6 +20,7 @@
 #include "FieldRange.hpp"
 #include "FieldSample.hpp"
 #include "NucleationError.hpp"
+#include "Schematic.hpp"
 #include "Shape.hpp"
 #include "diplomat_runtime.hpp"
 
@@ -36,6 +37,15 @@ namespace capi {
     nucleation::capi::Field* Field_coord_y(void);
 
     nucleation::capi::Field* Field_coord_z(void);
+
+    typedef struct Field_from_schematic_result {union {nucleation::capi::Field* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Field_from_schematic_result;
+    Field_from_schematic_result Field_from_schematic(const nucleation::capi::Schematic* schematic, uint32_t pad);
+
+    typedef struct Field_from_glb_bytes_result {union {nucleation::capi::Field* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Field_from_glb_bytes_result;
+    Field_from_glb_bytes_result Field_from_glb_bytes(nucleation::diplomat::capi::DiplomatU8View bytes, uint32_t max_dim, uint32_t pad);
+
+    typedef struct Field_from_obj_str_result {union {nucleation::capi::Field* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Field_from_obj_str_result;
+    Field_from_obj_str_result Field_from_obj_str(nucleation::diplomat::capi::DiplomatStringView obj_text, uint32_t max_dim, uint32_t pad);
 
     typedef struct Field_sphere_result {union {nucleation::capi::Field* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Field_sphere_result;
     Field_sphere_result Field_sphere(float radius);
@@ -327,6 +337,26 @@ inline std::unique_ptr<nucleation::Field> nucleation::Field::coord_y() {
 inline std::unique_ptr<nucleation::Field> nucleation::Field::coord_z() {
     auto result = nucleation::capi::Field_coord_z();
     return std::unique_ptr<nucleation::Field>(nucleation::Field::FromFFI(result));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError> nucleation::Field::from_schematic(const nucleation::Schematic& schematic, uint32_t pad) {
+    auto result = nucleation::capi::Field_from_schematic(schematic.AsFFI(),
+        pad);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Field>>(std::unique_ptr<nucleation::Field>(nucleation::Field::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError> nucleation::Field::from_glb_bytes(nucleation::diplomat::span<const uint8_t> bytes, uint32_t max_dim, uint32_t pad) {
+    auto result = nucleation::capi::Field_from_glb_bytes({bytes.data(), bytes.size()},
+        max_dim,
+        pad);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Field>>(std::unique_ptr<nucleation::Field>(nucleation::Field::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError> nucleation::Field::from_obj_str(std::string_view obj_text, uint32_t max_dim, uint32_t pad) {
+    auto result = nucleation::capi::Field_from_obj_str({obj_text.data(), obj_text.size()},
+        max_dim,
+        pad);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Field>>(std::unique_ptr<nucleation::Field>(nucleation::Field::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError> nucleation::Field::sphere(float radius) {

@@ -309,8 +309,8 @@ central differences if discrete noise intrinsics are called).
 
 | Group | Functions |
 | --- | --- |
-| Scalar math | `abs(s)`, `sqrt(s)`, `ln(s)` / `log(s)`, `exp(s)`, `sin(s)`, `cos(s)`, `tan(s)`, `asin(s)`, `acos(s)`, `atan2(y, x)`, `floor(s)`, `ceil(s)`, `fract(s)`, `sign(s)`, `pow(a, b)`, `min(a, b)`, `max(a, b)`, `clamp(x, lo, hi)`, `mix(a, b, t)` / `lerp(a, b, t)`, `smoothstep(e0, e1, x)`, `step(edge, x)`, `smin(a, b, k)`, `smax(a, b, k)`, `saturate(x)` |
-| Vector math | `vec3(x, y, z)`, `length(v)`, `dot(a, b)`, `cross(a, b)`, `normalize(v)`, `abs(v)`, `min(a, b)`, `max(a, b)`, `mix(a, b, t)` / `lerp(a, b, t)` |
+| Scalar math | `abs(s)`, `sqrt(s)`, `ln(s)` / `log(s)`, `exp(s)`, `sin(s)`, `cos(s)`, `tan(s)`, `asin(s)`, `acos(s)`, `atan2(y, x)`, `floor(s)`, `ceil(s)`, `fract(s)`, `sign(s)`, `pow(a, b)`, `min(a, b)`, `max(a, b)`, `clamp(x, lo, hi)`, `mix(a, b, t)` / `lerp(a, b, t)`, `smoothstep(e0, e1, x)`, `step(edge, x)`, `smin(a, b, k)`, `smax(a, b, k)`, `chamfer_min(a, b, r)`, `chamfer_max(a, b, r)`, `saturate(x)` |
+| Vector & domain math | `vec3(x, y, z)`, `length(v)`, `dot(a, b)`, `cross(a, b)`, `normalize(v)`, `abs(v)`, `min(a, b)`, `max(a, b)`, `mix(a, b, t)` / `lerp(a, b, t)`, `rot_x(p, rad)`, `rot_y(p, rad)`, `rot_z(p, rad)`, `repeat(p, period_vec3)`, `repeat_polar(p, count)` |
 | Noise intrinsics | `value_noise(p, seed)`, `perlin(p, seed)`, `fbm(p, freq, seed, octaves)`, `ridged(p, freq, seed, octaves)`, `worley(p, freq, seed)` |
 | Primitive intrinsics | `sphere(p, r)`, `box(p, half_extents_vec3)`, `torus(p, major, minor)`, `cylinder(p, r, half_h)`, `capsule(p, a_vec3, b_vec3, r)`, `plane(p, normal_vec3, offset)` |
 

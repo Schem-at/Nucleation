@@ -22,6 +22,18 @@ and the implementation disagree, the capture is the reference. Version-gated
 entity loading, displacement laws, and measured hitboxes are documented in the
 [mechanics notes](tick-simulation-mechanics.md).
 
+## Try it live: interactive `mc-tick` step-through lab
+
+Click **Toggle input** (lever or button), then step **+1 tick** or **+2 ticks**
+to watch real `mc-tick` redstone propagation in WebAssembly — every block
+change is logged with its exact tick and state transition:
+
+<div class="sdf-studio" data-tick-studio>
+  <noscript>
+    <p>Enable JavaScript to run the live WebAssembly mc-tick redstone simulator.</p>
+  </noscript>
+</div>
+
 ## Quick start: build a scene, press the button
 
 The examples on this page are Python (`pip install nucleation`). The same API

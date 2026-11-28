@@ -145,6 +145,7 @@ enum EvalOp {
     RepeatPoints { child: CompiledField, offsets: Vec<[f32; 3]> },
     Tag { child: u32, material_id: u16 },
     Expr { program: Arc<ExprProgram>, inputs: Vec<CompiledField> },
+    Grid(Arc<super::grid::VoxelDistanceGrid>),
 }
 
 /// A compiled multi-root DAG: root `0..N` all share intermediate registers via CSE.
@@ -785,6 +786,7 @@ impl GraphCompiler {
                     },
                 )
             }
+            FieldNode::Grid(grid) => self.alloc_eval(coord, EvalOp::Grid(Arc::clone(grid))),
         };
         self.memo.insert((coord, ptr), reg);
         reg
@@ -869,46 +871,140 @@ impl CompiledGraph {
         })
     }
 
-    /// Evaluate root `root_idx` over a conservative 3D interval box.
-    pub fn eval_interval(&self, root_idx: usize, box3: Interval3) -> Interval {
-        let mut coords = vec![Interval3::new(Interval::ENTIRE, Interval::ENTIRE, Interval::ENTIRE); self.num_coords];
-        let mut vals = vec![Interval::ENTIRE; self.num_vals];
-        coords[0] = box3;
-        for instr in &self.instrs {
-            match instr {
-                CompiledInstr::Coord { dst, op } => {
-                    coords[*dst as usize] = eval_coord_interval(op, &coords, &vals);
+    /// Evaluate up to 8 vertical slab points `(x, y0..y0+len, z)` in a SINGLE
+    /// thread-local scratch borrow (zero per-voxel TLS borrows, L1-hot registers).
+    /// Writes root `r` of sample `k` to `out_roots[k * num_roots + r]`.
+    pub fn eval_slab_f32(&self, x: f32, y0: i32, len: usize, z: f32, out_roots: &mut [f32]) {
+        let num_roots = self.roots.len();
+        debug_assert!(len <= 8 && out_roots.len() >= len * num_roots);
+        GRAPH_F32_SCRATCH.with(|cell| {
+            let mut run = |st: &mut GraphScratch<f32>| {
+                st.prepare(self.num_coords, self.num_vals);
+                for k in 0..len {
+                    st.coords[0] = [x, (y0 + k as i32) as f32 + 0.5, z];
+                    self.run_f32(&mut st.coords, &mut st.vals);
+                    let base = k * num_roots;
+                    for (r_idx, &reg) in self.roots.iter().enumerate() {
+                        out_roots[base + r_idx] = st.vals[reg as usize];
+                    }
                 }
-                CompiledInstr::Eval { dst, coord, op } => {
-                    vals[*dst as usize] = eval_op_interval(op, coords[*coord as usize], &vals);
-                }
+            };
+            if let Ok(mut guard) = cell.try_borrow_mut() {
+                run(&mut guard);
+            } else {
+                let mut local = GraphScratch {
+                    coords: Vec::new(),
+                    vals: Vec::new(),
+                };
+                run(&mut local);
             }
-        }
-        vals[self.roots[root_idx] as usize]
+        });
     }
 
-    /// Evaluate root `root_idx` with forward-mode dual numbers for an exact analytic gradient.
-    /// Returns `None` if any op is non-differentiable or produces non-finite derivatives.
-    pub fn eval_dual(&self, root_idx: usize, x: f32, y: f32, z: f32) -> Option<(f32, [f32; 3])> {
-        let mut coords = vec![[Dual3::constant(0.0); 3]; self.num_coords];
-        let mut vals = vec![Dual3::constant(0.0); self.num_vals];
-        coords[0] = [Dual3::var(x, 0), Dual3::var(y, 1), Dual3::var(z, 2)];
-        for instr in &self.instrs {
-            match instr {
-                CompiledInstr::Coord { dst, op } => {
-                    coords[*dst as usize] = eval_coord_dual(op, &coords, &vals)?;
+    /// Evaluate up to 8 vertical slab points with full material-tag propagation
+    /// in a SINGLE thread-local scratch borrow.
+    pub fn eval_slab_tagged(
+        &self,
+        x: f32,
+        y0: i32,
+        len: usize,
+        z: f32,
+        primary_out: &mut [TaggedSample],
+        aux_out: &mut [f32],
+    ) {
+        let aux_len = self.roots.len().saturating_sub(1);
+        debug_assert!(len <= 8 && primary_out.len() >= len && aux_out.len() >= len * aux_len);
+        GRAPH_TAG_SCRATCH.with(|cell| {
+            let mut run = |st: &mut GraphScratch<TaggedSample>| {
+                st.prepare(self.num_coords, self.num_vals);
+                for k in 0..len {
+                    st.coords[0] = [x, (y0 + k as i32) as f32 + 0.5, z];
+                    self.run_tagged(&mut st.coords, &mut st.vals);
+                    primary_out[k] = st.vals[self.roots[0] as usize];
+                    let base = k * aux_len;
+                    for (a_idx, &reg) in self.roots.iter().skip(1).enumerate() {
+                        aux_out[base + a_idx] = st.vals[reg as usize].distance;
+                    }
                 }
-                CompiledInstr::Eval { dst, coord, op } => {
-                    vals[*dst as usize] = eval_op_dual(op, coords[*coord as usize], &vals)?;
-                }
+            };
+            if let Ok(mut guard) = cell.try_borrow_mut() {
+                run(&mut guard);
+            } else {
+                let mut local = GraphScratch {
+                    coords: Vec::new(),
+                    vals: Vec::new(),
+                };
+                run(&mut local);
             }
-        }
-        let d = vals[self.roots[root_idx] as usize];
-        if d.v.is_finite() && d.d.iter().all(|c| c.is_finite()) {
-            Some((d.v, d.d))
-        } else {
-            None
-        }
+        });
+    }
+
+    /// Evaluate root `root_idx` over a conservative 3D interval box (zero-alloc TLS scratch).
+    pub fn eval_interval(&self, root_idx: usize, box3: Interval3) -> Interval {
+        GRAPH_INTERVAL_SCRATCH.with(|cell| {
+            let run = |st: &mut IntervalScratch| {
+                st.prepare(self.num_coords, self.num_vals);
+                st.coords[0] = box3;
+                for instr in &self.instrs {
+                    match instr {
+                        CompiledInstr::Coord { dst, op } => {
+                            st.coords[*dst as usize] = eval_coord_interval(op, &st.coords, &st.vals);
+                        }
+                        CompiledInstr::Eval { dst, coord, op } => {
+                            st.vals[*dst as usize] =
+                                eval_op_interval(op, st.coords[*coord as usize], &st.vals);
+                        }
+                    }
+                }
+                st.vals[self.roots[root_idx] as usize]
+            };
+            if let Ok(mut guard) = cell.try_borrow_mut() {
+                run(&mut guard)
+            } else {
+                let mut local = IntervalScratch {
+                    coords: Vec::new(),
+                    vals: Vec::new(),
+                };
+                run(&mut local)
+            }
+        })
+    }
+
+    /// Evaluate root `root_idx` with forward-mode dual numbers for an exact analytic gradient
+    /// (zero-alloc TLS scratch). Returns `None` if any op is non-differentiable or non-finite.
+    pub fn eval_dual(&self, root_idx: usize, x: f32, y: f32, z: f32) -> Option<(f32, [f32; 3])> {
+        GRAPH_DUAL_SCRATCH.with(|cell| {
+            let run = |st: &mut DualScratch| -> Option<(f32, [f32; 3])> {
+                st.prepare(self.num_coords, self.num_vals);
+                st.coords[0] = [Dual3::var(x, 0), Dual3::var(y, 1), Dual3::var(z, 2)];
+                for instr in &self.instrs {
+                    match instr {
+                        CompiledInstr::Coord { dst, op } => {
+                            st.coords[*dst as usize] = eval_coord_dual(op, &st.coords, &st.vals)?;
+                        }
+                        CompiledInstr::Eval { dst, coord, op } => {
+                            st.vals[*dst as usize] =
+                                eval_op_dual(op, st.coords[*coord as usize], &st.vals)?;
+                        }
+                    }
+                }
+                let d = st.vals[self.roots[root_idx] as usize];
+                if d.v.is_finite() && d.d.iter().all(|c| c.is_finite()) {
+                    Some((d.v, d.d))
+                } else {
+                    None
+                }
+            };
+            if let Ok(mut guard) = cell.try_borrow_mut() {
+                run(&mut guard)
+            } else {
+                let mut local = DualScratch {
+                    coords: Vec::new(),
+                    vals: Vec::new(),
+                };
+                run(&mut local)
+            }
+        })
     }
 
     fn run_f32(&self, coords: &mut [[f32; 3]], vals: &mut [f32]) {
@@ -962,6 +1058,11 @@ impl CompiledField {
         let mut out = [0.0f32; 1];
         self.graph.eval_all_f32(x, y, z, &mut out);
         out[0]
+    }
+
+    #[inline]
+    pub fn graph_eval_slab_f32(&self, x: f32, y0: i32, len: usize, z: f32, out: &mut [f32]) {
+        self.graph.eval_slab_f32(x, y0, len, z, out);
     }
 
     #[inline]
@@ -1115,12 +1216,55 @@ impl GraphScratch<TaggedSample> {
     }
 }
 
+struct IntervalScratch {
+    coords: Vec<Interval3>,
+    vals: Vec<Interval>,
+}
+
+impl IntervalScratch {
+    #[inline]
+    fn prepare(&mut self, num_coords: usize, num_vals: usize) {
+        if self.coords.len() < num_coords {
+            self.coords.resize(
+                num_coords,
+                Interval3::new(Interval::ENTIRE, Interval::ENTIRE, Interval::ENTIRE),
+            );
+        }
+        if self.vals.len() < num_vals {
+            self.vals.resize(num_vals, Interval::ENTIRE);
+        }
+    }
+}
+
+struct DualScratch {
+    coords: Vec<[Dual3; 3]>,
+    vals: Vec<Dual3>,
+}
+
+impl DualScratch {
+    #[inline]
+    fn prepare(&mut self, num_coords: usize, num_vals: usize) {
+        if self.coords.len() < num_coords {
+            self.coords.resize(num_coords, [Dual3::constant(0.0); 3]);
+        }
+        if self.vals.len() < num_vals {
+            self.vals.resize(num_vals, Dual3::constant(0.0));
+        }
+    }
+}
+
 thread_local! {
     static GRAPH_F32_SCRATCH: RefCell<GraphScratch<f32>> = const {
         RefCell::new(GraphScratch { coords: Vec::new(), vals: Vec::new() })
     };
     static GRAPH_TAG_SCRATCH: RefCell<GraphScratch<TaggedSample>> = const {
         RefCell::new(GraphScratch { coords: Vec::new(), vals: Vec::new() })
+    };
+    static GRAPH_INTERVAL_SCRATCH: RefCell<IntervalScratch> = const {
+        RefCell::new(IntervalScratch { coords: Vec::new(), vals: Vec::new() })
+    };
+    static GRAPH_DUAL_SCRATCH: RefCell<DualScratch> = const {
+        RefCell::new(DualScratch { coords: Vec::new(), vals: Vec::new() })
     };
 }
 
@@ -1740,6 +1884,7 @@ fn eval_op_f32(op: &EvalOp, p: [f32; 3], vals: &[f32]) -> f32 {
         EvalOp::Expr { program, inputs } => program.eval_f32(p[0], p[1], p[2], &|idx, qx, qy, qz| {
             inputs[idx].eval(qx, qy, qz)
         }),
+        EvalOp::Grid(grid) => grid.eval_f32(p[0], p[1], p[2]),
         _ => unreachable!(),
     }
 }
@@ -2017,6 +2162,7 @@ fn eval_op_tagged(op: &EvalOp, p: [f32; 3], vals: &[TaggedSample]) -> TaggedSamp
             p[2],
             &|idx, qx, qy, qz| inputs[idx].eval(qx, qy, qz),
         )),
+        EvalOp::Grid(grid) => TaggedSample::plain(grid.eval_f32(p[0], p[1], p[2])),
         _ => unreachable!(),
     }
 }
@@ -2478,6 +2624,7 @@ fn eval_op_interval(op: &EvalOp, p: Interval3, vals: &[Interval]) -> Interval {
             [-*half_base, -0.5 * height, -*half_base],
             [*half_base, 0.5 * height, *half_base],
         ),
+        EvalOp::Grid(grid) => grid.eval_interval(p),
         EvalOp::InfiniteCone { .. } | EvalOp::Expr { .. } => Interval::ENTIRE,
     }
 }
@@ -2712,6 +2859,7 @@ fn eval_op_dual(op: &EvalOp, p: [Dual3; 3], vals: &[Dual3]) -> Option<Dual3> {
             ..
         } => vals[*child as usize].add(vals[*offset as usize].mul(Dual3::constant(*amplitude))),
         EvalOp::Tag { child, .. } => vals[*child as usize],
+        EvalOp::Grid(grid) => return Some(grid.eval_dual(p)),
         EvalOp::Expr { program, inputs } => {
             if !program.is_differentiable() {
                 return None;

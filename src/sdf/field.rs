@@ -495,6 +495,8 @@ pub(crate) enum FieldNode {
         bounds: Option<Aabb>,
         distance_kind: DistanceKind,
     },
+    /// Exact 3D signed distance grid (from a [`UniversalSchematic`] or 3D mesh).
+    Grid(Arc<super::grid::VoxelDistanceGrid>),
 }
 
 /// Unified, immutable, reference-counted spatial field / SDF expression graph.
@@ -521,6 +523,155 @@ impl Field {
     /// pruning and dual-number gradient support.
     pub fn compile(&self) -> super::compile::CompiledField {
         super::compile::CompiledField::compile(self)
+    }
+
+    /// Convert any existing Minecraft schematic into a smooth, composable 3D
+    /// signed distance [`Field`] using an exact linear-time 3D Euclidean
+    /// Distance Transform.
+    ///
+    /// Non-air voxels become negative (inside); air becomes positive (outside).
+    /// `pad` adds an empty border (in blocks, clamped to `2..=32`) around the
+    /// schematic's tight bounds so smooth CSG fillets and displacements have
+    /// exact Euclidean distances outside the original build.
+    pub fn from_schematic(
+        schematic: &crate::UniversalSchematic,
+        pad: u32,
+    ) -> Result<Self, FieldError> {
+        let mut min = [i32::MAX; 3];
+        let mut max = [i32::MIN; 3];
+        let mut solid_pts: Vec<[i32; 3]> = Vec::new();
+        for (pos, state) in schematic.iter_blocks() {
+            if state.name == "minecraft:air"
+                || state.name == "minecraft:cave_air"
+                || state.name == "minecraft:void_air"
+            {
+                continue;
+            }
+            let p = [pos.x, pos.y, pos.z];
+            for a in 0..3 {
+                min[a] = min[a].min(p[a]);
+                max[a] = max[a].max(p[a]);
+            }
+            solid_pts.push(p);
+        }
+        if solid_pts.is_empty() {
+            return Err(FieldError::InvalidArgument(
+                "schematic contains no solid blocks".into(),
+            ));
+        }
+
+        let pad = pad.clamp(2, 32) as i32;
+        let orig = [min[0] - pad, min[1] - pad, min[2] - pad];
+        let dims = [
+            (max[0] - min[0] + 1 + 2 * pad) as usize,
+            (max[1] - min[1] + 1 + 2 * pad) as usize,
+            (max[2] - min[2] + 1 + 2 * pad) as usize,
+        ];
+        let total = (dims[0] as u64)
+            .saturating_mul(dims[1] as u64)
+            .saturating_mul(dims[2] as u64);
+        if total > super::MAX_SDF_SAMPLE_VOLUME {
+            return Err(FieldError::BudgetExceeded(format!(
+                "schematic SDF grid volume {total} exceeds limit {}",
+                super::MAX_SDF_SAMPLE_VOLUME
+            )));
+        }
+
+        let mut mask = vec![false; total as usize];
+        for [x, y, z] in solid_pts {
+            let ix = (x - orig[0]) as usize;
+            let iy = (y - orig[1]) as usize;
+            let iz = (z - orig[2]) as usize;
+            mask[ix + dims[0] * (iz + dims[2] * iy)] = true;
+        }
+
+        let grid = super::grid::VoxelDistanceGrid::from_solid_mask(
+            [orig[0] as f32, orig[1] as f32, orig[2] as f32],
+            1.0,
+            dims,
+            &mask,
+        );
+        Ok(Self::wrap(FieldNode::Grid(Arc::new(grid))))
+    }
+
+    /// Convert a binary glTF (`.glb`) 3D mesh into a smooth, composable signed
+    /// distance [`Field`] fitted to `max_dim` blocks along its longest axis.
+    #[cfg(feature = "voxelize")]
+    pub fn from_glb_bytes(bytes: &[u8], max_dim: u32, pad: u32) -> Result<Self, FieldError> {
+        let mut model = crate::voxelize::MeshModel::from_glb_bytes(bytes)
+            .map_err(FieldError::Parse)?;
+        Self::from_mesh_model(&mut model, max_dim, pad)
+    }
+
+    /// Convert a Wavefront `.obj` string into a smooth, composable signed
+    /// distance [`Field`] fitted to `max_dim` blocks along its longest axis.
+    #[cfg(feature = "voxelize")]
+    pub fn from_obj_str(obj_text: &str, max_dim: u32, pad: u32) -> Result<Self, FieldError> {
+        let mut model = crate::voxelize::MeshModel::from_obj_str(obj_text)
+            .map_err(FieldError::Parse)?;
+        Self::from_mesh_model(&mut model, max_dim, pad)
+    }
+
+    #[cfg(feature = "voxelize")]
+    fn from_mesh_model(
+        model: &mut crate::voxelize::MeshModel,
+        max_dim: u32,
+        pad: u32,
+    ) -> Result<Self, FieldError> {
+        use crate::building::Shape as _;
+        if !(2..=256).contains(&max_dim) {
+            return Err(FieldError::InvalidArgument(
+                "mesh SDF max_dim must be in 2..=256".into(),
+            ));
+        }
+        model.fit(max_dim as f32);
+        let shape = crate::voxelize::MeshShape::new(model.clone());
+        let mut min = [i32::MAX; 3];
+        let mut max = [i32::MIN; 3];
+        let mut solid_pts: Vec<[i32; 3]> = Vec::new();
+        shape.for_each_point(|x, y, z| {
+            let p = [x, y, z];
+            for a in 0..3 {
+                min[a] = min[a].min(p[a]);
+                max[a] = max[a].max(p[a]);
+            }
+            solid_pts.push(p);
+        });
+        if solid_pts.is_empty() {
+            return Err(FieldError::InvalidArgument(
+                "mesh produced no solid voxels".into(),
+            ));
+        }
+        let pad = pad.clamp(2, 32) as i32;
+        let orig = [min[0] - pad, min[1] - pad, min[2] - pad];
+        let dims = [
+            (max[0] - min[0] + 1 + 2 * pad) as usize,
+            (max[1] - min[1] + 1 + 2 * pad) as usize,
+            (max[2] - min[2] + 1 + 2 * pad) as usize,
+        ];
+        let total = (dims[0] as u64)
+            .saturating_mul(dims[1] as u64)
+            .saturating_mul(dims[2] as u64);
+        if total > super::MAX_SDF_SAMPLE_VOLUME {
+            return Err(FieldError::BudgetExceeded(format!(
+                "mesh SDF grid volume {total} exceeds limit {}",
+                super::MAX_SDF_SAMPLE_VOLUME
+            )));
+        }
+        let mut mask = vec![false; total as usize];
+        for [x, y, z] in solid_pts {
+            let ix = (x - orig[0]) as usize;
+            let iy = (y - orig[1]) as usize;
+            let iz = (z - orig[2]) as usize;
+            mask[ix + dims[0] * (iz + dims[2] * iy)] = true;
+        }
+        let grid = super::grid::VoxelDistanceGrid::from_solid_mask(
+            [orig[0] as f32, orig[1] as f32, orig[2] as f32],
+            1.0,
+            dims,
+            &mask,
+        );
+        Ok(Self::wrap(FieldNode::Grid(Arc::new(grid))))
     }
 
     /// Convenience point evaluation (compiles on the fly; prefer `compile()`
@@ -1913,6 +2064,7 @@ impl Field {
             FieldNode::Tag { child, .. } => child.bounds(),
             FieldNode::Bounded { bounds, .. } => Some(*bounds),
             FieldNode::Expr { bounds, .. } => *bounds,
+            FieldNode::Grid(grid) => Some(grid.aabb()),
             _ => None,
         }
     }
@@ -1938,7 +2090,8 @@ impl Field {
             | FieldNode::HexPrism { .. }
             | FieldNode::BoxFrame { .. }
             | FieldNode::InfiniteCone { .. }
-            | FieldNode::SquarePyramid { .. } => DistanceKind::Exact,
+            | FieldNode::SquarePyramid { .. }
+            | FieldNode::Grid(_) => DistanceKind::Exact,
             FieldNode::Ellipsoid { .. }
             | FieldNode::SuperPrism { .. }
             | FieldNode::Intersect { .. }
@@ -2311,6 +2464,12 @@ enum WireNode {
         bounds: Option<Aabb>,
         distance_kind: DistanceKind,
     },
+    Grid {
+        origin: [f32; 3],
+        voxel_size: f32,
+        dims: [usize; 3],
+        values: Vec<f32>,
+    },
 }
 
 fn encode_field(
@@ -2538,6 +2697,12 @@ fn encode_field(
                 distance_kind: *distance_kind,
             }
         }
+        FieldNode::Grid(grid) => WireNode::Grid {
+            origin: grid.origin,
+            voxel_size: grid.voxel_size,
+            dims: grid.dims,
+            values: grid.values.clone(),
+        },
     };
     let id = nodes.len();
     nodes.push(wn);
@@ -2671,6 +2836,26 @@ fn decode_node(wn: WireNode, idx: usize, decoded: &[Field]) -> Result<Field, Fie
                 resolved.push((name.as_str(), get(id)?));
             }
             Field::expr_with(&source, &resolved, bounds, distance_kind)
+        }
+        WireNode::Grid {
+            origin,
+            voxel_size,
+            dims,
+            values,
+        } => {
+            positive_all(&[voxel_size])?;
+            finite_all(&origin)?;
+            let expected = dims[0]
+                .checked_mul(dims[1])
+                .and_then(|v| v.checked_mul(dims[2]))
+                .ok_or_else(|| FieldError::Parse("grid dimensions overflow".into()))?;
+            if expected == 0 || values.len() != expected {
+                return Err(FieldError::Parse(
+                    "grid values length does not match dims".into(),
+                ));
+            }
+            let grid = super::grid::VoxelDistanceGrid::from_values(origin, voxel_size, dims, values);
+            Ok(Field::wrap(FieldNode::Grid(Arc::new(grid))))
         }
     }
 }

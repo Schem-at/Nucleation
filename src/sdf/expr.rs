@@ -482,6 +482,11 @@ pub enum BinaryInstr {
     MaxVec3,
     Dot,
     Cross,
+    RotX,
+    RotY,
+    RotZ,
+    RepeatDomain,
+    RepeatPolarDomain,
     Lt,
     Le,
     Gt,
@@ -500,6 +505,8 @@ pub enum TernaryInstr {
     Smoothstep,
     Smin,
     Smax,
+    ChamferMin,
+    ChamferMax,
     SelectScalar,
     SelectVec3,
 }
@@ -882,6 +889,61 @@ fn exec_block<S: ScalarNum>(
                             a[0].mul(c[1]).sub(a[1].mul(c[0])),
                         ])
                     }
+                    BinaryInstr::RotX => {
+                        let v = as_v(lhs);
+                        let a = as_s(rhs);
+                        let c = a.cos();
+                        let s = a.sin();
+                        Val::Vec3([v[0], v[1].mul(c).sub(v[2].mul(s)), v[1].mul(s).add(v[2].mul(c))])
+                    }
+                    BinaryInstr::RotY => {
+                        let v = as_v(lhs);
+                        let a = as_s(rhs);
+                        let c = a.cos();
+                        let s = a.sin();
+                        Val::Vec3([v[0].mul(c).add(v[2].mul(s)), v[1], v[2].mul(c).sub(v[0].mul(s))])
+                    }
+                    BinaryInstr::RotZ => {
+                        let v = as_v(lhs);
+                        let a = as_s(rhs);
+                        let c = a.cos();
+                        let s = a.sin();
+                        Val::Vec3([v[0].mul(c).sub(v[1].mul(s)), v[0].mul(s).add(v[1].mul(c)), v[2]])
+                    }
+                    BinaryInstr::RepeatDomain => {
+                        let v = as_v(lhs);
+                        let period = as_v(rhs);
+                        let half = S::constant(0.5);
+                        let rep = |coord: S, per: S| -> S {
+                            if per.primal().abs() < 1e-6 {
+                                coord
+                            } else {
+                                let k = coord.div(per).add(half).floor();
+                                coord.sub(per.mul(k))
+                            }
+                        };
+                        Val::Vec3([
+                            rep(v[0], period[0]),
+                            rep(v[1], period[1]),
+                            rep(v[2], period[2]),
+                        ])
+                    }
+                    BinaryInstr::RepeatPolarDomain => {
+                        let v = as_v(lhs);
+                        let count = as_s(rhs).primal().max(1.0);
+                        let sector = std::f32::consts::TAU / count;
+                        let half_sector = sector * 0.5;
+                        let ang = v[2].atan2(v[0]);
+                        let k = ((ang.primal() + half_sector) / sector).floor();
+                        let rot = -k * sector;
+                        let c = S::constant(rot.cos());
+                        let s = S::constant(rot.sin());
+                        Val::Vec3([
+                            v[0].mul(c).sub(v[2].mul(s)),
+                            v[1],
+                            v[0].mul(s).add(v[2].mul(c)),
+                        ])
+                    }
                     BinaryInstr::Lt => Val::Bool(as_s(lhs).primal() < as_s(rhs).primal()),
                     BinaryInstr::Le => Val::Bool(as_s(lhs).primal() <= as_s(rhs).primal()),
                     BinaryInstr::Gt => Val::Bool(as_s(lhs).primal() > as_s(rhs).primal()),
@@ -931,6 +993,20 @@ fn exec_block<S: ScalarNum>(
                     }
                     TernaryInstr::Smin => Val::Scalar(as_s(a).smin(as_s(b), as_s(c))),
                     TernaryInstr::Smax => Val::Scalar(as_s(a).smax(as_s(b), as_s(c))),
+                    TernaryInstr::ChamferMin => {
+                        let va = as_s(a);
+                        let vb = as_s(b);
+                        let vr = as_s(c);
+                        let diag = va.add(vb).sub(vr).mul(S::constant(std::f32::consts::FRAC_1_SQRT_2));
+                        Val::Scalar(va.min(vb).min(diag))
+                    }
+                    TernaryInstr::ChamferMax => {
+                        let va = as_s(a);
+                        let vb = as_s(b);
+                        let vr = as_s(c);
+                        let diag = va.add(vb).add(vr).mul(S::constant(std::f32::consts::FRAC_1_SQRT_2));
+                        Val::Scalar(va.max(vb).max(diag))
+                    }
                     TernaryInstr::SelectScalar => {
                         Val::Scalar(if as_b(a) { as_s(b) } else { as_s(c) })
                     }
@@ -2026,6 +2102,34 @@ impl<'a> Parser<'a> {
             ("smax", [Scalar, Scalar, Scalar]) => {
                 ops.push(ExprOp::Ternary(TernaryInstr::Smax));
                 Ok(Scalar)
+            }
+            ("chamfer_min", [Scalar, Scalar, Scalar]) => {
+                ops.push(ExprOp::Ternary(TernaryInstr::ChamferMin));
+                Ok(Scalar)
+            }
+            ("chamfer_max", [Scalar, Scalar, Scalar]) => {
+                ops.push(ExprOp::Ternary(TernaryInstr::ChamferMax));
+                Ok(Scalar)
+            }
+            ("rot_x", [Vec3, Scalar]) => {
+                ops.push(ExprOp::Binary(BinaryInstr::RotX));
+                Ok(Vec3)
+            }
+            ("rot_y", [Vec3, Scalar]) => {
+                ops.push(ExprOp::Binary(BinaryInstr::RotY));
+                Ok(Vec3)
+            }
+            ("rot_z", [Vec3, Scalar]) => {
+                ops.push(ExprOp::Binary(BinaryInstr::RotZ));
+                Ok(Vec3)
+            }
+            ("repeat", [Vec3, Vec3]) => {
+                ops.push(ExprOp::Binary(BinaryInstr::RepeatDomain));
+                Ok(Vec3)
+            }
+            ("repeat_polar", [Vec3, Scalar]) => {
+                ops.push(ExprOp::Binary(BinaryInstr::RepeatPolarDomain));
+                Ok(Vec3)
             }
             ("value_noise", [Vec3, Scalar]) => {
                 self.has_non_diff = true;

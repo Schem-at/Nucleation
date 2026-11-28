@@ -23,6 +23,9 @@
 typedef struct MeshResult_create_result {union {MeshResult* ok; NucleationError err;}; bool is_ok;} MeshResult_create_result;
 MeshResult_create_result MeshResult_create(const Schematic* schematic, const ResourcePack* pack, const MeshConfig* config);
 
+typedef struct MeshResult_create_or_empty_result {union {MeshResult* ok; NucleationError err;}; bool is_ok;} MeshResult_create_or_empty_result;
+MeshResult_create_or_empty_result MeshResult_create_or_empty(const Schematic* schematic, const ResourcePack* pack, const MeshConfig* config);
+
 typedef struct MeshResult_create_usdz_result {union {MeshResult* ok; NucleationError err;}; bool is_ok;} MeshResult_create_usdz_result;
 MeshResult_create_usdz_result MeshResult_create_usdz(const Schematic* schematic, const ResourcePack* pack, const MeshConfig* config);
 

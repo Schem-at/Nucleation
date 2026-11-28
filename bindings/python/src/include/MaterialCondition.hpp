@@ -53,6 +53,33 @@ namespace capi {
 
     nucleation::capi::MaterialCondition* MaterialCondition_exposed_face(uint8_t mask, bool require_all);
 
+    nucleation::capi::MaterialCondition* MaterialCondition_exposed_top(void);
+
+    nucleation::capi::MaterialCondition* MaterialCondition_exposed_bottom(void);
+
+    nucleation::capi::MaterialCondition* MaterialCondition_exposed_side(void);
+
+    nucleation::capi::MaterialCondition* MaterialCondition_exposed_any(void);
+
+    nucleation::capi::MaterialCondition* MaterialCondition_interior(void);
+
+    typedef struct MaterialCondition_y_above_result {union {nucleation::capi::MaterialCondition* ok; nucleation::capi::NucleationError err;}; bool is_ok;} MaterialCondition_y_above_result;
+    MaterialCondition_y_above_result MaterialCondition_y_above(float min_y);
+
+    typedef struct MaterialCondition_y_below_result {union {nucleation::capi::MaterialCondition* ok; nucleation::capi::NucleationError err;}; bool is_ok;} MaterialCondition_y_below_result;
+    MaterialCondition_y_below_result MaterialCondition_y_below(float max_y);
+
+    typedef struct MaterialCondition_y_between_result {union {nucleation::capi::MaterialCondition* ok; nucleation::capi::NucleationError err;}; bool is_ok;} MaterialCondition_y_between_result;
+    MaterialCondition_y_between_result MaterialCondition_y_between(float min_y, float max_y);
+
+    typedef struct MaterialCondition_slope_below_result {union {nucleation::capi::MaterialCondition* ok; nucleation::capi::NucleationError err;}; bool is_ok;} MaterialCondition_slope_below_result;
+    MaterialCondition_slope_below_result MaterialCondition_slope_below(float max_slope);
+
+    typedef struct MaterialCondition_slope_above_result {union {nucleation::capi::MaterialCondition* ok; nucleation::capi::NucleationError err;}; bool is_ok;} MaterialCondition_slope_above_result;
+    MaterialCondition_slope_above_result MaterialCondition_slope_above(float min_slope);
+
+    nucleation::capi::MaterialCondition* MaterialCondition_depth_between(int32_t min_depth, int32_t max_depth);
+
     typedef struct MaterialCondition_chance_result {union {nucleation::capi::MaterialCondition* ok; nucleation::capi::NucleationError err;}; bool is_ok;} MaterialCondition_chance_result;
     MaterialCondition_chance_result MaterialCondition_chance(float probability, int32_t seed);
 
@@ -153,6 +180,63 @@ inline nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialConditio
 inline std::unique_ptr<nucleation::MaterialCondition> nucleation::MaterialCondition::exposed_face(uint8_t mask, bool require_all) {
     auto result = nucleation::capi::MaterialCondition_exposed_face(mask,
         require_all);
+    return std::unique_ptr<nucleation::MaterialCondition>(nucleation::MaterialCondition::FromFFI(result));
+}
+
+inline std::unique_ptr<nucleation::MaterialCondition> nucleation::MaterialCondition::exposed_top() {
+    auto result = nucleation::capi::MaterialCondition_exposed_top();
+    return std::unique_ptr<nucleation::MaterialCondition>(nucleation::MaterialCondition::FromFFI(result));
+}
+
+inline std::unique_ptr<nucleation::MaterialCondition> nucleation::MaterialCondition::exposed_bottom() {
+    auto result = nucleation::capi::MaterialCondition_exposed_bottom();
+    return std::unique_ptr<nucleation::MaterialCondition>(nucleation::MaterialCondition::FromFFI(result));
+}
+
+inline std::unique_ptr<nucleation::MaterialCondition> nucleation::MaterialCondition::exposed_side() {
+    auto result = nucleation::capi::MaterialCondition_exposed_side();
+    return std::unique_ptr<nucleation::MaterialCondition>(nucleation::MaterialCondition::FromFFI(result));
+}
+
+inline std::unique_ptr<nucleation::MaterialCondition> nucleation::MaterialCondition::exposed_any() {
+    auto result = nucleation::capi::MaterialCondition_exposed_any();
+    return std::unique_ptr<nucleation::MaterialCondition>(nucleation::MaterialCondition::FromFFI(result));
+}
+
+inline std::unique_ptr<nucleation::MaterialCondition> nucleation::MaterialCondition::interior() {
+    auto result = nucleation::capi::MaterialCondition_interior();
+    return std::unique_ptr<nucleation::MaterialCondition>(nucleation::MaterialCondition::FromFFI(result));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError> nucleation::MaterialCondition::y_above(float min_y) {
+    auto result = nucleation::capi::MaterialCondition_y_above(min_y);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::MaterialCondition>>(std::unique_ptr<nucleation::MaterialCondition>(nucleation::MaterialCondition::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError> nucleation::MaterialCondition::y_below(float max_y) {
+    auto result = nucleation::capi::MaterialCondition_y_below(max_y);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::MaterialCondition>>(std::unique_ptr<nucleation::MaterialCondition>(nucleation::MaterialCondition::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError> nucleation::MaterialCondition::y_between(float min_y, float max_y) {
+    auto result = nucleation::capi::MaterialCondition_y_between(min_y,
+        max_y);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::MaterialCondition>>(std::unique_ptr<nucleation::MaterialCondition>(nucleation::MaterialCondition::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError> nucleation::MaterialCondition::slope_below(float max_slope) {
+    auto result = nucleation::capi::MaterialCondition_slope_below(max_slope);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::MaterialCondition>>(std::unique_ptr<nucleation::MaterialCondition>(nucleation::MaterialCondition::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError> nucleation::MaterialCondition::slope_above(float min_slope) {
+    auto result = nucleation::capi::MaterialCondition_slope_above(min_slope);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::MaterialCondition>>(std::unique_ptr<nucleation::MaterialCondition>(nucleation::MaterialCondition::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::MaterialCondition>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline std::unique_ptr<nucleation::MaterialCondition> nucleation::MaterialCondition::depth_between(int32_t min_depth, int32_t max_depth) {
+    auto result = nucleation::capi::MaterialCondition_depth_between(min_depth,
+        max_depth);
     return std::unique_ptr<nucleation::MaterialCondition>(nucleation::MaterialCondition::FromFFI(result));
 }
 

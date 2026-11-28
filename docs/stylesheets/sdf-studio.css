@@ -580,6 +580,73 @@
   background: var(--stage);
 }
 
+.pal-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px;
+}
+
+.pal-pickers {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.pal-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.pal-color input[type="color"] {
+  width: 32px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--rule-hi);
+  background: transparent;
+  cursor: pointer;
+}
+
+.pal-blocks {
+  padding: 9px 14px;
+  border-top: 1px solid var(--rule);
+  background: var(--stage);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--mist);
+  line-height: 1.55;
+}
+
+.tick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel);
+}
+
+.tick-log {
+  margin: 0;
+  padding: 10px 14px;
+  max-height: 148px;
+  overflow-y: auto;
+  background: var(--stage);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--code-text);
+  white-space: pre;
+}
+
 @media screen and (max-width: 47.9375em) {
   .sdf-studio__stage,
   .wg-stage {

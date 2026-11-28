@@ -24,6 +24,12 @@ export class MeshResult {
     static create(schematic: Schematic, pack: ResourcePack, config: MeshConfig): MeshResult;
 
     /**
+     * Mesh a schematic, returning an empty `MeshResult` (`0` triangles)
+     * instead of an error when the schematic contains no blocks.
+     */
+    static createOrEmpty(schematic: Schematic, pack: ResourcePack, config: MeshConfig): MeshResult;
+
+    /**
      * Mesh a schematic with USDZ-compatible output (old ABI: `schematic_to_usdz`).
      */
     static createUsdz(schematic: Schematic, pack: ResourcePack, config: MeshConfig): MeshResult;

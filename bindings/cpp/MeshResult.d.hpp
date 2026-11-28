@@ -41,6 +41,12 @@ public:
   inline static diplomat::result<std::unique_ptr<MeshResult>, NucleationError> create(const Schematic& schematic, const ResourcePack& pack, const MeshConfig& config);
 
   /**
+   * Mesh a schematic, returning an empty `MeshResult` (`0` triangles)
+   * instead of an error when the schematic contains no blocks.
+   */
+  inline static diplomat::result<std::unique_ptr<MeshResult>, NucleationError> create_or_empty(const Schematic& schematic, const ResourcePack& pack, const MeshConfig& config);
+
+  /**
    * Mesh a schematic with USDZ-compatible output (old ABI: `schematic_to_usdz`).
    */
   inline static diplomat::result<std::unique_ptr<MeshResult>, NucleationError> create_usdz(const Schematic& schematic, const ResourcePack& pack, const MeshConfig& config);

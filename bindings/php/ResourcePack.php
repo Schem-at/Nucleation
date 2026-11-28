@@ -40,6 +40,11 @@ final class ResourcePack {
         return new ResourcePack($result->ok, true);
     }
 
+    public static function builtinProcedural() {
+        $ret = Lib::ffi()->ResourcePack_builtin_procedural();
+        return new ResourcePack($ret, true);
+    }
+
     public function blockstateCount() {
         $ret = Lib::ffi()->ResourcePack_blockstate_count($this->ptr);
         return $ret;

@@ -18,6 +18,7 @@ void add_MeshResult_binding(nb::module_ mod) {
         .def_static("animated_glb_b64", &nucleation::MeshResult::animated_glb_b64, "schematic"_a, "pack"_a, "timeline_json"_a)
         .def("bounds", &nucleation::MeshResult::bounds)
         .def_static("create", std::move(maybe_op_unwrap(&nucleation::MeshResult::create)), "schematic"_a, "pack"_a, "config"_a)
+        .def_static("create_or_empty", std::move(maybe_op_unwrap(&nucleation::MeshResult::create_or_empty)), "schematic"_a, "pack"_a, "config"_a)
         .def_static("create_usdz", std::move(maybe_op_unwrap(&nucleation::MeshResult::create_usdz)), "schematic"_a, "pack"_a, "config"_a)
         .def("glb_data_b64", &nucleation::MeshResult::glb_data_b64)
         .def("has_transparency", &nucleation::MeshResult::has_transparency)

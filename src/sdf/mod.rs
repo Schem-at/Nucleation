@@ -15,6 +15,7 @@
 pub mod compile;
 pub mod expr;
 pub mod field;
+pub mod grid;
 pub mod interval;
 pub mod material;
 pub mod noise;
@@ -26,6 +27,7 @@ pub use field::{
     Aabb, Axis, BinaryMathOp, DistanceKind, Field, FieldError, FieldGraph, NoiseBasis,
     UnaryMathOp, FIELD_GRAPH_VERSION,
 };
+pub use grid::VoxelDistanceGrid;
 pub use interval::{Interval, Interval3};
 pub use material::{
     face_mask, Channel, Condition, FluidLayer, Material, MaterialLayer, ScatterFace, ScatterRule,

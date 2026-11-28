@@ -14,6 +14,8 @@ pub(crate) mod mesh;
 pub(crate) mod pack;
 pub(crate) mod port;
 pub(crate) mod scene;
+pub(crate) mod sdf;
+pub(crate) mod worldgen;
 #[cfg(feature = "render")]
 pub(crate) mod render;
 #[cfg(feature = "render")]

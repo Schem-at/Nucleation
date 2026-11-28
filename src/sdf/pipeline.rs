@@ -350,8 +350,11 @@ impl CompiledPipeline {
         }
 
         let aux_len = self.registry.aux_fields.len();
-        let mut aux_buf = vec![0.0f32; aux_len];
-        let mut all_buf = vec![0.0f32; 1 + aux_len];
+        let num_roots = 1 + aux_len;
+        let mut slab_f32 = vec![0.0f32; 8 * num_roots];
+        let mut slab_tagged = [TaggedSample::plain(0.0); 8];
+        let mut slab_aux = vec![0.0f32; 8 * aux_len];
+        let mut depth_slab_f32 = [0.0f32; 8];
 
         // Per-column depth buffer (only used when depth_below_surface is requested)
         let mut col_solid = if self.registry.needs_depth {
@@ -377,14 +380,22 @@ impl CompiledPipeline {
                     for s in 0..num_slabs {
                         let sy0 = y0 + s * BRICK_SIZE;
                         let sy1 = (sy0 + BRICK_SIZE - 1).min(y1);
+                        let slab_len = (sy1 - sy0 + 1) as usize;
                         if !slab_has_solid[s as usize] {
-                            for y in sy0..=sy1 {
-                                col_solid[(y - y0) as usize] = false;
+                            for k in 0..slab_len {
+                                col_solid[(sy0 + k as i32 - y0) as usize] = false;
                             }
                         } else {
-                            for y in sy0..=sy1 {
-                                col_solid[(y - y0) as usize] =
-                                    self.geometry_compiled.eval(fx, y as f32 + 0.5, fz) <= 0.0;
+                            self.geometry_compiled.graph_eval_slab_f32(
+                                fx,
+                                sy0,
+                                slab_len,
+                                fz,
+                                &mut depth_slab_f32[..slab_len],
+                            );
+                            for k in 0..slab_len {
+                                col_solid[(sy0 + k as i32 - y0) as usize] =
+                                    depth_slab_f32[k] <= 0.0;
                             }
                         }
                     }
@@ -407,24 +418,43 @@ impl CompiledPipeline {
                     }
                     let sy0 = y0 + s * BRICK_SIZE;
                     let sy1 = (sy0 + BRICK_SIZE - 1).min(y1);
+                    let slab_len = (sy1 - sy0 + 1) as usize;
 
-                    for y in sy0..=sy1 {
+                    if self.registry.needs_tags {
+                        self.graph.eval_slab_tagged(
+                            fx,
+                            sy0,
+                            slab_len,
+                            fz,
+                            &mut slab_tagged[..slab_len],
+                            &mut slab_aux,
+                        );
+                    } else {
+                        self.graph
+                            .eval_slab_f32(fx, sy0, slab_len, fz, &mut slab_f32);
+                    }
+
+                    for k in 0..slab_len {
+                        let y = sy0 + k as i32;
                         let fy = y as f32 + 0.5;
-                        let sample: TaggedSample = if self.registry.needs_tags {
-                            self.graph
-                                .eval_primary_tagged_and_aux(fx, fy, fz, &mut aux_buf)
-                        } else {
-                            self.graph.eval_all_f32(fx, fy, fz, &mut all_buf);
-                            aux_buf.copy_from_slice(&all_buf[1..]);
-                            TaggedSample::plain(all_buf[0])
-                        };
+                        let (sample, aux_slice): (TaggedSample, &[f32]) =
+                            if self.registry.needs_tags {
+                                let base = k * aux_len;
+                                (slab_tagged[k], &slab_aux[base..base + aux_len])
+                            } else {
+                                let base = k * num_roots;
+                                (
+                                    TaggedSample::plain(slab_f32[base]),
+                                    &slab_f32[base + 1..base + num_roots],
+                                )
+                            };
 
                         if sample.distance > 0.0 {
                             // Air voxel: check fluid layers in order
                             if slab_has_fluid[s as usize] {
                                 for (i, fluid) in self.fluids.iter().enumerate() {
                                     let aux_idx = self.fluid_root_indices[i] - 1;
-                                    if aux_buf[aux_idx] <= 0.0 {
+                                    if aux_slice[aux_idx] <= 0.0 {
                                         out.blocks.push((x, y, z, fluid.block.clone()));
                                         break;
                                     }
@@ -472,7 +502,7 @@ impl CompiledPipeline {
                             material_id: sample.material_id,
                             blend_material_id: sample.blend_material_id,
                             blend_weight: sample.blend_weight,
-                            aux_fields: &aux_buf,
+                            aux_fields: aux_slice,
                         };
 
                         let placed_block = eval_material(&self.material, &ctx, &self.registry);

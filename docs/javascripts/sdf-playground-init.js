@@ -63,7 +63,9 @@
     const hasInteractive =
       document.querySelector("[data-sdf-workbench]") !== null ||
       document.querySelector("[data-sdf-csg-lab]") !== null ||
-      document.querySelector("[data-worldgen-lab]") !== null;
+      document.querySelector("[data-worldgen-lab]") !== null ||
+      document.querySelector("[data-palette-studio]") !== null ||
+      document.querySelector("[data-tick-studio]") !== null;
 
     if (hasInteractive) {
       try {

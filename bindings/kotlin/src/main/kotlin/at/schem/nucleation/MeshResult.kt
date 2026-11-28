@@ -8,6 +8,7 @@ import com.sun.jna.Structure
 internal interface MeshResultLib: Library {
     fun MeshResult_destroy(handle: Pointer)
     fun MeshResult_create(schematic: Pointer, pack: Pointer, config: Pointer): ResultPointerInt
+    fun MeshResult_create_or_empty(schematic: Pointer, pack: Pointer, config: Pointer): ResultPointerInt
     fun MeshResult_create_usdz(schematic: Pointer, pack: Pointer, config: Pointer): ResultPointerInt
     fun MeshResult_animated_glb_b64(schematic: Pointer, pack: Pointer, timelineJson: Slice, write: Pointer): ResultUnitInt
     fun MeshResult_glb_data_b64(handle: Pointer, write: Pointer): ResultUnitInt
@@ -53,6 +54,24 @@ class MeshResult internal constructor (
         fun create(schematic: Schematic, pack: ResourcePack, config: MeshConfig): Result<MeshResult> {
 
             val returnVal = lib.MeshResult_create(schematic.handle, pack.handle, config.handle);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal
+                val returnOpaque = MeshResult(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+
+        /** Mesh a schematic, returning an empty `MeshResult` (`0` triangles)
+        *instead of an error when the schematic contains no blocks.
+        */
+        fun createOrEmpty(schematic: Schematic, pack: ResourcePack, config: MeshConfig): Result<MeshResult> {
+
+            val returnVal = lib.MeshResult_create_or_empty(schematic.handle, pack.handle, config.handle);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()

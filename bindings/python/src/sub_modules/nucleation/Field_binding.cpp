@@ -5,6 +5,7 @@
 #include "FieldAxis.hpp"
 #include "FieldCellMode.hpp"
 #include "FieldNoiseBasis.hpp"
+#include "Schematic.hpp"
 
 namespace nucleation {
 void add_Field_binding(nb::module_ mod) {
@@ -49,7 +50,10 @@ void add_Field_binding(nb::module_ mod) {
         .def_static("expr", std::move(maybe_op_unwrap(&nucleation::Field::expr)), "source"_a)
         .def_static("fbm2", std::move(maybe_op_unwrap(&nucleation::Field::fbm2)), "basis"_a, "frequency"_a, "seed"_a, "octaves"_a, "lacunarity"_a, "gain"_a, "ridged"_a)
         .def_static("fbm3", std::move(maybe_op_unwrap(&nucleation::Field::fbm3)), "basis"_a, "frequency"_a, "seed"_a, "octaves"_a, "lacunarity"_a, "gain"_a, "ridged"_a)
+        .def_static("from_glb_bytes", std::move(maybe_op_unwrap(&nucleation::Field::from_glb_bytes)), "bytes"_a, "max_dim"_a, "pad"_a)
         .def_static("from_json", std::move(maybe_op_unwrap(&nucleation::Field::from_json)), "json"_a)
+        .def_static("from_obj_str", std::move(maybe_op_unwrap(&nucleation::Field::from_obj_str)), "obj_text"_a, "max_dim"_a, "pad"_a)
+        .def_static("from_schematic", std::move(maybe_op_unwrap(&nucleation::Field::from_schematic)), "schematic"_a, "pad"_a)
         .def_static("heightmap", std::move(maybe_op_unwrap(&nucleation::Field::heightmap)), "base_y"_a, "height"_a)
         .def_static("hex_prism", std::move(maybe_op_unwrap(&nucleation::Field::hex_prism)), "radius"_a, "half_height"_a)
         .def_static("infinite_cone", std::move(maybe_op_unwrap(&nucleation::Field::infinite_cone)), "angle_degrees"_a)

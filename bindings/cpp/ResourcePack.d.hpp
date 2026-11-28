@@ -45,6 +45,13 @@ public:
   inline static diplomat::result<std::unique_ptr<ResourcePack>, NucleationError> from_list(const ResourcePackList& list);
 
   /**
+   * Create the built-in procedural Minecraft block resource pack
+   * (multi-face pixel art, fluids, flora, redstone states, and 16-color
+   * concrete/wool/terracotta spectra — zero external files required).
+   */
+  inline static std::unique_ptr<ResourcePack> builtin_procedural();
+
+  /**
    * Number of blockstate definitions in the pack.
    */
   inline uint32_t blockstate_count() const;

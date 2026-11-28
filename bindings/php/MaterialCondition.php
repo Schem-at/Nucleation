@@ -97,6 +97,76 @@ final class MaterialCondition {
         return new MaterialCondition($ret, true);
     }
 
+    public static function exposedTop() {
+        $ret = Lib::ffi()->MaterialCondition_exposed_top();
+        return new MaterialCondition($ret, true);
+    }
+
+    public static function exposedBottom() {
+        $ret = Lib::ffi()->MaterialCondition_exposed_bottom();
+        return new MaterialCondition($ret, true);
+    }
+
+    public static function exposedSide() {
+        $ret = Lib::ffi()->MaterialCondition_exposed_side();
+        return new MaterialCondition($ret, true);
+    }
+
+    public static function exposedAny() {
+        $ret = Lib::ffi()->MaterialCondition_exposed_any();
+        return new MaterialCondition($ret, true);
+    }
+
+    public static function interior() {
+        $ret = Lib::ffi()->MaterialCondition_interior();
+        return new MaterialCondition($ret, true);
+    }
+
+    public static function yAbove( $min_y) {
+        $result = Lib::ffi()->MaterialCondition_y_above($min_y);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new MaterialCondition($result->ok, true);
+    }
+
+    public static function yBelow( $max_y) {
+        $result = Lib::ffi()->MaterialCondition_y_below($max_y);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new MaterialCondition($result->ok, true);
+    }
+
+    public static function yBetween( $min_y,  $max_y) {
+        $result = Lib::ffi()->MaterialCondition_y_between($min_y, $max_y);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new MaterialCondition($result->ok, true);
+    }
+
+    public static function slopeBelow( $max_slope) {
+        $result = Lib::ffi()->MaterialCondition_slope_below($max_slope);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new MaterialCondition($result->ok, true);
+    }
+
+    public static function slopeAbove( $min_slope) {
+        $result = Lib::ffi()->MaterialCondition_slope_above($min_slope);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new MaterialCondition($result->ok, true);
+    }
+
+    public static function depthBetween( $min_depth,  $max_depth) {
+        $ret = Lib::ffi()->MaterialCondition_depth_between($min_depth, $max_depth);
+        return new MaterialCondition($ret, true);
+    }
+
     public static function chance( $probability,  $seed) {
         $result = Lib::ffi()->MaterialCondition_chance($probability, $seed);
         if (!$result->is_ok) {

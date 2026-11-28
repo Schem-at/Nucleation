@@ -8,6 +8,7 @@ import { FieldNormal } from "./FieldNormal.mjs"
 import { FieldRange } from "./FieldRange.mjs"
 import { FieldSample } from "./FieldSample.mjs"
 import { NucleationError } from "./NucleationError.mjs"
+import { Schematic } from "./Schematic.mjs"
 import { Shape } from "./Shape.mjs"
 import wasm from "./diplomat-wasm.mjs";
 import * as diplomatRuntime from "./diplomat-runtime.mjs";
@@ -108,6 +109,88 @@ export class Field {
 
         finally {
             diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * Convert any existing Minecraft schematic into a smooth, composable
+     * 3D signed distance field via exact 3D Euclidean Distance Transform.
+     */
+    static fromSchematic(schematic, pad) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Field_from_schematic(diplomatReceive.buffer, schematic.ffiValue, pad);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new Field(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Convert binary glTF (`.glb`) bytes into a composable 3D signed
+     * distance field fitted to `max_dim` blocks along its longest axis.
+     */
+    static fromGlbBytes(bytes, maxDim, pad) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const bytesSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, bytes, "u8")));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Field_from_glb_bytes(diplomatReceive.buffer, bytesSlice.ptr, maxDim, pad);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new Field(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Convert a Wavefront `.obj` string into a composable 3D signed
+     * distance field fitted to `max_dim` blocks along its longest axis.
+     */
+    static fromObjStr(objText, maxDim, pad) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const objTextSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, objText)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Field_from_obj_str(diplomatReceive.buffer, objTextSlice.ptr, maxDim, pad);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new Field(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
         }
     }
 

@@ -11,6 +11,19 @@ palette design decides *which candidates are acceptable*.
   <img class="kg-fallback--light" src="../../media/kineglyph/palettes-and-color.light.svg" alt="">
 </div>
 
+## Try it live: Oklab gradient & dithering studio
+
+Pick any two colors, choose a Minecraft block palette, compare **Oklab** vs
+**CIE Lab** vs **sRGB** interpolation, and toggle ordered Bayer dithering —
+evaluated live in the browser by Nucleation WebAssembly with real Minecraft
+blocks:
+
+<div class="sdf-studio" data-palette-studio>
+  <noscript>
+    <p>Enable JavaScript to run the live WebAssembly Oklab palette and dithering studio.</p>
+  </noscript>
+</div>
+
 ## One color atlas in three bindings
 
 The guide fixture is a 32 by 16 wall with 448 blocks. Its large lower panel

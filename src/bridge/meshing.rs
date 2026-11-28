@@ -113,6 +113,15 @@ pub mod ffi {
                 .map_err(|_| NucleationError::Parse)
         }
 
+        /// Create the built-in procedural Minecraft block resource pack
+        /// (multi-face pixel art, fluids, flora, redstone states, and 16-color
+        /// concrete/wool/terracotta spectra — zero external files required).
+        pub fn builtin_procedural() -> Box<ResourcePack> {
+            Box::new(ResourcePack(
+                crate::meshing::ResourcePackSource::builtin_procedural(),
+            ))
+        }
+
         /// Number of blockstate definitions in the pack.
         pub fn blockstate_count(&self) -> u32 {
             self.0.stats().blockstate_count as u32
@@ -426,6 +435,20 @@ pub mod ffi {
             schematic
                 .0
                 .to_mesh(&pack.0, &config.0)
+                .map(|r| Box::new(MeshResult(r)))
+                .map_err(|_| NucleationError::Mesh)
+        }
+
+        /// Mesh a schematic, returning an empty `MeshResult` (`0` triangles)
+        /// instead of an error when the schematic contains no blocks.
+        pub fn create_or_empty(
+            schematic: &Schematic,
+            pack: &ResourcePack,
+            config: &MeshConfig,
+        ) -> Result<Box<MeshResult>, NucleationError> {
+            schematic
+                .0
+                .to_mesh_or_empty(&pack.0, &config.0)
                 .map(|r| Box::new(MeshResult(r)))
                 .map_err(|_| NucleationError::Mesh)
         }

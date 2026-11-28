@@ -95,6 +95,24 @@ export class ResourcePack {
     }
 
     /**
+     * Create the built-in procedural Minecraft block resource pack
+     * (multi-face pixel art, fluids, flora, redstone states, and 16-color
+     * concrete/wool/terracotta spectra — zero external files required).
+     */
+    static builtinProcedural() {
+
+        const result = wasm.ResourcePack_builtin_procedural();
+
+        try {
+            return new ResourcePack(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
      * Number of blockstate definitions in the pack.
      */
     blockstateCount() {

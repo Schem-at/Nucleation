@@ -25,6 +25,8 @@ ResourcePack_from_bytes_result ResourcePack_from_bytes(DiplomatU8View data);
 typedef struct ResourcePack_from_list_result {union {ResourcePack* ok; NucleationError err;}; bool is_ok;} ResourcePack_from_list_result;
 ResourcePack_from_list_result ResourcePack_from_list(const ResourcePackList* list);
 
+ResourcePack* ResourcePack_builtin_procedural(void);
+
 uint32_t ResourcePack_blockstate_count(const ResourcePack* self);
 
 uint32_t ResourcePack_model_count(const ResourcePack* self);

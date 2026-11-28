@@ -26,6 +26,9 @@ namespace capi {
     typedef struct MeshResult_create_result {union {diplomat::capi::MeshResult* ok; diplomat::capi::NucleationError err;}; bool is_ok;} MeshResult_create_result;
     MeshResult_create_result MeshResult_create(const diplomat::capi::Schematic* schematic, const diplomat::capi::ResourcePack* pack, const diplomat::capi::MeshConfig* config);
 
+    typedef struct MeshResult_create_or_empty_result {union {diplomat::capi::MeshResult* ok; diplomat::capi::NucleationError err;}; bool is_ok;} MeshResult_create_or_empty_result;
+    MeshResult_create_or_empty_result MeshResult_create_or_empty(const diplomat::capi::Schematic* schematic, const diplomat::capi::ResourcePack* pack, const diplomat::capi::MeshConfig* config);
+
     typedef struct MeshResult_create_usdz_result {union {diplomat::capi::MeshResult* ok; diplomat::capi::NucleationError err;}; bool is_ok;} MeshResult_create_usdz_result;
     MeshResult_create_usdz_result MeshResult_create_usdz(const diplomat::capi::Schematic* schematic, const diplomat::capi::ResourcePack* pack, const diplomat::capi::MeshConfig* config);
 
@@ -56,6 +59,13 @@ namespace capi {
 
 inline diplomat::result<std::unique_ptr<MeshResult>, NucleationError> MeshResult::create(const Schematic& schematic, const ResourcePack& pack, const MeshConfig& config) {
     auto result = diplomat::capi::MeshResult_create(schematic.AsFFI(),
+        pack.AsFFI(),
+        config.AsFFI());
+    return result.is_ok ? diplomat::result<std::unique_ptr<MeshResult>, NucleationError>(diplomat::Ok<std::unique_ptr<MeshResult>>(std::unique_ptr<MeshResult>(MeshResult::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<MeshResult>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<MeshResult>, NucleationError> MeshResult::create_or_empty(const Schematic& schematic, const ResourcePack& pack, const MeshConfig& config) {
+    auto result = diplomat::capi::MeshResult_create_or_empty(schematic.AsFFI(),
         pack.AsFFI(),
         config.AsFFI());
     return result.is_ok ? diplomat::result<std::unique_ptr<MeshResult>, NucleationError>(diplomat::Ok<std::unique_ptr<MeshResult>>(std::unique_ptr<MeshResult>(MeshResult::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<MeshResult>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));

@@ -37,6 +37,50 @@ final class Field {
         return new Field($ret, true);
     }
 
+    public static function fromSchematic( $schematic,  $pad) {
+        $result = Lib::ffi()->Field_from_schematic($schematic->ptr, $pad);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Field($result->ok, true);
+    }
+
+    public static function fromGlbBytes(array $bytes,  $max_dim,  $pad) {
+        $__n0 = count($bytes);
+        $__view0 = Lib::ffi()->new('DiplomatU8View');
+        if ($__n0 > 0) {
+            $__arr0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            foreach ($bytes as $__i0 => $__v0) { $__arr0[$__i0] = $__v0; }
+            $__view0->data = \FFI::addr($__arr0[0]);
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Field_from_glb_bytes($__view0, $max_dim, $pad);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Field($result->ok, true);
+    }
+
+    public static function fromObjStr(string $obj_text,  $max_dim,  $pad) {
+        $__n0 = strlen($obj_text);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $obj_text, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Field_from_obj_str($__view0, $max_dim, $pad);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Field($result->ok, true);
+    }
+
     public static function sphere( $radius) {
         $result = Lib::ffi()->Field_sphere($radius);
         if (!$result->is_ok) {

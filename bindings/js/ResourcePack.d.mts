@@ -29,6 +29,13 @@ export class ResourcePack {
     static fromList(list: ResourcePackList): ResourcePack;
 
     /**
+     * Create the built-in procedural Minecraft block resource pack
+     * (multi-face pixel art, fluids, flora, redstone states, and 16-color
+     * concrete/wool/terracotta spectra — zero external files required).
+     */
+    static builtinProcedural(): ResourcePack;
+
+    /**
      * Number of blockstate definitions in the pack.
      */
     blockstateCount(): number;

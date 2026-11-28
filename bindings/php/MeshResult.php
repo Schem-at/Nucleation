@@ -22,6 +22,14 @@ final class MeshResult {
         return new MeshResult($result->ok, true);
     }
 
+    public static function createOrEmpty( $schematic,  $pack,  $config) {
+        $result = Lib::ffi()->MeshResult_create_or_empty($schematic->ptr, $pack->ptr, $config->ptr);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new MeshResult($result->ok, true);
+    }
+
     public static function createUsdz( $schematic,  $pack,  $config) {
         $result = Lib::ffi()->MeshResult_create_usdz($schematic->ptr, $pack->ptr, $config->ptr);
         if (!$result->is_ok) {

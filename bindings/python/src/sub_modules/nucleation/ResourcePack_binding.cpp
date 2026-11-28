@@ -19,6 +19,7 @@ void add_ResourcePack_binding(nb::module_ mod) {
         .def("add_player_skin", &nucleation::ResourcePack::add_player_skin, "url_or_hash"_a, "png"_a)
         .def("add_texture", &nucleation::ResourcePack::add_texture, "name"_a, "width"_a, "height"_a, "pixels"_a)
         .def("blockstate_count", &nucleation::ResourcePack::blockstate_count)
+        .def_static("builtin_procedural", std::move(maybe_op_unwrap(&nucleation::ResourcePack::builtin_procedural)))
         .def_static("from_bytes", std::move(maybe_op_unwrap(&nucleation::ResourcePack::from_bytes)), "data"_a)
         .def_static("from_list", std::move(maybe_op_unwrap(&nucleation::ResourcePack::from_list)), "list"_a)
         .def("get_blockstate_json", &nucleation::ResourcePack::get_blockstate_json, "name"_a)

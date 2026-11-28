@@ -30,394 +30,23 @@ async function loadNucleation() {
     import("./vendor/nucleation/CellularSdfConfig.mjs"),
     import("./vendor/nucleation/GeneratedChunkOverlayMode.mjs"),
     import("./vendor/nucleation/Brush.mjs"),
+    import("./vendor/nucleation/TickSimulation.mjs"),
+    import("./vendor/nucleation/TickSettleMode.mjs"),
   ]).then((mods) => Object.assign({}, ...mods));
   return wasmPromise;
 }
 
-const EMPTY_ZIP = [
-  80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-];
-
 /* ============================================================================
- * MULTI-FACE PIXEL-ART MINECRAFT BLOCK PACK (+ OPTIONAL USER .ZIP OVERRIDE)
+ * BUILT-IN PROCEDURAL MINECRAFT BLOCK PACK (+ OPTIONAL USER .ZIP OVERRIDE)
+ * Powered directly by Rust/WASM `ResourcePack.builtinProcedural()`!
  * ============================================================================ */
-
-function clampByte(v) {
-  return Math.max(0, Math.min(255, Math.round(v)));
-}
-
-function texHash(x, y, salt = 0) {
-  let n = (x * 374761393 + y * 668265263 + salt * 1442695041) | 0;
-  n = ((n ^ (n >> 13)) * 1274126177) | 0;
-  return ((n ^ (n >> 16)) >>> 0) / 4294967295;
-}
-
-function makeTex(painter) {
-  const px = new Uint8Array(16 * 16 * 4);
-  for (let y = 0; y < 16; y += 1) {
-    for (let x = 0; x < 16; x += 1) {
-      const [r, g, b, a = 255] = painter(x, y);
-      const i = (y * 16 + x) * 4;
-      px[i] = clampByte(r);
-      px[i + 1] = clampByte(g);
-      px[i + 2] = clampByte(b);
-      px[i + 3] = clampByte(a);
-    }
-  }
-  return px;
-}
-
-function solidSpeckle(rgb, amp = 14, salt = 1) {
-  return makeTex((x, y) => {
-    const d = (texHash(x, y, salt) - 0.5) * 2 * amp;
-    return [rgb[0] + d, rgb[1] + d, rgb[2] + d];
-  });
-}
-
-function brickTex(base, mortar, mossy = false, salt = 3) {
-  return makeTex((x, y) => {
-    const row = y >> 3;
-    const isMortar = y === 0 || y === 8 || ((x + (row ? 8 : 0)) & 15) === 0;
-    const n = (texHash(x, y, salt) - 0.5) * 16;
-    if (isMortar) return [mortar[0] + n * 0.4, mortar[1] + n * 0.4, mortar[2] + n * 0.4];
-    if (mossy && texHash(x >> 1, y >> 1, 91) > 0.72) {
-      return [76 + n * 0.6, 114 + n * 0.8, 48 + n * 0.5];
-    }
-    const bevel = y === 1 || y === 9 ? 10 : y === 7 || y === 15 ? -10 : 0;
-    return [base[0] + n + bevel, base[1] + n + bevel, base[2] + n + bevel];
-  });
-}
-
-function planksTex(base, seam, salt = 5) {
-  return makeTex((x, y) => {
-    const board = y >> 2;
-    const isHSeam = (y & 3) === 0;
-    const isVSeam = (x === 7 && (board & 1) === 0) || (x === 15 && (board & 1) === 1);
-    const grain = (texHash(x >> 1, y, salt + board * 13) - 0.5) * 18;
-    if (isHSeam || isVSeam) return [seam[0], seam[1], seam[2]];
-    const shade = (y & 3) === 1 ? 8 : (y & 3) === 3 ? -8 : 0;
-    return [base[0] + grain + shade, base[1] + grain + shade, base[2] + grain + shade];
-  });
-}
-
-function cobbleTex(base, dark, salt = 9) {
-  return makeTex((x, y) => {
-    const cx = Math.floor((x + ((y >> 2) & 1) * 2) / 4);
-    const cy = Math.floor(y / 4);
-    const edge = (x + ((y >> 2) & 1) * 2) % 4 === 0 || y % 4 === 0;
-    const stoneTone = (texHash(cx, cy, salt) - 0.5) * 32;
-    const micro = (texHash(x, y, salt + 7) - 0.5) * 10;
-    if (edge) return [dark[0] + micro, dark[1] + micro, dark[2] + micro];
-    return [base[0] + stoneTone + micro, base[1] + stoneTone + micro, base[2] + stoneTone + micro];
-  });
-}
-
-function buildDefaultResourcePack(nuc) {
-  const pack = nuc.ResourcePack.fromBytes(EMPTY_ZIP);
-
-  function addCubeAll(name, pixels) {
-    const block = `minecraft:${name}`;
-    const tex = `minecraft:block/${name}`;
-    const faces = Object.fromEntries(
-      ["down", "up", "north", "south", "west", "east"].map((s) => [s, { texture: "#all", cullface: s }]),
-    );
-    pack.addBlockstateJson(block, JSON.stringify({ variants: { "": { model: tex } } }));
-    pack.addModelJson(tex, JSON.stringify({ textures: { all: tex }, elements: [{ from: [0, 0, 0], to: [16, 16, 16], faces }] }));
-    pack.addTexture(tex, 16, 16, pixels);
-  }
-
-  function addCubeTopSideBottom(name, topPx, sidePx, bottomPx) {
-    const block = `minecraft:${name}`;
-    const model = `minecraft:block/${name}`;
-    const tTop = `minecraft:block/${name}_top`;
-    const tSide = `minecraft:block/${name}_side`;
-    const tBot = `minecraft:block/${name}_bottom`;
-    pack.addBlockstateJson(block, JSON.stringify({ variants: { "": { model } } }));
-    pack.addModelJson(
-      model,
-      JSON.stringify({
-        textures: { top: tTop, side: tSide, bottom: tBot },
-        elements: [
-          {
-            from: [0, 0, 0],
-            to: [16, 16, 16],
-            faces: {
-              up: { texture: "#top", cullface: "up" },
-              down: { texture: "#bottom", cullface: "down" },
-              north: { texture: "#side", cullface: "north" },
-              south: { texture: "#side", cullface: "south" },
-              west: { texture: "#side", cullface: "west" },
-              east: { texture: "#side", cullface: "east" },
-            },
-          },
-        ],
-      }),
-    );
-    pack.addTexture(tTop, 16, 16, topPx);
-    pack.addTexture(tSide, 16, 16, sidePx);
-    pack.addTexture(tBot, 16, 16, bottomPx);
-  }
-
-  function addCrossPlant(name, pixels) {
-    const block = `minecraft:${name}`;
-    const tex = `minecraft:block/${name}`;
-    pack.addBlockstateJson(block, JSON.stringify({ variants: { "": { model: tex } } }));
-    pack.addModelJson(
-      tex,
-      JSON.stringify({
-        textures: { cross: tex },
-        elements: [
-          {
-            from: [2, 0, 8],
-            to: [14, 14, 8],
-            rotation: { origin: [8, 8, 8], axis: "y", angle: 45, rescale: true },
-            shade: false,
-            faces: { north: { texture: "#cross" }, south: { texture: "#cross" } },
-          },
-          {
-            from: [8, 0, 2],
-            to: [8, 14, 14],
-            rotation: { origin: [8, 8, 8], axis: "y", angle: 45, rescale: true },
-            shade: false,
-            faces: { east: { texture: "#cross" }, west: { texture: "#cross" } },
-          },
-        ],
-      }),
-    );
-    pack.addTexture(tex, 16, 16, pixels);
-  }
-
-  // 1. Real multi-face grass_block (lush green top, dirt with hanging grass fringe on sides, dirt bottom)
-  const dirtPx = makeTex((x, y) => {
-    const n = (texHash(x, y, 11) - 0.5) * 24;
-    const pebble = texHash(x, y, 29) > 0.9 ? 28 : 0;
-    return [134 + n + pebble, 96 + n * 0.8 + pebble, 67 + n * 0.6 + pebble];
-  });
-  const grassTopPx = makeTex((x, y) => {
-    const n = (texHash(x, y, 17) - 0.5) * 26;
-    const blade = texHash(x, y, 37) > 0.72 ? 16 : 0;
-    return [102 + n * 0.7 + blade * 0.6, 164 + n + blade, 66 + n * 0.5];
-  });
-  const grassSidePx = makeTex((x, y) => {
-    const fringe = 2 + Math.floor(texHash(x, 0, 41) * 3.6);
-    if (y < fringe) {
-      const n = (texHash(x, y, 17) - 0.5) * 22;
-      return [98 + n * 0.7, 158 + n, 62 + n * 0.5];
-    }
-    const n = (texHash(x, y, 11) - 0.5) * 24;
-    return [134 + n, 96 + n * 0.8, 67 + n * 0.6];
-  });
-  addCubeTopSideBottom("grass_block", grassTopPx, grassSidePx, dirtPx);
-  addCubeAll("dirt", dirtPx);
-
-  // 2. Real multi-face oak_log & spruce_log
-  const oakBark = makeTex((x, y) => {
-    const ridge = ((x + Math.floor(texHash(x, y >> 2, 51) * 2)) % 3 === 0) ? -16 : 8;
-    const n = (texHash(x, y, 52) - 0.5) * 12;
-    return [108 + ridge + n, 84 + ridge * 0.8 + n, 52 + ridge * 0.6 + n];
-  });
-  const oakTop = makeTex((x, y) => {
-    const r = Math.hypot(x - 7.5, y - 7.5);
-    if (r > 6.6) return [102, 78, 48];
-    const ring = Math.sin(r * 2.2) > 0 ? 12 : -10;
-    return [174 + ring, 140 + ring * 0.85, 92 + ring * 0.65];
-  });
-  addCubeTopSideBottom("oak_log", oakTop, oakBark, oakTop);
-
-  const spruceBark = makeTex((x, y) => {
-    const ridge = (x % 3 === 0) ? -14 : 6;
-    const n = (texHash(x, y, 55) - 0.5) * 10;
-    return [62 + ridge + n, 44 + ridge * 0.7 + n, 28 + ridge * 0.5 + n];
-  });
-  addCubeTopSideBottom("spruce_log", oakTop, spruceBark, oakTop);
-
-  // 3. Leaves
-  addCubeAll(
-    "oak_leaves",
-    makeTex((x, y) => {
-      const cluster = texHash(x >> 1, y >> 1, 61);
-      const n = (texHash(x, y, 62) - 0.5) * 22;
-      if (cluster < 0.24) return [46 + n * 0.5, 86 + n * 0.6, 30 + n * 0.4];
-      return [76 + n * 0.7, 134 + n, 46 + n * 0.5];
-    }),
-  );
-  addCubeAll(
-    "spruce_leaves",
-    makeTex((x, y) => {
-      const cluster = texHash(x >> 1, y >> 1, 67);
-      const n = (texHash(x, y, 68) - 0.5) * 18;
-      if (cluster < 0.25) return [36 + n * 0.4, 64 + n * 0.5, 42 + n * 0.4];
-      return [58 + n * 0.6, 98 + n * 0.8, 64 + n * 0.6];
-    }),
-  );
-
-  // 4. Sandstone (multi-face: smooth top, layered band side, rough bottom)
-  const sandPx = solidSpeckle([222, 208, 162], 12, 71);
-  const sandstoneSide = makeTex((x, y) => {
-    const n = (texHash(x, y, 73) - 0.5) * 12;
-    const band = y < 4 ? 10 : y === 4 ? -18 : y > 12 ? -10 : 0;
-    return [218 + band + n, 204 + band + n, 156 + band + n];
-  });
-  addCubeTopSideBottom("sandstone", sandPx, sandstoneSide, cobbleTex([208, 192, 146], [176, 160, 118], 75));
-  addCubeAll("smooth_sandstone", sandPx);
-  addCubeAll("sand", sandPx);
-
-  // 5. Stone, bricks, planks & minerals
-  addCubeAll("stone", solidSpeckle([130, 132, 134], 14, 101));
-  addCubeAll("andesite", solidSpeckle([144, 146, 144], 18, 102));
-  addCubeAll("tuff", solidSpeckle([108, 109, 101], 16, 103));
-  addCubeAll(
-    "deepslate",
-    makeTex((x, y) => {
-      const stripe = (y % 4 === 0 ? -12 : y % 4 === 2 ? 8 : 0) + (texHash(x, y, 104) - 0.5) * 12;
-      return [72 + stripe, 74 + stripe, 82 + stripe];
-    }),
-  );
-  addCubeAll("cobblestone", cobbleTex([126, 128, 128], [86, 88, 90], 105));
-  addCubeAll("stone_bricks", brickTex([132, 134, 134], [88, 90, 92], false, 106));
-  addCubeAll("mossy_stone_bricks", brickTex([128, 132, 128], [82, 92, 78], true, 107));
-  addCubeAll("deepslate_bricks", brickTex([74, 76, 82], [46, 48, 54], false, 108));
-  addCubeAll("oak_planks", planksTex([168, 134, 84], [116, 88, 52], 109));
-  addCubeAll("spruce_planks", planksTex([116, 86, 52], [78, 54, 32], 110));
-  addCubeAll("dark_oak_planks", planksTex([72, 48, 28], [46, 30, 16], 111));
-  addCubeAll("moss_block", grassTopPx);
-  addCubeAll("calcite", makeTex((x, y) => {
-    const v = ((x - y + 32) % 7 === 0 ? -16 : 0) + (texHash(x, y, 112) - 0.5) * 10;
-    return [224 + v, 223 + v, 214 + v];
-  }));
-  addCubeAll("snow_block", solidSpeckle([242, 248, 252], 6, 113));
-  addCubeAll("gravel", cobbleTex([132, 128, 126], [96, 92, 90], 114));
-
-  // 6. Architectural metals, crystals, glow & Nether
-  addCubeAll("oxidized_copper", brickTex([82, 164, 146], [56, 118, 106], false, 120));
-  addCubeAll("weathered_copper", brickTex([106, 152, 118], [74, 112, 86], false, 121));
-  addCubeAll("cut_copper", brickTex([192, 108, 78], [134, 72, 50], false, 122));
-  addCubeAll("copper_block", brickTex([196, 112, 82], [142, 76, 54], false, 123));
-  addCubeAll("prismarine_bricks", brickTex([98, 174, 162], [64, 124, 116], false, 124));
-  addCubeAll("dark_prismarine", brickTex([52, 98, 88], [32, 64, 58], false, 125));
-  addCubeAll(
-    "amethyst_block",
-    makeTex((x, y) => {
-      const facet = (x + y) % 6 === 0 || (x - y + 16) % 8 === 0 ? 28 : -8;
-      const n = (texHash(x, y, 126) - 0.5) * 14;
-      return [148 + facet + n, 102 + facet * 0.8 + n, 206 + facet + n];
-    }),
-  );
-  addCubeAll(
-    "obsidian",
-    makeTex((x, y) => {
-      const glint = texHash(x, y, 127) > 0.84 ? 32 : 0;
-      const n = (texHash(x, y, 128) - 0.5) * 12;
-      return [24 + glint + n, 18 + glint * 0.5 + n, 40 + glint * 1.4 + n];
-    }),
-  );
-  addCubeAll(
-    "sea_lantern",
-    makeTex((x, y) => {
-      const rim = x <= 1 || y <= 1 || x >= 14 || y >= 14;
-      const n = (texHash(x, y, 129) - 0.5) * 10;
-      return rim ? [138 + n, 178 + n, 174 + n] : [206 + n, 240 + n, 234 + n];
-    }),
-  );
-  addCubeAll(
-    "glowstone",
-    makeTex((x, y) => {
-      const bright = texHash(x >> 1, y >> 1, 130) > 0.45 ? 24 : -24;
-      return [232 + bright * 0.6, 192 + bright, 96 + bright];
-    }),
-  );
-  addCubeAll("lapis_block", solidSpeckle([42, 82, 168], 20, 131));
-  addCubeAll("gold_block", solidSpeckle([246, 208, 68], 16, 132));
-  addCubeAll("netherrack", cobbleTex([112, 46, 46], [76, 28, 28], 133));
-  addCubeAll("blackstone", cobbleTex([44, 40, 48], [26, 24, 30], 134));
-  addCubeAll("magma_block", makeTex((x, y) => {
-    const crack = (x + y * 2) % 7 === 0 || (x * 2 - y + 32) % 9 === 0;
-    return crack ? [246, 146, 36] : [58, 30, 32];
-  }));
-
-  // 7. Fluids (water & lava)
-  const waterPx = makeTex((x, y) => {
-    const wave = (x + y * 2) % 6 < 2 ? 18 : -8;
-    return [52 + wave, 122 + wave, 212 + wave, 190];
-  });
-  pack.addTexture("minecraft:block/water_still", 16, 16, waterPx);
-  pack.addTexture("minecraft:block/water_flow", 16, 16, waterPx);
-  addCubeAll("water", waterPx);
-
-  const lavaPx = makeTex((x, y) => {
-    const hot = texHash(x >> 1, y >> 1, 140) > 0.55;
-    return hot ? [250, 186, 48] : [224, 92, 24];
-  });
-  pack.addTexture("minecraft:block/lava_still", 16, 16, lavaPx);
-  pack.addTexture("minecraft:block/lava_flow", 16, 16, lavaPx);
-  addCubeAll("lava", lavaPx);
-
-  // 8. Flora (short_grass, poppy, dandelion)
-  addCrossPlant(
-    "short_grass",
-    makeTex((x, y) => {
-      const blade =
-        (Math.abs(x - 4) <= 1 && y >= 6) ||
-        (Math.abs(x - 8) <= 1 && y >= 3) ||
-        (Math.abs(x - 12) <= 1 && y >= 7) ||
-        (y >= 12 && x >= 3 && x <= 13);
-      return blade ? [96 + (y < 8 ? 24 : 0), 162 + (y < 8 ? 22 : 0), 58, 255] : [0, 0, 0, 0];
-    }),
-  );
-  addCrossPlant(
-    "poppy",
-    makeTex((x, y) => {
-      const petal = Math.hypot(x - 8, y - 5) <= 2.6;
-      const stem = x === 8 && y >= 7 && y <= 15;
-      const leaf = (x === 6 || x === 7) && (y === 11 || y === 12);
-      if (petal) return [220, 44, 42, 255];
-      if (stem || leaf) return [64, 134, 48, 255];
-      return [0, 0, 0, 0];
-    }),
-  );
-  addCrossPlant(
-    "dandelion",
-    makeTex((x, y) => {
-      const petal = Math.hypot(x - 8, y - 6) <= 2.4;
-      const stem = x === 8 && y >= 8 && y <= 15;
-      if (petal) return [248, 212, 48, 255];
-      if (stem) return [68, 138, 48, 255];
-      return [0, 0, 0, 0];
-    }),
-  );
-
-  // 9. Concrete spectrum for Oklab palette mapping
-  const concretes = {
-    white_concrete: [212, 216, 218],
-    light_gray_concrete: [136, 138, 134],
-    gray_concrete: [62, 66, 70],
-    black_concrete: [22, 24, 30],
-    blue_concrete: [44, 52, 148],
-    cyan_concrete: [28, 136, 148],
-    light_blue_concrete: [52, 164, 208],
-    lime_concrete: [108, 178, 42],
-    green_concrete: [78, 102, 42],
-    yellow_concrete: [244, 194, 48],
-    orange_concrete: [226, 114, 32],
-    red_concrete: [164, 42, 40],
-    magenta_concrete: [178, 62, 168],
-    purple_concrete: [112, 44, 166],
-    pink_concrete: [218, 114, 152],
-    brown_concrete: [102, 66, 44],
-  };
-  for (const [k, rgb] of Object.entries(concretes)) {
-    addCubeAll(k, solidSpeckle(rgb, 5, k.length * 19));
-  }
-
-  return pack;
-}
 
 let activePack = null;
 let customPackName = null;
 const packListeners = new Set();
 
 function getActivePack(nuc) {
-  if (!activePack) activePack = buildDefaultResourcePack(nuc);
+  if (!activePack) activePack = nuc.ResourcePack.builtinProcedural();
   return activePack;
 }
 
@@ -621,12 +250,11 @@ const tree = trunk.tag(2).unionWith(crown.tag(3));
 
 // Exposed +Y flat tops -> grass_block; depth 1..2 -> dirt; stone below
 layers.addLayer(
-  MaterialCondition.exposedFace(1, true)
-    .andWith(MaterialCondition.slopeRange(true, 0, true, 0.72)),
+  MaterialCondition.exposedTop().andWith(MaterialCondition.slopeBelow(0.72)),
   Material.solid("minecraft:grass_block"),
 );
 layers.addLayer(
-  MaterialCondition.depthBelowSurface(true, 1, true, 2),
+  MaterialCondition.depthBetween(1, 2),
   Material.solid("minecraft:dirt"),
 );
 
@@ -644,12 +272,11 @@ tree = trunk.tag(2).union_with(crown.tag(3))
 
 # Exposed +Y flat tops -> grass_block; depth 1..2 -> dirt; stone below
 layers.add_layer(
-    MaterialCondition.exposed_face(1, True)
-    .and_with(MaterialCondition.slope_range(True, 0, True, 0.72)),
+    MaterialCondition.exposed_top().and_with(MaterialCondition.slope_below(0.72)),
     Material.solid("minecraft:grass_block"),
 )
 layers.add_layer(
-    MaterialCondition.depth_below_surface(True, 1, True, 2),
+    MaterialCondition.depth_between(1, 2),
     Material.solid("minecraft:dirt"),
 )
 
@@ -673,13 +300,11 @@ pipe.add_scatter(flora)  # short_grass, poppy, dandelion on grass_block`;
 
       const layers = nuc.MaterialBuilder.createLayered();
       layers.addLayer(
-        nuc.MaterialCondition.exposedFace(1, true).andWith(
-          nuc.MaterialCondition.slopeRange(true, 0.0, true, 0.72),
-        ),
+        nuc.MaterialCondition.exposedTop().andWith(nuc.MaterialCondition.slopeBelow(0.72)),
         nuc.Material.solid("minecraft:grass_block"),
       );
       layers.addLayer(
-        nuc.MaterialCondition.depthBelowSurface(true, 1.0, true, 2.0),
+        nuc.MaterialCondition.depthBetween(1, 2),
         nuc.Material.solid("minecraft:dirt"),
       );
       layers.setDefault(
@@ -2197,6 +1822,457 @@ async function mountWorldgenLab(root, ensureModelViewer) {
   };
 }
 
+/* ============================================================================
+ * WIDGET 4: INTERACTIVE OKLAB PALETTE & DITHERING STUDIO (palettes-and-color)
+ * ============================================================================ */
+
+function hexToRgb(hex) {
+  const v = hex.replace("#", "");
+  return [
+    parseInt(v.slice(0, 2), 16) || 0,
+    parseInt(v.slice(2, 4), 16) || 0,
+    parseInt(v.slice(4, 6), 16) || 0,
+  ];
+}
+
+const PALETTE_PRESETS = [
+  { label: "Sunset", a: "#2B1E70", b: "#F6BE38" },
+  { label: "Ocean", a: "#183B8C", b: "#58E0D4" },
+  { label: "Nether", a: "#23142C", b: "#F47820" },
+  { label: "Forest", a: "#1E4A2C", b: "#B6E244" },
+  { label: "Monochrome", a: "#181A20", b: "#EEF2F6" },
+];
+
+async function mountPaletteStudio(root, ensureModelViewer) {
+  if (root.dataset.mounted === "true") return () => {};
+  root.dataset.mounted = "true";
+
+  let colorA = PALETTE_PRESETS[0].a;
+  let colorB = PALETTE_PRESETS[0].b;
+  let family = "concrete";
+  let space = "Oklab";
+  let dither = true;
+  let currentUrl = null;
+  let lastSchematic = null;
+  let seq = 0;
+  let nuc = null;
+
+  root.innerHTML = `
+    <div class="sdf-studio__bar">
+      <div class="sdf-seg" role="radiogroup" aria-label="Palette family" data-role="pal-family">
+        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="true" data-family="concrete">Concrete</button>
+        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="false" data-family="wool">Wool</button>
+        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="false" data-family="terracotta">Terracotta</button>
+      </div>
+      <div class="sdf-seg" role="radiogroup" aria-label="Interpolation color space" data-role="pal-space">
+        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="true" data-space="Oklab">Oklab</button>
+        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="false" data-space="Lab">CIE Lab</button>
+        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="false" data-space="Rgb">sRGB</button>
+      </div>
+    </div>
+
+    <div class="sdf-studio__stage">
+      <model-viewer
+        class="sdf-studio__viewer"
+        alt="Interactive 3D Minecraft block gradient wall generated by Nucleation Oklab palette mapping"
+        camera-controls
+        camera-orbit="12deg 78deg 112%"
+        field-of-view="26deg"
+        shadow-intensity="0.6"
+        exposure="1.05"
+        interaction-prompt="none"
+      ></model-viewer>
+      <div class="sdf-studio__overlay" data-role="pal-status">Loading Nucleation WASM...</div>
+    </div>
+
+    <div class="pal-controls">
+      <div class="pal-pickers">
+        <label class="pal-color">Start <input type="color" data-role="pal-a" value="${colorA}"></label>
+        <label class="pal-color">End <input type="color" data-role="pal-b" value="${colorB}"></label>
+        <label class="sdf-check"><input type="checkbox" data-role="pal-dither" checked><span>Ordered Bayer dithering</span></label>
+      </div>
+      <div class="sdf-expr-presets" data-role="pal-presets">
+        ${PALETTE_PRESETS.map(
+          (p, i) => `<button type="button" class="sdf-expr-snippet" data-pal-preset="${i}">${p.label}</button>`,
+        ).join("")}
+      </div>
+    </div>
+
+    <div class="pal-blocks" data-role="pal-blocks"></div>
+
+    <div class="sdf-studio__footer">
+      <div class="sdf-telemetry" data-role="pal-telemetry">Initializing Oklab palette engine...</div>
+      <button type="button" class="sdf-download-btn" data-role="pal-download" disabled>Download .schem</button>
+    </div>
+  `;
+
+  const viewer = root.querySelector(".sdf-studio__viewer");
+  const statusEl = root.querySelector('[data-role="pal-status"]');
+  const inputA = root.querySelector('[data-role="pal-a"]');
+  const inputB = root.querySelector('[data-role="pal-b"]');
+  const ditherEl = root.querySelector('[data-role="pal-dither"]');
+  const blocksEl = root.querySelector('[data-role="pal-blocks"]');
+  const telemetryEl = root.querySelector('[data-role="pal-telemetry"]');
+  const downloadBtn = root.querySelector('[data-role="pal-download"]');
+
+  async function rebuild() {
+    const mySeq = ++seq;
+    statusEl.textContent = "Mapping gradient in WASM...";
+    statusEl.hidden = false;
+    try {
+      if (!nuc) {
+        await ensureModelViewer();
+        nuc = await loadNucleation();
+      }
+      if (mySeq !== seq) return;
+
+      const t0 = performance.now();
+      let pal =
+        family === "wool"
+          ? nuc.Palette.wool()
+          : family === "terracotta"
+            ? nuc.Palette.terracotta()
+            : nuc.Palette.concrete();
+      if (dither) pal = pal.dithered();
+
+      const rgbA = hexToRgb(colorA);
+      const rgbB = hexToRgb(colorB);
+      const interp =
+        space === "Lab"
+          ? nuc.InterpolationSpace.Lab
+          : space === "Rgb"
+            ? nuc.InterpolationSpace.Rgb
+            : nuc.InterpolationSpace.Oklab;
+
+      const wall = nuc.Field.boxShape(12.0, 5.0, 0.9, 0.0);
+      const mat = nuc.Material.channelGradient(
+        nuc.FieldChannel.WorldX,
+        [0.0, 1.0],
+        [...rgbA, ...rgbB],
+        -11.5,
+        11.5,
+        pal,
+        interp,
+      );
+      const schem = nuc.VoxelPipeline.create(wall, mat).toSchematicBounded(
+        "palette_gradient",
+        -12,
+        -5,
+        -1,
+        12,
+        5,
+        1,
+      );
+
+      const cfg = nuc.MeshConfig.create();
+      cfg.setAmbientOcclusion(true);
+      cfg.setAoIntensity(0.45);
+      cfg.setGreedyMeshing(true);
+      const mesh = nuc.MeshResult.create(schem, getActivePack(nuc), cfg);
+      const glbBytes = decodeBase64(mesh.glbDataB64());
+      const ms = Math.round(performance.now() - t0);
+      if (mySeq !== seq) return;
+
+      lastSchematic = schem;
+      const nextUrl = URL.createObjectURL(new Blob([glbBytes], { type: "model/gltf-binary" }));
+      if (currentUrl) URL.revokeObjectURL(currentUrl);
+      currentUrl = nextUrl;
+      viewer.src = nextUrl;
+
+      const paletteIds = JSON.parse(schem.countBlocksJson());
+      const names = Object.entries(paletteIds)
+        .sort((a, b) => b[1] - a[1])
+        .map(([id, n]) => `${id.replace("minecraft:", "")} (${n})`);
+      blocksEl.textContent = `Selected blocks (${names.length}): ${names.join(" · ")}`;
+      telemetryEl.textContent = `${schem.blockCount()} blocks · ${space} · ${dither ? "Bayer dithered" : "snapped"} · ${ms} ms`;
+      statusEl.hidden = true;
+      downloadBtn.disabled = false;
+    } catch (err) {
+      if (mySeq !== seq) return;
+      statusEl.hidden = true;
+      telemetryEl.textContent = `Palette error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  root.querySelector('[data-role="pal-family"]').addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-family]");
+    if (!btn) return;
+    family = btn.dataset.family;
+    for (const el of root.querySelectorAll("[data-family]")) {
+      el.setAttribute("aria-checked", String(el === btn));
+    }
+    void rebuild();
+  });
+
+  root.querySelector('[data-role="pal-space"]').addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-space]");
+    if (!btn) return;
+    space = btn.dataset.space;
+    for (const el of root.querySelectorAll("[data-space]")) {
+      el.setAttribute("aria-checked", String(el === btn));
+    }
+    void rebuild();
+  });
+
+  root.querySelector('[data-role="pal-presets"]').addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-pal-preset]");
+    if (!btn) return;
+    const preset = PALETTE_PRESETS[Number(btn.dataset.palPreset)];
+    colorA = preset.a;
+    colorB = preset.b;
+    inputA.value = colorA;
+    inputB.value = colorB;
+    void rebuild();
+  });
+
+  inputA.addEventListener("input", () => {
+    colorA = inputA.value;
+    void rebuild();
+  });
+  inputB.addEventListener("input", () => {
+    colorB = inputB.value;
+    void rebuild();
+  });
+  ditherEl.addEventListener("change", () => {
+    dither = ditherEl.checked;
+    void rebuild();
+  });
+  downloadBtn.addEventListener("click", () => {
+    if (!lastSchematic) return;
+    const bytes = decodeBase64(lastSchematic.toSchematicB64());
+    const blobUrl = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = `nucleation-gradient-${family}-${space.toLowerCase()}.schem`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+  });
+
+  void rebuild();
+  return () => {
+    if (currentUrl) URL.revokeObjectURL(currentUrl);
+    root.dataset.mounted = "false";
+  };
+}
+
+/* ============================================================================
+ * WIDGET 5: INTERACTIVE MC-TICK REDSTONE STEP-THROUGH LAB (tick-simulation)
+ * ============================================================================ */
+
+const TICK_CIRCUITS = {
+  delay: {
+    label: "1. Repeater delay line",
+    inputPos: [0, 1, 1],
+    actionLabel: "Toggle lever",
+    build(nuc) {
+      const s = nuc.Schematic.create("repeater_delay");
+      for (let x = 0; x <= 7; x += 1) {
+        for (let z = 0; z <= 2; z += 1) {
+          s.setBlock(x, 0, z, "minecraft:smooth_stone");
+        }
+      }
+      s.setBlockFromString(0, 1, 1, "minecraft:lever[face=floor,facing=east,powered=false]");
+      s.setBlockFromString(1, 1, 1, "minecraft:redstone_wire[east=side,west=side,north=none,south=none,power=0]");
+      s.setBlockFromString(2, 1, 1, "minecraft:repeater[facing=west,delay=2,locked=false,powered=false]");
+      s.setBlockFromString(3, 1, 1, "minecraft:redstone_wire[east=side,west=side,north=none,south=none,power=0]");
+      s.setBlockFromString(4, 1, 1, "minecraft:repeater[facing=west,delay=2,locked=false,powered=false]");
+      s.setBlockFromString(5, 1, 1, "minecraft:redstone_wire[east=side,west=side,north=none,south=none,power=0]");
+      s.setBlockFromString(6, 1, 1, "minecraft:repeater[facing=west,delay=2,locked=false,powered=false]");
+      s.setBlockFromString(7, 1, 1, "minecraft:redstone_lamp[lit=false]");
+      return s;
+    },
+  },
+  inverter: {
+    label: "2. Torch inverter (NOT)",
+    inputPos: [0, 1, 1],
+    actionLabel: "Toggle lever",
+    build(nuc) {
+      const s = nuc.Schematic.create("torch_inverter");
+      for (let x = 0; x <= 5; x += 1) {
+        for (let z = 0; z <= 2; z += 1) {
+          s.setBlock(x, 0, z, "minecraft:smooth_stone");
+        }
+      }
+      s.setBlockFromString(0, 1, 1, "minecraft:lever[face=floor,facing=east,powered=false]");
+      s.setBlockFromString(1, 1, 1, "minecraft:redstone_wire[east=side,west=side,north=none,south=none,power=0]");
+      s.setBlock(2, 1, 1, "minecraft:stone_bricks");
+      s.setBlockFromString(3, 1, 1, "minecraft:redstone_wall_torch[facing=east,lit=true]");
+      s.setBlockFromString(4, 1, 1, "minecraft:redstone_wire[east=side,west=side,north=none,south=none,power=15]");
+      s.setBlockFromString(5, 1, 1, "minecraft:redstone_lamp[lit=true]");
+      return s;
+    },
+  },
+  button: {
+    label: "3. Button pulse timer",
+    inputPos: [0, 1, 1],
+    actionLabel: "Press button",
+    build(nuc) {
+      const s = nuc.Schematic.create("button_pulse");
+      for (let x = 0; x <= 4; x += 1) {
+        for (let z = 0; z <= 2; z += 1) {
+          s.setBlock(x, 0, z, "minecraft:smooth_stone");
+        }
+      }
+      s.setBlockFromString(0, 1, 1, "minecraft:stone_button[face=floor,facing=east,powered=false]");
+      s.setBlockFromString(1, 1, 1, "minecraft:redstone_wire[east=side,west=side,north=none,south=none,power=0]");
+      s.setBlockFromString(2, 1, 1, "minecraft:redstone_wire[east=side,west=side,north=none,south=none,power=0]");
+      s.setBlockFromString(3, 1, 1, "minecraft:redstone_wire[east=side,west=side,north=none,south=none,power=0]");
+      s.setBlockFromString(4, 1, 1, "minecraft:redstone_lamp[lit=false]");
+      return s;
+    },
+  },
+};
+
+async function mountTickStudio(root, ensureModelViewer) {
+  if (root.dataset.mounted === "true") return () => {};
+  root.dataset.mounted = "true";
+
+  let circuitKey = "delay";
+  let nuc = null;
+  let sim = null;
+  let liveSchem = null;
+  let currentUrl = null;
+
+  root.innerHTML = `
+    <div class="sdf-studio__bar">
+      <div class="sdf-seg" role="radiogroup" aria-label="Redstone circuit preset" data-role="tick-presets">
+        ${Object.entries(TICK_CIRCUITS)
+          .map(
+            ([k, c]) =>
+              `<button type="button" class="sdf-seg__btn" role="radio" aria-checked="${
+                k === circuitKey
+              }" data-circuit="${k}">${c.label}</button>`,
+          )
+          .join("")}
+      </div>
+    </div>
+
+    <div class="sdf-studio__stage">
+      <model-viewer
+        class="sdf-studio__viewer"
+        alt="Live 3D Minecraft redstone circuit simulated in WebAssembly by mc-tick"
+        camera-controls
+        camera-orbit="26deg 56deg 116%"
+        field-of-view="28deg"
+        shadow-intensity="0.65"
+        exposure="1.05"
+        interaction-prompt="none"
+      ></model-viewer>
+      <div class="sdf-studio__overlay" data-role="tick-status">Loading mc-tick WASM...</div>
+    </div>
+
+    <div class="tick-actions">
+      <button type="button" class="sdf-run-btn" data-role="tick-use">${TICK_CIRCUITS[circuitKey].actionLabel}</button>
+      <button type="button" class="sdf-pack-btn" data-role="tick-step1">Step +1 tick</button>
+      <button type="button" class="sdf-pack-btn" data-role="tick-step2">Step +2 ticks</button>
+      <button type="button" class="sdf-pack-btn" data-role="tick-settle">Run to settle</button>
+      <button type="button" class="sdf-pack-btn" data-role="tick-reset">Reset</button>
+    </div>
+
+    <pre class="tick-log" data-role="tick-log">Click Toggle lever, then Step +1 / +2 ticks to inspect mc-tick block transitions.</pre>
+
+    <div class="sdf-studio__footer">
+      <div class="sdf-telemetry" data-role="tick-telemetry">Initializing mc-tick simulator...</div>
+    </div>
+  `;
+
+  const viewer = root.querySelector(".sdf-studio__viewer");
+  const statusEl = root.querySelector('[data-role="tick-status"]');
+  const useBtn = root.querySelector('[data-role="tick-use"]');
+  const logEl = root.querySelector('[data-role="tick-log"]');
+  const telemetryEl = root.querySelector('[data-role="tick-telemetry"]');
+
+  function renderSim() {
+    if (!sim || !nuc || !liveSchem) return;
+    sim.bakeTo(liveSchem);
+    const cfg = nuc.MeshConfig.create();
+    cfg.setAmbientOcclusion(true);
+    cfg.setAoIntensity(0.45);
+    cfg.setGreedyMeshing(true);
+    const mesh = nuc.MeshResult.create(liveSchem, getActivePack(nuc), cfg);
+    const glbBytes = decodeBase64(mesh.glbDataB64());
+    const nextUrl = URL.createObjectURL(new Blob([glbBytes], { type: "model/gltf-binary" }));
+    if (currentUrl) URL.revokeObjectURL(currentUrl);
+    currentUrl = nextUrl;
+    viewer.src = nextUrl;
+
+    const changes = JSON.parse(sim.changesJson());
+    const recent = changes.slice(-8).reverse();
+    if (recent.length === 0) {
+      logEl.textContent = `Tick ${sim.tickCount()} · no block transitions yet. Click "${TICK_CIRCUITS[circuitKey].actionLabel}" to excite the circuit.`;
+    } else {
+      logEl.textContent = recent
+        .map(
+          (c) =>
+            `[t=${String(c.tick).padStart(2, " ")}] (${c.pos.join(",")})  ${c.from.replace("minecraft:", "")}  ->  ${c.to.replace("minecraft:", "")}`,
+        )
+        .join("\n");
+    }
+    telemetryEl.textContent = `mc-tick WASM · tick ${sim.tickCount()} · ${sim.changesCount()} total transitions`;
+    statusEl.hidden = true;
+  }
+
+  async function initCircuit() {
+    statusEl.textContent = "Loading mc-tick WASM...";
+    statusEl.hidden = false;
+    useBtn.textContent = TICK_CIRCUITS[circuitKey].actionLabel;
+    try {
+      if (!nuc) {
+        await ensureModelViewer();
+        nuc = await loadNucleation();
+      }
+      liveSchem = TICK_CIRCUITS[circuitKey].build(nuc);
+      sim = nuc.TickSimulation.fromSchematic(liveSchem, nuc.TickSettleMode.InWorld, 0, 0, 0, "");
+      sim.recordUpdates(true);
+      renderSim();
+    } catch (err) {
+      statusEl.hidden = true;
+      telemetryEl.textContent = `mc-tick error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  root.querySelector('[data-role="tick-presets"]').addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-circuit]");
+    if (!btn) return;
+    circuitKey = btn.dataset.circuit;
+    for (const el of root.querySelectorAll("[data-circuit]")) {
+      el.setAttribute("aria-checked", String(el === btn));
+    }
+    void initCircuit();
+  });
+
+  useBtn.addEventListener("click", () => {
+    if (!sim) return;
+    const [x, y, z] = TICK_CIRCUITS[circuitKey].inputPos;
+    sim.useBlock(x, y, z);
+    renderSim();
+  });
+  root.querySelector('[data-role="tick-step1"]').addEventListener("click", () => {
+    if (!sim) return;
+    sim.step();
+    renderSim();
+  });
+  root.querySelector('[data-role="tick-step2"]').addEventListener("click", () => {
+    if (!sim) return;
+    sim.run(2);
+    renderSim();
+  });
+  root.querySelector('[data-role="tick-settle"]').addEventListener("click", () => {
+    if (!sim) return;
+    sim.runUntilQuiescent(120);
+    renderSim();
+  });
+  root.querySelector('[data-role="tick-reset"]').addEventListener("click", () => {
+    void initCircuit();
+  });
+
+  void initCircuit();
+  return () => {
+    if (currentUrl) URL.revokeObjectURL(currentUrl);
+    root.dataset.mounted = "false";
+  };
+}
+
 export async function mountSdfPlaygrounds(ensureModelViewer) {
   const cleanups = [];
   const rerenders = [];
@@ -2214,6 +2290,16 @@ export async function mountSdfPlaygrounds(ensureModelViewer) {
 
   for (const el of document.querySelectorAll("[data-worldgen-lab]")) {
     const destroy = await mountWorldgenLab(el, ensureModelViewer);
+    cleanups.push(destroy);
+  }
+
+  for (const el of document.querySelectorAll("[data-palette-studio]")) {
+    const destroy = await mountPaletteStudio(el, ensureModelViewer);
+    cleanups.push(destroy);
+  }
+
+  for (const el of document.querySelectorAll("[data-tick-studio]")) {
+    const destroy = await mountTickStudio(el, ensureModelViewer);
     cleanups.push(destroy);
   }
 

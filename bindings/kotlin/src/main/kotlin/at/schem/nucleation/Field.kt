@@ -11,6 +11,9 @@ internal interface FieldLib: Library {
     fun Field_coord_x(): Pointer
     fun Field_coord_y(): Pointer
     fun Field_coord_z(): Pointer
+    fun Field_from_schematic(schematic: Pointer, pad: FFIUint32): ResultPointerInt
+    fun Field_from_glb_bytes(bytes: Slice, maxDim: FFIUint32, pad: FFIUint32): ResultPointerInt
+    fun Field_from_obj_str(objText: Slice, maxDim: FFIUint32, pad: FFIUint32): ResultPointerInt
     fun Field_sphere(radius: Float): ResultPointerInt
     fun Field_box_shape(halfX: Float, halfY: Float, halfZ: Float, rounding: Float): ResultPointerInt
     fun Field_ellipsoid(radiusX: Float, radiusY: Float, radiusZ: Float): ResultPointerInt
@@ -184,6 +187,70 @@ class Field internal constructor (
             val handle = returnVal
             val returnOpaque = Field(handle, selfEdges, true)
             return returnOpaque
+        }
+        @JvmStatic
+
+        /** Convert any existing Minecraft schematic into a smooth, composable
+        *3D signed distance field via exact 3D Euclidean Distance Transform.
+        */
+        fun fromSchematic(schematic: Schematic, pad: UInt): Result<Field> {
+
+            val returnVal = lib.Field_from_schematic(schematic.handle, FFIUint32(pad));
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal
+                val returnOpaque = Field(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+
+        /** Convert binary glTF (`.glb`) bytes into a composable 3D signed
+        *distance field fitted to `max_dim` blocks along its longest axis.
+        */
+        fun fromGlbBytes(bytes: UByteArray, maxDim: UInt, pad: UInt): Result<Field> {
+            val bytesSliceMemory = PrimitiveArrayTools.borrow(bytes)
+
+            val returnVal = lib.Field_from_glb_bytes(bytesSliceMemory.slice, FFIUint32(maxDim), FFIUint32(pad));
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = Field(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                bytesSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Convert a Wavefront `.obj` string into a composable 3D signed
+        *distance field fitted to `max_dim` blocks along its longest axis.
+        */
+        fun fromObjStr(objText: String, maxDim: UInt, pad: UInt): Result<Field> {
+            val objTextSliceMemory = PrimitiveArrayTools.borrowUtf8(objText)
+
+            val returnVal = lib.Field_from_obj_str(objTextSliceMemory.slice, FFIUint32(maxDim), FFIUint32(pad));
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = Field(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                objTextSliceMemory.close()
+            }
         }
         @JvmStatic
 

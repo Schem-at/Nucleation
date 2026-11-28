@@ -28,6 +28,8 @@ namespace capi {
     typedef struct ResourcePack_from_list_result {union {diplomat::capi::ResourcePack* ok; diplomat::capi::NucleationError err;}; bool is_ok;} ResourcePack_from_list_result;
     ResourcePack_from_list_result ResourcePack_from_list(const diplomat::capi::ResourcePackList* list);
 
+    diplomat::capi::ResourcePack* ResourcePack_builtin_procedural(void);
+
     uint32_t ResourcePack_blockstate_count(const diplomat::capi::ResourcePack* self);
 
     uint32_t ResourcePack_model_count(const diplomat::capi::ResourcePack* self);
@@ -85,6 +87,11 @@ inline diplomat::result<std::unique_ptr<ResourcePack>, NucleationError> Resource
 inline diplomat::result<std::unique_ptr<ResourcePack>, NucleationError> ResourcePack::from_list(const ResourcePackList& list) {
     auto result = diplomat::capi::ResourcePack_from_list(list.AsFFI());
     return result.is_ok ? diplomat::result<std::unique_ptr<ResourcePack>, NucleationError>(diplomat::Ok<std::unique_ptr<ResourcePack>>(std::unique_ptr<ResourcePack>(ResourcePack::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<ResourcePack>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline std::unique_ptr<ResourcePack> ResourcePack::builtin_procedural() {
+    auto result = diplomat::capi::ResourcePack_builtin_procedural();
+    return std::unique_ptr<ResourcePack>(ResourcePack::FromFFI(result));
 }
 
 inline uint32_t ResourcePack::blockstate_count() const {

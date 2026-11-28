@@ -45,13 +45,7 @@ pub(crate) fn mesh_main(args: impl Iterator<Item = String>) {
             input.with_extension("glb")
         }
     });
-    let Some(pack) = pack.or_else(super::pack::discover_pack) else {
-        eprintln!(
-            "no resource pack found — pass --pack <zip or client jar>, set NUCLEATION_PACK, \
-             or install Minecraft"
-        );
-        std::process::exit(2);
-    };
+    let pack_path = pack.or_else(super::pack::discover_pack);
 
     // The container: `--to glb|usdz`, else the output extension, else glb.
     // USDZ is the one macOS Quick Look opens natively — `open build.usdz`
@@ -78,9 +72,11 @@ pub(crate) fn mesh_main(args: impl Iterator<Item = String>) {
                 .read(&bytes)
                 .map_err(|e| format!("{}: unreadable: {e:?}", super::io::display_name(&input)))?
         };
-        let source =
-            nucleation::meshing::ResourcePackSource::from_file(&pack.display().to_string())
-                .map_err(|e| format!("loading resource pack {}: {e:?}", pack.display()))?;
+        let source = match &pack_path {
+            Some(p) => nucleation::meshing::ResourcePackSource::from_file(&p.display().to_string())
+                .map_err(|e| format!("loading resource pack {}: {e:?}", p.display()))?,
+            None => nucleation::meshing::ResourcePackSource::builtin_procedural(),
+        };
         let mesh = schematic
             .to_mesh(&source, &nucleation::meshing::MeshConfig::default())
             .map_err(|e| format!("meshing: {e:?}"))?;
@@ -101,9 +97,11 @@ pub(crate) fn mesh_main(args: impl Iterator<Item = String>) {
                 "meshed {} ({in_bytes} bytes) -> {} ({container}, {out_bytes} bytes, pack {})",
                 super::io::display_name(&input),
                 super::io::display_out(&output),
-                pack.file_name()
+                pack_path
+                    .as_ref()
+                    .and_then(|p| p.file_name())
                     .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_default()
+                    .unwrap_or_else(|| "builtin-procedural".to_string())
             ),
             piping_out,
         ),

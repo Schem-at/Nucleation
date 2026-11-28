@@ -20,6 +20,7 @@
 #include "FieldRange.hpp"
 #include "FieldSample.hpp"
 #include "NucleationError.hpp"
+#include "Schematic.hpp"
 #include "Shape.hpp"
 #include "diplomat_runtime.hpp"
 
@@ -36,6 +37,15 @@ namespace capi {
     diplomat::capi::Field* Field_coord_y(void);
 
     diplomat::capi::Field* Field_coord_z(void);
+
+    typedef struct Field_from_schematic_result {union {diplomat::capi::Field* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Field_from_schematic_result;
+    Field_from_schematic_result Field_from_schematic(const diplomat::capi::Schematic* schematic, uint32_t pad);
+
+    typedef struct Field_from_glb_bytes_result {union {diplomat::capi::Field* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Field_from_glb_bytes_result;
+    Field_from_glb_bytes_result Field_from_glb_bytes(diplomat::capi::DiplomatU8View bytes, uint32_t max_dim, uint32_t pad);
+
+    typedef struct Field_from_obj_str_result {union {diplomat::capi::Field* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Field_from_obj_str_result;
+    Field_from_obj_str_result Field_from_obj_str(diplomat::capi::DiplomatStringView obj_text, uint32_t max_dim, uint32_t pad);
 
     typedef struct Field_sphere_result {union {diplomat::capi::Field* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Field_sphere_result;
     Field_sphere_result Field_sphere(float radius);
@@ -327,6 +337,26 @@ inline std::unique_ptr<Field> Field::coord_y() {
 inline std::unique_ptr<Field> Field::coord_z() {
     auto result = diplomat::capi::Field_coord_z();
     return std::unique_ptr<Field>(Field::FromFFI(result));
+}
+
+inline diplomat::result<std::unique_ptr<Field>, NucleationError> Field::from_schematic(const Schematic& schematic, uint32_t pad) {
+    auto result = diplomat::capi::Field_from_schematic(schematic.AsFFI(),
+        pad);
+    return result.is_ok ? diplomat::result<std::unique_ptr<Field>, NucleationError>(diplomat::Ok<std::unique_ptr<Field>>(std::unique_ptr<Field>(Field::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Field>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Field>, NucleationError> Field::from_glb_bytes(diplomat::span<const uint8_t> bytes, uint32_t max_dim, uint32_t pad) {
+    auto result = diplomat::capi::Field_from_glb_bytes({bytes.data(), bytes.size()},
+        max_dim,
+        pad);
+    return result.is_ok ? diplomat::result<std::unique_ptr<Field>, NucleationError>(diplomat::Ok<std::unique_ptr<Field>>(std::unique_ptr<Field>(Field::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Field>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Field>, NucleationError> Field::from_obj_str(std::string_view obj_text, uint32_t max_dim, uint32_t pad) {
+    auto result = diplomat::capi::Field_from_obj_str({obj_text.data(), obj_text.size()},
+        max_dim,
+        pad);
+    return result.is_ok ? diplomat::result<std::unique_ptr<Field>, NucleationError>(diplomat::Ok<std::unique_ptr<Field>>(std::unique_ptr<Field>(Field::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Field>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline diplomat::result<std::unique_ptr<Field>, NucleationError> Field::sphere(float radius) {

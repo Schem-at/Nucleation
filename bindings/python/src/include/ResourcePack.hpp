@@ -28,6 +28,8 @@ namespace capi {
     typedef struct ResourcePack_from_list_result {union {nucleation::capi::ResourcePack* ok; nucleation::capi::NucleationError err;}; bool is_ok;} ResourcePack_from_list_result;
     ResourcePack_from_list_result ResourcePack_from_list(const nucleation::capi::ResourcePackList* list);
 
+    nucleation::capi::ResourcePack* ResourcePack_builtin_procedural(void);
+
     uint32_t ResourcePack_blockstate_count(const nucleation::capi::ResourcePack* self);
 
     uint32_t ResourcePack_model_count(const nucleation::capi::ResourcePack* self);
@@ -85,6 +87,11 @@ inline nucleation::diplomat::result<std::unique_ptr<nucleation::ResourcePack>, n
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::ResourcePack>, nucleation::NucleationError> nucleation::ResourcePack::from_list(const nucleation::ResourcePackList& list) {
     auto result = nucleation::capi::ResourcePack_from_list(list.AsFFI());
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::ResourcePack>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::ResourcePack>>(std::unique_ptr<nucleation::ResourcePack>(nucleation::ResourcePack::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::ResourcePack>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline std::unique_ptr<nucleation::ResourcePack> nucleation::ResourcePack::builtin_procedural() {
+    auto result = nucleation::capi::ResourcePack_builtin_procedural();
+    return std::unique_ptr<nucleation::ResourcePack>(nucleation::ResourcePack::FromFFI(result));
 }
 
 inline uint32_t nucleation::ResourcePack::blockstate_count() const {

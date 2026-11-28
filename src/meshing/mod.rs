@@ -66,6 +66,7 @@ use schematic_mesher::{
 pub mod cache;
 pub mod item_model;
 pub mod player_heads;
+mod procedural_pack;
 mod resource_pack_compat;
 
 // Re-export the real MeshOutput and MeshLayer types from schematic-mesher.
@@ -211,6 +212,15 @@ impl ResourcePackSource {
     /// Create a ResourcePackSource from an already-loaded ResourcePack.
     pub fn from_resource_pack(pack: ResourcePack) -> Self {
         Self::with_mesher_texture_aliases(pack)
+    }
+
+    /// Create the built-in procedural Minecraft block resource pack.
+    ///
+    /// Synthesizes multi-face pixel-art textures, fluids, flora, redstone
+    /// state variants, and full 16-color concrete/wool/terracotta spectra
+    /// entirely in memory with zero external files.
+    pub fn builtin_procedural() -> Self {
+        procedural_pack::build_builtin_procedural_pack()
     }
 
     /// Get a reference to the underlying ResourcePack.
@@ -1105,6 +1115,31 @@ impl UniversalSchematic {
     pub fn to_mesh(&self, pack: &ResourcePackSource, config: &MeshConfig) -> Result<MeshOutput> {
         let output = self.compute_mesh_output(pack, config)?;
         Ok(mesh_output_from_mesher(output, None))
+    }
+
+    /// Generate a 3D mesh for the schematic, returning an empty [`MeshOutput`]
+    /// (`0` vertices, `0` triangles) instead of an error when the schematic
+    /// contains no blocks.
+    pub fn to_mesh_or_empty(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+    ) -> Result<MeshOutput> {
+        match self.compute_mesh_output(pack, config) {
+            Ok(output) => Ok(mesh_output_from_mesher(output, None)),
+            Err(MeshError::Meshing(msg)) if msg == "No blocks to mesh" => Ok(MeshOutput {
+                opaque: MeshLayer::default(),
+                cutout: MeshLayer::default(),
+                transparent: MeshLayer::default(),
+                atlas: TextureAtlas::empty(),
+                greedy_materials: Vec::new(),
+                animated_textures: Vec::new(),
+                bounds: MesherBoundingBox::new([0.0; 3], [0.0; 3]),
+                chunk_coord: None,
+                lod_level: 0,
+            }),
+            Err(e) => Err(e),
+        }
     }
 
     /// Build an *animated* GLB replaying a captured scenario.
@@ -2245,6 +2280,26 @@ mod tests {
         assert!(empty.is_empty());
         assert_eq!(empty.vertex_count(), 0);
         assert_eq!(empty.triangle_count(), 0);
+    }
+
+    #[test]
+    fn test_builtin_procedural_pack_and_empty_mesh() {
+        let pack = ResourcePackSource::builtin_procedural();
+        assert!(pack.stats().blockstate_count > 80);
+        assert!(pack.get_texture_info("minecraft:block/grass_block_top").is_some());
+        assert!(pack.get_texture_info("minecraft:block/water_still").is_some());
+
+        let empty = UniversalSchematic::new("empty".to_string());
+        let empty_mesh = empty.to_mesh_or_empty(&pack, &MeshConfig::default()).unwrap();
+        assert!(empty_mesh.is_empty());
+        assert_eq!(empty_mesh.total_triangles(), 0);
+
+        let mut one = UniversalSchematic::new("one".to_string());
+        one.set_block(0, 0, 0, &BlockState::new("minecraft:grass_block"));
+        one.set_block(1, 0, 0, &BlockState::new("minecraft:redstone_lamp[lit=true]"));
+        let mesh = one.to_mesh(&pack, &MeshConfig::default()).unwrap();
+        assert!(mesh.total_triangles() > 0);
+        assert!(mesh.to_glb().unwrap().len() > 64);
     }
 
     #[test]

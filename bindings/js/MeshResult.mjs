@@ -67,6 +67,30 @@ export class MeshResult {
     }
 
     /**
+     * Mesh a schematic, returning an empty `MeshResult` (`0` triangles)
+     * instead of an error when the schematic contains no blocks.
+     */
+    static createOrEmpty(schematic, pack, config) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.MeshResult_create_or_empty(diplomatReceive.buffer, schematic.ffiValue, pack.ffiValue, config.ffiValue);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new MeshResult(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
      * Mesh a schematic with USDZ-compatible output (old ABI: `schematic_to_usdz`).
      */
     static createUsdz(schematic, pack, config) {

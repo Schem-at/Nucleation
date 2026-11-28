@@ -348,3 +348,48 @@ fn graph_json_roundtrip_preserves_shared_identity_and_expressions() {
         .unwrap();
     assert!(s.total_blocks() > 0);
 }
+
+#[test]
+fn expr_stdlib_domain_and_chamfer_builtins_work_with_dual3() {
+    let twisted = Field::expr("box(rot_y(p, y * 0.15), vec3(3.0, 6.0, 3.0))").unwrap();
+    assert!(twisted.eval(0.0, 0.0, 0.0) < 0.0);
+    let n = twisted.normal(3.0, 0.0, 0.0, 0.05).unwrap();
+    assert!((n[0] - 1.0).abs() < 0.05, "expected +X normal, got {n:?}");
+
+    let polar = Field::expr("cylinder(repeat_polar(p, 6.0) - vec3(6.0, 0.0, 0.0), 1.5, 4.0)").unwrap();
+    assert!(polar.eval(6.0, 0.0, 0.0) < 0.0);
+    // 60 degrees rotated around Y should also be inside a repeated pillar
+    let ang = std::f32::consts::TAU / 6.0;
+    assert!(polar.eval(6.0 * ang.cos(), 0.0, 6.0 * ang.sin()) < 0.0);
+
+    let rep = Field::expr("sphere(repeat(p, vec3(10.0, 0.0, 10.0)), 2.0)").unwrap();
+    assert!(rep.eval(0.0, 0.0, 0.0) < 0.0);
+    assert!(rep.eval(10.0, 0.0, -20.0) < 0.0);
+
+    let ch = Field::expr("chamfer_min(sphere(p + vec3(2.0, 0.0, 0.0), 3.0), box(p - vec3(2.0, 0.0, 0.0), vec3(2.5, 2.5, 2.5)), 1.0)").unwrap();
+    assert!(ch.eval(0.0, 0.0, 0.0) < 0.0);
+    assert!(ch.normal(0.0, 2.6, 0.0, 0.05).is_some());
+}
+
+#[test]
+fn schematic_to_sdf_grid_blends_and_roundtrips_json() {
+    let base_schem = VoxelPipeline::new(
+        Field::box_shape([3.0, 3.0, 3.0], 0.0).unwrap(),
+        Material::solid("minecraft:stone"),
+    )
+    .to_schematic(None, "cube")
+    .unwrap();
+    let grid_field = Field::from_schematic(&base_schem, 4).unwrap();
+    assert!(grid_field.eval(0.5, 0.5, 0.5) < 0.0, "center must be inside");
+    assert!(grid_field.eval(8.0, 0.5, 0.5) > 2.0, "exterior must have positive distance");
+    let n = grid_field.normal(3.2, 0.5, 0.5, 0.1).unwrap();
+    assert!(n[0] > 0.7, "expected outward +X normal on cube face, got {n:?}");
+
+    // Compose with smooth_union + roundtrip JSON
+    let blended = grid_field
+        .smooth_union(&Field::sphere(3.0).unwrap().translate([4.0, 0.0, 0.0]).unwrap(), 1.5)
+        .unwrap();
+    let json = blended.to_json().unwrap();
+    let reloaded = Field::from_json(&json).unwrap();
+    assert!((blended.eval(2.5, 0.5, 0.5) - reloaded.eval(2.5, 0.5, 0.5)).abs() < 1e-5);
+}

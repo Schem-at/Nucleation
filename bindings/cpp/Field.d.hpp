@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include "diplomat_runtime.hpp"
 
+namespace diplomat::capi { struct Schematic; }
+class Schematic;
 namespace diplomat::capi { struct Shape; }
 class Shape;
 struct FieldBounds;
@@ -49,6 +51,24 @@ public:
   inline static std::unique_ptr<Field> coord_y();
 
   inline static std::unique_ptr<Field> coord_z();
+
+  /**
+   * Convert any existing Minecraft schematic into a smooth, composable
+   * 3D signed distance field via exact 3D Euclidean Distance Transform.
+   */
+  inline static diplomat::result<std::unique_ptr<Field>, NucleationError> from_schematic(const Schematic& schematic, uint32_t pad);
+
+  /**
+   * Convert binary glTF (`.glb`) bytes into a composable 3D signed
+   * distance field fitted to `max_dim` blocks along its longest axis.
+   */
+  inline static diplomat::result<std::unique_ptr<Field>, NucleationError> from_glb_bytes(diplomat::span<const uint8_t> bytes, uint32_t max_dim, uint32_t pad);
+
+  /**
+   * Convert a Wavefront `.obj` string into a composable 3D signed
+   * distance field fitted to `max_dim` blocks along its longest axis.
+   */
+  inline static diplomat::result<std::unique_ptr<Field>, NucleationError> from_obj_str(std::string_view obj_text, uint32_t max_dim, uint32_t pad);
 
   inline static diplomat::result<std::unique_ptr<Field>, NucleationError> sphere(float radius);
 

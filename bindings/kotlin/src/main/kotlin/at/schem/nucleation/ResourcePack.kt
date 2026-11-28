@@ -9,6 +9,7 @@ internal interface ResourcePackLib: Library {
     fun ResourcePack_destroy(handle: Pointer)
     fun ResourcePack_from_bytes(data: Slice): ResultPointerInt
     fun ResourcePack_from_list(list: Pointer): ResultPointerInt
+    fun ResourcePack_builtin_procedural(): Pointer
     fun ResourcePack_blockstate_count(handle: Pointer): FFIUint32
     fun ResourcePack_model_count(handle: Pointer): FFIUint32
     fun ResourcePack_texture_count(handle: Pointer): FFIUint32
@@ -94,6 +95,20 @@ class ResourcePack internal constructor (
             } else {
                 return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
             }
+        }
+        @JvmStatic
+
+        /** Create the built-in procedural Minecraft block resource pack
+        *(multi-face pixel art, fluids, flora, redstone states, and 16-color
+        *concrete/wool/terracotta spectra — zero external files required).
+        */
+        fun builtinProcedural(): ResourcePack {
+
+            val returnVal = lib.ResourcePack_builtin_procedural();
+            val selfEdges: List<Any> = listOf()
+            val handle = returnVal
+            val returnOpaque = ResourcePack(handle, selfEdges, true)
+            return returnOpaque
         }
         @JvmStatic
 

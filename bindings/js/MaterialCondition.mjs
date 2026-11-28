@@ -252,6 +252,217 @@ export class MaterialCondition {
         }
     }
 
+    /**
+     * True when the voxel's top (`+Y`) face is exposed to air (`face_mask::TOP`).
+     */
+    static exposedTop() {
+
+        const result = wasm.MaterialCondition_exposed_top();
+
+        try {
+            return new MaterialCondition(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * True when the voxel's bottom (`-Y`) face is exposed to air (`face_mask::BOTTOM`).
+     */
+    static exposedBottom() {
+
+        const result = wasm.MaterialCondition_exposed_bottom();
+
+        try {
+            return new MaterialCondition(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * True when any horizontal side face (`±X` or `±Z`) is exposed to air.
+     */
+    static exposedSide() {
+
+        const result = wasm.MaterialCondition_exposed_side();
+
+        try {
+            return new MaterialCondition(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * True when any face of the voxel is exposed to air.
+     */
+    static exposedAny() {
+
+        const result = wasm.MaterialCondition_exposed_any();
+
+        try {
+            return new MaterialCondition(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * True when all six neighbor voxels are solid (completely interior).
+     */
+    static interior() {
+
+        const result = wasm.MaterialCondition_interior();
+
+        try {
+            return new MaterialCondition(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * True when world `y >= min_y`.
+     */
+    static yAbove(minY) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.MaterialCondition_y_above(diplomatReceive.buffer, minY);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new MaterialCondition(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * True when world `y <= max_y`.
+     */
+    static yBelow(maxY) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.MaterialCondition_y_below(diplomatReceive.buffer, maxY);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new MaterialCondition(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * True when world `min_y <= y <= max_y`.
+     */
+    static yBetween(minY, maxY) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.MaterialCondition_y_between(diplomatReceive.buffer, minY, maxY);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new MaterialCondition(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * True when surface slope (`1 - normal.y`) is `<= max_slope` (flatter than threshold).
+     */
+    static slopeBelow(maxSlope) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.MaterialCondition_slope_below(diplomatReceive.buffer, maxSlope);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new MaterialCondition(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * True when surface slope (`1 - normal.y`) is `>= min_slope` (steeper than threshold).
+     */
+    static slopeAbove(minSlope) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.MaterialCondition_slope_above(diplomatReceive.buffer, minSlope);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new MaterialCondition(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * True when column depth below the exposed surface is in `[min_depth, max_depth]`.
+     */
+    static depthBetween(minDepth, maxDepth) {
+
+        const result = wasm.MaterialCondition_depth_between(minDepth, maxDepth);
+
+        try {
+            return new MaterialCondition(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
     static chance(probability, seed) {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 

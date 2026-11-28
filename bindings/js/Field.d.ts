@@ -8,6 +8,7 @@ import type { FieldNormal } from "./FieldNormal.mjs"
 import type { FieldRange } from "./FieldRange.mjs"
 import type { FieldSample } from "./FieldSample.mjs"
 import type { NucleationError } from "./NucleationError.mjs"
+import type { Schematic } from "./Schematic.mjs"
 import type { Shape } from "./Shape.mjs"
 import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
@@ -34,6 +35,24 @@ export class Field {
     static coordY(): Field;
 
     static coordZ(): Field;
+
+    /**
+     * Convert any existing Minecraft schematic into a smooth, composable
+     * 3D signed distance field via exact 3D Euclidean Distance Transform.
+     */
+    static fromSchematic(schematic: Schematic, pad: number): Field;
+
+    /**
+     * Convert binary glTF (`.glb`) bytes into a composable 3D signed
+     * distance field fitted to `max_dim` blocks along its longest axis.
+     */
+    static fromGlbBytes(bytes: Array<number>, maxDim: number, pad: number): Field;
+
+    /**
+     * Convert a Wavefront `.obj` string into a composable 3D signed
+     * distance field fitted to `max_dim` blocks along its longest axis.
+     */
+    static fromObjStr(objText: string, maxDim: number, pad: number): Field;
 
     static sphere(radius: number): Field;
 

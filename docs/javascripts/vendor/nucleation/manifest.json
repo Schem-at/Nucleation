@@ -1,9 +1,10 @@
 {
   "features": [
     "bridge",
-    "meshing"
+    "meshing",
+    "mc-tick"
   ],
-  "wasmSha256": "c46065f4555db68257e2800fd26fd27a24035eb234b81e58ab07f0b5463cb496",
+  "wasmSha256": "eb5b944c9bba4d8e864e173a006f48f5851fbd4ee90ca8ce7c2023a2f41c5543",
   "modules": [
     "BlockPos.mjs",
     "BlockState.mjs",
@@ -36,6 +37,7 @@
     "MeshResult.mjs",
     "NucleationError.mjs",
     "Palette.mjs",
+    "PaletteBuilder.mjs",
     "ResourcePack.mjs",
     "ResourcePackList.mjs",
     "ScatterFace.mjs",
@@ -44,6 +46,8 @@
     "SchematicSplitResult.mjs",
     "Shape.mjs",
     "TextureInfo.mjs",
+    "TickSettleMode.mjs",
+    "TickSimulation.mjs",
     "VoxelPipeline.mjs",
     "WorldChunkView.mjs",
     "WorldGenerator.mjs",

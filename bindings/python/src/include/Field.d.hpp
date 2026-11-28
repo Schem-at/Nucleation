@@ -13,6 +13,8 @@
 namespace nucleation {
 namespace capi { struct Field; }
 class Field;
+namespace capi { struct Schematic; }
+class Schematic;
 namespace capi { struct Shape; }
 class Shape;
 struct FieldBounds;
@@ -52,6 +54,24 @@ public:
   inline static std::unique_ptr<nucleation::Field> coord_y();
 
   inline static std::unique_ptr<nucleation::Field> coord_z();
+
+  /**
+   * Convert any existing Minecraft schematic into a smooth, composable
+   * 3D signed distance field via exact 3D Euclidean Distance Transform.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError> from_schematic(const nucleation::Schematic& schematic, uint32_t pad);
+
+  /**
+   * Convert binary glTF (`.glb`) bytes into a composable 3D signed
+   * distance field fitted to `max_dim` blocks along its longest axis.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError> from_glb_bytes(nucleation::diplomat::span<const uint8_t> bytes, uint32_t max_dim, uint32_t pad);
+
+  /**
+   * Convert a Wavefront `.obj` string into a composable 3D signed
+   * distance field fitted to `max_dim` blocks along its longest axis.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError> from_obj_str(std::string_view obj_text, uint32_t max_dim, uint32_t pad);
 
   inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Field>, nucleation::NucleationError> sphere(float radius);
 
