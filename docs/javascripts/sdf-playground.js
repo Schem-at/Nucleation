@@ -1,6 +1,8 @@
 /**
- * Interactive SDF & VoxelPipeline Studio + 2D CSG / Interval Brick-Pruning Explorer
- * Powered by Nucleation v0.13.0 compiled to WebAssembly.
+ * Nucleation v0.13.0 Interactive Browser Studios
+ * 1. Progressive 3D SDF & VoxelPipeline Studio (real multi-face Minecraft blocks + custom pack .zip support)
+ * 2. 2D SDF, CSG, Dual3 Autodiff Normals & 8x8 Brick-Pruning Lab (evaluated live by Nucleation WASM Field)
+ * 3. Infinite WorldGenerator Chunk Streamer (WorldGenerator.pipeline + cellularSdf + composite)
  */
 
 let wasmPromise;
@@ -36,49 +38,395 @@ const EMPTY_ZIP = [
   80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
-// Authentic 16x16 procedural block textures for the browser mesher.
-const BLOCKS = {
-  // Natural terrain & stone
-  deepslate: { rgb: [66, 70, 78], style: "strata" },
-  tuff: { rgb: [108, 109, 102], style: "speckle" },
-  stone: { rgb: [130, 132, 134], style: "stone" },
-  andesite: { rgb: [152, 154, 152], style: "speckle" },
-  calcite: { rgb: [223, 222, 213], style: "vein" },
-  snow_block: { rgb: [242, 248, 252], style: "matte" },
-  dirt: { rgb: [134, 96, 67], style: "speckle" },
-  moss_block: { rgb: [98, 136, 56], style: "moss" },
-  short_grass: { rgb: [112, 166, 68], style: "cross" },
-  water: { rgb: [56, 126, 212], style: "water" },
-  // Architectural & jewel blocks
-  obsidian: { rgb: [28, 22, 42], style: "speckle" },
-  amethyst_block: { rgb: [148, 102, 206], style: "crystal" },
-  lapis_block: { rgb: [42, 82, 168], style: "crystal" },
-  prismarine_bricks: { rgb: [98, 174, 162], style: "bricks" },
-  dark_prismarine: { rgb: [52, 96, 86], style: "bricks" },
-  oxidized_copper: { rgb: [82, 164, 146], style: "patina" },
-  weathered_copper: { rgb: [108, 154, 118], style: "patina" },
-  cut_copper: { rgb: [192, 108, 78], style: "bricks" },
-  smooth_sandstone: { rgb: [224, 210, 168], style: "strata" },
-  sea_lantern: { rgb: [188, 232, 226], style: "lantern" },
-  gold_block: { rgb: [246, 208, 68], style: "crystal" },
-  // Concrete spectrum for Oklab gradients
-  white_concrete: { rgb: [212, 216, 218], style: "matte" },
-  light_gray_concrete: { rgb: [136, 138, 134], style: "matte" },
-  gray_concrete: { rgb: [62, 66, 70], style: "matte" },
-  black_concrete: { rgb: [22, 24, 30], style: "matte" },
-  blue_concrete: { rgb: [44, 52, 148], style: "matte" },
-  cyan_concrete: { rgb: [28, 136, 148], style: "matte" },
-  light_blue_concrete: { rgb: [52, 164, 208], style: "matte" },
-  lime_concrete: { rgb: [108, 178, 42], style: "matte" },
-  green_concrete: { rgb: [78, 102, 42], style: "matte" },
-  yellow_concrete: { rgb: [244, 194, 48], style: "matte" },
-  orange_concrete: { rgb: [226, 114, 32], style: "matte" },
-  red_concrete: { rgb: [164, 42, 40], style: "matte" },
-  magenta_concrete: { rgb: [178, 62, 168], style: "matte" },
-  purple_concrete: { rgb: [112, 44, 166], style: "matte" },
-  pink_concrete: { rgb: [218, 114, 152], style: "matte" },
-  brown_concrete: { rgb: [102, 66, 44], style: "matte" },
-};
+/* ============================================================================
+ * MULTI-FACE PIXEL-ART MINECRAFT BLOCK PACK (+ OPTIONAL USER .ZIP OVERRIDE)
+ * ============================================================================ */
+
+function clampByte(v) {
+  return Math.max(0, Math.min(255, Math.round(v)));
+}
+
+function texHash(x, y, salt = 0) {
+  let n = (x * 374761393 + y * 668265263 + salt * 1442695041) | 0;
+  n = ((n ^ (n >> 13)) * 1274126177) | 0;
+  return ((n ^ (n >> 16)) >>> 0) / 4294967295;
+}
+
+function makeTex(painter) {
+  const px = new Uint8Array(16 * 16 * 4);
+  for (let y = 0; y < 16; y += 1) {
+    for (let x = 0; x < 16; x += 1) {
+      const [r, g, b, a = 255] = painter(x, y);
+      const i = (y * 16 + x) * 4;
+      px[i] = clampByte(r);
+      px[i + 1] = clampByte(g);
+      px[i + 2] = clampByte(b);
+      px[i + 3] = clampByte(a);
+    }
+  }
+  return px;
+}
+
+function solidSpeckle(rgb, amp = 14, salt = 1) {
+  return makeTex((x, y) => {
+    const d = (texHash(x, y, salt) - 0.5) * 2 * amp;
+    return [rgb[0] + d, rgb[1] + d, rgb[2] + d];
+  });
+}
+
+function brickTex(base, mortar, mossy = false, salt = 3) {
+  return makeTex((x, y) => {
+    const row = y >> 3;
+    const isMortar = y === 0 || y === 8 || ((x + (row ? 8 : 0)) & 15) === 0;
+    const n = (texHash(x, y, salt) - 0.5) * 16;
+    if (isMortar) return [mortar[0] + n * 0.4, mortar[1] + n * 0.4, mortar[2] + n * 0.4];
+    if (mossy && texHash(x >> 1, y >> 1, 91) > 0.72) {
+      return [76 + n * 0.6, 114 + n * 0.8, 48 + n * 0.5];
+    }
+    const bevel = y === 1 || y === 9 ? 10 : y === 7 || y === 15 ? -10 : 0;
+    return [base[0] + n + bevel, base[1] + n + bevel, base[2] + n + bevel];
+  });
+}
+
+function planksTex(base, seam, salt = 5) {
+  return makeTex((x, y) => {
+    const board = y >> 2;
+    const isHSeam = (y & 3) === 0;
+    const isVSeam = (x === 7 && (board & 1) === 0) || (x === 15 && (board & 1) === 1);
+    const grain = (texHash(x >> 1, y, salt + board * 13) - 0.5) * 18;
+    if (isHSeam || isVSeam) return [seam[0], seam[1], seam[2]];
+    const shade = (y & 3) === 1 ? 8 : (y & 3) === 3 ? -8 : 0;
+    return [base[0] + grain + shade, base[1] + grain + shade, base[2] + grain + shade];
+  });
+}
+
+function cobbleTex(base, dark, salt = 9) {
+  return makeTex((x, y) => {
+    const cx = Math.floor((x + ((y >> 2) & 1) * 2) / 4);
+    const cy = Math.floor(y / 4);
+    const edge = (x + ((y >> 2) & 1) * 2) % 4 === 0 || y % 4 === 0;
+    const stoneTone = (texHash(cx, cy, salt) - 0.5) * 32;
+    const micro = (texHash(x, y, salt + 7) - 0.5) * 10;
+    if (edge) return [dark[0] + micro, dark[1] + micro, dark[2] + micro];
+    return [base[0] + stoneTone + micro, base[1] + stoneTone + micro, base[2] + stoneTone + micro];
+  });
+}
+
+function buildDefaultResourcePack(nuc) {
+  const pack = nuc.ResourcePack.fromBytes(EMPTY_ZIP);
+
+  function addCubeAll(name, pixels) {
+    const block = `minecraft:${name}`;
+    const tex = `minecraft:block/${name}`;
+    const faces = Object.fromEntries(
+      ["down", "up", "north", "south", "west", "east"].map((s) => [s, { texture: "#all", cullface: s }]),
+    );
+    pack.addBlockstateJson(block, JSON.stringify({ variants: { "": { model: tex } } }));
+    pack.addModelJson(tex, JSON.stringify({ textures: { all: tex }, elements: [{ from: [0, 0, 0], to: [16, 16, 16], faces }] }));
+    pack.addTexture(tex, 16, 16, pixels);
+  }
+
+  function addCubeTopSideBottom(name, topPx, sidePx, bottomPx) {
+    const block = `minecraft:${name}`;
+    const model = `minecraft:block/${name}`;
+    const tTop = `minecraft:block/${name}_top`;
+    const tSide = `minecraft:block/${name}_side`;
+    const tBot = `minecraft:block/${name}_bottom`;
+    pack.addBlockstateJson(block, JSON.stringify({ variants: { "": { model } } }));
+    pack.addModelJson(
+      model,
+      JSON.stringify({
+        textures: { top: tTop, side: tSide, bottom: tBot },
+        elements: [
+          {
+            from: [0, 0, 0],
+            to: [16, 16, 16],
+            faces: {
+              up: { texture: "#top", cullface: "up" },
+              down: { texture: "#bottom", cullface: "down" },
+              north: { texture: "#side", cullface: "north" },
+              south: { texture: "#side", cullface: "south" },
+              west: { texture: "#side", cullface: "west" },
+              east: { texture: "#side", cullface: "east" },
+            },
+          },
+        ],
+      }),
+    );
+    pack.addTexture(tTop, 16, 16, topPx);
+    pack.addTexture(tSide, 16, 16, sidePx);
+    pack.addTexture(tBot, 16, 16, bottomPx);
+  }
+
+  function addCrossPlant(name, pixels) {
+    const block = `minecraft:${name}`;
+    const tex = `minecraft:block/${name}`;
+    pack.addBlockstateJson(block, JSON.stringify({ variants: { "": { model: tex } } }));
+    pack.addModelJson(
+      tex,
+      JSON.stringify({
+        textures: { cross: tex },
+        elements: [
+          {
+            from: [2, 0, 8],
+            to: [14, 14, 8],
+            rotation: { origin: [8, 8, 8], axis: "y", angle: 45, rescale: true },
+            shade: false,
+            faces: { north: { texture: "#cross" }, south: { texture: "#cross" } },
+          },
+          {
+            from: [8, 0, 2],
+            to: [8, 14, 14],
+            rotation: { origin: [8, 8, 8], axis: "y", angle: 45, rescale: true },
+            shade: false,
+            faces: { east: { texture: "#cross" }, west: { texture: "#cross" } },
+          },
+        ],
+      }),
+    );
+    pack.addTexture(tex, 16, 16, pixels);
+  }
+
+  // 1. Real multi-face grass_block (lush green top, dirt with hanging grass fringe on sides, dirt bottom)
+  const dirtPx = makeTex((x, y) => {
+    const n = (texHash(x, y, 11) - 0.5) * 24;
+    const pebble = texHash(x, y, 29) > 0.9 ? 28 : 0;
+    return [134 + n + pebble, 96 + n * 0.8 + pebble, 67 + n * 0.6 + pebble];
+  });
+  const grassTopPx = makeTex((x, y) => {
+    const n = (texHash(x, y, 17) - 0.5) * 26;
+    const blade = texHash(x, y, 37) > 0.72 ? 16 : 0;
+    return [102 + n * 0.7 + blade * 0.6, 164 + n + blade, 66 + n * 0.5];
+  });
+  const grassSidePx = makeTex((x, y) => {
+    const fringe = 2 + Math.floor(texHash(x, 0, 41) * 3.6);
+    if (y < fringe) {
+      const n = (texHash(x, y, 17) - 0.5) * 22;
+      return [98 + n * 0.7, 158 + n, 62 + n * 0.5];
+    }
+    const n = (texHash(x, y, 11) - 0.5) * 24;
+    return [134 + n, 96 + n * 0.8, 67 + n * 0.6];
+  });
+  addCubeTopSideBottom("grass_block", grassTopPx, grassSidePx, dirtPx);
+  addCubeAll("dirt", dirtPx);
+
+  // 2. Real multi-face oak_log & spruce_log
+  const oakBark = makeTex((x, y) => {
+    const ridge = ((x + Math.floor(texHash(x, y >> 2, 51) * 2)) % 3 === 0) ? -16 : 8;
+    const n = (texHash(x, y, 52) - 0.5) * 12;
+    return [108 + ridge + n, 84 + ridge * 0.8 + n, 52 + ridge * 0.6 + n];
+  });
+  const oakTop = makeTex((x, y) => {
+    const r = Math.hypot(x - 7.5, y - 7.5);
+    if (r > 6.6) return [102, 78, 48];
+    const ring = Math.sin(r * 2.2) > 0 ? 12 : -10;
+    return [174 + ring, 140 + ring * 0.85, 92 + ring * 0.65];
+  });
+  addCubeTopSideBottom("oak_log", oakTop, oakBark, oakTop);
+
+  const spruceBark = makeTex((x, y) => {
+    const ridge = (x % 3 === 0) ? -14 : 6;
+    const n = (texHash(x, y, 55) - 0.5) * 10;
+    return [62 + ridge + n, 44 + ridge * 0.7 + n, 28 + ridge * 0.5 + n];
+  });
+  addCubeTopSideBottom("spruce_log", oakTop, spruceBark, oakTop);
+
+  // 3. Leaves
+  addCubeAll(
+    "oak_leaves",
+    makeTex((x, y) => {
+      const cluster = texHash(x >> 1, y >> 1, 61);
+      const n = (texHash(x, y, 62) - 0.5) * 22;
+      if (cluster < 0.24) return [46 + n * 0.5, 86 + n * 0.6, 30 + n * 0.4];
+      return [76 + n * 0.7, 134 + n, 46 + n * 0.5];
+    }),
+  );
+  addCubeAll(
+    "spruce_leaves",
+    makeTex((x, y) => {
+      const cluster = texHash(x >> 1, y >> 1, 67);
+      const n = (texHash(x, y, 68) - 0.5) * 18;
+      if (cluster < 0.25) return [36 + n * 0.4, 64 + n * 0.5, 42 + n * 0.4];
+      return [58 + n * 0.6, 98 + n * 0.8, 64 + n * 0.6];
+    }),
+  );
+
+  // 4. Sandstone (multi-face: smooth top, layered band side, rough bottom)
+  const sandPx = solidSpeckle([222, 208, 162], 12, 71);
+  const sandstoneSide = makeTex((x, y) => {
+    const n = (texHash(x, y, 73) - 0.5) * 12;
+    const band = y < 4 ? 10 : y === 4 ? -18 : y > 12 ? -10 : 0;
+    return [218 + band + n, 204 + band + n, 156 + band + n];
+  });
+  addCubeTopSideBottom("sandstone", sandPx, sandstoneSide, cobbleTex([208, 192, 146], [176, 160, 118], 75));
+  addCubeAll("smooth_sandstone", sandPx);
+  addCubeAll("sand", sandPx);
+
+  // 5. Stone, bricks, planks & minerals
+  addCubeAll("stone", solidSpeckle([130, 132, 134], 14, 101));
+  addCubeAll("andesite", solidSpeckle([144, 146, 144], 18, 102));
+  addCubeAll("tuff", solidSpeckle([108, 109, 101], 16, 103));
+  addCubeAll(
+    "deepslate",
+    makeTex((x, y) => {
+      const stripe = (y % 4 === 0 ? -12 : y % 4 === 2 ? 8 : 0) + (texHash(x, y, 104) - 0.5) * 12;
+      return [72 + stripe, 74 + stripe, 82 + stripe];
+    }),
+  );
+  addCubeAll("cobblestone", cobbleTex([126, 128, 128], [86, 88, 90], 105));
+  addCubeAll("stone_bricks", brickTex([132, 134, 134], [88, 90, 92], false, 106));
+  addCubeAll("mossy_stone_bricks", brickTex([128, 132, 128], [82, 92, 78], true, 107));
+  addCubeAll("deepslate_bricks", brickTex([74, 76, 82], [46, 48, 54], false, 108));
+  addCubeAll("oak_planks", planksTex([168, 134, 84], [116, 88, 52], 109));
+  addCubeAll("spruce_planks", planksTex([116, 86, 52], [78, 54, 32], 110));
+  addCubeAll("dark_oak_planks", planksTex([72, 48, 28], [46, 30, 16], 111));
+  addCubeAll("moss_block", grassTopPx);
+  addCubeAll("calcite", makeTex((x, y) => {
+    const v = ((x - y + 32) % 7 === 0 ? -16 : 0) + (texHash(x, y, 112) - 0.5) * 10;
+    return [224 + v, 223 + v, 214 + v];
+  }));
+  addCubeAll("snow_block", solidSpeckle([242, 248, 252], 6, 113));
+  addCubeAll("gravel", cobbleTex([132, 128, 126], [96, 92, 90], 114));
+
+  // 6. Architectural metals, crystals, glow & Nether
+  addCubeAll("oxidized_copper", brickTex([82, 164, 146], [56, 118, 106], false, 120));
+  addCubeAll("weathered_copper", brickTex([106, 152, 118], [74, 112, 86], false, 121));
+  addCubeAll("cut_copper", brickTex([192, 108, 78], [134, 72, 50], false, 122));
+  addCubeAll("copper_block", brickTex([196, 112, 82], [142, 76, 54], false, 123));
+  addCubeAll("prismarine_bricks", brickTex([98, 174, 162], [64, 124, 116], false, 124));
+  addCubeAll("dark_prismarine", brickTex([52, 98, 88], [32, 64, 58], false, 125));
+  addCubeAll(
+    "amethyst_block",
+    makeTex((x, y) => {
+      const facet = (x + y) % 6 === 0 || (x - y + 16) % 8 === 0 ? 28 : -8;
+      const n = (texHash(x, y, 126) - 0.5) * 14;
+      return [148 + facet + n, 102 + facet * 0.8 + n, 206 + facet + n];
+    }),
+  );
+  addCubeAll(
+    "obsidian",
+    makeTex((x, y) => {
+      const glint = texHash(x, y, 127) > 0.84 ? 32 : 0;
+      const n = (texHash(x, y, 128) - 0.5) * 12;
+      return [24 + glint + n, 18 + glint * 0.5 + n, 40 + glint * 1.4 + n];
+    }),
+  );
+  addCubeAll(
+    "sea_lantern",
+    makeTex((x, y) => {
+      const rim = x <= 1 || y <= 1 || x >= 14 || y >= 14;
+      const n = (texHash(x, y, 129) - 0.5) * 10;
+      return rim ? [138 + n, 178 + n, 174 + n] : [206 + n, 240 + n, 234 + n];
+    }),
+  );
+  addCubeAll(
+    "glowstone",
+    makeTex((x, y) => {
+      const bright = texHash(x >> 1, y >> 1, 130) > 0.45 ? 24 : -24;
+      return [232 + bright * 0.6, 192 + bright, 96 + bright];
+    }),
+  );
+  addCubeAll("lapis_block", solidSpeckle([42, 82, 168], 20, 131));
+  addCubeAll("gold_block", solidSpeckle([246, 208, 68], 16, 132));
+  addCubeAll("netherrack", cobbleTex([112, 46, 46], [76, 28, 28], 133));
+  addCubeAll("blackstone", cobbleTex([44, 40, 48], [26, 24, 30], 134));
+  addCubeAll("magma_block", makeTex((x, y) => {
+    const crack = (x + y * 2) % 7 === 0 || (x * 2 - y + 32) % 9 === 0;
+    return crack ? [246, 146, 36] : [58, 30, 32];
+  }));
+
+  // 7. Fluids (water & lava)
+  const waterPx = makeTex((x, y) => {
+    const wave = (x + y * 2) % 6 < 2 ? 18 : -8;
+    return [52 + wave, 122 + wave, 212 + wave, 190];
+  });
+  pack.addTexture("minecraft:block/water_still", 16, 16, waterPx);
+  pack.addTexture("minecraft:block/water_flow", 16, 16, waterPx);
+  addCubeAll("water", waterPx);
+
+  const lavaPx = makeTex((x, y) => {
+    const hot = texHash(x >> 1, y >> 1, 140) > 0.55;
+    return hot ? [250, 186, 48] : [224, 92, 24];
+  });
+  pack.addTexture("minecraft:block/lava_still", 16, 16, lavaPx);
+  pack.addTexture("minecraft:block/lava_flow", 16, 16, lavaPx);
+  addCubeAll("lava", lavaPx);
+
+  // 8. Flora (short_grass, poppy, dandelion)
+  addCrossPlant(
+    "short_grass",
+    makeTex((x, y) => {
+      const blade =
+        (Math.abs(x - 4) <= 1 && y >= 6) ||
+        (Math.abs(x - 8) <= 1 && y >= 3) ||
+        (Math.abs(x - 12) <= 1 && y >= 7) ||
+        (y >= 12 && x >= 3 && x <= 13);
+      return blade ? [96 + (y < 8 ? 24 : 0), 162 + (y < 8 ? 22 : 0), 58, 255] : [0, 0, 0, 0];
+    }),
+  );
+  addCrossPlant(
+    "poppy",
+    makeTex((x, y) => {
+      const petal = Math.hypot(x - 8, y - 5) <= 2.6;
+      const stem = x === 8 && y >= 7 && y <= 15;
+      const leaf = (x === 6 || x === 7) && (y === 11 || y === 12);
+      if (petal) return [220, 44, 42, 255];
+      if (stem || leaf) return [64, 134, 48, 255];
+      return [0, 0, 0, 0];
+    }),
+  );
+  addCrossPlant(
+    "dandelion",
+    makeTex((x, y) => {
+      const petal = Math.hypot(x - 8, y - 6) <= 2.4;
+      const stem = x === 8 && y >= 8 && y <= 15;
+      if (petal) return [248, 212, 48, 255];
+      if (stem) return [68, 138, 48, 255];
+      return [0, 0, 0, 0];
+    }),
+  );
+
+  // 9. Concrete spectrum for Oklab palette mapping
+  const concretes = {
+    white_concrete: [212, 216, 218],
+    light_gray_concrete: [136, 138, 134],
+    gray_concrete: [62, 66, 70],
+    black_concrete: [22, 24, 30],
+    blue_concrete: [44, 52, 148],
+    cyan_concrete: [28, 136, 148],
+    light_blue_concrete: [52, 164, 208],
+    lime_concrete: [108, 178, 42],
+    green_concrete: [78, 102, 42],
+    yellow_concrete: [244, 194, 48],
+    orange_concrete: [226, 114, 32],
+    red_concrete: [164, 42, 40],
+    magenta_concrete: [178, 62, 168],
+    purple_concrete: [112, 44, 166],
+    pink_concrete: [218, 114, 152],
+    brown_concrete: [102, 66, 44],
+  };
+  for (const [k, rgb] of Object.entries(concretes)) {
+    addCubeAll(k, solidSpeckle(rgb, 5, k.length * 19));
+  }
+
+  return pack;
+}
+
+let activePack = null;
+let customPackName = null;
+const packListeners = new Set();
+
+function getActivePack(nuc) {
+  if (!activePack) activePack = buildDefaultResourcePack(nuc);
+  return activePack;
+}
+
+async function loadCustomPackFile(nuc, file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  activePack = nuc.ResourcePack.fromBytes(bytes);
+  customPackName = file.name;
+  for (const fn of packListeners) fn(customPackName);
+}
 
 const GRADIENT_PALETTE_IDS = JSON.stringify([
   "minecraft:obsidian",
@@ -98,149 +446,32 @@ const GRADIENT_PALETTE_IDS = JSON.stringify([
   "minecraft:gold_block",
   "minecraft:orange_concrete",
   "minecraft:red_concrete",
-  "minecraft:magenta_concrete",
   "minecraft:white_concrete",
   "minecraft:calcite",
   "minecraft:smooth_sandstone",
 ]);
 
-const SHADED_PALETTE_IDS = JSON.stringify([
+const NETHER_PALETTE_IDS = JSON.stringify([
   "minecraft:obsidian",
-  "minecraft:deepslate",
-  "minecraft:gray_concrete",
-  "minecraft:tuff",
-  "minecraft:stone",
-  "minecraft:light_gray_concrete",
-  "minecraft:andesite",
-  "minecraft:prismarine_bricks",
-  "minecraft:oxidized_copper",
-  "minecraft:calcite",
-  "minecraft:white_concrete",
-  "minecraft:sea_lantern",
+  "minecraft:blackstone",
+  "minecraft:netherrack",
+  "minecraft:magma_block",
+  "minecraft:orange_concrete",
+  "minecraft:glowstone",
+  "minecraft:gold_block",
 ]);
 
-function generateTexture(spec) {
-  const [r0, g0, b0] = spec.rgb;
-  const style = spec.style;
-  const pixels = new Uint8Array(16 * 16 * 4);
-  for (let y = 0; y < 16; y += 1) {
-    for (let x = 0; x < 16; x += 1) {
-      const idx = (y * 16 + x) * 4;
-      const hash = ((x * 37 + y * 59 + (x ^ y) * 17) & 31) - 16;
-      let delta = Math.round(hash * 0.45);
-      let alpha = 255;
-
-      if (style === "bricks") {
-        const mortar = y % 8 === 0 || (x + (y >= 8 ? 4 : 0)) % 8 === 0;
-        delta = mortar ? -26 : Math.round(hash * 0.35);
-      } else if (style === "strata") {
-        const band = ((y * 3 + (x >> 2)) % 6) === 0 ? -16 : ((y % 4) === 2 ? 10 : 0);
-        delta = band + Math.round(hash * 0.3);
-      } else if (style === "moss") {
-        delta = ((x * 13 + y * 29) % 7 < 2 ? 18 : -10) + Math.round(hash * 0.5);
-      } else if (style === "patina") {
-        const edge = x === 0 || y === 0 || x === 15 || y === 15;
-        delta = edge ? -18 : ((x + y * 2) % 9 < 2 ? 16 : Math.round(hash * 0.35));
-      } else if (style === "crystal") {
-        const facet = ((x + y) % 7 === 0 || (x - y + 16) % 9 === 0) ? 24 : -8;
-        delta = facet + Math.round(hash * 0.35);
-      } else if (style === "lantern") {
-        const rim = x <= 1 || y <= 1 || x >= 14 || y >= 14;
-        delta = rim ? -34 : 18 + Math.round(hash * 0.2);
-      } else if (style === "vein") {
-        delta = (x - y + 32) % 7 === 0 ? -20 : Math.round(hash * 0.25);
-      } else if (style === "water") {
-        delta = ((x + y * 2) % 6 < 2 ? 16 : -8);
-        alpha = 185;
-      } else if (style === "matte") {
-        delta = Math.round(hash * 0.18);
-      } else if (style === "cross") {
-        // Stylized tuft of blades on transparent background
-        const blade =
-          (Math.abs(x - 4) <= 1 && y >= 6) ||
-          (Math.abs(x - 8) <= 1 && y >= 3) ||
-          (Math.abs(x - 12) <= 1 && y >= 7) ||
-          (y >= 12 && x >= 3 && x <= 13);
-        if (!blade) alpha = 0;
-        delta = y < 8 ? 22 : -8;
-      }
-
-      pixels[idx] = Math.max(0, Math.min(255, r0 + delta));
-      pixels[idx + 1] = Math.max(0, Math.min(255, g0 + delta));
-      pixels[idx + 2] = Math.max(0, Math.min(255, b0 + delta));
-      pixels[idx + 3] = alpha;
-    }
-  }
-  return pixels;
-}
-
-let cachedPack;
-function getResourcePack(nuc) {
-  if (cachedPack) return cachedPack;
-  const pack = nuc.ResourcePack.fromBytes(EMPTY_ZIP);
-  const cubeFaces = Object.fromEntries(
-    ["down", "up", "north", "south", "west", "east"].map((side) => [
-      side,
-      { texture: "#all", cullface: side },
-    ]),
-  );
-  for (const [name, spec] of Object.entries(BLOCKS)) {
-    const block = `minecraft:${name}`;
-    const texture = `minecraft:block/${name}`;
-    pack.addBlockstateJson(
-      block,
-      JSON.stringify({ variants: { "": { model: texture } } }),
-    );
-    if (spec.style === "cross") {
-      // Compact tuft cross model
-      pack.addModelJson(
-        texture,
-        JSON.stringify({
-          textures: { cross: texture },
-          elements: [
-            {
-              from: [2, 0, 8],
-              to: [14, 13, 8],
-              rotation: { origin: [8, 8, 8], axis: "y", angle: 45, rescale: true },
-              shade: false,
-              faces: { north: { texture: "#cross" }, south: { texture: "#cross" } },
-            },
-            {
-              from: [8, 0, 2],
-              to: [8, 13, 14],
-              rotation: { origin: [8, 8, 8], axis: "y", angle: 45, rescale: true },
-              shade: false,
-              faces: { east: { texture: "#cross" }, west: { texture: "#cross" } },
-            },
-          ],
-        }),
-      );
-    } else if (spec.style === "water") {
-      pack.addModelJson(
-        texture,
-        JSON.stringify({
-          textures: { all: texture },
-          elements: [{ from: [0, 0, 0], to: [16, 14, 16], faces: cubeFaces }],
-        }),
-      );
-    } else {
-      pack.addModelJson(
-        texture,
-        JSON.stringify({
-          textures: { all: texture },
-          elements: [{ from: [0, 0, 0], to: [16, 16, 16], faces: cubeFaces }],
-        }),
-      );
-    }
-    pack.addTexture(texture, 16, 16, generateTexture(spec));
-  }
-  // Register vanilla fluid texture names used by schematic-mesher for minecraft:water
-  const waterTex = generateTexture(BLOCKS.water);
-  pack.addTexture("minecraft:block/water_still", 16, 16, waterTex);
-  pack.addTexture("minecraft:block/water_flow", 16, 16, waterTex);
-  cachedPack = pack;
-  return pack;
-}
+const SHADED_STONE_IDS = JSON.stringify([
+  "minecraft:deepslate_bricks",
+  "minecraft:deepslate",
+  "minecraft:tuff",
+  "minecraft:cobblestone",
+  "minecraft:stone",
+  "minecraft:stone_bricks",
+  "minecraft:andesite",
+  "minecraft:calcite",
+  "minecraft:snow_block",
+]);
 
 function decodeBase64(value) {
   const binary = globalThis.atob(value);
@@ -249,18 +480,26 @@ function decodeBase64(value) {
   return out;
 }
 
+/* ============================================================================
+ * WIDGET 1: PROGRESSIVE 5-STEP 3D MINECRAFT SDF & VOXELPIPELINE STUDIO
+ * ============================================================================ */
+
 const CUSTOM_SNIPPETS = [
   {
-    label: "Gyroid sphere",
-    expr: `let q = p * 0.42;\nlet g = abs(sin(q.x)*cos(q.y) + sin(q.y)*cos(q.z) + sin(q.z)*cos(q.x)) - 0.32;\nmax(g, sphere(p, 11.5))`,
+    label: "Gyroid temple",
+    expr: `let q = p * 0.40;\nlet g = abs(sin(q.x)*cos(q.y) + sin(q.y)*cos(q.z) + sin(q.z)*cos(q.x)) - 0.30;\nmax(g, sphere(p, 11.4))`,
   },
   {
-    label: "Twisted torus",
-    expr: `let a = y * 0.16;\nlet q = vec3(x*cos(a) - z*sin(a), y, x*sin(a) + z*cos(a));\ntorus(q, 8.0, 2.8) + sin(x*0.7)*cos(z*0.7)*0.55`,
+    label: "Power-8 Mandelbulb",
+    expr: `let z = p / 9.5; let dr = 1.0; let r = 0.0;\nfor i in 0..7 {\n  r = length(z);\n  if r > 3.5 { break; }\n  let th = acos(clamp(z.z / max(r, 1e-5), -1.0, 1.0)) * 8.0;\n  let ph = atan2(z.y, z.x) * 8.0;\n  dr = pow(max(r, 1e-5), 7.0) * 8.0 * dr + 1.0;\n  let zr = pow(max(r, 1e-5), 8.0);\n  z = vec3(sin(th)*cos(ph), sin(ph)*sin(th), cos(th)) * zr + p / 9.5;\n}\nlet rs = max(r, 1e-5);\n0.5 * log(rs) * rs / max(dr, 1e-5) * 9.5`,
   },
   {
-    label: "Schwarz-P lattice",
-    expr: `let q = p * 0.48;\nlet s = abs(cos(q.x) + cos(q.y) + cos(q.z)) - 0.42;\nmax(s, box(p, vec3(10.5, 10.5, 10.5)))`,
+    label: "Twisted spire",
+    expr: `let a = y * 0.22;\nlet q = vec3(x*cos(a) - z*sin(a), y, x*sin(a) + z*cos(a));\nbox(q, vec3(5.5 - y * 0.28, 10.5, 5.5 - y * 0.28)) - 0.6`,
+  },
+  {
+    label: "Volcanic crater",
+    expr: `let r = length(vec3(x, 0.0, z));\nlet cone = y - (10.0 - r * 0.85) + exp(-r * r * 0.05) * 7.0;\nmax(cone, length(vec3(x, 0.0, z)) - 11.5)`,
   },
   {
     label: "Orbital rings",
@@ -268,29 +507,109 @@ const CUSTOM_SNIPPETS = [
   },
 ];
 
-const PRESETS = {
+const WORKBENCH_STEPS = {
+  sphere: {
+    label: "1. Sphere",
+    p1: { label: "Radius", min: 4, max: 11, step: 0.5, value: 8.5 },
+    p2: { label: "Hollow shell (0 = solid)", min: 0, max: 2.5, step: 0.5, value: 0 },
+    bounds: [-12, -12, -12, 12, 12, 12],
+    code(p1, p2) {
+      return p2 > 0
+        ? `Field.sphere(${p1}).shell(${p2})  // stone_bricks + mossy_stone_bricks`
+        : `Field.sphere(${p1})  // stone_bricks + mossy_stone_bricks`;
+    },
+    build(nuc, p1, p2, matMode) {
+      let geom = nuc.Field.sphere(p1);
+      if (p2 > 0) {
+        geom = geom.shell(p2).subtract(nuc.Field.boxShape(8, 8, 8, 0).translate(7, 5, 7));
+      }
+      const noise = nuc.Field.perlinFbm3(0.18, 7, 3);
+      const mat = buildWorkbenchMaterial(nuc, matMode, noise, () =>
+        nuc.Material.weighted(
+          '["minecraft:stone_bricks","minecraft:mossy_stone_bricks","minecraft:cobblestone"]',
+          [0.62, 0.24, 0.14],
+          17,
+        ),
+      );
+      return nuc.VoxelPipeline.create(geom, mat).toSchematicBounded("first_sphere", ...this.bounds);
+    },
+  },
+
+  arch: {
+    label: "2. Carve & blend",
+    p1: { label: "Archway width", min: 2.5, max: 6.0, step: 0.5, value: 4.0 },
+    p2: { label: "Smooth blend (k)", min: 0.2, max: 3.5, step: 0.3, value: 1.4 },
+    bounds: [-12, -8, -12, 12, 13, 12],
+    code(p1, p2) {
+      return `tower.smooth_union(dome.tag(2), ${p2}).subtract(archway(${p1}))`;
+    },
+    build(nuc, p1, p2, matMode) {
+      const base = nuc.Field.boxShape(8.5, 6.5, 8.5, 0.8).translate(0, -1, 0).tag(1);
+      const dome = nuc.Field.sphere(7.6).translate(0, 6.0, 0).tag(2);
+      const doorwayX = nuc.Field.cappedCylinder(p1, 11.0).rotate(0, 0, 90).translate(0, -2.5, 0);
+      const doorwayZ = nuc.Field.cappedCylinder(p1, 11.0).rotate(90, 0, 0).translate(0, -2.5, 0);
+      const geom = base
+        .smoothUnion(dome, p2)
+        .subtract(doorwayX)
+        .subtract(doorwayZ);
+
+      const noise = nuc.Field.perlinFbm3(0.16, 23, 3);
+      const mat = buildWorkbenchMaterial(nuc, matMode, noise, () => {
+        const m = nuc.MaterialBuilder.createTagMatcher(true, 41);
+        m.addTagCase(
+          1,
+          nuc.Material.weighted(
+            '["minecraft:stone_bricks","minecraft:mossy_stone_bricks","minecraft:stone"]',
+            [0.58, 0.24, 0.18],
+            11,
+          ),
+        );
+        m.addTagCase(
+          2,
+          nuc.Material.weighted(
+            '["minecraft:oxidized_copper","minecraft:weathered_copper","minecraft:prismarine_bricks"]',
+            [0.52, 0.28, 0.20],
+            29,
+          ),
+        );
+        m.setDefault(nuc.Material.solid("minecraft:stone_bricks"));
+        return m.build();
+      });
+
+      return nuc.VoxelPipeline.create(geom, mat).toSchematicBounded("carved_arch", ...this.bounds);
+    },
+  },
+
   island: {
-    label: "Mossy island",
-    p1: { label: "Noise amplitude", min: 0.5, max: 4.0, step: 0.25, value: 2.2 },
+    label: "3. Island",
+    p1: { label: "Terrain roughness", min: 0.5, max: 3.8, step: 0.25, value: 2.0 },
     p2: { label: "Lagoon water level", min: -1, max: 4, step: 1, value: 2 },
-    bounds: [-14, -8, -14, 14, 12, 14],
+    bounds: [-14, -8, -14, 14, 14, 14],
+    code(p1, p2) {
+      return `ellipsoid.displace(fbm, ${p1}).subtract(lagoon) + grass/dirt/stone + water(${p2}) + trees`;
+    },
     build(nuc, p1, p2, matMode) {
       const noise = nuc.Field.perlinFbm3(0.09, 42, 4);
-      const crater = nuc.Field.sphere(6.2).translate(2.8, 5.5, 2.2);
-      const basin = nuc.Field.ellipsoid(13, 6.8, 13)
+      const crater = nuc.Field.sphere(6.2).translate(3.2, 5.8, 2.5);
+      const terrain = nuc.Field.ellipsoid(13, 6.6, 13)
         .displace(noise, p1)
         .subtract(crater)
         .tag(1);
-      const crystal = nuc.Field.octahedron(4.5).translate(-5.2, 5.8, -4.0).tag(2);
-      const geom = basin.smoothUnion(crystal, 1.5);
+      // Small Minecraft tree on the high ridge: oak_log trunk (tag 2) + oak_leaves crown (tag 3)
+      const trunk = nuc.Field.cappedCylinder(0.95, 3.5).translate(-5.5, 7.2, -3.5).tag(2);
+      const crown = nuc.Field.sphere(3.6)
+        .displace(nuc.Field.perlinFbm3(0.35, 9, 2), 0.7)
+        .translate(-5.5, 11.2, -3.5)
+        .tag(3);
+      const geom = terrain.unionWith(trunk).unionWith(crown);
 
-      const mat = buildMaterial(nuc, matMode, noise, () => {
+      const mat = buildWorkbenchMaterial(nuc, matMode, noise, () => {
         const layers = nuc.MaterialBuilder.createLayered();
         layers.addLayer(
-          nuc.MaterialCondition.exposedFace(4, true).andWith(
-            nuc.MaterialCondition.slopeRange(true, 0.0, true, 0.68),
+          nuc.MaterialCondition.exposedFace(1, true).andWith(
+            nuc.MaterialCondition.slopeRange(true, 0.0, true, 0.72),
           ),
-          nuc.Material.solid("minecraft:moss_block"),
+          nuc.Material.solid("minecraft:grass_block"),
         );
         layers.addLayer(
           nuc.MaterialCondition.depthBelowSurface(true, 1.0, true, 2.0),
@@ -305,168 +624,89 @@ const PRESETS = {
             true,
           ),
         );
-        const matcher = nuc.MaterialBuilder.createTagMatcher(true, 73);
+        const matcher = nuc.MaterialBuilder.createTagMatcher(false, 73);
         matcher.addTagCase(1, layers.build());
-        matcher.addTagCase(2, nuc.Material.solid("minecraft:amethyst_block"));
+        matcher.addTagCase(2, nuc.Material.solid("minecraft:oak_log"));
+        matcher.addTagCase(3, nuc.Material.solid("minecraft:oak_leaves"));
         matcher.setDefault(nuc.Material.solid("minecraft:stone"));
         return matcher.build();
       });
 
       const pipe = nuc.VoxelPipeline.create(geom, mat);
-      if (matMode === "pipeline") {
-        // Confine water to the carved lagoon basin below water level p2
-        const lagoonPool = crater.intersectionWith(
-          nuc.Field.plane(0, 1, 0, -p2),
-        );
+      if (matMode === "minecraft") {
+        const lagoonPool = crater.intersectionWith(nuc.Field.plane(0, 1, 0, -p2));
         pipe.addFluid(lagoonPool, "minecraft:water");
-        const grass = nuc.ScatterRule.create(
+        const flora = nuc.ScatterRule.create(
           nuc.ScatterFace.Top,
-          0.36,
-          '["minecraft:short_grass"]',
-          [1.0],
+          0.32,
+          '["minecraft:short_grass","minecraft:poppy","minecraft:dandelion"]',
+          [0.65, 0.18, 0.17],
           19,
         );
-        grass.setOnBlock("minecraft:moss_block");
-        pipe.addScatter(grass);
+        flora.setOnBlock("minecraft:grass_block");
+        pipe.addScatter(flora);
       }
-      return pipe.toSchematicBounded("mossy_island", ...this.bounds);
+      return pipe.toSchematicBounded("minecraft_island", ...this.bounds);
     },
   },
 
-  gyroid: {
-    label: "Gyroid core",
-    p1: { label: "Frequency", min: 0.24, max: 0.56, step: 0.02, value: 0.38 },
-    p2: { label: "Wall thickness", min: 0.16, max: 0.52, step: 0.02, value: 0.30 },
-    bounds: [-12, -12, -12, 12, 12, 12],
-    build(nuc, p1, p2, matMode) {
-      const b = nuc.FieldExprBuilder.create();
-      b.setBounds(-12, -12, -12, 12, 12, 12);
-      b.setDistanceKind(nuc.FieldDistanceKind.Implicit);
-      const gyroid = b.compile(
-        `let q = p * ${p1.toFixed(3)};\n` +
-          `let g = abs(sin(q.x)*cos(q.y) + sin(q.y)*cos(q.z) + sin(q.z)*cos(q.x)) - ${p2.toFixed(3)};\n` +
-          `max(g, sphere(p, 11.4))`,
-      );
-      const radial = nuc.Field.expr("length(p) / 11.5");
-
-      const mat = buildMaterial(nuc, matMode, radial, () => {
-        const pal = nuc.Palette.fromBlockIds(GRADIENT_PALETTE_IDS).dithered();
-        return nuc.Material.fieldGradient(
-          radial,
-          [0.0, 0.35, 0.72, 1.0],
-          [188, 232, 226, 48, 168, 178, 92, 56, 172, 28, 22, 42],
-          0.1,
-          1.0,
-          pal,
-          nuc.InterpolationSpace.Oklab,
-        );
-      });
-
-      const pipe = nuc.VoxelPipeline.create(gyroid, mat);
-      return pipe.toSchematicBounded("gyroid_core", ...this.bounds);
+  temple: {
+    label: "4. Temple",
+    p1: { label: "Columns (repeat_polar)", min: 4, max: 10, step: 1, value: 6 },
+    p2: { label: "Chamfer bevel (r)", min: 0.4, max: 2.8, step: 0.2, value: 1.4 },
+    bounds: [-13, -9, -13, 13, 12, 13],
+    code(p1, p2) {
+      return `plinth.chamfer_union(col.repeat_polar(${p1}), ${p2}).smooth_union(copper_ring, 1.2)`;
     },
-  },
-
-  mandelbulb: {
-    label: "Mandelbulb",
-    p1: { label: "Power", min: 4, max: 10, step: 1, value: 8 },
-    p2: { label: "Iterations", min: 3, max: 9, step: 1, value: 7 },
-    bounds: [-13, -13, -13, 13, 13, 13],
     build(nuc, p1, p2, matMode) {
-      const power = p1.toFixed(1);
-      const powerM1 = (p1 - 1).toFixed(1);
-      const iters = Math.round(p2);
-      const b = nuc.FieldExprBuilder.create();
-      b.setBounds(-1.3, -1.3, -1.3, 1.3, 1.3, 1.3);
-      b.setDistanceKind(nuc.FieldDistanceKind.Estimate);
-      const bulb = b
-        .compile(
-          `let z = p; let dr = 1.0; let r = 0.0;\n` +
-            `for i in 0..${iters} {\n` +
-            `  r = length(z);\n` +
-            `  if r > 3.5 { break; }\n` +
-            `  let theta = acos(clamp(z.z / max(r, 1e-5), -1.0, 1.0)) * ${power};\n` +
-            `  let phi = atan2(z.y, z.x) * ${power};\n` +
-            `  dr = pow(max(r, 1e-5), ${powerM1}) * ${power} * dr + 1.0;\n` +
-            `  let zr = pow(max(r, 1e-5), ${power});\n` +
-            `  z = vec3(sin(theta)*cos(phi), sin(phi)*sin(theta), cos(theta)) * zr + p;\n` +
-            `}\n` +
-            `let rs = max(r, 1e-5);\n` +
-            `0.5 * log(rs) * rs / max(dr, 1e-5)`,
-        )
-        .scale(10.2);
-
-      const trap = nuc.Field.expr("clamp((length(p) - 4.0) / 8.5, 0.0, 1.0)");
-      const mat = buildMaterial(nuc, matMode, trap, () => {
-        const pal = nuc.Palette.fromBlockIds(GRADIENT_PALETTE_IDS).dithered();
-        return nuc.Material.fieldGradient(
-          trap,
-          [0.0, 0.35, 0.68, 0.92, 1.0],
-          [28, 22, 42, 42, 82, 168, 82, 164, 146, 246, 208, 68, 188, 232, 226],
-          0.0,
-          1.0,
-          pal,
-          nuc.InterpolationSpace.Oklab,
-        );
-      });
-
-      const pipe = nuc.VoxelPipeline.create(bulb, mat);
-      return pipe.toSchematicBounded("mandelbulb", ...this.bounds);
-    },
-  },
-
-  arch: {
-    label: "Chamfer colonnade",
-    p1: { label: "Columns", min: 4, max: 10, step: 1, value: 6 },
-    p2: { label: "Chamfer radius", min: 0.4, max: 3.0, step: 0.2, value: 1.4 },
-    bounds: [-13, -9, -13, 13, 11, 13],
-    build(nuc, p1, p2, matMode) {
-      const base = nuc.Field.cappedCylinder(11.0, 1.5).translate(0, -6.5, 0).tag(1);
-      const col = nuc.Field.cappedCylinder(1.5, 7.2)
+      const plinth = nuc.Field.cappedCylinder(11.2, 1.5).translate(0, -6.5, 0).tag(1);
+      const col = nuc.Field.cappedCylinder(1.4, 7.0)
         .translate(7.8, 0.5, 0)
         .repeatPolar(Math.round(p1))
         .tag(1);
       const ring = nuc.Field.torus(7.8, 1.8).translate(0, 7.5, 0).tag(2);
-      const core = nuc.Field.octahedron(4.2).translate(0, 0.5, 0).tag(3);
-      const geom = base
+      const altar = nuc.Field.octahedron(3.8).translate(0, 0.5, 0).tag(3);
+      const geom = plinth
         .chamferUnion(col, p2)
-        .smoothUnion(ring, p2 * 0.9)
-        .unionWith(core);
+        .smoothUnion(ring, 1.2)
+        .unionWith(altar);
 
       const noise = nuc.Field.perlinFbm3(0.14, 17, 3);
-      const mat = buildMaterial(nuc, matMode, noise, () => {
-        const matcher = nuc.MaterialBuilder.createTagMatcher(true, 11);
-        matcher.addTagCase(
+      const mat = buildWorkbenchMaterial(nuc, matMode, noise, () => {
+        const m = nuc.MaterialBuilder.createTagMatcher(true, 11);
+        m.addTagCase(
           1,
           nuc.Material.weighted(
-            '["minecraft:smooth_sandstone","minecraft:calcite","minecraft:andesite"]',
-            [0.55, 0.30, 0.15],
+            '["minecraft:sandstone","minecraft:smooth_sandstone","minecraft:stone_bricks"]',
+            [0.50, 0.30, 0.20],
             31,
           ),
         );
-        matcher.addTagCase(
+        m.addTagCase(
           2,
           nuc.Material.weighted(
-            '["minecraft:oxidized_copper","minecraft:weathered_copper","minecraft:prismarine_bricks"]',
-            [0.50, 0.30, 0.20],
+            '["minecraft:oxidized_copper","minecraft:weathered_copper","minecraft:cut_copper"]',
+            [0.54, 0.28, 0.18],
             53,
           ),
         );
-        matcher.addTagCase(3, nuc.Material.solid("minecraft:sea_lantern"));
-        matcher.setDefault(nuc.Material.solid("minecraft:stone"));
-        return matcher.build();
+        m.addTagCase(3, nuc.Material.solid("minecraft:sea_lantern"));
+        m.setDefault(nuc.Material.solid("minecraft:sandstone"));
+        return m.build();
       });
 
-      const pipe = nuc.VoxelPipeline.create(geom, mat);
-      return pipe.toSchematicBounded("chamfer_colonnade", ...this.bounds);
+      return nuc.VoxelPipeline.create(geom, mat).toSchematicBounded("temple_colonnade", ...this.bounds);
     },
   },
 
   custom: {
-    label: "Custom Field.expr",
+    label: "5. Field.expr",
     p1: { label: "Scale", min: 0.7, max: 1.4, step: 0.05, value: 1.0 },
-    p2: { label: "Iso offset", min: -1.5, max: 1.5, step: 0.1, value: 0.0 },
+    p2: { label: "Surface offset", min: -1.5, max: 1.5, step: 0.1, value: 0.0 },
     bounds: [-12, -12, -12, 12, 12, 12],
+    code() {
+      return `Field.expr(source)  // edit any formula below and press Run (⌘↵)`;
+    },
     build(nuc, p1, p2, matMode, customSource) {
       const b = nuc.FieldExprBuilder.create();
       b.setBounds(-12, -12, -12, 12, 12, 12);
@@ -474,46 +714,48 @@ const PRESETS = {
       let field = b.compile(customSource);
       if (Math.abs(p1 - 1.0) > 1e-3) field = field.scale(p1);
       if (Math.abs(p2) > 1e-3) field = field.addConst(p2);
-      const colorField = nuc.Field.expr("(y + 12.0) / 24.0");
-      const mat = buildMaterial(nuc, matMode, colorField, () => {
+      const colorField = nuc.Field.expr("clamp((length(p) - 2.0) / 10.0, 0.0, 1.0)");
+      const mat = buildWorkbenchMaterial(nuc, matMode, colorField, () => {
         const pal = nuc.Palette.fromBlockIds(GRADIENT_PALETTE_IDS).dithered();
         return nuc.Material.fieldGradient(
           colorField,
-          [0.0, 0.5, 1.0],
-          [44, 52, 148, 82, 164, 146, 246, 208, 68],
+          [0.0, 0.35, 0.72, 1.0],
+          [206, 240, 234, 82, 164, 146, 148, 102, 206, 28, 22, 42],
           0.0,
           1.0,
           pal,
           nuc.InterpolationSpace.Oklab,
         );
       });
-      const pipe = nuc.VoxelPipeline.create(field, mat);
-      return pipe.toSchematicBounded("custom_expr", ...this.bounds);
+      return nuc.VoxelPipeline.create(field, mat).toSchematicBounded("custom_expr", ...this.bounds);
     },
   },
 };
 
-function buildMaterial(nuc, mode, scalarField, pipelineFactory) {
-  if (mode === "pipeline") return pipelineFactory();
-  if (mode === "shaded") {
-    const pal = nuc.Palette.fromBlockIds(SHADED_PALETTE_IDS).dithered();
-    return nuc.Material.shaded(210, 232, 226, 0.55, 0.75, 0.35, 0.18, pal);
-  }
-  if (mode === "strata") {
-    return nuc.Material.channelRamp(
+function buildWorkbenchMaterial(nuc, mode, scalarField, defaultFactory) {
+  if (mode === "minecraft") return defaultFactory();
+  if (mode === "nether") {
+    const pal = nuc.Palette.fromBlockIds(NETHER_PALETTE_IDS).dithered();
+    return nuc.Material.channelGradient(
       nuc.FieldChannel.WorldY,
+      [0.0, 0.45, 0.85, 1.0],
+      [24, 18, 40, 112, 46, 46, 224, 92, 24, 246, 208, 68],
       -10.0,
       10.0,
-      '["minecraft:deepslate","minecraft:tuff","minecraft:stone","minecraft:andesite","minecraft:calcite","minecraft:smooth_sandstone"]',
-      true,
+      pal,
+      nuc.InterpolationSpace.Oklab,
     );
+  }
+  if (mode === "shaded") {
+    const pal = nuc.Palette.fromBlockIds(SHADED_STONE_IDS).dithered();
+    return nuc.Material.shaded(215, 225, 220, 0.55, 0.75, 0.35, 0.16, pal);
   }
   // "oklab"
   const pal = nuc.Palette.fromBlockIds(GRADIENT_PALETTE_IDS).dithered();
   return nuc.Material.fieldGradient(
     scalarField,
     [0.0, 0.5, 1.0],
-    [42, 62, 158, 66, 178, 166, 246, 200, 62],
+    [42, 62, 158, 82, 164, 146, 246, 208, 68],
     -1.0,
     1.0,
     pal,
@@ -521,28 +763,25 @@ function buildMaterial(nuc, mode, scalarField, pipelineFactory) {
   );
 }
 
-/* ============================================================================
- * WIDGET 1: 3D VOXELPIPELINE & FIELD.EXPR LIVE WORKBENCH
- * ============================================================================ */
-
 async function mountWorkbench(root, ensureModelViewer) {
   if (root.dataset.mounted === "true") return () => {};
   root.dataset.mounted = "true";
 
   let presetKey = "island";
-  let matMode = "pipeline";
-  let p1Val = PRESETS.island.p1.value;
-  let p2Val = PRESETS.island.p2.value;
+  let matMode = "minecraft";
+  let p1Val = WORKBENCH_STEPS.island.p1.value;
+  let p2Val = WORKBENCH_STEPS.island.p2.value;
   let customExpr = CUSTOM_SNIPPETS[0].expr;
   let currentUrl = null;
   let lastSchematic = null;
   let buildSeq = 0;
   let debounceTimer = null;
+  let nuc = null;
 
   root.innerHTML = `
     <div class="sdf-studio__bar">
-      <div class="sdf-seg" role="radiogroup" aria-label="Scene preset" data-role="presets">
-        ${Object.entries(PRESETS)
+      <div class="sdf-seg" role="radiogroup" aria-label="Progressive SDF step" data-role="presets">
+        ${Object.entries(WORKBENCH_STEPS)
           .map(
             ([k, p]) =>
               `<button type="button" class="sdf-seg__btn" role="radio" aria-checked="${
@@ -551,11 +790,11 @@ async function mountWorkbench(root, ensureModelViewer) {
           )
           .join("")}
       </div>
-      <div class="sdf-seg sdf-seg--compact" role="radiogroup" aria-label="Material shading" data-role="materials">
-        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="true" data-mat="pipeline">Pipeline</button>
+      <div class="sdf-seg" role="radiogroup" aria-label="Block theme" data-role="materials">
+        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="true" data-mat="minecraft">Minecraft</button>
+        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="false" data-mat="nether">Nether</button>
+        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="false" data-mat="shaded">Stone</button>
         <button type="button" class="sdf-seg__btn" role="radio" aria-checked="false" data-mat="oklab">Oklab</button>
-        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="false" data-mat="shaded">Shaded</button>
-        <button type="button" class="sdf-seg__btn" role="radio" aria-checked="false" data-mat="strata">Strata</button>
       </div>
     </div>
 
@@ -567,8 +806,8 @@ async function mountWorkbench(root, ensureModelViewer) {
           camera-controls
           auto-rotate
           auto-rotate-delay="1800"
-          rotation-per-second="14deg"
-          camera-orbit="38deg 66deg 118%"
+          rotation-per-second="13deg"
+          camera-orbit="38deg 64deg 118%"
           field-of-view="28deg"
           min-camera-orbit="auto auto 68%"
           max-camera-orbit="auto auto 220%"
@@ -580,21 +819,23 @@ async function mountWorkbench(root, ensureModelViewer) {
         <div class="sdf-studio__overlay" data-role="status">Loading Nucleation WASM...</div>
       </div>
 
+      <div class="sdf-code-preview" data-role="live-code"></div>
+
       <div class="sdf-studio__controls">
         <div class="sdf-sliders">
           <label class="sdf-slider">
             <span class="sdf-slider__head">
-              <span data-role="p1-label">${PRESETS.island.p1.label}</span>
+              <span data-role="p1-label">${WORKBENCH_STEPS.island.p1.label}</span>
               <output data-role="p1-val">${p1Val}</output>
             </span>
-            <input type="range" data-role="p1-input" min="${PRESETS.island.p1.min}" max="${PRESETS.island.p1.max}" step="${PRESETS.island.p1.step}" value="${p1Val}">
+            <input type="range" data-role="p1-input" min="${WORKBENCH_STEPS.island.p1.min}" max="${WORKBENCH_STEPS.island.p1.max}" step="${WORKBENCH_STEPS.island.p1.step}" value="${p1Val}">
           </label>
           <label class="sdf-slider">
             <span class="sdf-slider__head">
-              <span data-role="p2-label">${PRESETS.island.p2.label}</span>
+              <span data-role="p2-label">${WORKBENCH_STEPS.island.p2.label}</span>
               <output data-role="p2-val">${p2Val}</output>
             </span>
-            <input type="range" data-role="p2-input" min="${PRESETS.island.p2.min}" max="${PRESETS.island.p2.max}" step="${PRESETS.island.p2.step}" value="${p2Val}">
+            <input type="range" data-role="p2-input" min="${WORKBENCH_STEPS.island.p2.min}" max="${WORKBENCH_STEPS.island.p2.max}" step="${WORKBENCH_STEPS.island.p2.step}" value="${p2Val}">
           </label>
         </div>
 
@@ -615,15 +856,24 @@ async function mountWorkbench(root, ensureModelViewer) {
     </div>
 
     <div class="sdf-studio__footer">
-      <div class="sdf-telemetry" data-role="telemetry">Initializing WebAssembly engine...</div>
-      <button type="button" class="sdf-download-btn" data-role="download" disabled>Download .schem</button>
+      <div class="sdf-telemetry" data-role="telemetry">Initializing Nucleation WebAssembly...</div>
+      <div class="sdf-footer-actions">
+        <label class="sdf-pack-btn" title="Drop any Minecraft resource pack .zip or client.jar to render with its exact block textures (stays 100% local in your browser)">
+          <span data-role="pack-label">Load pack .zip</span>
+          <input type="file" accept=".zip,.jar" data-role="pack-input" hidden>
+        </label>
+        <button type="button" class="sdf-download-btn" data-role="download" disabled>Download .schem</button>
+      </div>
     </div>
   `;
 
   const viewer = root.querySelector(".sdf-studio__viewer");
   const statusEl = root.querySelector('[data-role="status"]');
+  const liveCodeEl = root.querySelector('[data-role="live-code"]');
   const telemetryEl = root.querySelector('[data-role="telemetry"]');
   const downloadBtn = root.querySelector('[data-role="download"]');
+  const packInput = root.querySelector('[data-role="pack-input"]');
+  const packLabel = root.querySelector('[data-role="pack-label"]');
   const p1Label = root.querySelector('[data-role="p1-label"]');
   const p1ValEl = root.querySelector('[data-role="p1-val"]');
   const p1Input = root.querySelector('[data-role="p1-input"]');
@@ -636,7 +886,7 @@ async function mountWorkbench(root, ensureModelViewer) {
   const exprRun = root.querySelector('[data-role="expr-run"]');
 
   function syncSliderConfig() {
-    const preset = PRESETS[presetKey];
+    const preset = WORKBENCH_STEPS[presetKey];
     p1Label.textContent = preset.p1.label;
     p1Input.min = String(preset.p1.min);
     p1Input.max = String(preset.p1.max);
@@ -652,15 +902,15 @@ async function mountWorkbench(root, ensureModelViewer) {
     p2ValEl.textContent = String(p2Val);
 
     exprPane.hidden = presetKey !== "custom";
+    liveCodeEl.textContent = preset.code(p1Val, p2Val);
   }
-
-  let nuc = null;
 
   async function rebuild() {
     const seq = ++buildSeq;
-    statusEl.textContent = "Voxelizing...";
+    statusEl.textContent = "Voxelizing in WASM...";
     statusEl.hidden = false;
     exprError.hidden = true;
+    liveCodeEl.textContent = WORKBENCH_STEPS[presetKey].code(p1Val, p2Val);
 
     try {
       if (!nuc) {
@@ -670,24 +920,20 @@ async function mountWorkbench(root, ensureModelViewer) {
       if (seq !== buildSeq) return;
 
       const t0 = performance.now();
-      const preset = PRESETS[presetKey];
-      const schem = preset.build(nuc, p1Val, p2Val, matMode, customExpr);
+      const schem = WORKBENCH_STEPS[presetKey].build(nuc, p1Val, p2Val, matMode, customExpr);
       const tVox = performance.now();
 
       const cfg = nuc.MeshConfig.create();
       cfg.setAmbientOcclusion(true);
       cfg.setAoIntensity(0.55);
       cfg.setGreedyMeshing(true);
-      const mesh = nuc.MeshResult.create(schem, getResourcePack(nuc), cfg);
+      const mesh = nuc.MeshResult.create(schem, getActivePack(nuc), cfg);
       const glbBytes = decodeBase64(mesh.glbDataB64());
       const tEnd = performance.now();
 
       if (seq !== buildSeq) return;
 
-      const blocks = schem.blockCount();
-      const tris = mesh.triangleCount();
       lastSchematic = schem;
-
       const nextUrl = URL.createObjectURL(new Blob([glbBytes], { type: "model/gltf-binary" }));
       if (currentUrl) URL.revokeObjectURL(currentUrl);
       currentUrl = nextUrl;
@@ -696,7 +942,7 @@ async function mountWorkbench(root, ensureModelViewer) {
       statusEl.hidden = true;
       downloadBtn.disabled = false;
       telemetryEl.textContent =
-        `${blocks.toLocaleString()} blocks · ${tris.toLocaleString()} triangles · ` +
+        `${schem.blockCount().toLocaleString()} blocks · ${mesh.triangleCount().toLocaleString()} triangles · ` +
         `${Math.round(tVox - t0)} ms voxelize · ${Math.round(tEnd - tVox)} ms mesh`;
     } catch (err) {
       if (seq !== buildSeq) return;
@@ -711,10 +957,30 @@ async function mountWorkbench(root, ensureModelViewer) {
     }
   }
 
-  function scheduleRebuild(delay = 90) {
+  function scheduleRebuild(delay = 85) {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => void rebuild(), delay);
   }
+
+  const onPackUpdated = (name) => {
+    packLabel.textContent = `Pack: ${name.slice(0, 18)}`;
+    scheduleRebuild(0);
+  };
+  packListeners.add(onPackUpdated);
+
+  packInput.addEventListener("change", async () => {
+    const file = packInput.files?.[0];
+    if (!file) return;
+    try {
+      if (!nuc) nuc = await loadNucleation();
+      statusEl.textContent = "Loading resource pack...";
+      statusEl.hidden = false;
+      await loadCustomPackFile(nuc, file);
+    } catch (err) {
+      statusEl.hidden = true;
+      telemetryEl.textContent = `Pack error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  });
 
   root.querySelector('[data-role="presets"]').addEventListener("click", (e) => {
     const btn = e.target.closest("[data-preset]");
@@ -723,8 +989,8 @@ async function mountWorkbench(root, ensureModelViewer) {
     for (const el of root.querySelectorAll("[data-preset]")) {
       el.setAttribute("aria-checked", String(el === btn));
     }
-    p1Val = PRESETS[presetKey].p1.value;
-    p2Val = PRESETS[presetKey].p2.value;
+    p1Val = WORKBENCH_STEPS[presetKey].p1.value;
+    p2Val = WORKBENCH_STEPS[presetKey].p2.value;
     syncSliderConfig();
     scheduleRebuild(0);
   });
@@ -742,12 +1008,14 @@ async function mountWorkbench(root, ensureModelViewer) {
   p1Input.addEventListener("input", () => {
     p1Val = Number(p1Input.value);
     p1ValEl.textContent = String(p1Val);
+    liveCodeEl.textContent = WORKBENCH_STEPS[presetKey].code(p1Val, p2Val);
     scheduleRebuild(75);
   });
 
   p2Input.addEventListener("input", () => {
     p2Val = Number(p2Input.value);
     p2ValEl.textContent = String(p2Val);
+    liveCodeEl.textContent = WORKBENCH_STEPS[presetKey].code(p1Val, p2Val);
     scheduleRebuild(75);
   });
 
@@ -789,6 +1057,7 @@ async function mountWorkbench(root, ensureModelViewer) {
 
   return () => {
     clearTimeout(debounceTimer);
+    packListeners.delete(onPackUpdated);
     if (currentUrl) URL.revokeObjectURL(currentUrl);
     root.dataset.mounted = "false";
   };
@@ -796,40 +1065,8 @@ async function mountWorkbench(root, ensureModelViewer) {
 
 /* ============================================================================
  * WIDGET 2: INTERACTIVE 2D SDF, CSG, DUAL NORMALS & 8x8 BRICK-PRUNING LAB
+ * Powered directly by Nucleation WASM `Field.evalAt` + `Field.normal` (Dual3)!
  * ============================================================================ */
-
-function sdCircle(px, py, cx, cy, r) {
-  return Math.hypot(px - cx, py - cy) - r;
-}
-
-function sdRoundBox(px, py, cx, cy, hx, hy, r) {
-  const qx = Math.abs(px - cx) - hx + r;
-  const qy = Math.abs(py - cy) - hy + r;
-  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
-}
-
-function opCSG(a, b, mode, k, steps) {
-  if (mode === "union") return Math.min(a, b);
-  if (mode === "smooth_union") {
-    const h = Math.max(k - Math.abs(a - b), 0) / k;
-    return Math.min(a, b) - h * h * k * 0.25;
-  }
-  if (mode === "chamfer") {
-    return Math.min(Math.min(a, b), (a - k + b) * Math.SQRT1_2);
-  }
-  if (mode === "steps") {
-    const s = k / Math.max(steps, 1);
-    const u = b - k;
-    return Math.min(Math.min(a, b), 0.5 * (u + a + Math.abs(((u - a + s) % (2 * s) + 2 * s) % (2 * s) - s)));
-  }
-  if (mode === "smooth_sub") {
-    const h = Math.max(k - Math.abs(-b - a), 0) / k;
-    return Math.max(a, -b) + h * h * k * 0.25;
-  }
-  // smooth_intersect
-  const h = Math.max(k - Math.abs(a - b), 0) / k;
-  return Math.max(a, b) + h * h * k * 0.25;
-}
 
 function mountCsgLab(root) {
   if (root.dataset.mounted === "true") return () => {};
@@ -852,6 +1089,9 @@ function mountCsgLab(root) {
     br: 1.0,
     dragging: null,
     hover: null,
+    nuc: null,
+    wasmField: null,
+    fieldKey: "",
   };
 
   root.innerHTML = `
@@ -867,8 +1107,10 @@ function mountCsgLab(root) {
     </div>
 
     <div class="sdf-csg__stage">
-      <canvas class="sdf-csg__canvas" width="900" height="400" aria-label="Interactive 2D signed distance field and 8x8 brick pruning canvas"></canvas>
+      <canvas class="sdf-csg__canvas" width="900" height="400" aria-label="Interactive 2D signed distance field powered by Nucleation WebAssembly"></canvas>
     </div>
+
+    <div class="sdf-code-preview" data-role="csg-code"></div>
 
     <div class="sdf-csg__controls">
       <label class="sdf-slider sdf-slider--inline">
@@ -881,13 +1123,13 @@ function mountCsgLab(root) {
 
       <div class="sdf-toggles">
         <label class="sdf-check"><input type="checkbox" data-toggle="isolines" checked><span>Isolines</span></label>
-        <label class="sdf-check"><input type="checkbox" data-toggle="normals" checked><span>Dual normals</span></label>
+        <label class="sdf-check"><input type="checkbox" data-toggle="normals" checked><span>Dual3 normals</span></label>
         <label class="sdf-check"><input type="checkbox" data-toggle="bricks" checked><span>8×8 interval bricks</span></label>
       </div>
     </div>
 
     <div class="sdf-studio__footer">
-      <div class="sdf-telemetry" data-role="csg-telemetry">Drag either shape handle directly on the field.</div>
+      <div class="sdf-telemetry" data-role="csg-telemetry">Loading Nucleation WASM Field...</div>
       <div class="sdf-telemetry sdf-telemetry--right" data-role="brick-stats"></div>
     </div>
   `;
@@ -897,20 +1139,59 @@ function mountCsgLab(root) {
   const kInput = root.querySelector('[data-role="k-input"]');
   const kVal = root.querySelector('[data-role="k-val"]');
   const kLabel = root.querySelector('[data-role="k-label"]');
+  const codeEl = root.querySelector('[data-role="csg-code"]');
   const telemetry = root.querySelector('[data-role="csg-telemetry"]');
   const brickStats = root.querySelector('[data-role="brick-stats"]');
 
-  // World coordinate extent: X in [-24, 24] (48 blocks = 6 bricks of 8), Y in [-12, 12] (24 blocks = 3 bricks of 8)
   const WORLD_W = 48;
   const WORLD_H = 24;
 
+  function formatCode() {
+    const k = state.k.toFixed(1);
+    const tail = `  // a=sphere(${state.ar})@(${state.ax.toFixed(1)},${state.ay.toFixed(1)})  b=box(${state.bhx},${state.bhy})@(${state.bx.toFixed(1)},${state.by.toFixed(1)})`;
+    if (state.mode === "union") return `a.unionWith(b)${tail}`;
+    if (state.mode === "smooth_union") return `a.smoothUnion(b, ${k})${tail}`;
+    if (state.mode === "chamfer") return `a.chamferUnion(b, ${k})${tail}`;
+    if (state.mode === "steps") return `a.stepsUnion(b, ${k}, ${state.steps})${tail}`;
+    if (state.mode === "smooth_sub") return `a.smoothSubtract(b, ${k})${tail}`;
+    return `a.smoothIntersection(b, ${k})${tail}`;
+  }
+
+  function ensureWasmField() {
+    if (!state.nuc) return null;
+    const key = `${state.mode}|${state.k.toFixed(2)}|${state.ax.toFixed(2)}|${state.ay.toFixed(2)}|${state.bx.toFixed(2)}|${state.by.toFixed(2)}`;
+    if (state.fieldKey === key && state.wasmField) return state.wasmField;
+    const F = state.nuc.Field;
+    const a = F.sphere(state.ar).translate(state.ax, state.ay, 0.0);
+    const b = F.boxShape(state.bhx, state.bhy, 5.4, state.br).translate(state.bx, state.by, 0.0);
+    let out;
+    if (state.mode === "union") out = a.unionWith(b);
+    else if (state.mode === "smooth_union") out = a.smoothUnion(b, state.k);
+    else if (state.mode === "chamfer") out = a.chamferUnion(b, state.k);
+    else if (state.mode === "steps") out = a.stepsUnion(b, state.k, state.steps);
+    else if (state.mode === "smooth_sub") out = a.smoothSubtract(b, state.k);
+    else out = a.smoothIntersection(b, state.k);
+    state.wasmField = out;
+    state.fieldKey = key;
+    return out;
+  }
+
   function evalField(wx, wy) {
-    const a = sdCircle(wx, wy, state.ax, state.ay, state.ar);
-    const b = sdRoundBox(wx, wy, state.bx, state.by, state.bhx, state.bhy, state.br);
-    return opCSG(a, b, state.mode, state.k, state.steps);
+    const f = ensureWasmField();
+    if (f) return f.evalAt(wx, wy, 0.0);
+    return Math.hypot(wx - state.ax, wy - state.ay) - state.ar;
   }
 
   function evalNormal(wx, wy) {
+    const f = ensureWasmField();
+    if (f) {
+      try {
+        const n = f.normal(wx, wy, 0.0, 0.05);
+        return [n.x, n.y];
+      } catch {
+        // fall through to finite difference at exact medial-axis singularity
+      }
+    }
     const e = 0.05;
     const dx = evalField(wx + e, wy) - evalField(wx - e, wy);
     const dy = evalField(wx, wy + e) - evalField(wx, wy - e);
@@ -924,7 +1205,6 @@ function mountCsgLab(root) {
       ? {
           bg: "#FCFBF9",
           insideTint: [26, 117, 100],
-          outsideTint: [110, 116, 128],
           contour: "#146458",
           isolineIn: "rgba(26, 117, 100, 0.28)",
           isolineOut: "rgba(42, 46, 54, 0.14)",
@@ -942,7 +1222,6 @@ function mountCsgLab(root) {
       : {
           bg: "#12161C",
           insideTint: [95, 209, 188],
-          outsideTint: [138, 147, 163],
           contour: "#7FF0DC",
           isolineIn: "rgba(95, 209, 188, 0.30)",
           isolineOut: "rgba(228, 231, 236, 0.11)",
@@ -968,6 +1247,7 @@ function mountCsgLab(root) {
   }
 
   function render() {
+    codeEl.textContent = formatCode();
     const rect = canvas.getBoundingClientRect();
     const cssW = Math.max(300, Math.round(rect.width));
     const cssH = Math.round(cssW * (WORLD_H / WORLD_W));
@@ -982,8 +1262,11 @@ function mountCsgLab(root) {
     ctx.fillStyle = pal.bg;
     ctx.fillRect(0, 0, cssW, cssH);
 
-    // 1. Sample distance grid (coarse 2px resolution for fast 60fps contours)
-    const step = 3;
+    const wasmReady = ensureWasmField() !== null;
+    if (!wasmReady) return;
+
+    // 1. Evaluate the REAL Nucleation WASM Field across a crisp grid
+    const step = 6;
     const cols = Math.ceil(cssW / step) + 1;
     const rows = Math.ceil(cssH / step) + 1;
     const grid = new Float32Array(cols * rows);
@@ -996,7 +1279,6 @@ function mountCsgLab(root) {
         const wx = (px / cssW) * WORLD_W - WORLD_W / 2;
         const d = evalField(wx, wy);
         grid[j * cols + i] = d;
-
         if (d <= 0) {
           const depth = Math.min(1, -d / 8.0);
           const alpha = 0.14 + depth * 0.22;
@@ -1006,7 +1288,7 @@ function mountCsgLab(root) {
       }
     }
 
-    // 2. Crisp isolines & d=0 surface contour (+ collect exact contour anchors for normals)
+    // 2. Crisp isolines & d = 0 contour + anchor points for Dual3 normals
     const contourAnchors = [];
     if (state.showIsolines || state.showNormals) {
       const levels = state.showIsolines ? [-6, -4, -2, 0, 2, 4, 6, 8, 10] : [0];
@@ -1036,10 +1318,7 @@ function mountCsgLab(root) {
                 ctx.lineTo(pts[1][0], pts[1][1]);
               }
               if (lv === 0 && state.showNormals) {
-                contourAnchors.push([
-                  (pts[0][0] + pts[1][0]) * 0.5,
-                  (pts[0][1] + pts[1][1]) * 0.5,
-                ]);
+                contourAnchors.push([(pts[0][0] + pts[1][0]) * 0.5, (pts[0][1] + pts[1][1]) * 0.5]);
               }
             }
           }
@@ -1048,32 +1327,25 @@ function mountCsgLab(root) {
       }
     }
 
-    // 3. 8x8 Conservative Interval Brick Pruning Overlay
+    // 3. 8x8 Conservative Interval Brick Pruning
     let totalBricks = 0;
     let prunedBricks = 0;
-    let solidBricks = 0;
     let surfaceBricks = 0;
-    const brickSize = 8; // 8x8 world units
+    const brickSize = 8;
     const halfDiag = Math.hypot(brickSize * 0.5, brickSize * 0.5);
     const lipBoost = state.mode === "steps" ? 1.35 : 1.05;
 
     for (let by = -WORLD_H / 2; by < WORLD_H / 2; by += brickSize) {
       for (let bx = -WORLD_W / 2; bx < WORLD_W / 2; bx += brickSize) {
         totalBricks += 1;
-        const cx = bx + brickSize * 0.5;
-        const cy = by + brickSize * 0.5;
-        const dc = evalField(cx, cy);
+        const dc = evalField(bx + brickSize * 0.5, by + brickSize * 0.5);
         const bound = halfDiag * lipBoost;
-        const lo = dc - bound;
-        const hi = dc + bound;
-
         let kind = "surface";
-        if (lo > 0) {
+        if (dc - bound > 0) {
           kind = "pruned";
           prunedBricks += 1;
-        } else if (hi <= 0) {
+        } else if (dc + bound <= 0) {
           kind = "solid";
-          solidBricks += 1;
         } else {
           surfaceBricks += 1;
         }
@@ -1083,7 +1355,6 @@ function mountCsgLab(root) {
           const [px1, py1] = worldToPx(bx + brickSize, by, cssW, cssH);
           const bw = px1 - px0;
           const bh = py1 - py0;
-
           if (kind === "pruned") {
             ctx.fillStyle = pal.brickPruned;
             ctx.fillRect(px0 + 1, py0 + 1, bw - 2, bh - 2);
@@ -1109,9 +1380,9 @@ function mountCsgLab(root) {
 
     const prunedPct = Math.round((prunedBricks / totalBricks) * 100);
     brickStats.textContent =
-      `${prunedBricks}/${totalBricks} bricks pruned (${prunedPct}% skipped) · ${surfaceBricks} surface`;
+      `Nucleation WASM Field · ${prunedBricks}/${totalBricks} bricks pruned (${prunedPct}% skipped)`;
 
-    // 4. Dual-number gradient / normal vectors anchored directly on the d = 0 contour
+    // 4. Contour-anchored Dual3 autodiff normal vectors from WASM Field.normal()
     if (state.showNormals && contourAnchors.length > 0) {
       ctx.strokeStyle = pal.normal;
       ctx.fillStyle = pal.normal;
@@ -1130,9 +1401,8 @@ function mountCsgLab(root) {
         drawn.push([px, py]);
         const [wx, wy] = pxToWorld(px, py, cssW, cssH);
         const [nx, ny] = evalNormal(wx, wy);
-        const len = 15;
-        const ex = px + nx * len;
-        const ey = py - ny * len;
+        const ex = px + nx * 15;
+        const ey = py - ny * 15;
         ctx.beginPath();
         ctx.moveTo(px, py);
         ctx.lineTo(ex, ey);
@@ -1143,7 +1413,7 @@ function mountCsgLab(root) {
       }
     }
 
-    // 5. Draggable shape center handles (A and B)
+    // 5. Draggable shape center handles
     for (const [label, wx, wy, color] of [
       ["A", state.ax, state.ay, pal.handleA],
       ["B", state.bx, state.by, pal.handleB],
@@ -1166,9 +1436,8 @@ function mountCsgLab(root) {
       const d = evalField(wx, wy);
       const [nx, ny] = evalNormal(wx, wy);
       const [px, py] = worldToPx(wx, wy, cssW, cssH);
-      const pxRadius = (Math.abs(d) / WORLD_W) * cssW;
       ctx.beginPath();
-      ctx.arc(px, py, Math.max(2, pxRadius), 0, Math.PI * 2);
+      ctx.arc(px, py, Math.max(2, (Math.abs(d) / WORLD_W) * cssW), 0, Math.PI * 2);
       ctx.strokeStyle = pal.cursor;
       ctx.globalAlpha = 0.45;
       ctx.lineWidth = 1;
@@ -1181,27 +1450,24 @@ function mountCsgLab(root) {
       ctx.fillStyle = pal.cursor;
       ctx.fill();
       telemetry.textContent =
-        `p = (${wx.toFixed(1)}, ${wy.toFixed(1)}) · d = ${d >= 0 ? "+" : ""}${d.toFixed(2)} · ` +
-        `n = (${nx.toFixed(2)}, ${ny.toFixed(2)})`;
+        `p = (${wx.toFixed(1)}, ${wy.toFixed(1)}, 0) · evalAt = ${d >= 0 ? "+" : ""}${d.toFixed(2)} · ` +
+        `normal = (${nx.toFixed(2)}, ${ny.toFixed(2)})`;
+    } else {
+      telemetry.textContent = "Drag shape handle A or B, or hover anywhere to query Field.evalAt() and Dual3 normal().";
     }
   }
 
   function pointerToWorld(e) {
     const rect = canvas.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = e.clientY - rect.top;
-    return pxToWorld(px, py, rect.width, rect.height);
+    return pxToWorld(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
   }
 
   canvas.addEventListener("pointerdown", (e) => {
     const [wx, wy] = pointerToWorld(e);
     const da = Math.hypot(wx - state.ax, wy - state.ay);
     const db = Math.hypot(wx - state.bx, wy - state.by);
-    if (da < 3.0 || da <= db) {
-      state.dragging = da < 4.5 ? "a" : db < 4.5 ? "b" : null;
-    } else if (db < 4.5) {
-      state.dragging = "b";
-    }
+    if (da < 3.0 || da <= db) state.dragging = da < 4.5 ? "a" : db < 4.5 ? "b" : null;
+    else if (db < 4.5) state.dragging = "b";
     if (state.dragging) {
       canvas.setPointerCapture(e.pointerId);
       canvas.style.cursor = "grabbing";
@@ -1218,10 +1484,10 @@ function mountCsgLab(root) {
       state.bx = Math.max(-20, Math.min(20, wx));
       state.by = Math.max(-9, Math.min(9, wy));
     } else {
-      const nearHandle =
+      const near =
         Math.hypot(wx - state.ax, wy - state.ay) < 2.5 ||
         Math.hypot(wx - state.bx, wy - state.by) < 2.5;
-      canvas.style.cursor = nearHandle ? "grab" : "crosshair";
+      canvas.style.cursor = near ? "grab" : "crosshair";
     }
     render();
   });
@@ -1235,7 +1501,6 @@ function mountCsgLab(root) {
   canvas.addEventListener("pointerleave", () => {
     if (!state.dragging) {
       state.hover = null;
-      telemetry.textContent = "Drag shape handle A or B, or hover anywhere to inspect d(p) and ∇f.";
       render();
     }
   });
@@ -1275,7 +1540,11 @@ function mountCsgLab(root) {
 
   const ro = new ResizeObserver(() => render());
   ro.observe(canvas);
-  render();
+
+  void loadNucleation().then((nuc) => {
+    state.nuc = nuc;
+    render();
+  });
 
   return {
     rerender: render,
@@ -1302,16 +1571,16 @@ const WORLD_PRESETS = {
 
       const layers = nuc.MaterialBuilder.createLayered();
       layers.addLayer(
-        nuc.MaterialCondition.exposedFace(4, true)
+        nuc.MaterialCondition.exposedFace(1, true)
           .andWith(nuc.MaterialCondition.yRange(true, 11.0, false, 0.0))
           .andWith(nuc.MaterialCondition.slopeRange(true, 0.0, true, 0.75)),
         nuc.Material.solid("minecraft:snow_block"),
       );
       layers.addLayer(
-        nuc.MaterialCondition.exposedFace(4, true)
+        nuc.MaterialCondition.exposedFace(1, true)
           .andWith(nuc.MaterialCondition.yRange(true, 4.5, true, 12.0))
           .andWith(nuc.MaterialCondition.slopeRange(true, 0.0, true, 0.72)),
-        nuc.Material.solid("minecraft:moss_block"),
+        nuc.Material.solid("minecraft:grass_block"),
       );
       layers.addLayer(
         nuc.MaterialCondition.depthBelowSurface(true, 1.0, true, 2.0)
@@ -1330,23 +1599,17 @@ const WORLD_PRESETS = {
 
       const pipe = nuc.VoxelPipeline.create(terrain, layers.build());
       pipe.addFluidLevel(5.0, "minecraft:water");
-      const grass = nuc.ScatterRule.create(
+      const flora = nuc.ScatterRule.create(
         nuc.ScatterFace.Top,
-        0.25,
-        '["minecraft:short_grass"]',
-        [1.0],
+        0.26,
+        '["minecraft:short_grass","minecraft:poppy","minecraft:dandelion"]',
+        [0.70, 0.15, 0.15],
         13,
       );
-      grass.setOnBlock("minecraft:moss_block");
-      pipe.addScatter(grass);
+      flora.setOnBlock("minecraft:grass_block");
+      pipe.addScatter(flora);
 
-      return nuc.WorldGenerator.pipeline(
-        pipe,
-        this.minY,
-        this.maxY,
-        "docs:alpine-archipelago",
-        "v1",
-      );
+      return nuc.WorldGenerator.pipeline(pipe, this.minY, this.maxY, "docs:alpine-archipelago", "v1");
     },
   },
 
@@ -1364,36 +1627,30 @@ const WORLD_PRESETS = {
 
       const layers = nuc.MaterialBuilder.createLayered();
       layers.addLayer(
-        nuc.MaterialCondition.exposedFace(4, true)
+        nuc.MaterialCondition.exposedFace(1, true)
           .andWith(nuc.MaterialCondition.yRange(true, 4.0, false, 0.0))
-          .andWith(nuc.MaterialCondition.slopeRange(true, 0.0, true, 0.55)),
-        nuc.Material.solid("minecraft:moss_block"),
+          .andWith(nuc.MaterialCondition.slopeRange(true, 0.0, true, 0.62)),
+        nuc.Material.solid("minecraft:grass_block"),
       );
       layers.addLayer(
-        nuc.MaterialCondition.exposedFace(8, true).andWith(
+        nuc.MaterialCondition.exposedFace(2, true).andWith(
           nuc.MaterialCondition.chance(0.08, 71),
         ),
-        nuc.Material.solid("minecraft:sea_lantern"),
+        nuc.Material.solid("minecraft:glowstone"),
       );
       layers.setDefault(
         nuc.Material.channelRamp(
           nuc.FieldChannel.WorldY,
           -10.0,
           14.0,
-          '["minecraft:obsidian","minecraft:deepslate","minecraft:tuff","minecraft:stone","minecraft:smooth_sandstone"]',
+          '["minecraft:obsidian","minecraft:deepslate","minecraft:tuff","minecraft:stone","minecraft:sandstone"]',
           true,
         ),
       );
 
       const pipe = nuc.VoxelPipeline.create(carved, layers.build());
       pipe.addFluidLevel(-4.0, "minecraft:water");
-      return nuc.WorldGenerator.pipeline(
-        pipe,
-        this.minY,
-        this.maxY,
-        "docs:gyroid-karst",
-        "v1",
-      );
+      return nuc.WorldGenerator.pipeline(pipe, this.minY, this.maxY, "docs:gyroid-karst", "v1");
     },
   },
 
@@ -1408,10 +1665,14 @@ const WORLD_PRESETS = {
       );
       const groundMat = nuc.MaterialBuilder.createLayered();
       groundMat.addLayer(
-        nuc.MaterialCondition.exposedFace(4, true).andWith(
+        nuc.MaterialCondition.exposedFace(1, true).andWith(
           nuc.MaterialCondition.yRange(true, 1.0, false, 0.0),
         ),
-        nuc.Material.solid("minecraft:moss_block"),
+        nuc.Material.solid("minecraft:grass_block"),
+      );
+      groundMat.addLayer(
+        nuc.MaterialCondition.depthBelowSurface(true, 1.0, true, 2.0),
+        nuc.Material.solid("minecraft:dirt"),
       );
       groundMat.setDefault(
         nuc.Material.channelRamp(
@@ -1425,15 +1686,8 @@ const WORLD_PRESETS = {
       const groundPipe = nuc.VoxelPipeline.create(lowland, groundMat.build());
       groundPipe.addFluidLevel(0.0, "minecraft:water");
 
-      const base = nuc.WorldGenerator.pipeline(
-        groundPipe,
-        this.minY,
-        this.maxY,
-        "docs:spires-ground",
-        "v1",
-      );
+      const base = nuc.WorldGenerator.pipeline(groundPipe, this.minY, this.maxY, "docs:spires-ground", "v1");
 
-      // Non-periodic hashed-cell crystal spires scattered seamlessly across chunk boundaries
       const spireShape = nuc.Field.roundCone(0, -1, 0, 0, 14, 0, 4.2, 0.6).smoothUnion(
         nuc.Field.octahedron(3.2).translate(0, 14.5, 0),
         1.2,
@@ -1554,7 +1808,13 @@ async function mountWorldgenLab(root, ensureModelViewer) {
 
     <div class="sdf-studio__footer">
       <div class="sdf-telemetry" data-role="wg-telemetry">Initializing infinite WorldGenerator...</div>
-      <button type="button" class="sdf-download-btn" data-role="wg-download" disabled>Download .schem</button>
+      <div class="sdf-footer-actions">
+        <label class="sdf-pack-btn" title="Drop any Minecraft resource pack .zip or client.jar to render with its exact block textures">
+          <span data-role="wg-pack-label">Load pack .zip</span>
+          <input type="file" accept=".zip,.jar" data-role="wg-pack-input" hidden>
+        </label>
+        <button type="button" class="sdf-download-btn" data-role="wg-download" disabled>Download .schem</button>
+      </div>
     </div>
   `;
 
@@ -1564,6 +1824,8 @@ async function mountWorldgenLab(root, ensureModelViewer) {
   const statusEl = root.querySelector('[data-role="wg-status"]');
   const telemetryEl = root.querySelector('[data-role="wg-telemetry"]');
   const downloadBtn = root.querySelector('[data-role="wg-download"]');
+  const packInput = root.querySelector('[data-role="wg-pack-input"]');
+  const packLabel = root.querySelector('[data-role="wg-pack-label"]');
   const waveBtn = root.querySelector('[data-role="wg-wave"]');
 
   function renderGrid(streamingKey = null) {
@@ -1574,10 +1836,8 @@ async function mountWorldgenLab(root, ensureModelViewer) {
         const cx = originCx + dx;
         const cz = originCz + dz;
         const key = `${cx},${cz}`;
-        const active = selected.has(key);
-        const streaming = streamingKey === key;
         cells.push(
-          `<button type="button" class="wg-cell" data-cx="${cx}" data-cz="${cz}" data-active="${active}" data-streaming="${streaming}">${cx}, ${cz}</button>`,
+          `<button type="button" class="wg-cell" data-cx="${cx}" data-cz="${cz}" data-active="${selected.has(key)}" data-streaming="${streamingKey === key}">${cx}, ${cz}</button>`,
         );
       }
     }
@@ -1589,9 +1849,7 @@ async function mountWorldgenLab(root, ensureModelViewer) {
       await ensureModelViewer();
       nuc = await loadNucleation();
     }
-    if (!generator) {
-      generator = WORLD_PRESETS[presetKey].buildGenerator(nuc);
-    }
+    if (!generator) generator = WORLD_PRESETS[presetKey].buildGenerator(nuc);
     return generator;
   }
 
@@ -1613,7 +1871,6 @@ async function mountWorldgenLab(root, ensureModelViewer) {
           if (selected.has(`${cx},${cz}`)) coords.push([cx, cz]);
         }
       }
-
       if (coords.length === 0) {
         statusEl.textContent = "Select at least one chunk on the left.";
         waveBtn.disabled = false;
@@ -1621,7 +1878,6 @@ async function mountWorldgenLab(root, ensureModelViewer) {
       }
 
       const combined = nuc.Schematic.create(`worldgen_${presetKey}`);
-      const t0 = performance.now();
       let genMsTotal = 0;
 
       for (const [cx, cz] of coords) {
@@ -1663,7 +1919,7 @@ async function mountWorldgenLab(root, ensureModelViewer) {
       cfg.setAmbientOcclusion(true);
       cfg.setAoIntensity(0.5);
       cfg.setGreedyMeshing(true);
-      const mesh = nuc.MeshResult.create(combined, getResourcePack(nuc), cfg);
+      const mesh = nuc.MeshResult.create(combined, getActivePack(nuc), cfg);
       const glbBytes = decodeBase64(mesh.glbDataB64());
       const meshMs = performance.now() - tMesh0;
 
@@ -1678,12 +1934,11 @@ async function mountWorldgenLab(root, ensureModelViewer) {
       statusEl.hidden = true;
       downloadBtn.disabled = false;
       waveBtn.disabled = false;
-      const avgChunk = (genMsTotal / coords.length).toFixed(1);
       telemetryEl.textContent =
         `${coords.length} chunk${coords.length === 1 ? "" : "s"} · ` +
         `${combined.blockCount().toLocaleString()} blocks · ` +
         `${mesh.triangleCount().toLocaleString()} tris · ` +
-        `${avgChunk} ms/chunk · ${Math.round(meshMs)} ms mesh`;
+        `${(genMsTotal / coords.length).toFixed(1)} ms/chunk · ${Math.round(meshMs)} ms mesh`;
     } catch (err) {
       if (seq !== runSeq) return;
       statusEl.hidden = true;
@@ -1691,6 +1946,26 @@ async function mountWorldgenLab(root, ensureModelViewer) {
       telemetryEl.textContent = `WorldGenerator error: ${err instanceof Error ? err.message : String(err)}`;
     }
   }
+
+  const onPackUpdated = (name) => {
+    packLabel.textContent = `Pack: ${name.slice(0, 18)}`;
+    void rebuildPatch(false);
+  };
+  packListeners.add(onPackUpdated);
+
+  packInput.addEventListener("change", async () => {
+    const file = packInput.files?.[0];
+    if (!file) return;
+    try {
+      if (!nuc) nuc = await loadNucleation();
+      statusEl.textContent = "Loading resource pack...";
+      statusEl.hidden = false;
+      await loadCustomPackFile(nuc, file);
+    } catch (err) {
+      statusEl.hidden = true;
+      telemetryEl.textContent = `Pack error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  });
 
   root.querySelector('[data-role="wg-presets"]').addEventListener("click", (e) => {
     const btn = e.target.closest("[data-wg-preset]");
@@ -1757,6 +2032,7 @@ async function mountWorldgenLab(root, ensureModelViewer) {
   void rebuildPatch(false);
 
   return () => {
+    packListeners.delete(onPackUpdated);
     if (currentUrl) URL.revokeObjectURL(currentUrl);
     root.dataset.mounted = "false";
   };

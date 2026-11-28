@@ -1,18 +1,65 @@
 # SDFs, terrain, and fields
 
-Nucleation models procedural 3D geometry, scalar noise, cellular patterns, and
-custom mathematical formulas with a single composable type: **`Field`**.
+## What is a signed distance field?
 
-When interpreted as geometry, a `Field` is a signed distance field (SDF) where
-negative values lie inside the surface, zero lies on the surface, and positive
-values lie outside. When interpreted as data, the exact same `Field` drives
-surface displacement, domain warping, material gradients, biome masks, fluid
-cavities, or scatter probability.
+Building complex 3D forms in Minecraft by hand usually means writing nested
+`for x, y, z` loops and keeping track of masks, overlaps, and block arrays
+yourself. A **signed distance field (SDF)** replaces that with one simple
+question at every point `(x, y, z)` in space:
 
-Because `Field` is an immutable, `Arc`-shared DAG compiled into a flat
-instruction tape with common-subexpression elimination (CSE), sharing one noise
-or heightmap subgraph across geometry, displacement, and five material layers
-evaluates it **once per voxel** instead of six times.
+> **How far is this point from the nearest surface?**
+
+- **Negative (`< 0`)** means the point is **inside** the shape — place a block.
+- **Zero (`= 0`)** sits directly on the surface.
+- **Positive (`> 0`)** means the point is **outside** in open air.
+
+Because every point knows its *distance* rather than just a yes/no inside test,
+shapes behave like clay instead of rigid boxes: you can blend a dome smoothly
+into a tower (`smooth_union`), bevel stonework at 45° (`chamfer_union`), cut
+terraced stairs (`steps_union`), warp cliffs with noise, and automatically know
+which way every surface faces so grass lands only on flat exposed tops while
+vines hang under ceilings.
+
+In Nucleation, geometry, noise, heightmaps, and custom formulas all share one
+composable type: **`Field`**.
+
+## What you can build for Minecraft
+
+<div class="sdf-apps">
+  <div class="sdf-apps__item">
+    <p class="sdf-apps__title">Cliffs, overhangs &amp; 3D caves</p>
+    <p class="sdf-apps__body">Carve arches, floating islands, and winding cavern systems that ordinary 2D heightmaps cannot represent.</p>
+  </div>
+  <div class="sdf-apps__item">
+    <p class="sdf-apps__title">Architectural stonework</p>
+    <p class="sdf-apps__body">Build colonnades, vaulted domes, beveled arches, spiral spires, and terraced temples from clean primitives and polar repeats.</p>
+  </div>
+  <div class="sdf-apps__item">
+    <p class="sdf-apps__title">Automatic biome painting</p>
+    <p class="sdf-apps__body">Place <code>grass_block</code> on flat exposed tops, <code>dirt</code> two blocks deep, rock strata by height, <code>water</code> in basins, and flowers on top.</p>
+  </div>
+  <div class="sdf-apps__item">
+    <p class="sdf-apps__title">Organic props &amp; sculptures</p>
+    <p class="sdf-apps__body">Blend trunks, roots, boulders, coral, and crystal clusters smoothly without jagged voxel seams.</p>
+  </div>
+  <div class="sdf-apps__item">
+    <p class="sdf-apps__title">Fractals &amp; megastructures</p>
+    <p class="sdf-apps__body">Write gyroid lattices, Schwarz-P sponges, or power-8 Mandelbulbs in a few lines of <code>Field.expr</code>.</p>
+  </div>
+  <div class="sdf-apps__item">
+    <p class="sdf-apps__title">Infinite playable worlds</p>
+    <p class="sdf-apps__body">Stream the exact same <code>VoxelPipeline</code> directly into Java Anvil chunks with <a href="../streaming-and-worlds/">WorldGenerator</a> in flat memory.</p>
+  </div>
+</div>
+
+## Try it live: from one sphere to a full Minecraft scene
+
+Start at **1. Sphere** and step across to **5. Field.expr**. Every
+preset runs the real Nucleation WebAssembly engine directly in your browser —
+building the `Field`, voxelizing it with `VoxelPipeline`, and greedy-meshing it
+with ambient occlusion. Drop any Minecraft resource pack `.zip` (or `client.jar`)
+with **Load pack .zip** to preview with your own exact textures, or export
+**Download `.schem`** to paste straight into Minecraft.
 
 <div class="sdf-studio" data-sdf-workbench>
   <noscript>
@@ -20,11 +67,28 @@ evaluates it **once per voxel** instead of six times.
   </noscript>
 </div>
 
-Every slider move, preset switch, or `Field.expr` edit compiles, voxelizes, and greedy-meshes a real Minecraft schematic in WebAssembly. Drag to orbit or export the live `.schem` directly.
-
 ---
 
-## Architecture at a glance
+## How it works under the hood
+
+### Interactive 2D SDF, CSG, `Dual3` normals & `8×8` brick pruning
+
+Before thinking in 3D, it helps to see a 2D slice of an SDF. This canvas calls
+**Nucleation WebAssembly `Field.evalAt()` and `Field.normal()` live** on every
+frame. Drag shape handle **A** (a sphere) or **B** (a rounded box), switch CSG
+operators, and hover anywhere to inspect the exact distance and surface normal:
+
+- **Glowing teal line (`d = 0`)**: the surface boundary where blocks stop and air begins.
+- **Gold arrows (`∇f`)**: unit surface normals computed analytically via forward-mode dual numbers (`Dual3`), used to detect flat ground vs. steep cliffs.
+- **Dashed red `8×8` squares**: bricks proven to be empty air (`interval_min > 0`) and skipped in O(1) without touching a single voxel inside them.
+
+<div class="sdf-csg" data-sdf-csg-lab>
+  <noscript>
+    <p>Enable JavaScript to interact with the 2D signed distance field, CSG operator, and 8×8 interval brick pruning explorer.</p>
+  </noscript>
+</div>
+
+### Architecture at a glance
 
 <figure class="sdf-diagram" data-adaptive-diagram data-dark="../../media/features/sdf-and-fields/sdf-pipeline-architecture.svg" data-light="../../media/features/sdf-and-fields/sdf-pipeline-architecture.light.svg">
   <picture>
@@ -195,16 +259,6 @@ heightmaps, and derive material channels without writing an expression string:
 | Architectural CSG | `chamfer_union(b, r)`, `chamfer_subtract(b, r)`, `chamfer_intersection(b, r)`, `steps_union(b, r, n)` | 45° beveled joints (`chamfer_*`) and terraced staircases (`steps_union`) |
 | Surface modifiers | `rounded(r)`, `shell(thickness)`, `elongate(hx, hy, hz)` | Offset outward by `r`, hollow to `abs(d) - thickness`, or stretch center |
 | Displacement | `displace(offset_field, amplitude)`, `displace_noise(amplitude, freq, seed, octaves)` | Adds `amplitude * offset_field(p)` to distance and automatically expands conservative AABB bounds |
-
-### Interactive CSG, dual normals & `8×8` brick pruning
-
-Drag either shape handle (`A` or `B`) directly on the field, switch CSG operators, and hover anywhere to inspect `d(p)` and the unit normal `∇f`. Dashed red bricks are provably empty air (`interval_min > 0`) and skipped in O(1) without testing any voxel inside them.
-
-<div class="sdf-csg" data-sdf-csg-lab>
-  <noscript>
-    <p>Enable JavaScript to interact with the 2D signed distance field, CSG operator, and 8×8 interval brick pruning explorer.</p>
-  </noscript>
-</div>
 
 ### Domain transforms, repetition & warps
 
@@ -524,7 +578,7 @@ The 6-bit `face_mask` constants are:
     # 2. Layered rock/moss terrain material for tag 1
     terrain_mat = MaterialBuilder.create_layered()
     terrain_mat.add_layer(
-        MaterialCondition.exposed_face(4, True)  # +Y (top) exposed to air
+        MaterialCondition.exposed_face(1, True)  # bit 0 (+Y top) exposed to air
             .and_with(MaterialCondition.slope_range(True, 0.0, True, 0.35)),
         Material.solid("minecraft:moss_block"),
     )
@@ -583,7 +637,7 @@ The 6-bit `face_mask` constants are:
 
     const terrainMat = MaterialBuilder.createLayered();
     terrainMat.addLayer(
-      MaterialCondition.exposedFace(4, true).andWith(
+      MaterialCondition.exposedFace(1, true).andWith(
         MaterialCondition.slopeRange(true, 0.0, true, 0.35),
       ),
       Material.solid("minecraft:moss_block"),
@@ -640,7 +694,7 @@ The 6-bit `face_mask` constants are:
     let terrain_mat = Material::layers(
         vec![
             (
-                Condition::exposed_face(face_mask::POS_Y, true)
+                Condition::exposed_face(face_mask::TOP, true)
                     .and(Condition::slope_range(0.0, 0.35)),
                 Material::solid("minecraft:moss_block"),
             ),

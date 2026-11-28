@@ -49,9 +49,10 @@ never call host code per voxel.
 ### Live WebAssembly infinite chunk streamer
 
 Try `WorldGenerator.pipeline`, `WorldGenerator.cellularSdf`, and
-`WorldGenerator.composite` directly in the browser. Pan to negative or distant
-chunk coordinates, toggle individual `16×16` chunks on or off, or stream a
-`3×3` wave in canonical region-major order:
+`WorldGenerator.composite` directly in the browser with real Minecraft blocks.
+Pan to negative or distant chunk coordinates, toggle individual `16×16` chunks
+on or off, stream a `3×3` wave in canonical region-major order, or click
+**Load pack .zip** to render with your own resource pack:
 
 <div class="sdf-worldgen" data-worldgen-lab>
   <noscript>
@@ -126,13 +127,13 @@ or underground aquifers, and `ScatterRule` flora or hanging vines.
     # 2. Elevation & slope biome layers + stratified bedrock
     layers = MaterialBuilder.create_layered()
     layers.add_layer(
-        MaterialCondition.exposed_face(4, True)
+        MaterialCondition.exposed_face(1, True)
             .and_with(MaterialCondition.y_range(True, 26.0, False, 0.0))
             .and_with(MaterialCondition.slope_range(True, 0.0, True, 0.55)),
         Material.solid("minecraft:snow_block"),
     )
     layers.add_layer(
-        MaterialCondition.exposed_face(4, True)
+        MaterialCondition.exposed_face(1, True)
             .and_with(MaterialCondition.y_range(True, 4.0, True, 26.0))
             .and_with(MaterialCondition.slope_range(True, 0.0, True, 0.50)),
         Material.solid("minecraft:grass_block"),
@@ -196,7 +197,7 @@ or underground aquifers, and `ScatterRule` flora or hanging vines.
 
     const layers = MaterialBuilder.createLayered();
     layers.addLayer(
-      MaterialCondition.exposedFace(4, true)
+      MaterialCondition.exposedFace(1, true)
         .andWith(MaterialCondition.yRange(true, 4.0, false, 0.0))
         .andWith(MaterialCondition.slopeRange(true, 0.0, true, 0.5)),
       Material.solid("minecraft:grass_block"),
@@ -241,7 +242,7 @@ or underground aquifers, and `ScatterRule` flora or hanging vines.
     let material = Material::layers(
         vec![
             (
-                Condition::exposed_face(face_mask::POS_Y, true)
+                Condition::exposed_face(face_mask::TOP, true)
                     .and(Condition::y_range(Some(4.0), None))
                     .and(Condition::slope_range(0.0, 0.5)),
                 Material::solid("minecraft:grass_block"),
