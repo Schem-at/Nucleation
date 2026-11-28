@@ -26,9 +26,11 @@ Every slider move, preset switch, or `Field.expr` edit compiles, voxelizes, and 
 
 ## Architecture at a glance
 
-<figure class="sdf-diagram">
-  <img class="sdf-diagram__dark" src="../../media/features/sdf-and-fields/sdf-pipeline-architecture.svg" alt="Four-stage dataflow from Unified Field DAG through CSE Compiler, 8x8x8 interval brick pruner, and demand-driven VoxelPipeline to schematics, BuildingTool, and WorldGenerator">
-  <img class="sdf-diagram__light" src="../../media/features/sdf-and-fields/sdf-pipeline-architecture.light.svg" alt="Four-stage dataflow from Unified Field DAG through CSE Compiler, 8x8x8 interval brick pruner, and demand-driven VoxelPipeline to schematics, BuildingTool, and WorldGenerator">
+<figure class="sdf-diagram" data-adaptive-diagram data-dark="../../media/features/sdf-and-fields/sdf-pipeline-architecture.svg" data-light="../../media/features/sdf-and-fields/sdf-pipeline-architecture.light.svg">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../../media/features/sdf-and-fields/sdf-pipeline-architecture.svg">
+    <img src="../../media/features/sdf-and-fields/sdf-pipeline-architecture.light.svg" alt="Four-stage dataflow from Unified Field DAG through CSE Compiler, 8x8x8 interval brick pruner, and demand-driven VoxelPipeline to schematics, BuildingTool, and WorldGenerator">
+  </picture>
 </figure>
 
 Four design properties make the pipeline both flexible and fast:
@@ -426,9 +428,11 @@ Classify custom expressions honestly via `FieldDistanceKind` (`DistanceKind` in 
 gradient-painted volumes. For multi-material worlds, stratified cliffs, biome
 caps, water pools, and surface foliage, use **`VoxelPipeline`**:
 
-<figure class="sdf-diagram">
-  <img class="sdf-diagram__dark" src="../../media/features/sdf-and-fields/sdf-material-facemask.svg" alt="Left: voxel terrain cutaway showing ExposedFace moss cap, DepthBelowSurface dirt, WorldY rock strata, FluidLayer water pool, and Top/Bottom ScatterRule grass and vines. Right: isometric cube showing all six 6-bit face_mask bit positions.">
-  <img class="sdf-diagram__light" src="../../media/features/sdf-and-fields/sdf-material-facemask.light.svg" alt="Left: voxel terrain cutaway showing ExposedFace moss cap, DepthBelowSurface dirt, WorldY rock strata, FluidLayer water pool, and Top/Bottom ScatterRule grass and vines. Right: isometric cube showing all six 6-bit face_mask bit positions.">
+<figure class="sdf-diagram" data-adaptive-diagram data-dark="../../media/features/sdf-and-fields/sdf-material-facemask.svg" data-light="../../media/features/sdf-and-fields/sdf-material-facemask.light.svg">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../../media/features/sdf-and-fields/sdf-material-facemask.svg">
+    <img src="../../media/features/sdf-and-fields/sdf-material-facemask.light.svg" alt="Left: voxel terrain cutaway showing ExposedFace moss cap, DepthBelowSurface dirt, WorldY rock strata, FluidLayer water pool, and Top/Bottom ScatterRule grass and vines. Right: isometric cube showing all six 6-bit face_mask bit positions.">
+  </picture>
 </figure>
 
 ### Channels (demand-driven)

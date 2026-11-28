@@ -13,6 +13,7 @@ const target = resolve(import.meta.dirname, "../docs/javascripts/vendor/nucleati
 const entries = [
   "Brush.mjs",
   "BuildingTool.mjs",
+  "CellularSdfConfig.mjs",
   "Field.mjs",
   "FieldAxis.mjs",
   "FieldCellMode.mjs",
@@ -20,6 +21,10 @@ const entries = [
   "FieldDistanceKind.mjs",
   "FieldExprBuilder.mjs",
   "FieldNoiseBasis.mjs",
+  "GeneratedChunk.mjs",
+  "GeneratedChunkCoverage.mjs",
+  "GeneratedChunkOverlayMode.mjs",
+  "GeneratedWorldStream.mjs",
   "InterpolationSpace.mjs",
   "Material.mjs",
   "MaterialBuilder.mjs",
@@ -32,6 +37,8 @@ const entries = [
   "ScatterRule.mjs",
   "Schematic.mjs",
   "VoxelPipeline.mjs",
+  "WorldChunkView.mjs",
+  "WorldGenerator.mjs",
 ];
 const modules = new Set();
 

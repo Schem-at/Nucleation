@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400" role="img" aria-labelledby="wg-title wg-desc">
+  <title id="wg-title">Infinite SDF WorldGenerator Chunk Streaming Architecture</title>
+  <desc id="wg-desc">Shows how WorldGenerator.composite combines continuous VoxelPipeline terrain, hashed CellularSdfConfig landmarks, and projected footprints, evaluates 16xYx16 chunk columns at exact world coordinates with 8x8x8 brick pruning, and streams region-major chunks into Anvil WorldSink in flat memory.</desc>
+  <defs>
+    <pattern id="wg-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(20, 24, 32, 0.045)" stroke-width="1"/>
+    </pattern>
+    <marker id="arr-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#1A7564"/>
+    </marker>
+    <marker id="arr-m" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#B9B3A6"/>
+    </marker>
+    <style>
+      .mono { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .sans { font-family: "Inter", system-ui, -apple-system, sans-serif; }
+      .h { font-size: 13.5px; font-weight: 600; fill: #12151A; }
+      .sub { font-size: 11px; fill: #636975; }
+      .t { font-size: 11.5px; font-weight: 600; fill: #12151A; }
+      .s { font-size: 10.5px; fill: #636975; }
+      .p { font-size: 10px; font-weight: 500; }
+    </style>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="959" height="399" fill="#FCFBF9" stroke="#D8D3C8"/>
+  <rect x="1" y="1" width="958" height="398" fill="url(#wg-grid)"/>
+  <line x1="20" y1="54" x2="940" y2="54" stroke="#D8D3C8"/>
+
+  <text x="28" y="33" class="mono h">1. Source Layers</text>
+  <text x="28" y="47" class="sans sub">Immutable WorldGenerator graph</text>
+
+  <text x="284" y="33" class="mono h">2. Chunk Evaluator</text>
+  <text x="284" y="47" class="sans sub">Exact world (x+0.5, y+0.5, z+0.5)</text>
+
+  <text x="556" y="33" class="mono h">3. Region-Major Stream</text>
+  <text x="556" y="47" class="sans sub">Lazy 1-chunk resident window</text>
+
+  <text x="782" y="33" class="mono h">4. Anvil Output</text>
+  <text x="782" y="47" class="sans sub">Flat O(1) RAM at any scale</text>
+
+  <!-- Stage 1: Sources -->
+  <rect x="28" y="72" width="216" height="86" fill="rgba(26, 117, 100, 0.09)" stroke="#1A7564" stroke-width="1.2"/>
+  <text x="40" y="93" class="mono t" fill="#1A7564">WorldGenerator.pipeline</text>
+  <text x="40" y="110" class="sans s">Continuous terrain, 3D caves,</text>
+  <text x="40" y="124" class="sans s">layered materials, water &amp; scatter</text>
+  <text x="40" y="144" class="mono p" fill="#1A7564">Complete coverage · zero seams</text>
+
+  <rect x="28" y="172" width="216" height="86" fill="rgba(154, 101, 8, 0.10)" stroke="#9A6508" stroke-width="1.2"/>
+  <text x="40" y="193" class="mono t" fill="#9A6508">WorldGenerator.cellular_sdf</text>
+  <text x="40" y="210" class="sans s">Non-periodic hashed-cell motifs</text>
+  <text x="40" y="224" class="sans s">(spires, cliffs, cabins, groves)</text>
+  <text x="40" y="244" class="mono p" fill="#9A6508">Shared CellularSdfConfig + salt</text>
+
+  <rect x="28" y="272" width="216" height="60" fill="rgba(39, 91, 160, 0.10)" stroke="#275BA0" stroke-width="1.1"/>
+  <text x="40" y="293" class="mono t" fill="#275BA0">projected_footprints</text>
+  <text x="40" y="310" class="sans s">OSM polygons clipped per chunk</text>
+
+  <rect x="28" y="344" width="216" height="36" fill="#EFECE4" stroke="#D8D3C8"/>
+  <text x="40" y="366" class="mono p" fill="#2A2E36">Composite: Replace / Keep</text>
+
+  <!-- Connectors 1 -> 2 -->
+  <path d="M 244 115 L 280 115" fill="none" stroke="#1A7564" stroke-width="1.6" marker-end="url(#arr-a)"/>
+  <path d="M 244 215 L 280 215" fill="none" stroke="#B9B3A6" stroke-width="1.4" marker-end="url(#arr-m)"/>
+  <path d="M 244 302 L 262 302 L 262 248 L 280 248" fill="none" stroke="#B9B3A6" stroke-width="1.4" marker-end="url(#arr-m)"/>
+
+  <!-- Stage 2: Chunk Column Evaluator -->
+  <rect x="284" y="72" width="232" height="308" fill="#F7F5F0" stroke="#B9B3A6" stroke-width="1.2"/>
+  <rect x="284" y="72" width="232" height="28" fill="#EFECE4"/>
+  <text x="296" y="90" class="mono t">Chunk (cx, cz) · 16 × Y × 16</text>
+
+  <!-- Mini 2x2 brick column graphic -->
+  <g transform="translate(298, 114)">
+    <rect x="0" y="0" width="46" height="32" fill="#EFECE4" stroke="#D8D3C8" stroke-dasharray="3 2"/>
+    <text x="23" y="19" text-anchor="middle" class="mono p" fill="#636975">skip</text>
+    <rect x="52" y="0" width="46" height="32" fill="#EFECE4" stroke="#D8D3C8" stroke-dasharray="3 2"/>
+    <text x="75" y="19" text-anchor="middle" class="mono p" fill="#636975">skip</text>
+
+    <rect x="0" y="38" width="46" height="32" fill="rgba(26, 117, 100, 0.09)" stroke="#1A7564"/>
+    <text x="23" y="57" text-anchor="middle" class="mono p" fill="#1A7564">8×8×8</text>
+    <rect x="52" y="38" width="46" height="32" fill="rgba(26, 117, 100, 0.09)" stroke="#1A7564"/>
+    <text x="75" y="57" text-anchor="middle" class="mono p" fill="#1A7564">8×8×8</text>
+
+    <rect x="0" y="76" width="46" height="32" fill="#EFECE4" stroke="#B9B3A6"/>
+    <text x="23" y="95" text-anchor="middle" class="mono p" fill="#2A2E36">solid</text>
+    <rect x="52" y="76" width="46" height="32" fill="#EFECE4" stroke="#B9B3A6"/>
+    <text x="75" y="95" text-anchor="middle" class="mono p" fill="#2A2E36">solid</text>
+  </g>
+  <text x="410" y="132" class="mono t">Brick-pruned</text>
+  <text x="410" y="148" class="sans s">Empty sky &amp; deep</text>
+  <text x="410" y="162" class="sans s">cavities skipped</text>
+  <text x="410" y="176" class="sans s">in O(1) intervals</text>
+
+  <rect x="298" y="236" width="204" height="58" fill="#EFECE4" stroke="#D8D3C8"/>
+  <text x="310" y="256" class="mono t">Seamless Borders</text>
+  <text x="310" y="272" class="sans s">Neighbor halo + ±1 face probe</text>
+  <text x="310" y="286" class="sans s">never clips motifs at chunk edge</text>
+
+  <rect x="298" y="306" width="204" height="60" fill="rgba(99, 70, 150, 0.10)" stroke="#634696"/>
+  <text x="310" y="326" class="mono t" fill="#634696">Zero Host Callbacks</text>
+  <text x="310" y="342" class="sans s">Compiled CSE graph &amp; palettes</text>
+  <text x="310" y="356" class="sans s">run 100% natively in Rust/WASM</text>
+
+  <!-- Connector 2 -> 3 -->
+  <path d="M 516 215 L 552 215" fill="none" stroke="#1A7564" stroke-width="1.8" marker-end="url(#arr-a)"/>
+
+  <!-- Stage 3: Region-Major Stream -->
+  <rect x="556" y="72" width="186" height="308" fill="#F7F5F0" stroke="#D8D3C8"/>
+  <rect x="556" y="72" width="186" height="28" fill="#EFECE4"/>
+  <text x="568" y="90" class="mono t">Region-Major Order</text>
+
+  <!-- 4x4 chunk walk grid inside stage 3 -->
+  <g transform="translate(576, 114)">
+    <rect x="0" y="0" width="32" height="32" fill="rgba(26, 117, 100, 0.24)" stroke="#1A7564"/>
+    <text x="16" y="20" text-anchor="middle" class="mono p" fill="#12151A">0,0</text>
+    <rect x="36" y="0" width="32" height="32" fill="rgba(26, 117, 100, 0.24)" stroke="#1A7564"/>
+    <text x="52" y="20" text-anchor="middle" class="mono p" fill="#12151A">1,0</text>
+    <rect x="72" y="0" width="32" height="32" fill="rgba(26, 117, 100, 0.09)" stroke="#1A7564"/>
+    <text x="88" y="20" text-anchor="middle" class="mono p" fill="#1A7564">2,0</text>
+    <rect x="108" y="0" width="32" height="32" fill="#EFECE4" stroke="#D8D3C8"/>
+    <text x="124" y="20" text-anchor="middle" class="mono p" fill="#636975">3,0</text>
+
+    <rect x="0" y="36" width="32" height="32" fill="rgba(26, 117, 100, 0.24)" stroke="#1A7564"/>
+    <text x="16" y="56" text-anchor="middle" class="mono p" fill="#12151A">0,1</text>
+    <rect x="36" y="36" width="32" height="32" fill="rgba(154, 101, 8, 0.10)" stroke="#9A6508" stroke-width="1.5"/>
+    <text x="52" y="56" text-anchor="middle" class="mono p" fill="#9A6508">1,1</text>
+    <rect x="72" y="36" width="32" height="32" fill="#EFECE4" stroke="#D8D3C8"/>
+    <text x="88" y="56" text-anchor="middle" class="mono p" fill="#636975">2,1</text>
+    <rect x="108" y="36" width="32" height="32" fill="#EFECE4" stroke="#D8D3C8"/>
+    <text x="124" y="56" text-anchor="middle" class="mono p" fill="#636975">3,1</text>
+
+    <rect x="0" y="72" width="32" height="32" fill="#EFECE4" stroke="#D8D3C8"/>
+    <rect x="36" y="72" width="32" height="32" fill="#EFECE4" stroke="#D8D3C8"/>
+    <rect x="72" y="72" width="32" height="32" fill="#EFECE4" stroke="#D8D3C8"/>
+    <rect x="108" y="72" width="32" height="32" fill="#EFECE4" stroke="#D8D3C8"/>
+  </g>
+
+  <text x="572" y="246" class="mono t">GeneratedChunk</text>
+  <text x="572" y="264" class="sans s">• coverage: Complete /</text>
+  <text x="572" y="278" class="sans s">  Partial / Outside</text>
+  <text x="572" y="294" class="sans s">• source_id + version</text>
+  <text x="572" y="310" class="sans s">• take_view() →</text>
+  <text x="572" y="324" class="sans s">  WorldChunkView</text>
+  <text x="572" y="352" class="mono p" fill="#9A6508">1 active chunk in RAM</text>
+
+  <!-- Connector 3 -> 4 -->
+  <path d="M 742 150 L 778 150" fill="none" stroke="#1A7564" stroke-width="1.6" marker-end="url(#arr-a)"/>
+  <path d="M 742 290 L 778 290" fill="none" stroke="#B9B3A6" stroke-width="1.4" marker-end="url(#arr-m)"/>
+
+  <!-- Stage 4: Outputs -->
+  <rect x="782" y="72" width="154" height="142" fill="#F7F5F0" stroke="#D8D3C8"/>
+  <rect x="782" y="72" width="154" height="3" fill="#1A7564"/>
+  <text x="794" y="98" class="mono t">WorldSink</text>
+  <text x="794" y="116" class="sans s">Playable Java save</text>
+  <text x="794" y="132" class="sans s">r.rx.rz.mca regions</text>
+  <text x="794" y="148" class="sans s">level.dat metadata</text>
+  <line x1="794" y1="164" x2="924" y2="164" stroke="#D8D3C8"/>
+  <text x="794" y="182" class="mono p" fill="#1A7564">Never revisits a</text>
+  <text x="794" y="196" class="mono p" fill="#1A7564">flushed .mca file</text>
+
+  <rect x="782" y="230" width="154" height="150" fill="#F7F5F0" stroke="#D8D3C8"/>
+  <rect x="782" y="230" width="154" height="3" fill="#9A6508"/>
+  <text x="794" y="256" class="mono t">On-Demand API</text>
+  <text x="794" y="274" class="sans s">generate(cx, cz)</text>
+  <text x="794" y="290" class="sans s">Random access in</text>
+  <text x="794" y="304" class="sans s">any chunk order</text>
+  <line x1="794" y1="320" x2="924" y2="320" stroke="#D8D3C8"/>
+  <text x="794" y="338" class="sans s">to_schematic() →</text>
+  <text x="794" y="354" class="sans s">.schem · .litematic</text>
+  <text x="794" y="368" class="sans s">GLB · live preview</text>
+</svg>

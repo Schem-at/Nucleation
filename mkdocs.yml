@@ -118,9 +118,11 @@ markdown_extensions:
 
 extra_css:
   - stylesheets/extra.css
+  - stylesheets/sdf-studio.css
 
 extra_javascript:
   - javascripts/kineglyph-docs.js
+  - javascripts/sdf-playground-init.js
 
 extra:
   social:

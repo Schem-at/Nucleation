@@ -24,6 +24,10 @@ async function loadNucleation() {
     import("./vendor/nucleation/MeshResult.mjs"),
     import("./vendor/nucleation/ResourcePack.mjs"),
     import("./vendor/nucleation/Schematic.mjs"),
+    import("./vendor/nucleation/WorldGenerator.mjs"),
+    import("./vendor/nucleation/CellularSdfConfig.mjs"),
+    import("./vendor/nucleation/GeneratedChunkOverlayMode.mjs"),
+    import("./vendor/nucleation/Brush.mjs"),
   ]).then((mods) => Object.assign({}, ...mods));
   return wasmPromise;
 }
@@ -40,6 +44,7 @@ const BLOCKS = {
   stone: { rgb: [130, 132, 134], style: "stone" },
   andesite: { rgb: [152, 154, 152], style: "speckle" },
   calcite: { rgb: [223, 222, 213], style: "vein" },
+  snow_block: { rgb: [242, 248, 252], style: "matte" },
   dirt: { rgb: [134, 96, 67], style: "speckle" },
   moss_block: { rgb: [98, 136, 56], style: "moss" },
   short_grass: { rgb: [112, 166, 68], style: "cross" },
@@ -1281,6 +1286,482 @@ function mountCsgLab(root) {
   };
 }
 
+/* ============================================================================
+ * WIDGET 3: INTERACTIVE INFINITE SDF CHUNK-STREAMING WORLD EXPLORER
+ * ============================================================================ */
+
+const WORLD_PRESETS = {
+  archipelago: {
+    label: "Alpine archipelago",
+    minY: -8,
+    maxY: 22,
+    buildGenerator(nuc) {
+      const hills = nuc.Field.perlinFbm2(0.038, 42, 4).mulConst(10.0);
+      const peaks = nuc.Field.ridgedFbm3(0.025, 99, 3).mulConst(7.0);
+      const terrain = nuc.Field.heightmap(1.0, hills.add(peaks));
+
+      const layers = nuc.MaterialBuilder.createLayered();
+      layers.addLayer(
+        nuc.MaterialCondition.exposedFace(4, true)
+          .andWith(nuc.MaterialCondition.yRange(true, 11.0, false, 0.0))
+          .andWith(nuc.MaterialCondition.slopeRange(true, 0.0, true, 0.75)),
+        nuc.Material.solid("minecraft:snow_block"),
+      );
+      layers.addLayer(
+        nuc.MaterialCondition.exposedFace(4, true)
+          .andWith(nuc.MaterialCondition.yRange(true, 4.5, true, 12.0))
+          .andWith(nuc.MaterialCondition.slopeRange(true, 0.0, true, 0.72)),
+        nuc.Material.solid("minecraft:moss_block"),
+      );
+      layers.addLayer(
+        nuc.MaterialCondition.depthBelowSurface(true, 1.0, true, 2.0)
+          .andWith(nuc.MaterialCondition.yRange(true, 3.0, true, 11.0)),
+        nuc.Material.solid("minecraft:dirt"),
+      );
+      layers.setDefault(
+        nuc.Material.channelRamp(
+          nuc.FieldChannel.WorldY,
+          -8.0,
+          14.0,
+          '["minecraft:deepslate","minecraft:tuff","minecraft:stone","minecraft:andesite"]',
+          true,
+        ),
+      );
+
+      const pipe = nuc.VoxelPipeline.create(terrain, layers.build());
+      pipe.addFluidLevel(5.0, "minecraft:water");
+      const grass = nuc.ScatterRule.create(
+        nuc.ScatterFace.Top,
+        0.25,
+        '["minecraft:short_grass"]',
+        [1.0],
+        13,
+      );
+      grass.setOnBlock("minecraft:moss_block");
+      pipe.addScatter(grass);
+
+      return nuc.WorldGenerator.pipeline(
+        pipe,
+        this.minY,
+        this.maxY,
+        "docs:alpine-archipelago",
+        "v1",
+      );
+    },
+  },
+
+  karst: {
+    label: "3D gyroid caves",
+    minY: -10,
+    maxY: 18,
+    buildGenerator(nuc) {
+      const hills = nuc.Field.perlinFbm2(0.036, 17, 3).mulConst(6.5);
+      const surface = nuc.Field.heightmap(7.5, hills);
+      const caves = nuc.Field.expr(
+        "let q = p * 0.20; abs(sin(q.x)*cos(q.y) + sin(q.y)*cos(q.z) + sin(q.z)*cos(q.x)) - 0.36",
+      );
+      const carved = surface.subtract(caves);
+
+      const layers = nuc.MaterialBuilder.createLayered();
+      layers.addLayer(
+        nuc.MaterialCondition.exposedFace(4, true)
+          .andWith(nuc.MaterialCondition.yRange(true, 4.0, false, 0.0))
+          .andWith(nuc.MaterialCondition.slopeRange(true, 0.0, true, 0.55)),
+        nuc.Material.solid("minecraft:moss_block"),
+      );
+      layers.addLayer(
+        nuc.MaterialCondition.exposedFace(8, true).andWith(
+          nuc.MaterialCondition.chance(0.08, 71),
+        ),
+        nuc.Material.solid("minecraft:sea_lantern"),
+      );
+      layers.setDefault(
+        nuc.Material.channelRamp(
+          nuc.FieldChannel.WorldY,
+          -10.0,
+          14.0,
+          '["minecraft:obsidian","minecraft:deepslate","minecraft:tuff","minecraft:stone","minecraft:smooth_sandstone"]',
+          true,
+        ),
+      );
+
+      const pipe = nuc.VoxelPipeline.create(carved, layers.build());
+      pipe.addFluidLevel(-4.0, "minecraft:water");
+      return nuc.WorldGenerator.pipeline(
+        pipe,
+        this.minY,
+        this.maxY,
+        "docs:gyroid-karst",
+        "v1",
+      );
+    },
+  },
+
+  spires: {
+    label: "Composite + cellular spires",
+    minY: -8,
+    maxY: 22,
+    buildGenerator(nuc) {
+      const lowland = nuc.Field.heightmap(
+        1.5,
+        nuc.Field.perlinFbm2(0.035, 31, 3).mulConst(4.5),
+      );
+      const groundMat = nuc.MaterialBuilder.createLayered();
+      groundMat.addLayer(
+        nuc.MaterialCondition.exposedFace(4, true).andWith(
+          nuc.MaterialCondition.yRange(true, 1.0, false, 0.0),
+        ),
+        nuc.Material.solid("minecraft:moss_block"),
+      );
+      groundMat.setDefault(
+        nuc.Material.channelRamp(
+          nuc.FieldChannel.WorldY,
+          -8.0,
+          8.0,
+          '["minecraft:deepslate","minecraft:tuff","minecraft:stone"]',
+          true,
+        ),
+      );
+      const groundPipe = nuc.VoxelPipeline.create(lowland, groundMat.build());
+      groundPipe.addFluidLevel(0.0, "minecraft:water");
+
+      const base = nuc.WorldGenerator.pipeline(
+        groundPipe,
+        this.minY,
+        this.maxY,
+        "docs:spires-ground",
+        "v1",
+      );
+
+      // Non-periodic hashed-cell crystal spires scattered seamlessly across chunk boundaries
+      const spireShape = nuc.Field.roundCone(0, -1, 0, 0, 14, 0, 4.2, 0.6).smoothUnion(
+        nuc.Field.octahedron(3.2).translate(0, 14.5, 0),
+        1.2,
+      );
+      const cells = nuc.CellularSdfConfig.create(
+        26,
+        26,
+        0x6a09e667n,
+        5.0,
+        5.0,
+        45.0,
+        0.78,
+        1.22,
+        -1,
+        3,
+        4,
+        5,
+        0n,
+      );
+      const spireLayer = nuc.WorldGenerator.cellularSdf(
+        spireShape,
+        nuc.Brush.solid("minecraft:amethyst_block"),
+        this.minY,
+        this.maxY,
+        cells,
+        "docs:spires-motifs",
+        "v1",
+      );
+
+      const comp = nuc.WorldGenerator.composite("docs:spires-world", "v1");
+      comp.addLayer(base, nuc.GeneratedChunkOverlayMode.Replace);
+      comp.addLayer(spireLayer, nuc.GeneratedChunkOverlayMode.Replace);
+      return comp;
+    },
+  },
+};
+
+async function mountWorldgenLab(root, ensureModelViewer) {
+  if (root.dataset.mounted === "true") return () => {};
+  root.dataset.mounted = "true";
+
+  let presetKey = "archipelago";
+  let originCx = 0;
+  let originCz = 0;
+  let selected = new Set();
+  let currentUrl = null;
+  let lastSchematic = null;
+  let runSeq = 0;
+  let nuc = null;
+  let generator = null;
+
+  function selectAll3x3() {
+    selected = new Set();
+    for (let dz = -1; dz <= 1; dz += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        selected.add(`${originCx + dx},${originCz + dz}`);
+      }
+    }
+  }
+  selectAll3x3();
+
+  root.innerHTML = `
+    <div class="sdf-studio__bar">
+      <div class="sdf-seg" role="radiogroup" aria-label="Infinite world preset" data-role="wg-presets">
+        ${Object.entries(WORLD_PRESETS)
+          .map(
+            ([k, p]) =>
+              `<button type="button" class="sdf-seg__btn" role="radio" aria-checked="${
+                k === presetKey
+              }" data-wg-preset="${k}">${p.label}</button>`,
+          )
+          .join("")}
+      </div>
+      <button type="button" class="sdf-run-btn" data-role="wg-wave">Stream 3×3 wave</button>
+    </div>
+
+    <div class="wg-layout">
+      <div class="wg-sidebar">
+        <div class="wg-sidebar__head">
+          <span>Chunk window (16×16)</span>
+          <span data-role="wg-origin">(0, 0)</span>
+        </div>
+
+        <div class="wg-grid" data-role="wg-grid" aria-label="Selectable 3x3 chunk window"></div>
+
+        <div class="wg-pan" role="group" aria-label="Pan chunk window">
+          <button type="button" class="wg-pan__btn" data-pan="0,-1">North (−Z)</button>
+          <button type="button" class="wg-pan__btn" data-pan="reset">Origin (0,0)</button>
+          <button type="button" class="wg-pan__btn" data-pan="0,1">South (+Z)</button>
+          <button type="button" class="wg-pan__btn" data-pan="-1,0">West (−X)</button>
+          <button type="button" class="wg-pan__btn" data-pan="neg">Jump (−12, 8)</button>
+          <button type="button" class="wg-pan__btn" data-pan="1,0">East (+X)</button>
+        </div>
+
+        <p class="wg-note">Click any chunk to toggle it, or pan anywhere in the infinite coordinate space. Every chunk is evaluated independently by <code>WorldGenerator</code> in Rust/WASM and stitched with zero seams.</p>
+      </div>
+
+      <div class="wg-stage">
+        <model-viewer
+          class="sdf-studio__viewer"
+          alt="Interactive 3D multi-chunk Minecraft terrain streamed in the browser by Nucleation WorldGenerator"
+          camera-controls
+          auto-rotate
+          auto-rotate-delay="2200"
+          rotation-per-second="10deg"
+          camera-orbit="42deg 58deg 128%"
+          field-of-view="30deg"
+          min-camera-orbit="auto auto 68%"
+          max-camera-orbit="auto auto 240%"
+          shadow-intensity="0.7"
+          shadow-softness="0.85"
+          exposure="1.05"
+          interaction-prompt="none"
+        ></model-viewer>
+        <div class="sdf-studio__overlay" data-role="wg-status">Loading WorldGenerator WASM...</div>
+      </div>
+    </div>
+
+    <div class="sdf-studio__footer">
+      <div class="sdf-telemetry" data-role="wg-telemetry">Initializing infinite WorldGenerator...</div>
+      <button type="button" class="sdf-download-btn" data-role="wg-download" disabled>Download .schem</button>
+    </div>
+  `;
+
+  const gridEl = root.querySelector('[data-role="wg-grid"]');
+  const originEl = root.querySelector('[data-role="wg-origin"]');
+  const viewer = root.querySelector(".sdf-studio__viewer");
+  const statusEl = root.querySelector('[data-role="wg-status"]');
+  const telemetryEl = root.querySelector('[data-role="wg-telemetry"]');
+  const downloadBtn = root.querySelector('[data-role="wg-download"]');
+  const waveBtn = root.querySelector('[data-role="wg-wave"]');
+
+  function renderGrid(streamingKey = null) {
+    originEl.textContent = `(${originCx}, ${originCz})`;
+    const cells = [];
+    for (let dz = -1; dz <= 1; dz += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        const cx = originCx + dx;
+        const cz = originCz + dz;
+        const key = `${cx},${cz}`;
+        const active = selected.has(key);
+        const streaming = streamingKey === key;
+        cells.push(
+          `<button type="button" class="wg-cell" data-cx="${cx}" data-cz="${cz}" data-active="${active}" data-streaming="${streaming}">${cx}, ${cz}</button>`,
+        );
+      }
+    }
+    gridEl.innerHTML = cells.join("");
+  }
+
+  async function ensureGenerator() {
+    if (!nuc) {
+      await ensureModelViewer();
+      nuc = await loadNucleation();
+    }
+    if (!generator) {
+      generator = WORLD_PRESETS[presetKey].buildGenerator(nuc);
+    }
+    return generator;
+  }
+
+  async function rebuildPatch(animateWave = false) {
+    const seq = ++runSeq;
+    statusEl.textContent = animateWave ? "Streaming chunks..." : "Generating chunks...";
+    statusEl.hidden = false;
+    waveBtn.disabled = true;
+
+    try {
+      const gen = await ensureGenerator();
+      if (seq !== runSeq) return;
+
+      const coords = [];
+      for (let dz = -1; dz <= 1; dz += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const cx = originCx + dx;
+          const cz = originCz + dz;
+          if (selected.has(`${cx},${cz}`)) coords.push([cx, cz]);
+        }
+      }
+
+      if (coords.length === 0) {
+        statusEl.textContent = "Select at least one chunk on the left.";
+        waveBtn.disabled = false;
+        return;
+      }
+
+      const combined = nuc.Schematic.create(`worldgen_${presetKey}`);
+      const t0 = performance.now();
+      let genMsTotal = 0;
+
+      for (const [cx, cz] of coords) {
+        if (seq !== runSeq) return;
+        if (animateWave) {
+          renderGrid(`${cx},${cz}`);
+          await new Promise((r) => setTimeout(r, 45));
+        }
+        const tc0 = performance.now();
+        const chunk = gen.generate(cx, cz);
+        const view = chunk.takeView();
+        const chunkSchem = view.toSchematic();
+        genMsTotal += performance.now() - tc0;
+
+        if (chunkSchem.blockCount() > 0) {
+          const lo = chunkSchem.tightBoundsMin();
+          const hi = chunkSchem.tightBoundsMax();
+          combined.stampBox(
+            chunkSchem,
+            lo.x,
+            lo.y,
+            lo.z,
+            hi.x,
+            hi.y,
+            hi.z,
+            lo.x,
+            lo.y,
+            lo.z,
+            '["minecraft:air"]',
+          );
+        }
+      }
+
+      renderGrid(null);
+      if (seq !== runSeq) return;
+
+      const tMesh0 = performance.now();
+      const cfg = nuc.MeshConfig.create();
+      cfg.setAmbientOcclusion(true);
+      cfg.setAoIntensity(0.5);
+      cfg.setGreedyMeshing(true);
+      const mesh = nuc.MeshResult.create(combined, getResourcePack(nuc), cfg);
+      const glbBytes = decodeBase64(mesh.glbDataB64());
+      const meshMs = performance.now() - tMesh0;
+
+      if (seq !== runSeq) return;
+
+      const nextUrl = URL.createObjectURL(new Blob([glbBytes], { type: "model/gltf-binary" }));
+      if (currentUrl) URL.revokeObjectURL(currentUrl);
+      currentUrl = nextUrl;
+      viewer.src = nextUrl;
+
+      lastSchematic = combined;
+      statusEl.hidden = true;
+      downloadBtn.disabled = false;
+      waveBtn.disabled = false;
+      const avgChunk = (genMsTotal / coords.length).toFixed(1);
+      telemetryEl.textContent =
+        `${coords.length} chunk${coords.length === 1 ? "" : "s"} · ` +
+        `${combined.blockCount().toLocaleString()} blocks · ` +
+        `${mesh.triangleCount().toLocaleString()} tris · ` +
+        `${avgChunk} ms/chunk · ${Math.round(meshMs)} ms mesh`;
+    } catch (err) {
+      if (seq !== runSeq) return;
+      statusEl.hidden = true;
+      waveBtn.disabled = false;
+      telemetryEl.textContent = `WorldGenerator error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  root.querySelector('[data-role="wg-presets"]').addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-wg-preset]");
+    if (!btn) return;
+    presetKey = btn.dataset.wgPreset;
+    generator = null;
+    for (const el of root.querySelectorAll("[data-wg-preset]")) {
+      el.setAttribute("aria-checked", String(el === btn));
+    }
+    void rebuildPatch(false);
+  });
+
+  gridEl.addEventListener("click", (e) => {
+    const cell = e.target.closest(".wg-cell");
+    if (!cell) return;
+    const key = `${cell.dataset.cx},${cell.dataset.cz}`;
+    if (selected.has(key)) {
+      if (selected.size > 1) selected.delete(key);
+    } else {
+      selected.add(key);
+    }
+    renderGrid();
+    void rebuildPatch(false);
+  });
+
+  root.querySelector(".wg-pan").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-pan]");
+    if (!btn) return;
+    const action = btn.dataset.pan;
+    if (action === "reset") {
+      originCx = 0;
+      originCz = 0;
+    } else if (action === "neg") {
+      originCx = -12;
+      originCz = 8;
+    } else {
+      const [dx, dz] = action.split(",").map(Number);
+      originCx += dx;
+      originCz += dz;
+    }
+    selectAll3x3();
+    renderGrid();
+    void rebuildPatch(false);
+  });
+
+  waveBtn.addEventListener("click", () => {
+    selectAll3x3();
+    renderGrid();
+    void rebuildPatch(true);
+  });
+
+  downloadBtn.addEventListener("click", () => {
+    if (!lastSchematic) return;
+    const bytes = decodeBase64(lastSchematic.toSchematicB64());
+    const blobUrl = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = `nucleation-world-${presetKey}-${originCx}_${originCz}.schem`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+  });
+
+  renderGrid();
+  void rebuildPatch(false);
+
+  return () => {
+    if (currentUrl) URL.revokeObjectURL(currentUrl);
+    root.dataset.mounted = "false";
+  };
+}
+
 export async function mountSdfPlaygrounds(ensureModelViewer) {
   const cleanups = [];
   const rerenders = [];
@@ -1294,6 +1775,11 @@ export async function mountSdfPlaygrounds(ensureModelViewer) {
     const lab = mountCsgLab(el);
     if (lab?.rerender) rerenders.push(lab.rerender);
     if (lab?.destroy) cleanups.push(lab.destroy);
+  }
+
+  for (const el of document.querySelectorAll("[data-worldgen-lab]")) {
+    const destroy = await mountWorldgenLab(el, ensureModelViewer);
+    cleanups.push(destroy);
   }
 
   return {
