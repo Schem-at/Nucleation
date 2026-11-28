@@ -2254,6 +2254,34 @@ const TICK_TOOLS = [
   { id: "break", label: "Break", swatch: "#e05252", danger: true, title: "Click any block to mine it (or Shift+Click)" },
 ];
 
+const TICK_EXTRA_STATES = (() => {
+  const dirs4 = ["north", "south", "east", "west"];
+  const dirs6 = ["north", "south", "east", "west", "up", "down"];
+  const states = [
+    "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]",
+    "minecraft:redstone_torch[lit=true]",
+    "minecraft:redstone_block",
+    "minecraft:redstone_lamp[lit=false]",
+    "minecraft:slime_block",
+    "minecraft:smooth_stone",
+    "minecraft:gold_block",
+    "minecraft:obsidian",
+  ];
+  for (const d of dirs4) {
+    states.push(`minecraft:repeater[delay=1,facing=${d},locked=false,powered=false]`);
+    states.push(`minecraft:redstone_wall_torch[facing=${d},lit=true]`);
+    states.push(`minecraft:lever[face=floor,facing=${d},powered=false]`);
+    states.push(`minecraft:lever[face=wall,facing=${d},powered=false]`);
+    states.push(`minecraft:stone_button[face=floor,facing=${d},powered=false]`);
+    states.push(`minecraft:stone_button[face=wall,facing=${d},powered=false]`);
+  }
+  for (const d of dirs6) {
+    states.push(`minecraft:sticky_piston[extended=false,facing=${d}]`);
+    states.push(`minecraft:observer[facing=${d},powered=false]`);
+  }
+  return states.join(";");
+})();
+
 async function mountTickStudio(root) {
   if (root.dataset.mounted === "true") return { destroy: () => {} };
   root.dataset.mounted = "true";
@@ -2583,7 +2611,14 @@ async function mountTickStudio(root) {
         hintEl.textContent = "Drop .schem / .litematic / .nbt here";
       }
 
-      sim = nuc.TickSimulation.fromSchematic(baseSchem, nuc.TickSettleMode.InWorld, 0, 0, 0, "");
+      sim = nuc.TickSimulation.fromSchematic(
+        baseSchem,
+        nuc.TickSettleMode.InWorld,
+        0,
+        0,
+        0,
+        TICK_EXTRA_STATES,
+      );
       sim.recordUpdates(true);
       scheduleRemesh(true);
 
