@@ -926,16 +926,16 @@ fn ramp_ids_picks_distinct_monotonic_blocks() {
 #[test]
 fn sdf_shapes_plug_into_the_building_system() {
     use nucleation::building::{BlockPalette, ColorBrush, SdfShape};
-    use nucleation::sdf::SdfNode;
+    use nucleation::sdf::Field;
 
     // A smooth-union blob as a fillable Shape.
-    let node = SdfNode::from_json(
-        r#"{"type": "smoothUnion", "k": 4.0,
-            "a": {"type": "sphere", "radius": 6},
-            "b": {"type": "translate", "offset": [7, 0, 0],
-                   "child": {"type": "sphere", "radius": 5}}}"#,
-    )
-    .unwrap();
+    let node = Field::sphere(6.0)
+        .unwrap()
+        .smooth_union(
+            &Field::sphere(5.0).unwrap().translate([7.0, 0.0, 0.0]).unwrap(),
+            4.0,
+        )
+        .unwrap();
     let shape = SdfShape::new(node).expect("bounded tree");
 
     let mut s = UniversalSchematic::new("blob".to_string());
@@ -957,7 +957,7 @@ fn sdf_shapes_plug_into_the_building_system() {
     assert!(ny > 0.8, "top normal should point up, got ({nx},{ny},{nz})");
 
     // Unbounded trees refuse auto-bounds.
-    let plane = SdfNode::from_json(r#"{"type": "plane", "normal": [0, 1, 0]}"#).unwrap();
+    let plane = Field::plane([0.0, 1.0, 0.0], 0.0).unwrap();
     assert!(SdfShape::new(plane).is_none());
 }
 

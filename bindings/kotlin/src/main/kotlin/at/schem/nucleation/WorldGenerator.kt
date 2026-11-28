@@ -8,6 +8,7 @@ import com.sun.jna.Structure
 internal interface WorldGeneratorLib: Library {
     fun WorldGenerator_destroy(handle: Pointer)
     fun WorldGenerator_sdf(volume: Pointer, material: Pointer, minY: Int, maxY: Int, sourceId: Slice, version: Slice): ResultPointerInt
+    fun WorldGenerator_pipeline(pipeline: Pointer, minY: Int, maxY: Int, sourceId: Slice, version: Slice): ResultPointerInt
     fun WorldGenerator_cellular_sdf(volume: Pointer, material: Pointer, minY: Int, maxY: Int, config: Pointer, sourceId: Slice, version: Slice): ResultPointerInt
     fun WorldGenerator_projected_footprints(buildingsJson: Slice, baseBlock: Slice, sourceId: Slice, version: Slice): ResultPointerInt
     fun WorldGenerator_composite(sourceId: Slice, version: Slice): ResultPointerInt
@@ -48,10 +49,10 @@ class WorldGenerator internal constructor (
         internal val lib: WorldGeneratorLib = Native.load("nucleation", libClass)
         @JvmStatic
 
-        /** Create an SDF-backed source evaluated at voxel centers over the inclusive
+        /** Create a field-backed source evaluated at voxel centers over the inclusive
         *Y range. `source_id` and `version` become chunk provenance/cache metadata.
         */
-        fun sdf(volume: Sdf, material: Brush, minY: Int, maxY: Int, sourceId: String, version: String): Result<WorldGenerator> {
+        fun sdf(volume: Field, material: Brush, minY: Int, maxY: Int, sourceId: String, version: String): Result<WorldGenerator> {
             val sourceIdSliceMemory = PrimitiveArrayTools.borrowUtf8(sourceId)
             val versionSliceMemory = PrimitiveArrayTools.borrowUtf8(version)
 
@@ -73,11 +74,36 @@ class WorldGenerator internal constructor (
         }
         @JvmStatic
 
-        /** Create a sparse infinite source by placing a bounded SDF motif once per
+        /** Create a world generator backed by a full [VoxelPipeline] (multi-material
+        *layers, CSG tags, fluids, surface scatter, brick interval pruning).
+        */
+        fun pipeline(pipeline: VoxelPipeline, minY: Int, maxY: Int, sourceId: String, version: String): Result<WorldGenerator> {
+            val sourceIdSliceMemory = PrimitiveArrayTools.borrowUtf8(sourceId)
+            val versionSliceMemory = PrimitiveArrayTools.borrowUtf8(version)
+
+            val returnVal = lib.WorldGenerator_pipeline(pipeline.handle, minY, maxY, sourceIdSliceMemory.slice, versionSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = WorldGenerator(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                sourceIdSliceMemory.close()
+                versionSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Create a sparse infinite source by placing a bounded field motif once per
         *deterministically transformed cell. Reuse `config` across layers to keep
         *terrain, water, vegetation, paths, and structures coordinated.
         */
-        fun cellularSdf(volume: Sdf, material: Brush, minY: Int, maxY: Int, config: CellularSdfConfig, sourceId: String, version: String): Result<WorldGenerator> {
+        fun cellularSdf(volume: Field, material: Brush, minY: Int, maxY: Int, config: CellularSdfConfig, sourceId: String, version: String): Result<WorldGenerator> {
             val sourceIdSliceMemory = PrimitiveArrayTools.borrowUtf8(sourceId)
             val versionSliceMemory = PrimitiveArrayTools.borrowUtf8(version)
 

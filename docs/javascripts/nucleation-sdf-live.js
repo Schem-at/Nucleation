@@ -1,13 +1,12 @@
 import { Brush } from "./vendor/nucleation/Brush.mjs";
 import { BuildingTool } from "./vendor/nucleation/BuildingTool.mjs";
-import { Field3 } from "./vendor/nucleation/Field3.mjs";
+import { Field } from "./vendor/nucleation/Field.mjs";
 import { InterpolationSpace } from "./vendor/nucleation/InterpolationSpace.mjs";
 import { MeshConfig } from "./vendor/nucleation/MeshConfig.mjs";
 import { MeshResult } from "./vendor/nucleation/MeshResult.mjs";
 import { Palette } from "./vendor/nucleation/Palette.mjs";
 import { ResourcePack } from "./vendor/nucleation/ResourcePack.mjs";
 import { Schematic } from "./vendor/nucleation/Schematic.mjs";
-import { Sdf } from "./vendor/nucleation/Sdf.mjs";
 
 const EMPTY_ZIP = [
   80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -90,25 +89,25 @@ function selected(context) {
 
 function volume(kind, field) {
   if (kind === "rings") {
-    const ring = Sdf.torus(4.8, 1.25);
+    const ring = Field.torus(4.8, 1.25);
     return ring
-      .smoothUnion(Sdf.torus(4.8, 1.25).rotate(90, 0, 0), 0.55)
-      .smoothUnion(Sdf.torus(4.8, 1.25).rotate(0, 0, 90), 0.55);
+      .smoothUnion(Field.torus(4.8, 1.25).rotate(90, 0, 0), 0.55)
+      .smoothUnion(Field.torus(4.8, 1.25).rotate(0, 0, 90), 0.55);
   }
   if (kind === "frame") {
-    return Sdf.boxFrame(5.4, 5.4, 5.4, 0.85)
+    return Field.boxFrame(5.4, 5.4, 5.4, 0.85)
       .rounded(0.35)
-      .smoothUnion(Sdf.sphere(2.6), 0.7);
+      .smoothUnion(Field.sphere(2.6), 0.7);
   }
-  return Sdf.sphere(5.9)
-    .offsetByField(field, 1.65)
-    .smoothUnion(Sdf.torus(5.1, 1.15).rotate(90, 0, 0), 0.8);
+  return Field.sphere(5.9)
+    .displace(field, 1.65)
+    .smoothUnion(Field.torus(5.1, 1.15).rotate(90, 0, 0), 0.8);
 }
 
 function materialBrush(kind, field) {
   if (kind === "calcite") return Brush.solid("minecraft:calcite");
   if (kind === "copper") return Brush.solid("minecraft:oxidized_copper");
-  const brush = Brush.field3(
+  const brush = Brush.field(
     field,
     [0, 0.5, 1],
     [29, 29, 33, 58, 179, 218, 254, 216, 61],
@@ -141,7 +140,7 @@ async function generateGlb(context) {
   await new Promise((resolve) => requestAnimationFrame(resolve));
   if (context.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
-  const field = Field3.valueNoiseFbm(0.12, 2026, 4);
+  const field = Field.valueFbm3(0.12, 2026, 4);
   const schematic = Schematic.create(`sdf-${choice.shape}-${choice.material}`);
   BuildingTool.fill(schematic, volume(choice.shape, field).toShape(), materialBrush(choice.material, field));
 

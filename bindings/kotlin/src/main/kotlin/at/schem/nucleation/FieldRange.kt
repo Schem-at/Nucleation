@@ -62,7 +62,7 @@ internal class OptionFieldRangeNative constructor(): Structure(), Structure.ByVa
 
 }
 
-/** The closed interval a field's values are analytically proven to lie in.
+/** Analytically proven inclusive scalar output range `[min, max]`.
 */
 class FieldRange (var min: Float, var max: Float) {
     companion object {

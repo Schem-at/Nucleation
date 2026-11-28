@@ -13,11 +13,12 @@
 #include <cstdlib>
 #include "Brush.hpp"
 #include "CellularSdfConfig.hpp"
+#include "Field.hpp"
 #include "GeneratedChunk.hpp"
 #include "GeneratedChunkOverlayMode.hpp"
 #include "GeneratedWorldStream.hpp"
 #include "NucleationError.hpp"
-#include "Sdf.hpp"
+#include "VoxelPipeline.hpp"
 #include "diplomat_runtime.hpp"
 
 
@@ -26,10 +27,13 @@ namespace capi {
     extern "C" {
 
     typedef struct WorldGenerator_sdf_result {union {diplomat::capi::WorldGenerator* ok; diplomat::capi::NucleationError err;}; bool is_ok;} WorldGenerator_sdf_result;
-    WorldGenerator_sdf_result WorldGenerator_sdf(const diplomat::capi::Sdf* volume, const diplomat::capi::Brush* material, int32_t min_y, int32_t max_y, diplomat::capi::DiplomatStringView source_id, diplomat::capi::DiplomatStringView version);
+    WorldGenerator_sdf_result WorldGenerator_sdf(const diplomat::capi::Field* volume, const diplomat::capi::Brush* material, int32_t min_y, int32_t max_y, diplomat::capi::DiplomatStringView source_id, diplomat::capi::DiplomatStringView version);
+
+    typedef struct WorldGenerator_pipeline_result {union {diplomat::capi::WorldGenerator* ok; diplomat::capi::NucleationError err;}; bool is_ok;} WorldGenerator_pipeline_result;
+    WorldGenerator_pipeline_result WorldGenerator_pipeline(const diplomat::capi::VoxelPipeline* pipeline, int32_t min_y, int32_t max_y, diplomat::capi::DiplomatStringView source_id, diplomat::capi::DiplomatStringView version);
 
     typedef struct WorldGenerator_cellular_sdf_result {union {diplomat::capi::WorldGenerator* ok; diplomat::capi::NucleationError err;}; bool is_ok;} WorldGenerator_cellular_sdf_result;
-    WorldGenerator_cellular_sdf_result WorldGenerator_cellular_sdf(const diplomat::capi::Sdf* volume, const diplomat::capi::Brush* material, int32_t min_y, int32_t max_y, const diplomat::capi::CellularSdfConfig* config, diplomat::capi::DiplomatStringView source_id, diplomat::capi::DiplomatStringView version);
+    WorldGenerator_cellular_sdf_result WorldGenerator_cellular_sdf(const diplomat::capi::Field* volume, const diplomat::capi::Brush* material, int32_t min_y, int32_t max_y, const diplomat::capi::CellularSdfConfig* config, diplomat::capi::DiplomatStringView source_id, diplomat::capi::DiplomatStringView version);
 
     typedef struct WorldGenerator_projected_footprints_result {union {diplomat::capi::WorldGenerator* ok; diplomat::capi::NucleationError err;}; bool is_ok;} WorldGenerator_projected_footprints_result;
     WorldGenerator_projected_footprints_result WorldGenerator_projected_footprints(diplomat::capi::DiplomatStringView buildings_json, diplomat::capi::DiplomatStringView base_block, diplomat::capi::DiplomatStringView source_id, diplomat::capi::DiplomatStringView version);
@@ -52,7 +56,7 @@ namespace capi {
 } // namespace capi
 } // namespace
 
-inline diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError> WorldGenerator::sdf(const Sdf& volume, const Brush& material, int32_t min_y, int32_t max_y, std::string_view source_id, std::string_view version) {
+inline diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError> WorldGenerator::sdf(const Field& volume, const Brush& material, int32_t min_y, int32_t max_y, std::string_view source_id, std::string_view version) {
     auto result = diplomat::capi::WorldGenerator_sdf(volume.AsFFI(),
         material.AsFFI(),
         min_y,
@@ -62,7 +66,16 @@ inline diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError> WorldG
     return result.is_ok ? diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError>(diplomat::Ok<std::unique_ptr<WorldGenerator>>(std::unique_ptr<WorldGenerator>(WorldGenerator::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
-inline diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError> WorldGenerator::cellular_sdf(const Sdf& volume, const Brush& material, int32_t min_y, int32_t max_y, const CellularSdfConfig& config, std::string_view source_id, std::string_view version) {
+inline diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError> WorldGenerator::pipeline(const VoxelPipeline& pipeline, int32_t min_y, int32_t max_y, std::string_view source_id, std::string_view version) {
+    auto result = diplomat::capi::WorldGenerator_pipeline(pipeline.AsFFI(),
+        min_y,
+        max_y,
+        {source_id.data(), source_id.size()},
+        {version.data(), version.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError>(diplomat::Ok<std::unique_ptr<WorldGenerator>>(std::unique_ptr<WorldGenerator>(WorldGenerator::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError> WorldGenerator::cellular_sdf(const Field& volume, const Brush& material, int32_t min_y, int32_t max_y, const CellularSdfConfig& config, std::string_view source_id, std::string_view version) {
     auto result = diplomat::capi::WorldGenerator_cellular_sdf(volume.AsFFI(),
         material.AsFFI(),
         min_y,

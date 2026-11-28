@@ -5,7 +5,7 @@ import * as diplomatRuntime from "./diplomat-runtime.mjs";
 
 
 /**
- * The closed interval a field's values are analytically proven to lie in.
+ * Analytically proven inclusive scalar output range `[min, max]`.
  */
 export class FieldRange {
     #min;

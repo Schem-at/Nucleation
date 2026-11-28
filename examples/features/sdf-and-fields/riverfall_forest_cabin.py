@@ -10,12 +10,11 @@ from pathlib import Path
 from nucleation import (
     Brush,
     BuildingTool,
-    Field3,
+    Field,
+    FieldCellMode,
     InterpolationSpace,
     Palette,
     Schematic,
-    Sdf,
-    SdfCellMode,
 )
 
 NAME = "riverfall-forest-cabin-escarpment"
@@ -42,12 +41,10 @@ def build() -> tuple[Schematic, int, int]:
     schematic = Schematic.create(NAME)
 
     # Broad lowland. One reusable field drives both its silhouette and rock strata.
-    terrain_field = Field3.value_noise_fbm(frequency=0.027, seed=31, octaves=5)
-    terrain = Sdf.plane(0, 1, 0, 0).offset_by_field(
-        field=terrain_field, amplitude=6.5
-    )
-    ground = terrain.intersection_with(Sdf.box_shape(68, 12, 50, 6).translate(0, -5, 0))
-    ground_brush = Brush.field3(
+    terrain_field = Field.value_fbm3(frequency=0.027, seed=31, octaves=5)
+    terrain = Field.plane(0, 1, 0, 0).displace(terrain_field, amplitude=6.5)
+    ground = terrain.intersection_with(Field.box_shape(68, 12, 50, 6).translate(0, -5, 0))
+    ground_brush = Brush.field(
         field=terrain_field,
         stops=[0.0, 0.48, 1.0],
         colors=[42, 45, 52, 98, 96, 88, 148, 142, 126],
@@ -72,26 +69,22 @@ def build() -> tuple[Schematic, int, int]:
         return next(y for y in range(11, -18, -1) if terrain.eval_at(x, y, z) <= 0)
 
     # Tall escarpment. Independent reusable fields displace its top and front.
-    plateau_field = Field3.value_noise_fbm(frequency=0.024, seed=73, octaves=4)
-    cliff_field = Field3.value_noise_fbm(frequency=0.032, seed=91, octaves=4)
-    plateau_top = Sdf.plane(0, 1, 0, -35).offset_by_field(
-        field=plateau_field, amplitude=5.5
-    )
-    cliff_front = Sdf.plane(-1, 0, 0, 15).offset_by_field(
-        field=cliff_field, amplitude=5.2
-    )
+    plateau_field = Field.value_fbm3(frequency=0.024, seed=73, octaves=4)
+    cliff_field = Field.value_fbm3(frequency=0.032, seed=91, octaves=4)
+    plateau_top = Field.plane(0, 1, 0, -35).displace(plateau_field, amplitude=5.5)
+    cliff_front = Field.plane(-1, 0, 0, 15).displace(cliff_field, amplitude=5.2)
     # Keep a steep central face for the waterfall, then attach two diagonal
     # buttresses that descend into the lowland. Only the central mass is clipped
     # by the vertical front plane, so the shoulders can form a natural ramp.
     cliff_profile = plateau_top.smooth_intersection(cliff_front, radius=9.0)
-    central_envelope = Sdf.box_shape(29, 27, 34, 9).translate(44, 9, 0)
+    central_envelope = Field.box_shape(29, 27, 34, 9).translate(44, 9, 0)
     central_cliff = central_envelope.intersection_with(cliff_profile)
-    north_shoulder = Sdf.round_cone(
+    north_shoulder = Field.round_cone(
         10, 1, -39,
         48, 28, -32,
         22, 15,
     ).intersection_with(plateau_top)
-    south_shoulder = Sdf.round_cone(
+    south_shoulder = Field.round_cone(
         10, 1, 39,
         48, 28, 32,
         22, 15,
@@ -99,16 +92,19 @@ def build() -> tuple[Schematic, int, int]:
     cliff = central_cliff.smooth_union(north_shoulder, radius=7.0).smooth_union(
         south_shoulder, radius=7.0
     )
-    cracks = Sdf.cells(
-        frequency=0.085,
-        seed=19,
-        jitter=1.0,
-        mode=SdfCellMode.F2MinusF1,
-        threshold=0.46,
-    ).rotate(18, 27, 9)
+    cracks = (
+        Field.cells(
+            frequency=0.085,
+            seed=19,
+            jitter=1.0,
+            mode=FieldCellMode.F2MinusF1,
+        )
+        .add_const(-0.46)
+        .rotate(18, 27, 9)
+    )
     fractured = cliff.subtract(cracks)
     BuildingTool.fill(schematic, cliff.to_shape(), Brush.solid("minecraft:cobbled_deepslate"))
-    cliff_brush = Brush.field3(
+    cliff_brush = Brush.field(
         field=cliff_field,
         stops=[0.0, 0.42, 0.72, 1.0],
         colors=[50, 52, 57, 105, 101, 91, 155, 149, 132, 205, 198, 177],
@@ -347,8 +343,8 @@ def build() -> tuple[Schematic, int, int]:
             if y is not None:
                 points[1] += [x, y + 1, z]
 
-    trunk = Sdf.capped_cylinder(1.25, 4.8).translate(0, 4.8, 0)
-    crown = Sdf.round_cone(0, 5.8, 0, 0, 15.5, 0, 4.2, 0.35)
+    trunk = Field.capped_cylinder(1.25, 4.8).translate(0, 4.8, 0)
+    crown = Field.round_cone(0, 5.8, 0, 0, 15.5, 0, 4.2, 0.35)
     for scale, xyz in ((1.0, points[0]), (0.8, points[1])):
         trunks = trunk.scale(scale).repeat_points(xyz)
         crowns = crown.scale(scale).repeat_points(xyz)

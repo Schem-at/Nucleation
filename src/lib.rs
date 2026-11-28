@@ -18,7 +18,6 @@ pub mod dataconverter;
 pub mod definition_region;
 pub mod diff;
 mod entity;
-pub mod field;
 pub mod fingerprint;
 pub mod formats;
 pub mod geo;

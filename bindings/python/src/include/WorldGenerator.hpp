@@ -13,11 +13,12 @@
 #include <cstdlib>
 #include "Brush.hpp"
 #include "CellularSdfConfig.hpp"
+#include "Field.hpp"
 #include "GeneratedChunk.hpp"
 #include "GeneratedChunkOverlayMode.hpp"
 #include "GeneratedWorldStream.hpp"
 #include "NucleationError.hpp"
-#include "Sdf.hpp"
+#include "VoxelPipeline.hpp"
 #include "diplomat_runtime.hpp"
 
 
@@ -26,10 +27,13 @@ namespace capi {
     extern "C" {
 
     typedef struct WorldGenerator_sdf_result {union {nucleation::capi::WorldGenerator* ok; nucleation::capi::NucleationError err;}; bool is_ok;} WorldGenerator_sdf_result;
-    WorldGenerator_sdf_result WorldGenerator_sdf(const nucleation::capi::Sdf* volume, const nucleation::capi::Brush* material, int32_t min_y, int32_t max_y, nucleation::diplomat::capi::DiplomatStringView source_id, nucleation::diplomat::capi::DiplomatStringView version);
+    WorldGenerator_sdf_result WorldGenerator_sdf(const nucleation::capi::Field* volume, const nucleation::capi::Brush* material, int32_t min_y, int32_t max_y, nucleation::diplomat::capi::DiplomatStringView source_id, nucleation::diplomat::capi::DiplomatStringView version);
+
+    typedef struct WorldGenerator_pipeline_result {union {nucleation::capi::WorldGenerator* ok; nucleation::capi::NucleationError err;}; bool is_ok;} WorldGenerator_pipeline_result;
+    WorldGenerator_pipeline_result WorldGenerator_pipeline(const nucleation::capi::VoxelPipeline* pipeline, int32_t min_y, int32_t max_y, nucleation::diplomat::capi::DiplomatStringView source_id, nucleation::diplomat::capi::DiplomatStringView version);
 
     typedef struct WorldGenerator_cellular_sdf_result {union {nucleation::capi::WorldGenerator* ok; nucleation::capi::NucleationError err;}; bool is_ok;} WorldGenerator_cellular_sdf_result;
-    WorldGenerator_cellular_sdf_result WorldGenerator_cellular_sdf(const nucleation::capi::Sdf* volume, const nucleation::capi::Brush* material, int32_t min_y, int32_t max_y, const nucleation::capi::CellularSdfConfig* config, nucleation::diplomat::capi::DiplomatStringView source_id, nucleation::diplomat::capi::DiplomatStringView version);
+    WorldGenerator_cellular_sdf_result WorldGenerator_cellular_sdf(const nucleation::capi::Field* volume, const nucleation::capi::Brush* material, int32_t min_y, int32_t max_y, const nucleation::capi::CellularSdfConfig* config, nucleation::diplomat::capi::DiplomatStringView source_id, nucleation::diplomat::capi::DiplomatStringView version);
 
     typedef struct WorldGenerator_projected_footprints_result {union {nucleation::capi::WorldGenerator* ok; nucleation::capi::NucleationError err;}; bool is_ok;} WorldGenerator_projected_footprints_result;
     WorldGenerator_projected_footprints_result WorldGenerator_projected_footprints(nucleation::diplomat::capi::DiplomatStringView buildings_json, nucleation::diplomat::capi::DiplomatStringView base_block, nucleation::diplomat::capi::DiplomatStringView source_id, nucleation::diplomat::capi::DiplomatStringView version);
@@ -52,7 +56,7 @@ namespace capi {
 } // namespace capi
 } // namespace
 
-inline nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError> nucleation::WorldGenerator::sdf(const nucleation::Sdf& volume, const nucleation::Brush& material, int32_t min_y, int32_t max_y, std::string_view source_id, std::string_view version) {
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError> nucleation::WorldGenerator::sdf(const nucleation::Field& volume, const nucleation::Brush& material, int32_t min_y, int32_t max_y, std::string_view source_id, std::string_view version) {
     auto result = nucleation::capi::WorldGenerator_sdf(volume.AsFFI(),
         material.AsFFI(),
         min_y,
@@ -62,7 +66,16 @@ inline nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>,
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::WorldGenerator>>(std::unique_ptr<nucleation::WorldGenerator>(nucleation::WorldGenerator::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
-inline nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError> nucleation::WorldGenerator::cellular_sdf(const nucleation::Sdf& volume, const nucleation::Brush& material, int32_t min_y, int32_t max_y, const nucleation::CellularSdfConfig& config, std::string_view source_id, std::string_view version) {
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError> nucleation::WorldGenerator::pipeline(const nucleation::VoxelPipeline& pipeline, int32_t min_y, int32_t max_y, std::string_view source_id, std::string_view version) {
+    auto result = nucleation::capi::WorldGenerator_pipeline(pipeline.AsFFI(),
+        min_y,
+        max_y,
+        {source_id.data(), source_id.size()},
+        {version.data(), version.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::WorldGenerator>>(std::unique_ptr<nucleation::WorldGenerator>(nucleation::WorldGenerator::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError> nucleation::WorldGenerator::cellular_sdf(const nucleation::Field& volume, const nucleation::Brush& material, int32_t min_y, int32_t max_y, const nucleation::CellularSdfConfig& config, std::string_view source_id, std::string_view version) {
     auto result = nucleation::capi::WorldGenerator_cellular_sdf(volume.AsFFI(),
         material.AsFFI(),
         min_y,

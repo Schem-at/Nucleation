@@ -776,38 +776,6 @@ class ResultDimensionsNativeInt: Structure(), Structure.ByValue  {
     }
 
 }
-internal class ResultFFIUint16IntUnion: Union() {
-    @JvmField
-    internal var ok: FFIUint16 = FFIUint16()
-    @JvmField
-    internal var err: Int = 0
-}
-
-class ResultFFIUint16Int: Structure(), Structure.ByValue  {
-    @JvmField
-    internal var union: ResultFFIUint16IntUnion = ResultFFIUint16IntUnion()
-
-    @JvmField
-    internal var isOk: Byte = 0
-
-    // Define the fields of the struct
-    override fun getFieldOrder(): List<String> {
-        return listOf("union", "isOk")
-    }
-    internal fun getNativeOk(): FFIUint16? {
-        if (isOk == 1.toByte()) {
-            return union.getTypedValue(FFIUint16::class.java) as FFIUint16
-        }
-        return null
-    }
-    internal fun getNativeErr(): Int? {
-        if (isOk == 0.toByte()) {
-            return union.getTypedValue(Int::class.java) as Int
-        }
-        return null
-    }
-
-}
 internal class ResultFFIUint32IntUnion: Union() {
     @JvmField
     internal var ok: FFIUint32 = FFIUint32()
@@ -893,6 +861,70 @@ class ResultFFIUint8Int: Structure(), Structure.ByValue  {
     internal fun getNativeOk(): FFIUint8? {
         if (isOk == 1.toByte()) {
             return union.getTypedValue(FFIUint8::class.java) as FFIUint8
+        }
+        return null
+    }
+    internal fun getNativeErr(): Int? {
+        if (isOk == 0.toByte()) {
+            return union.getTypedValue(Int::class.java) as Int
+        }
+        return null
+    }
+
+}
+internal class ResultFieldBoundsNativeIntUnion: Union() {
+    @JvmField
+    internal var ok: FieldBoundsNative = FieldBoundsNative()
+    @JvmField
+    internal var err: Int = 0
+}
+
+class ResultFieldBoundsNativeInt: Structure(), Structure.ByValue  {
+    @JvmField
+    internal var union: ResultFieldBoundsNativeIntUnion = ResultFieldBoundsNativeIntUnion()
+
+    @JvmField
+    internal var isOk: Byte = 0
+
+    // Define the fields of the struct
+    override fun getFieldOrder(): List<String> {
+        return listOf("union", "isOk")
+    }
+    internal fun getNativeOk(): FieldBoundsNative? {
+        if (isOk == 1.toByte()) {
+            return union.getTypedValue(FieldBoundsNative::class.java) as FieldBoundsNative
+        }
+        return null
+    }
+    internal fun getNativeErr(): Int? {
+        if (isOk == 0.toByte()) {
+            return union.getTypedValue(Int::class.java) as Int
+        }
+        return null
+    }
+
+}
+internal class ResultFieldNormalNativeIntUnion: Union() {
+    @JvmField
+    internal var ok: FieldNormalNative = FieldNormalNative()
+    @JvmField
+    internal var err: Int = 0
+}
+
+class ResultFieldNormalNativeInt: Structure(), Structure.ByValue  {
+    @JvmField
+    internal var union: ResultFieldNormalNativeIntUnion = ResultFieldNormalNativeIntUnion()
+
+    @JvmField
+    internal var isOk: Byte = 0
+
+    // Define the fields of the struct
+    override fun getFieldOrder(): List<String> {
+        return listOf("union", "isOk")
+    }
+    internal fun getNativeOk(): FieldNormalNative? {
+        if (isOk == 1.toByte()) {
+            return union.getTypedValue(FieldNormalNative::class.java) as FieldNormalNative
         }
         return null
     }
@@ -1085,70 +1117,6 @@ class ResultRegionBoundsNativeInt: Structure(), Structure.ByValue  {
     internal fun getNativeOk(): RegionBoundsNative? {
         if (isOk == 1.toByte()) {
             return union.getTypedValue(RegionBoundsNative::class.java) as RegionBoundsNative
-        }
-        return null
-    }
-    internal fun getNativeErr(): Int? {
-        if (isOk == 0.toByte()) {
-            return union.getTypedValue(Int::class.java) as Int
-        }
-        return null
-    }
-
-}
-internal class ResultSdfBoundsNativeIntUnion: Union() {
-    @JvmField
-    internal var ok: SdfBoundsNative = SdfBoundsNative()
-    @JvmField
-    internal var err: Int = 0
-}
-
-class ResultSdfBoundsNativeInt: Structure(), Structure.ByValue  {
-    @JvmField
-    internal var union: ResultSdfBoundsNativeIntUnion = ResultSdfBoundsNativeIntUnion()
-
-    @JvmField
-    internal var isOk: Byte = 0
-
-    // Define the fields of the struct
-    override fun getFieldOrder(): List<String> {
-        return listOf("union", "isOk")
-    }
-    internal fun getNativeOk(): SdfBoundsNative? {
-        if (isOk == 1.toByte()) {
-            return union.getTypedValue(SdfBoundsNative::class.java) as SdfBoundsNative
-        }
-        return null
-    }
-    internal fun getNativeErr(): Int? {
-        if (isOk == 0.toByte()) {
-            return union.getTypedValue(Int::class.java) as Int
-        }
-        return null
-    }
-
-}
-internal class ResultSdfNormalNativeIntUnion: Union() {
-    @JvmField
-    internal var ok: SdfNormalNative = SdfNormalNative()
-    @JvmField
-    internal var err: Int = 0
-}
-
-class ResultSdfNormalNativeInt: Structure(), Structure.ByValue  {
-    @JvmField
-    internal var union: ResultSdfNormalNativeIntUnion = ResultSdfNormalNativeIntUnion()
-
-    @JvmField
-    internal var isOk: Byte = 0
-
-    // Define the fields of the struct
-    override fun getFieldOrder(): List<String> {
-        return listOf("union", "isOk")
-    }
-    internal fun getNativeOk(): SdfNormalNative? {
-        if (isOk == 1.toByte()) {
-            return union.getTypedValue(SdfNormalNative::class.java) as SdfNormalNative
         }
         return null
     }

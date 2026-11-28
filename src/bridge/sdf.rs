@@ -1,53 +1,147 @@
-//! Typed signed-distance-field graphs plus legacy JSON sampling entry points.
+//! Unified spatial field / SDF DAG, infix expression compiler, composable
+//! materials, and brick-pruned voxelization pipeline for all Diplomat bindings.
 
 #[diplomat::bridge]
 pub mod ffi {
-    use super::super::building::ffi::Shape;
-    use super::super::field::ffi::Field3;
+    use super::super::building::ffi::{Brush, InterpolationSpace, Palette, Shape};
     use super::super::schematic::ffi::Schematic;
     use super::super::shared::ffi::NucleationError;
-    use diplomat_runtime::DiplomatWrite;
+    use diplomat_runtime::{DiplomatStr, DiplomatWrite};
     use std::fmt::Write;
+    use std::sync::Arc;
 
-    /// Axis used by mirror operations.
-    pub enum SdfAxis {
+    /// Axis selector for mirror operations.
+    pub enum FieldAxis {
         X,
         Y,
         Z,
     }
 
-    impl SdfAxis {
+    impl FieldAxis {
         fn to_core(self) -> crate::sdf::Axis {
             match self {
-                SdfAxis::X => crate::sdf::Axis::X,
-                SdfAxis::Y => crate::sdf::Axis::Y,
-                SdfAxis::Z => crate::sdf::Axis::Z,
+                FieldAxis::X => crate::sdf::Axis::X,
+                FieldAxis::Y => crate::sdf::Axis::Y,
+                FieldAxis::Z => crate::sdf::Axis::Z,
             }
         }
     }
 
-    /// Cellular/Worley field output.
-    pub enum SdfCellMode {
+    /// Cellular / Worley noise output mode.
+    pub enum FieldCellMode {
         F1,
         F2,
         F2MinusF1,
         CellValue,
     }
 
-    impl SdfCellMode {
+    impl FieldCellMode {
         fn to_core(self) -> crate::sdf::CellMode {
             match self {
-                SdfCellMode::F1 => crate::sdf::CellMode::F1,
-                SdfCellMode::F2 => crate::sdf::CellMode::F2,
-                SdfCellMode::F2MinusF1 => crate::sdf::CellMode::F2MinusF1,
-                SdfCellMode::CellValue => crate::sdf::CellMode::Value,
+                FieldCellMode::F1 => crate::sdf::CellMode::F1,
+                FieldCellMode::F2 => crate::sdf::CellMode::F2,
+                FieldCellMode::F2MinusF1 => crate::sdf::CellMode::F2MinusF1,
+                FieldCellMode::CellValue => crate::sdf::CellMode::Value,
             }
         }
     }
 
-    /// Continuous bounds of a bounded SDF graph.
+    /// Noise basis for procedural 2D/3D noise and FBM.
+    pub enum FieldNoiseBasis {
+        ValueNoise,
+        Perlin,
+    }
+
+    impl FieldNoiseBasis {
+        fn to_core(self) -> crate::sdf::NoiseBasis {
+            match self {
+                FieldNoiseBasis::ValueNoise => crate::sdf::NoiseBasis::Value,
+                FieldNoiseBasis::Perlin => crate::sdf::NoiseBasis::Perlin,
+            }
+        }
+    }
+
+    /// Distance semantics of a [`Field`].
+    pub enum FieldDistanceKind {
+        Exact,
+        LowerBound,
+        Estimate,
+        Implicit,
+    }
+
+    impl FieldDistanceKind {
+        fn to_core(self) -> crate::sdf::DistanceKind {
+            match self {
+                FieldDistanceKind::Exact => crate::sdf::DistanceKind::Exact,
+                FieldDistanceKind::LowerBound => crate::sdf::DistanceKind::LowerBound,
+                FieldDistanceKind::Estimate => crate::sdf::DistanceKind::Estimate,
+                FieldDistanceKind::Implicit => crate::sdf::DistanceKind::Implicit,
+            }
+        }
+
+        fn from_core(k: crate::sdf::DistanceKind) -> Self {
+            match k {
+                crate::sdf::DistanceKind::Exact => FieldDistanceKind::Exact,
+                crate::sdf::DistanceKind::LowerBound => FieldDistanceKind::LowerBound,
+                crate::sdf::DistanceKind::Estimate => FieldDistanceKind::Estimate,
+                crate::sdf::DistanceKind::Implicit => FieldDistanceKind::Implicit,
+            }
+        }
+    }
+
+    /// Built-in voxel channels readable by material gradients, ramps, and conditions.
+    pub enum FieldChannel {
+        WorldX,
+        WorldY,
+        WorldZ,
+        Distance,
+        DepthBelowSurface,
+        Slope,
+        NormalY,
+        Curvature,
+    }
+
+    impl FieldChannel {
+        fn to_core(self) -> crate::sdf::Channel {
+            match self {
+                FieldChannel::WorldX => crate::sdf::Channel::WorldX,
+                FieldChannel::WorldY => crate::sdf::Channel::WorldY,
+                FieldChannel::WorldZ => crate::sdf::Channel::WorldZ,
+                FieldChannel::Distance => crate::sdf::Channel::Distance,
+                FieldChannel::DepthBelowSurface => crate::sdf::Channel::DepthBelowSurface,
+                FieldChannel::Slope => crate::sdf::Channel::Slope,
+                FieldChannel::NormalY => crate::sdf::Channel::NormalY,
+                FieldChannel::Curvature => crate::sdf::Channel::Curvature,
+            }
+        }
+    }
+
+    /// Face direction for surface scatter rules.
+    pub enum ScatterFace {
+        Top,
+        Bottom,
+        North,
+        South,
+        East,
+        West,
+    }
+
+    impl ScatterFace {
+        fn to_core(self) -> crate::sdf::ScatterFace {
+            match self {
+                ScatterFace::Top => crate::sdf::ScatterFace::Top,
+                ScatterFace::Bottom => crate::sdf::ScatterFace::Bottom,
+                ScatterFace::North => crate::sdf::ScatterFace::North,
+                ScatterFace::South => crate::sdf::ScatterFace::South,
+                ScatterFace::East => crate::sdf::ScatterFace::East,
+                ScatterFace::West => crate::sdf::ScatterFace::West,
+            }
+        }
+    }
+
+    /// Conservative continuous bounds of a bounded [`Field`].
     #[diplomat::out]
-    pub struct SdfBounds {
+    pub struct FieldBounds {
         pub min_x: f32,
         pub min_y: f32,
         pub min_z: f32,
@@ -56,102 +150,108 @@ pub mod ffi {
         pub max_z: f32,
     }
 
-    /// Unit surface normal estimated from the SDF gradient.
+    /// Analytically proven inclusive scalar output range `[min, max]`.
     #[diplomat::out]
-    pub struct SdfNormal {
+    pub struct FieldRange {
+        pub min: f32,
+        pub max: f32,
+    }
+
+    /// Unit surface normal estimated from the field gradient.
+    #[diplomat::out]
+    pub struct FieldNormal {
         pub x: f32,
         pub y: f32,
         pub z: f32,
     }
 
-    /// An immutable, composable signed-distance-field expression graph.
+    /// Distance plus propagated CSG material tag and smooth seam blend weight.
+    #[diplomat::out]
+    pub struct FieldSample {
+        pub distance: f32,
+        pub material_id: u16,
+        pub blend_material_id: u16,
+        pub blend_weight: f32,
+    }
+
+    /// Unified immutable spatial field / SDF DAG node.
     ///
-    /// Primitive constructors and every combinator return a new graph, so values
-    /// can be shared safely between Flow nodes and across Kotlin/Java, JavaScript,
-    /// and Python bindings. JSON is retained only for explicit import/export and
-    /// the legacy sampling helpers.
+    /// Primitives, CSG (hard, smooth, chamfer, stepped), transforms, domain
+    /// warps, procedural noise, arbitrary math, material tags, and sandboxed
+    /// infix expressions all compose freely and share storage across consumers.
     #[diplomat::opaque]
-    pub struct Sdf(pub(crate) crate::sdf::SdfNode);
+    pub struct Field(pub(crate) crate::sdf::Field);
 
-    impl Sdf {
-        // ── Typed primitives ──────────────────────────────────────────────
+    impl Field {
+        // ── Coordinates & Constants ───────────────────────────────────────
 
-        pub fn sphere(radius: f32) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[radius])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Sphere { radius })))
+        pub fn constant(value: f32) -> Result<Box<Field>, NucleationError> {
+            crate::sdf::Field::constant(value)
+                .map(|f| Box::new(Field(f)))
+                .map_err(map_field_error)
         }
 
-        /// Axis-aligned rounded box, centered at the origin.
+        pub fn coord_x() -> Box<Field> {
+            Box::new(Field(crate::sdf::Field::x()))
+        }
+
+        pub fn coord_y() -> Box<Field> {
+            Box::new(Field(crate::sdf::Field::y()))
+        }
+
+        pub fn coord_z() -> Box<Field> {
+            Box::new(Field(crate::sdf::Field::z()))
+        }
+
+        // ── Primitives ────────────────────────────────────────────────────
+
+        pub fn sphere(radius: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::sphere(radius))
+        }
+
         pub fn box_shape(
             half_x: f32,
             half_y: f32,
             half_z: f32,
             rounding: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[half_x, half_y, half_z])?;
-            non_negative(&[rounding])?;
-            if rounding > half_x.min(half_y).min(half_z) {
-                return Err(NucleationError::InvalidArgument);
-            }
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Box {
-                half_extents: [half_x, half_y, half_z],
-                rounding,
-            })))
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::box_shape([half_x, half_y, half_z], rounding))
         }
 
         pub fn ellipsoid(
             radius_x: f32,
             radius_y: f32,
             radius_z: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[radius_x, radius_y, radius_z])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Ellipsoid {
-                radii: [radius_x, radius_y, radius_z],
-            })))
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::ellipsoid([radius_x, radius_y, radius_z]))
         }
 
-        pub fn torus(major_radius: f32, minor_radius: f32) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[major_radius, minor_radius])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Torus {
-                major_radius,
-                minor_radius,
-            })))
+        pub fn torus(major_radius: f32, minor_radius: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::torus(major_radius, minor_radius))
         }
 
-        /// Torus ring cut down to an arc. `cap_angle_degrees` is the half-aperture
-        /// in `(0, 180]`, measured from +X and mirrored across X; `180` is a full
-        /// torus.
         pub fn capped_torus(
             major_radius: f32,
             minor_radius: f32,
             cap_angle_degrees: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[major_radius, minor_radius])?;
-            finite(&[cap_angle_degrees])?;
-            if cap_angle_degrees <= 0.0 || cap_angle_degrees > 180.0 {
-                return Err(NucleationError::InvalidArgument);
-            }
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::CappedTorus {
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::capped_torus(
                 major_radius,
                 minor_radius,
-                cap_angle: cap_angle_degrees,
-            })))
+                cap_angle_degrees,
+            ))
         }
 
-        /// Chain-link shape: a torus stretched along Z by `half_length` and
-        /// capped by two half-tori. `half_length: 0` is a plain torus.
         pub fn link(
             major_radius: f32,
             minor_radius: f32,
             half_length: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[major_radius, minor_radius])?;
-            non_negative(&[half_length])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Link {
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::link(
                 major_radius,
                 minor_radius,
                 half_length,
-            })))
+            ))
         }
 
         #[allow(clippy::too_many_arguments)]
@@ -163,18 +263,10 @@ pub mod ffi {
             by: f32,
             bz: f32,
             radius: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            finite(&[ax, ay, az, bx, by, bz])?;
-            positive(&[radius])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Capsule {
-                a: [ax, ay, az],
-                b: [bx, by, bz],
-                radius,
-            })))
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::capsule([ax, ay, az], [bx, by, bz], radius))
         }
 
-        /// Convex hull of two spheres: a capsule with a linear taper between
-        /// `r1` (at `a`) and `r2` (at `b`) instead of one constant radius.
         #[allow(clippy::too_many_arguments)]
         pub fn round_cone(
             ax: f32,
@@ -185,100 +277,54 @@ pub mod ffi {
             bz: f32,
             r1: f32,
             r2: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            finite(&[ax, ay, az, bx, by, bz])?;
-            positive(&[r1, r2])?;
-            if ax == bx && ay == by && az == bz {
-                return Err(NucleationError::InvalidArgument);
-            }
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::RoundCone {
-                a: [ax, ay, az],
-                b: [bx, by, bz],
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::round_cone(
+                [ax, ay, az],
+                [bx, by, bz],
                 r1,
                 r2,
-            })))
+            ))
         }
 
-        /// Sphere of `radius` intersected with an infinite cone of
-        /// half-aperture `angle_degrees` (in `(0, 180)`) from the +Y axis,
-        /// apex at the origin.
-        pub fn solid_angle(radius: f32, angle_degrees: f32) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[radius])?;
-            finite(&[angle_degrees])?;
-            if angle_degrees <= 0.0 || angle_degrees >= 180.0 {
-                return Err(NucleationError::InvalidArgument);
-            }
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::SolidAngle {
-                radius,
-                angle: angle_degrees,
-            })))
+        pub fn solid_angle(radius: f32, angle_degrees: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::solid_angle(radius, angle_degrees))
         }
 
-        /// Sphere cut by the plane `y = height`, keeping the cap above it
-        /// (a dome). `height` must be strictly between `-radius` and
-        /// `radius`.
-        pub fn cut_sphere(radius: f32, height: f32) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[radius])?;
-            finite(&[height])?;
-            if height <= -radius || height >= radius {
-                return Err(NucleationError::InvalidArgument);
-            }
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::CutSphere {
-                radius,
-                height,
-            })))
+        pub fn cut_sphere(radius: f32, height: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::cut_sphere(radius, height))
         }
 
-        /// Open (hollow) shell of `cut_sphere`'s dome: just the spherical
-        /// cap surface, offset by `thickness`, with no flat floor.
         pub fn cut_hollow_sphere(
             radius: f32,
             height: f32,
             thickness: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[radius, thickness])?;
-            finite(&[height])?;
-            if height <= -radius || height >= radius {
-                return Err(NucleationError::InvalidArgument);
-            }
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::CutHollowSphere {
-                radius,
-                height,
-                thickness,
-            })))
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::cut_hollow_sphere(
+                radius, height, thickness,
+            ))
         }
 
-        pub fn capped_cylinder(radius: f32, half_height: f32) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[radius, half_height])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::CappedCylinder {
-                radius,
-                half_height,
-            })))
+        pub fn capped_cylinder(
+            radius: f32,
+            half_height: f32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::capped_cylinder(radius, half_height))
         }
 
-        /// Exact Y-axis cylinder with infinite extent. Sampling requires explicit bounds.
-        pub fn infinite_cylinder(radius: f32) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[radius])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::InfiniteCylinder {
-                radius,
-            })))
+        pub fn infinite_cylinder(radius: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::infinite_cylinder(radius))
         }
 
         pub fn capped_cone(
             half_height: f32,
             bottom_radius: f32,
             top_radius: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[half_height])?;
-            non_negative(&[bottom_radius, top_radius])?;
-            if bottom_radius == 0.0 && top_radius == 0.0 {
-                return Err(NucleationError::InvalidArgument);
-            }
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::CappedCone {
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::capped_cone(
                 half_height,
-                r1: bottom_radius,
-                r2: top_radius,
-            })))
+                bottom_radius,
+                top_radius,
+            ))
         }
 
         pub fn plane(
@@ -286,34 +332,19 @@ pub mod ffi {
             normal_y: f32,
             normal_z: f32,
             offset: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            finite(&[normal_x, normal_y, normal_z, offset])?;
-            let length =
-                ((normal_x as f64).powi(2) + (normal_y as f64).powi(2) + (normal_z as f64).powi(2))
-                    .sqrt();
-            if !length.is_finite() || length <= f64::from(f32::EPSILON) {
-                return Err(NucleationError::InvalidArgument);
-            }
-            let normal = [
-                (f64::from(normal_x) / length) as f32,
-                (f64::from(normal_y) / length) as f32,
-                (f64::from(normal_z) / length) as f32,
-            ];
-            finite(&normal)?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Plane { normal, offset })))
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::plane(
+                [normal_x, normal_y, normal_z],
+                offset,
+            ))
         }
 
-        pub fn octahedron(size: f32) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[size])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Octahedron { size })))
+        pub fn octahedron(size: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::octahedron(size))
         }
 
-        pub fn hex_prism(radius: f32, half_height: f32) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[radius, half_height])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::HexPrism {
-                radius,
-                half_height,
-            })))
+        pub fn hex_prism(radius: f32, half_height: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::hex_prism(radius, half_height))
         }
 
         pub fn super_prism(
@@ -321,188 +352,349 @@ pub mod ffi {
             half_y: f32,
             half_z: f32,
             exponent: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[half_x, half_y, half_z, exponent])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::SuperPrism {
-                half_extents: [half_x, half_y, half_z],
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::super_prism(
+                [half_x, half_y, half_z],
                 exponent,
-            })))
+            ))
         }
 
-        /// Hollow wireframe box: only the 12 edge beams are solid.
         pub fn box_frame(
             half_x: f32,
             half_y: f32,
             half_z: f32,
             thickness: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[half_x, half_y, half_z])?;
-            non_negative(&[thickness])?;
-            if thickness > half_x.min(half_y).min(half_z) {
-                return Err(NucleationError::InvalidArgument);
-            }
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::BoxFrame {
-                half_extents: [half_x, half_y, half_z],
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::box_frame(
+                [half_x, half_y, half_z],
                 thickness,
-            })))
+            ))
         }
 
-        /// Exact but unbounded Y-axis infinite cone: apex at the origin,
-        /// single nappe opening along +Y, half-aperture `angle_degrees`
-        /// strictly in `(0, 90)`.
-        pub fn infinite_cone(angle_degrees: f32) -> Result<Box<Sdf>, NucleationError> {
-            finite(&[angle_degrees])?;
-            if angle_degrees <= 0.0 || angle_degrees >= 90.0 {
-                return Err(NucleationError::InvalidArgument);
-            }
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::InfiniteCone {
-                angle: angle_degrees,
-            })))
+        pub fn infinite_cone(angle_degrees: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::infinite_cone(angle_degrees))
         }
 
-        /// Square-base pyramid, vertically centered: base (half-extent
-        /// `half_base`) at `y = -height/2`, apex at `y = height/2`. `height`
-        /// must be at least the smallest positive normal `f32`.
-        pub fn square_pyramid(half_base: f32, height: f32) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[half_base, height])?;
-            if height < f32::MIN_POSITIVE {
-                return Err(NucleationError::InvalidArgument);
-            }
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::SquarePyramid {
-                half_base,
-                height,
-            })))
+        pub fn square_pyramid(half_base: f32, height: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::square_pyramid(half_base, height))
+        }
+
+        /// Heightmap terrain surface: solid where `y <= base_y + height(x, 0, z)`.
+        pub fn heightmap(base_y: f32, height: &Field) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::heightmap(base_y, height.0.clone()))
+        }
+
+        // ── Procedural Noise & Cellular ───────────────────────────────────
+
+        pub fn value_noise2(frequency: f32, seed: i32) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::value_noise2(frequency, seed))
+        }
+
+        pub fn value_noise3(frequency: f32, seed: i32) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::value_noise3(frequency, seed))
+        }
+
+        pub fn perlin2(frequency: f32, seed: i32) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::perlin2(frequency, seed))
+        }
+
+        pub fn perlin3(frequency: f32, seed: i32) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::perlin3(frequency, seed))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub fn fbm2(
+            basis: FieldNoiseBasis,
+            frequency: f32,
+            seed: i32,
+            octaves: u32,
+            lacunarity: f32,
+            gain: f32,
+            ridged: bool,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::fbm2(
+                basis.to_core(),
+                frequency,
+                seed,
+                octaves,
+                lacunarity,
+                gain,
+                ridged,
+            ))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub fn fbm3(
+            basis: FieldNoiseBasis,
+            frequency: f32,
+            seed: i32,
+            octaves: u32,
+            lacunarity: f32,
+            gain: f32,
+            ridged: bool,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::fbm3(
+                basis.to_core(),
+                frequency,
+                seed,
+                octaves,
+                lacunarity,
+                gain,
+                ridged,
+            ))
+        }
+
+        pub fn value_fbm3(
+            frequency: f32,
+            seed: i32,
+            octaves: u32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::value_fbm3(frequency, seed, octaves))
+        }
+
+        pub fn perlin_fbm3(
+            frequency: f32,
+            seed: i32,
+            octaves: u32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::perlin_fbm3(frequency, seed, octaves))
+        }
+
+        pub fn ridged_fbm3(
+            frequency: f32,
+            seed: i32,
+            octaves: u32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::ridged_fbm3(frequency, seed, octaves))
+        }
+
+        pub fn perlin_fbm2(
+            frequency: f32,
+            seed: i32,
+            octaves: u32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::perlin_fbm2(frequency, seed, octaves))
         }
 
         pub fn cells(
             frequency: f32,
             seed: i32,
             jitter: f32,
-            mode: SdfCellMode,
+            mode: FieldCellMode,
             threshold: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[frequency])?;
-            non_negative(&[jitter])?;
-            finite(&[threshold])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Cells {
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(crate::sdf::Field::cells(
                 frequency,
                 seed,
                 jitter,
-                mode: mode.to_core(),
+                mode.to_core(),
                 threshold,
-            })))
+            ))
         }
 
-        // ── Immutable composition ─────────────────────────────────────────
+        // ── Scalar Math & Combinators ─────────────────────────────────────
 
-        pub fn union_with(&self, other: &Sdf) -> Box<Sdf> {
-            Box::new(Sdf(crate::sdf::SdfNode::Union {
-                children: vec![self.0.clone(), other.0.clone()],
-            }))
+        pub fn neg(&self) -> Box<Field> {
+            Box::new(Field(self.0.neg()))
         }
 
-        pub fn intersection_with(&self, other: &Sdf) -> Box<Sdf> {
-            Box::new(Sdf(crate::sdf::SdfNode::Intersect {
-                children: vec![self.0.clone(), other.0.clone()],
-            }))
+        pub fn abs(&self) -> Box<Field> {
+            Box::new(Field(self.0.abs()))
         }
 
-        pub fn subtract(&self, other: &Sdf) -> Box<Sdf> {
-            Box::new(Sdf(crate::sdf::SdfNode::Subtract {
-                a: Box::new(self.0.clone()),
-                b: Box::new(other.0.clone()),
-            }))
+        pub fn sqrt(&self) -> Box<Field> {
+            Box::new(Field(self.0.sqrt()))
         }
 
-        pub fn smooth_union(&self, other: &Sdf, radius: f32) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[radius])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::SmoothUnion {
-                a: Box::new(self.0.clone()),
-                b: Box::new(other.0.clone()),
-                k: radius,
-            })))
+        pub fn sin(&self) -> Box<Field> {
+            Box::new(Field(self.0.sin()))
+        }
+
+        pub fn cos(&self) -> Box<Field> {
+            Box::new(Field(self.0.cos()))
+        }
+
+        pub fn saturate(&self) -> Box<Field> {
+            Box::new(Field(self.0.saturate()))
+        }
+
+        pub fn add(&self, other: &Field) -> Box<Field> {
+            Box::new(Field(self.0.add(&other.0)))
+        }
+
+        pub fn sub(&self, other: &Field) -> Box<Field> {
+            Box::new(Field(self.0.sub(&other.0)))
+        }
+
+        pub fn mul(&self, other: &Field) -> Box<Field> {
+            Box::new(Field(self.0.mul(&other.0)))
+        }
+
+        pub fn div(&self, other: &Field) -> Box<Field> {
+            Box::new(Field(self.0.div(&other.0)))
+        }
+
+        pub fn min_with(&self, other: &Field) -> Box<Field> {
+            Box::new(Field(self.0.min_with(&other.0)))
+        }
+
+        pub fn max_with(&self, other: &Field) -> Box<Field> {
+            Box::new(Field(self.0.max_with(&other.0)))
+        }
+
+        pub fn add_const(&self, value: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.add_const(value))
+        }
+
+        pub fn mul_const(&self, value: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.mul_const(value))
+        }
+
+        pub fn clamp(&self, lo: f32, hi: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.clamp(lo, hi))
+        }
+
+        pub fn smoothstep(&self, edge0: f32, edge1: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.smoothstep(edge0, edge1))
+        }
+
+        pub fn step(&self, edge: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.step(edge))
+        }
+
+        pub fn remap(
+            &self,
+            in_lo: f32,
+            in_hi: f32,
+            out_lo: f32,
+            out_hi: f32,
+            clamp: bool,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.remap(in_lo, in_hi, out_lo, out_hi, clamp))
+        }
+
+        pub fn lerp_with(&self, other: &Field, t: &Field) -> Box<Field> {
+            Box::new(Field(self.0.lerp(&other.0, &t.0)))
+        }
+
+        pub fn select(cond: &Field, then_field: &Field, else_field: &Field) -> Box<Field> {
+            Box::new(Field(crate::sdf::Field::select(
+                &cond.0,
+                &then_field.0,
+                &else_field.0,
+            )))
+        }
+
+        // ── CSG & Surface Modifiers ───────────────────────────────────────
+
+        pub fn union_with(&self, other: &Field) -> Box<Field> {
+            Box::new(Field(self.0.union(&other.0)))
+        }
+
+        pub fn intersection_with(&self, other: &Field) -> Box<Field> {
+            Box::new(Field(self.0.intersect(&other.0)))
+        }
+
+        pub fn subtract(&self, other: &Field) -> Box<Field> {
+            Box::new(Field(self.0.subtract(&other.0)))
+        }
+
+        pub fn xor_with(&self, other: &Field) -> Box<Field> {
+            Box::new(Field(self.0.xor(&other.0)))
+        }
+
+        pub fn smooth_union(
+            &self,
+            other: &Field,
+            radius: f32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.smooth_union(&other.0, radius))
         }
 
         pub fn smooth_subtract(
             &self,
-            other: &Sdf,
+            other: &Field,
             radius: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[radius])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::SmoothSubtract {
-                a: Box::new(self.0.clone()),
-                b: Box::new(other.0.clone()),
-                k: radius,
-            })))
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.smooth_subtract(&other.0, radius))
         }
 
         pub fn smooth_intersection(
             &self,
-            other: &Sdf,
+            other: &Field,
             radius: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[radius])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::SmoothIntersect {
-                a: Box::new(self.0.clone()),
-                b: Box::new(other.0.clone()),
-                k: radius,
-            })))
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.smooth_intersect(&other.0, radius))
         }
 
-        pub fn rounded(&self, radius: f32) -> Result<Box<Sdf>, NucleationError> {
-            non_negative(&[radius])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Round {
-                child: Box::new(self.0.clone()),
-                radius,
-            })))
+        pub fn chamfer_union(
+            &self,
+            other: &Field,
+            radius: f32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.chamfer_union(&other.0, radius))
         }
 
-        pub fn shell(&self, thickness: f32) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[thickness])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Shell {
-                child: Box::new(self.0.clone()),
-                thickness,
-            })))
+        pub fn chamfer_subtract(
+            &self,
+            other: &Field,
+            radius: f32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.chamfer_subtract(&other.0, radius))
         }
 
-        /// Symmetric difference (XOR): solid where exactly one of `self`/
-        /// `other` is solid.
-        pub fn xor_with(&self, other: &Sdf) -> Box<Sdf> {
-            Box::new(Sdf(crate::sdf::SdfNode::Xor {
-                a: Box::new(self.0.clone()),
-                b: Box::new(other.0.clone()),
-            }))
+        pub fn chamfer_intersection(
+            &self,
+            other: &Field,
+            radius: f32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.chamfer_intersect(&other.0, radius))
         }
 
-        /// Stretches this graph with IQ's origin-centered `opElongate` fold.
-        /// Exactness requires a suitable origin-centered, reflection-symmetric
-        /// child; off-center/asymmetric children are mirrored and produce only
-        /// an estimate. Half-lengths must be finite and non-negative, with at
-        /// least one strictly positive.
+        pub fn steps_union(
+            &self,
+            other: &Field,
+            radius: f32,
+            steps: f32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.steps_union(&other.0, radius, steps))
+        }
+
+        pub fn rounded(&self, radius: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.round(radius))
+        }
+
+        pub fn shell(&self, thickness: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.shell(thickness))
+        }
+
         pub fn elongate(
             &self,
             half_x: f32,
             half_y: f32,
             half_z: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            non_negative(&[half_x, half_y, half_z])?;
-            if half_x <= 0.0 && half_y <= 0.0 && half_z <= 0.0 {
-                return Err(NucleationError::InvalidArgument);
-            }
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Elongate {
-                child: Box::new(self.0.clone()),
-                half_lengths: [half_x, half_y, half_z],
-            })))
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.elongate([half_x, half_y, half_z]))
         }
 
-        // ── Immutable transforms and modifiers ────────────────────────────
+        pub fn displace(&self, offset: &Field, amplitude: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.displace(&offset.0, amplitude))
+        }
 
-        pub fn translate(&self, x: f32, y: f32, z: f32) -> Result<Box<Sdf>, NucleationError> {
-            finite(&[x, y, z])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Translate {
-                child: Box::new(self.0.clone()),
-                offset: [x, y, z],
-            })))
+        pub fn displace_noise(
+            &self,
+            amplitude: f32,
+            frequency: f32,
+            seed: i32,
+            octaves: u32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.displace_noise(amplitude, frequency, seed, octaves))
+        }
+
+        // ── Domain Transforms & Space Warps ───────────────────────────────
+
+        pub fn translate(&self, x: f32, y: f32, z: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.translate([x, y, z]))
         }
 
         pub fn rotate(
@@ -510,49 +702,30 @@ pub mod ffi {
             x_degrees: f32,
             y_degrees: f32,
             z_degrees: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            finite(&[x_degrees, y_degrees, z_degrees])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Rotate {
-                child: Box::new(self.0.clone()),
-                angles: [x_degrees, y_degrees, z_degrees],
-            })))
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.rotate([x_degrees, y_degrees, z_degrees]))
         }
 
-        pub fn scale(&self, factor: f32) -> Result<Box<Sdf>, NucleationError> {
-            positive(&[factor])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Scale {
-                child: Box::new(self.0.clone()),
-                factor,
-            })))
+        pub fn scale(&self, factor: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.scale(factor))
         }
 
-        pub fn mirror(&self, axis: SdfAxis) -> Box<Sdf> {
-            Box::new(Sdf(crate::sdf::SdfNode::Mirror {
-                child: Box::new(self.0.clone()),
-                axis: axis.to_core(),
-            }))
+        pub fn scale_xyz(&self, sx: f32, sy: f32, sz: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.scale_xyz([sx, sy, sz]))
         }
 
-        /// Twists this graph about the Y axis by `amount` radians per unit
-        /// Y (IQ's `opTwist`). *Distorted*: not guaranteed exact even when
-        /// `self` is.
-        pub fn twist(&self, amount: f32) -> Result<Box<Sdf>, NucleationError> {
-            finite(&[amount])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Twist {
-                child: Box::new(self.0.clone()),
-                amount,
-            })))
+        pub fn mirror(&self, axis: FieldAxis) -> Box<Field> {
+            Box::new(Field(self.0.mirror(axis.to_core())))
         }
 
-        /// Cheaply bends this graph by `amount` radians per unit X (IQ's
-        /// `opCheapBend`). *Distorted*: not guaranteed exact even when
-        /// `self` is.
-        pub fn bend(&self, amount: f32) -> Result<Box<Sdf>, NucleationError> {
-            finite(&[amount])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Bend {
-                child: Box::new(self.0.clone()),
-                amount,
-            })))
+        pub fn mirror_plane(
+            &self,
+            nx: f32,
+            ny: f32,
+            nz: f32,
+            offset: f32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.mirror_plane([nx, ny, nz], offset))
         }
 
         pub fn repeat_infinite(
@@ -560,8 +733,8 @@ pub mod ffi {
             spacing_x: f32,
             spacing_y: f32,
             spacing_z: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            repeat(self, spacing_x, spacing_y, spacing_z, None)
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.repeat_infinite([spacing_x, spacing_y, spacing_z]))
         }
 
         #[allow(clippy::too_many_arguments)]
@@ -573,89 +746,98 @@ pub mod ffi {
             count_x: u32,
             count_y: u32,
             count_z: u32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            repeat(
-                self,
-                spacing_x,
-                spacing_y,
-                spacing_z,
-                Some([count_x, count_y, count_z]),
-            )
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.repeat_counted(
+                [spacing_x, spacing_y, spacing_z],
+                [count_x, count_y, count_z],
+            ))
         }
 
-        /// Finite rigid instances of this graph at arbitrary XYZ offsets.
-        /// `offsets` is flat `[x0, y0, z0, x1, y1, z1, ...]` and may contain
-        /// at most 4096 points.
-        pub fn repeat_points(&self, offsets: &[f32]) -> Result<Box<Sdf>, NucleationError> {
-            if offsets.is_empty() || offsets.len() % 3 != 0 || offsets.len() > 4096 * 3 {
+        pub fn repeat_polar(&self, count: u32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.repeat_polar(count))
+        }
+
+        pub fn repeat_points(&self, offsets: &[f32]) -> Result<Box<Field>, NucleationError> {
+            if offsets.is_empty() || offsets.len() % 3 != 0 {
                 return Err(NucleationError::InvalidArgument);
             }
-            finite(offsets)?;
-            let offsets = offsets
+            let pts: Vec<[f32; 3]> = offsets
                 .chunks_exact(3)
-                .map(|p| [p[0], p[1], p[2]])
+                .map(|c| [c[0], c[1], c[2]])
                 .collect();
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::RepeatPoints {
-                child: Box::new(self.0.clone()),
-                offsets,
-            })))
+            wrap(self.0.repeat_points(pts))
         }
 
-        pub fn displace(
+        pub fn twist(&self, amount: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.twist(amount))
+        }
+
+        pub fn bend(&self, amount: f32) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.bend(amount))
+        }
+
+        pub fn warp(
+            &self,
+            warp_x: &Field,
+            warp_y: &Field,
+            warp_z: &Field,
+            amplitude: f32,
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.warp(&warp_x.0, &warp_y.0, &warp_z.0, amplitude))
+        }
+
+        pub fn warp_noise(
             &self,
             amplitude: f32,
             frequency: f32,
             seed: i32,
             octaves: u32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            non_negative(&[amplitude])?;
-            positive(&[frequency])?;
-            if !(1..=8).contains(&octaves) {
-                return Err(NucleationError::InvalidArgument);
-            }
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Displace {
-                child: Box::new(self.0.clone()),
-                amplitude,
-                frequency,
-                seed,
-                octaves,
-            })))
+        ) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.warp_noise(amplitude, frequency, seed, octaves))
         }
 
-        /// Offset this surface by a reusable scalar field. The resulting zero
-        /// set is generally an approximate field, not an exact distance field.
-        pub fn offset_by_field(
+        // ── Tagging, Bounds & Inline Expressions ──────────────────────────
+
+        pub fn tag(&self, material_id: u16) -> Result<Box<Field>, NucleationError> {
+            wrap(self.0.tag(material_id))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub fn bounded(
             &self,
-            field: &Field3,
-            amplitude: f32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            self.0
-                .clone()
-                .offset_by_field(field.0.clone(), amplitude)
-                .map(|node| Box::new(Sdf(node)))
-                .map_err(|_| NucleationError::InvalidArgument)
+            min_x: f32,
+            min_y: f32,
+            min_z: f32,
+            max_x: f32,
+            max_y: f32,
+            max_z: f32,
+        ) -> Result<Box<Field>, NucleationError> {
+            let aabb = crate::sdf::Aabb::new([min_x, min_y, min_z], [max_x, max_y, max_z])
+                .map_err(map_field_error)?;
+            wrap(self.0.bounded(aabb))
         }
 
-        pub fn warp(
-            &self,
-            amplitude: f32,
-            frequency: f32,
-            seed: i32,
-        ) -> Result<Box<Sdf>, NucleationError> {
-            non_negative(&[amplitude])?;
-            positive(&[frequency])?;
-            Ok(Box::new(Sdf(crate::sdf::SdfNode::Warp {
-                child: Box::new(self.0.clone()),
-                amplitude,
-                frequency,
-                seed,
-            })))
+        /// Parse a sandboxed infix expression (supports `x, y, z, p`, math,
+        /// noise, primitives, `let`, `if/else`, and bounded `for` loops).
+        pub fn expr(source: &DiplomatStr) -> Result<Box<Field>, NucleationError> {
+            let src = std::str::from_utf8(source).map_err(|_| NucleationError::InvalidArgument)?;
+            wrap(crate::sdf::Field::expr(src))
         }
 
-        // ── Evaluation, conversion, and explicit serialization ────────────
+        // ── Evaluation, Inspection, Conversion & Serialization ────────────
 
         pub fn eval_at(&self, x: f32, y: f32, z: f32) -> f32 {
             self.0.eval(x, y, z)
+        }
+
+        pub fn sample_tagged(&self, x: f32, y: f32, z: f32) -> FieldSample {
+            let s = self.0.compile().eval_tagged(x, y, z);
+            FieldSample {
+                distance: s.distance,
+                material_id: s.material_id,
+                blend_material_id: s.blend_material_id,
+                blend_weight: s.blend_weight,
+            }
         }
 
         pub fn normal(
@@ -664,37 +846,46 @@ pub mod ffi {
             y: f32,
             z: f32,
             epsilon: f32,
-        ) -> Result<SdfNormal, NucleationError> {
-            finite(&[x, y, z])?;
-            positive(&[epsilon])?;
-            let [nx, ny, nz] = crate::sdf::numerical_normal(&self.0, [x, y, z], epsilon)
+        ) -> Result<FieldNormal, NucleationError> {
+            let [nx, ny, nz] = self
+                .0
+                .normal(x, y, z, epsilon)
                 .ok_or(NucleationError::InvalidArgument)?;
-            Ok(SdfNormal {
-                x: nx as f32,
-                y: ny as f32,
-                z: nz as f32,
+            Ok(FieldNormal {
+                x: nx,
+                y: ny,
+                z: nz,
             })
         }
 
-        /// Conservative finite bounds, or `NotFound` for an unbounded graph
-        /// (a bare `plane` or `infinite_cylinder` has no finite extent).
-        pub fn bounds(&self) -> Result<SdfBounds, NucleationError> {
+        pub fn bounds(&self) -> Result<FieldBounds, NucleationError> {
             self.0
                 .bounds()
-                .map(|bounds| SdfBounds {
-                    min_x: bounds.min[0],
-                    min_y: bounds.min[1],
-                    min_z: bounds.min[2],
-                    max_x: bounds.max[0],
-                    max_y: bounds.max[1],
-                    max_z: bounds.max[2],
+                .map(|b| FieldBounds {
+                    min_x: b.min[0],
+                    min_y: b.min[1],
+                    min_z: b.min[2],
+                    max_x: b.max[0],
+                    max_y: b.max[1],
+                    max_z: b.max[2],
                 })
                 .ok_or(NucleationError::NotFound)
         }
 
+        pub fn output_range(&self) -> Result<FieldRange, NucleationError> {
+            self.0
+                .output_range()
+                .map(|r| FieldRange { min: r[0], max: r[1] })
+                .ok_or(NucleationError::NotFound)
+        }
+
+        pub fn distance_kind(&self) -> FieldDistanceKind {
+            FieldDistanceKind::from_core(self.0.distance_kind())
+        }
+
         pub fn to_shape(&self) -> Result<Box<Shape>, NucleationError> {
             crate::building::SdfShape::new(self.0.clone())
-                .map(|shape| Box::new(Shape(crate::building::ShapeEnum::Sdf(shape))))
+                .map(|s| Box::new(Shape(crate::building::ShapeEnum::Sdf(s))))
                 .ok_or(NucleationError::InvalidArgument)
         }
 
@@ -708,239 +899,18 @@ pub mod ffi {
             max_y: i32,
             max_z: i32,
         ) -> Result<Box<Shape>, NucleationError> {
-            let shape = crate::building::SdfShape::with_bounds(
+            crate::building::SdfShape::with_bounds(
                 self.0.clone(),
                 (min_x, min_y, min_z),
                 (max_x, max_y, max_z),
             )
-            .ok_or(NucleationError::InvalidArgument)?;
-            Ok(Box::new(Shape(crate::building::ShapeEnum::Sdf(shape))))
+            .map(|s| Box::new(Shape(crate::building::ShapeEnum::Sdf(s))))
+            .ok_or(NucleationError::InvalidArgument)
         }
 
-        pub fn from_json_string(json: &DiplomatStr) -> Result<Box<Sdf>, NucleationError> {
-            let json = std::str::from_utf8(json).map_err(|_| NucleationError::InvalidArgument)?;
-            crate::sdf::SdfNode::from_json(json)
-                .map(|node| Box::new(Sdf(node)))
-                .map_err(|_| NucleationError::Parse)
-        }
-
-        pub fn to_json(&self, write: &mut DiplomatWrite) -> Result<(), NucleationError> {
-            let json = self.0.to_json().map_err(|_| NucleationError::Serialize)?;
-            let _ = write!(write, "{json}");
-            Ok(())
-        }
-
-        /// Wrap a validated [`FieldProgram`] as an `Sdf` graph (cloning it,
-        /// with its own explicit bounds and distance-kind metadata), so it
-        /// composes with every other combinator.
-        pub fn from_program(program: &FieldProgram) -> Box<Sdf> {
-            Box::new(Sdf(crate::sdf::SdfNode::Program {
-                program: Box::new(program.0.clone()),
-            }))
-        }
-
-        // ── Legacy JSON-first API ─────────────────────────────────────────
-
-        /// Legacy JSON-first terrain helper. Prefer typed constructors and
-        /// `to_shape()` with `BuildingTool.fill()` for new code.
-        pub fn schematic_from_sdf_auto(
-            sdf_json: &DiplomatStr,
-            rules_json: &DiplomatStr,
-        ) -> Result<Box<Schematic>, NucleationError> {
-            Self::schematic_from_sdf(sdf_json, rules_json, false, 0, 0, 0, 0, 0, 0)
-        }
-
-        /// Legacy JSON-first terrain helper with optional explicit bounds.
-        #[allow(clippy::too_many_arguments)]
-        pub fn schematic_from_sdf(
-            sdf_json: &DiplomatStr,
-            rules_json: &DiplomatStr,
-            has_bounds: bool,
-            min_x: i32,
-            min_y: i32,
-            min_z: i32,
-            max_x: i32,
-            max_y: i32,
-            max_z: i32,
-        ) -> Result<Box<Schematic>, NucleationError> {
-            let sdf_str =
-                std::str::from_utf8(sdf_json).map_err(|_| NucleationError::InvalidArgument)?;
-            let rules_str =
-                std::str::from_utf8(rules_json).map_err(|_| NucleationError::InvalidArgument)?;
-            let node =
-                crate::sdf::SdfNode::from_json(sdf_str).map_err(|_| NucleationError::Parse)?;
-            let rules = crate::sdf::MaterialRules::from_json(rules_str)
-                .map_err(|_| NucleationError::Parse)?;
-            let bounds = if has_bounds {
-                Some(crate::sdf::SampleBounds {
-                    min: [min_x, min_y, min_z],
-                    max: [max_x, max_y, max_z],
-                })
-            } else {
-                None
-            };
-            crate::sdf::sample_to_schematic(&node, &rules, bounds, "sdf")
-                .map(|schematic| Box::new(Schematic(schematic)))
-                .map_err(|_| NucleationError::InvalidArgument)
-        }
-
-        /// Legacy JSON-first evaluator. Prefer `Sdf.from_json_string(...).eval_at(...)`.
-        pub fn eval(
-            sdf_json: &DiplomatStr,
-            x: f32,
-            y: f32,
-            z: f32,
-        ) -> Result<f32, NucleationError> {
-            let sdf_str =
-                std::str::from_utf8(sdf_json).map_err(|_| NucleationError::InvalidArgument)?;
-            let node =
-                crate::sdf::SdfNode::from_json(sdf_str).map_err(|_| NucleationError::Parse)?;
-            Ok(node.eval(x, y, z))
-        }
-    }
-
-    // ── Portable custom field programs ─────────────────────────────────────
-
-    /// The type of a value on a [`FieldProgramBuilder`]'s stack or in a slot.
-    pub enum FieldProgramValueType {
-        Scalar,
-        Vec3,
-        Bool,
-    }
-
-    impl FieldProgramValueType {
-        fn to_core(self) -> crate::sdf::ValueType {
-            match self {
-                FieldProgramValueType::Scalar => crate::sdf::ValueType::Scalar,
-                FieldProgramValueType::Vec3 => crate::sdf::ValueType::Vec3,
-                FieldProgramValueType::Bool => crate::sdf::ValueType::Bool,
-            }
-        }
-    }
-
-    /// Unary field-program operations (see `crate::sdf::UnaryOp`).
-    pub enum FieldProgramUnaryOp {
-        Neg,
-        Abs,
-        Sqrt,
-        Log,
-        Sin,
-        Cos,
-        Acos,
-        VecX,
-        VecY,
-        VecZ,
-        Length,
-        Normalize,
-    }
-
-    impl FieldProgramUnaryOp {
-        fn to_core(self) -> crate::sdf::UnaryOp {
-            use crate::sdf::UnaryOp as U;
-            match self {
-                FieldProgramUnaryOp::Neg => U::Neg,
-                FieldProgramUnaryOp::Abs => U::Abs,
-                FieldProgramUnaryOp::Sqrt => U::Sqrt,
-                FieldProgramUnaryOp::Log => U::Log,
-                FieldProgramUnaryOp::Sin => U::Sin,
-                FieldProgramUnaryOp::Cos => U::Cos,
-                FieldProgramUnaryOp::Acos => U::Acos,
-                FieldProgramUnaryOp::VecX => U::VecX,
-                FieldProgramUnaryOp::VecY => U::VecY,
-                FieldProgramUnaryOp::VecZ => U::VecZ,
-                FieldProgramUnaryOp::Length => U::Length,
-                FieldProgramUnaryOp::Normalize => U::Normalize,
-            }
-        }
-    }
-
-    /// Binary field-program operations (see `crate::sdf::BinaryOp`). `Add`
-    /// and `Sub` accept either two scalars or two vec3s.
-    pub enum FieldProgramBinaryOp {
-        Add,
-        Sub,
-        Mul,
-        Div,
-        Min,
-        Max,
-        Pow,
-        Atan2,
-        Lt,
-        Le,
-        Gt,
-        Ge,
-        Eq,
-        Dot,
-        Cross,
-        /// `vec3 * scalar`, componentwise.
-        Scale,
-    }
-
-    impl FieldProgramBinaryOp {
-        fn to_core(self) -> crate::sdf::BinaryOp {
-            use crate::sdf::BinaryOp as B;
-            match self {
-                FieldProgramBinaryOp::Add => B::Add,
-                FieldProgramBinaryOp::Sub => B::Sub,
-                FieldProgramBinaryOp::Mul => B::Mul,
-                FieldProgramBinaryOp::Div => B::Div,
-                FieldProgramBinaryOp::Min => B::Min,
-                FieldProgramBinaryOp::Max => B::Max,
-                FieldProgramBinaryOp::Pow => B::Pow,
-                FieldProgramBinaryOp::Atan2 => B::Atan2,
-                FieldProgramBinaryOp::Lt => B::Lt,
-                FieldProgramBinaryOp::Le => B::Le,
-                FieldProgramBinaryOp::Gt => B::Gt,
-                FieldProgramBinaryOp::Ge => B::Ge,
-                FieldProgramBinaryOp::Eq => B::Eq,
-                FieldProgramBinaryOp::Dot => B::Dot,
-                FieldProgramBinaryOp::Cross => B::Cross,
-                FieldProgramBinaryOp::Scale => B::Scale,
-            }
-        }
-    }
-
-    /// What kind of distance a field program's output represents.
-    pub enum FieldProgramDistanceKind {
-        Exact,
-        LowerBound,
-        Estimate,
-        Implicit,
-    }
-
-    impl FieldProgramDistanceKind {
-        fn to_core(self) -> crate::sdf::DistanceKind {
-            match self {
-                FieldProgramDistanceKind::Exact => crate::sdf::DistanceKind::Exact,
-                FieldProgramDistanceKind::LowerBound => crate::sdf::DistanceKind::LowerBound,
-                FieldProgramDistanceKind::Estimate => crate::sdf::DistanceKind::Estimate,
-                FieldProgramDistanceKind::Implicit => crate::sdf::DistanceKind::Implicit,
-            }
-        }
-
-        fn from_core(kind: crate::sdf::DistanceKind) -> Self {
-            match kind {
-                crate::sdf::DistanceKind::Exact => FieldProgramDistanceKind::Exact,
-                crate::sdf::DistanceKind::LowerBound => FieldProgramDistanceKind::LowerBound,
-                crate::sdf::DistanceKind::Estimate => FieldProgramDistanceKind::Estimate,
-                crate::sdf::DistanceKind::Implicit => FieldProgramDistanceKind::Implicit,
-            }
-        }
-    }
-
-    /// A validated, sandboxed custom SDF field program: deterministic typed
-    /// bytecode over scalar/vec3/bool values with bounded loops, carrying
-    /// its own explicit finite bounds and distance-kind metadata. Build one
-    /// with [`FieldProgramBuilder`] or import it from JSON.
-    #[diplomat::opaque]
-    pub struct FieldProgram(pub(crate) crate::sdf::Program);
-
-    impl FieldProgram {
-        pub fn from_json_string(json: &DiplomatStr) -> Result<Box<FieldProgram>, NucleationError> {
-            let json = std::str::from_utf8(json).map_err(|_| NucleationError::InvalidArgument)?;
-            crate::sdf::Program::from_json(json)
-                .map(|program| Box::new(FieldProgram(program)))
-                .map_err(|_| NucleationError::Parse)
+        pub fn from_json(json: &DiplomatStr) -> Result<Box<Field>, NucleationError> {
+            let s = std::str::from_utf8(json).map_err(|_| NucleationError::InvalidArgument)?;
+            wrap(crate::sdf::Field::from_json(s))
         }
 
         pub fn to_json(&self, write: &mut DiplomatWrite) -> Result<(), NucleationError> {
@@ -948,179 +918,34 @@ pub mod ffi {
             let _ = write!(write, "{json}");
             Ok(())
         }
+    }
 
-        pub fn eval_at(&self, x: f32, y: f32, z: f32) -> f32 {
-            self.0.eval(x, y, z)
-        }
+    /// Builder for compiling infix expressions that reference named external [`Field`]s.
+    #[diplomat::opaque_mut]
+    pub struct FieldExprBuilder {
+        bindings: Vec<(String, crate::sdf::Field)>,
+        bounds: Option<crate::sdf::Aabb>,
+        distance_kind: crate::sdf::DistanceKind,
+    }
 
-        /// Unit-length gradient of the scalar output at `(x, y, z)`: the
-        /// program's own forward-mode analytic gradient where it's
-        /// differentiable there, falling back to a numerical estimate
-        /// (central differences via `epsilon`) otherwise.
-        pub fn gradient(
-            &self,
-            x: f32,
-            y: f32,
-            z: f32,
-            epsilon: f32,
-        ) -> Result<SdfNormal, NucleationError> {
-            finite(&[x, y, z])?;
-            positive(&[epsilon])?;
-            let normal = self.0.analytic_gradient(x, y, z).or_else(|| {
-                let node = crate::sdf::SdfNode::Program {
-                    program: Box::new(self.0.clone()),
-                };
-                crate::sdf::numerical_normal(&node, [x, y, z], epsilon)
-                    .map(|n| [n[0] as f32, n[1] as f32, n[2] as f32])
-            });
-            let normal = normal.ok_or(NucleationError::InvalidArgument)?;
-            Ok(SdfNormal {
-                x: normal[0],
-                y: normal[1],
-                z: normal[2],
+    impl FieldExprBuilder {
+        pub fn create() -> Box<FieldExprBuilder> {
+            Box::new(FieldExprBuilder {
+                bindings: Vec::new(),
+                bounds: None,
+                distance_kind: crate::sdf::DistanceKind::Estimate,
             })
         }
 
-        pub fn bounds(&self) -> SdfBounds {
-            let aabb = self.0.aabb();
-            SdfBounds {
-                min_x: aabb.min[0],
-                min_y: aabb.min[1],
-                min_z: aabb.min[2],
-                max_x: aabb.max[0],
-                max_y: aabb.max[1],
-                max_z: aabb.max[2],
+        pub fn bind(&mut self, name: &DiplomatStr, field: &Field) -> Result<(), NucleationError> {
+            let n = std::str::from_utf8(name).map_err(|_| NucleationError::InvalidArgument)?;
+            if n.is_empty() {
+                return Err(NucleationError::InvalidArgument);
             }
-        }
-
-        pub fn distance_kind(&self) -> FieldProgramDistanceKind {
-            FieldProgramDistanceKind::from_core(self.0.distance_kind())
-        }
-    }
-
-    /// Programmatic builder for a [`FieldProgram`]: append typed stack
-    /// instructions, then [`FieldProgramBuilder::build`] to validate and
-    /// obtain a [`FieldProgram`]. Consuming: every method after `build()`
-    /// (successful or not) returns `AlreadyConsumed`.
-    #[diplomat::opaque_mut]
-    pub struct FieldProgramBuilder(Option<crate::sdf::ProgramBuilder>);
-
-    impl FieldProgramBuilder {
-        pub fn create() -> Box<FieldProgramBuilder> {
-            Box::new(FieldProgramBuilder(Some(crate::sdf::ProgramBuilder::new())))
-        }
-
-        /// Declare a new typed local slot and return its index.
-        pub fn add_slot(
-            &mut self,
-            value_type: FieldProgramValueType,
-        ) -> Result<u16, NucleationError> {
-            let slot = self.inner_mut()?.add_slot(value_type.to_core());
-            if slot == u16::MAX {
-                Err(NucleationError::InvalidArgument)
-            } else {
-                Ok(slot)
-            }
-        }
-
-        pub fn push_const_scalar(&mut self, value: f32) -> Result<(), NucleationError> {
-            finite(&[value])?;
-            self.inner_mut()?
-                .push_const(crate::sdf::Const::Scalar(value));
+            self.bindings.push((n.to_string(), field.0.clone()));
             Ok(())
         }
 
-        pub fn push_const_vec3(&mut self, x: f32, y: f32, z: f32) -> Result<(), NucleationError> {
-            finite(&[x, y, z])?;
-            self.inner_mut()?
-                .push_const(crate::sdf::Const::Vec3([x, y, z]));
-            Ok(())
-        }
-
-        pub fn push_const_bool(&mut self, value: bool) -> Result<(), NucleationError> {
-            self.inner_mut()?.push_const(crate::sdf::Const::Bool(value));
-            Ok(())
-        }
-
-        /// Push the `Vec3` position the program is being evaluated at.
-        pub fn push_pos(&mut self) -> Result<(), NucleationError> {
-            self.inner_mut()?.push_pos();
-            Ok(())
-        }
-
-        pub fn load_local(&mut self, slot: u16) -> Result<(), NucleationError> {
-            self.inner_mut()?.load_local(slot);
-            Ok(())
-        }
-
-        pub fn store_local(&mut self, slot: u16) -> Result<(), NucleationError> {
-            self.inner_mut()?.store_local(slot);
-            Ok(())
-        }
-
-        /// Discard the top of the stack.
-        pub fn pop(&mut self) -> Result<(), NucleationError> {
-            self.inner_mut()?.pop();
-            Ok(())
-        }
-
-        pub fn unary_op(&mut self, op: FieldProgramUnaryOp) -> Result<(), NucleationError> {
-            self.inner_mut()?.unary(op.to_core());
-            Ok(())
-        }
-
-        pub fn binary_op(&mut self, op: FieldProgramBinaryOp) -> Result<(), NucleationError> {
-            self.inner_mut()?.binary(op.to_core());
-            Ok(())
-        }
-
-        /// Pop `(x, lo, hi)`, push `x` clamped to `[lo, hi]`.
-        pub fn clamp(&mut self) -> Result<(), NucleationError> {
-            self.inner_mut()?.clamp();
-            Ok(())
-        }
-
-        /// Pop `(a, b, cond)`, push `a` if `cond` else `b`.
-        pub fn select(&mut self) -> Result<(), NucleationError> {
-            self.inner_mut()?.select();
-            Ok(())
-        }
-
-        /// Pop `(x, y, z)`, push `Vec3([x, y, z])`.
-        pub fn make_vec3(&mut self) -> Result<(), NucleationError> {
-            self.inner_mut()?.make_vec3();
-            Ok(())
-        }
-
-        /// Pop a `Bool`; if true, stop the nearest enclosing repeat after
-        /// this iteration. Only valid inside `beginRepeat`/`endRepeat`.
-        pub fn break_if(&mut self) -> Result<(), NucleationError> {
-            self.inner_mut()?.break_if();
-            Ok(())
-        }
-
-        /// Open a new statically bounded repeat block; subsequent
-        /// instructions append to its body until `endRepeat`.
-        pub fn begin_repeat(&mut self, count: u32) -> Result<(), NucleationError> {
-            self.inner_mut()?.begin_repeat(count);
-            Ok(())
-        }
-
-        /// Close the innermost open repeat block.
-        pub fn end_repeat(&mut self) -> Result<(), NucleationError> {
-            self.inner_mut()?
-                .end_repeat()
-                .map_err(|_| NucleationError::InvalidArgument)?;
-            Ok(())
-        }
-
-        /// Declare which scalar slot holds the program's output.
-        pub fn set_output(&mut self, slot: u16) -> Result<(), NucleationError> {
-            self.inner_mut()?.set_output(slot);
-            Ok(())
-        }
-
-        /// Set the program's explicit, author-asserted finite bounds.
         #[allow(clippy::too_many_arguments)]
         pub fn set_bounds(
             &mut self,
@@ -1131,522 +956,637 @@ pub mod ffi {
             max_y: f32,
             max_z: f32,
         ) -> Result<(), NucleationError> {
-            finite(&[min_x, min_y, min_z, max_x, max_y, max_z])?;
-            self.inner_mut()?
-                .set_bounds([min_x, min_y, min_z], [max_x, max_y, max_z]);
+            let aabb = crate::sdf::Aabb::new([min_x, min_y, min_z], [max_x, max_y, max_z])
+                .map_err(map_field_error)?;
+            self.bounds = Some(aabb);
             Ok(())
         }
 
-        pub fn set_distance_kind(
+        pub fn set_distance_kind(&mut self, kind: FieldDistanceKind) {
+            self.distance_kind = kind.to_core();
+        }
+
+        pub fn compile(&self, source: &DiplomatStr) -> Result<Box<Field>, NucleationError> {
+            let src = std::str::from_utf8(source).map_err(|_| NucleationError::InvalidArgument)?;
+            let refs: Vec<(&str, crate::sdf::Field)> = self
+                .bindings
+                .iter()
+                .map(|(n, f)| (n.as_str(), f.clone()))
+                .collect();
+            wrap(crate::sdf::Field::expr_with(
+                src,
+                &refs,
+                self.bounds,
+                self.distance_kind,
+            ))
+        }
+    }
+
+    /// Composable voxel predicate for [`Material`] layers and [`ScatterRule`]s.
+    #[diplomat::opaque]
+    pub struct MaterialCondition(pub(crate) crate::sdf::Condition);
+
+    impl MaterialCondition {
+        pub fn always() -> Box<MaterialCondition> {
+            Box::new(MaterialCondition(crate::sdf::Condition::Always))
+        }
+
+        pub fn and_with(&self, other: &MaterialCondition) -> Box<MaterialCondition> {
+            Box::new(MaterialCondition(self.0.clone().and(other.0.clone())))
+        }
+
+        pub fn or_with(&self, other: &MaterialCondition) -> Box<MaterialCondition> {
+            Box::new(MaterialCondition(self.0.clone().or(other.0.clone())))
+        }
+
+        pub fn negated(&self) -> Box<MaterialCondition> {
+            Box::new(MaterialCondition(self.0.clone().not()))
+        }
+
+        pub fn tag(material_id: u16) -> Box<MaterialCondition> {
+            Box::new(MaterialCondition(crate::sdf::Condition::tag(material_id)))
+        }
+
+        pub fn channel_range(
+            channel: FieldChannel,
+            has_min: bool,
+            min: f32,
+            has_max: bool,
+            max: f32,
+        ) -> Result<Box<MaterialCondition>, NucleationError> {
+            let lo = opt_finite(has_min, min)?;
+            let hi = opt_finite(has_max, max)?;
+            Ok(Box::new(MaterialCondition(
+                crate::sdf::Condition::channel_range(channel.to_core(), lo, hi),
+            )))
+        }
+
+        pub fn field_range(
+            field: &Field,
+            has_min: bool,
+            min: f32,
+            has_max: bool,
+            max: f32,
+        ) -> Result<Box<MaterialCondition>, NucleationError> {
+            let lo = opt_finite(has_min, min)?;
+            let hi = opt_finite(has_max, max)?;
+            Ok(Box::new(MaterialCondition(
+                crate::sdf::Condition::field_range(field.0.clone(), lo, hi),
+            )))
+        }
+
+        pub fn y_range(
+            has_min: bool,
+            min: f32,
+            has_max: bool,
+            max: f32,
+        ) -> Result<Box<MaterialCondition>, NucleationError> {
+            let lo = opt_finite(has_min, min)?;
+            let hi = opt_finite(has_max, max)?;
+            Ok(Box::new(MaterialCondition(crate::sdf::Condition::y_range(
+                lo, hi,
+            ))))
+        }
+
+        pub fn depth_below_surface(
+            has_min: bool,
+            min: i32,
+            has_max: bool,
+            max: i32,
+        ) -> Box<MaterialCondition> {
+            Box::new(MaterialCondition(
+                crate::sdf::Condition::depth_below_surface(
+                    has_min.then_some(min),
+                    has_max.then_some(max),
+                ),
+            ))
+        }
+
+        pub fn slope_range(
+            has_min: bool,
+            min: f32,
+            has_max: bool,
+            max: f32,
+        ) -> Result<Box<MaterialCondition>, NucleationError> {
+            let lo = opt_finite(has_min, min)?;
+            let hi = opt_finite(has_max, max)?;
+            Ok(Box::new(MaterialCondition(
+                crate::sdf::Condition::slope_range(lo, hi),
+            )))
+        }
+
+        pub fn curvature_range(
+            has_min: bool,
+            min: f32,
+            has_max: bool,
+            max: f32,
+        ) -> Result<Box<MaterialCondition>, NucleationError> {
+            let lo = opt_finite(has_min, min)?;
+            let hi = opt_finite(has_max, max)?;
+            Ok(Box::new(MaterialCondition(
+                crate::sdf::Condition::curvature_range(lo, hi),
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub fn normal_dot(
+            dx: f32,
+            dy: f32,
+            dz: f32,
+            has_min: bool,
+            min: f32,
+            has_max: bool,
+            max: f32,
+        ) -> Result<Box<MaterialCondition>, NucleationError> {
+            let lo = opt_finite(has_min, min)?;
+            let hi = opt_finite(has_max, max)?;
+            crate::sdf::Condition::normal_dot([dx, dy, dz], lo, hi)
+                .map(|c| Box::new(MaterialCondition(c)))
+                .map_err(map_field_error)
+        }
+
+        pub fn exposed_face(mask: u8, require_all: bool) -> Box<MaterialCondition> {
+            Box::new(MaterialCondition(crate::sdf::Condition::exposed_face(
+                mask,
+                require_all,
+            )))
+        }
+
+        pub fn chance(probability: f32, seed: i32) -> Result<Box<MaterialCondition>, NucleationError> {
+            crate::sdf::Condition::chance(probability, seed)
+                .map(|c| Box::new(MaterialCondition(c)))
+                .map_err(map_field_error)
+        }
+    }
+
+    /// Composable block shader for [`VoxelPipeline`].
+    #[diplomat::opaque]
+    pub struct Material(pub(crate) crate::sdf::Material);
+
+    impl Material {
+        pub fn solid(block: &DiplomatStr) -> Result<Box<Material>, NucleationError> {
+            let s = std::str::from_utf8(block).map_err(|_| NucleationError::InvalidArgument)?;
+            Ok(Box::new(Material(crate::sdf::Material::solid(s))))
+        }
+
+        pub fn skip() -> Box<Material> {
+            Box::new(Material(crate::sdf::Material::skip()))
+        }
+
+        pub fn color(r: u8, g: u8, b: u8, palette: &Palette) -> Box<Material> {
+            Box::new(Material(crate::sdf::Material::color(
+                [r, g, b],
+                Arc::clone(&palette.0),
+            )))
+        }
+
+        pub fn from_brush(brush: &Brush) -> Box<Material> {
+            Box::new(Material(crate::sdf::Material::from_brush(brush.0.clone())))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub fn channel_gradient(
+            channel: FieldChannel,
+            stops: &[f32],
+            colors: &[u8],
+            lo: f32,
+            hi: f32,
+            palette: &Palette,
+            space: InterpolationSpace,
+        ) -> Result<Box<Material>, NucleationError> {
+            let gstops = parse_stops(stops, colors)?;
+            crate::sdf::Material::channel_gradient(
+                channel.to_core(),
+                gstops,
+                lo,
+                hi,
+                Arc::clone(&palette.0),
+                interp_space(space),
+            )
+            .map(|m| Box::new(Material(m)))
+            .map_err(map_field_error)
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub fn field_gradient(
+            field: &Field,
+            stops: &[f32],
+            colors: &[u8],
+            lo: f32,
+            hi: f32,
+            palette: &Palette,
+            space: InterpolationSpace,
+        ) -> Result<Box<Material>, NucleationError> {
+            let gstops = parse_stops(stops, colors)?;
+            crate::sdf::Material::channel_gradient(
+                crate::sdf::Channel::Field(field.0.clone()),
+                gstops,
+                lo,
+                hi,
+                Arc::clone(&palette.0),
+                interp_space(space),
+            )
+            .map(|m| Box::new(Material(m)))
+            .map_err(map_field_error)
+        }
+
+        pub fn channel_ramp(
+            channel: FieldChannel,
+            lo: f32,
+            hi: f32,
+            blocks_json: &DiplomatStr,
+            dither: bool,
+        ) -> Result<Box<Material>, NucleationError> {
+            let blocks = parse_blocks_json(blocks_json)?;
+            crate::sdf::Material::channel_ramp(channel.to_core(), lo, hi, blocks, dither)
+                .map(|m| Box::new(Material(m)))
+                .map_err(map_field_error)
+        }
+
+        pub fn field_ramp(
+            field: &Field,
+            lo: f32,
+            hi: f32,
+            blocks_json: &DiplomatStr,
+            dither: bool,
+        ) -> Result<Box<Material>, NucleationError> {
+            let blocks = parse_blocks_json(blocks_json)?;
+            crate::sdf::Material::channel_ramp(
+                crate::sdf::Channel::Field(field.0.clone()),
+                lo,
+                hi,
+                blocks,
+                dither,
+            )
+            .map(|m| Box::new(Material(m)))
+            .map_err(map_field_error)
+        }
+
+        pub fn weighted(
+            blocks_json: &DiplomatStr,
+            weights: &[f32],
+            seed: i32,
+        ) -> Result<Box<Material>, NucleationError> {
+            let blocks = parse_blocks_json(blocks_json)?;
+            if blocks.len() != weights.len() {
+                return Err(NucleationError::InvalidArgument);
+            }
+            let entries = blocks.into_iter().zip(weights.iter().copied()).collect();
+            crate::sdf::Material::weighted(entries, seed)
+                .map(|m| Box::new(Material(m)))
+                .map_err(map_field_error)
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub fn shaded(
+            r: u8,
+            g: u8,
+            b: u8,
+            lx: f32,
+            ly: f32,
+            lz: f32,
+            ambient: f32,
+            palette: &Palette,
+        ) -> Result<Box<Material>, NucleationError> {
+            crate::sdf::Material::shaded(
+                [r, g, b],
+                [lx, ly, lz],
+                ambient,
+                Arc::clone(&palette.0),
+            )
+            .map(|m| Box::new(Material(m)))
+            .map_err(map_field_error)
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub fn spotlight(
+            px: f32,
+            py: f32,
+            pz: f32,
+            dx: f32,
+            dy: f32,
+            dz: f32,
+            cone_angle_deg: f32,
+            r: u8,
+            g: u8,
+            b: u8,
+            ambient: f32,
+            palette: &Palette,
+        ) -> Result<Box<Material>, NucleationError> {
+            crate::sdf::Material::spotlight(
+                [px, py, pz],
+                [dx, dy, dz],
+                cone_angle_deg,
+                [r, g, b],
+                ambient,
+                Arc::clone(&palette.0),
+            )
+            .map(|m| Box::new(Material(m)))
+            .map_err(map_field_error)
+        }
+    }
+
+    /// Builder for layered conditional materials and CSG tag-dispatched materials.
+    #[diplomat::opaque_mut]
+    pub struct MaterialBuilder {
+        is_tag_matcher: bool,
+        blend_seams: bool,
+        seed: i32,
+        layers: Vec<crate::sdf::MaterialLayer>,
+        cases: Vec<(u16, crate::sdf::Material)>,
+        default: Option<crate::sdf::Material>,
+    }
+
+    impl MaterialBuilder {
+        pub fn create_layered() -> Box<MaterialBuilder> {
+            Box::new(MaterialBuilder {
+                is_tag_matcher: false,
+                blend_seams: false,
+                seed: 0,
+                layers: Vec::new(),
+                cases: Vec::new(),
+                default: None,
+            })
+        }
+
+        pub fn create_tag_matcher(blend_seams: bool, seed: i32) -> Box<MaterialBuilder> {
+            Box::new(MaterialBuilder {
+                is_tag_matcher: true,
+                blend_seams,
+                seed,
+                layers: Vec::new(),
+                cases: Vec::new(),
+                default: None,
+            })
+        }
+
+        pub fn add_layer(
             &mut self,
-            kind: FieldProgramDistanceKind,
+            condition: &MaterialCondition,
+            material: &Material,
         ) -> Result<(), NucleationError> {
-            self.inner_mut()?.set_distance_kind(kind.to_core());
+            if self.is_tag_matcher {
+                return Err(NucleationError::InvalidArgument);
+            }
+            self.layers.push(crate::sdf::MaterialLayer {
+                condition: condition.0.clone(),
+                material: material.0.clone(),
+            });
             Ok(())
         }
 
-        /// Validate and finalize. Consumes the builder even on failure.
-        pub fn build(&mut self) -> Result<Box<FieldProgram>, NucleationError> {
-            let inner = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
-            inner
-                .build()
-                .map(|program| Box::new(FieldProgram(program)))
+        pub fn add_tag_case(
+            &mut self,
+            material_id: u16,
+            material: &Material,
+        ) -> Result<(), NucleationError> {
+            if !self.is_tag_matcher {
+                return Err(NucleationError::InvalidArgument);
+            }
+            self.cases.push((material_id, material.0.clone()));
+            Ok(())
+        }
+
+        pub fn set_default(&mut self, material: &Material) {
+            self.default = Some(material.0.clone());
+        }
+
+        pub fn build(&self) -> Box<Material> {
+            if self.is_tag_matcher {
+                let default = self
+                    .default
+                    .clone()
+                    .unwrap_or_else(crate::sdf::Material::skip);
+                Box::new(Material(crate::sdf::Material::match_tag(
+                    self.cases.clone(),
+                    default,
+                    self.blend_seams,
+                    self.seed,
+                )))
+            } else {
+                Box::new(Material(crate::sdf::Material::layered(
+                    self.layers.clone(),
+                    self.default.clone(),
+                )))
+            }
+        }
+    }
+
+    /// Surface scatter rule attached to a [`VoxelPipeline`].
+    #[diplomat::opaque_mut]
+    pub struct ScatterRule(pub(crate) crate::sdf::ScatterRule);
+
+    impl ScatterRule {
+        pub fn create(
+            face: ScatterFace,
+            density: f32,
+            blocks_json: &DiplomatStr,
+            weights: &[f32],
+            seed: i32,
+        ) -> Result<Box<ScatterRule>, NucleationError> {
+            let blocks = parse_blocks_json(blocks_json)?;
+            if blocks.len() != weights.len() {
+                return Err(NucleationError::InvalidArgument);
+            }
+            let entries = blocks.into_iter().zip(weights.iter().copied()).collect();
+            crate::sdf::ScatterRule::new(face.to_core(), density, entries, seed)
+                .map(|r| Box::new(ScatterRule(r)))
+                .map_err(map_field_error)
+        }
+
+        pub fn set_condition(&mut self, condition: &MaterialCondition) {
+            self.0.condition = condition.0.clone();
+        }
+
+        pub fn set_on_block(&mut self, prefix: &DiplomatStr) -> Result<(), NucleationError> {
+            let s = std::str::from_utf8(prefix).map_err(|_| NucleationError::InvalidArgument)?;
+            self.0.on_block = if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            };
+            Ok(())
+        }
+
+        pub fn set_height_range(&mut self, min: u32, max: u32) -> Result<(), NucleationError> {
+            if min == 0 || min > max || max > 64 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            self.0.height_min = min;
+            self.0.height_max = max;
+            Ok(())
+        }
+    }
+
+    /// Unified brick-pruned, parallel voxelization pipeline.
+    #[diplomat::opaque_mut]
+    pub struct VoxelPipeline(pub(crate) crate::sdf::VoxelPipeline);
+
+    impl VoxelPipeline {
+        pub fn create(geometry: &Field, material: &Material) -> Box<VoxelPipeline> {
+            Box::new(VoxelPipeline(crate::sdf::VoxelPipeline::new(
+                geometry.0.clone(),
+                material.0.clone(),
+            )))
+        }
+
+        pub fn add_fluid(
+            &mut self,
+            field: &Field,
+            block: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            let b = std::str::from_utf8(block).map_err(|_| NucleationError::InvalidArgument)?;
+            self.0
+                .fluids
+                .push(crate::sdf::FluidLayer::new(field.0.clone(), b));
+            Ok(())
+        }
+
+        pub fn add_fluid_level(
+            &mut self,
+            y_level: f32,
+            block: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            let b = std::str::from_utf8(block).map_err(|_| NucleationError::InvalidArgument)?;
+            let layer = crate::sdf::FluidLayer::level(y_level, b).map_err(map_field_error)?;
+            self.0.fluids.push(layer);
+            Ok(())
+        }
+
+        pub fn add_scatter(&mut self, rule: &ScatterRule) {
+            self.0.scatter.push(rule.0.clone());
+        }
+
+        pub fn set_fill_replace(&mut self) {
+            self.0.fill_mode = crate::building::FillMode::Replace;
+        }
+
+        pub fn set_fill_keep_existing(&mut self) {
+            self.0.fill_mode = crate::building::FillMode::KeepExisting;
+        }
+
+        pub fn set_fill_replacing(
+            &mut self,
+            targets_json: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            let json =
+                std::str::from_utf8(targets_json).map_err(|_| NucleationError::InvalidArgument)?;
+            let targets: Vec<String> =
+                serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
+            self.0.fill_mode = crate::building::FillMode::ReplaceOnly(targets);
+            Ok(())
+        }
+
+        pub fn to_schematic(&self, name: &DiplomatStr) -> Result<Box<Schematic>, NucleationError> {
+            let n = std::str::from_utf8(name).map_err(|_| NucleationError::InvalidArgument)?;
+            self.0
+                .to_schematic(None, n)
+                .map(|s| Box::new(Schematic(s)))
                 .map_err(|_| NucleationError::InvalidArgument)
         }
 
-        fn inner_mut(&mut self) -> Result<&mut crate::sdf::ProgramBuilder, NucleationError> {
-            self.0.as_mut().ok_or(NucleationError::AlreadyConsumed)
+        #[allow(clippy::too_many_arguments)]
+        pub fn to_schematic_bounded(
+            &self,
+            name: &DiplomatStr,
+            min_x: i32,
+            min_y: i32,
+            min_z: i32,
+            max_x: i32,
+            max_y: i32,
+            max_z: i32,
+        ) -> Result<Box<Schematic>, NucleationError> {
+            let n = std::str::from_utf8(name).map_err(|_| NucleationError::InvalidArgument)?;
+            let bounds = crate::sdf::SampleBounds::new([min_x, min_y, min_z], [max_x, max_y, max_z])
+                .map_err(|_| NucleationError::InvalidArgument)?;
+            self.0
+                .to_schematic(Some(bounds), n)
+                .map(|s| Box::new(Schematic(s)))
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        pub fn apply_to_schematic(&self, schematic: &mut Schematic) -> Result<(), NucleationError> {
+            self.0
+                .apply_to_schematic(&mut schematic.0, None)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub fn apply_to_schematic_bounded(
+            &self,
+            schematic: &mut Schematic,
+            min_x: i32,
+            min_y: i32,
+            min_z: i32,
+            max_x: i32,
+            max_y: i32,
+            max_z: i32,
+        ) -> Result<(), NucleationError> {
+            let bounds = crate::sdf::SampleBounds::new([min_x, min_y, min_z], [max_x, max_y, max_z])
+                .map_err(|_| NucleationError::InvalidArgument)?;
+            self.0
+                .apply_to_schematic(&mut schematic.0, Some(bounds))
+                .map_err(|_| NucleationError::InvalidArgument)
         }
     }
 
-    fn finite(values: &[f32]) -> Result<(), NucleationError> {
-        if values.iter().all(|value| value.is_finite()) {
-            Ok(())
+    // ── Helpers ───────────────────────────────────────────────────────────
+
+    fn wrap(res: Result<crate::sdf::Field, crate::sdf::FieldError>) -> Result<Box<Field>, NucleationError> {
+        res.map(|f| Box::new(Field(f))).map_err(map_field_error)
+    }
+
+    fn map_field_error(err: crate::sdf::FieldError) -> NucleationError {
+        crate::bridge::set_last_error_detail(err.to_string());
+        match err {
+            crate::sdf::FieldError::Parse(_) => NucleationError::Parse,
+            crate::sdf::FieldError::InputTooLarge
+            | crate::sdf::FieldError::InvalidArgument(_)
+            | crate::sdf::FieldError::BudgetExceeded(_) => NucleationError::InvalidArgument,
+        }
+    }
+
+    fn opt_finite(has: bool, val: f32) -> Result<Option<f32>, NucleationError> {
+        if !has {
+            Ok(None)
+        } else if val.is_finite() {
+            Ok(Some(val))
         } else {
             Err(NucleationError::InvalidArgument)
         }
     }
 
-    fn positive(values: &[f32]) -> Result<(), NucleationError> {
-        finite(values)?;
-        if values.iter().all(|value| *value > 0.0) {
-            Ok(())
-        } else {
-            Err(NucleationError::InvalidArgument)
+    fn interp_space(space: InterpolationSpace) -> crate::building::InterpolationSpace {
+        match space {
+            InterpolationSpace::Rgb => crate::building::InterpolationSpace::Rgb,
+            InterpolationSpace::Oklab => crate::building::InterpolationSpace::Oklab,
         }
     }
 
-    fn non_negative(values: &[f32]) -> Result<(), NucleationError> {
-        finite(values)?;
-        if values.iter().all(|value| *value >= 0.0) {
-            Ok(())
-        } else {
-            Err(NucleationError::InvalidArgument)
-        }
-    }
-
-    fn repeat(
-        sdf: &Sdf,
-        spacing_x: f32,
-        spacing_y: f32,
-        spacing_z: f32,
-        count: Option<[u32; 3]>,
-    ) -> Result<Box<Sdf>, NucleationError> {
-        finite(&[spacing_x, spacing_y, spacing_z])?;
-        if spacing_x < 0.0
-            || spacing_y < 0.0
-            || spacing_z < 0.0
-            || (spacing_x == 0.0 && spacing_y == 0.0 && spacing_z == 0.0)
-        {
+    fn parse_stops(
+        stops: &[f32],
+        colors: &[u8],
+    ) -> Result<Vec<crate::building::GradientStop>, NucleationError> {
+        let expected = stops
+            .len()
+            .checked_mul(3)
+            .ok_or(NucleationError::InvalidArgument)?;
+        if stops.is_empty() || colors.len() != expected {
             return Err(NucleationError::InvalidArgument);
         }
-        Ok(Box::new(Sdf(crate::sdf::SdfNode::Repeat {
-            child: Box::new(sdf.0.clone()),
-            spacing: [spacing_x, spacing_y, spacing_z],
-            count,
-        })))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::ffi::Sdf;
-
-    #[test]
-    fn typed_sdf_graph_composes_without_json() {
-        let left = Sdf::sphere(4.0).unwrap().translate(-3.0, 0.0, 0.0).unwrap();
-        let right = Sdf::box_shape(3.0, 3.0, 3.0, 0.5)
-            .unwrap()
-            .translate(3.0, 0.0, 0.0)
-            .unwrap();
-        let field = left.smooth_union(&right, 1.25).unwrap();
-
-        assert!(field.eval_at(-3.0, 0.0, 0.0) < 0.0);
-        assert!(field.eval_at(3.0, 0.0, 0.0) < 0.0);
-        assert!(field.eval_at(20.0, 0.0, 0.0) > 0.0);
-
-        let bounds = field.bounds().unwrap();
-        assert!(bounds.min_x <= -7.0 && bounds.max_x >= 6.5);
-        assert!(field.to_shape().is_ok());
+        Ok(stops
+            .iter()
+            .zip(colors.chunks_exact(3))
+            .map(|(p, c)| crate::building::GradientStop {
+                position: *p as f64,
+                color: crate::blockpedia::ExtendedColorData::from_rgb(c[0], c[1], c[2]),
+            })
+            .collect())
     }
 
-    #[test]
-    fn typed_sdf_exposes_normal_and_explicit_json_roundtrip() {
-        let field = Sdf::ellipsoid(2.0, 3.0, 4.0).unwrap();
-        let normal = field.normal(2.0, 0.0, 0.0, 0.01).unwrap();
-        assert!((normal.x - 1.0).abs() < 0.01);
-        assert!(normal.y.abs() < 0.01);
-        assert!(normal.z.abs() < 0.01);
-
-        let json = field.0.to_json().unwrap();
-        let restored = Sdf::from_json_string(json.as_bytes()).unwrap();
-        assert!((restored.eval_at(2.0, 0.0, 0.0) - field.eval_at(2.0, 0.0, 0.0)).abs() < 1e-6);
-    }
-
-    #[test]
-    fn typed_shapes_reject_unsafe_inferred_and_explicit_bounds() {
-        assert!(Sdf::sphere(20_000_000.0).unwrap().to_shape().is_err());
-        let plane = Sdf::plane(0.0, 1.0, 0.0, 0.0).unwrap();
-        assert!(plane
-            .to_shape_bounded(i32::MIN, 0, 0, i32::MAX, 0, 0)
-            .is_err());
-        assert!(plane.to_shape_bounded(0, 0, 0, 255, 255, 255).is_ok());
-        assert!(plane.to_shape_bounded(0, 0, 0, 256, 255, 255).is_err());
-    }
-
-    #[test]
-    fn box_frame_validates_and_bounds_match_outer_extents() {
-        assert!(Sdf::box_frame(2.0, 2.0, 2.0, 0.25).is_ok());
-        // Thickness cannot exceed the smallest half-extent.
-        assert!(Sdf::box_frame(2.0, 2.0, 2.0, 2.5).is_err());
-        assert!(Sdf::box_frame(-1.0, 2.0, 2.0, 0.25).is_err());
-        assert!(Sdf::box_frame(f32::NAN, 2.0, 2.0, 0.25).is_err());
-        assert!(Sdf::box_frame(f32::INFINITY, 2.0, 2.0, 0.25).is_err());
-
-        let huge = Sdf::box_frame(1.0e30, 1.0e30, 1.0e30, 0.1).unwrap();
-        assert!(huge.to_shape().is_err(), "huge frame exceeds voxel budget");
-
-        let frame = Sdf::box_frame(2.0, 2.0, 2.0, 0.25).unwrap();
-        let bounds = frame.bounds().unwrap();
-        assert!((bounds.min_x + 2.0).abs() < 1e-6);
-        assert!((bounds.max_x - 2.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn capped_torus_validates_angle_and_rejects_huge_radii() {
-        assert!(Sdf::capped_torus(5.0, 1.0, 90.0).is_ok());
-        assert!(Sdf::capped_torus(5.0, 1.0, 0.0).is_err());
-        assert!(Sdf::capped_torus(5.0, 1.0, 181.0).is_err());
-        assert!(Sdf::capped_torus(5.0, 1.0, f32::NAN).is_err());
-        assert!(Sdf::capped_torus(-1.0, 1.0, 90.0).is_err());
-
-        let huge = Sdf::capped_torus(1.0e30, 1.0, 90.0).unwrap();
-        assert!(huge.to_shape().is_err(), "huge torus exceeds voxel budget");
-    }
-
-    #[test]
-    fn link_validates_and_rejects_huge_radii() {
-        assert!(Sdf::link(3.0, 0.75, 4.0).is_ok());
-        assert!(Sdf::link(3.0, 0.75, 0.0).is_ok());
-        assert!(Sdf::link(-1.0, 0.75, 4.0).is_err());
-        assert!(Sdf::link(3.0, 0.75, -1.0).is_err());
-        assert!(Sdf::link(3.0, 0.75, f32::NAN).is_err());
-
-        let huge = Sdf::link(1.0e30, 1.0, 1.0e30).unwrap();
-        assert!(huge.to_shape().is_err(), "huge link exceeds voxel budget");
-    }
-
-    #[test]
-    fn infinite_cylinder_is_typed_unbounded_and_validated() {
-        assert!(Sdf::infinite_cylinder(2.0).is_ok());
-        assert!(Sdf::infinite_cylinder(0.0).is_err());
-        assert!(Sdf::infinite_cylinder(-1.0).is_err());
-        assert!(Sdf::infinite_cylinder(f32::NAN).is_err());
-        let cylinder = Sdf::infinite_cylinder(2.0).unwrap();
-        assert!(cylinder.bounds().is_err());
-        assert!((cylinder.eval_at(5.0, 1.0e9, 0.0) - 3.0).abs() < 1e-3);
-    }
-
-    #[test]
-    fn round_cone_validates_and_rejects_degenerate_axis() {
-        assert!(Sdf::round_cone(0.0, 0.0, 0.0, 0.0, 10.0, 0.0, 3.0, 1.0).is_ok());
-        // Coincident endpoints collapse the axis to a point (division by zero).
-        assert!(Sdf::round_cone(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 3.0, 1.0).is_err());
-        assert!(Sdf::round_cone(0.0, 0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 1.0).is_err());
-        assert!(Sdf::round_cone(0.0, 0.0, 0.0, 0.0, 10.0, 0.0, -1.0, 1.0).is_err());
-        assert!(Sdf::round_cone(0.0, 0.0, 0.0, 0.0, 10.0, 0.0, f32::NAN, 1.0).is_err());
-        assert!(Sdf::round_cone(f32::INFINITY, 0.0, 0.0, 0.0, 10.0, 0.0, 3.0, 1.0).is_err());
-
-        let huge = Sdf::round_cone(0.0, 0.0, 0.0, 0.0, 1.0e30, 0.0, 1.0e30, 1.0).unwrap();
-        assert!(
-            huge.to_shape().is_err(),
-            "huge round cone exceeds voxel budget"
-        );
-    }
-
-    #[test]
-    fn round_cone_bounds_span_both_end_spheres() {
-        let rc = Sdf::round_cone(0.0, 0.0, 0.0, 0.0, 10.0, 0.0, 3.0, 1.0).unwrap();
-        let bounds = rc.bounds().unwrap();
-        assert!((bounds.min_y + 3.0).abs() < 1e-6);
-        assert!((bounds.max_y - 11.0).abs() < 1e-6);
-        assert!((bounds.min_x + 3.0).abs() < 1e-6);
-        assert!((bounds.max_x - 3.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn solid_angle_validates_angle_range_and_rejects_huge_radius() {
-        assert!(Sdf::solid_angle(5.0, 45.0).is_ok());
-        assert!(Sdf::solid_angle(5.0, 0.0).is_err());
-        assert!(Sdf::solid_angle(5.0, 180.0).is_err());
-        assert!(Sdf::solid_angle(5.0, 181.0).is_err());
-        assert!(Sdf::solid_angle(5.0, f32::NAN).is_err());
-        assert!(Sdf::solid_angle(-1.0, 45.0).is_err());
-        assert!(Sdf::solid_angle(0.0, 45.0).is_err());
-
-        let huge = Sdf::solid_angle(1.0e30, 45.0).unwrap();
-        assert!(
-            huge.to_shape().is_err(),
-            "huge solid angle exceeds voxel budget"
-        );
-    }
-
-    #[test]
-    fn solid_angle_bounds_match_the_enclosing_sphere() {
-        let wedge = Sdf::solid_angle(7.0, 45.0).unwrap();
-        let bounds = wedge.bounds().unwrap();
-        assert!((bounds.min_x + 7.0).abs() < 1e-6);
-        assert!((bounds.max_x - 7.0).abs() < 1e-6);
-        assert!((bounds.min_y + 7.0).abs() < 1e-6);
-        assert!((bounds.max_y - 7.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn cut_sphere_validates_height_range_and_rejects_huge_radius() {
-        assert!(Sdf::cut_sphere(5.0, 2.0).is_ok());
-        assert!(Sdf::cut_sphere(5.0, 5.0).is_err());
-        assert!(Sdf::cut_sphere(5.0, -5.0).is_err());
-        assert!(Sdf::cut_sphere(5.0, 6.0).is_err());
-        assert!(Sdf::cut_sphere(5.0, f32::NAN).is_err());
-        assert!(Sdf::cut_sphere(-1.0, 0.0).is_err());
-        assert!(Sdf::cut_sphere(0.0, 0.0).is_err());
-
-        let huge = Sdf::cut_sphere(1.0e30, 0.0).unwrap();
-        assert!(
-            huge.to_shape().is_err(),
-            "huge cut sphere exceeds voxel budget"
-        );
-    }
-
-    #[test]
-    fn cut_hollow_sphere_validates_and_rejects_huge_radius() {
-        assert!(Sdf::cut_hollow_sphere(5.0, 2.0, 0.3).is_ok());
-        assert!(Sdf::cut_hollow_sphere(5.0, 5.0, 0.3).is_err());
-        assert!(Sdf::cut_hollow_sphere(5.0, 2.0, 0.0).is_err());
-        assert!(Sdf::cut_hollow_sphere(5.0, 2.0, -1.0).is_err());
-        assert!(Sdf::cut_hollow_sphere(5.0, f32::NAN, 0.3).is_err());
-
-        let huge = Sdf::cut_hollow_sphere(1.0e30, 0.0, 0.1).unwrap();
-        assert!(
-            huge.to_shape().is_err(),
-            "huge cut hollow sphere exceeds voxel budget"
-        );
-    }
-
-    #[test]
-    fn cut_sphere_bounds_are_tighter_than_the_full_sphere() {
-        let dome = Sdf::cut_sphere(5.0, 2.0).unwrap();
-        let bounds = dome.bounds().unwrap();
-        let w = (25.0f32 - 4.0).sqrt();
-        assert!((bounds.min_y - 2.0).abs() < 1e-5);
-        assert!((bounds.max_y - 5.0).abs() < 1e-5);
-        assert!((bounds.max_x - w).abs() < 1e-5);
-    }
-
-    #[test]
-    fn plane_normalization_is_robust_for_large_finite_components() {
-        let plane = Sdf::plane(f32::MAX, 0.0, 0.0, 0.0).unwrap();
-        assert!((plane.eval_at(2.0, 0.0, 0.0) - 2.0).abs() < 1e-6);
-        let normal = plane.normal(0.0, 0.0, 0.0, 0.01).unwrap();
-        assert!((normal.x - 1.0).abs() < 1e-6);
-        assert!(normal.y.abs() < 1e-6);
-        assert!(normal.z.abs() < 1e-6);
-        let extreme = plane.normal(i32::MAX as f32, 0.0, 0.0, 0.5).unwrap();
-        assert!((extreme.x - 1.0).abs() < 1e-6);
-        assert!(extreme.y.abs() < 1e-6);
-        assert!(extreme.z.abs() < 1e-6);
-        let endpoint = plane.normal(f32::MAX, 0.0, 0.0, 0.5).unwrap();
-        assert!((endpoint.x - 1.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn infinite_cone_validates_angle_range_and_is_unbounded() {
-        assert!(Sdf::infinite_cone(45.0).is_ok());
-        assert!(Sdf::infinite_cone(0.0).is_err());
-        assert!(Sdf::infinite_cone(90.0).is_err());
-        assert!(Sdf::infinite_cone(91.0).is_err());
-        assert!(Sdf::infinite_cone(f32::NAN).is_err());
-
-        let cone = Sdf::infinite_cone(30.0).unwrap();
-        assert!(cone.bounds().is_err());
-        assert!(cone.eval_at(0.0, 0.0, 0.0).abs() < 1e-4);
-    }
-
-    #[test]
-    fn square_pyramid_validates_and_bounds_match_half_extents() {
-        assert!(Sdf::square_pyramid(2.0, 4.0).is_ok());
-        assert!(Sdf::square_pyramid(0.0, 4.0).is_err());
-        assert!(Sdf::square_pyramid(2.0, 0.0).is_err());
-        assert!(Sdf::square_pyramid(-1.0, 4.0).is_err());
-        assert!(Sdf::square_pyramid(2.0, f32::NAN).is_err());
-        assert!(Sdf::square_pyramid(1.0, f32::from_bits(1)).is_err());
-
-        let pyramid = Sdf::square_pyramid(2.0, 4.0).unwrap();
-        let bounds = pyramid.bounds().unwrap();
-        assert!((bounds.min_x + 2.0).abs() < 1e-5);
-        assert!((bounds.max_x - 2.0).abs() < 1e-5);
-        assert!((bounds.min_y + 2.0).abs() < 1e-5);
-        assert!((bounds.max_y - 2.0).abs() < 1e-5);
-        assert!(pyramid.eval_at(0.0, 2.0, 0.0).abs() < 1e-3);
-
-        let huge = Sdf::square_pyramid(1.0e30, 1.0e30).unwrap();
-        assert!(
-            huge.to_shape().is_err(),
-            "huge pyramid exceeds voxel budget"
-        );
-    }
-
-    #[test]
-    fn xor_with_is_solid_in_exactly_one_child() {
-        let left = Sdf::sphere(3.0).unwrap();
-        let right = Sdf::sphere(3.0).unwrap().translate(4.0, 0.0, 0.0).unwrap();
-        let xor = left.xor_with(&right);
-        assert!(xor.eval_at(-2.0, 0.0, 0.0) < 0.0);
-        assert!(xor.eval_at(6.0, 0.0, 0.0) < 0.0);
-        assert!(xor.eval_at(2.0, 0.0, 0.0) > 0.0, "overlap is excluded");
-        assert!(xor.eval_at(20.0, 0.0, 0.0) > 0.0);
-    }
-
-    #[test]
-    fn elongate_validates_half_lengths_and_grows_bounds() {
-        let sphere = Sdf::sphere(1.0).unwrap();
-        assert!(sphere.elongate(3.0, 0.0, 0.0).is_ok());
-        assert!(sphere.elongate(0.0, 0.0, 0.0).is_err());
-        assert!(sphere.elongate(-1.0, 0.0, 0.0).is_err());
-        assert!(sphere.elongate(f32::NAN, 0.0, 0.0).is_err());
-
-        let elongated = sphere.elongate(3.0, 0.0, 0.0).unwrap();
-        let bounds = elongated.bounds().unwrap();
-        assert!((bounds.max_x - 4.0).abs() < 1e-5);
-        assert!((bounds.max_y - 1.0).abs() < 1e-5);
-        assert!((elongated.eval_at(4.0, 0.0, 0.0)).abs() < 1e-4);
-    }
-
-    #[test]
-    fn twist_validates_finite_amount_and_preserves_y_bounds() {
-        let box_shape = Sdf::box_shape(1.0, 5.0, 1.0, 0.0).unwrap();
-        assert!(box_shape.twist(0.5).is_ok());
-        assert!(box_shape.twist(f32::NAN).is_err());
-        assert!(box_shape.twist(f32::INFINITY).is_err());
-
-        let twisted = box_shape.twist(0.5).unwrap();
-        let bounds = twisted.bounds().unwrap();
-        assert!((bounds.min_y + 5.0).abs() < 1e-5);
-        assert!((bounds.max_y - 5.0).abs() < 1e-5);
-        // Untwisted at the origin: deep inside the box, by its smallest half-extent.
-        assert!((twisted.eval_at(0.0, 0.0, 0.0) + 1.0).abs() < 1e-4);
-    }
-
-    #[test]
-    fn bend_validates_finite_amount_and_preserves_z_bounds() {
-        let box_shape = Sdf::box_shape(5.0, 1.0, 1.0, 0.0).unwrap();
-        assert!(box_shape.bend(0.5).is_ok());
-        assert!(box_shape.bend(f32::NAN).is_err());
-        assert!(box_shape.bend(f32::INFINITY).is_err());
-
-        let bent = box_shape.bend(0.5).unwrap();
-        let bounds = bent.bounds().unwrap();
-        assert!((bounds.min_z + 1.0).abs() < 1e-5);
-        assert!((bounds.max_z - 1.0).abs() < 1e-5);
-        // Unbent at the origin: deep inside the box, by its smallest half-extent.
-        assert!((bent.eval_at(0.0, 0.0, 0.0) + 1.0).abs() < 1e-4);
-    }
-
-    use super::ffi::{
-        FieldProgram, FieldProgramBinaryOp, FieldProgramBuilder, FieldProgramDistanceKind,
-        FieldProgramUnaryOp, FieldProgramValueType,
-    };
-
-    fn sphere_builder(radius: f32) -> (Box<FieldProgramBuilder>, u16) {
-        let mut b = FieldProgramBuilder::create();
-        let out = b.add_slot(FieldProgramValueType::Scalar).unwrap();
-        b.set_output(out).unwrap();
-        b.set_bounds(-radius, -radius, -radius, radius, radius, radius)
-            .unwrap();
-        b.set_distance_kind(FieldProgramDistanceKind::Exact)
-            .unwrap();
-        b.push_pos().unwrap();
-        b.unary_op(FieldProgramUnaryOp::Length).unwrap();
-        b.push_const_scalar(radius).unwrap();
-        b.binary_op(FieldProgramBinaryOp::Sub).unwrap();
-        b.store_local(out).unwrap();
-        (b, out)
-    }
-
-    #[test]
-    fn field_program_builder_builds_sphere_and_evaluates() {
-        let (mut b, _) = sphere_builder(2.0);
-        let program = b.build().unwrap();
-        assert!(program.eval_at(0.0, 0.0, 0.0) < 0.0);
-        assert!((program.eval_at(2.0, 0.0, 0.0)).abs() < 1e-5);
-        assert!(program.eval_at(10.0, 0.0, 0.0) > 0.0);
-        let bounds = program.bounds();
-        assert_eq!(bounds.min_x, -2.0);
-        assert_eq!(bounds.max_x, 2.0);
-    }
-
-    #[test]
-    fn field_program_builder_rejects_invalid_output_slot() {
-        let mut b = FieldProgramBuilder::create();
-        let flag = b.add_slot(FieldProgramValueType::Bool).unwrap();
-        b.set_output(flag).unwrap();
-        b.set_bounds(-1.0, -1.0, -1.0, 1.0, 1.0, 1.0).unwrap();
-        b.push_const_bool(true).unwrap();
-        b.store_local(flag).unwrap();
-        assert!(b.build().is_err());
-    }
-
-    #[test]
-    fn field_program_builder_rejects_slots_past_the_limit_immediately() {
-        let mut builder = FieldProgramBuilder::create();
-        for _ in 0..crate::sdf::MAX_SLOTS {
-            builder.add_slot(FieldProgramValueType::Scalar).unwrap();
-        }
-        assert!(builder.add_slot(FieldProgramValueType::Scalar).is_err());
-    }
-
-    #[test]
-    fn field_program_builder_after_build_is_already_consumed() {
-        let (mut b, out) = sphere_builder(1.0);
-        assert!(b.build().is_ok());
-        assert!(b.store_local(out).is_err());
-        assert!(b.build().is_err());
-    }
-
-    #[test]
-    fn field_program_json_roundtrip() {
-        let (mut b, _) = sphere_builder(3.5);
-        let program = b.build().unwrap();
-        let json = program.0.to_json().unwrap();
-        let restored = FieldProgram::from_json_string(json.as_bytes()).unwrap();
-        assert!((program.eval_at(1.0, 1.0, 1.0) - restored.eval_at(1.0, 1.0, 1.0)).abs() < 1e-6);
-        assert!(FieldProgram::from_json_string(b"{ not json").is_err());
-    }
-
-    #[test]
-    fn field_program_builder_bounded_repeat_break_if() {
-        let mut b = FieldProgramBuilder::create();
-        let counter = b.add_slot(FieldProgramValueType::Scalar).unwrap();
-        b.set_output(counter).unwrap();
-        b.set_bounds(-1.0, -1.0, -1.0, 1.0, 1.0, 1.0).unwrap();
-
-        b.begin_repeat(1000).unwrap();
-        b.load_local(counter).unwrap();
-        b.push_const_scalar(1.0).unwrap();
-        b.binary_op(FieldProgramBinaryOp::Add).unwrap();
-        b.store_local(counter).unwrap();
-
-        b.load_local(counter).unwrap();
-        b.push_const_scalar(5.0).unwrap();
-        b.binary_op(FieldProgramBinaryOp::Ge).unwrap();
-        b.break_if().unwrap();
-        b.end_repeat().unwrap();
-
-        let program = b.build().unwrap();
-        assert!((program.eval_at(0.0, 0.0, 0.0) - 5.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn field_program_gradient_returns_unit_normal() {
-        let (mut b, _) = sphere_builder(2.0);
-        let program = b.build().unwrap();
-        let normal = program.gradient(2.0, 0.0, 0.0, 0.01).unwrap();
-        assert!((normal.x - 1.0).abs() < 1e-3);
-        assert!(normal.y.abs() < 1e-3);
-        assert!(normal.z.abs() < 1e-3);
-    }
-
-    #[test]
-    fn field_program_eval_rejects_non_finite_inputs_and_results() {
-        let mut builder = FieldProgramBuilder::create();
-        let output = builder.add_slot(FieldProgramValueType::Scalar).unwrap();
-        builder.set_output(output).unwrap();
-        builder.set_bounds(-1.0, -1.0, -1.0, 1.0, 1.0, 1.0).unwrap();
-        builder.push_const_scalar(0.0).unwrap();
-        builder.push_const_scalar(0.0).unwrap();
-        builder.binary_op(FieldProgramBinaryOp::Div).unwrap();
-        builder.store_local(output).unwrap();
-        let program = builder.build().unwrap();
-
-        assert_eq!(program.eval_at(0.0, 0.0, 0.0), f32::INFINITY);
-        assert_eq!(program.eval_at(f32::NAN, 0.0, 0.0), f32::INFINITY);
-        assert_eq!(program.eval_at(f32::INFINITY, 0.0, 0.0), f32::INFINITY);
-    }
-
-    #[test]
-    fn sdf_from_program_composes_and_reports_bounds() {
-        let (mut b, _) = sphere_builder(2.0);
-        let program = b.build().unwrap();
-        let field = Sdf::from_program(&program);
-        let other = Sdf::sphere(1.0).unwrap().translate(10.0, 0.0, 0.0).unwrap();
-        let union = field.union_with(&other);
-
-        assert!(union.eval_at(0.0, 0.0, 0.0) < 0.0);
-        assert!(union.eval_at(10.0, 0.0, 0.0) < 0.0);
-        assert!(union.eval_at(5.0, 0.0, 0.0) > 0.0);
-
-        let bounds = union.bounds().unwrap();
-        assert!(bounds.min_x <= -2.0);
-        assert!(bounds.max_x >= 11.0);
+    fn parse_blocks_json(json: &DiplomatStr) -> Result<Vec<crate::BlockState>, NucleationError> {
+        let s = std::str::from_utf8(json).map_err(|_| NucleationError::InvalidArgument)?;
+        let ids: Vec<String> = serde_json::from_str(s).map_err(|_| NucleationError::Parse)?;
+        Ok(ids.into_iter().map(crate::BlockState::new).collect())
     }
 }

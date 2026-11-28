@@ -67,3 +67,7 @@ definitionregion_intersect - DefinitionRegion::intersected (alias collapse: in-p
 definitionregion_subtract - DefinitionRegion::subtracted (alias collapse)
 definitionregion_with_metadata - DefinitionRegion::set_metadata (alias collapse)
 definitionregion_set_metadata_mut - DefinitionRegion::set_metadata (alias collapse)
+#
+# --- Clean-break v2 SDF pipeline rework (v0.13.0) ---
+schematic_from_sdf - replaced by VoxelPipeline::to_schematic and Field::to_shape in sdf.rs
+sdf_eval - replaced by Field::eval_at in sdf.rs

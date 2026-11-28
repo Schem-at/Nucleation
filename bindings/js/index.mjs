@@ -14,11 +14,13 @@ export { BlockPos } from "./BlockPos.mjs"
 
 export { Dimensions } from "./Dimensions.mjs"
 
+export { FieldBounds } from "./FieldBounds.mjs"
+
+export { FieldNormal } from "./FieldNormal.mjs"
+
 export { FieldRange } from "./FieldRange.mjs"
 
-export { SdfBounds } from "./SdfBounds.mjs"
-
-export { SdfNormal } from "./SdfNormal.mjs"
+export { FieldSample } from "./FieldSample.mjs"
 
 export { AnimationEffect } from "./AnimationEffect.mjs"
 
@@ -53,8 +55,6 @@ export { Diff } from "./Diff.mjs"
 export { Fingerprint } from "./Fingerprint.mjs"
 
 export { DistanceField } from "./DistanceField.mjs"
-
-export { Field3 } from "./Field3.mjs"
 
 export { Geo } from "./Geo.mjs"
 
@@ -104,11 +104,19 @@ export { SchematicBuilder } from "./SchematicBuilder.mjs"
 
 export { Scripting } from "./Scripting.mjs"
 
-export { FieldProgram } from "./FieldProgram.mjs"
+export { Field } from "./Field.mjs"
 
-export { FieldProgramBuilder } from "./FieldProgramBuilder.mjs"
+export { FieldExprBuilder } from "./FieldExprBuilder.mjs"
 
-export { Sdf } from "./Sdf.mjs"
+export { Material } from "./Material.mjs"
+
+export { MaterialBuilder } from "./MaterialBuilder.mjs"
+
+export { MaterialCondition } from "./MaterialCondition.mjs"
+
+export { ScatterRule } from "./ScatterRule.mjs"
+
+export { VoxelPipeline } from "./VoxelPipeline.mjs"
 
 export { CellExecutor } from "./CellExecutor.mjs"
 
@@ -172,17 +180,17 @@ export { TickSettleMode } from "./TickSettleMode.mjs"
 
 export { MeshPhase } from "./MeshPhase.mjs"
 
-export { FieldProgramBinaryOp } from "./FieldProgramBinaryOp.mjs"
+export { FieldAxis } from "./FieldAxis.mjs"
 
-export { FieldProgramDistanceKind } from "./FieldProgramDistanceKind.mjs"
+export { FieldCellMode } from "./FieldCellMode.mjs"
 
-export { FieldProgramUnaryOp } from "./FieldProgramUnaryOp.mjs"
+export { FieldChannel } from "./FieldChannel.mjs"
 
-export { FieldProgramValueType } from "./FieldProgramValueType.mjs"
+export { FieldDistanceKind } from "./FieldDistanceKind.mjs"
 
-export { SdfAxis } from "./SdfAxis.mjs"
+export { FieldNoiseBasis } from "./FieldNoiseBasis.mjs"
 
-export { SdfCellMode } from "./SdfCellMode.mjs"
+export { ScatterFace } from "./ScatterFace.mjs"
 
 export { NucleationError } from "./NucleationError.mjs"
 

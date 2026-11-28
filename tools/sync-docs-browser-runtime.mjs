@@ -13,14 +13,13 @@ const target = resolve(import.meta.dirname, "../docs/javascripts/vendor/nucleati
 const entries = [
   "Brush.mjs",
   "BuildingTool.mjs",
-  "Field3.mjs",
+  "Field.mjs",
   "InterpolationSpace.mjs",
   "MeshConfig.mjs",
   "MeshResult.mjs",
   "Palette.mjs",
   "ResourcePack.mjs",
   "Schematic.mjs",
-  "Sdf.mjs",
 ];
 const modules = new Set();
 

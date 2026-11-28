@@ -11,12 +11,10 @@
 #include <cstdlib>
 #include "diplomat_runtime.hpp"
 
-namespace diplomat::capi { struct Field3; }
-class Field3;
+namespace diplomat::capi { struct Field; }
+class Field;
 namespace diplomat::capi { struct Palette; }
 class Palette;
-namespace diplomat::capi { struct Sdf; }
-class Sdf;
 class InterpolationSpace;
 class NucleationError;
 
@@ -95,24 +93,10 @@ public:
   inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> curve_gradient(diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, InterpolationSpace space);
 
   /**
-   * Compatibility path that colors voxels by evaluating an SDF graph as
-   * a scalar field. Prefer `field3` for new code.
-   * `stops` are in `[0, 1]`; `colors` are flat RGB triples. The sampled
-   * value is remapped from `[lo, hi]` before reading the gradient.
+   * Color every voxel by evaluating any {@link Field} at its center `(x+0.5, y+0.5, z+0.5)`,
+   * remapping `[lo, hi]` into `[0, 1]`, and sampling the RGB/Oklab gradient stops.
    */
-  inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> field_sdf(const Sdf& field, diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, float lo, float hi, InterpolationSpace space);
-
-  /**
-   * Color every voxel by evaluating a geometry-neutral scalar field at
-   * its center. The field is cloned into the brush, so both wrappers
-   * may be independently destroyed after construction.
-   */
-  inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> field3(const Field3& field, diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, float lo, float hi, InterpolationSpace space);
-
-  /**
-   * Legacy JSON-first field brush. Prefer `field3` for new code.
-   */
-  inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> field(std::string_view field_json, diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, float lo, float hi, InterpolationSpace space);
+  inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> field(const Field& field, diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, float lo, float hi, InterpolationSpace space);
 
     inline const diplomat::capi::Brush* AsFFI() const;
     inline diplomat::capi::Brush* AsFFI();

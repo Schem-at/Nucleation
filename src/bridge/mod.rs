@@ -48,7 +48,6 @@ pub mod definition_region;
 pub mod design;
 pub mod diff;
 pub mod distance_field;
-pub mod field;
 pub mod geo;
 #[cfg(feature = "hdl")]
 pub mod hdl;

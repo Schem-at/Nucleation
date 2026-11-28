@@ -7,13 +7,13 @@ sample and you have the painting version.
 
 ```python
 import json, math, colorsys
-from nucleation import Schematic, Sdf, Brush, BuildingTool, Palette
+from nucleation import Schematic, Field, Brush, BuildingTool, Palette
 
-# One SDF: a torus, minus a repeating lattice of spheres (holes), warped by noise.
+# One Field: a torus, minus a repeating lattice of spheres (holes), warped by noise.
 torus = (
-    Sdf.torus(26, 9)
-    .smooth_subtract(Sdf.sphere(3.5).repeat_infinite(11, 11, 11), 1.5)
-    .warp(3, 0.045, 11)
+    Field.torus(26, 9)
+    .smooth_subtract(Field.sphere(3.5).repeat_infinite(11, 11, 11), 1.5)
+    .warp_noise(3, 0.045, 11, 3)
     .to_shape()
 )
 

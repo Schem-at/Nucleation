@@ -117,7 +117,7 @@ final class Brush {
         return new Brush($result->ok, true);
     }
 
-    public static function fieldSdf( $field, array $stops, array $colors,  $lo,  $hi, int $space) {
+    public static function field( $field, array $stops, array $colors,  $lo,  $hi, int $space) {
         $__n1 = count($stops);
         $__view1 = Lib::ffi()->new('DiplomatF32View');
         if ($__n1 > 0) {
@@ -138,73 +138,7 @@ final class Brush {
             $__view2->data = null;
         }
         $__view2->len = $__n2;
-        $result = Lib::ffi()->Brush_field_sdf($field->ptr, $__view1, $__view2, $lo, $hi, $space);
-        if (!$result->is_ok) {
-            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
-        }
-        return new Brush($result->ok, true);
-    }
-
-    public static function field3( $field, array $stops, array $colors,  $lo,  $hi, int $space) {
-        $__n1 = count($stops);
-        $__view1 = Lib::ffi()->new('DiplomatF32View');
-        if ($__n1 > 0) {
-            $__arr1 = Lib::ffi()->new("float[" . $__n1 . "]", false);
-            foreach ($stops as $__i1 => $__v1) { $__arr1[$__i1] = $__v1; }
-            $__view1->data = \FFI::addr($__arr1[0]);
-        } else {
-            $__view1->data = null;
-        }
-        $__view1->len = $__n1;
-        $__n2 = count($colors);
-        $__view2 = Lib::ffi()->new('DiplomatU8View');
-        if ($__n2 > 0) {
-            $__arr2 = Lib::ffi()->new("uint8_t[" . $__n2 . "]", false);
-            foreach ($colors as $__i2 => $__v2) { $__arr2[$__i2] = $__v2; }
-            $__view2->data = \FFI::addr($__arr2[0]);
-        } else {
-            $__view2->data = null;
-        }
-        $__view2->len = $__n2;
-        $result = Lib::ffi()->Brush_field3($field->ptr, $__view1, $__view2, $lo, $hi, $space);
-        if (!$result->is_ok) {
-            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
-        }
-        return new Brush($result->ok, true);
-    }
-
-    public static function field(string $field_json, array $stops, array $colors,  $lo,  $hi, int $space) {
-        $__n0 = strlen($field_json);
-        $__view0 = Lib::ffi()->new('DiplomatStringView');
-        if ($__n0 > 0) {
-            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
-            \FFI::memcpy($__buf0, $field_json, $__n0);
-            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
-        } else {
-            $__view0->data = null;
-        }
-        $__view0->len = $__n0;
-        $__n1 = count($stops);
-        $__view1 = Lib::ffi()->new('DiplomatF32View');
-        if ($__n1 > 0) {
-            $__arr1 = Lib::ffi()->new("float[" . $__n1 . "]", false);
-            foreach ($stops as $__i1 => $__v1) { $__arr1[$__i1] = $__v1; }
-            $__view1->data = \FFI::addr($__arr1[0]);
-        } else {
-            $__view1->data = null;
-        }
-        $__view1->len = $__n1;
-        $__n2 = count($colors);
-        $__view2 = Lib::ffi()->new('DiplomatU8View');
-        if ($__n2 > 0) {
-            $__arr2 = Lib::ffi()->new("uint8_t[" . $__n2 . "]", false);
-            foreach ($colors as $__i2 => $__v2) { $__arr2[$__i2] = $__v2; }
-            $__view2->data = \FFI::addr($__arr2[0]);
-        } else {
-            $__view2->data = null;
-        }
-        $__view2->len = $__n2;
-        $result = Lib::ffi()->Brush_field($__view0, $__view1, $__view2, $lo, $hi, $space);
+        $result = Lib::ffi()->Brush_field($field->ptr, $__view1, $__view2, $lo, $hi, $space);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }

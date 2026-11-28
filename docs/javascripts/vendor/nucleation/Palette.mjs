@@ -43,6 +43,40 @@ export class Palette {
 
 
     /**
+     * Opaque building blocks and full glass blocks, for material-aware imports.
+     */
+    static materials() {
+
+        const result = wasm.Palette_materials();
+
+        try {
+            return new Palette(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * Keep only opaque blocks (`false`) or full glass blocks (`true`).
+     * Includes/excludes remain respected. Returns an empty palette when
+     * no suitable block exists; check `len()` before matching colours.
+     */
+    forMaterial(translucent) {
+
+        const result = wasm.Palette_for_material(this.ffiValue, translucent);
+
+        try {
+            return new Palette(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
      * Every block blockpedia knows a color for (the default palette
      * brushes use when none is set).
      */

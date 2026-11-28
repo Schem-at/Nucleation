@@ -62,6 +62,21 @@ export class Schematic {
     }
 
     /**
+     * Release all block/entity storage immediately, keeping an empty valid
+     * schematic handle. JS consumers should call this when a parsed world or
+     * editing session is no longer needed instead of waiting for finalizers.
+     */
+    clearContents() {
+    wasm.Schematic_clear_contents(this.ffiValue);
+
+        try {}
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
      * Return an independent deep copy. Subsequent block, region, entity,
      * metadata, or transform changes do not affect the original.
      */
@@ -202,8 +217,7 @@ export class Schematic {
     }
 
     /**
-     * The allocated dimensions (width, height, length) of the schematic's
-     * bounding box.
+     * The dimensions (width, height, length) of the schematic's bounding box.
      */
     dimensions() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 12, 4, false);
@@ -941,6 +955,40 @@ export class Schematic {
 
 
         const result = wasm.Schematic_set_blocks(diplomatReceive.buffer, this.ffiValue, positionsSlice.ptr, blockNameSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return (new Int32Array(wasm.memory.buffer, diplomatReceive.buffer, 1))[0];
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Place many different blocks in one call: position `i` gets
+     * `palette[indices[i]]`. `positions` is flat `[x0,y0,z0, ...]`,
+     * `indices` has one entry per position, and `palette_json` is a JSON
+     * array of block strings (properties and NBT allowed, `simulate` not).
+     * Returns the number of blocks set.
+     */
+    setBlocksIndexed(positions, indices, paletteJson) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const positionsSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, positions, "i32")));
+        const indicesSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, indices, "u32")));
+        const paletteJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, paletteJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_set_blocks_indexed(diplomatReceive.buffer, this.ffiValue, positionsSlice.ptr, indicesSlice.ptr, paletteJsonSlice.ptr);
 
         try {
             if (!diplomatReceive.resultFlag) {
@@ -1741,6 +1789,11 @@ export class Schematic {
      * Air cells are materialized too — on a large sparse build this
      * dump is `volume()`-sized and can exhaust wasm memory; renderers
      * and analyzers want `get_non_air_blocks_json`.
+     *
+     * Prefer `get_non_air_blocks_json` for a block list,
+     * `count_blocks_json` for a material tally and
+     * `non_air_blocks_packed_b64` for bulk transfer. This method is
+     * kept for compatibility and is the wrong tool at any real size.
      */
     getAllBlocksJson() {
         const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
@@ -1810,6 +1863,102 @@ export class Schematic {
     }
 
     /**
+     * Non-air blocks tallied by id: `{"minecraft:stone": 123, ...}`.
+     * One pass, no per block allocation, so a caller that only wants a
+     * material list never has to pull `get_non_air_blocks_json`. "Air"
+     * covers `minecraft:air`, `cave_air` and `void_air` alike.
+     */
+    countBlocksJson() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Schematic_count_blocks_json(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * Apply a `{"from id": "to id"}` map in place and return how many
+     * blocks changed. Keys match on block id only, ignoring block
+     * states; values may carry states (`minecraft:oak_stairs[facing=north]`),
+     * but not NBT: `parse_block_string` only returns a `BlockState`, so
+     * any `{...}` payload on a `to` value is silently dropped rather
+     * than copied onto the replaced block.
+     * A block whose id is not a key is left alone, and so is one that
+     * already equals its target: the count is the number of blocks
+     * actually changed, so a map that rewrites stone to stone returns 0.
+     * Errors with `Parse` on malformed JSON or an unparseable target id.
+     */
+    replaceBlocksJson(mapJson) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const mapJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, mapJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 9, 8, true);
+
+
+        const result = wasm.Schematic_replace_blocks_json(diplomatReceive.buffer, this.ffiValue, mapJsonSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return (new BigUint64Array(wasm.memory.buffer, diplomatReceive.buffer, 1))[0];
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Every non-air block as a compact binary blob, base64 encoded
+     * (`DiplomatWrite` is UTF-8 only, see `to_litematic_b64`). Little
+     * endian throughout:
+     *
+     * ```text
+     * u32 count
+     * count * { i32 x, i32 y, i32 z, u16 palette_index }
+     * u32 palette_json_len
+     * u8[palette_json_len]   ["minecraft:stone", ...]
+     * ```
+     *
+     * Palette indices are assigned in first-seen order, so the same
+     * schematic always packs identically. About seven times smaller
+     * than `get_non_air_blocks_json` and free of per block JSON
+     * parsing on the far side.
+     *
+     * Palette indices are `u16`, so at most 65,535 distinct non-air
+     * block states can be addressed. A schematic with more than that
+     * writes **an empty string**, not a truncated palette: callers must
+     * treat an empty result as "too many distinct states, fall back to
+     * `get_non_air_blocks_json`". No real build has that many.
+     */
+    nonAirBlocksPackedB64() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Schematic_non_air_blocks_packed_b64(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
      * All blocks within a sub-region (chunk) of the schematic, as the same
      * JSON array shape as `get_all_blocks_json`.
      */
@@ -1825,6 +1974,91 @@ export class Schematic {
         finally {
             diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
             write.free();
+        }
+    }
+
+    /**
+     * Non-air blocks inside a bounded box, retaining block-state properties.
+     * Visits only intersecting region cells, not the whole schematic. Bounds
+     * and arithmetic are checked; queries may scan at most 1,048,576 cells
+     * (including region overlaps) and emit at most 32 MiB of JSON. Renderers
+     * should request 16³ sections. Coordinates may be negative.
+     */
+    getChunkNonAirBlocksJson(offsetX, offsetY, offsetZ, width, height, length) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Schematic_get_chunk_non_air_blocks_json(diplomatReceive.buffer, this.ffiValue, offsetX, offsetY, offsetZ, width, height, length, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * Storage metadata and full block states for palette-index streaming. Region order
+     * is default first, then sorted names (highest precedence first); indices are LOCAL to each region. `min`
+     * and `size` are the region's bounds (never tight bounds); `length` cells, x fastest, then z, then y.
+     * No block buffer is cloned or serialized here.
+     */
+    renderRegionsJson() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.Schematic_render_regions_json(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * Copy a window of a region's palette indices (air included) into `out`:
+     * cells `start..start + out.len()` of its bounds, in `render_regions_json`
+     * order. Returns the number of cells written (fewer than `out.len()` at the
+     * end of the region). No coordinate tuples or intermediate allocation.
+     */
+    regionBlockIndices(regionName, start, count) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const regionNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, regionName)));
+        const outBuf = diplomatRuntime.DiplomatBuf.slice(wasm, new Uint32Array(count), "u32");
+        const outSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, outBuf));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_region_block_indices(diplomatReceive.buffer, this.ffiValue, regionNameSlice.ptr, start, outSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            const written = (new Uint32Array(wasm.memory.buffer, diplomatReceive.buffer, 1))[0];
+            return new Uint32Array(wasm.memory.buffer, outBuf.ptr, written).slice();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
         }
     }
 
@@ -3317,8 +3551,9 @@ export class Schematic {
     }
 
     /**
-     * The allocated dimensions (same as `dimensions`; named for parity with
-     * the old `schematic_get_allocated_dimensions`).
+     * The default region's storage dimensions: its bounds plus growth
+     * padding (named for parity with the old
+     * `schematic_get_allocated_dimensions`).
      */
     allocatedDimensions() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 12, 4, false);

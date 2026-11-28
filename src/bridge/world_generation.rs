@@ -54,7 +54,7 @@ pub(crate) fn map_generation_error(
 #[diplomat::bridge]
 pub mod ffi {
     use super::super::building::ffi::Brush;
-    use super::super::sdf::ffi::Sdf;
+    use super::super::sdf::ffi::{Field, VoxelPipeline};
     use super::super::shared::ffi::NucleationError;
     use super::super::world_stream::ffi::WorldChunkView;
     use diplomat_runtime::DiplomatWrite;
@@ -157,10 +157,10 @@ pub mod ffi {
             std::str::from_utf8(value).map_err(|_| NucleationError::InvalidArgument)
         }
 
-        /// Create an SDF-backed source evaluated at voxel centers over the inclusive
+        /// Create a field-backed source evaluated at voxel centers over the inclusive
         /// Y range. `source_id` and `version` become chunk provenance/cache metadata.
         pub fn sdf(
-            volume: &Sdf,
+            volume: &Field,
             material: &Brush,
             min_y: i32,
             max_y: i32,
@@ -185,11 +185,37 @@ pub mod ffi {
             )))
         }
 
-        /// Create a sparse infinite source by placing a bounded SDF motif once per
+        /// Create a world generator backed by a full [`VoxelPipeline`] (multi-material
+        /// layers, CSG tags, fluids, surface scatter, brick interval pruning).
+        pub fn pipeline(
+            pipeline: &VoxelPipeline,
+            min_y: i32,
+            max_y: i32,
+            source_id: &DiplomatStr,
+            version: &DiplomatStr,
+        ) -> Result<Box<WorldGenerator>, NucleationError> {
+            let provenance = crate::world_generation::SourceProvenance::new(
+                Self::utf8(source_id)?,
+                Self::utf8(version)?,
+            )
+            .map_err(super::map_generation_error)?;
+            let source = crate::world_generation::SdfChunkSource::from_pipeline(
+                pipeline.0.clone(),
+                min_y,
+                max_y,
+                provenance,
+            )
+            .map_err(super::map_generation_error)?;
+            Ok(Box::new(WorldGenerator(
+                super::InnerWorldGenerator::Source(Arc::new(source)),
+            )))
+        }
+
+        /// Create a sparse infinite source by placing a bounded field motif once per
         /// deterministically transformed cell. Reuse `config` across layers to keep
         /// terrain, water, vegetation, paths, and structures coordinated.
         pub fn cellular_sdf(
-            volume: &Sdf,
+            volume: &Field,
             material: &Brush,
             min_y: i32,
             max_y: i32,

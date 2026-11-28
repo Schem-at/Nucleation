@@ -7,9 +7,8 @@
 
 #[diplomat::bridge]
 pub mod ffi {
-    use super::super::field::ffi::Field3;
     use super::super::schematic::ffi::Schematic;
-    use super::super::sdf::ffi::Sdf;
+    use super::super::sdf::ffi::Field;
     use super::super::shared::ffi::NucleationError;
     use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
@@ -354,46 +353,6 @@ pub mod ffi {
             Ok(Box::new(Shape(crate::building::ShapeEnum::BezierCurve(
                 crate::building::BezierCurve::new(points, thickness as f64, resolution),
             ))))
-        }
-
-        /// Any SDF tree as a Shape: the same JSON the terrain sampler takes
-        /// (primitives, smooth booleans, noise — see the SDF guide) becomes
-        /// fillable with every brush, combinable with other shapes, and
-        /// usable in masked fills. Normals come from the field gradient, so
-        /// the shaded brush shades smooth blends smoothly. Errors with
-        /// `Parse` on invalid JSON and `InvalidArgument` for unbounded trees
-        /// (use `sdf_bounded`).
-        pub fn sdf(sdf_json: &DiplomatStr) -> Result<Box<Shape>, NucleationError> {
-            let json =
-                std::str::from_utf8(sdf_json).map_err(|_| NucleationError::InvalidArgument)?;
-            let node = crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
-            let shape =
-                crate::building::SdfShape::new(node).ok_or(NucleationError::InvalidArgument)?;
-            Ok(Box::new(Shape(crate::building::ShapeEnum::Sdf(shape))))
-        }
-
-        /// Like `sdf`, with explicit sampling bounds (inclusive block
-        /// coordinates) for unbounded trees such as planes.
-        #[allow(clippy::too_many_arguments)]
-        pub fn sdf_bounded(
-            sdf_json: &DiplomatStr,
-            min_x: i32,
-            min_y: i32,
-            min_z: i32,
-            max_x: i32,
-            max_y: i32,
-            max_z: i32,
-        ) -> Result<Box<Shape>, NucleationError> {
-            let json =
-                std::str::from_utf8(sdf_json).map_err(|_| NucleationError::InvalidArgument)?;
-            let node = crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
-            let shape = crate::building::SdfShape::with_bounds(
-                node,
-                (min_x, min_y, min_z),
-                (max_x, max_y, max_z),
-            )
-            .ok_or(NucleationError::InvalidArgument)?;
-            Ok(Box::new(Shape(crate::building::ShapeEnum::Sdf(shape))))
         }
 
         /// Hollowed-out copy of this shape with the given wall thickness (clones the
@@ -1012,12 +971,10 @@ pub mod ffi {
             ))))
         }
 
-        /// Compatibility path that colors voxels by evaluating an SDF graph as
-        /// a scalar field. Prefer `field3` for new code.
-        /// `stops` are in `[0, 1]`; `colors` are flat RGB triples. The sampled
-        /// value is remapped from `[lo, hi]` before reading the gradient.
-        pub fn field_sdf(
-            field: &Sdf,
+        /// Color every voxel by evaluating any [`Field`] at its center `(x+0.5, y+0.5, z+0.5)`,
+        /// remapping `[lo, hi]` into `[0, 1]`, and sampling the RGB/Oklab gradient stops.
+        pub fn field(
+            field: &Field,
             stops: &[f32],
             colors: &[u8],
             lo: f32,
@@ -1025,35 +982,6 @@ pub mod ffi {
             space: InterpolationSpace,
         ) -> Result<Box<Brush>, NucleationError> {
             field_brush(field.0.clone(), stops, colors, lo, hi, space)
-        }
-
-        /// Color every voxel by evaluating a geometry-neutral scalar field at
-        /// its center. The field is cloned into the brush, so both wrappers
-        /// may be independently destroyed after construction.
-        pub fn field3(
-            field: &Field3,
-            stops: &[f32],
-            colors: &[u8],
-            lo: f32,
-            hi: f32,
-            space: InterpolationSpace,
-        ) -> Result<Box<Brush>, NucleationError> {
-            field3_brush(field.0.clone(), stops, colors, lo, hi, space)
-        }
-
-        /// Legacy JSON-first field brush. Prefer `field3` for new code.
-        pub fn field(
-            field_json: &DiplomatStr,
-            stops: &[f32],
-            colors: &[u8],
-            lo: f32,
-            hi: f32,
-            space: InterpolationSpace,
-        ) -> Result<Box<Brush>, NucleationError> {
-            let json =
-                std::str::from_utf8(field_json).map_err(|_| NucleationError::InvalidArgument)?;
-            let node = crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
-            field_brush(node, stops, colors, lo, hi, space)
         }
     }
 
@@ -1117,7 +1045,7 @@ pub mod ffi {
     }
 
     fn field_brush(
-        node: crate::sdf::SdfNode,
+        field: crate::sdf::Field,
         stops: &[f32],
         colors: &[u8],
         lo: f32,
@@ -1136,32 +1064,7 @@ pub mod ffi {
                 color: crate::blockpedia::ExtendedColorData::from_rgb(color[0], color[1], color[2]),
             })
             .collect();
-        let brush = crate::building::FieldBrush::new(node, gstops, lo as f64, hi as f64)
-            .with_space(space.to_core());
-        Ok(Box::new(Brush(crate::building::BrushEnum::Field(brush))))
-    }
-
-    fn field3_brush(
-        field: crate::field::Field3,
-        stops: &[f32],
-        colors: &[u8],
-        lo: f32,
-        hi: f32,
-        space: InterpolationSpace,
-    ) -> Result<Box<Brush>, NucleationError> {
-        validate_gradient_data(stops, colors)?;
-        if !lo.is_finite() || !hi.is_finite() || lo >= hi {
-            return Err(NucleationError::InvalidArgument);
-        }
-        let gstops = stops
-            .iter()
-            .zip(colors.chunks_exact(3))
-            .map(|(position, color)| crate::building::GradientStop {
-                position: *position as f64,
-                color: crate::blockpedia::ExtendedColorData::from_rgb(color[0], color[1], color[2]),
-            })
-            .collect();
-        let brush = crate::building::FieldBrush::from_field3(field, gstops, lo as f64, hi as f64)
+        let brush = crate::building::FieldBrush::new(field, gstops, lo as f64, hi as f64)
             .map_err(|_| NucleationError::InvalidArgument)?
             .with_space(space.to_core());
         Ok(Box::new(Brush(crate::building::BrushEnum::Field(brush))))
@@ -1188,8 +1091,7 @@ pub mod ffi {
 #[cfg(test)]
 mod sdf_gradient_validation_tests {
     use super::ffi::{Brush, InterpolationSpace};
-    use crate::bridge::field::ffi::Field3;
-    use crate::bridge::sdf::ffi::Sdf;
+    use crate::bridge::sdf::ffi::Field;
 
     #[test]
     fn gradients_reject_non_finite_or_out_of_range_inputs() {
@@ -1200,8 +1102,8 @@ mod sdf_gradient_validation_tests {
             );
         }
 
-        let field = Sdf::sphere(1.0).unwrap();
-        assert!(Brush::field_sdf(
+        let field = Field::sphere(1.0).unwrap();
+        assert!(Brush::field(
             &field,
             &[0.0, 1.0],
             &colors,
@@ -1211,7 +1113,7 @@ mod sdf_gradient_validation_tests {
         )
         .is_err());
         assert!(Brush::field(
-            br#"{"type":"sphere","radius":1}"#,
+            &field,
             &[0.0, f32::INFINITY],
             &colors,
             -1.0,
@@ -1222,10 +1124,10 @@ mod sdf_gradient_validation_tests {
     }
 
     #[test]
-    fn field3_rejects_reversed_domains_and_descending_stops() {
-        let field = Field3::value_noise_fbm(0.125, 17, 4).unwrap();
+    fn field_rejects_reversed_domains_and_descending_stops() {
+        let field = Field::value_fbm3(0.125, 17, 4).unwrap();
         let two_colors = [0_u8, 0, 0, 255, 255, 255];
-        assert!(Brush::field3(
+        assert!(Brush::field(
             &field,
             &[0.0, 1.0],
             &two_colors,
@@ -1234,7 +1136,7 @@ mod sdf_gradient_validation_tests {
             InterpolationSpace::Rgb,
         )
         .is_err());
-        assert!(Brush::field3(
+        assert!(Brush::field(
             &field,
             &[1.0, 0.0],
             &two_colors,
@@ -1245,7 +1147,7 @@ mod sdf_gradient_validation_tests {
         .is_err());
 
         let three_colors = [0_u8, 0, 0, 127, 127, 127, 255, 255, 255];
-        assert!(Brush::field3(
+        assert!(Brush::field(
             &field,
             &[0.0, 0.0, 1.0],
             &three_colors,

@@ -10,7 +10,7 @@ use std::sync::Arc;
 use crate::building::{Brush, BrushEnum, PolygonPrism, Shape};
 use crate::formats::anvil::ChunkSection;
 use crate::formats::world_stream::WorldChunkView;
-use crate::sdf::SdfNode;
+use crate::sdf::{CompiledField, CompiledPipeline, Field, Material, VoxelPipeline};
 use crate::BlockState;
 use rustc_hash::FxHashMap;
 use thiserror::Error;
@@ -779,8 +779,9 @@ struct CellularTransform {
 /// Places a bounded motif once per deterministically transformed world cell.
 #[derive(Clone)]
 pub struct CellularSdfChunkSource {
-    motif: SdfNode,
+    motif: Arc<CompiledField>,
     material: BrushEnum,
+    needs_normal: bool,
     min_y: i32,
     max_y: i32,
     config: CellularSdfConfig,
@@ -813,7 +814,7 @@ fn hash_choice(value: u64, count: u64) -> u64 {
 
 impl CellularSdfChunkSource {
     pub fn new(
-        motif: SdfNode,
+        motif: Field,
         material: BrushEnum,
         min_y: i32,
         max_y: i32,
@@ -826,7 +827,9 @@ impl CellularSdfChunkSource {
         if min_y.div_euclid(16) < i8::MIN as i32 || max_y.div_euclid(16) > i8::MAX as i32 {
             return Err(WorldGenerationError::YBoundsOutOfRange);
         }
-        motif.validate().map_err(WorldGenerationError::InvalidSdf)?;
+        motif
+            .validate()
+            .map_err(|e| WorldGenerationError::InvalidSdf(e.to_string()))?;
         let bounds = motif.bounds().ok_or_else(|| {
             WorldGenerationError::InvalidCellularSource(
                 "motif must have conservative finite bounds".to_string(),
@@ -844,11 +847,7 @@ impl CellularSdfChunkSource {
             ));
         }
         config.validate()?;
-        if brush_needs_normal(&material) {
-            return Err(WorldGenerationError::InvalidCellularSource(
-                "normal-dependent brushes are not supported".to_string(),
-            ));
-        }
+        let needs_normal = brush_needs_normal(&material);
         let motif_radius = bounds.min[0]
             .abs()
             .max(bounds.max[0].abs())
@@ -874,8 +873,9 @@ impl CellularSdfChunkSource {
             ));
         }
         Ok(Self {
-            motif,
+            motif: Arc::new(motif.compile()),
             material,
+            needs_normal,
             min_y,
             max_y,
             config,
@@ -972,25 +972,44 @@ impl ChunkSource for CellularSdfChunkSource {
             .collect();
 
         let mut sections = BTreeMap::<i8, SectionAccumulator>::new();
-        for y in self.min_y..=self.max_y {
-            for z in z0..=z1 {
-                for x in x0..=x1 {
-                    let world_y = y as f32 + 0.5;
-                    if transforms.iter().any(|transform| {
-                        let dx = ((i64::from(x) - transform.anchor_x) as f32 + 0.5
-                            - transform.jitter_x)
-                            / transform.scale;
-                        let dz = ((i64::from(z) - transform.anchor_z) as f32 + 0.5
-                            - transform.jitter_z)
-                            / transform.scale;
-                        let local_x = transform.cos_yaw * dx + transform.sin_yaw * dz;
-                        let local_z = -transform.sin_yaw * dx + transform.cos_yaw * dz;
-                        self.motif
-                            .eval(local_x, world_y - transform.y_offset, local_z)
-                            <= 0.0
-                    }) {
-                        if let Some(block) = self.material.get_block(x, y, z, (0.0, 1.0, 0.0)) {
-                            set_generated_block(&mut sections, x0, z0, x, y, z, block);
+        if !transforms.is_empty() {
+            for y in self.min_y..=self.max_y {
+                let world_y = y as f32 + 0.5;
+                for z in z0..=z1 {
+                    for x in x0..=x1 {
+                        let mut hit: Option<(CellularTransform, f32, f32, f32)> = None;
+                        for transform in &transforms {
+                            let dx = ((i64::from(x) - transform.anchor_x) as f32 + 0.5
+                                - transform.jitter_x)
+                                / transform.scale;
+                            let dz = ((i64::from(z) - transform.anchor_z) as f32 + 0.5
+                                - transform.jitter_z)
+                                / transform.scale;
+                            let local_x = transform.cos_yaw * dx + transform.sin_yaw * dz;
+                            let local_z = -transform.sin_yaw * dx + transform.cos_yaw * dz;
+                            let local_y = world_y - transform.y_offset;
+                            if self.motif.eval(local_x, local_y, local_z) <= 0.0 {
+                                hit = Some((*transform, local_x, local_y, local_z));
+                                break;
+                            }
+                        }
+                        if let Some((tr, lx, ly, lz)) = hit {
+                            let normal = if self.needs_normal {
+                                self.motif
+                                    .normal(lx, ly, lz, 0.5)
+                                    .map(|ln| {
+                                        // Rotate local normal back to world space by inverse of local transform
+                                        let wx = tr.cos_yaw * ln[0] - tr.sin_yaw * ln[2];
+                                        let wz = tr.sin_yaw * ln[0] + tr.cos_yaw * ln[2];
+                                        (wx as f64, ln[1] as f64, wz as f64)
+                                    })
+                                    .unwrap_or((0.0, 1.0, 0.0))
+                            } else {
+                                (0.0, 1.0, 0.0)
+                            };
+                            if let Some(block) = self.material.get_block(x, y, z, normal) {
+                                set_generated_block(&mut sections, x0, z0, x, y, z, block);
+                            }
                         }
                     }
                 }
@@ -1016,19 +1035,34 @@ fn brush_needs_normal(brush: &BrushEnum) -> bool {
     matches!(brush, BrushEnum::Shaded(_) | BrushEnum::Spotlight(_))
 }
 
+/// Chunk source backed by the unified [`VoxelPipeline`] (multi-material layers,
+/// fluids, surface scatter, CSE DAG, and interval brick pruning).
 #[derive(Clone)]
 pub struct SdfChunkSource {
-    volume: SdfNode,
-    material: BrushEnum,
+    pipeline: Arc<CompiledPipeline>,
     min_y: i32,
     max_y: i32,
     provenance: SourceProvenance,
 }
 
 impl SdfChunkSource {
+    /// Construct from a [`Field`] and a [`BrushEnum`] (convenience wrapper
+    /// around [`Self::from_pipeline`]).
     pub fn new(
-        volume: SdfNode,
+        volume: Field,
         material: BrushEnum,
+        min_y: i32,
+        max_y: i32,
+        provenance: SourceProvenance,
+    ) -> Result<Self, WorldGenerationError> {
+        let pipeline = VoxelPipeline::new(volume, Material::from_brush(material));
+        Self::from_pipeline(pipeline, min_y, max_y, provenance)
+    }
+
+    /// Construct from a full [`VoxelPipeline`] with layered materials, CSG tags,
+    /// fluids, and surface scatter.
+    pub fn from_pipeline(
+        pipeline: VoxelPipeline,
         min_y: i32,
         max_y: i32,
         provenance: SourceProvenance,
@@ -1039,12 +1073,11 @@ impl SdfChunkSource {
         if min_y.div_euclid(16) < i8::MIN as i32 || max_y.div_euclid(16) > i8::MAX as i32 {
             return Err(WorldGenerationError::YBoundsOutOfRange);
         }
-        volume
-            .validate()
+        let compiled = pipeline
+            .compile()
             .map_err(WorldGenerationError::InvalidSdf)?;
         Ok(Self {
-            volume,
-            material,
+            pipeline: Arc::new(compiled),
             min_y,
             max_y,
             provenance,
@@ -1075,36 +1108,12 @@ impl ChunkSource for SdfChunkSource {
             }
         }
 
-        let needs_normal = brush_needs_normal(&self.material);
+        let blocks = self
+            .pipeline
+            .generate_chunk_blocks(x0, z0, self.min_y, self.max_y);
         let mut sections = BTreeMap::<i8, SectionAccumulator>::new();
-        for y in self.min_y..=self.max_y {
-            for z in z0..=z1 {
-                for x in x0..=x1 {
-                    let point = (x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5);
-                    if self.volume.eval(point.0, point.1, point.2) > 0.0 {
-                        continue;
-                    }
-                    let normal = if needs_normal {
-                        crate::sdf::numerical_normal(&self.volume, [point.0, point.1, point.2], 0.5)
-                            .map(|normal| (normal[0], normal[1], normal[2]))
-                            .unwrap_or((0.0, 1.0, 0.0))
-                    } else {
-                        (0.0, 1.0, 0.0)
-                    };
-                    if let Some(block) = self.material.get_block(x, y, z, normal) {
-                        let section_y = y.div_euclid(16) as i8;
-                        sections
-                            .entry(section_y)
-                            .or_insert_with(|| SectionAccumulator::new(section_y))
-                            .set(
-                                (x - x0) as usize,
-                                y.rem_euclid(16) as usize,
-                                (z - z0) as usize,
-                                block,
-                            );
-                    }
-                }
-            }
+        for (x, y, z, block) in blocks {
+            set_generated_block(&mut sections, x0, z0, x, y, z, block);
         }
         let chunk = WorldChunkView::from_generated_sections(
             request.cx,

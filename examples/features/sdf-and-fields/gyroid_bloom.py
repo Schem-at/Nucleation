@@ -12,13 +12,10 @@ from pathlib import Path
 from nucleation import (
     AnimationEffect,
     BuildAnimation,
-    FieldProgramBinaryOp as B,
-    FieldProgramBuilder,
-    FieldProgramDistanceKind as DistanceKind,
-    FieldProgramUnaryOp as U,
-    FieldProgramValueType as ValueType,
+    Field,
+    FieldDistanceKind,
+    FieldExprBuilder,
     RenderConfig,
-    Sdf,
 )
 
 RADIUS = 15
@@ -29,40 +26,16 @@ STAGGER_MS = 1_500.0
 FPS = 20.0
 
 
-def gyroid() -> Sdf:
+def gyroid() -> Field:
     """Build ``abs(sin x cos y + sin y cos z + sin z cos x) - t``."""
-    p = FieldProgramBuilder.create()
-    q = p.add_slot(ValueType.Vec3)
-    distance = p.add_slot(ValueType.Scalar)
-    p.set_output(distance)
-    p.set_bounds(-RADIUS, -RADIUS, -RADIUS, RADIUS, RADIUS, RADIUS)
-    p.set_distance_kind(DistanceKind.Implicit)
-
-    p.push_pos()
-    p.push_const_scalar(FREQUENCY)
-    p.binary_op(B.Scale)
-    p.store_local(q)
-
-    for sine_axis, cosine_axis in (
-        (U.VecX, U.VecY),
-        (U.VecY, U.VecZ),
-        (U.VecZ, U.VecX),
-    ):
-        p.load_local(q)
-        p.unary_op(sine_axis)
-        p.unary_op(U.Sin)
-        p.load_local(q)
-        p.unary_op(cosine_axis)
-        p.unary_op(U.Cos)
-        p.binary_op(B.Mul)
-    p.binary_op(B.Add)
-    p.binary_op(B.Add)
-    p.unary_op(U.Abs)
-    p.push_const_scalar(THICKNESS)
-    p.binary_op(B.Sub)
-    p.store_local(distance)
-
-    return Sdf.from_program(p.build()).intersection_with(Sdf.sphere(RADIUS - 0.5))
+    builder = FieldExprBuilder.create()
+    builder.set_bounds(-RADIUS, -RADIUS, -RADIUS, RADIUS, RADIUS, RADIUS)
+    builder.set_distance_kind(FieldDistanceKind.Implicit)
+    expr = builder.compile(
+        f"let q = p * {FREQUENCY}; "
+        f"abs(sin(q.x)*cos(q.y) + sin(q.y)*cos(q.z) + sin(q.z)*cos(q.x)) - {THICKNESS}"
+    )
+    return expr.intersection_with(Field.sphere(RADIUS - 0.5))
 
 
 def materialize() -> AnimationEffect:

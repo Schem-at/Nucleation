@@ -39,7 +39,7 @@ Every capability, with its own deep-dive doc:
 - [Formats and I/O](docs/features/formats-and-io.md) — load, edit, and save every supported format
 - [Regions, transforms, stamping](docs/features/regions-and-transforms.md) — deterministic multi-region builds, scoped rigid transforms, and reusable stamping
 - [Shapes, brushes, masked fills](docs/features/shapes-and-brushes.md) — the building primitives
-- [SDF shapes, terrain, and fields](docs/features/sdf-and-fields.md) — typed composable geometry, custom functions, terrain, Voronoi
+- [SDF shapes, terrain, and fields](docs/features/sdf-and-fields.md) — unified `Field` DAG, infix expression language, composable `Material` / `VoxelPipeline` (layers, tag seam dithering, fluids, scatter), CSE compiler, and `8×8×8` interval pruning
 - [Palettes and color](docs/features/palettes-and-color.md) — turning colors into blocks
 - [Voxelizing 3D models](docs/features/voxelize.md) — GLB/OBJ meshes, texture projection
 - [Geodata](docs/features/geo.md) — elevation grids and OSM footprints

@@ -26,7 +26,7 @@ namespace capi {
 
 namespace nucleation {
 /**
- * The closed interval a field's values are analytically proven to lie in.
+ * Analytically proven inclusive scalar output range `[min, max]`.
  */
 struct FieldRange {
     float min;

@@ -6,14 +6,14 @@ ways.
 
 ```python
 from nucleation import (Schematic, Shape, Brush, BuildingTool, Palette,
-                        InterpolationSpace, Sdf, SdfCellMode)
+                        InterpolationSpace, Field, FieldCellMode)
 
-field  = Sdf.cells(0.11, 7, 1.0, SdfCellMode.CellValue, 0.0)
+field  = Field.cells(0.11, 7, 1.0, FieldCellMode.CellValue)
 stops  = [0.0, 0.25, 0.5, 0.75, 1.0]
 colors = bytes([235,70,70, 240,175,45, 70,200,90, 60,150,235, 160,80,220])
 
 # TEXTURE: color a sphere by which Voronoi cell each voxel falls in.
-brush = Brush.field_sdf(field, stops, colors, 0.0, 1.0, InterpolationSpace.Oklab)
+brush = Brush.field(field, stops, colors, 0.0, 1.0, InterpolationSpace.Oklab)
 brush.set_palette(Palette.concrete())
 mosaic = Schematic.create("mosaic")
 BuildingTool.fill(mosaic, Shape.sphere(0, 0, 0, 20), brush)

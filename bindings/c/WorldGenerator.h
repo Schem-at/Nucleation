@@ -9,11 +9,12 @@
 
 #include "Brush.d.h"
 #include "CellularSdfConfig.d.h"
+#include "Field.d.h"
 #include "GeneratedChunk.d.h"
 #include "GeneratedChunkOverlayMode.d.h"
 #include "GeneratedWorldStream.d.h"
 #include "NucleationError.d.h"
-#include "Sdf.d.h"
+#include "VoxelPipeline.d.h"
 
 #include "WorldGenerator.d.h"
 
@@ -23,10 +24,13 @@
 
 
 typedef struct WorldGenerator_sdf_result {union {WorldGenerator* ok; NucleationError err;}; bool is_ok;} WorldGenerator_sdf_result;
-WorldGenerator_sdf_result WorldGenerator_sdf(const Sdf* volume, const Brush* material, int32_t min_y, int32_t max_y, DiplomatStringView source_id, DiplomatStringView version);
+WorldGenerator_sdf_result WorldGenerator_sdf(const Field* volume, const Brush* material, int32_t min_y, int32_t max_y, DiplomatStringView source_id, DiplomatStringView version);
+
+typedef struct WorldGenerator_pipeline_result {union {WorldGenerator* ok; NucleationError err;}; bool is_ok;} WorldGenerator_pipeline_result;
+WorldGenerator_pipeline_result WorldGenerator_pipeline(const VoxelPipeline* pipeline, int32_t min_y, int32_t max_y, DiplomatStringView source_id, DiplomatStringView version);
 
 typedef struct WorldGenerator_cellular_sdf_result {union {WorldGenerator* ok; NucleationError err;}; bool is_ok;} WorldGenerator_cellular_sdf_result;
-WorldGenerator_cellular_sdf_result WorldGenerator_cellular_sdf(const Sdf* volume, const Brush* material, int32_t min_y, int32_t max_y, const CellularSdfConfig* config, DiplomatStringView source_id, DiplomatStringView version);
+WorldGenerator_cellular_sdf_result WorldGenerator_cellular_sdf(const Field* volume, const Brush* material, int32_t min_y, int32_t max_y, const CellularSdfConfig* config, DiplomatStringView source_id, DiplomatStringView version);
 
 typedef struct WorldGenerator_projected_footprints_result {union {WorldGenerator* ok; NucleationError err;}; bool is_ok;} WorldGenerator_projected_footprints_result;
 WorldGenerator_projected_footprints_result WorldGenerator_projected_footprints(DiplomatStringView buildings_json, DiplomatStringView base_block, DiplomatStringView source_id, DiplomatStringView version);

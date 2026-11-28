@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Generate a typed SDF island with a concrete color gradient."""
+"""Generate a typed Field island with a concrete color gradient."""
 
 import sys
 
 from nucleation import (
     Brush,
     BuildingTool,
+    Field,
     InterpolationSpace,
     Palette,
     Schematic,
-    Sdf,
 )
 
 output = sys.argv[1] if len(sys.argv) > 1 else "sdf-gradient.litematic"
 
-field = Sdf.ellipsoid(14, 8, 14).displace(
-    amplitude=3,
+field = Field.ellipsoid(14, 8, 14).displace_noise(
+    amplitude=3.0,
     frequency=0.1,
     seed=7,
     octaves=3,

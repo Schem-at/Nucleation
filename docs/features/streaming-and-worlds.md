@@ -47,10 +47,10 @@ portable bindings never call host code per voxel.
 
 ```python
 from nucleation import (
-    Brush, GeneratedChunkCoverage, Sdf, WorldGenerator, WorldSink,
+    Brush, Field, GeneratedChunkCoverage, WorldGenerator, WorldSink,
 )
 
-terrain = Sdf.plane(0.0, 1.0, 0.0, -12.0).displace(3.0, 0.04, 42, 4)
+terrain = Field.plane(0.0, 1.0, 0.0, -12.0).displace_noise(3.0, 0.04, 42, 4)
 source = WorldGenerator.sdf(
     terrain,
     Brush.solid("minecraft:stone"),
@@ -87,20 +87,22 @@ Generation failures are errors, not missing coverage.
 
 ### SDF, projected OSM data, and composition
 
-`WorldGenerator.sdf` evaluates a validated native SDF at voxel centers and builds
-Anvil sections and palettes directly. Geometry and brushes execute entirely in
-Rust. Because the current SDF evaluator is `f32`, requests beyond exact
-half-integer voxel-center precision fail instead of silently aliasing neighboring
-blocks.
+`WorldGenerator.sdf` evaluates a compiled native `Field` at voxel centers with
+`Brush` coloring, and `WorldGenerator.pipeline` runs a full `VoxelPipeline`
+(multi-material `Layers`/`MatchTag`, `FluidLayer` water/lava fills, and
+`ScatterRule` surface features) per chunk with automatic CSE and `8×8×8` brick
+pruning. Geometry, materials, and scatter execute entirely in Rust. Because the
+SDF evaluator is `f32`, requests beyond exact half-integer voxel-center
+precision fail instead of silently aliasing neighboring blocks.
 
-`WorldGenerator.cellular_sdf` turns a **bounded** SDF motif into a non-periodic
+`WorldGenerator.cellular_sdf` turns a **bounded** `Field` motif into a non-periodic
 hashed-cell source. Signed cell coordinates deterministically select position
 jitter, yaw, horizontal scale, elevation, and optional feature presence. Reusing
 one `CellularSdfConfig` across material layers keeps a cliff, river, waterfall,
 forest, path, and cabin spatially coordinated without modulo-wrapping the world:
 
 ```python
-from nucleation import Brush, CellularSdfConfig, Sdf, WorldGenerator
+from nucleation import Brush, CellularSdfConfig, Field, WorldGenerator
 
 cells = CellularSdfConfig.create(
     192, 160, 0x6A09E667,  # cell dimensions and world seed
@@ -110,7 +112,7 @@ cells = CellularSdfConfig.create(
     1, 1, 0,               # presence ratio and feature salt
 )
 landmark = WorldGenerator.cellular_sdf(
-    Sdf.sphere(24.0), Brush.solid("minecraft:stone"),
+    Field.sphere(24.0), Brush.solid("minecraft:stone"),
     -32, 64, cells, "example:landmarks", "recipe-v1",
 )
 ```

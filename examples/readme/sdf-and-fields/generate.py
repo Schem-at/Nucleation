@@ -8,24 +8,23 @@ from nucleation import (
     Brush,
     BuildAnimation,
     BuildingTool,
-    Field3,
+    Field,
     InterpolationSpace,
     Palette,
     RenderConfig,
     Renderer,
     Schematic,
-    Sdf,
 )
 
 
 def make_observatory():
-    field = Field3.value_noise_fbm(0.13, 73, 3)
-    body = Sdf.ellipsoid(11, 7, 11).offset_by_field(field, 1.7)
-    form = body.subtract(Sdf.capped_cylinder(3.2, 12)).smooth_union(
-        Sdf.torus(9.2, 1.45),
+    field = Field.value_fbm3(0.13, 73, 3)
+    body = Field.ellipsoid(11, 7, 11).displace(field, 1.7)
+    form = body.subtract(Field.capped_cylinder(3.2, 12)).smooth_union(
+        Field.torus(9.2, 1.45),
         0.7,
     )
-    brush = Brush.field3(
+    brush = Brush.field(
         field,
         [0.0, 0.5, 1.0],
         [25, 38, 105, 42, 185, 165, 245, 185, 48],

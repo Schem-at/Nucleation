@@ -42,6 +42,34 @@ final class WorldGenerator {
         return new WorldGenerator($result->ok, true);
     }
 
+    public static function pipeline( $pipeline,  $min_y,  $max_y, string $source_id, string $version) {
+        $__n3 = strlen($source_id);
+        $__view3 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n3 > 0) {
+            $__buf3 = Lib::ffi()->new("uint8_t[" . $__n3 . "]", false);
+            \FFI::memcpy($__buf3, $source_id, $__n3);
+            $__view3->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf3[0]));
+        } else {
+            $__view3->data = null;
+        }
+        $__view3->len = $__n3;
+        $__n4 = strlen($version);
+        $__view4 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n4 > 0) {
+            $__buf4 = Lib::ffi()->new("uint8_t[" . $__n4 . "]", false);
+            \FFI::memcpy($__buf4, $version, $__n4);
+            $__view4->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf4[0]));
+        } else {
+            $__view4->data = null;
+        }
+        $__view4->len = $__n4;
+        $result = Lib::ffi()->WorldGenerator_pipeline($pipeline->ptr, $min_y, $max_y, $__view3, $__view4);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new WorldGenerator($result->ok, true);
+    }
+
     public static function cellularSdf( $volume,  $material,  $min_y,  $max_y,  $config, string $source_id, string $version) {
         $__n5 = strlen($source_id);
         $__view5 = Lib::ffi()->new('DiplomatStringView');

@@ -5,7 +5,7 @@ import os
 from collections import defaultdict
 from pathlib import Path
 
-from nucleation import AnimationEffect, BuildAnimation, RenderConfig, Sdf
+from nucleation import AnimationEffect, BuildAnimation, Field, RenderConfig
 
 ROOT = Path(__file__).resolve().parents[3]
 FPS = 20.0
@@ -13,13 +13,13 @@ EFFECT_MS = 5_000.0
 STAGGER_MS = 1_500.0
 
 
-def rocket_parts() -> tuple[Sdf, Sdf, Sdf, Sdf, Sdf, Sdf]:
+def rocket_parts() -> tuple[Field, Field, Field, Field, Field, Field]:
     """Return the named terms used by the readable composition example."""
-    body = Sdf.capped_cylinder(4.5, 8.0)
-    nose = Sdf.capped_cone(4.0, 4.5, 0.0).translate(0.0, 12.0, 0.0)
+    body = Field.capped_cylinder(4.5, 8.0)
+    nose = Field.capped_cone(4.0, 4.5, 0.0).translate(0.0, 12.0, 0.0)
 
-    fin_x = Sdf.box_shape(2.0, 3.5, 1.2, 0.65)
-    fin_z = Sdf.box_shape(1.2, 3.5, 2.0, 0.65)
+    fin_x = Field.box_shape(2.0, 3.5, 1.2, 0.65)
+    fin_z = Field.box_shape(1.2, 3.5, 2.0, 0.65)
     fins = fin_x.translate(4.5, -5.0, 0.0).union_with(
         fin_x.translate(-4.5, -5.0, 0.0)
     ).union_with(
@@ -27,13 +27,13 @@ def rocket_parts() -> tuple[Sdf, Sdf, Sdf, Sdf, Sdf, Sdf]:
     ).union_with(
         fin_z.translate(0.0, -5.0, -4.5)
     )
-    nozzle = Sdf.capped_cone(2.0, 0.8, 1.9).translate(0.0, -10.0, 0.0)
-    window_cut = Sdf.capped_cylinder(2.1, 1.2).rotate(90.0, 0.0, 0.0).translate(0.0, 3.5, 4.1)
-    window_glass = Sdf.capped_cylinder(1.55, 0.55).rotate(90.0, 0.0, 0.0).translate(0.0, 3.5, 4.2)
+    nozzle = Field.capped_cone(2.0, 0.8, 1.9).translate(0.0, -10.0, 0.0)
+    window_cut = Field.capped_cylinder(2.1, 1.2).rotate(90.0, 0.0, 0.0).translate(0.0, 3.5, 4.1)
+    window_glass = Field.capped_cylinder(1.55, 0.55).rotate(90.0, 0.0, 0.0).translate(0.0, 3.5, 4.2)
     return body, nose, fins, nozzle, window_cut, window_glass
 
 
-def rocket() -> Sdf:
+def rocket() -> Field:
     body, nose, fins, nozzle, window_cut, window_glass = rocket_parts()
     hull = body.smooth_union(nose, 1.1).smooth_union(fins, 0.75).union_with(nozzle)
     return hull.subtract(window_cut).union_with(window_glass)
@@ -64,7 +64,7 @@ def materialize() -> AnimationEffect:
 
 
 def block_for(
-    x: int, y: int, z: int, nose: Sdf, fins: Sdf, nozzle: Sdf, window_glass: Sdf
+    x: int, y: int, z: int, nose: Field, fins: Field, nozzle: Field, window_glass: Field
 ) -> str:
     if window_glass.eval_at(x, y, z) <= 0.0:
         return "minecraft:light_blue_stained_glass"

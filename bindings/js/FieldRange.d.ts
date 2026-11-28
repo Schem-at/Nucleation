@@ -4,7 +4,7 @@ import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
 
 /**
- * The closed interval a field's values are analytically proven to lie in.
+ * Analytically proven inclusive scalar output range `[min, max]`.
  */
 export class FieldRange {
     get min(): number;

@@ -15,12 +15,14 @@ namespace diplomat::capi { struct Brush; }
 class Brush;
 namespace diplomat::capi { struct CellularSdfConfig; }
 class CellularSdfConfig;
+namespace diplomat::capi { struct Field; }
+class Field;
 namespace diplomat::capi { struct GeneratedChunk; }
 class GeneratedChunk;
 namespace diplomat::capi { struct GeneratedWorldStream; }
 class GeneratedWorldStream;
-namespace diplomat::capi { struct Sdf; }
-class Sdf;
+namespace diplomat::capi { struct VoxelPipeline; }
+class VoxelPipeline;
 class GeneratedChunkOverlayMode;
 class NucleationError;
 
@@ -43,17 +45,23 @@ class WorldGenerator {
 public:
 
   /**
-   * Create an SDF-backed source evaluated at voxel centers over the inclusive
+   * Create a field-backed source evaluated at voxel centers over the inclusive
    * Y range. `source_id` and `version` become chunk provenance/cache metadata.
    */
-  inline static diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError> sdf(const Sdf& volume, const Brush& material, int32_t min_y, int32_t max_y, std::string_view source_id, std::string_view version);
+  inline static diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError> sdf(const Field& volume, const Brush& material, int32_t min_y, int32_t max_y, std::string_view source_id, std::string_view version);
 
   /**
-   * Create a sparse infinite source by placing a bounded SDF motif once per
+   * Create a world generator backed by a full {@link VoxelPipeline} (multi-material
+   * layers, CSG tags, fluids, surface scatter, brick interval pruning).
+   */
+  inline static diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError> pipeline(const VoxelPipeline& pipeline, int32_t min_y, int32_t max_y, std::string_view source_id, std::string_view version);
+
+  /**
+   * Create a sparse infinite source by placing a bounded field motif once per
    * deterministically transformed cell. Reuse `config` across layers to keep
    * terrain, water, vegetation, paths, and structures coordinated.
    */
-  inline static diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError> cellular_sdf(const Sdf& volume, const Brush& material, int32_t min_y, int32_t max_y, const CellularSdfConfig& config, std::string_view source_id, std::string_view version);
+  inline static diplomat::result<std::unique_ptr<WorldGenerator>, NucleationError> cellular_sdf(const Field& volume, const Brush& material, int32_t min_y, int32_t max_y, const CellularSdfConfig& config, std::string_view source_id, std::string_view version);
 
   /**
    * Create a sparse source from projected building footprints, including

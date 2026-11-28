@@ -1604,27 +1604,12 @@ fn sample_stops(stops: &[GradientStop], t: f64, space: InterpolationSpace) -> Ex
     }
 }
 
-/// Internal compatibility source for the pre-v2 SDF/JSON field-brush entry points.
-#[derive(Clone)]
-enum FieldBrushSource {
-    Field3(crate::field::Field3),
-    LegacySdf(crate::sdf::SdfNode),
-}
-
-impl FieldBrushSource {
-    fn eval(&self, x: f32, y: f32, z: f32) -> f32 {
-        match self {
-            FieldBrushSource::Field3(field) => field.eval(x, y, z),
-            FieldBrushSource::LegacySdf(field) => field.eval(x, y, z),
-        }
-    }
-}
-
-/// A brush that colors each voxel from a scalar source: evaluate the source at
-/// the voxel center, remap `[lo, hi]` to `[0, 1]`, and read a multi-stop gradient.
+/// A brush that colors each voxel from any scalar [`crate::sdf::Field`]:
+/// evaluates the compiled field at the voxel center `(x + 0.5, y + 0.5, z + 0.5)`,
+/// remaps `[lo, hi]` to `[0, 1]`, and reads a multi-stop gradient.
 #[derive(Clone)]
 pub struct FieldBrush {
-    field: FieldBrushSource,
+    field: Arc<crate::sdf::CompiledField>,
     stops: Vec<GradientStop>,
     lo: f64,
     hi: f64,
@@ -1633,24 +1618,10 @@ pub struct FieldBrush {
 }
 
 impl FieldBrush {
-    /// Construct from an existing SDF-shaped scalar source.
-    ///
-    /// This retains the historical Rust API. New geometry-neutral scalar fields
-    /// should use [`Self::from_field3`].
-    pub fn new(field: crate::sdf::SdfNode, stops: Vec<GradientStop>, lo: f64, hi: f64) -> Self {
-        Self {
-            field: FieldBrushSource::LegacySdf(field),
-            stops,
-            lo,
-            hi,
-            palette: get_default_palette(),
-            space: InterpolationSpace::Oklab,
-        }
-    }
-
-    /// Construct from a geometry-neutral reusable [`crate::field::Field3`].
-    pub fn from_field3(
-        field: crate::field::Field3,
+    /// Construct from any [`crate::sdf::Field`] (distance field, noise, expression,
+    /// cellular pattern, etc.).
+    pub fn new(
+        field: crate::sdf::Field,
         stops: Vec<GradientStop>,
         lo: f64,
         hi: f64,
@@ -1666,10 +1637,12 @@ impl FieldBrush {
                 .windows(2)
                 .any(|pair| pair[0].position > pair[1].position)
         {
-            return Err("field3 brush requires lo < hi and nondecreasing stops in [0, 1]".into());
+            return Err("field brush requires lo < hi and nondecreasing stops in [0, 1]".into());
         }
+        field.validate()?;
+        let compiled = field.compile();
         Ok(Self {
-            field: FieldBrushSource::Field3(field),
+            field: Arc::new(compiled),
             stops,
             lo,
             hi,

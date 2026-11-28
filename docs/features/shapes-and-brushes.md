@@ -111,7 +111,7 @@ fields belongs to the [SDFs and fields](sdf-and-fields.md) guide.
 | Volumes | `sphere`, `cuboid`, `ellipsoid`, `cylinder`, `cylinder_between`, `cone`, `pyramid`, `polygon_prism` |
 | Curved paths | `torus`, `line`, `bezier`, `tube_along` |
 | Surfaces | `disk`, `plane`, `triangle` |
-| Derived | `sdf`, `sdf_bounded`, voxelized mesh shapes, boolean combinators, `hollow` |
+| Derived | `Field.to_shape` / `Field.to_shape_bounded`, voxelized mesh shapes, boolean combinators, `hollow` |
 
 Constructors use schematic coordinates. Axes and direction vectors are
 normalized internally where required. Zero-length vectors fall back to each
@@ -129,7 +129,7 @@ shape's documented default orientation.
 | `curve_gradient` | color stops sampled from a shape's parameter `t` |
 | `shaded` | base color lit by the shape's surface normal |
 | `spotlight` | color constrained by a position, direction, and cone |
-| `field` / `field3` / `field_sdf` | color selected from a scalar field |
+| `field` | color selected from any scalar `Field` (noise, Worley, expression, or SDF) |
 
 Color interpolation can use RGB or Oklab. The interpolated color is then
 matched against the brush palette. A wool palette cannot select concrete, even

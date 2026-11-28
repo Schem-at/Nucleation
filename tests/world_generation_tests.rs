@@ -1,8 +1,8 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use nucleation::building::{BrushEnum, SolidBrush};
-use nucleation::sdf::SdfNode;
+use nucleation::building::{BrushEnum, ShadedBrush, SolidBrush};
+use nucleation::sdf::{Condition, Field, FluidLayer, Material, MaterialLayer, VoxelPipeline};
 use nucleation::world_generation::{
     CellularSdfChunkSource, CellularSdfConfig, ChunkBounds, ChunkCoverage, ChunkOverlayMode,
     ChunkRequest, ChunkResult, ChunkSource, CompositeChunkSource, GeneratedChunkStream,
@@ -17,7 +17,7 @@ fn stone_brush() -> BrushEnum {
 #[test]
 fn sdf_source_generates_requested_chunk_at_voxel_centers() {
     let source = SdfChunkSource::new(
-        SdfNode::Sphere { radius: 2.0 },
+        Field::sphere(2.0).unwrap(),
         stone_brush(),
         -4,
         4,
@@ -45,7 +45,7 @@ fn sdf_source_generates_requested_chunk_at_voxel_centers() {
 #[test]
 fn sdf_source_rejects_reversed_y_bounds() {
     let result = SdfChunkSource::new(
-        SdfNode::Sphere { radius: 2.0 },
+        Field::sphere(2.0).unwrap(),
         stone_brush(),
         5,
         4,
@@ -58,7 +58,7 @@ fn sdf_source_rejects_reversed_y_bounds() {
 #[test]
 fn sdf_source_rejects_unrepresentable_section_bounds() {
     let result = SdfChunkSource::new(
-        SdfNode::Sphere { radius: 2.0 },
+        Field::sphere(2.0).unwrap(),
         stone_brush(),
         (i8::MIN as i32) * 16 - 1,
         4,
@@ -72,16 +72,37 @@ fn sdf_source_rejects_unrepresentable_section_bounds() {
 }
 
 #[test]
-fn sdf_source_rejects_invalid_sdf_before_generation() {
-    let result = SdfChunkSource::new(
-        SdfNode::Sphere { radius: f32::NAN },
-        stone_brush(),
+fn sdf_pipeline_source_supports_layered_materials_and_fluids_in_chunks() {
+    let ground = Field::plane([0.0, 1.0, 0.0], 0.0).unwrap();
+    let mat = Material::layered(
+        vec![MaterialLayer {
+            condition: Condition::depth_below_surface(Some(0), Some(0)),
+            material: Material::solid("minecraft:grass_block"),
+        }],
+        Some(Material::solid("minecraft:stone")),
+    );
+    let pipe = VoxelPipeline::new(ground, mat)
+        .with_fluid(FluidLayer::level(2.0, "minecraft:water").unwrap());
+    let source = SdfChunkSource::from_pipeline(
+        pipe,
         -4,
         4,
-        SourceProvenance::new("example:terrain", "v1").unwrap(),
+        SourceProvenance::new("example:pipeline", "v2").unwrap(),
+    )
+    .unwrap();
+    let chunk = source.generate(ChunkRequest::new(0, 0)).unwrap();
+    assert_eq!(
+        chunk.chunk().get_block(0, -1, 0).unwrap().get_name(),
+        "minecraft:grass_block"
     );
-
-    assert!(matches!(result, Err(WorldGenerationError::InvalidSdf(_))));
+    assert_eq!(
+        chunk.chunk().get_block(0, -2, 0).unwrap().get_name(),
+        "minecraft:stone"
+    );
+    assert_eq!(
+        chunk.chunk().get_block(0, 0, 0).unwrap().get_name(),
+        "minecraft:water"
+    );
 }
 
 #[test]
@@ -107,7 +128,7 @@ fn provenance_rejects_unbounded_metadata() {
 #[test]
 fn generation_rejects_chunk_coordinates_that_overflow_world_blocks() {
     let source = SdfChunkSource::new(
-        SdfNode::Sphere { radius: 2.0 },
+        Field::sphere(2.0).unwrap(),
         stone_brush(),
         -4,
         4,
@@ -124,7 +145,7 @@ fn generation_rejects_chunk_coordinates_that_overflow_world_blocks() {
 #[test]
 fn sdf_source_rejects_coordinates_without_exact_voxel_centers() {
     let source = SdfChunkSource::new(
-        SdfNode::Sphere { radius: 2.0 },
+        Field::sphere(2.0).unwrap(),
         stone_brush(),
         -4,
         4,
@@ -140,10 +161,10 @@ fn sdf_source_rejects_coordinates_without_exact_voxel_centers() {
 
 #[test]
 fn sdf_source_uses_absolute_coordinates_across_negative_chunk_boundaries() {
-    let volume = SdfNode::Translate {
-        child: Box::new(SdfNode::Sphere { radius: 2.0 }),
-        offset: [-0.5, 0.0, 0.0],
-    };
+    let volume = Field::sphere(2.0)
+        .unwrap()
+        .translate([-0.5, 0.0, 0.0])
+        .unwrap();
     let source = SdfChunkSource::new(
         volume,
         stone_brush(),
@@ -523,10 +544,7 @@ fn cellular_sdf_source_varies_cells_deterministically() {
         feature_salt: 0,
     };
     let source = CellularSdfChunkSource::new(
-        SdfNode::Box {
-            half_extents: [3.0, 2.0, 1.0],
-            rounding: 0.0,
-        },
+        Field::box_shape([3.0, 2.0, 1.0], 0.0).unwrap(),
         stone_brush(),
         -8,
         8,
@@ -571,12 +589,29 @@ fn cellular_sdf_source_varies_cells_deterministically() {
 }
 
 #[test]
+fn cellular_sdf_source_supports_normal_dependent_brushes() {
+    let source = CellularSdfChunkSource::new(
+        Field::sphere(3.0).unwrap(),
+        BrushEnum::Shaded(ShadedBrush::new((180, 180, 180), (0.0, 1.0, 0.0))),
+        -4,
+        4,
+        CellularSdfConfig {
+            cell_size_x: 32,
+            cell_size_z: 32,
+            max_yaw_degrees: 90.0,
+            ..CellularSdfConfig::default()
+        },
+        SourceProvenance::new("example:cellular_shaded", "v1").unwrap(),
+    )
+    .unwrap();
+    let result = source.generate(ChunkRequest::new(0, 0)).unwrap();
+    assert!(result.chunk().blocks().count() > 0);
+}
+
+#[test]
 fn cellular_sdf_source_rejects_unbounded_motifs() {
     let result = CellularSdfChunkSource::new(
-        SdfNode::Plane {
-            normal: [0.0, 1.0, 0.0],
-            offset: 0.0,
-        },
+        Field::plane([0.0, 1.0, 0.0], 0.0).unwrap(),
         stone_brush(),
         -8,
         8,
@@ -592,15 +627,12 @@ fn cellular_sdf_source_rejects_unbounded_motifs() {
 
 #[test]
 fn cellular_sdf_source_rejects_inverted_motif_bounds() {
-    let motif = SdfNode::Intersect {
-        children: vec![
-            SdfNode::Sphere { radius: 2.0 },
-            SdfNode::Translate {
-                child: Box::new(SdfNode::Sphere { radius: 2.0 }),
-                offset: [100.0, 0.0, 0.0],
-            },
-        ],
-    };
+    let motif = Field::sphere(2.0).unwrap().intersect(
+        &Field::sphere(2.0)
+            .unwrap()
+            .translate([100.0, 0.0, 0.0])
+            .unwrap(),
+    );
     let result = CellularSdfChunkSource::new(
         motif,
         stone_brush(),
@@ -619,10 +651,10 @@ fn cellular_sdf_source_rejects_inverted_motif_bounds() {
 #[test]
 fn cellular_sdf_source_includes_neighbor_motifs_that_cross_a_chunk_seam() {
     let source = CellularSdfChunkSource::new(
-        SdfNode::Translate {
-            child: Box::new(SdfNode::Sphere { radius: 2.0 }),
-            offset: [-17.0, 0.0, 0.0],
-        },
+        Field::sphere(2.0)
+            .unwrap()
+            .translate([-17.0, 0.0, 0.0])
+            .unwrap(),
         stone_brush(),
         -4,
         4,
@@ -642,7 +674,7 @@ fn cellular_sdf_source_includes_neighbor_motifs_that_cross_a_chunk_seam() {
 #[test]
 fn cellular_sdf_source_uses_local_precision_at_extreme_world_coordinates() {
     let source = CellularSdfChunkSource::new(
-        SdfNode::Sphere { radius: 2.0 },
+        Field::sphere(2.0).unwrap(),
         stone_brush(),
         -4,
         4,
@@ -666,10 +698,7 @@ fn cellular_sdf_source_uses_local_precision_at_extreme_world_coordinates() {
 #[test]
 fn cellular_sdf_source_rejects_candidate_budget_exhaustion() {
     let result = CellularSdfChunkSource::new(
-        SdfNode::Box {
-            half_extents: [100.0, 1.0, 1.0],
-            rounding: 0.0,
-        },
+        Field::box_shape([100.0, 1.0, 1.0], 0.0).unwrap(),
         stone_brush(),
         -4,
         4,
@@ -735,7 +764,7 @@ fn cellular_config_validation_is_shared_with_source_construction() {
             "validate accepted a config the source rejects: {config:?}"
         );
         let source = CellularSdfChunkSource::new(
-            SdfNode::Sphere { radius: 1.0 },
+            Field::sphere(1.0).unwrap(),
             stone_brush(),
             -4,
             4,
@@ -759,7 +788,7 @@ fn composite_layers_added_after_a_stream_do_not_affect_it() {
         .add_layer(
             Arc::new(
                 SdfChunkSource::new(
-                    SdfNode::Sphere { radius: 2.0 },
+                    Field::sphere(2.0).unwrap(),
                     stone_brush(),
                     -4,
                     4,
@@ -783,7 +812,7 @@ fn composite_layers_added_after_a_stream_do_not_affect_it() {
         .add_layer(
             Arc::new(
                 SdfChunkSource::new(
-                    SdfNode::Sphere { radius: 4.0 },
+                    Field::sphere(4.0).unwrap(),
                     stone_brush(),
                     -4,
                     4,

@@ -140,6 +140,15 @@ impl<'a> BuildingTool<'a> {
         Ok(())
     }
 
+    /// Run a [`crate::sdf::VoxelPipeline`] into the target schematic.
+    pub fn run_pipeline(
+        &mut self,
+        pipeline: &crate::sdf::VoxelPipeline,
+        bounds: Option<crate::sdf::SampleBounds>,
+    ) -> Result<(), String> {
+        pipeline.apply_to_schematic(self.schematic, bounds)
+    }
+
     /// Repeat a shape+brush fill at regular offset intervals.
     /// Creates `count` copies of the shape, each offset by `offset * i` from the original.
     pub fn rstack(

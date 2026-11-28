@@ -6,15 +6,12 @@ import {
   BuildAnimation,
   DefinitionRegion,
   Diff,
-  FieldProgramBinaryOp,
-  FieldProgramBuilder,
-  FieldProgramDistanceKind,
-  FieldProgramUnaryOp,
-  FieldProgramValueType,
+  Field,
+  Material,
   Schematic,
   SchematicBuilder,
   SchematicRegions,
-  Sdf,
+  VoxelPipeline,
 } from "../../../bindings/js/index.mjs";
 
 function expect(cond, what) {
@@ -91,19 +88,12 @@ expect(animation.withEffect(effect).setBlock(0, 0, 0, "minecraft:stone") === 0, 
 expect(animation.setBlock(1, 0, 0, "minecraft:dirt") === 1, "next operation uses normal path");
 expect(animation.groupCount() === 2, "both animation targets recorded");
 
-// --- portable field program: length(position) - 2 ---
-const programBuilder = FieldProgramBuilder.create();
-const distance = programBuilder.addSlot(FieldProgramValueType.Scalar);
-programBuilder.setOutput(distance);
-programBuilder.setBounds(-2, -2, -2, 2, 2, 2);
-programBuilder.setDistanceKind(FieldProgramDistanceKind.Exact);
-programBuilder.pushPos();
-programBuilder.unaryOp(FieldProgramUnaryOp.Length);
-programBuilder.pushConstScalar(2);
-programBuilder.binaryOp(FieldProgramBinaryOp.Sub);
-programBuilder.storeLocal(distance);
-const program = programBuilder.build();
-expect(program.toJson().includes('"version":1'), "program JSON is versioned");
-expect(Sdf.fromProgram(program).evalAt(0, 0, 0) < 0, "program composes as an SDF");
+// --- unified Field expression + VoxelPipeline ---
+const exprField = Field.expr("length(p) - 2.0").bounded(-2, -2, -2, 2, 2, 2);
+expect(exprField.toJson().includes('"version":2'), "field graph JSON is version 2");
+expect(exprField.evalAt(0, 0, 0) < 0, "expr field evaluates negative inside");
+const pipe = VoxelPipeline.create(exprField, Material.solid("minecraft:stone"));
+const vox = pipe.toSchematic("expr_sphere");
+expect(vox.blockCount() > 0, "pipeline generates voxels");
 
 console.log("bridge smoke (JS) OK");

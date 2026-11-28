@@ -15,12 +15,14 @@ namespace capi { struct Brush; }
 class Brush;
 namespace capi { struct CellularSdfConfig; }
 class CellularSdfConfig;
+namespace capi { struct Field; }
+class Field;
 namespace capi { struct GeneratedChunk; }
 class GeneratedChunk;
 namespace capi { struct GeneratedWorldStream; }
 class GeneratedWorldStream;
-namespace capi { struct Sdf; }
-class Sdf;
+namespace capi { struct VoxelPipeline; }
+class VoxelPipeline;
 namespace capi { struct WorldGenerator; }
 class WorldGenerator;
 class GeneratedChunkOverlayMode;
@@ -46,17 +48,23 @@ class WorldGenerator {
 public:
 
   /**
-   * Create an SDF-backed source evaluated at voxel centers over the inclusive
+   * Create a field-backed source evaluated at voxel centers over the inclusive
    * Y range. `source_id` and `version` become chunk provenance/cache metadata.
    */
-  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError> sdf(const nucleation::Sdf& volume, const nucleation::Brush& material, int32_t min_y, int32_t max_y, std::string_view source_id, std::string_view version);
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError> sdf(const nucleation::Field& volume, const nucleation::Brush& material, int32_t min_y, int32_t max_y, std::string_view source_id, std::string_view version);
 
   /**
-   * Create a sparse infinite source by placing a bounded SDF motif once per
+   * Create a world generator backed by a full {@link VoxelPipeline} (multi-material
+   * layers, CSG tags, fluids, surface scatter, brick interval pruning).
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError> pipeline(const nucleation::VoxelPipeline& pipeline, int32_t min_y, int32_t max_y, std::string_view source_id, std::string_view version);
+
+  /**
+   * Create a sparse infinite source by placing a bounded field motif once per
    * deterministically transformed cell. Reuse `config` across layers to keep
    * terrain, water, vegetation, paths, and structures coordinated.
    */
-  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError> cellular_sdf(const nucleation::Sdf& volume, const nucleation::Brush& material, int32_t min_y, int32_t max_y, const nucleation::CellularSdfConfig& config, std::string_view source_id, std::string_view version);
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::WorldGenerator>, nucleation::NucleationError> cellular_sdf(const nucleation::Field& volume, const nucleation::Brush& material, int32_t min_y, int32_t max_y, const nucleation::CellularSdfConfig& config, std::string_view source_id, std::string_view version);
 
   /**
    * Create a sparse source from projected building footprints, including

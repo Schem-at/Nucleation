@@ -20,12 +20,11 @@ from pathlib import Path
 from nucleation import (
     Brush,
     CellularSdfConfig,
-    Field3,
+    Field,
+    FieldCellMode,
     GeneratedChunkOverlayMode,
     InterpolationSpace,
     Palette,
-    Sdf,
-    SdfCellMode,
     WorldGenerator,
     WorldSink,
 )
@@ -64,19 +63,19 @@ def cell_config(
     )
 
 
-def union_all(shapes: Sequence[Sdf]) -> Sdf:
+def union_all(shapes: Sequence[Field]) -> Field:
     if not shapes:
-        raise ValueError("at least one SDF is required")
+        raise ValueError("at least one Field is required")
     result = shapes[0]
     for shape in shapes[1:]:
         result = result.union_with(shape)
     return result
 
 
-def capsules(points: Sequence[tuple[float, float, float]], radius: float) -> Sdf:
+def capsules(points: Sequence[tuple[float, float, float]], radius: float) -> Field:
     return union_all(
         [
-            Sdf.capsule(*start, *end, radius)
+            Field.capsule(*start, *end, radius)
             for start, end in zip(points, points[1:])
         ]
     )
@@ -84,7 +83,7 @@ def capsules(points: Sequence[tuple[float, float, float]], radius: float) -> Sdf
 
 def add_sdf_layer(
     composite: WorldGenerator,
-    shape: Sdf,
+    shape: Field,
     brush: Brush,
     min_y: int,
     max_y: int,
@@ -103,7 +102,7 @@ def add_sdf_layer(
 
 def add_cellular_layer(
     composite: WorldGenerator,
-    shape: Sdf,
+    shape: Field,
     brush: Brush,
     min_y: int,
     max_y: int,
@@ -144,9 +143,9 @@ def make_source() -> WorldGenerator:
 
     # Continuous non-repeated lowland: distant chunks remain terrain and share
     # absolute-coordinate noise without any finite boundary.
-    terrain_field = Field3.value_noise_fbm(frequency=0.027, seed=31, octaves=5)
-    ground = Sdf.plane(0.0, 1.0, 0.0, 0.0).offset_by_field(terrain_field, 6.5)
-    ground_brush = Brush.field3(
+    terrain_field = Field.value_fbm3(frequency=0.027, seed=31, octaves=5)
+    ground = Field.plane(0.0, 1.0, 0.0, 0.0).displace(terrain_field, 6.5)
+    ground_brush = Brush.field(
         terrain_field,
         [0.0, 0.48, 1.0],
         [42, 45, 52, 98, 96, 88, 148, 142, 126],
@@ -167,7 +166,7 @@ def make_source() -> WorldGenerator:
     add_sdf_layer(world, ground, ground_brush, MIN_Y, 10, "lowland")
     lowland_cap = ground.subtract(ground.translate(0.0, -2.0, 0.0))
     lowland_moss = lowland_cap.intersection_with(
-        Sdf.cells(0.055, 211, 1.0, SdfCellMode.CellValue, 0.22)
+        Field.cells(0.055, 211, 1.0, FieldCellMode.CellValue).add_const(-0.22)
     )
     add_sdf_layer(
         world,
@@ -188,30 +187,32 @@ def make_source() -> WorldGenerator:
 
     # The accepted finite scene's central escarpment recipe becomes a bounded
     # hashed-cell motif. Smooth shoulders avoid tile-wide vertical walls.
-    plateau_field = Field3.value_noise_fbm(frequency=0.024, seed=73, octaves=4)
-    cliff_field = Field3.value_noise_fbm(frequency=0.032, seed=91, octaves=4)
-    plateau_top = Sdf.plane(0.0, 1.0, 0.0, -35.0).offset_by_field(
+    plateau_field = Field.value_fbm3(frequency=0.024, seed=73, octaves=4)
+    cliff_field = Field.value_fbm3(frequency=0.032, seed=91, octaves=4)
+    plateau_top = Field.plane(0.0, 1.0, 0.0, -35.0).displace(
         plateau_field, 5.5
     )
-    cliff_front = Sdf.plane(-1.0, 0.0, 0.0, 15.0).offset_by_field(cliff_field, 5.2)
+    cliff_front = Field.plane(-1.0, 0.0, 0.0, 15.0).displace(cliff_field, 5.2)
     central = (
-        Sdf.box_shape(29.0, 27.0, 34.0, 9.0)
+        Field.box_shape(29.0, 27.0, 34.0, 9.0)
         .translate(44.0, 9.0, 0.0)
         .intersection_with(plateau_top.smooth_intersection(cliff_front, 9.0))
     )
-    north = Sdf.round_cone(10, 1, -39, 48, 28, -32, 22, 15).intersection_with(
+    north = Field.round_cone(10, 1, -39, 48, 28, -32, 22, 15).intersection_with(
         plateau_top
     )
-    south = Sdf.round_cone(10, 1, 39, 48, 28, 32, 22, 15).intersection_with(
+    south = Field.round_cone(10, 1, 39, 48, 28, 32, 22, 15).intersection_with(
         plateau_top
     )
     cliff = central
-    cracks = Sdf.cells(
-        0.085, 19, 1.0, SdfCellMode.F2MinusF1, 0.46
-    ).rotate(18.0, 27.0, 9.0)
+    cracks = (
+        Field.cells(0.085, 19, 1.0, FieldCellMode.F2MinusF1)
+        .add_const(-0.46)
+        .rotate(18.0, 27.0, 9.0)
+    )
     landmark_config = cell_config()
     fractured = cliff.subtract(cracks)
-    cliff_brush = Brush.field3(
+    cliff_brush = Brush.field(
         cliff_field,
         [0.0, 0.42, 0.72, 1.0],
         [50, 52, 57, 105, 101, 91, 155, 149, 132, 205, 198, 177],
@@ -235,7 +236,7 @@ def make_source() -> WorldGenerator:
     )
     plateau_cap = cliff.subtract(cliff.translate(0.0, -2.0, 0.0))
     plateau_moss = plateau_cap.intersection_with(
-        Sdf.cells(0.05, 307, 1.0, SdfCellMode.CellValue, 0.20)
+        Field.cells(0.05, 307, 1.0, FieldCellMode.CellValue).add_const(-0.20)
     )
     add_cellular_layer(
         world,
@@ -294,8 +295,8 @@ def make_source() -> WorldGenerator:
         ],
         2.4,
     )
-    waterfall = Sdf.box_shape(1.8, 17.0, 3.2, 1.0).translate(14.0, 18.0, 4.0)
-    pool = Sdf.ellipsoid(10.0, 2.2, 7.5).translate(8.0, 1.0, 4.0)
+    waterfall = Field.box_shape(1.8, 17.0, 3.2, 1.0).translate(14.0, 18.0, 4.0)
+    pool = Field.ellipsoid(10.0, 2.2, 7.5).translate(8.0, 1.0, 4.0)
     outflow = capsules(
         [
             (7, 1, 4),
@@ -350,10 +351,10 @@ def make_source() -> WorldGenerator:
     )
 
     # Optional cabin assembled from coordinated material-specific native volumes.
-    foundation = Sdf.box_shape(5.0, 4.5, 4.0, 0.6).translate(-39, -3.5, 22)
-    walls = Sdf.box_frame(4.5, 3.5, 3.5, 0.8).translate(-39, 4.0, 22)
-    roof = Sdf.box_shape(5.5, 1.2, 4.6, 0.5).translate(-39, 8.2, 22)
-    chimney = Sdf.box_shape(0.8, 3.2, 0.8, 0.2).translate(-36, 9.5, 24)
+    foundation = Field.box_shape(5.0, 4.5, 4.0, 0.6).translate(-39, -3.5, 22)
+    walls = Field.box_frame(4.5, 3.5, 3.5, 0.8).translate(-39, 4.0, 22)
+    roof = Field.box_shape(5.5, 1.2, 4.6, 0.5).translate(-39, 8.2, 22)
+    chimney = Field.box_shape(0.8, 3.2, 0.8, 0.2).translate(-36, 9.5, 24)
     for shape, block, y0, y1, name in (
         (foundation, "minecraft:cobblestone", -10, 6, "cabin-foundation"),
         (walls, "minecraft:spruce_planks", -3, 14, "cabin-walls"),
@@ -366,8 +367,8 @@ def make_source() -> WorldGenerator:
 
     # Forest clusters are independently selected per hashed cell.
     low_offsets = lowland_tree_points()
-    low_trunk = Sdf.capped_cylinder(1.2, 7.0).translate(0, 3.0, 0)
-    low_crown = Sdf.round_cone(0, 6, 0, 0, 17, 0, 4.4, 0.4)
+    low_trunk = Field.capped_cylinder(1.2, 7.0).translate(0, 3.0, 0)
+    low_crown = Field.round_cone(0, 6, 0, 0, 17, 0, 4.4, 0.4)
     plateau_offsets: list[float] = []
     for x in (31, 47, 63):
         for z in (-37, -20, 21, 38):
