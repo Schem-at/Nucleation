@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 390" width="960" height="390" role="img" aria-labelledby="mat-title mat-desc">
+  <title id="mat-title">VoxelPipeline Material Passes and 6-Bit Face Mask</title>
+  <desc id="mat-desc">Left panel shows a voxel terrain cutaway with ExposedFace moss cap, DepthBelowSurface dirt, WorldY rock strata, FluidLayer water pool, and Top/Bottom ScatterRule grass and vines. Right panel shows an isometric voxel cube with the six face_mask bit values.</desc>
+  <defs>
+    <pattern id="mat-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(255, 255, 255, 0.04)" stroke-width="1"/>
+    </pattern>
+    <style>
+      .mono { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .sans { font-family: "Inter", system-ui, -apple-system, sans-serif; }
+      .h2 { font-size: 14px; font-weight: 600; fill: #F6F8FA; }
+      .sub { font-size: 11.5px; fill: #8A93A3; }
+      .lbl { font-size: 11px; font-weight: 600; fill: #F6F8FA; }
+      .lbl-sub { font-size: 10px; fill: #8A93A3; }
+    </style>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="959" height="389" fill="#12161C" stroke="#2A313D"/>
+  <rect x="1" y="1" width="958" height="388" fill="url(#mat-grid)"/>
+
+  <!-- Divider between Left (Terrain Cutaway) and Right (face_mask Cube) -->
+  <line x1="570" y1="20" x2="570" y2="370" stroke="#2A313D" stroke-width="1"/>
+
+  <!-- ==================== LEFT PANEL: CUTAWAY ==================== -->
+  <text x="32" y="36" class="mono h2">VoxelPipeline Column Cutaway</text>
+  <text x="32" y="54" class="sans sub">How Conditions, Channels, FluidLayer, and ScatterRule stack on one Field</text>
+
+  <!-- Cutaway frame -->
+  <rect x="31.5" y="91.5" width="309" height="225" fill="#161A21" stroke="#3D4657"/>
+  <g>
+    <rect x="32" y="288" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="32" y="260" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="32" y="232" width="28" height="28" fill="#7A828F" stroke="#12161C" stroke-width="1"/>
+    <rect x="32" y="204" width="28" height="28" fill="#7A828F" stroke="#12161C" stroke-width="1"/>
+    <rect x="32" y="176" width="28" height="28" fill="#9E734E" stroke="#12161C" stroke-width="1"/>
+    <rect x="32" y="148" width="28" height="28" fill="#6BC47D" stroke="#12161C" stroke-width="1"/>
+    <rect x="60" y="288" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="60" y="260" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="60" y="232" width="28" height="28" fill="#7A828F" stroke="#12161C" stroke-width="1"/>
+    <rect x="60" y="204" width="28" height="28" fill="#7A828F" stroke="#12161C" stroke-width="1"/>
+    <rect x="60" y="176" width="28" height="28" fill="#9E734E" stroke="#12161C" stroke-width="1"/>
+    <rect x="60" y="148" width="28" height="28" fill="#6BC47D" stroke="#12161C" stroke-width="1"/>
+    <rect x="88" y="288" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="88" y="260" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="88" y="232" width="28" height="28" fill="#7A828F" stroke="#12161C" stroke-width="1"/>
+    <rect x="88" y="204" width="28" height="28" fill="#7A828F" stroke="#12161C" stroke-width="1"/>
+    <rect x="88" y="176" width="28" height="28" fill="#9E734E" stroke="#12161C" stroke-width="1"/>
+    <rect x="88" y="148" width="28" height="28" fill="#6BC47D" stroke="#12161C" stroke-width="1"/>
+    <rect x="116" y="288" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="116" y="260" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="116" y="176" width="28" height="28" fill="#7A828F" stroke="#12161C" stroke-width="1"/>
+    <rect x="116" y="148" width="28" height="28" fill="#6BC47D" stroke="#12161C" stroke-width="1"/>
+    <rect x="144" y="288" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="144" y="260" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="172" y="288" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="172" y="260" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="200" y="288" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="200" y="260" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="228" y="288" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="228" y="260" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="228" y="232" width="28" height="28" fill="#6BC47D" stroke="#12161C" stroke-width="1"/>
+    <rect x="256" y="288" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="256" y="260" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="256" y="232" width="28" height="28" fill="#9E734E" stroke="#12161C" stroke-width="1"/>
+    <rect x="256" y="204" width="28" height="28" fill="#6BC47D" stroke="#12161C" stroke-width="1"/>
+    <rect x="284" y="288" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="284" y="260" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="284" y="232" width="28" height="28" fill="#7A828F" stroke="#12161C" stroke-width="1"/>
+    <rect x="284" y="204" width="28" height="28" fill="#9E734E" stroke="#12161C" stroke-width="1"/>
+    <rect x="284" y="176" width="28" height="28" fill="#6BC47D" stroke="#12161C" stroke-width="1"/>
+    <rect x="312" y="288" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="312" y="260" width="28" height="28" fill="#4B5260" stroke="#12161C" stroke-width="1"/>
+    <rect x="312" y="232" width="28" height="28" fill="#7A828F" stroke="#12161C" stroke-width="1"/>
+    <rect x="312" y="204" width="28" height="28" fill="#9E734E" stroke="#12161C" stroke-width="1"/>
+    <rect x="312" y="176" width="28" height="28" fill="#6BC47D" stroke="#12161C" stroke-width="1"/>
+    <rect x="144" y="232" width="28" height="28" fill="rgba(79, 166, 232, 0.28)" stroke="#4FA6E8" stroke-width="1"/>
+    <line x1="147" y1="237" x2="169" y2="237" stroke="#4FA6E8" stroke-width="1.5"/>
+    <rect x="172" y="232" width="28" height="28" fill="rgba(79, 166, 232, 0.28)" stroke="#4FA6E8" stroke-width="1"/>
+    <line x1="175" y1="237" x2="197" y2="237" stroke="#4FA6E8" stroke-width="1.5"/>
+    <rect x="200" y="232" width="28" height="28" fill="rgba(79, 166, 232, 0.28)" stroke="#4FA6E8" stroke-width="1"/>
+    <line x1="203" y1="237" x2="225" y2="237" stroke="#4FA6E8" stroke-width="1.5"/>
+    <path d="M 39 148 L 41 134 M 46 148 L 46 130 M 53 148 L 51 135" stroke="#5FD1BC" stroke-width="2" stroke-linecap="round"/>
+    <path d="M 95 148 L 97 134 M 102 148 L 102 130 M 109 148 L 107 135" stroke="#5FD1BC" stroke-width="2" stroke-linecap="round"/>
+    <path d="M 263 204 L 265 190 M 270 204 L 270 186 M 277 204 L 275 191" stroke="#5FD1BC" stroke-width="2" stroke-linecap="round"/>
+    <path d="M 319 176 L 321 162 M 326 176 L 326 158 M 333 176 L 331 163" stroke="#5FD1BC" stroke-width="2" stroke-linecap="round"/>
+    <line x1="130" y1="204" x2="130" y2="246" stroke="#6BC47D" stroke-width="2.2" stroke-dasharray="5 2"/>
+    <circle cx="130" cy="226" r="3.2" fill="#F2CD87"/>
+    <circle cx="130" cy="246" r="3.2" fill="#F2CD87"/>
+  </g>
+
+  <!-- Water level dashed line -->
+  <line x1="28" y1="232" x2="350" y2="232" stroke="#4FA6E8" stroke-width="1" stroke-dasharray="4 3" opacity="0.8"/>
+
+  <!-- Callout annotations on right side of cutaway -->
+  <g transform="translate(362, 92)">
+    <!-- Scatter Top (points directly at grass tuft on col 10, y=5 from bottom -> local y=66) -->
+    <path d="M -36 66 L -18 66 L -18 28 L -6 28" fill="none" stroke="#5FD1BC" stroke-width="1.2"/>
+    <circle cx="-36" cy="66" r="2.5" fill="#5FD1BC"/>
+    <text x="2" y="25" class="mono lbl" fill="#5FD1BC">ScatterRule (Top)</text>
+    <text x="2" y="39" class="sans lbl-sub">short_grass on moss_block</text>
+
+    <!-- ExposedFace +Y (points directly at moss_block on col 10, y=4 -> local y=98) -->
+    <path d="M -28 98 L -14 98 L -14 74 L -6 74" fill="none" stroke="#6BC47D" stroke-width="1.2"/>
+    <circle cx="-28" cy="98" r="2.5" fill="#6BC47D"/>
+    <text x="2" y="71" class="mono lbl">ExposedFace(+Y) &amp; Slope</text>
+    <text x="2" y="85" class="sans lbl-sub">moss_block cap on flat tops</text>
+
+    <!-- DepthBelowSurface (points directly at dirt on col 10, y=3 -> local y=126) -->
+    <path d="M -28 126 L -14 126 L -14 118 L -6 118" fill="none" stroke="#9E734E" stroke-width="1.2"/>
+    <circle cx="-28" cy="126" r="2.5" fill="#9E734E"/>
+    <text x="2" y="115" class="mono lbl">DepthBelowSurface(1..2)</text>
+    <text x="2" y="129" class="sans lbl-sub">dirt sub-surface band</text>
+
+    <!-- FluidLayer -->
+    <line x1="-170" y1="154" x2="-6" y2="154" stroke="#4FA6E8" stroke-width="1.2" stroke-dasharray="3 2"/>
+    <circle cx="-170" cy="154" r="2.5" fill="#4FA6E8"/>
+    <text x="2" y="151" class="mono lbl" fill="#4FA6E8">FluidLayer (y ≤ level)</text>
+    <text x="2" y="165" class="sans lbl-sub">fills empty air pockets only</text>
+
+    <!-- WorldY strata -->
+    <line x1="-28" y1="204" x2="-6" y2="204" stroke="#7A828F" stroke-width="1.2"/>
+    <circle cx="-28" cy="204" r="2.5" fill="#7A828F"/>
+    <text x="2" y="201" class="mono lbl">ChannelRamp (WorldY)</text>
+    <text x="2" y="215" class="sans lbl-sub">deepslate → tuff → stone</text>
+  </g>
+
+  <!-- Bottom note for hanging vine -->
+  <line x1="130" y1="242" x2="130" y2="342" stroke="#F2CD87" stroke-width="1.1" stroke-dasharray="3 2"/>
+  <circle cx="130" cy="242" r="2.5" fill="#F2CD87"/>
+  <text x="140" y="346" class="mono lbl" fill="#F2CD87">ScatterRule (Bottom)</text>
+  <text x="140" y="361" class="sans lbl-sub">cave_vines hanging under ceiling overhangs</text>
+
+  <!-- ==================== RIGHT PANEL: 6-BIT FACE MASK ==================== -->
+  <text x="598" y="36" class="mono h2">6-Bit face_mask Layout</text>
+  <text x="598" y="54" class="sans sub">Bitwise OR any combination for ExposedFace</text>
+
+  <!-- Isometric Cube centered at (765, 195), radius 66 -->
+  <g transform="translate(765, 192)">
+    <!-- Top face (+Y) -->
+    <polygon points="0,-72 64,-36 0,0 -64,-36" fill="rgba(95, 209, 188, 0.12)" stroke="#5FD1BC" stroke-width="1.6"/>
+    <!-- Left-front face (-X / +Z) -->
+    <polygon points="-64,-36 0,0 0,72 -64,36" fill="#1B2029" stroke="#3D4657" stroke-width="1.4"/>
+    <!-- Right-front face (+X) -->
+    <polygon points="64,-36 0,0 0,72 64,36" fill="#161A21" stroke="#3D4657" stroke-width="1.4"/>
+
+    <!-- Back hidden edges (dashed) -->
+    <line x1="0" y1="-72" x2="0" y2="-4" stroke="#3D4657" stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>
+    <line x1="-64" y1="36" x2="0" y2="-4" stroke="#3D4657" stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>
+    <line x1="64" y1="36" x2="0" y2="-4" stroke="#3D4657" stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>
+
+    <!-- Face labels with bit numbers -->
+    <!-- +Y Top -->
+    <text x="0" y="-38" text-anchor="middle" class="mono lbl" fill="#5FD1BC">+Y (Top)</text>
+    <text x="0" y="-23" text-anchor="middle" class="mono" font-size="10.5" fill="#5FD1BC">bit 2 = 4</text>
+
+    <!-- +Z South (Left visible face) -->
+    <text x="-32" y="16" text-anchor="middle" class="mono lbl">+Z</text>
+    <text x="-32" y="31" text-anchor="middle" class="mono lbl-sub">bit 4 = 16</text>
+
+    <!-- +X East (Right visible face) -->
+    <text x="32" y="16" text-anchor="middle" class="mono lbl">+X</text>
+    <text x="32" y="31" text-anchor="middle" class="mono lbl-sub">bit 0 = 1</text>
+
+    <!-- External callouts for back/bottom faces -->
+    <!-- -Y Bottom -->
+    <line x1="0" y1="74" x2="0" y2="96" stroke="#F2CD87" stroke-width="1.2"/>
+    <text x="0" y="110" text-anchor="middle" class="mono lbl" fill="#F2CD87">-Y (Bottom) · bit 3 = 8</text>
+
+    <!-- -X West (top-left) -->
+    <line x1="-54" y1="-42" x2="-82" y2="-58" stroke="#8A93A3" stroke-width="1.1"/>
+    <text x="-86" y="-62" text-anchor="end" class="mono lbl">-X</text>
+    <text x="-86" y="-48" text-anchor="end" class="mono lbl-sub">bit 1 = 2</text>
+
+    <!-- -Z North (top-right) -->
+    <line x1="54" y1="-42" x2="82" y2="-58" stroke="#8A93A3" stroke-width="1.1"/>
+    <text x="86" y="-62" text-anchor="start" class="mono lbl">-Z</text>
+    <text x="86" y="-48" text-anchor="start" class="mono lbl-sub">bit 5 = 32</text>
+  </g>
+
+  <!-- Summary bitmask pills at bottom right -->
+  <rect x="598" y="324" width="164" height="40" fill="#161A21" stroke="#2A313D"/>
+  <text x="610" y="342" class="mono lbl">ANY_SIDE = 51</text>
+  <text x="610" y="356" class="mono lbl-sub">1 | 2 | 16 | 32</text>
+
+  <rect x="772" y="324" width="156" height="40" fill="rgba(95, 209, 188, 0.12)" stroke="#5FD1BC"/>
+  <text x="784" y="342" class="mono lbl" fill="#5FD1BC">ANY = 63</text>
+  <text x="784" y="356" class="mono lbl-sub">all 6 neighbors</text>
+</svg>

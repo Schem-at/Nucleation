@@ -14,37 +14,22 @@ instruction tape with common-subexpression elimination (CSE), sharing one noise
 or heightmap subgraph across geometry, displacement, and five material layers
 evaluates it **once per voxel** instead of six times.
 
-<div class="bb-kineglyph" data-kineglyph="sdf-and-fields" data-theme="nucleation" data-autoplay="false" data-controls="false" data-readout="false" aria-busy="true">
-  <img class="kg-fallback--dark" src="../../media/kineglyph/sdf-and-fields.svg" alt="One scalar field branching into geometry and material before both meet in a schematic fill">
-  <img class="kg-fallback--light" src="../../media/kineglyph/sdf-and-fields.light.svg" alt="">
+<div class="sdf-studio" data-sdf-workbench>
+  <noscript>
+    <p>Enable JavaScript to run the live WebAssembly SDF and VoxelPipeline workbench in the browser.</p>
+  </noscript>
 </div>
 
-Every change runs `BuildingTool.fill` and the GLB mesher in the browser.
+Every slider move, preset switch, or `Field.expr` edit compiles, voxelizes, and greedy-meshes a real Minecraft schematic in WebAssembly. Drag to orbit or export the live `.schem` directly.
 
 ---
 
 ## Architecture at a glance
 
-```text
-  Primitives / Noise / Math / CSG / Transforms / Infix Expr
-                              │
-                              ▼
-                    Unified Field DAG
-        (immutable, Arc-shared, v2 JSON-serializable)
-                              │
-                   compile() + CSE pass
-                              │
-          ┌───────────────────┴───────────────────┐
-          ▼                                       ▼
-   CompiledField                           VoxelPipeline
-   • eval / eval_tagged                    • Geometry Field + Material tree
-   • dual-number autodiff normals          • Demand-driven Channel scanner
-   • 8×8×8 conservative interval bricks    • FluidLayer fills & ScatterRule props
-          │                                       │
-          ├──▶ BuildingTool.fill (SdfShape)       ├──▶ to_schematic / apply_to_schematic
-          ├──▶ Brush.field                        ├──▶ BuildingTool.run_pipeline
-          └──▶ WorldGenerator.sdf / cellular_sdf  └──▶ WorldGenerator.pipeline
-```
+<figure class="sdf-diagram">
+  <img class="sdf-diagram__dark" src="../../media/features/sdf-and-fields/sdf-pipeline-architecture.svg" alt="Four-stage dataflow from Unified Field DAG through CSE Compiler, 8x8x8 interval brick pruner, and demand-driven VoxelPipeline to schematics, BuildingTool, and WorldGenerator">
+  <img class="sdf-diagram__light" src="../../media/features/sdf-and-fields/sdf-pipeline-architecture.light.svg" alt="Four-stage dataflow from Unified Field DAG through CSE Compiler, 8x8x8 interval brick pruner, and demand-driven VoxelPipeline to schematics, BuildingTool, and WorldGenerator">
+</figure>
 
 Four design properties make the pipeline both flexible and fast:
 
@@ -208,6 +193,16 @@ heightmaps, and derive material channels without writing an expression string:
 | Architectural CSG | `chamfer_union(b, r)`, `chamfer_subtract(b, r)`, `chamfer_intersection(b, r)`, `steps_union(b, r, n)` | 45° beveled joints (`chamfer_*`) and terraced staircases (`steps_union`) |
 | Surface modifiers | `rounded(r)`, `shell(thickness)`, `elongate(hx, hy, hz)` | Offset outward by `r`, hollow to `abs(d) - thickness`, or stretch center |
 | Displacement | `displace(offset_field, amplitude)`, `displace_noise(amplitude, freq, seed, octaves)` | Adds `amplitude * offset_field(p)` to distance and automatically expands conservative AABB bounds |
+
+### Interactive CSG, dual normals & `8×8` brick pruning
+
+Drag either shape handle (`A` or `B`) directly on the field, switch CSG operators, and hover anywhere to inspect `d(p)` and the unit normal `∇f`. Dashed red bricks are provably empty air (`interval_min > 0`) and skipped in O(1) without testing any voxel inside them.
+
+<div class="sdf-csg" data-sdf-csg-lab>
+  <noscript>
+    <p>Enable JavaScript to interact with the 2D signed distance field, CSG operator, and 8×8 interval brick pruning explorer.</p>
+  </noscript>
+</div>
 
 ### Domain transforms, repetition & warps
 
@@ -431,11 +426,10 @@ Classify custom expressions honestly via `FieldDistanceKind` (`DistanceKind` in 
 gradient-painted volumes. For multi-material worlds, stratified cliffs, biome
 caps, water pools, and surface foliage, use **`VoxelPipeline`**:
 
-```text
-  VoxelPipeline(geometry: Field, material: Material)
-    ├── FluidLayer[]   (fill air pockets below a Y level or inside a Field)
-    └── ScatterRule[]  (attach surface props to exposed Top/Bottom/Side faces)
-```
+<figure class="sdf-diagram">
+  <img class="sdf-diagram__dark" src="../../media/features/sdf-and-fields/sdf-material-facemask.svg" alt="Left: voxel terrain cutaway showing ExposedFace moss cap, DepthBelowSurface dirt, WorldY rock strata, FluidLayer water pool, and Top/Bottom ScatterRule grass and vines. Right: isometric cube showing all six 6-bit face_mask bit positions.">
+  <img class="sdf-diagram__light" src="../../media/features/sdf-and-fields/sdf-material-facemask.light.svg" alt="Left: voxel terrain cutaway showing ExposedFace moss cap, DepthBelowSurface dirt, WorldY rock strata, FluidLayer water pool, and Top/Bottom ScatterRule grass and vines. Right: isometric cube showing all six 6-bit face_mask bit positions.">
+</figure>
 
 ### Channels (demand-driven)
 
@@ -527,11 +521,11 @@ The 6-bit `face_mask` constants are:
     terrain_mat = MaterialBuilder.create_layered()
     terrain_mat.add_layer(
         MaterialCondition.exposed_face(4, True)  # +Y (top) exposed to air
-            .and_with(MaterialCondition.slope_range(0.0, 0.35)),
+            .and_with(MaterialCondition.slope_range(True, 0.0, True, 0.35)),
         Material.solid("minecraft:moss_block"),
     )
     terrain_mat.add_layer(
-        MaterialCondition.depth_below_surface(1.0, 3.0),
+        MaterialCondition.depth_below_surface(True, 1.0, True, 3.0),
         Material.solid("minecraft:dirt"),
     )
     terrain_mat.set_default(
@@ -540,6 +534,7 @@ The 6-bit `face_mask` constants are:
             -12.0,
             10.0,
             '["minecraft:deepslate","minecraft:tuff","minecraft:stone","minecraft:andesite"]',
+            True,
         )
     )
 
@@ -553,7 +548,9 @@ The 6-bit `face_mask` constants are:
     pipe = VoxelPipeline.create(scene, matcher.build())
     pipe.add_fluid_level(-2.0, "minecraft:water")
 
-    flowers = ScatterRule.create("minecraft:short_grass", ScatterFace.Top, 0.25, 17)
+    flowers = ScatterRule.create(
+        ScatterFace.Top, 0.25, '["minecraft:short_grass"]', [1.0], 17
+    )
     flowers.set_on_block("minecraft:moss_block")
     pipe.add_scatter(flowers)
 
@@ -583,12 +580,12 @@ The 6-bit `face_mask` constants are:
     const terrainMat = MaterialBuilder.createLayered();
     terrainMat.addLayer(
       MaterialCondition.exposedFace(4, true).andWith(
-        MaterialCondition.slopeRange(0.0, 0.35),
+        MaterialCondition.slopeRange(true, 0.0, true, 0.35),
       ),
       Material.solid("minecraft:moss_block"),
     );
     terrainMat.addLayer(
-      MaterialCondition.depthBelowSurface(1.0, 3.0),
+      MaterialCondition.depthBelowSurface(true, 1.0, true, 3.0),
       Material.solid("minecraft:dirt"),
     );
     terrainMat.setDefault(
@@ -597,6 +594,7 @@ The 6-bit `face_mask` constants are:
         -12.0,
         10.0,
         '["minecraft:deepslate","minecraft:tuff","minecraft:stone","minecraft:andesite"]',
+        true,
       ),
     );
 
@@ -608,7 +606,13 @@ The 6-bit `face_mask` constants are:
     const pipe = VoxelPipeline.create(scene, matcher.build());
     pipe.addFluidLevel(-2.0, "minecraft:water");
 
-    const flowers = ScatterRule.create("minecraft:short_grass", ScatterFace.Top, 0.25, 17);
+    const flowers = ScatterRule.create(
+      ScatterFace.Top,
+      0.25,
+      '["minecraft:short_grass"]',
+      [1.0],
+      17,
+    );
     flowers.setOnBlock("minecraft:moss_block");
     pipe.addScatter(flowers);
 

@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" width="960" height="430" role="img" aria-labelledby="arch-title arch-desc">
+  <title id="arch-title">Unified Field DAG to VoxelPipeline Architecture</title>
+  <desc id="arch-desc">Four-stage dataflow: Unified Field DAG with shared Arc subgraphs, coordinate-space CSE compiler with 8x8x8 interval brick pruning and Dual3 autodiff, demand-driven VoxelPipeline material/fluid/scatter passes, and shared output targets across schematics, BuildingTool, and WorldGenerator.</desc>
+  <defs>
+    <pattern id="arch-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(255, 255, 255, 0.04)" stroke-width="1"/>
+    </pattern>
+    <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#5FD1BC"/>
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#3D4657"/>
+    </marker>
+    <marker id="arrow-gold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#F2CD87"/>
+    </marker>
+    <style>
+      .mono { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .sans { font-family: "Inter", system-ui, -apple-system, sans-serif; }
+      .stage-num { font-size: 11px; font-weight: 600; fill: #5FD1BC; }
+      .stage-title { font-size: 14px; font-weight: 600; fill: #F6F8FA; }
+      .stage-sub { font-size: 11.5px; fill: #8A93A3; }
+      .node-title { font-size: 11.5px; font-weight: 600; fill: #F6F8FA; }
+      .node-sub { font-size: 10.5px; fill: #8A93A3; }
+      .pill { font-size: 10px; font-weight: 500; }
+    </style>
+  </defs>
+
+  <!-- Canvas & subtle drafting grid -->
+  <rect x="0.5" y="0.5" width="959" height="429" fill="#12161C" stroke="#2A313D"/>
+  <rect x="1" y="1" width="958" height="428" fill="url(#arch-grid)"/>
+
+  <!-- Top stage header rail -->
+  <line x1="20" y1="54" x2="940" y2="54" stroke="#2A313D" stroke-width="1"/>
+
+  <!-- Stage 1 header -->
+  <text x="28" y="34" class="mono stage-title">1. Unified Field DAG</text>
+  <text x="28" y="48" class="sans stage-sub">Immutable Arc graph · v2 JSON</text>
+
+  <!-- Stage 2 header -->
+  <text x="268" y="34" class="mono stage-title">2. CSE Compiler</text>
+  <text x="268" y="48" class="sans stage-sub">Flat tape · 8×8×8 pruning · Dual3</text>
+
+  <!-- Stage 3 header -->
+  <text x="518" y="34" class="mono stage-title">3. VoxelPipeline</text>
+  <text x="518" y="48" class="sans stage-sub">Demand-driven channels &amp; passes</text>
+
+  <!-- Stage 4 header -->
+  <text x="772" y="34" class="mono stage-title">4. Targets</text>
+  <text x="772" y="48" class="sans stage-sub">One rasterizer · 7 bindings</text>
+
+  <!-- ==================== STAGE 1: FIELD DAG ==================== -->
+  <!-- Primitives -->
+  <rect x="28" y="72" width="204" height="52" fill="#161A21" stroke="#2A313D"/>
+  <rect x="28" y="72" width="3" height="52" fill="#5FD1BC"/>
+  <text x="40" y="94" class="mono node-title">21 Primitives + Heightmap</text>
+  <text x="40" y="111" class="sans node-sub">sphere, box, torus, cone, plane…</text>
+
+  <!-- Noise & Worley (SHARED HIGHLIGHT!) -->
+  <rect x="28" y="138" width="204" height="62" fill="rgba(242, 205, 135, 0.13)" stroke="#F2CD87" stroke-width="1.2"/>
+  <text x="40" y="159" class="mono node-title" fill="#F2CD87">Shared Noise &amp; Worley</text>
+  <text x="40" y="175" class="sans node-sub">Value, Perlin, FBM, Ridged, Cells</text>
+  <text x="40" y="191" class="mono pill" fill="#F2CD87">evaluated once per voxel</text>
+
+  <!-- CSG & Transforms -->
+  <rect x="28" y="214" width="204" height="52" fill="#161A21" stroke="#2A313D"/>
+  <rect x="28" y="214" width="3" height="52" fill="#8AB8FF"/>
+  <text x="40" y="236" class="mono node-title">CSG, Warps &amp; Tags</text>
+  <text x="40" y="253" class="sans node-sub">smooth, chamfer, steps, polar, tag()</text>
+
+  <!-- Infix Expr -->
+  <rect x="28" y="280" width="204" height="62" fill="rgba(201, 182, 255, 0.13)" stroke="#C9B6FF" stroke-width="1.1"/>
+  <text x="40" y="301" class="mono node-title" fill="#C9B6FF">Field.expr / ExprBuilder</text>
+  <text x="40" y="317" class="sans node-sub">Infix math, bounded for loops,</text>
+  <text x="40" y="332" class="sans node-sub">bound Field calls, Dual3 autodiff</text>
+
+  <!-- v2 JSON bar -->
+  <rect x="28" y="356" width="204" height="44" fill="#1B2029" stroke="#2A313D" stroke-dasharray="4 3"/>
+  <text x="40" y="376" class="mono node-title">FieldGraph v2 JSON</text>
+  <text x="40" y="391" class="sans node-sub">Deduplicated DAG · 1 MiB safe cap</text>
+
+  <!-- Connectors 1 -> 2 -->
+  <path d="M 232 98 L 249 98 L 249 132 L 264 132" fill="none" stroke="#3D4657" stroke-width="1.4" marker-end="url(#arrow-muted)"/>
+  <path d="M 232 169 L 264 169" fill="none" stroke="#F2CD87" stroke-width="1.6" marker-end="url(#arrow-gold)"/>
+  <path d="M 232 240 L 249 240 L 249 195 L 264 195" fill="none" stroke="#3D4657" stroke-width="1.4" marker-end="url(#arrow-muted)"/>
+  <path d="M 232 311 L 254 311 L 254 215 L 264 215" fill="none" stroke="#C9B6FF" stroke-width="1.4" marker-end="url(#arrow-muted)"/>
+
+  <!-- ==================== STAGE 2: CSE COMPILER ==================== -->
+  <rect x="268" y="72" width="206" height="176" fill="#161A21" stroke="#5FD1BC" stroke-width="1.3"/>
+  <rect x="268" y="72" width="206" height="28" fill="rgba(95, 209, 188, 0.12)"/>
+  <text x="282" y="90" class="mono node-title" fill="#5FD1BC">CompiledGraph (CSE)</text>
+
+  <!-- Instruction tape rows -->
+  <rect x="282" y="110" width="178" height="24" fill="#1B2029" stroke="#2A313D"/>
+  <text x="290" y="126" class="mono pill" fill="#DCE1E9">[0] PerlinFbm3 @ p_world</text>
+
+  <rect x="282" y="140" width="178" height="24" fill="#1B2029" stroke="#2A313D"/>
+  <text x="290" y="156" class="mono pill" fill="#DCE1E9">[1] Ellipsoid + 1.7·[0]</text>
+
+  <rect x="282" y="170" width="178" height="24" fill="#1B2029" stroke="#2A313D"/>
+  <text x="290" y="186" class="mono pill" fill="#DCE1E9">[2] SmoothUnion([1], …)</text>
+
+  <rect x="282" y="200" width="178" height="36" fill="rgba(242, 205, 135, 0.13)" stroke="#F2CD87"/>
+  <text x="290" y="216" class="mono pill" fill="#F2CD87">Material reuses [0]</text>
+  <text x="290" y="230" class="sans node-sub">Zero redundant noise evals</text>
+
+  <!-- 8x8x8 Brick Pruner card -->
+  <rect x="268" y="262" width="206" height="66" fill="#161A21" stroke="#2A313D"/>
+  <!-- mini 3x2 brick grid icon -->
+  <g transform="translate(282, 276)">
+    <rect x="0" y="0" width="14" height="14" fill="rgba(242, 153, 153, 0.13)" stroke="#F29999"/>
+    <rect x="17" y="0" width="14" height="14" fill="rgba(95, 209, 188, 0.12)" stroke="#5FD1BC"/>
+    <rect x="34" y="0" width="14" height="14" fill="rgba(242, 153, 153, 0.13)" stroke="#F29999"/>
+    <rect x="0" y="17" width="14" height="14" fill="rgba(95, 209, 188, 0.12)" stroke="#5FD1BC"/>
+    <rect x="17" y="17" width="14" height="14" fill="rgba(95, 209, 188, 0.28)" stroke="#5FD1BC"/>
+    <rect x="34" y="17" width="14" height="14" fill="rgba(95, 209, 188, 0.12)" stroke="#5FD1BC"/>
+  </g>
+  <text x="342" y="286" class="mono node-title">8×8×8 Interval</text>
+  <text x="342" y="302" class="mono node-title">Brick Pruner</text>
+  <text x="342" y="318" class="sans node-sub">Skips empty air in O(1)</text>
+
+  <!-- Dual3 Autodiff card -->
+  <rect x="268" y="340" width="206" height="60" fill="#161A21" stroke="#2A313D"/>
+  <rect x="268" y="340" width="3" height="60" fill="#8AB8FF"/>
+  <text x="282" y="362" class="mono node-title">Dual3 Autodiff Normals</text>
+  <text x="282" y="378" class="sans node-sub">Analytic ∇f for primitives, CSG,</text>
+  <text x="282" y="392" class="sans node-sub">and Expr · ULP-safe fallback</text>
+
+  <!-- Connectors 2 -> 3 -->
+  <path d="M 474 160 L 514 160" fill="none" stroke="#5FD1BC" stroke-width="1.8" marker-end="url(#arrow-accent)"/>
+  <path d="M 474 295 L 495 295 L 495 190 L 514 190" fill="none" stroke="#3D4657" stroke-width="1.4" marker-end="url(#arrow-muted)"/>
+  <path d="M 474 370 L 501 370 L 501 232 L 514 232" fill="none" stroke="#8AB8FF" stroke-width="1.4" marker-end="url(#arrow-muted)"/>
+
+  <!-- ==================== STAGE 3: VOXEL PIPELINE ==================== -->
+  <rect x="518" y="72" width="212" height="328" fill="#161A21" stroke="#3D4657" stroke-width="1.2"/>
+  <rect x="518" y="72" width="212" height="28" fill="#1B2029"/>
+  <text x="532" y="90" class="mono node-title">CompiledPipeline Passes</text>
+
+  <!-- Pass 1 -->
+  <rect x="532" y="112" width="184" height="50" fill="#1B2029" stroke="#2A313D"/>
+  <text x="542" y="131" class="mono node-title">1. Occupancy &amp; Tags</text>
+  <text x="542" y="148" class="sans node-sub">Parallel tiles · d ≤ 0 + tag_id</text>
+
+  <!-- Pass 2 -->
+  <rect x="532" y="172" width="184" height="58" fill="rgba(95, 209, 188, 0.12)" stroke="#5FD1BC"/>
+  <text x="542" y="191" class="mono node-title" fill="#5FD1BC">2. Demand Channels</text>
+  <text x="542" y="207" class="sans node-sub">Only computes Slope, Depth,</text>
+  <text x="542" y="221" class="sans node-sub">Curvature, Faces if referenced</text>
+
+  <!-- Pass 3 -->
+  <rect x="532" y="240" width="184" height="50" fill="#1B2029" stroke="#2A313D"/>
+  <text x="542" y="259" class="mono node-title">3. Material Tree</text>
+  <text x="542" y="276" class="sans node-sub">Layers, MatchTag seam dither</text>
+
+  <!-- Pass 4 -->
+  <rect x="532" y="300" width="184" height="40" fill="rgba(138, 184, 255, 0.13)" stroke="#8AB8FF"/>
+  <text x="542" y="318" class="mono node-title" fill="#8AB8FF">4. FluidLayer</text>
+  <text x="542" y="332" class="sans node-sub">Fill air below Y or Field ≤ 0</text>
+
+  <!-- Pass 5 -->
+  <rect x="532" y="350" width="184" height="40" fill="#1B2029" stroke="#2A313D"/>
+  <text x="542" y="368" class="mono node-title">5. ScatterRule</text>
+  <text x="542" y="382" class="sans node-sub">Top / Bottom / Side props</text>
+
+  <!-- Connectors 3 -> 4 -->
+  <path d="M 730 160 L 750 160 L 750 112 L 768 112" fill="none" stroke="#5FD1BC" stroke-width="1.6" marker-end="url(#arrow-accent)"/>
+  <path d="M 730 220 L 768 220" fill="none" stroke="#5FD1BC" stroke-width="1.6" marker-end="url(#arrow-accent)"/>
+  <path d="M 730 290 L 750 290 L 750 326 L 768 326" fill="none" stroke="#5FD1BC" stroke-width="1.6" marker-end="url(#arrow-accent)"/>
+
+  <!-- ==================== STAGE 4: OUTPUT TARGETS ==================== -->
+  <!-- Schematic -->
+  <rect x="772" y="72" width="164" height="84" fill="#161A21" stroke="#2A313D"/>
+  <rect x="772" y="72" width="164" height="3" fill="#5FD1BC"/>
+  <text x="786" y="98" class="mono node-title">UniversalSchematic</text>
+  <text x="786" y="116" class="sans node-sub">to_schematic()</text>
+  <text x="786" y="132" class="sans node-sub">.litematic · .schem ·</text>
+  <text x="786" y="146" class="sans node-sub">.nbt · GLB · GPU render</text>
+
+  <!-- BuildingTool -->
+  <rect x="772" y="176" width="164" height="84" fill="#161A21" stroke="#2A313D"/>
+  <rect x="772" y="176" width="164" height="3" fill="#F2CD87"/>
+  <text x="786" y="202" class="mono node-title">BuildingTool</text>
+  <text x="786" y="220" class="sans node-sub">run_pipeline() &amp; fill()</text>
+  <text x="786" y="236" class="sans node-sub">KeepExisting / ReplaceOnly</text>
+  <text x="786" y="250" class="sans node-sub">Brush.field() &amp; SdfShape</text>
+
+  <!-- WorldGenerator -->
+  <rect x="772" y="280" width="164" height="120" fill="#161A21" stroke="#2A313D"/>
+  <rect x="772" y="280" width="164" height="3" fill="#8AB8FF"/>
+  <text x="786" y="306" class="mono node-title">WorldGenerator</text>
+  <text x="786" y="324" class="sans node-sub">pipeline() · sdf()</text>
+  <text x="786" y="340" class="sans node-sub">cellular_sdf()</text>
+  <line x1="786" y1="354" x2="922" y2="354" stroke="#2A313D"/>
+  <text x="786" y="372" class="mono pill" fill="#5FD1BC">Rust · Py · JS/WASM</text>
+  <text x="786" y="388" class="mono pill" fill="#8A93A3">C · C++ · Kotlin · PHP</text>
+</svg>

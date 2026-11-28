@@ -1,5 +1,6 @@
 let controllers = [];
 let visibilityCleanups = [];
+let playgroundHandle;
 let themeObserver;
 let generation = 0;
 let modelViewerPromise;
@@ -32,6 +33,22 @@ async function loadSdfSurface(runtime) {
   }
 }
 
+async function mountPlaygroundsIfPresent() {
+  if (
+    document.querySelector("[data-sdf-workbench]") === null &&
+    document.querySelector("[data-sdf-csg-lab]") === null
+  ) {
+    return undefined;
+  }
+  try {
+    const mod = await import("./sdf-playground.js");
+    return await mod.mountSdfPlaygrounds(ensureModelViewer);
+  } catch (error) {
+    console.warn("Could not initialize the interactive SDF playground.", error);
+    return undefined;
+  }
+}
+
 function activeKineglyphTheme(runtime) {
   const scheme = document.body.getAttribute("data-md-color-scheme");
   return runtime.themes[scheme === "vellum" ? "nucleation-light" : "nucleation-dark"];
@@ -40,6 +57,7 @@ function activeKineglyphTheme(runtime) {
 function applyKineglyphTheme(runtime) {
   const theme = activeKineglyphTheme(runtime);
   for (const controller of controllers) controller.setTheme(theme);
+  playgroundHandle?.onThemeChange?.();
 }
 
 async function mountKineglyphPage() {
@@ -49,11 +67,20 @@ async function mountKineglyphPage() {
   for (const cleanup of visibilityCleanups) cleanup();
   visibilityCleanups = [];
   themeObserver?.disconnect();
+  playgroundHandle?.destroy?.();
+  playgroundHandle = undefined;
   for (const controller of controllers) controller.destroy();
   controllers = [];
 
-  const runtime = await import("./vendor/kineglyph-web.js");
-  if (current !== generation) return;
+  const [runtime, nextPlaygrounds] = await Promise.all([
+    import("./vendor/kineglyph-web.js"),
+    mountPlaygroundsIfPresent(),
+  ]);
+  if (current !== generation) {
+    nextPlaygrounds?.destroy?.();
+    return;
+  }
+  playgroundHandle = nextPlaygrounds;
 
   const sdfSurface = await loadSdfSurface(runtime);
   if (current !== generation) return;
